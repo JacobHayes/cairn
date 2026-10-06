@@ -28,8 +28,8 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 2.5 | Gravity, leverage, rank | `crates/engine` | 2.4 |  |
 | 2.6 | Projections | `crates/engine` | 2.5 |  |
 | 2.7 | Route files, upgrade, save-as-route, re-link, proposal documents | `crates/engine` | 2.6 |  |
-| 3.1 | Store trait, memory and Turso backends, conformance suite | `crates/store`, `crates/store-turso` | 1.2 (beside phase 2) | in progress |
-| 3.2 | Auth providers, users, identities, agent tokens | `crates/auth` | 3.1 | in progress |
+| 3.1 | Store trait, memory and Turso backends, conformance suite | `crates/store`, `crates/store-turso` | 1.2 (beside phase 2) | landed `tvlztrmq` |
+| 3.2 | Auth providers, users, identities, agent tokens | `crates/auth` | 3.1 | landed `nspnswuo` |
 | 4.1 | Service layer, composition root, capabilities, notifier | `crates/service` | 2.7, 3.1 |  |
 | 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 |  |
 | 4.3 | MCP server and shipped instructions | `crates/mcp`, `instructions/` | 4.2 |  |

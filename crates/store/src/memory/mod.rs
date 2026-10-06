@@ -16,7 +16,7 @@ use std::sync::{Mutex, MutexGuard, PoisonError};
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    ConversationId, Domain, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal,
+    ConversationId, Domain, Email, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal,
     ProposalId, Revision, RevisionConflict, RevisionOf, Slug, Timestamp, Title, TouchedSet, UserId,
 };
 
@@ -431,6 +431,13 @@ impl AuthStore for MemoryStore {
         user: &UserId,
     ) -> impl Future<Output = Result<Vec<IdentityRecord>, StoreError>> + Send {
         ready(Ok(self.state().outside.identities_of(user)))
+    }
+
+    fn identities_with_email(
+        &self,
+        email: &Email,
+    ) -> impl Future<Output = Result<Vec<IdentityRecord>, StoreError>> + Send {
+        ready(Ok(self.state().outside.identities_with_email(email)))
     }
 
     fn remove_identity(

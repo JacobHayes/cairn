@@ -25,8 +25,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::path::Path;
 
 use cairn_schema::{
-    ConversationId, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal, ProposalId,
-    Revision, RouteId, Slug, Timestamp, Title, UserId,
+    ConversationId, Email, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal,
+    ProposalId, Revision, RouteId, Slug, Timestamp, Title, UserId,
 };
 use cairn_store::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, AuthStore, Commit, CommitError, Committed,
@@ -231,6 +231,13 @@ impl AuthStore for TursoStore {
 
     async fn identities_of(&self, user: &UserId) -> Result<Vec<IdentityRecord>, StoreError> {
         read!(self, connection => records::identities_of(connection, user))
+    }
+
+    async fn identities_with_email(
+        &self,
+        email: &Email,
+    ) -> Result<Vec<IdentityRecord>, StoreError> {
+        read!(self, connection => records::identities_with_email(connection, email))
     }
 
     async fn remove_identity(&self, provider: &Slug, subject: &Title) -> Result<bool, StoreError> {

@@ -133,6 +133,39 @@ pub async fn auth_records_round_trip<B: Backend>(backend: &B) {
     }
 }
 
+/// H3: identities are found by a verified email, across providers and users, and an
+/// identity's emails are replaced by a put rather than accumulated.
+pub async fn identities_are_found_by_verified_email<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    for key in ["u_ann", "u_bob"] {
+        store.put_user(user(key)).await.unwrap();
+    }
+    let mut work = identity("oidc", "sub-1", "u_ann");
+    let mut tailnet = identity("tailscale", "ann@tailnet", "u_ann");
+    let mut other = identity("oidc", "sub-2", "u_bob");
+    work.verified_emails = BTreeSet::from([id("ann@example.org"), id("a@example.org")]);
+    tailnet.verified_emails = BTreeSet::from([id("ann@example.org")]);
+    other.verified_emails = BTreeSet::from([id("bob@example.org")]);
+    for held in [&work, &tailnet, &other] {
+        store.put_identity(held.clone()).await.unwrap();
+    }
+    let with = |email: &'static str| {
+        let store = &store;
+        async move { store.identities_with_email(&id(email)).await.unwrap() }
+    };
+    assert_eq!(
+        with("ann@example.org").await,
+        vec![work.clone(), tailnet.clone()]
+    );
+    assert_eq!(with("bob@example.org").await, vec![other]);
+    assert_eq!(with("nobody@example.org").await, Vec::new());
+
+    work.verified_emails = BTreeSet::from([id("a@example.org")]);
+    store.put_identity(work.clone()).await.unwrap();
+    assert_eq!(with("ann@example.org").await, vec![tailnet]);
+    assert_eq!(with("a@example.org").await, vec![work]);
+}
+
 /// Transient OAuth state is used once, and sessions and state are gone once expired.
 pub async fn oauth_state_is_taken_once_and_expired_records_go<B: Backend>(backend: &B) {
     let store = open(backend).await;

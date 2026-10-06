@@ -2,6 +2,27 @@
 
 Judgment calls made while implementing the briefs, for the user to review (`AGENTS.md`, Decide, record, keep going). Newest first. Each entry: date, brief, the question, the call, the alternatives, and what would change it.
 
+## 2026-10-06, brief 3.2: a Tailscale login name is a verified email
+
+- Question: H3 matches users to entities by verified email, and a provider lists only emails its issuer marks verified. Tailscale's whois and its `Tailscale-User-Login` header give a login name, with no verified flag.
+- Call: the login name is listed as a verified email when it has an email's shape. Every tailnet login was authenticated by the tailnet's identity provider (Tailscale has no passwords of its own), so the login is as verified as that provider's email; a login that is not an address in practice (`someone@github`) matches no entity email anyone would write. A tagged node (a machine, not a person) signs no one in. The identity's subject is the login name in both modes, so direct and proxy mode name the same identity.
+- Alternatives: no verified emails from Tailscale (a Tailscale-only deployment would have no "mine", H3); Tailscale's numeric user id as the subject (proxy mode's headers do not carry it).
+- What would change it: a tailnet whose identity provider does not verify emails, which would then need this provider's verified emails off.
+
+## 2026-10-06, brief 3.2: the built-in OAuth server stores no clients and issues agent tokens
+
+- Question: dynamic client registration (I2) needs registered clients somewhere, but the store's records outside the domains (3.1) have no client record; and the OAuth flow's access token needs a meaning in Cairn's terms (H2: an agent acting for a user).
+- Call: a client id is its registration (name and redirect URIs) encoded as base64url JSON, checked again on every use exactly as at registration (redirect URIs https or loopback http, no fragment, public clients only, the whole within `body_bytes_max`, the nearest named limit). Registration is open to anyone, so a stored record would vouch for nothing a forged id could not claim; the redirect URI checks and the consent page are what protect a user. The token endpoint's access token is an agent token for the user who allowed the client, named after it, listed with their tokens and revocable there; like every agent token it lasts until revoked, so there is no refresh token. The consent step and the code are transient OAuth state stored by digest (the step as login state, a pending browser step), single use, for 10 minutes and 60 seconds. No store change.
+- Alternatives: a client table in the store (a schema migration and a conformance case for records that protect nothing); short-lived access tokens with refresh tokens (a second token type and rotation, for clients that the user can already revoke); no consent page (any site could silently obtain a token for a user whose browser is signed in or on the tailnet).
+- What would change it: a client registered with a secret or with metadata a user must be shown that the id cannot carry, or a need to list registered clients.
+
+## 2026-10-06, brief 3.2: a provider answers a verdict, and every provider hears every request
+
+- Question: ARCHITECTURE (Auth) has a provider return an identity or nothing, and the brief requires that a failing provider never falls through to a weaker one. Agent tokens name an actor (a user and an agent), not an identity; and with providers running together, "weaker" has no defined order.
+- Call: `AuthProvider::authenticate` answers a `Verdict`: absent (nothing of this provider's in the request), an identity (resolved to a user), an actor (Cairn's own agent tokens), or refused (its own credential, presented and bad, or a local-only credential from another machine). The layer puts every request to the session cookie and to every configured provider; any refusal refuses the request (401, 403, or 503 when the store or an identity provider failed); otherwise the session, then the first provider in configured order with a credential, names the actor. An `Authorization` header that is not a bearer token some provider claims (by prefix: Cairn's own secrets start `cairn_`) is refused, so a mistyped token is never silently ignored in favor of an ambient identity. ARCHITECTURE's Auth section says so.
+- Alternatives: first answer wins in configured order (a bad bearer token from a tailnet peer would be ignored when Tailscale is listed first); a fixed strength order among providers (no such order exists between, say, OIDC sessions and Tailscale); refusing when two good credentials name different users (breaks the dev token beside the named dev user, and adds a rule no requirement asks for).
+- What would change it: a provider whose whois or lookup is too slow to ask on every request, which would then be asked only when no earlier credential answered.
+
 ## 2026-10-06, brief 2.2: the membership-loss flag is derived from the breakdown's shape, not stored
 
 - Question: B10 flags "a child whose seeding entity later leaves the role" after the assisted one-child-per-member breakdown, which writes explicit per-member participations. Nothing stored records which role seeded a child, and no brief adds such a record.

@@ -2,7 +2,7 @@
 
 use std::collections::BTreeMap;
 
-use cairn_schema::{AgentId, ConversationId, Slug, Timestamp, Title, UserId};
+use cairn_schema::{AgentId, ConversationId, Email, Slug, Timestamp, Title, UserId};
 
 use crate::backend;
 use crate::commit::StoreError;
@@ -60,6 +60,14 @@ impl Outside {
             .values()
             .filter(|identity| identity.user == *user);
         mine.cloned().collect()
+    }
+
+    pub fn identities_with_email(&self, email: &Email) -> Vec<IdentityRecord> {
+        let verified = self
+            .identities
+            .values()
+            .filter(|identity| identity.verified_emails.contains(email));
+        verified.cloned().collect()
     }
 
     pub fn remove_identity(&mut self, provider: &Slug, subject: &Title) -> bool {

@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{ConversationId, Slug, Timestamp, Title, UserId};
+use cairn_schema::{ConversationId, Email, Slug, Timestamp, Title, UserId};
 use cairn_store::backend;
 use cairn_store::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
@@ -143,6 +143,16 @@ pub(crate) async fn identities_of(
     user: &UserId,
 ) -> Result<Vec<IdentityRecord>, StoreError> {
     identities(connection, "user_id = ?1", vec![text(user)]).await
+}
+
+pub(crate) async fn identities_with_email(
+    connection: &Connection,
+    email: &Email,
+) -> Result<Vec<IdentityRecord>, StoreError> {
+    let filter = "EXISTS (SELECT 1 FROM identity_emails AS verified \
+                  WHERE verified.provider = user_identities.provider \
+                  AND verified.subject = user_identities.subject AND verified.email = ?1)";
+    identities(connection, filter, vec![text(email)]).await
 }
 
 pub(crate) async fn remove_identity(

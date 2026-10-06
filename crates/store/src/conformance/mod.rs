@@ -119,6 +119,7 @@ macro_rules! conformance_suite {
             queries::events_filter_by_journey_node_user_type_patch_and_time,
             queries::text_search_hits_names_nodes_notes_and_resources,
             records::auth_records_round_trip,
+            records::identities_are_found_by_verified_email,
             records::oauth_state_is_taken_once_and_expired_records_go,
             records::agent_tokens_are_found_by_digest_and_revoked_by_a_put,
             records::the_auth_log_appends_in_order_and_pages_by_user,

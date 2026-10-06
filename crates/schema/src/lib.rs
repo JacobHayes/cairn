@@ -18,6 +18,7 @@ pub mod event;
 pub mod field;
 pub mod graph;
 pub mod id;
+pub mod identity;
 pub mod json_schema;
 pub mod limits;
 pub mod node;
@@ -66,6 +67,7 @@ pub use id::{
     NodeKey, PatchId, Path, Prefixed, ProposalId, RoleKey, RouteId, SequentialKeys, Slug, UserId,
     mint,
 };
+pub use identity::Identity;
 pub use jiff::Timestamp;
 pub use jiff::civil::Date;
 pub use limits::{Limit, LimitExceeded};

@@ -1,0 +1,37 @@
+[package]
+name = "cairn-auth"
+description = "Auth providers (dev, OIDC, the built-in OAuth server, Tailscale), users, identities, and agent tokens, with the axum layer the API and MCP endpoints sit behind."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+axum.workspace = true
+base64.workspace = true
+cairn-schema.workspace = true
+cairn-store.workspace = true
+chrono.workspace = true
+cookie.workspace = true
+getrandom.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util.workspace = true
+jiff.workspace = true
+openidconnect.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+sha2.workspace = true
+subtle.workspace = true
+tokio = { workspace = true, features = ["net", "rt", "sync", "time"] }
+url.workspace = true
+
+[dev-dependencies]
+ed25519-dalek.workspace = true
+tokio = { workspace = true, features = ["macros", "net", "rt"] }
+tower.workspace = true
+
+[lints]
+workspace = true

@@ -5,8 +5,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;
 
 use cairn_schema::{
-    ConversationId, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal, ProposalId,
-    Revision, RouteId, Slug, Timestamp, Title, UserId,
+    ConversationId, Email, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal,
+    ProposalId, Revision, RouteId, Slug, Timestamp, Title, UserId,
 };
 
 use crate::commit::{Commit, CommitError, Committed, StoreError};
@@ -131,6 +131,13 @@ pub trait AuthStore: Send + Sync {
     fn identities_of(
         &self,
         user: &UserId,
+    ) -> impl Future<Output = Result<Vec<IdentityRecord>, StoreError>> + Send;
+
+    /// H3: the identities whose provider marked `email` verified, by provider and subject:
+    /// what auto-linking a new identity on a matching verified email looks for (3.2).
+    fn identities_with_email(
+        &self,
+        email: &Email,
     ) -> impl Future<Output = Result<Vec<IdentityRecord>, StoreError>> + Send;
 
     /// Removes an identity; whether there was one.

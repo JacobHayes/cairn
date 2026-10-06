@@ -322,7 +322,7 @@ Structural changes become proposals; state changes the user asks for apply direc
 
 ## Auth
 
-`AuthProvider` is one trait: given a request, return an `Identity { provider, subject, display, verified_emails }` or nothing; a provider lists only emails its issuer marks verified. Providers are configured independently and can run together.
+`AuthProvider` is one trait: given a request, return an `Identity { provider, subject, display, verified_emails }`, the actor a credential Cairn issued itself names (an agent token), nothing, or a refusal; a provider lists only emails its issuer marks verified. Providers are configured independently and can run together: a request is put to its session cookie and to every provider, any refusal refuses it (a failing credential never falls through to another provider), and otherwise the session, then the first provider in configured order with a credential, names the actor (DECISIONS.md).
 
 | Provider | Mechanism |
 |---|---|
