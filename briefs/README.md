@@ -2,7 +2,7 @@
 
 A brief is an implementation milestone: what to build next, in what order, and how to show it works. It points into `PRD.md`, `ARCHITECTURE.md`, and `PRACTICES.md` by requirement id and section heading and does not restate them; where a brief and a document disagree, the document wins (`AGENTS.md`).
 
-Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase, steps run in order unless the table says otherwise.
+Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase, steps run in order unless the table says otherwise. 4.8 and 4.9 finish what 4.1 and 4.2 start once the engine is complete, so they run before 4.3 and 4.5, which depend on them (DECISIONS.md).
 
 ## Template
 
@@ -30,13 +30,15 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 2.7 | Route files, upgrade, save-as-route, re-link, proposal documents | `crates/engine` | 2.6 |  |
 | 3.1 | Store trait, memory and Turso backends, conformance suite | `crates/store`, `crates/store-turso` | 1.2 (beside phase 2) | landed `tvlztrmq` |
 | 3.2 | Auth providers, users, identities, agent tokens | `crates/auth` | 3.1 | landed `nspnswuo` |
-| 4.1 | Service layer, composition root, capabilities, notifier | `crates/service` | 2.7, 3.1 |  |
+| 4.1 | Service layer, composition root, capabilities, notifier | `crates/service`, `crates/store` (notifier) | 2.4, 3.1 | in progress |
 | 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 |  |
-| 4.3 | MCP server and shipped instructions | `crates/mcp`, `instructions/` | 4.2 |  |
+| 4.3 | MCP server and shipped instructions | `crates/mcp`, `instructions/` | 4.9 |  |
 | 4.4 | Assistant | `crates/assistant` | 4.3 |  |
-| 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.2 |  |
+| 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.9 |  |
 | 4.6 | Web client and app shell | `web/client`, `web/app` | 4.5 |  |
 | 4.7 | The binary | `crates/cairn` | 4.4, 4.6 |  |
+| 4.8 | Service completion: priority, projections, proposals, route files | `crates/service` | 2.7, 4.1 |  |
+| 4.9 | HTTP API completion: projections, proposals, route files | `crates/api`, `openapi/`, `web/client` | 4.8, 4.2 |  |
 | 5.1 | Node detail and explanations; notes, links, artifacts | `web/app` | 4.6 |  |
 | 5.2 | Canvas, semantic zoom, trace, layout | `web/app` | 5.1 |  |
 | 5.3 | List, next, triage, decision walkthrough | `web/app` | 5.2 |  |
@@ -57,10 +59,12 @@ flowchart LR
     s11[1.1] --> s12[1.2] --> s21[2.1] --> s22[2.2] --> s23[2.3] --> s24[2.4] --> s25[2.5] --> s26[2.6] --> s27[2.7]
     s11 -.-> s13[1.3]
     s12 --> s31[3.1] --> s32[3.2]
-    s27 & s31 --> s41[4.1] --> s42[4.2]
+    s24 & s31 --> s41[4.1] --> s42[4.2]
     s32 --> s42
-    s42 --> s43[4.3] --> s44[4.4]
-    s42 --> s45[4.5] --> s46[4.6]
+    s27 & s41 --> s48[4.8]
+    s48 & s42 --> s49[4.9]
+    s49 --> s43[4.3] --> s44[4.4]
+    s49 --> s45[4.5] --> s46[4.6]
     s44 & s46 --> s47[4.7]
     s46 --> s51[5.1] --> s52[5.2] --> s53[5.3] --> s55[5.5] --> s56[5.6] --> s57[5.7] --> s58[5.8]
     s52 --> s54[5.4]
@@ -91,24 +95,24 @@ Every PRD requirement id and named section, mapped to the brief that owns its ac
 | A10 | 2.6 | 1.2, 5.1 |
 | A11 | 4.1 | 2.1, 5.5 |
 | A12 | 5.6 | 4.1, 4.3, 4.4 |
-| A13 | 2.7 | 2.1 (fixtures load), 4.1, 4.2, 5.5 |
+| A13 | 2.7 | 2.1 (fixtures load), 4.8, 4.9, 5.5 |
 | A15, A16, A17, A18 | 2.1 | 1.2, 4.1, 4.2 |
 | A19 | 4.1 | 3.1, 5.5 |
 | B1, B2, B3, B5, B10, B11 | 2.1 | 2.2, 4.1, 5.3, 5.5, 5.6 |
 | B4 | 2.1 | 5.6, 2.7 |
 | B6 | 2.4 | 2.1, 5.3 |
-| B7, B8, B9 | 2.7 | 5.7 |
+| B7, B8, B9 | 2.7 | 4.8, 4.9, 5.7 |
 | B12 | none (reserved) | - |
 | C1, C3, C4, C5, C6, C7, C15 | 5.2 | 2.6 |
 | C2 | 2.6 (roll-up rules) | 5.2 |
 | C8 | 5.1 | 2.6 |
 | C9, C10, C11 | 5.3 | 2.6 |
 | C12, C13, C18 | 5.4 | 2.6 |
-| C14 | 5.7 | 2.7, 4.1 |
+| C14 | 5.7 | 2.7, 4.8, 4.9 |
 | C16, C17 | 5.5 | 3.1, 2.6 |
 | D1, D1a | 2.1 | 2.2 |
 | D2, D4, D5, D7 | 2.4 | 2.1, 4.1, 4.6 |
-| D3, D6 | 2.2 (the `Derived` struct) | every engine brief; 4.1 |
+| D3, D6 | 2.2 (the `Derived` struct) | every engine brief; 4.8 (memoized reads) |
 | E1, E2, E5 | 2.2 | - |
 | E3 | 2.1 | 5.1 |
 | E4 | 2.6 | 2.2 |
@@ -118,22 +122,22 @@ Every PRD requirement id and named section, mapped to the brief that owns its ac
 | G3 | 2.6 | 5.1 |
 | H1, H4 | 3.2 | 4.1 |
 | H3 | 4.1 | 3.2 (verified emails), 2.2, 5.5 |
-| H2 | 4.1 | 3.2, 4.4 |
+| H2 | 4.1 (the actor), 4.8 (the confirming user) | 3.2, 4.4 |
 | H5 | 3.1 | 1.2, 2.1, 4.1, 4.2, 6.1 |
 | H6 | 4.6 | 4.1, 4.2, 4.5, 5.5, 6.1 |
-| I1 | 4.2 | - |
-| I2, I4, I7 | 4.3 | 3.2 |
-| I3 | 2.6 | 4.2, 4.3 |
+| I1 | 4.2 | 4.9 |
+| I2, I4, I7 | 4.3 | 3.2, 4.8 (I7) |
+| I3 | 2.6 | 4.8, 4.9, 4.3 |
 | I5 | 4.4 | 5.8 |
-| I6 | 4.1 | 2.7, 5.7 |
+| I6 | 4.8 | 2.7, 4.9, 5.7 |
 | J1, J2, J3 | 2.1 | 3.1, 6.1, 6.2 |
 | J4 | 2.6 | 5.1 |
 | J5 | 3.1 | 4.2 |
 | Non-functional: Config-first | 5.6 | 4.4 |
-| Non-functional: Journey durability | 4.1 | 2.7 |
+| Non-functional: Journey durability | 4.1 (publishing never touches journeys), 4.8 (an upgrade only once confirmed) | 2.7 |
 | Non-functional: Structured storage | 3.1 | - |
 | Non-functional: Small-team scale | 2.3 (cost test at the limits) | every engine brief |
 | Non-functional: Deployable, Observable | 4.7 | 4.2 |
-| Non-functional: Portable data | 2.7 (route file round trip, save as route) | - |
+| Non-functional: Portable data | 2.7 (route file round trip, save as route) | 4.8 |
 | Non-functional: Domain-free, Naming in code | review of every brief | - |
 | Illustrative example | 1.2 (fixtures) | every engine brief |
