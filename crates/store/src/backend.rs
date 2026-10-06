@@ -88,10 +88,20 @@ impl Shape {
         Ok(shape)
     }
 
+    /// Whether an entity an event of `event_type` puts is a new one: an entity create, or a
+    /// proposal applied to a journey or route, whose mutations may create entities (they ride
+    /// in any patch) but never edit one (deployment only).
+    fn creates_entity(&self, event_type: EventType) -> bool {
+        event_type == EventType::EntityCreated
+            || (event_type == EventType::ProposalApplied && self.domain != Domain::Deployment)
+    }
+
     fn classify(&mut self, write: &Write, event_type: EventType) -> Result<(), StoreError> {
         let key = match write {
             Write::Put(record) => {
-                if let (Record::Entity(entity), EventType::EntityCreated) = (record, event_type) {
+                if let Record::Entity(entity) = record
+                    && self.creates_entity(event_type)
+                {
                     self.created_entities.insert(entity.key.clone());
                 }
                 record.key()
@@ -118,8 +128,8 @@ impl Shape {
         if key.domain() == self.domain {
             return Ok(());
         }
-        let riding_create = matches!(write, Write::Put(Record::Entity(_)))
-            && event_type == EventType::EntityCreated;
+        let riding_create =
+            matches!(write, Write::Put(Record::Entity(_))) && self.creates_entity(event_type);
         let own_deletion = matches!(
             (write, &self.domain),
             (Write::Put(Record::DeletedJourney { journey, .. }), Domain::Journey(target)) if journey == target
@@ -778,6 +788,23 @@ mod tests {
         let shape = Shape::of(&riding).unwrap();
         assert!(shape.bumps_deployment);
         assert_eq!(shape.created_entities, BTreeSet::from([id("e_new")]));
+
+        // A proposal applied to a journey may create entities its mutations carry (the
+        // fixtures' bake-off does), and they ride the same way.
+        let applied = build::journey_patch("p_four", "j_one", 1)
+            .event(
+                EventType::ProposalApplied,
+                Subject::Journey(id("j_one")),
+                vec![Write::Put(Record::Entity(build::entity(
+                    "e_proposed",
+                    "Proposed",
+                    &[],
+                )))],
+            )
+            .commit();
+        let shape = Shape::of(&applied).unwrap();
+        assert!(shape.bumps_deployment);
+        assert_eq!(shape.created_entities, BTreeSet::from([id("e_proposed")]));
 
         let edit_riding = build::journey_patch("p_three", "j_one", 1)
             .event(

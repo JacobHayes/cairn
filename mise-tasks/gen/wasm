@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+#MISE description="Regenerate web/wasm/generated/: the wasm-bindgen bindings of crates/wasm"
+# ARCHITECTURE, Generated artifacts. Builds the module (mise run build:wasm) and copies its
+# JavaScript bindings and type declarations into web/wasm/generated/, each with a header
+# saying so; the .wasm itself stays in web/wasm/dist/bindgen/, a build output. Writes only
+# into web/wasm/generated/.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+mise run build:wasm
+from=web/wasm/dist/bindgen
+to=web/wasm/generated
+rm -rf "$to"
+mkdir -p "$to"
+for file in cairn_wasm.js cairn_wasm.d.ts cairn_wasm_bg.wasm.d.ts; do
+  {
+    echo "// Generated from crates/wasm by wasm-bindgen ('mise run gen'); do not edit."
+    cat "$from/$file"
+  } >"$to/$file"
+done

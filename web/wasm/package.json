@@ -1,0 +1,15 @@
+{
+  "name": "@cairn/wasm",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "The browser host: bindings generated from crates/wasm (generated/), the loader that types them, the derive worker, and the in-browser root.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "@types/node": "26.6.4",
+    "vite": "8.3.3"
+  }
+}

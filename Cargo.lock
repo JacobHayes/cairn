@@ -585,6 +585,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "cairn-wasm"
+version = "0.1.0"
+dependencies = [
+ "cairn-api",
+ "cairn-engine",
+ "cairn-schema",
+ "cairn-service",
+ "cairn-store",
+ "jiff",
+ "serde",
+ "serde_json",
+ "serde_path_to_error",
+ "wasm-bindgen",
+]
+
+[[package]]
 name = "cc"
 version = "1.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"

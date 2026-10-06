@@ -1,0 +1,46 @@
+[package]
+name = "cairn-wasm"
+description = "The browser host: the engine's derive, apply, projections, preview, touched sets, and route files over JSON for every host, and the in-browser root that runs the service over the memory store seeded from the fixtures."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[lib]
+# cdylib for wasm-bindgen; rlib so the native tests and the cases generator link it.
+crate-type = ["cdylib", "rlib"]
+
+[features]
+# The server's side of the agreement (`cairn_wasm::cases`): the fixtures walked through the
+# service natively, and a document at the limits, for the native agreement tests, the browser
+# tests, and the benchmark. Native only; never part of the browser build.
+server = ["cairn-engine/testing"]
+
+[[bin]]
+name = "cairn-wasm-cases"
+path = "src/bin/cases.rs"
+required-features = ["server"]
+
+[[test]]
+name = "agreement"
+required-features = ["server"]
+
+[dependencies]
+cairn-engine.workspace = true
+cairn-schema.workspace = true
+cairn-service.workspace = true
+cairn-store.workspace = true
+jiff.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+wasm-bindgen.workspace = true
+
+[target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
+cairn-api.workspace = true
+cairn-engine = { workspace = true, features = ["testing"] }
+
+[lints]
+workspace = true

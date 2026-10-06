@@ -222,13 +222,17 @@ fn invalid(found: cairn_schema::Violation) -> WriteError {
 /// patch id mints the same keys, so a resubmitted import is the same patch (H5); different
 /// patch ids mint different keys with overwhelming likelihood, and the engine draws again for
 /// a body a graph already holds or retired.
+///
+/// Public so the browser host mints the same keys when it imports a file locally (brief 4.5).
 #[derive(Clone, Debug)]
-pub(crate) struct PatchKeys {
+pub struct PatchKeys {
     seed: String,
     count: u64,
 }
 
 impl PatchKeys {
+    /// The keys `patch` mints, from its first.
+    #[must_use]
     pub fn new(patch: &PatchId) -> Self {
         Self {
             seed: patch.to_string(),

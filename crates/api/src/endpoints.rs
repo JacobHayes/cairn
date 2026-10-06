@@ -134,6 +134,8 @@ pub static SNAPSHOT: Endpoint =
 pub static LEVEL: Endpoint = endpoint(Method::GET, "/journeys/{id}/level", "getJourneyLevel");
 /// `GET /journeys/{id}/trace/{key}`: what is upstream and downstream of a node (C7).
 pub static TRACE: Endpoint = endpoint(Method::GET, "/journeys/{id}/trace/{key}", "traceNode");
+/// `GET /journeys/{id}/derived`: every derived value (D3), as the browser derives it.
+pub static DERIVED: Endpoint = endpoint(Method::GET, "/journeys/{id}/derived", "getJourneyDerived");
 /// `GET /journeys/{id}/decisions`: the decision view (C12).
 pub static DECISIONS: Endpoint =
     endpoint(Method::GET, "/journeys/{id}/decisions", "getDecisionView");
@@ -194,7 +196,7 @@ pub static REVOKE_TOKEN: Endpoint = endpoint(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 46] = [
+pub static ALL: [&Endpoint; 47] = [
     &CAPABILITIES,
     &PATCH_JOURNEY,
     &PATCH_ROUTE,
@@ -219,6 +221,7 @@ pub static ALL: [&Endpoint; 46] = [
     &SNAPSHOT,
     &LEVEL,
     &TRACE,
+    &DERIVED,
     &DECISIONS,
     &TIMELINE,
     &SUMMARY,

@@ -7,8 +7,8 @@ use axum::Json;
 use axum::extract::{Extension, RawQuery, State};
 use axum::routing::get;
 use cairn_schema::{
-    Actor, DecisionView, ExplainedField, ExplanationPage, JourneyId, Level, ListPage, Next,
-    NodeKey, Snapshot, StatusSummary, Timeline, Trace,
+    Actor, DecisionView, Derived, ExplainedField, ExplanationPage, JourneyId, Level, ListPage,
+    Next, NodeKey, Snapshot, StatusSummary, Timeline, Trace,
 };
 use cairn_store::Store;
 
@@ -25,6 +25,7 @@ pub fn served<S: Store + 'static>() -> crate::Served<S> {
         (&at::SNAPSHOT, get(snapshot::<S>)),
         (&at::LEVEL, get(level::<S>)),
         (&at::TRACE, get(trace::<S>)),
+        (&at::DERIVED, get(derived::<S>)),
         (&at::DECISIONS, get(decisions::<S>)),
         (&at::TIMELINE, get(timeline::<S>)),
         (&at::SUMMARY, get(summary::<S>)),
@@ -89,6 +90,18 @@ pub async fn trace<S: Store + 'static>(
 ) -> Projection<Trace> {
     let (id, key) = (journey(&id)?, node(&key)?);
     let projected = api.service.trace(&api.call(actor), &id, &key).await?;
+    Ok(Json(Projected::from_service(projected)))
+}
+
+/// `GET /journeys/{id}/derived` (D3): the whole derive, which the browser computes itself from
+/// the domain document; for a client without the wasm engine.
+pub async fn derived<S: Store + 'static>(
+    State(api): State<Api<S>>,
+    Extension(actor): Extension<Actor>,
+    Path(id): Path<String>,
+) -> Projection<Derived> {
+    let id = journey(&id)?;
+    let projected = api.service.derived(&api.call(actor), &id).await?;
     Ok(Json(Projected::from_service(projected)))
 }
 

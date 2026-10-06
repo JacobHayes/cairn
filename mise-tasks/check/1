@@ -131,9 +131,9 @@ labels=$(node -e '
 ladder_suite "patina site labels" "$labels" sites
 
 # ARCHITECTURE, Repository layout: the service is runtime-free (no tokio, database driver,
-# or transport), so it builds for the browser with the engine, schema, and store beneath it.
-# A dependency that pulls in a runtime fails here, not when the wasm host (4.5) arrives.
-wasm_crates=(cairn-service)
+# or transport), so it builds for the browser with the engine, schema, and store beneath it,
+# and the browser host (crates/wasm) on top. A dependency that pulls in a runtime fails here.
+wasm_crates=(cairn-service cairn-wasm)
 wasm_packages=()
 for name in "${wasm_crates[@]}"; do
   wasm_packages+=(-p "$name")

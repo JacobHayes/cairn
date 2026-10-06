@@ -174,6 +174,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/journeys/{id}/derived": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every derived value with its explanation inputs, as the browser derives the document (D3). */
+        get: operations["getJourneyDerived"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/journeys/{id}/document": {
         parameters: {
             query?: never;
@@ -1352,6 +1369,24 @@ export interface components {
             today: string;
             /** @description The viewer's entities, resolved from verified emails (H3); usually one. */
             viewer?: components["schemas"]["EntityKey"][];
+        };
+        /** @description A derived journey (ARCHITECTURE, Read path: `Derived`). */
+        Derived: {
+            /** @description The acting frontier, ranked. */
+            acting_frontier: components["schemas"]["NodeKey"][];
+            /** @description The frontier, ranked (Priority: ties by slack, gravity, key). */
+            frontier: components["schemas"]["NodeKey"][];
+            /** @description Per node. */
+            nodes: {
+                [key: string]: components["schemas"]["NodeDerived"];
+            };
+            /** @description The stalled diagnostic, when stalled. */
+            stalled?: components["schemas"]["Stalled"] | null;
+            /**
+             * Format: date
+             * @description The today it was derived for.
+             */
+            today: string;
         };
         /** @description A patch domain, by identity (A17). */
         Domain: {
@@ -2945,6 +2980,20 @@ export interface components {
             today: string;
             /** @description The projection. */
             value: components["schemas"]["DecisionView"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedDerived: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["Derived"];
         };
         /** @description A projection with what it was derived from (D3: computed per read, never stored). */
         ProjectedExplanationPage: {
@@ -4994,6 +5043,84 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ProjectedDecisionView"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getJourneyDerived: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedDerived"];
                 };
             };
             /** @description The request is malformed. */

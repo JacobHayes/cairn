@@ -109,6 +109,7 @@ macro_rules! conformance_suite {
             commits::emails_may_move_between_entities_within_a_commit_but_stay_unique,
             commits::an_entity_create_in_a_journey_patch_bumps_the_deployment_revision,
             commits::an_entity_create_whose_key_is_an_entity_or_alias_is_rejected,
+            commits::an_entity_an_applied_proposal_creates_bumps_the_deployment_revision,
             commits::a_hard_delete_removes_events_and_keeps_the_deployment_event,
             commits::a_create_at_a_deleted_journey_id_is_rejected,
             commits::a_proposal_revision_is_independent_of_its_destination,

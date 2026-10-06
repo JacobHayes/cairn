@@ -168,21 +168,28 @@ impl<'a> DerivedJourney<'a> {
     }
 }
 
-/// The domain document (ARCHITECTURE, Terms): the journey's graph and state with the derive
-/// inputs (the deployment context included) and the engine version, which the browser
-/// derives and projects locally. Nothing derived is in it.
+/// This engine's version (ARCHITECTURE, Web UI: version skew): what every domain document it
+/// builds carries, and what a host compares a document's with before deriving, previewing,
+/// or writing with it.
 ///
 /// # Panics
 ///
 /// Never: the crate's version is a valid engine version.
 #[must_use]
-pub fn document(journey: &Journey, inputs: &DeriveInputs) -> DomainDocument {
-    let engine_version: EngineVersion = env!("CARGO_PKG_VERSION")
+pub fn engine_version() -> EngineVersion {
+    env!("CARGO_PKG_VERSION")
         .parse()
-        .unwrap_or_else(|error| panic!("the crate version: {error}"));
+        .unwrap_or_else(|error| panic!("the crate version: {error}"))
+}
+
+/// The domain document (ARCHITECTURE, Terms): the journey's graph and state with the derive
+/// inputs (the deployment context included) and the engine version, which the browser
+/// derives and projects locally. Nothing derived is in it.
+#[must_use]
+pub fn document(journey: &Journey, inputs: &DeriveInputs) -> DomainDocument {
     DomainDocument {
         journey: journey.clone(),
         inputs: inputs.clone(),
-        engine_version,
+        engine_version: engine_version(),
     }
 }

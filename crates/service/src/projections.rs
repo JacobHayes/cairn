@@ -145,6 +145,24 @@ impl<S: Store> Service<S> {
             .await
     }
 
+    /// D3: the journey's whole derive in the schema's shape (every node's derived values with
+    /// their explanation inputs, the frontiers, the stalled diagnostic): what the browser's
+    /// wasm derive of the journey's domain document gives byte for byte (brief 4.5).
+    ///
+    /// # Errors
+    ///
+    /// When the journey does not exist, or the store fails.
+    pub async fn derived(
+        &self,
+        call: &Call,
+        id: &JourneyId,
+    ) -> Result<Projected<cairn_schema::Derived>, ReadError> {
+        self.project(call, id, |journey, _| {
+            Ok(journey.derived().to_schema(journey.graph()))
+        })
+        .await
+    }
+
     /// C2: one canvas level: the kinds shown, at the top or drilled into `container`.
     ///
     /// # Errors

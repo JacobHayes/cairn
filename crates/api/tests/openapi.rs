@@ -42,6 +42,7 @@ mod in_process {
             ("snapshot", vec![&at::SNAPSHOT]),
             ("level", vec![&at::LEVEL]),
             ("trace", vec![&at::TRACE]),
+            ("derived", vec![&at::DERIVED]),
             ("decision_view", vec![&at::DECISIONS]),
             ("timeline", vec![&at::TIMELINE]),
             ("status_summary", vec![&at::SUMMARY]),

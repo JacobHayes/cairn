@@ -2244,6 +2244,59 @@
         ],
         "type": "object"
       },
+      "Derived": {
+        "additionalProperties": false,
+        "description": "A derived journey (ARCHITECTURE, Read path: `Derived`).",
+        "properties": {
+          "acting_frontier": {
+            "description": "The acting frontier, ranked.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
+          "frontier": {
+            "description": "The frontier, ranked (Priority: ties by slack, gravity, key).",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
+          "nodes": {
+            "additionalProperties": false,
+            "description": "Per node.",
+            "patternProperties": {
+              "^n_[a-z0-9][a-z0-9_-]*$": {
+                "$ref": "#/components/schemas/NodeDerived"
+              }
+            },
+            "type": "object"
+          },
+          "stalled": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Stalled"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The stalled diagnostic, when stalled."
+          },
+          "today": {
+            "description": "The today it was derived for.",
+            "format": "date",
+            "type": "string"
+          }
+        },
+        "required": [
+          "today",
+          "nodes",
+          "frontier",
+          "acting_frontier"
+        ],
+        "type": "object"
+      },
       "Domain": {
         "description": "A patch domain, by identity (A17).",
         "oneOf": [
@@ -8619,6 +8672,36 @@
         ],
         "type": "object"
       },
+      "ProjectedDerived": {
+        "additionalProperties": false,
+        "description": "A projection with what it was derived from (D3: computed per read, never stored).",
+        "properties": {
+          "deployment_revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "The deployment revision it was derived over (E6)."
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "The journey's revision it was derived from: a tick newer than this means refetch (H6)."
+          },
+          "today": {
+            "description": "The today it was derived for, in the deployment's zone (A9).",
+            "format": "date",
+            "type": "string"
+          },
+          "value": {
+            "$ref": "#/components/schemas/Derived",
+            "description": "The projection."
+          }
+        },
+        "required": [
+          "revision",
+          "deployment_revision",
+          "today",
+          "value"
+        ],
+        "type": "object"
+      },
       "ProjectedExplanationPage": {
         "additionalProperties": false,
         "description": "A projection with what it was derived from (D3: computed per read, never stored).",
@@ -13784,6 +13867,100 @@
           }
         },
         "summary": "The decision view (C12)."
+      }
+    },
+    "/journeys/{id}/derived": {
+      "get": {
+        "operationId": "getJourneyDerived",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectedDerived"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Every derived value with its explanation inputs, as the browser derives the document (D3)."
       }
     },
     "/journeys/{id}/document": {

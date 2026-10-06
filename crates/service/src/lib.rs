@@ -33,6 +33,7 @@ pub use error::ServiceError;
 pub use projections::{ChildEntry, History, NodeDetail, Projected, ReadError};
 pub use proposals::{ProposalReview, ProposalWritten, StaleBase};
 pub use reads::RouteSummary;
+pub use routes::PatchKeys;
 pub use viewer::Viewer;
 pub use write::{DomainPatch, NotADomainPatch, WriteError, Written};
 

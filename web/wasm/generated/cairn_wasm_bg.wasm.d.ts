@@ -1,0 +1,32 @@
+// Generated from crates/wasm by wasm-bindgen ('mise run gen'); do not edit.
+/* tslint:disable */
+/* eslint-disable */
+export const memory: WebAssembly.Memory;
+export const __wbg_browserroot_free: (a: number, b: number) => void;
+export const __wbg_derivation_free: (a: number, b: number) => void;
+export const __wbg_rootsubscription_free: (a: number, b: number) => void;
+export const apply: (a: number, b: number, c: number, d: number, e: number) => void;
+export const browserroot_capabilities: (a: number, b: number) => void;
+export const browserroot_deployment: (a: number, b: number) => void;
+export const browserroot_document: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+export const browserroot_journeys: (a: number, b: number) => void;
+export const browserroot_new: (a: number) => void;
+export const browserroot_patch: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+export const browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
+export const derivation_derived: (a: number, b: number) => void;
+export const derivation_key: (a: number, b: number) => void;
+export const derivation_new: (a: number, b: number, c: number) => void;
+export const derivation_project: (a: number, b: number, c: number, d: number) => void;
+export const engineVersion: (a: number) => void;
+export const exportRoute: (a: number, b: number, c: number) => void;
+export const importRoute: (a: number, b: number, c: number) => void;
+export const preview: (a: number, b: number, c: number, d: number, e: number) => void;
+export const rootsubscription_take: (a: number, b: number, c: number) => void;
+export const start: () => void;
+export const touched: (a: number, b: number, c: number) => void;
+export const touchedOverlaps: (a: number, b: number, c: number, d: number, e: number) => void;
+export const __wbindgen_add_to_stack_pointer: (a: number) => number;
+export const __wbindgen_export: (a: number, b: number) => number;
+export const __wbindgen_export2: (a: number, b: number, c: number, d: number) => number;
+export const __wbindgen_export3: (a: number, b: number, c: number) => void;
+export const __wbindgen_start: () => void;

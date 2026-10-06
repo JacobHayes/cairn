@@ -2,6 +2,27 @@
 
 Judgment calls made while implementing the briefs, for the user to review (`AGENTS.md`, Decide, record, keep going). Newest first. Each entry: date, brief, the question, the call, the alternatives, and what would change it.
 
+## 2026-10-06, brief 4.5: the browser host's calls carry the schema's JSON, and the server's answer they match is the service's
+
+- Question: what crosses the wasm boundary, and what "the server's derive" is for the byte-equality acceptance, when the API serves a document and projections but no whole derive.
+- Call: every `crates/wasm` export takes and answers JSON text, written by `serde_json` as the API writes it (compact), and throws a `HostError`'s JSON on failure; `web/wasm`'s loader types the text with the OpenAPI types (`@cairn/client`), and the derive worker answers text the page parses. The server's answer is the service's, which the API serializes unchanged: a new `Service::derived` answers the whole derive (`cairn_schema::Derived`) through the same memo as the projections, served at `GET /journeys/{id}/derived` like every service operation (I1), and a projection is what the API puts in `value`. The agreement is checked natively in `tests/agreement.rs` (rung 2) and in Chromium (rung 6) against one walk of the fixtures through the service (`cairn_wasm::cases`), so a server-side cache that answers a stale derive fails both.
+- Alternatives: JavaScript objects through `serde-wasm-bindgen` (the bindings would type every value as `any`, and a value cannot be compared byte for byte); the HTTP API as the oracle (it serializes the service's values unchanged, and would add a server to rung 6 that 4.6 builds for the server host).
+- What would change it: profiling that shows JSON is the bottleneck at the limits (the benchmark in `briefs/proof/4.5/` says not yet).
+
+## 2026-10-06, brief 4.5: the in-browser root seeds every fixture into one deployment, in UTC, as one local user
+
+- Question: each fixture scenario is written for a fresh deployment at revision 0, the browser bundles no time zone database, and the root has one identity; how the in-browser host is seeded "from the fixtures" (ARCHITECTURE, Web UI: in-browser host).
+- Call: one root holds every fixture, seeded in order (bake-off, hiring loop, product launch, vendor evaluation): each route published as version 1, then each scenario's steps through the service, a proposal's create and apply through the proposal lifecycle, and a step's deployment revision moved by the revision its fixture started at (entity keys are distinct across the fixtures). The deployment's zone is UTC. Everything is done as `u_local`, signed in with the `local` method and verified for each fixture's lead's email, so in every fixture the viewer is its lead and "mine" and the viewer's ranking show that work (review round 1: an empty viewer let a viewer bug pass the agreement). The page's clock is each call's.
+- Alternatives: one root per fixture (an index of one journey, and no demo of the index or entities); jiff's bundled zone database (megabytes, for a demo host with no configured zone).
+- What would change it: fixtures whose entity keys collide, or an in-browser host that must show a configured zone or a person other than the fixtures' leads.
+
+## 2026-10-06, brief 4.5: a proposal applied to a journey or route creates entities as a riding create
+
+- Question: the bake-off fixture's proposal creates two entities. Seeded through the service, its apply was refused by the store as writing entities outside the journey's domain: the store's commit shape (`crates/store/src/backend.rs`, shared by both backends) counted an entity put as a riding create (E6: creates ride in any patch, moving the deployment revision) only in an `entity_created` event, and an applied proposal's writes all sit in its one `proposal_applied` event.
+- Call: an entity put in a `proposal_applied` event of a commit to a journey or route is a riding create: it moves the deployment revision and is checked for a taken key, as a direct create is. A proposal to the deployment writes the deployment's own records, as before. A shape test covers the case.
+- Alternatives: seeding the bake-off with its proposal's mutations as a domain patch (the store would keep refusing every applied proposal that creates an entity).
+- What would change it: proposal mutations that may edit an entity outside the deployment, which would need the event to say which puts are creates.
+
 ## 2026-10-06, brief 4.3 (review round 1): DNS-rebinding protection is a Host allowlist in front of the whole router, built by 4.7
 
 - Question: the review found that turning rmcp's `Host` allowlist off leaves a gap the API shares: the dev provider without a token and Tailscale in direct mode authenticate on the peer, so a page whose name an attacker rebinds to the server's loopback or tailnet address can drive `/mcp` and the API as that user. The session cookie (host-scoped, `SameSite=Lax`) and the JSON content type do not help once the browser believes the request is same-origin. No brief carried a `Host` check.

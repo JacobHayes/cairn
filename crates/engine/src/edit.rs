@@ -155,7 +155,9 @@ fn resources_by_key(node: &Node<KeyRefs>) -> BTreeMap<&AttachmentKey, &Resource<
 }
 
 /// A18: a removal naming everything removing `node` reaches as the graph stands: its subtree,
-/// every edge into or out of it, and everything attached to those nodes.
+/// every edge into or out of it, and everything attached to those nodes. Only the generated
+/// operations remove one node at a time; the engine itself removes in batches.
+#[cfg(feature = "testing")]
 pub(crate) fn full_removal(graph: &Graph, node: &NodeKey) -> Removal {
     match full_removals(graph, std::slice::from_ref(node)).pop() {
         Some(removal) => removal,

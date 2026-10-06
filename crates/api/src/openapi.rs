@@ -19,7 +19,7 @@ use crate::wire::{
     SaveAsRouteRequest, SearchPage, Tick, TokenRequest, UpgradeRequest, Viewer,
 };
 use cairn_schema::{
-    AgentId, DecisionView, Deployment, DomainDocument, Entity, EntityKey, ExplainedField,
+    AgentId, DecisionView, Deployment, Derived, DomainDocument, Entity, EntityKey, ExplainedField,
     ExplanationPage, Journey, JourneyId, Level, ListPage, Next, NodeKey, Proposal, ProposalId,
     Rejection, Route, RouteFile, RouteId, RouteVersion, Snapshot, StatusSummary, Timeline, Trace,
     VersionNumber,
@@ -145,6 +145,11 @@ fn projections() -> Vec<Operation> {
                 &[],
             )
         },
+        projection::<Derived>(
+            &at::DERIVED,
+            "Every derived value with its explanation inputs, as the browser derives the document (D3).",
+            &[],
+        ),
         projection::<DecisionView>(&at::DECISIONS, "The decision view (C12).", &[]),
         projection::<Timeline>(&at::TIMELINE, "The timeline (C13).", &[]),
         projection::<StatusSummary>(&at::SUMMARY, "The status summary (C18).", &[]),

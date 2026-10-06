@@ -906,6 +906,57 @@ pub async fn an_entity_create_in_a_journey_patch_bumps_the_deployment_revision<B
     );
 }
 
+/// E6, I6: an entity a proposal applied to a journey creates rides as a direct create does:
+/// it moves the deployment revision, a key already taken is refused, and a deployment patch
+/// from before it is stale with the entity among what intervened.
+pub async fn an_entity_an_applied_proposal_creates_bumps_the_deployment_revision<B: Backend>(
+    backend: &B,
+) {
+    let store = open(backend).await;
+    applied(
+        &store,
+        create_journey("p_one", "j_one", Vec::new()).commit(),
+    )
+    .await;
+    let apply = |patch: &str, base: u32, key: &str| {
+        journey_patch(patch, "j_one", base)
+            .event(
+                EventType::ProposalApplied,
+                Subject::Journey(id("j_one")),
+                vec![Write::Put(Record::Entity(entity(key, "Proposed", &[])))],
+            )
+            .commit()
+    };
+    applied(&store, apply("p_two", 1, "e_proposed")).await;
+    let loaded = deployment(&store).await;
+    assert_eq!(loaded.revision, revision(1));
+    assert!(loaded.entities.get(&id("e_proposed")).is_some());
+    assert_eq!(
+        journey(&store, "j_one").await.unwrap().revision,
+        revision(2)
+    );
+
+    let before = snapshot(&store).await;
+    let error = failed(&store, apply("p_three", 2, "e_proposed")).await;
+    assert_eq!(violation_codes(&error), vec![ViolationCode::EntityKeyTaken]);
+    assert_eq!(snapshot(&store).await, before);
+
+    let stale = create_entity(
+        deployment_patch("p_four", 0),
+        entity("e_other", "Other", &[]),
+    );
+    let (conflicts, intervening) = stale_parts(failed(&store, stale.commit()).await);
+    assert_eq!(
+        conflicts,
+        vec![conflict(RevisionOf::Domain(Domain::Deployment), 0, 1)]
+    );
+    assert!(
+        intervening
+            .as_set()
+            .contains(&RecordKey::Entity(id("e_proposed")))
+    );
+}
+
 /// E6: an entity create whose key is already an entity or an alias is rejected, wherever
 /// it rides.
 pub async fn an_entity_create_whose_key_is_an_entity_or_alias_is_rejected<B: Backend>(backend: &B) {

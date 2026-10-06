@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#MISE description="Build the browser host's module: crates/wasm for wasm32 (the wasm profile), bound by wasm-bindgen into web/wasm/dist/bindgen/"
+# ARCHITECTURE, Generated artifacts: the compiled .wasm is a build output, never checked in.
+# This writes the module and its bindings to web/wasm/dist/bindgen/ (ignored); `mise run
+# gen` copies the bindings (not the .wasm) into web/wasm/generated/, and the browser tests
+# load the .wasm from here. The wasm-bindgen CLI pinned in mise.toml must be the version of
+# the `wasm-bindgen` crate in Cargo.toml, or it refuses the module.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+out=web/wasm/dist/bindgen
+cargo build --quiet --locked --profile wasm --target wasm32-unknown-unknown -p cairn-wasm --lib
+target_dir=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
+  let text = "";
+  process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => console.log(JSON.parse(text).target_directory));')
+rm -rf "$out"
+mkdir -p "$out"
+wasm-bindgen --target web --out-dir "$out" --out-name cairn_wasm \
+  "$target_dir/wasm32-unknown-unknown/wasm/cairn_wasm.wasm"

@@ -34,8 +34,8 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 | landed `rortptsk` |
 | 4.3 | MCP server and shipped instructions | `crates/mcp`, `instructions/` | 4.9 | landed `mmoznlnt` |
 | 4.4 | Assistant | `crates/assistant` | 4.3 | in progress |
-| 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.9 | in progress |
-| 4.6 | Web client and app shell | `web/client`, `web/app` | 4.5 |  |
+| 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.9 | landed `yxqzuwls` |
+| 4.6 | Web client and app shell | `web/client`, `web/app` | 4.5 | in progress |
 | 4.7 | The binary | `crates/cairn` | 4.4, 4.6 |  |
 | 4.8 | Service completion: priority, projections, proposals, route files | `crates/service` | 2.7, 4.1 | landed `lsmmlrpw` |
 | 4.9 | HTTP API completion: projections, proposals, route files | `crates/api`, `openapi/`, `web/client` | 4.8, 4.2 | landed `tsqvkvpw` |

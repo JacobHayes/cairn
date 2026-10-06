@@ -122,6 +122,7 @@ mod in_process {
                 "trace/n_kickoff",
                 same(service.trace(call, id, kickoff).await.unwrap()),
             ),
+            ("derived", same(service.derived(call, id).await.unwrap())),
             (
                 "decisions",
                 same(service.decision_view(call, id).await.unwrap()),

@@ -19,6 +19,7 @@ cairn-schema = { path = "crates/schema" }
 cairn-service = { path = "crates/service" }
 cairn-store = { path = "crates/store" }
 cairn-store-turso = { path = "crates/store-turso" }
+cairn-wasm = { path = "crates/wasm" }
 # The auth crate (ARCHITECTURE, Auth): axum for the layer and the providers' own routes
 # (HTTP/1 on tokio, as the spike proved, plus forms, queries, and JSON for the OAuth
 # endpoints); base64 for the built-in server's client ids; chrono only for the clock
@@ -67,6 +68,9 @@ sha2 = "0.11.0"
 # default allocator and full-text search; tokio for the Turso backend's pool alone.
 tokio = { version = "1.53.2", default-features = false }
 turso = { version = "=0.8.2", default-features = false }
+# The browser host (ARCHITECTURE, Web UI): the Rust half of the wasm bindings. Pinned exactly,
+# because the `wasm-bindgen` CLI in mise.toml must be this same version to generate them.
+wasm-bindgen = "=0.2.129"
 # The patina SDK (PRACTICES, Simulation with patina), all at one revision: the same one
 # `cargo-patina` is pinned to when the simulation track adds it to mise.toml. A crate opts
 # in with `patina-dst.workspace = true`; until one does, cargo resolves none of them.
@@ -88,3 +92,11 @@ too_many_lines = "deny"
 unwrap_used = "deny"
 # Configured in clippy.toml, raised to deny only for the engine by rung 1.
 disallowed_types = "allow"
+
+# The browser host's build (brief 4.5): the release profile, its symbols stripped and linked
+# as one unit, so the module the page downloads is small. Only the wasm build task uses it.
+[profile.wasm]
+inherits = "release"
+strip = true
+lto = true
+codegen-units = 1
