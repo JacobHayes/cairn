@@ -6,7 +6,7 @@
 
 use cairn_auth::Clock;
 use cairn_schema::Actor;
-use cairn_service::{Call, Service};
+use cairn_service::{Call, DomainPatch, Service};
 use cairn_store::Store;
 use schemars::JsonSchema;
 use schemars::generate::SchemaSettings;
@@ -196,6 +196,29 @@ impl<S: Store + 'static> ToolSet<S> {
             None => Err(ToolError::UnknownTool {
                 name: name.to_owned(),
             }),
+        }
+    }
+
+    /// The domain patch the direct-write tool `name` would submit for `arguments`, worked
+    /// out as [`call`](Self::call) would, without writing anything: what the assistant's
+    /// write wrapper reads to decide whether a write applies directly or becomes a proposal
+    /// (I5). `None` for a tool that submits no domain patch of its own drafting: the reads,
+    /// the proposal tools, and `import_route` (the service builds its patch from the file).
+    ///
+    /// # Errors
+    ///
+    /// [`ToolError::Arguments`] when the arguments do not match the tool's schema; what
+    /// drafting reads can fail with otherwise.
+    pub async fn drafted_patch(
+        &self,
+        name: &str,
+        arguments: Value,
+    ) -> Result<Option<DomainPatch>, ToolError> {
+        match tools::group_of(name) {
+            Some(tools::Group::Write) => self.drafted_patch_of(name, arguments).await,
+            Some(tools::Group::Derive | tools::Group::Read | tools::Group::Propose) | None => {
+                Ok(None)
+            }
         }
     }
 }

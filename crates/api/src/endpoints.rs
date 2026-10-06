@@ -195,8 +195,23 @@ pub static REVOKE_TOKEN: Endpoint = endpoint(
     "revokeAgentToken",
 );
 
+/// `POST /journeys/{id}/assistant`: one assistant turn about a journey (I5), when the host
+/// offers the assistant.
+pub static ASSISTANT_JOURNEY: Endpoint = endpoint(
+    Method::POST,
+    "/journeys/{id}/assistant",
+    "converseAboutJourney",
+);
+/// `POST /routes/{id}/draft/assistant`: one assistant turn about a route's draft (I5, A12),
+/// when the host offers the assistant.
+pub static ASSISTANT_ROUTE_DRAFT: Endpoint = endpoint(
+    Method::POST,
+    "/routes/{id}/draft/assistant",
+    "converseAboutRouteDraft",
+);
+
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 47] = [
+pub static ALL: [&Endpoint; 49] = [
     &CAPABILITIES,
     &PATCH_JOURNEY,
     &PATCH_ROUTE,
@@ -244,6 +259,8 @@ pub static ALL: [&Endpoint; 47] = [
     &TOKENS,
     &MINT_TOKEN,
     &REVOKE_TOKEN,
+    &ASSISTANT_JOURNEY,
+    &ASSISTANT_ROUTE_DRAFT,
 ];
 
 #[cfg(test)]

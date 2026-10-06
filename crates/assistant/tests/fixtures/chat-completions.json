@@ -1,0 +1,156 @@
+{
+  "source": "Written from the OpenAI chat completions reference (POST /v1/chat/completions, tool calls), the shape OpenAI-compatible servers accept, not captured live: a live capture needs a credential (DECISIONS.md, 4.4).",
+  "path": "/v1/chat/completions",
+  "headers": {
+    "authorization": "Bearer test-key"
+  },
+  "exchanges": [
+    {
+      "request": {
+        "model": "some-org/some-model",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a test assistant."
+          },
+          {
+            "role": "user",
+            "content": "What is next on j_one?"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_snapshot",
+              "description": "Reads a journey.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "journey": {
+                    "type": "string",
+                    "description": "The journey."
+                  }
+                },
+                "required": [
+                  "journey"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-abc123",
+        "object": "chat.completion",
+        "created": 1741570283,
+        "model": "some-org/some-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": null,
+              "tool_calls": [
+                {
+                  "id": "call_abc123",
+                  "type": "function",
+                  "function": {
+                    "name": "get_snapshot",
+                    "arguments": "{\"journey\":\"j_one\"}"
+                  }
+                }
+              ],
+              "refusal": null
+            },
+            "finish_reason": "tool_calls",
+            "logprobs": null
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 512,
+          "completion_tokens": 24,
+          "total_tokens": 536
+        }
+      }
+    },
+    {
+      "request": {
+        "model": "some-org/some-model",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a test assistant."
+          },
+          {
+            "role": "user",
+            "content": "What is next on j_one?"
+          },
+          {
+            "role": "assistant",
+            "content": null,
+            "tool_calls": [
+              {
+                "id": "call_abc123",
+                "type": "function",
+                "function": {
+                  "name": "get_snapshot",
+                  "arguments": "{\"journey\":\"j_one\"}"
+                }
+              }
+            ]
+          },
+          {
+            "role": "tool",
+            "tool_call_id": "call_abc123",
+            "content": "{\"revision\":3}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "function": {
+              "name": "get_snapshot",
+              "description": "Reads a journey.",
+              "parameters": {
+                "type": "object",
+                "properties": {
+                  "journey": {
+                    "type": "string",
+                    "description": "The journey."
+                  }
+                },
+                "required": [
+                  "journey"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "response": {
+        "id": "chatcmpl-abc124",
+        "object": "chat.completion",
+        "created": 1741570285,
+        "model": "some-org/some-model",
+        "choices": [
+          {
+            "index": 0,
+            "message": {
+              "role": "assistant",
+              "content": "Nothing is blocked; start the plan.",
+              "refusal": null
+            },
+            "finish_reason": "stop",
+            "logprobs": null
+          }
+        ],
+        "usage": {
+          "prompt_tokens": 560,
+          "completion_tokens": 10,
+          "total_tokens": 570
+        }
+      }
+    }
+  ]
+}

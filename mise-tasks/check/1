@@ -16,6 +16,7 @@ declare -A scoped_lints=(
   [cairn-engine]="-D clippy::indexing_slicing -D clippy::disallowed_types -D missing_docs"
   [cairn-api]="-D clippy::panic"
   [cairn-mcp]="-D clippy::panic"
+  [cairn-assistant]="-D clippy::panic"
 )
 
 ladder_require_tool cargo cargo --version

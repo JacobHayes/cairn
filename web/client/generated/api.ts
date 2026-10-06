@@ -157,6 +157,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/journeys/{id}/assistant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One assistant turn about a journey, when the capabilities offer the assistant (I5): its direct writes with their consequences, and its proposals for review. */
+        post: operations["converseAboutJourney"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/journeys/{id}/decisions": {
         parameters: {
             query?: never;
@@ -600,6 +617,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/routes/{id}/draft/assistant": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** One assistant turn about a route's draft, when the capabilities offer the assistant (I5, A12): what it drafts arrives as proposals on the draft. */
+        post: operations["converseAboutRouteDraft"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/routes/{id}/export": {
         parameters: {
             query?: never;
@@ -775,6 +809,31 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /**
+         * @description A write the assistant made, as the turn reports it (I5: every direct write is reported
+         *     with its consequences).
+         */
+        Action: {
+            /** @description What it newly caused in each journey it changed (D7). */
+            consequences?: {
+                [key: string]: components["schemas"]["Consequences"];
+            };
+            /** @constant */
+            outcome: "applied";
+            /** @description The patch's receipt. */
+            receipt: components["schemas"]["PatchReceipt"];
+            /** @description The tool. */
+            tool: string;
+        } | {
+            /** @description Why it is a proposal. */
+            because: components["schemas"]["Because"];
+            /** @constant */
+            outcome: "proposed";
+            /** @description The proposal. */
+            proposal: components["schemas"]["ProposalId"];
+            /** @description The tool. */
+            tool: string;
+        };
         /** @description Who made a change (H2): a user, or an agent acting for one. */
         Actor: {
             /** @description The agent acting for the user, if any. */
@@ -858,6 +917,14 @@ export interface components {
         } | {
             entity_list: components["schemas"]["EntityKey"][];
         };
+        /**
+         * @description `POST /journeys/{id}/assistant` and `POST /routes/{id}/draft/assistant`: one message of
+         *     the caller's conversation about that journey or draft.
+         */
+        AssistantRequest: {
+            /** @description What the user says. */
+            message: components["schemas"]["Markdown"];
+        };
         /** @description Starts with "a_"; at most id_bytes_max (64) bytes. */
         AttachmentKey: string;
         /** @description The kinds of sign-in a host can offer. */
@@ -868,6 +935,22 @@ export interface components {
             kind: components["schemas"]["AuthKind"];
             /** @description The provider's configured name. */
             name: components["schemas"]["Slug"];
+        };
+        /** @description Why a write became a proposal. */
+        Because: {
+            /** @constant */
+            reason: "structural";
+        } | {
+            /**
+             * Format: uint32
+             * @description The nodes it writes; absent when it may write every node of its domain.
+             */
+            count?: number | null;
+            /** @constant */
+            reason: "too_many_nodes";
+        } | {
+            /** @constant */
+            reason: "asked";
         };
         /** @description A dependency that blocks a node (D1, Gating: Blocked). */
         Blocker: {
@@ -1259,6 +1342,8 @@ export interface components {
             /** @description What it adds. */
             score: components["schemas"]["Score"];
         };
+        /** @description Starts with "cv_"; at most id_bytes_max (64) bytes. */
+        ConversationId: string;
         /**
          * Format: uint32
          * @description A position in a projection's order: where the next page starts (I3, J4). Valid for the
@@ -1450,6 +1535,25 @@ export interface components {
         };
         /** @description An email address; stored trimmed and lower-cased (H3). */
         Email: string;
+        /** @description How a turn ended. The writes before any ending stand and are reported. */
+        Ended: {
+            /** @constant */
+            status: "replied";
+        } | {
+            /** @constant */
+            status: "provider_timed_out";
+        } | {
+            /** @description What it said. */
+            message: string;
+            /** @constant */
+            status: "provider_failed";
+        } | {
+            /** @constant */
+            status: "iteration_limit";
+        } | {
+            /** @constant */
+            status: "turn_timed_out";
+        };
         /** @description A version, as `0.1.0`. */
         EngineVersion: string;
         /** @description A person or team journeys refer to (PRD glossary, Entity), deployment-scoped. */
@@ -4154,6 +4258,20 @@ export interface components {
                 reason: components["schemas"]["Reason"];
             };
         } | "reopen" | "reach";
+        /** @description What one turn answers. */
+        TurnReply: {
+            /**
+             * @description Every write the assistant made, in order: applied with its consequences, or drafted
+             *     as a proposal for review (I5).
+             */
+            actions?: components["schemas"]["Action"][];
+            /** @description The conversation the turn was added to: the user's, about its target. */
+            conversation: components["schemas"]["ConversationId"];
+            /** @description How the turn ended. */
+            ended: components["schemas"]["Ended"];
+            /** @description What the assistant said last, if anything. */
+            reply?: components["schemas"]["Markdown"] | null;
+        };
         /** @description One edge of the graph a canvas edge stands for: `dependent` waits on `requirement`. */
         UnderlyingEdge: {
             /** @description The node whose `requires`, condition, or opening it is. */
@@ -4996,6 +5114,107 @@ export interface operations {
             };
             /** @description No such resource. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    converseAboutJourney: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistantRequest"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TurnReply"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -7547,6 +7766,107 @@ export interface operations {
             };
             /** @description No such resource. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    converseAboutRouteDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AssistantRequest"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TurnReply"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
                 headers: {
                     [name: string]: unknown;
                 };

@@ -112,16 +112,22 @@ impl World {
     /// Starts a server over a fresh memory store on this runtime, its clock at the vendor
     /// evaluation's first step.
     pub async fn start() -> Self {
-        Self::begin(true).await
+        Self::begin(true, None).await
+    }
+
+    /// As [`World::start`], for a host whose root assembled the assistant over `provider`
+    /// (I5): its capabilities offer it and its endpoints are served.
+    pub async fn start_with_assistant(provider: Arc<dyn cairn_assistant::Provider>) -> Self {
+        Self::begin(true, Some(provider)).await
     }
 
     /// As [`World::start`], for a host that does not offer MCP, as the browser host does not
     /// (capability gating: its root serves no MCP endpoint).
     pub async fn start_without_mcp() -> Self {
-        Self::begin(false).await
+        Self::begin(false, None).await
     }
 
-    async fn begin(mcp: bool) -> Self {
+    async fn begin(mcp: bool, assistant: Option<Arc<dyn cairn_assistant::Provider>>) -> Self {
         let store = Arc::new(MemoryStore::new());
         let notifier = Arc::new(InProcessNotifier::new());
         let clock = TestClock::default();
@@ -151,10 +157,14 @@ impl World {
             settings: settings(),
             capabilities: Capabilities {
                 mcp,
-                ..Capabilities::server(methods, false)
+                ..Capabilities::server(methods, assistant.is_some())
             },
         });
-        let app = cairn_api::router(service.clone(), &auth);
+        let assistant = assistant.map(|provider| {
+            let store = Arc::clone(&store);
+            cairn_assistant::Assistant::new(service.clone(), store, clock.clock(), provider)
+        });
+        let app = cairn_api::router_with_assistant(service.clone(), &auth, assistant);
         let router = app.clone();
         tokio::spawn(async move {
             let app = app.into_make_service_with_connect_info::<SocketAddr>();

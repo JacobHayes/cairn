@@ -13,10 +13,11 @@ use serde_json::{Map, Value, json};
 use crate::endpoints::Endpoint;
 use crate::query::{self, ParamSpec, schema_of};
 use crate::wire::{
-    AgentToken, Capabilities, EventPage, History, JourneyPage, Mine, MintedToken, NodeDetail,
-    PatchAnswer, PatchRequest, Problem, Projected, ProposalAnswer, ProposalApply, ProposalCreate,
-    ProposalEdit, ProposalReview, ProposalStep, RelinkRequest, RouteDetail, RouteImport, RoutePage,
-    SaveAsRouteRequest, SearchPage, Tick, TokenRequest, UpgradeRequest, Viewer,
+    AgentToken, AssistantRequest, Capabilities, EventPage, History, JourneyPage, Mine, MintedToken,
+    NodeDetail, PatchAnswer, PatchRequest, Problem, Projected, ProposalAnswer, ProposalApply,
+    ProposalCreate, ProposalEdit, ProposalReview, ProposalStep, RelinkRequest, RouteDetail,
+    RouteImport, RoutePage, SaveAsRouteRequest, SearchPage, Tick, TokenRequest, TurnReply,
+    UpgradeRequest, Viewer,
 };
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, Entity, EntityKey, ExplainedField,
@@ -107,6 +108,7 @@ fn operations() -> Vec<Operation> {
     all.extend(node_reads());
     all.extend(rest);
     all.extend(users());
+    all.extend(assistant());
     all
 }
 
@@ -467,6 +469,31 @@ fn users() -> Vec<Operation> {
     ]
 }
 
+/// The assistant's turns (I5), served when the capabilities offer the assistant.
+fn assistant() -> Vec<Operation> {
+    use crate::endpoints as at;
+    let turn = |endpoint, path, summary| Operation {
+        path,
+        body: Some(schema_of::<AssistantRequest>),
+        success: json::<TurnReply>(),
+        ..operation(endpoint, summary)
+    };
+    vec![
+        turn(
+            &at::ASSISTANT_JOURNEY,
+            &[JOURNEY_ID],
+            "One assistant turn about a journey, when the capabilities offer the assistant \
+             (I5): its direct writes with their consequences, and its proposals for review.",
+        ),
+        turn(
+            &at::ASSISTANT_ROUTE_DRAFT,
+            &[ROUTE_ID],
+            "One assistant turn about a route's draft, when the capabilities offer the \
+             assistant (I5, A12): what it drafts arrives as proposals on the draft.",
+        ),
+    ]
+}
+
 /// The OpenAPI document, pretty-printed with a trailing newline.
 ///
 /// # Panics
@@ -605,7 +632,10 @@ fn problems_of(operation: &Operation) -> Vec<(&'static str, &'static str)> {
     }
     if matches!(
         operation.endpoint.path,
-        "/users/me/tokens" | "/users/me/tokens/{agent}"
+        "/users/me/tokens"
+            | "/users/me/tokens/{agent}"
+            | "/journeys/{id}/assistant"
+            | "/routes/{id}/draft/assistant"
     ) {
         problems.push((
             "403",

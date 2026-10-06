@@ -1,6 +1,72 @@
 {
   "components": {
     "schemas": {
+      "Action": {
+        "description": "A write the assistant made, as the turn reports it (I5: every direct write is reported\nwith its consequences).",
+        "oneOf": [
+          {
+            "description": "Applied directly, as one patch.",
+            "properties": {
+              "consequences": {
+                "additionalProperties": false,
+                "description": "What it newly caused in each journey it changed (D7).",
+                "patternProperties": {
+                  "^j_[a-z0-9][a-z0-9_-]*$": {
+                    "$ref": "#/components/schemas/Consequences"
+                  }
+                },
+                "type": "object"
+              },
+              "outcome": {
+                "const": "applied",
+                "type": "string"
+              },
+              "receipt": {
+                "$ref": "#/components/schemas/PatchReceipt",
+                "description": "The patch's receipt."
+              },
+              "tool": {
+                "description": "The tool.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "tool",
+              "receipt"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "Drafted as a proposal for the user to review and apply.",
+            "properties": {
+              "because": {
+                "$ref": "#/components/schemas/Because",
+                "description": "Why it is a proposal."
+              },
+              "outcome": {
+                "const": "proposed",
+                "type": "string"
+              },
+              "proposal": {
+                "$ref": "#/components/schemas/ProposalId",
+                "description": "The proposal."
+              },
+              "tool": {
+                "description": "The tool.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "tool",
+              "proposal",
+              "because"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "Actor": {
         "additionalProperties": false,
         "description": "Who made a change (H2): a user, or an agent acting for one.",
@@ -317,6 +383,20 @@
           }
         ]
       },
+      "AssistantRequest": {
+        "additionalProperties": false,
+        "description": "`POST /journeys/{id}/assistant` and `POST /routes/{id}/draft/assistant`: one message of\nthe caller's conversation about that journey or draft.",
+        "properties": {
+          "message": {
+            "$ref": "#/components/schemas/Markdown",
+            "description": "What the user says."
+          }
+        },
+        "required": [
+          "message"
+        ],
+        "type": "object"
+      },
       "AttachmentKey": {
         "description": "Starts with \"a_\"; at most id_bytes_max (64) bytes.",
         "maxLength": 64,
@@ -372,6 +452,59 @@
           "kind"
         ],
         "type": "object"
+      },
+      "Because": {
+        "description": "Why a write became a proposal.",
+        "oneOf": [
+          {
+            "description": "It changes structure, or writes a route or its draft (PRD glossary, Structural change).",
+            "properties": {
+              "reason": {
+                "const": "structural",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "It touches more nodes than one direct write may (I5).",
+            "properties": {
+              "count": {
+                "description": "The nodes it writes; absent when it may write every node of its domain.",
+                "format": "uint32",
+                "minimum": 0,
+                "type": [
+                  "integer",
+                  "null"
+                ]
+              },
+              "reason": {
+                "const": "too_many_nodes",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The assistant drafted it as a proposal itself.",
+            "properties": {
+              "reason": {
+                "const": "asked",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason"
+            ],
+            "type": "object"
+          }
+        ]
       },
       "Blocker": {
         "additionalProperties": false,
@@ -1827,6 +1960,13 @@
         ],
         "type": "object"
       },
+      "ConversationId": {
+        "description": "Starts with \"cv_\"; at most id_bytes_max (64) bytes.",
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^cv_[a-z0-9][a-z0-9_-]*$",
+        "type": "string"
+      },
       "Cursor": {
         "description": "A position in a projection's order: where the next page starts (I3, J4). Valid for the\nsame journey revision and derive inputs; a page read at another revision starts over.",
         "format": "uint32",
@@ -2487,6 +2627,81 @@
         "maxLength": 256,
         "minLength": 1,
         "type": "string"
+      },
+      "Ended": {
+        "description": "How a turn ended. The writes before any ending stand and are reported.",
+        "oneOf": [
+          {
+            "description": "The assistant answered.",
+            "properties": {
+              "status": {
+                "const": "replied",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The provider did not answer within `assistant_provider_call` (120 s).",
+            "properties": {
+              "status": {
+                "const": "provider_timed_out",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The provider answered with an error.",
+            "properties": {
+              "message": {
+                "description": "What it said.",
+                "type": "string"
+              },
+              "status": {
+                "const": "provider_failed",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status",
+              "message"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The model was still calling tools after `assistant_tool_loop_iterations` (32) calls.",
+            "properties": {
+              "status": {
+                "const": "iteration_limit",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "The turn ran past `assistant_turn` (10 min).",
+            "properties": {
+              "status": {
+                "const": "turn_timed_out",
+                "type": "string"
+              }
+            },
+            "required": [
+              "status"
+            ],
+            "type": "object"
+          }
+        ]
       },
       "EngineVersion": {
         "description": "A version, as `0.1.0`.",
@@ -12318,6 +12533,43 @@
           }
         ]
       },
+      "TurnReply": {
+        "additionalProperties": false,
+        "description": "What one turn answers.",
+        "properties": {
+          "actions": {
+            "description": "Every write the assistant made, in order: applied with its consequences, or drafted\nas a proposal for review (I5).",
+            "items": {
+              "$ref": "#/components/schemas/Action"
+            },
+            "type": "array"
+          },
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation the turn was added to: the user's, about its target."
+          },
+          "ended": {
+            "$ref": "#/components/schemas/Ended",
+            "description": "How the turn ended."
+          },
+          "reply": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Markdown"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "What the assistant said last, if anything."
+          }
+        },
+        "required": [
+          "conversation",
+          "ended"
+        ],
+        "type": "object"
+      },
       "UnderlyingEdge": {
         "additionalProperties": false,
         "description": "One edge of the graph a canvas edge stands for: `dependent` waits on `requirement`.",
@@ -13773,6 +14025,135 @@
           }
         },
         "summary": "A journey with its graph and state."
+      }
+    },
+    "/journeys/{id}/assistant": {
+      "post": {
+        "operationId": "converseAboutJourney",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnReply"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "One assistant turn about a journey, when the capabilities offer the assistant (I5): its direct writes with their consequences, and its proposals for review."
       }
     },
     "/journeys/{id}/decisions": {
@@ -17155,6 +17536,135 @@
           }
         },
         "summary": "A route with its draft."
+      }
+    },
+    "/routes/{id}/draft/assistant": {
+      "post": {
+        "operationId": "converseAboutRouteDraft",
+        "parameters": [
+          {
+            "description": "The route.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RouteId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AssistantRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TurnReply"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "One assistant turn about a route's draft, when the capabilities offer the assistant (I5, A12): what it drafts arrives as proposals on the draft."
       }
     },
     "/routes/{id}/export": {

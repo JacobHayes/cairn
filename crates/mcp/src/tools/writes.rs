@@ -172,7 +172,27 @@ impl<S: Store + 'static> ToolSet<S> {
         name: &str,
         arguments: Value,
     ) -> Result<Value, ToolError> {
-        let submitted = match name {
+        if name == "import_route" {
+            return output(self.import_route(call, parse(arguments)?).await);
+        }
+        let Some(submitted) = self.drafted_patch_of(name, arguments).await? else {
+            return Err(ToolError::UnknownTool {
+                name: name.to_owned(),
+            });
+        };
+        let written = self.service.patch(call, &submitted).await;
+        output(written.map(WriteOutput::from).map_err(ToolError::from))
+    }
+
+    /// The domain patch the direct-write tool `name` submits for `arguments`, worked out
+    /// without writing; `None` for `import_route`, whose patch the service builds from the
+    /// file, and for a name that is not a direct-write tool.
+    pub(crate) async fn drafted_patch_of(
+        &self,
+        name: &str,
+        arguments: Value,
+    ) -> Result<Option<DomainPatch>, ToolError> {
+        let drafted = match name {
             "answer_decision" => parse::<AnswerDecision>(arguments)?.patch(),
             "transition_node" => parse::<TransitionNode>(arguments)?.patch(),
             "assign" => parse::<Assign>(arguments)?.patch(),
@@ -185,14 +205,10 @@ impl<S: Store + 'static> ToolSet<S> {
             "apply_patch" => parse::<ApplyPatch>(arguments)?.patch(),
             "open_draft" => parse::<OpenDraft>(arguments)?.patch(),
             "publish_draft" => parse::<PublishDraft>(arguments)?.patch(),
-            "import_route" => return output(self.import_route(call, parse(arguments)?).await),
             "manage_entity" => self.entity_patch(parse(arguments)?).await,
-            _ => Err(ToolError::UnknownTool {
-                name: name.to_owned(),
-            }),
+            _ => return Ok(None),
         }?;
-        let written = self.service.patch(call, &submitted).await;
-        output(written.map(WriteOutput::from).map_err(ToolError::from))
+        Ok(Some(drafted))
     }
 
     /// `import_route`: one route patch (A13).

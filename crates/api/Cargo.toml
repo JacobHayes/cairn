@@ -10,6 +10,7 @@ publish.workspace = true
 
 [dependencies]
 axum = { workspace = true, features = ["matched-path"] }
+cairn-assistant.workspace = true
 cairn-auth.workspace = true
 cairn-engine.workspace = true
 cairn-mcp.workspace = true

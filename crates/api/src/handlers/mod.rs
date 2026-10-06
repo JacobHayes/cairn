@@ -2,6 +2,7 @@
 //! auth call) as the caller the auth layer named, and answers its wire shape. None decides
 //! anything the service does not: the API shapes the service's vocabulary for HTTP and
 //! never bypasses it (ARCHITECTURE, Service layer and composition).
+pub mod assistant;
 pub mod bulk;
 pub mod projections;
 pub mod proposals;

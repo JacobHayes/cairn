@@ -1,0 +1,167 @@
+{
+  "source": "Written from the OpenAI Responses API reference (POST /v1/responses, function calling, stateless reasoning), not captured live: a live capture needs a credential (DECISIONS.md, 4.4).",
+  "path": "/v1/responses",
+  "headers": {
+    "authorization": "Bearer test-key"
+  },
+  "exchanges": [
+    {
+      "request": {
+        "model": "gpt-5",
+        "instructions": "You are a test assistant.",
+        "input": [
+          {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "What is next on j_one?"
+              }
+            ]
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "get_snapshot",
+            "description": "Reads a journey.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "journey": {
+                  "type": "string",
+                  "description": "The journey."
+                }
+              },
+              "required": [
+                "journey"
+              ]
+            },
+            "strict": false
+          }
+        ],
+        "store": false,
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      },
+      "response": {
+        "id": "resp_68af402f9fbc8193a8b5e5b0a0a6e2c3",
+        "object": "response",
+        "created_at": 1756315695,
+        "status": "completed",
+        "model": "gpt-5",
+        "output": [
+          {
+            "type": "reasoning",
+            "id": "rs_68af4030592c81938ec0a5fbab4a3e9f",
+            "summary": [],
+            "encrypted_content": "gAAAAABor0Aw-encrypted-reasoning"
+          },
+          {
+            "type": "function_call",
+            "id": "fc_68af4030a3c081939a0f6f4a9d5bd0ad",
+            "call_id": "call_dpXL1Hn9QeQyK0Zp0EsZ3mVg",
+            "name": "get_snapshot",
+            "arguments": "{\"journey\":\"j_one\"}",
+            "status": "completed"
+          }
+        ],
+        "usage": {
+          "input_tokens": 512,
+          "output_tokens": 64,
+          "total_tokens": 576
+        }
+      }
+    },
+    {
+      "request": {
+        "model": "gpt-5",
+        "instructions": "You are a test assistant.",
+        "input": [
+          {
+            "type": "message",
+            "role": "user",
+            "content": [
+              {
+                "type": "input_text",
+                "text": "What is next on j_one?"
+              }
+            ]
+          },
+          {
+            "type": "reasoning",
+            "id": "rs_68af4030592c81938ec0a5fbab4a3e9f",
+            "summary": [],
+            "encrypted_content": "gAAAAABor0Aw-encrypted-reasoning"
+          },
+          {
+            "type": "function_call",
+            "id": "fc_68af4030a3c081939a0f6f4a9d5bd0ad",
+            "call_id": "call_dpXL1Hn9QeQyK0Zp0EsZ3mVg",
+            "name": "get_snapshot",
+            "arguments": "{\"journey\":\"j_one\"}",
+            "status": "completed"
+          },
+          {
+            "type": "function_call_output",
+            "call_id": "call_dpXL1Hn9QeQyK0Zp0EsZ3mVg",
+            "output": "{\"revision\":3}"
+          }
+        ],
+        "tools": [
+          {
+            "type": "function",
+            "name": "get_snapshot",
+            "description": "Reads a journey.",
+            "parameters": {
+              "type": "object",
+              "properties": {
+                "journey": {
+                  "type": "string",
+                  "description": "The journey."
+                }
+              },
+              "required": [
+                "journey"
+              ]
+            },
+            "strict": false
+          }
+        ],
+        "store": false,
+        "include": [
+          "reasoning.encrypted_content"
+        ]
+      },
+      "response": {
+        "id": "resp_68af4031c3d48193b2b1f51c2a9f7c3e",
+        "object": "response",
+        "created_at": 1756315697,
+        "status": "completed",
+        "model": "gpt-5",
+        "output": [
+          {
+            "type": "message",
+            "id": "msg_68af4032d1f08193b6c4a7e1a3b7d2f5",
+            "status": "completed",
+            "role": "assistant",
+            "content": [
+              {
+                "type": "output_text",
+                "text": "Nothing is blocked; start the plan.",
+                "annotations": []
+              }
+            ]
+          }
+        ],
+        "usage": {
+          "input_tokens": 640,
+          "output_tokens": 12,
+          "total_tokens": 652
+        }
+      }
+    }
+  ]
+}

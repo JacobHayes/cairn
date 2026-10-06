@@ -3,11 +3,13 @@
 //! rejections) cross unchanged as the schema crate's types; these wrap them, and give the
 //! service's answers and the store's query results a wire shape.
 
+mod assistant;
 mod projections;
 mod proposals;
 mod reads;
 mod users;
 
+pub use assistant::{AssistantRequest, TurnReply};
 pub use projections::{ChildEntry, History, Mine, NodeDetail, Projected};
 pub use proposals::{
     ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalReview, ProposalStep,

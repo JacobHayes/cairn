@@ -440,6 +440,7 @@ name = "cairn-api"
 version = "0.1.0"
 dependencies = [
  "axum",
+ "cairn-assistant",
  "cairn-auth",
  "cairn-engine",
  "cairn-mcp",
@@ -463,6 +464,30 @@ dependencies = [
  "serde_path_to_error",
  "tokio",
  "tower",
+ "tracing",
+ "url",
+]
+
+[[package]]
+name = "cairn-assistant"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "cairn-auth",
+ "cairn-engine",
+ "cairn-mcp",
+ "cairn-schema",
+ "cairn-service",
+ "cairn-store",
+ "jiff",
+ "metrics",
+ "patina-dst",
+ "reqwest",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tokio",
  "tracing",
  "url",
 ]

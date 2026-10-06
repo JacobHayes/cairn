@@ -12,6 +12,7 @@ publish = false
 
 [workspace.dependencies]
 cairn-api = { path = "crates/api" }
+cairn-assistant = { path = "crates/assistant" }
 cairn-auth = { path = "crates/auth" }
 cairn-engine = { path = "crates/engine" }
 cairn-mcp = { path = "crates/mcp" }
@@ -56,6 +57,10 @@ jsonschema = { version = "0.58.5", default-features = false }
 # The MCP endpoint (ARCHITECTURE, MCP endpoint names it): rmcp's server over Streamable HTTP
 # as a tower service the API mounts; its client only drives the endpoint in tests.
 rmcp = { version = "3.5.1", default-features = false }
+# The assistant's providers (ARCHITECTURE, Assistant): one JSON POST per model call over
+# HTTPS. reqwest is already in the tree under openidconnect with these features (rustls,
+# webpki roots), so the assistant adds no new crate.
+reqwest = { version = "0.12.28", default-features = false, features = ["rustls-tls"] }
 jiff = { version = "0.2.37", default-features = false, features = ["serde", "std"] }
 proptest = { version = "1.11.0", default-features = false, features = ["std", "bit-set"] }
 schemars = { version = "1.2.2", features = ["jiff02"] }

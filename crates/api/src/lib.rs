@@ -26,6 +26,7 @@ pub mod wire;
 use axum::Router;
 use axum::middleware;
 use axum::routing::{MethodRouter, delete, get, post};
+use cairn_assistant::Assistant;
 use cairn_auth::Auth;
 use cairn_schema::Actor;
 use cairn_service::{Call, Service};
@@ -33,10 +34,12 @@ use cairn_store::Store;
 
 use crate::endpoints::Endpoint;
 
-/// What every handler holds: the service, and auth for its accounts and clock.
+/// What every handler holds: the service, auth for its accounts and clock, and the
+/// assistant when the host assembled one.
 pub(crate) struct Api<S> {
     service: Service<S>,
     auth: Auth<S>,
+    assistant: Option<Assistant<S>>,
 }
 
 impl<S> Clone for Api<S> {
@@ -44,6 +47,7 @@ impl<S> Clone for Api<S> {
         Self {
             service: self.service.clone(),
             auth: self.auth.clone(),
+            assistant: self.assistant.clone(),
         }
     }
 }
@@ -63,13 +67,37 @@ type Served<S> = Vec<(&'static Endpoint, MethodRouter<Api<S>>)>;
 
 /// The API: every endpoint behind `auth`'s layer, with the MCP endpoint at `/mcp` when the
 /// service's capabilities offer it (I2), auth's own routes beside them, the request limits,
-/// and observability, over `service`. `auth` must share the service's store.
+/// and observability, over `service`. `auth` must share the service's store. No assistant:
+/// see [`router_with_assistant`].
 pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router {
+    router_with_assistant(service, auth, None)
+}
+
+/// [`router`], with the assistant's endpoints when the host's root assembled one (I5;
+/// ARCHITECTURE, Service layer and composition: absence is a `None` at the root). They sit
+/// behind the auth layer and the body and in-flight limits but outside the request
+/// duration, since a turn waits on the model provider under its own limits.
+///
+/// # Panics
+///
+/// When the service's capabilities say otherwise than `assistant` about the assistant: the
+/// capabilities document must say what is served.
+pub fn router_with_assistant<S: Store + 'static>(
+    service: Service<S>,
+    auth: &Auth<S>,
+    assistant: Option<Assistant<S>>,
+) -> Router {
     use crate::endpoints as at;
     use crate::handlers as handle;
+    assert_eq!(
+        service.capabilities().assistant,
+        assistant.is_some(),
+        "the capabilities offer the assistant exactly when one is mounted"
+    );
     let api = Api {
         service,
         auth: auth.clone(),
+        assistant,
     };
     let mut served: Served<S> = vec![
         (&at::CAPABILITIES, get(handle::capabilities::<S>)),
@@ -100,6 +128,13 @@ pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router
     for (endpoint, method_router) in served {
         routes = routes.route(endpoint.path, method_router);
     }
+    let conversing = api.assistant.is_some().then(|| {
+        let mut routes = Router::new();
+        for (endpoint, method_router) in handle::assistant::served::<S>() {
+            routes = routes.route(endpoint.path, method_router);
+        }
+        routes.with_state(api.clone())
+    });
     let mcp = api.service.capabilities().mcp.then(|| {
         let tools = cairn_mcp::ToolSet::new(api.service.clone(), auth.accounts().clock().clone());
         cairn_mcp::router(tools)
@@ -115,6 +150,12 @@ pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router
     // The duration limit is the API's, inside the auth layer: auth's own routes and layer
     // wait on identity providers under their own limit.
     let routes = admission::timed(routes);
+    // I5: the assistant's turns, outside the request duration (PRACTICES, Explicit limits:
+    // its provider call and turn limits hold them instead).
+    let routes = match conversing {
+        Some(conversing) => routes.merge(conversing),
+        None => routes,
+    };
     let app = auth
         .protect(routes)
         .merge(auth.router())
