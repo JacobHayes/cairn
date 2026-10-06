@@ -165,15 +165,26 @@ impl World {
     /// Publishes the vendor evaluation's route as `ann` and runs its scenario's first
     /// `steps` steps, each at its own time; answers `ann`'s transport.
     pub async fn vendor_after(&self, steps: usize) -> Transport {
+        self.vendor(steps, false).await
+    }
+
+    /// As [`World::vendor_after`], with the steps left out of the transcript but for a note:
+    /// set-up a proof does not show.
+    pub async fn vendor_quietly(&self, steps: usize) -> Transport {
+        self.vendor(steps, true).await
+    }
+
+    async fn vendor(&self, steps: usize, quietly: bool) -> Transport {
         let ann = self.signed_in("ann");
         let seed = publish_fixture_route("vendor-evaluation");
-        let quiet = Transport::new(self.address, Some("team-ann".to_owned()));
+        let quiet = self.quiet("ann");
         let reply = post(&quiet, "/routes/vendor-evaluation/patches", &request(&seed)).await;
         ok::<serde_json::Value>(&reply);
         transcript::note(
             "*Set up, not shown: the vendor evaluation's route published as version 1 by one \
              route patch (`POST /routes/vendor-evaluation/patches`).*",
         );
+        let stepping = if quietly { &quiet } else { &ann };
         for step in scenario("vendor-evaluation")
             .steps
             .as_slice()
@@ -182,7 +193,20 @@ impl World {
         {
             self.clock.set_to(step.at);
             let body = serde_json::json!({ "patch": step.patch, "note": step.note });
-            ok::<serde_json::Value>(&post(&ann, "/journeys/j_vendor_eval/patches", &body).await);
+            ok::<serde_json::Value>(
+                &post(stepping, "/journeys/j_vendor_eval/patches", &body).await,
+            );
+        }
+        if quietly && steps > 0 {
+            let which = if steps == 1 {
+                "first scenario step, a journey patch".to_owned()
+            } else {
+                format!("scenario steps 1 to {steps}, journey patches")
+            };
+            transcript::note(&format!(
+                "*Set up, not shown: the vendor evaluation's {which} as ann (`POST \
+                 /journeys/j_vendor_eval/patches`).*"
+            ));
         }
         ann
     }
@@ -195,6 +219,11 @@ impl World {
             .await
             .unwrap();
         journey.unwrap().revision.get()
+    }
+
+    /// A transport signed in as `member`, its exchanges left out of the transcript.
+    pub fn quiet(&self, member: &str) -> Transport {
+        Transport::new(self.address, Some(format!("team-{member}")))
     }
 
     /// A transport with no credentials.
@@ -297,4 +326,59 @@ pub fn patch(id: &str, target: &str, base: u32, mutations: &str) -> Patch {
 /// The body of `POST /{domain}/patches` for `patch`, with no note.
 pub fn request(patch: &Patch) -> serde_json::Value {
     serde_json::json!({ "patch": patch })
+}
+
+/// A proposal for each kind of destination, as `(create endpoint, its path, proposal id,
+/// draft)`, against the vendor evaluation after kickoff: the journey's adds a charter that
+/// kickoff, already reached, requires, so its preview has consequences (D7); the route's
+/// creates a route at revision 0; the deployment's creates an entity.
+pub async fn proposals_of_every_domain(
+    transport: &Transport,
+) -> Vec<(
+    &'static cairn_api::endpoints::Endpoint,
+    String,
+    &'static str,
+    serde_json::Value,
+)> {
+    use cairn_api::endpoints as at;
+    let journey: cairn_schema::Journey = get(transport, "/journeys/j_vendor_eval").await;
+    let deployment: cairn_schema::Deployment = get(transport, "/deployment").await;
+    let charter = serde_json::json!({
+        "title": "Charter first",
+        "destination_revision": journey.revision,
+        "mutations": [
+            {"op": "add_node", "node": {"key": "n_charter", "id": "charter", "kind": "action", "title": "Charter"}},
+            {"op": "add_edge", "edge": {"node": "n_kickoff", "requires": "n_charter"}},
+        ],
+    });
+    let route = serde_json::json!({
+        "title": "A new route",
+        "destination_revision": 0,
+        "mutations": [{"op": "create_route", "name": "New route"}],
+    });
+    let entity = serde_json::json!({
+        "title": "A new person",
+        "destination_revision": deployment.revision,
+        "mutations": [{"op": "create_entity", "entity": {"key": "e_new", "name": "New person"}}],
+    });
+    vec![
+        (
+            &at::PROPOSE_JOURNEY,
+            "/journeys/j_vendor_eval/proposals".to_owned(),
+            "pr_charter",
+            charter,
+        ),
+        (
+            &at::PROPOSE_ROUTE,
+            "/routes/new-route/proposals".to_owned(),
+            "pr_route",
+            route,
+        ),
+        (
+            &at::PROPOSE_DEPLOYMENT,
+            "/deployment/proposals".to_owned(),
+            "pr_entity",
+            entity,
+        ),
+    ]
 }

@@ -9,8 +9,9 @@ use std::fmt;
 use std::str::FromStr;
 
 use cairn_schema::{
-    Domain, EntityKey, EventType, JourneyId, JourneyStatus, NodeKey, PatchId, ProposalId,
-    RevisionOf, RouteId, Timestamp, Title, UserId, VersionNumber,
+    Cursor, Domain, EntityKey, EventType, JourneyId, JourneyStatus, KindKey, ListFlag, ListQuery,
+    NextQuery, NodeKey, NodeKind, PatchId, ProposalId, Revision, RevisionOf, RouteId,
+    SnapshotScope, SortBy, State, Timestamp, Title, UserId, VersionNumber,
 };
 use cairn_store::{EventQuery, JourneyQuery, PageSize, SearchQuery, Watch};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
@@ -19,6 +20,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::error::ApiError;
 use crate::extract::parse_text;
+use crate::wire::ProblemCode;
 
 /// One query parameter an endpoint takes.
 #[derive(Clone, Copy, Debug)]
@@ -122,6 +124,100 @@ pub const STREAM_PARAMS: &[ParamSpec] = &[ParamSpec {
     )
 }];
 
+const CURSOR: ParamSpec = ParamSpec::one::<Cursor>(
+    "cursor",
+    "Where the page starts: the previous page's `next`. A cursor is a position in the order \
+     at one journey revision, so a cursor past the start needs `revision`.",
+);
+
+const REVISION: ParamSpec = ParamSpec::one::<Revision>(
+    "revision",
+    "The journey revision the previous page was read at (its `revision`); needed with a cursor \
+     past the start. When the journey has moved since, the page is refused 409 `page_moved`: \
+     start again from the first page.",
+);
+
+const KINDS: ParamSpec =
+    ParamSpec::many::<NodeKind>("kind", "Only nodes of these kinds; every kind when none.");
+
+const SORT: ParamSpec = ParamSpec::one::<SortBy>("sort", "The signal to sort by; rank when none.");
+
+/// `GET /journeys/{id}/snapshot` (I3).
+pub const SNAPSHOT_PARAMS: &[ParamSpec] = &[
+    ParamSpec::one::<NodeKey>(
+        "subtree",
+        "This node and everything beneath it; the whole journey when none.",
+    ),
+    ParamSpec::one::<u32>(
+        "depth",
+        "How many levels below the subtree's node (or of roots, at 1) the node list goes; every \
+         level when none.",
+    ),
+    CURSOR,
+    REVISION,
+];
+
+/// `GET /journeys/{id}/level` (C2).
+pub const LEVEL_PARAMS: &[ParamSpec] = &[
+    ParamSpec::many::<NodeKind>("kind", "The kinds shown; every kind when none."),
+    ParamSpec::one::<NodeKey>(
+        "container",
+        "The container drilled into; the top level when none.",
+    ),
+];
+
+/// `GET /journeys/{id}/next` (C10).
+pub const NEXT_PARAMS: &[ParamSpec] = &[
+    SORT,
+    ParamSpec::one::<bool>("mine", "Only nodes the caller participates in (E4)."),
+    KINDS,
+    ParamSpec::one::<NodeKey>("within", "Only this node and the nodes beneath it."),
+    ParamSpec::one::<bool>(
+        "for_viewer",
+        "Rank for the caller: prioritize for me (Priority).",
+    ),
+];
+
+/// `GET /journeys/{id}/nodes` (C9).
+pub const LIST_PARAMS: &[ParamSpec] = &[
+    ParamSpec::many::<ListFlag>(
+        "flag",
+        "Filters with no argument; every one given must hold.",
+    ),
+    ParamSpec::one::<NodeKey>("within", "Only nodes beneath this container."),
+    ParamSpec::one::<EntityKey>("owner", "Only nodes this entity owns."),
+    ParamSpec::many::<State>("state", "Only nodes in these stored states; any when none."),
+    KINDS,
+    ParamSpec::one::<Title>(
+        "text",
+        "Text found in the title, description, notes, or resources, ignoring ASCII case.",
+    ),
+    SORT,
+    CURSOR,
+    REVISION,
+];
+
+/// `GET /journeys/{id}/mine` (E4).
+pub const MINE_PARAMS: &[ParamSpec] = &[ParamSpec::many::<KindKey>(
+    "kind",
+    "Only these participation kinds; every kind when none.",
+)];
+
+/// `GET /journeys/{id}/nodes/{key}/explanations/{field}`.
+pub const EXPLANATION_PARAMS: &[ParamSpec] = &[CURSOR, REVISION];
+
+/// `GET /journeys/{id}/history` (J4).
+pub const HISTORY_PARAMS: &[ParamSpec] = &[
+    ParamSpec::one::<NodeKey>("node", "Only the events that wrote anything on this node."),
+    ParamSpec::one::<u64>("after", "The page starts after this position in the log."),
+];
+
+/// `GET /routes/{id}/export` (A13).
+pub const EXPORT_PARAMS: &[ParamSpec] = &[ParamSpec::one::<VersionNumber>(
+    "version",
+    "The published version to export; the draft when none.",
+)];
+
 /// A request's query parameters, checked against what its endpoint declares.
 #[derive(Debug)]
 pub struct Params {
@@ -186,6 +282,40 @@ impl Params {
         Ok(self.all(name)?.into_iter().next())
     }
 
+    /// Where a projection's page starts: `cursor`, or the first item.
+    ///
+    /// # Errors
+    ///
+    /// A bad request when it does not parse.
+    pub fn cursor(&self) -> Result<Cursor, ApiError> {
+        Ok(self.one("cursor")?.unwrap_or(Cursor::START))
+    }
+
+    /// I3, C9: a page past the start continues the order at the revision its cursor came
+    /// from, so the projection's revision `at` must be the `revision` given with it; a first
+    /// page needs none, and checks one given.
+    ///
+    /// # Errors
+    ///
+    /// A bad request when a cursor past the start comes without a revision, or either does not
+    /// parse; `page_moved` when the journey is no longer at that revision.
+    pub fn page_at(&self, at: Revision) -> Result<(), ApiError> {
+        let read_at: Option<Revision> = self.one("revision")?;
+        match read_at {
+            None if self.cursor()? != Cursor::START => Err(ApiError::bad_request(
+                "a cursor past the start needs the revision of the page it came from",
+            )),
+            Some(read_at) if read_at != at => Err(ApiError::problem(
+                ProblemCode::PageMoved,
+                format!(
+                    "the journey moved from revision {read_at} to {at} since that page was \
+                     read; start again from the first page"
+                ),
+            )),
+            None | Some(_) => Ok(()),
+        }
+    }
+
     fn size(&self) -> Result<PageSize, ApiError> {
         Ok(self
             .one::<u32>("size")?
@@ -246,6 +376,83 @@ pub fn events(params: &Params) -> Result<EventQuery, ApiError> {
         after: params.one("after")?,
         size: params.size()?,
     })
+}
+
+/// I3: the snapshot's scope.
+///
+/// # Errors
+///
+/// A bad request for a parameter that does not parse.
+pub fn snapshot(params: &Params) -> Result<SnapshotScope, ApiError> {
+    Ok(SnapshotScope {
+        subtree: params.one("subtree")?,
+        depth: params.one("depth")?,
+        cursor: params.cursor()?,
+    })
+}
+
+/// C2: the kinds a level shows (every kind when none is given) and the container drilled into.
+///
+/// # Errors
+///
+/// A bad request for a parameter that does not parse.
+pub fn level(params: &Params) -> Result<(BTreeSet<NodeKind>, Option<NodeKey>), ApiError> {
+    let mut shown: BTreeSet<NodeKind> = params.all("kind")?.into_iter().collect();
+    if shown.is_empty() {
+        shown = NodeKind::ALL.into_iter().collect();
+    }
+    Ok((shown, params.one("container")?))
+}
+
+/// C10: the next list's query.
+///
+/// # Errors
+///
+/// A bad request for a parameter that does not parse.
+pub fn next(params: &Params) -> Result<NextQuery, ApiError> {
+    Ok(NextQuery {
+        sort: params.one("sort")?.unwrap_or_default(),
+        mine: params.one("mine")?.unwrap_or(false),
+        kinds: params.all("kind")?.into_iter().collect(),
+        within: params.one("within")?,
+        for_viewer: params.one("for_viewer")?.unwrap_or(false),
+    })
+}
+
+/// C9: the list's query.
+///
+/// # Errors
+///
+/// A bad request for a parameter that does not parse.
+pub fn list(params: &Params) -> Result<ListQuery, ApiError> {
+    Ok(ListQuery {
+        flags: params.all("flag")?.into_iter().collect(),
+        within: params.one("within")?,
+        owner: params.one("owner")?,
+        states: params.all("state")?.into_iter().collect(),
+        kinds: params.all("kind")?.into_iter().collect(),
+        text: params.one("text")?,
+        sort: params.one("sort")?.unwrap_or_default(),
+        cursor: params.cursor()?,
+    })
+}
+
+/// E4: the participation kinds asked for; every kind when empty.
+///
+/// # Errors
+///
+/// A bad request for a value that does not parse.
+pub fn mine(params: &Params) -> Result<BTreeSet<KindKey>, ApiError> {
+    Ok(params.all("kind")?.into_iter().collect())
+}
+
+/// J4: the node whose history is asked for, and where the page starts.
+///
+/// # Errors
+///
+/// A bad request for a parameter that does not parse.
+pub fn history(params: &Params) -> Result<(Option<NodeKey>, Option<u64>), ApiError> {
+    Ok((params.one("node")?, params.one("after")?))
 }
 
 /// H6: what a stream watches.

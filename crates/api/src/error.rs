@@ -7,8 +7,9 @@
 use axum::http::header::RETRY_AFTER;
 use axum::http::{HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
+use cairn_engine::DraftError;
 use cairn_schema::Rejection;
-use cairn_service::ServiceError;
+use cairn_service::{ProposeError, ReadError, ServiceError, WriteError};
 use cairn_store::StoreError;
 
 use crate::observe;
@@ -57,9 +58,11 @@ pub fn status_of(code: ProblemCode) -> StatusCode {
     match code {
         ProblemCode::BadRequest | ProblemCode::TargetMismatch => StatusCode::BAD_REQUEST,
         ProblemCode::UnsupportedMediaType => StatusCode::UNSUPPORTED_MEDIA_TYPE,
+        ProblemCode::CannotDraft => StatusCode::UNPROCESSABLE_ENTITY,
         ProblemCode::PayloadTooLarge => StatusCode::PAYLOAD_TOO_LARGE,
         ProblemCode::NotFound | ProblemCode::NoSuchEndpoint => StatusCode::NOT_FOUND,
         ProblemCode::MethodNotAllowed => StatusCode::METHOD_NOT_ALLOWED,
+        ProblemCode::PageMoved => StatusCode::CONFLICT,
         ProblemCode::UserOnly => StatusCode::FORBIDDEN,
         ProblemCode::Overloaded
         | ProblemCode::SubscriberLimit
@@ -125,6 +128,50 @@ impl From<ServiceError> for ApiError {
                 metrics::counter!(observe::ENGINE_PANICS).increment(1);
                 ApiError::problem(ProblemCode::EnginePanic, error.to_string())
             }
+        }
+    }
+}
+
+impl From<ReadError> for ApiError {
+    fn from(error: ReadError) -> Self {
+        match error {
+            ReadError::JourneyMissing(id) => ApiError::not_found(format_args!("journey {id}")),
+            ReadError::ProposalMissing(id) => ApiError::not_found(format_args!("proposal {id}")),
+            // The query names a node the journey does not hold (the engine's one projection
+            // error).
+            ReadError::Projection(error) => {
+                ApiError::problem(ProblemCode::NotFound, error.to_string())
+            }
+            ReadError::Failed(error) => error.into(),
+        }
+    }
+}
+
+impl From<WriteError> for ApiError {
+    fn from(error: WriteError) -> Self {
+        match error {
+            WriteError::Rejected(rejection) => ApiError::Rejected(rejection),
+            WriteError::Failed(error) => error.into(),
+        }
+    }
+}
+
+impl From<ProposeError> for ApiError {
+    fn from(error: ProposeError) -> Self {
+        match error {
+            ProposeError::Draft(DraftError::JourneyMissing(id)) => {
+                ApiError::not_found(format_args!("journey {id}"))
+            }
+            ProposeError::Draft(DraftError::VersionMissing(lineage)) => ApiError::not_found(
+                format_args!("version {} of route {}", lineage.version, lineage.route),
+            ),
+            ProposeError::Draft(
+                error @ (DraftError::NoLineage(_)
+                | DraftError::NotNewer { .. }
+                | DraftError::TooLarge),
+            ) => ApiError::problem(ProblemCode::CannotDraft, error.to_string()),
+            ProposeError::ProposalMissing(id) => ApiError::not_found(format_args!("proposal {id}")),
+            ProposeError::Write(error) => error.into(),
         }
     }
 }

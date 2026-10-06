@@ -81,6 +81,45 @@ pub static PATCH_ROUTE: Endpoint = endpoint(Method::POST, "/routes/{id}/patches"
 /// `POST /deployment/patches`: a deployment patch (entities, merges).
 pub static PATCH_DEPLOYMENT: Endpoint =
     endpoint(Method::POST, "/deployment/patches", "patchDeployment");
+/// `POST /journeys/{id}/proposals`: a proposal for a journey, which may not exist yet (I6).
+pub static PROPOSE_JOURNEY: Endpoint =
+    endpoint(Method::POST, "/journeys/{id}/proposals", "proposeToJourney");
+/// `POST /routes/{id}/proposals`: a proposal for a route, which may not exist yet (I6).
+pub static PROPOSE_ROUTE: Endpoint =
+    endpoint(Method::POST, "/routes/{id}/proposals", "proposeToRoute");
+/// `POST /deployment/proposals`: a proposal for the deployment (I6).
+pub static PROPOSE_DEPLOYMENT: Endpoint =
+    endpoint(Method::POST, "/deployment/proposals", "proposeToDeployment");
+/// `GET /proposals/{id}`: a proposal by its client-generated id (I6).
+pub static PROPOSAL: Endpoint = endpoint(Method::GET, "/proposals/{id}", "getProposal");
+/// `PATCH /proposals/{id}`: replaces a proposal's content against its editing revision.
+pub static EDIT_PROPOSAL: Endpoint = endpoint(Method::PATCH, "/proposals/{id}", "editProposal");
+/// `POST /proposals/{id}/preview`: what applying it now would do (C14, D7).
+pub static PREVIEW_PROPOSAL: Endpoint =
+    endpoint(Method::POST, "/proposals/{id}/preview", "previewProposal");
+/// `POST /proposals/{id}/apply`: applies it, the caller confirming (H2, I6).
+pub static APPLY_PROPOSAL: Endpoint =
+    endpoint(Method::POST, "/proposals/{id}/apply", "applyProposal");
+/// `POST /proposals/{id}/discard`: discards it.
+pub static DISCARD_PROPOSAL: Endpoint =
+    endpoint(Method::POST, "/proposals/{id}/discard", "discardProposal");
+/// `POST /proposals/{id}/refresh`: drafts it again against its destination as it stands (I6).
+pub static REFRESH_PROPOSAL: Endpoint =
+    endpoint(Method::POST, "/proposals/{id}/refresh", "refreshProposal");
+/// `POST /journeys/{id}/upgrade`: proposes upgrading it to a newer route version (B7).
+pub static UPGRADE: Endpoint = endpoint(Method::POST, "/journeys/{id}/upgrade", "proposeUpgrade");
+/// `POST /journeys/{id}/save-as-route`: proposes saving its structure as a route draft (B8).
+pub static SAVE_AS_ROUTE: Endpoint = endpoint(
+    Method::POST,
+    "/journeys/{id}/save-as-route",
+    "proposeSaveAsRoute",
+);
+/// `POST /journeys/{id}/relink`: proposes re-linking it to a published version (B9).
+pub static RELINK: Endpoint = endpoint(Method::POST, "/journeys/{id}/relink", "proposeRelink");
+/// `POST /routes/{id}/import`: imports a route file as a new route or draft (A13).
+pub static IMPORT_ROUTE: Endpoint = endpoint(Method::POST, "/routes/{id}/import", "importRoute");
+/// `GET /routes/{id}/export`: a version or the draft as a route file (A13).
+pub static EXPORT_ROUTE: Endpoint = endpoint(Method::GET, "/routes/{id}/export", "exportRoute");
 /// `GET /journeys`: the journey index (C16).
 pub static JOURNEYS: Endpoint = endpoint(Method::GET, "/journeys", "listJourneys");
 /// `GET /journeys/{id}`: a journey with its graph and state.
@@ -88,6 +127,36 @@ pub static JOURNEY: Endpoint = endpoint(Method::GET, "/journeys/{id}", "getJourn
 /// `GET /journeys/{id}/document`: the domain document the browser derives.
 pub static DOCUMENT: Endpoint =
     endpoint(Method::GET, "/journeys/{id}/document", "getJourneyDocument");
+/// `GET /journeys/{id}/snapshot`: the bounded agent snapshot, scoped and paged (I3).
+pub static SNAPSHOT: Endpoint =
+    endpoint(Method::GET, "/journeys/{id}/snapshot", "getJourneySnapshot");
+/// `GET /journeys/{id}/level`: one canvas level (C2).
+pub static LEVEL: Endpoint = endpoint(Method::GET, "/journeys/{id}/level", "getJourneyLevel");
+/// `GET /journeys/{id}/trace/{key}`: what is upstream and downstream of a node (C7).
+pub static TRACE: Endpoint = endpoint(Method::GET, "/journeys/{id}/trace/{key}", "traceNode");
+/// `GET /journeys/{id}/decisions`: the decision view (C12).
+pub static DECISIONS: Endpoint =
+    endpoint(Method::GET, "/journeys/{id}/decisions", "getDecisionView");
+/// `GET /journeys/{id}/timeline`: the timeline (C13).
+pub static TIMELINE: Endpoint = endpoint(Method::GET, "/journeys/{id}/timeline", "getTimeline");
+/// `GET /journeys/{id}/summary`: the status summary (C18).
+pub static SUMMARY: Endpoint = endpoint(Method::GET, "/journeys/{id}/summary", "getStatusSummary");
+/// `GET /journeys/{id}/next`: the ranked acting frontier (C10).
+pub static NEXT: Endpoint = endpoint(Method::GET, "/journeys/{id}/next", "getNext");
+/// `GET /journeys/{id}/nodes`: the nodes a list query matches, paged (C9).
+pub static NODES: Endpoint = endpoint(Method::GET, "/journeys/{id}/nodes", "listNodes");
+/// `GET /journeys/{id}/mine`: the nodes the caller participates in (E4).
+pub static MINE: Endpoint = endpoint(Method::GET, "/journeys/{id}/mine", "getMine");
+/// `GET /journeys/{id}/nodes/{key}`: one node in full, explanations capped (C8).
+pub static NODE: Endpoint = endpoint(Method::GET, "/journeys/{id}/nodes/{key}", "getNode");
+/// `GET /journeys/{id}/nodes/{key}/explanations/{field}`: a page of one explanation list.
+pub static EXPLANATIONS: Endpoint = endpoint(
+    Method::GET,
+    "/journeys/{id}/nodes/{key}/explanations/{field}",
+    "listExplanations",
+);
+/// `GET /journeys/{id}/history`: the journey's events, or a node's, grouped by patch (J4).
+pub static HISTORY: Endpoint = endpoint(Method::GET, "/journeys/{id}/history", "getHistory");
 /// `GET /routes/{id}`: a route with its draft.
 pub static ROUTE: Endpoint = endpoint(Method::GET, "/routes/{id}", "getRoute");
 /// `GET /routes/{id}/versions`: route detail, its versions and the journeys on each (C17).
@@ -123,14 +192,40 @@ pub static REVOKE_TOKEN: Endpoint = endpoint(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 19] = [
+pub static ALL: [&Endpoint; 45] = [
     &CAPABILITIES,
     &PATCH_JOURNEY,
     &PATCH_ROUTE,
     &PATCH_DEPLOYMENT,
+    &PROPOSE_JOURNEY,
+    &PROPOSE_ROUTE,
+    &PROPOSE_DEPLOYMENT,
+    &PROPOSAL,
+    &EDIT_PROPOSAL,
+    &PREVIEW_PROPOSAL,
+    &APPLY_PROPOSAL,
+    &DISCARD_PROPOSAL,
+    &REFRESH_PROPOSAL,
+    &UPGRADE,
+    &SAVE_AS_ROUTE,
+    &RELINK,
+    &IMPORT_ROUTE,
+    &EXPORT_ROUTE,
     &JOURNEYS,
     &JOURNEY,
     &DOCUMENT,
+    &SNAPSHOT,
+    &LEVEL,
+    &TRACE,
+    &DECISIONS,
+    &TIMELINE,
+    &SUMMARY,
+    &NEXT,
+    &NODES,
+    &MINE,
+    &NODE,
+    &EXPLANATIONS,
+    &HISTORY,
     &ROUTE,
     &ROUTE_VERSIONS,
     &ROUTE_VERSION,

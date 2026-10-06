@@ -11,6 +11,7 @@ publish.workspace = true
 [dependencies]
 axum = { workspace = true, features = ["matched-path"] }
 cairn-auth.workspace = true
+cairn-engine.workspace = true
 cairn-schema.workspace = true
 cairn-service.workspace = true
 cairn-store.workspace = true
@@ -30,7 +31,6 @@ tracing.workspace = true
 url.workspace = true
 
 [dev-dependencies]
-cairn-engine.workspace = true
 jiff.workspace = true
 jsonschema.workspace = true
 metrics-util.workspace = true

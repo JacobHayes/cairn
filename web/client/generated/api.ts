@@ -55,6 +55,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/deployment/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6). */
+        post: operations["proposeToDeployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/entities/{key}": {
         parameters: {
             query?: never;
@@ -140,6 +157,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/journeys/{id}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The decision view (C12). */
+        get: operations["getDecisionView"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/journeys/{id}/document": {
         parameters: {
             query?: never;
@@ -149,6 +183,125 @@ export interface paths {
         };
         /** The domain document: the journey, the caller's derive inputs, and the engine version; nothing derived. */
         get: operations["getJourneyDocument"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The journey's events, or a node's, grouped by patch and paged (J4). */
+        get: operations["getHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/level": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One canvas level: the kinds shown, at the top or within a container (C2). */
+        get: operations["getJourneyLevel"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/mine": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The nodes the caller participates in, by participation kind (E4). */
+        get: operations["getMine"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/next": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The acting frontier ranked, globally or for the caller, filtered (C10). */
+        get: operations["getNext"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/nodes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The nodes a list query matches, sorted and paged (C9). */
+        get: operations["listNodes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/nodes/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One node in full; each explanation list carries its largest entries up to the response limit and its total (C8). */
+        get: operations["getNode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/nodes/{key}/explanations/{field}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A page of a node's explanation list, largest first (C8). */
+        get: operations["listExplanations"];
         put?: never;
         post?: never;
         delete?: never;
@@ -174,6 +327,228 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/journeys/{id}/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6). */
+        post: operations["proposeToJourney"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/relink": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Proposes re-linking the journey to a published version, differences kept as local edits unless the reviewer takes the route's (B9). */
+        post: operations["proposeRelink"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/save-as-route": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Proposes saving the journey's structure as a route draft, with a participation mapping per explicit entity and an exclusion per node (B8). */
+        post: operations["proposeSaveAsRoute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/snapshot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The bounded agent snapshot, scoped to a subtree and depth, its nodes paged (I3). */
+        get: operations["getJourneySnapshot"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The status summary (C18). */
+        get: operations["getStatusSummary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/timeline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The timeline (C13). */
+        get: operations["getTimeline"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/trace/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** What is upstream and downstream of a node, gravity contributors marked (C7). */
+        get: operations["traceNode"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/journeys/{id}/upgrade": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Proposes upgrading the journey to a newer version of its route: the merge's conflicts, kept edits, and orphans are its review items (B7). */
+        post: operations["proposeUpgrade"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/proposals/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A proposal: its destination, editing revision, status, and content (I6). */
+        get: operations["getProposal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Replaces its content against its editing revision; its destination does not move (H5). */
+        patch: operations["editProposal"];
+        trace?: never;
+    };
+    "/proposals/{id}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6). */
+        post: operations["applyProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/proposals/{id}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discards it (I6). */
+        post: operations["discardProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/proposals/{id}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6). */
+        post: operations["previewProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/proposals/{id}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6). */
+        post: operations["refreshProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/routes/{id}": {
         parameters: {
             query?: never;
@@ -191,6 +566,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/routes/{id}/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A published version, or the draft, as a route file: every key kept, in one sorted order, naming the version it extends (A13). */
+        get: operations["exportRoute"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/routes/{id}/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Imports a route file as a new route or a new draft extending a published version, matched by key or path; one route patch (A13). */
+        post: operations["importRoute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/routes/{id}/patches": {
         parameters: {
             query?: never;
@@ -202,6 +611,23 @@ export interface paths {
         put?: never;
         /** Applies a route patch, its draft included (A17). */
         post: operations["patchRoute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/routes/{id}/proposals": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6). */
+        post: operations["proposeToRoute"];
         delete?: never;
         options?: never;
         head?: never;
@@ -409,6 +835,23 @@ export interface components {
             /** @description The provider's configured name. */
             name: components["schemas"]["Slug"];
         };
+        /** @description A dependency that blocks a node (D1, Gating: Blocked). */
+        Blocker: {
+            /** @description The unsatisfied dependency. */
+            node: components["schemas"]["NodeKey"];
+            /** @description How the dependency arose. */
+            via: components["schemas"]["DependencyVia"];
+        };
+        /** @description A derived date bound and the chain that produced it (F3, F7). */
+        Bound: {
+            /** @description The chain from a pin, actual, or today that produced it. */
+            chain: components["schemas"]["Chain"];
+            /**
+             * Format: date
+             * @description The date.
+             */
+            date: string;
+        };
         /**
          * @description A guard bypass as stored (D4): the guards bypassed, why, and the specific failures
          *     present when it was applied.
@@ -449,12 +892,41 @@ export interface components {
             /** @description The search was cut short at the limit. */
             more?: boolean;
         };
+        /** @description One child in a node's detail. */
+        ChildEntry: {
+            /** @description The child. */
+            key: components["schemas"]["NodeKey"];
+            /** @description Its kind. */
+            kind: components["schemas"]["NodeKind"];
+            /** @description Its stored state. */
+            state: components["schemas"]["State"];
+            /** @description Its title. */
+            title: components["schemas"]["Title"];
+        };
         /**
          * @description One choice of a single- or multi-choice decision: an id that answers and conditions use,
          *     and an optional label. Written as the bare id when it has no label.
          */
         Choice: components["schemas"]["Slug"] | components["schemas"]["LabeledChoice"];
         Choices: components["schemas"]["Choice"][];
+        /** @description A condition clause. The parser also holds the whole tree to 8 levels and 16 clauses, which JSON Schema cannot express. */
+        Clause: {
+            equals: components["schemas"]["Comparison"];
+        } | {
+            not_equals: components["schemas"]["Comparison"];
+        } | {
+            in: components["schemas"]["Membership"];
+        } | {
+            contains: components["schemas"]["Comparison"];
+        } | {
+            answered: components["schemas"]["Path"];
+        } | {
+            all: components["schemas"]["Clause"][];
+        } | {
+            any: components["schemas"]["Clause"][];
+        } | {
+            not: components["schemas"]["Clause"];
+        };
         /** @description A condition clause. The parser also holds the whole tree to 8 levels and 16 clauses, which JSON Schema cannot express. */
         ClauseResolved: {
             equals: components["schemas"]["ComparisonResolved"];
@@ -474,11 +946,39 @@ export interface components {
             not: components["schemas"]["ClauseResolved"];
         };
         /** @description `{decision, value}`: the operand of `equals`, `not_equals`, and `contains`. */
+        Comparison: {
+            /** @description The decision whose answer is compared. */
+            decision: components["schemas"]["Path"];
+            /** @description The value it is compared with. */
+            value: components["schemas"]["ConditionValue"];
+        };
+        /** @description `{decision, value}`: the operand of `equals`, `not_equals`, and `contains`. */
         ComparisonResolved: {
             /** @description The decision whose answer is compared. */
             decision: components["schemas"]["NodeKey"];
             /** @description The value it is compared with. */
             value: components["schemas"]["ConditionValue"];
+        };
+        /**
+         * @description A `relevant_when` condition: a clause tree within `condition_depth_max` and
+         *     `condition_clause_count_max`, where clauses are the leaf predicates.
+         */
+        Condition: {
+            equals: components["schemas"]["Comparison"];
+        } | {
+            not_equals: components["schemas"]["Comparison"];
+        } | {
+            in: components["schemas"]["Membership"];
+        } | {
+            contains: components["schemas"]["Comparison"];
+        } | {
+            answered: components["schemas"]["Path"];
+        } | {
+            all: components["schemas"]["Clause"][];
+        } | {
+            any: components["schemas"]["Clause"][];
+        } | {
+            not: components["schemas"]["Clause"];
         };
         /**
          * @description A `relevant_when` condition: a clause tree within `condition_depth_max` and
@@ -716,6 +1216,26 @@ export interface components {
         };
         /** @description A lower-case hex SHA-256 digest. */
         ContentHash: string;
+        /** @description A gravity or leverage contribution: the node and how much it adds. */
+        Contribution: {
+            /** @description The contributing node. */
+            node: components["schemas"]["NodeKey"];
+            /** @description It is owned by someone other than the node's owner (leverage's owner factor). */
+            other_owner?: boolean;
+            /** @description What it adds. */
+            score: components["schemas"]["Score"];
+        };
+        /**
+         * Format: uint32
+         * @description A position in a projection's order: where the next page starts (I3, J4). Valid for the
+         *     same journey revision and derive inputs; a page read at another revision starts over.
+         */
+        Cursor: number;
+        /**
+         * @description Where a milestone's effective date comes from (F1, F7: pin, actual, and derived dates are
+         *     told apart).
+         */
+        DateOrigin: "actual" | "pin" | "due";
         /**
          * @description A date rule (A8): `{before|after: <source(s)>, offset: <days>}`. Several sources are
          *     several constraints; the offset defaults to 0.
@@ -725,8 +1245,50 @@ export interface components {
             before?: components["schemas"]["DateSourceResolved"] | components["schemas"]["DateSourceResolved"][];
             offset?: components["schemas"]["Days"];
         } & (unknown | unknown);
+        /**
+         * @description A date rule (A8): `{before|after: <source(s)>, offset: <days>}`. Several sources are
+         *     several constraints; the offset defaults to 0.
+         */
+        DateRule2: {
+            after?: components["schemas"]["DateSource"] | components["schemas"]["DateSource"][];
+            before?: components["schemas"]["DateSource"] | components["schemas"]["DateSource"][];
+            offset?: components["schemas"]["Days"];
+        } & (unknown | unknown);
+        DateSource: "journey.created_at" | components["schemas"]["Path"];
         DateSourceResolved: "journey.created_at" | components["schemas"]["NodeKey"];
         Days: number;
+        /** @description C12: one decision in the decision view: its answer and which nodes the answer affects. */
+        DecisionEntry: {
+            /** @description The nodes whose relevance a condition reading it decides, their descendants included. */
+            affects?: components["schemas"]["NodeKey"][];
+            /** @description Its answer, while in effect (decided and in scope, E3). */
+            answer?: components["schemas"]["AnswerValue"] | null;
+            /** @description The role its answer fills (E3, `fills_role`). */
+            fills?: components["schemas"]["RoleKey"] | null;
+            /** @description Its unsatisfied prerequisites that no drawn edge stands for (C2's marker). */
+            hidden_prerequisites?: components["schemas"]["NodeKey"][];
+            /** @description The decision. */
+            node: components["schemas"]["NodeKey"];
+            /** @description Its owners. */
+            owners?: components["schemas"]["EntityKey"][];
+            /** @description The milestone its answer pins (E3, `feeds_milestone`). */
+            pins?: components["schemas"]["NodeKey"] | null;
+            /** @description Its relevance. */
+            relevance: components["schemas"]["Relevance"];
+            /** @description Its stored state. */
+            state: components["schemas"]["State"];
+        };
+        /**
+         * @description C12: the graph filtered to decisions and their gating edges, with answers and what each
+         *     answer affected. A projection of the level with only decisions shown, not a separate
+         *     structure.
+         */
+        DecisionView: {
+            /** @description The decisions, in tree order. */
+            decisions: components["schemas"]["DecisionEntry"][];
+            /** @description The edges between decisions. */
+            edges: components["schemas"]["LevelEdge"][];
+        };
         /** @description How a dependency arose (PRD glossary, Condition gate / implicit edge). */
         DependencyVia: "explicit" | "containment" | {
             inherited: {
@@ -812,6 +1374,28 @@ export interface components {
             /** @description The node it requires. */
             requires: components["schemas"]["NodeKey"];
         };
+        /** @description C2: how an edge on the canvas arose (C1: implicit gates are drawn dotted). */
+        EdgeOrigin: "explicit" | "condition" | "stage_opening";
+        /**
+         * @description A milestone's effective date (F1): its actual date if reached, else its pin, else its
+         *     derived due. What other constraints see when they reference it.
+         */
+        EffectiveDate: {
+            /**
+             * Format: date
+             * @description The date.
+             */
+            date: string;
+            /** @description Where it comes from. */
+            origin: components["schemas"]["DateOrigin"];
+        };
+        /** @description A node's effective participation of one kind (E2). */
+        EffectiveParticipation: {
+            /** @description The entities, resolved through aliases. */
+            entities: components["schemas"]["EntityKey"][];
+            /** @description Where it comes from. */
+            origin: components["schemas"]["ParticipationOrigin"];
+        };
         /** @description An email address; stored trimmed and lower-cased (H3). */
         Email: string;
         /** @description A version, as `0.1.0`. */
@@ -880,6 +1464,41 @@ export interface components {
          */
         EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "node_transitioned" | "milestone_reached" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "entity_created" | "entity_edited" | "entities_merged" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
         /**
+         * @description A list of explanation entries with its total (ARCHITECTURE, Read path): complete inside
+         *     the engine and the browser; a server response keeps the largest entries up to
+         *     `explanation_entry_count_max` and the total.
+         */
+        Explained: {
+            /** @description The entries, largest first. */
+            entries: components["schemas"]["Contribution"][];
+            /**
+             * Format: uint32
+             * @description How many there are in all.
+             */
+            total: number;
+        };
+        /** @description ARCHITECTURE, Read path: a derived value whose explanation list a server response pages. */
+        ExplainedField: "gravity" | "leverage";
+        /**
+         * @description A page of one value's explanation list, largest first, `explanation_entry_count_max` at a
+         *     time; the first page is what node detail carries.
+         */
+        ExplanationPage: {
+            /** @description The entries. */
+            entries: components["schemas"]["Contribution"][];
+            /** @description The value. */
+            field: components["schemas"]["ExplainedField"];
+            /** @description Where the next page starts, when there is one. */
+            next?: components["schemas"]["Cursor"] | null;
+            /** @description The node. */
+            node: components["schemas"]["NodeKey"];
+            /**
+             * Format: uint32
+             * @description How many entries there are in all.
+             */
+            total: number;
+        };
+        /**
          * @description What fixes an instant on a chain: a pin, an actual date, a date answer, or today (F1, F3,
          *     F6). A chain always ends at one of these.
          */
@@ -896,6 +1515,11 @@ export interface components {
             /** @description The instant. */
             instant: components["schemas"]["Instant"];
         };
+        /**
+         * @description The file format version.
+         * @constant
+         */
+        FormatVersion: 1;
         /**
          * @description The graph document (resolved): nodes, roles, and kinds by key, every reference a key,
          *     and, for a journey, its state (ARCHITECTURE, Engine > Model). Collections serialize
@@ -1082,6 +1706,8 @@ export interface components {
         } | {
             annotation: components["schemas"]["Annotation"];
         };
+        /** @description D1, C2: a group's display state, derived from its children and dependencies. */
+        GroupState: "not_relevant" | "skipped" | "done" | "waiting" | "active" | "not_started";
         /** @description A transition guard (D4). */
         Guard: "deps_done" | "has_artifact" | "broken_down";
         /**
@@ -1091,6 +1717,16 @@ export interface components {
         GuardFailure: {
             open_dependency: components["schemas"]["NodeKey"];
         } | "missing_artifact" | "not_broken_down";
+        /** @description J4: a page of a journey's history, or of one node's, grouped by patch. */
+        History: {
+            /**
+             * Format: uint64
+             * @description Pass as `after` for the next page.
+             */
+            next?: number | null;
+            /** @description At most a page of events, grouped by patch, in log order; a large patch spans pages. */
+            patches: components["schemas"]["PatchEvents"][];
+        };
         /**
          * @description A point in time the date network solves for (ARCHITECTURE, Date network). A container's
          *     entry is internal and never shown, so it has no form here.
@@ -1264,6 +1900,66 @@ export interface components {
             /** @description The label. */
             title: components["schemas"]["Title"];
         };
+        /**
+         * @description C2: one aggregation level of the canvas: the visible nodes for the shown kinds within the
+         *     drilled-in container, the edges re-targeted to visible stand-ins with duplicates collapsed,
+         *     and each container's roll-ups. Display only: stored state stays on each node.
+         */
+        Level: {
+            /** @description The drilled-in container; none for the whole journey. */
+            container?: components["schemas"]["NodeKey"] | null;
+            /** @description The edges, sorted by their ends. */
+            edges: components["schemas"]["LevelEdge"][];
+            /** @description The visible nodes, in tree order. */
+            nodes: components["schemas"]["LevelNode"][];
+            /** @description The kinds shown. */
+            shown: components["schemas"]["NodeKind"][];
+        };
+        /**
+         * @description C2: an edge drawn at a level, between the nearest visible stand-ins of its ends, with the
+         *     edges it collapses.
+         */
+        LevelEdge: {
+            /** @description The stand-in of the requirement side. */
+            from: components["schemas"]["NodeKey"];
+            /** @description Some underlying edge blocks. */
+            gates: boolean;
+            /** @description Every underlying edge is implicit (drawn dotted, C1). */
+            implicit?: boolean;
+            /** @description The stand-in of the dependent side. */
+            to: components["schemas"]["NodeKey"];
+            /** @description The edges it stands for, sorted; never empty. */
+            underlying: components["schemas"]["UnderlyingEdge"][];
+        };
+        /** @description C2: one visible node at a level. */
+        LevelNode: {
+            /** @description A group's display state. */
+            group_state?: components["schemas"]["GroupState"] | null;
+            /**
+             * @description Its hidden, unsatisfied prerequisites that no visible edge stands for: the "hidden
+             *     prerequisites" marker, which opens the trace (C7). Empty when it has none.
+             */
+            hidden_prerequisites?: components["schemas"]["NodeKey"][];
+            /**
+             * @description A skipped container whose kept work is not yet done: "skipped, kept work pending"
+             *     (D1a).
+             */
+            kept_work_pending?: boolean;
+            /** @description The node. */
+            key: components["schemas"]["NodeKey"];
+            /**
+             * @description Its nearest visible ancestor within the level, which it is drawn under; none at the
+             *     top level.
+             */
+            parent?: components["schemas"]["NodeKey"] | null;
+            /** @description A container's badges and roll-ups. */
+            roll_up?: components["schemas"]["RollUp"] | null;
+            /**
+             * @description The hidden nodes that roll up into it (a hidden action is a checklist item on its
+             *     deliverable, C4), in tree order.
+             */
+            rolled_up?: components["schemas"]["NodeKey"][];
+        };
         /** @description A limit, by name (PRACTICES, Explicit limits). */
         Limit: string;
         /**
@@ -1275,6 +1971,20 @@ export interface components {
             route: components["schemas"]["RouteId"];
             /** @description The version. */
             version: components["schemas"]["VersionNumber"];
+        };
+        /** @description C9: a list filter that needs no argument. */
+        ListFlag: "mine" | "unassigned" | "next_up" | "decisions_needed" | "needs_breakdown" | "active" | "blocked" | "overdue" | "stale" | "snoozed" | "snoozed_and_overdue" | "shortfall";
+        /** @description C9: a page of the list. */
+        ListPage: {
+            /** @description Where the next page starts, when there is one. */
+            next?: components["schemas"]["Cursor"] | null;
+            /** @description The rows, at most `page_item_count_max`. */
+            rows: components["schemas"]["NodeRow"][];
+            /**
+             * Format: uint32
+             * @description How many rows the query matches in all.
+             */
+            total: number;
         };
         /**
          * @description What a journey changed on a route-copied node (B4), so an upgrade leaves it alone. A
@@ -1319,6 +2029,13 @@ export interface components {
         /** @description Markdown, at most body_bytes_max (64 KiB) bytes. */
         Markdown: string;
         /** @description `{decision, values}`: the operand of `in`. */
+        Membership: {
+            /** @description The decision whose answer is tested. */
+            decision: components["schemas"]["Path"];
+            /** @description The values it may equal. */
+            values: components["schemas"]["ConditionValue"][];
+        };
+        /** @description `{decision, values}`: the operand of `in`. */
         MembershipResolved: {
             /** @description The decision whose answer is tested. */
             decision: components["schemas"]["NodeKey"];
@@ -1327,6 +2044,18 @@ export interface components {
         };
         /** @description A message draft with placeholders: {{journey.<name|description|created_at|url|status>}}, {{roles.<role>.name}}, {{answers.<decision>}}. */
         MessageTemplate: string;
+        /** @description E4: the nodes the caller participates in. */
+        Mine: {
+            /** @description The nodes, in key order, each with the participation kinds the caller holds on it. */
+            entries: components["schemas"]["MineEntry"][];
+        };
+        /** @description E4: a node the viewer participates in, with the kinds they hold. */
+        MineEntry: {
+            /** @description The participation kinds the viewer holds on it. */
+            kinds: components["schemas"]["KindKey"][];
+            /** @description The node. */
+            node: components["schemas"]["NodeKey"];
+        };
         /** @description A token just minted: the one time its secret is seen (H2). */
         MintedToken: {
             /** @description The agent the token acts as. */
@@ -1678,6 +2407,16 @@ export interface components {
          *     `mutation_count_per_patch_max`, in the order they apply.
          */
         Mutations: components["schemas"]["Mutation"][];
+        /**
+         * @description C10: the acting frontier ordered, each item with its breadcrumb and why it ranks where it
+         *     does; when it is empty, what the journey waits on (C5, D5).
+         */
+        Next: {
+            /** @description The items, in order. */
+            items: components["schemas"]["NodeRow"][];
+            /** @description The stalled diagnostic, when the journey is stalled. */
+            stalled?: components["schemas"]["Stalled"] | null;
+        };
         /** @description A node (A1a). */
         Node: {
             answer_type?: components["schemas"]["AnswerType"];
@@ -1709,6 +2448,144 @@ export interface components {
             title: components["schemas"]["Title"];
             weight?: components["schemas"]["Weight"] | null;
         } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        /** @description A node (A1a). */
+        Node2: {
+            answer_type?: components["schemas"]["AnswerType"];
+            auto_reach?: boolean;
+            choices?: components["schemas"]["Choices"];
+            closes?: boolean;
+            closes_at?: components["schemas"]["Path"];
+            description?: components["schemas"]["Markdown"] | null;
+            due_by?: components["schemas"]["DateRule2"] | null;
+            estimate?: components["schemas"]["Days"];
+            feeds_milestone?: components["schemas"]["Path"];
+            fills_role?: components["schemas"]["Slug"];
+            final?: boolean;
+            gates?: boolean;
+            help?: components["schemas"]["Markdown"];
+            id: components["schemas"]["Slug"];
+            key?: components["schemas"]["NodeKey"] | null;
+            kind: components["schemas"]["NodeKind"];
+            not_before?: components["schemas"]["DateRule2"] | null;
+            opens_at?: components["schemas"]["Path"];
+            parent?: components["schemas"]["Path"] | null;
+            participations?: components["schemas"]["Participations"];
+            placeholder?: boolean;
+            prompt?: components["schemas"]["Markdown"];
+            relevant_when?: components["schemas"]["Condition"] | null;
+            requires?: components["schemas"]["Path"][];
+            requires_artifact?: boolean;
+            resources?: components["schemas"]["Resource2"][];
+            title: components["schemas"]["Title"];
+            weight?: components["schemas"]["Weight"] | null;
+        } & (unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown & unknown);
+        /** @description A node's derived dates (F3, F6). Every bound is null when nothing reaches it. */
+        NodeDates: {
+            /** @description The latest it can finish. */
+            due?: components["schemas"]["Bound"] | null;
+            /** @description The earliest it can start. */
+            earliest_start?: components["schemas"]["Bound"] | null;
+            /** @description A milestone's effective date (F1); none for other kinds, or when nothing gives one. */
+            effective_date?: components["schemas"]["EffectiveDate"] | null;
+            /** @description The latest it can start. */
+            latest_start?: components["schemas"]["Bound"] | null;
+            /** @description The plan can no longer be met (F6). */
+            shortfall?: components["schemas"]["ShortChain"] | null;
+            /**
+             * Format: int32
+             * @description Latest start minus today; null is "no deadline".
+             */
+            slack_days?: number | null;
+        };
+        /**
+         * @description Every D3 value for one node, with the inputs that explain it. The flags are D3's own,
+         *     each independent of the others, so they stay booleans rather than a state enum.
+         */
+        NodeDerived: {
+            /** @description Relevant, not blocked, and non-terminal (D2). */
+            actionable: boolean;
+            /** @description A pending auto-reach milestone that reads as reached (F1). */
+            auto_reached?: boolean;
+            /**
+             * @description What blocks it itself: its own explicit requirements, condition gates, and stage
+             *     opening, and its children, each unsatisfied. What it inherits is listed once, on the
+             *     ancestor that holds it (`blocked_through`), never copied onto each descendant. A node
+             *     that is not blocked lists what its own requirements, conditions, and opening still
+             *     hold back beneath it.
+             */
+            blocked_by?: components["schemas"]["Blocker"][];
+            /**
+             * @description The ancestors, nearest first, whose own unsatisfied requirements, openings, or
+             *     conditions block it through containment; each lists them in its own `blocked_by`.
+             */
+            blocked_through?: components["schemas"]["NodeKey"][];
+            /** @description Dates. */
+            dates: components["schemas"]["NodeDates"];
+            /** @description Skipped through an ancestor's skip (D1a). */
+            effectively_skipped?: boolean;
+            /** @description Gravity and its contributors (Priority). */
+            gravity: components["schemas"]["Score"];
+            /** @description The contributors to gravity. */
+            gravity_from: components["schemas"]["Explained"];
+            /** @description Leverage (Priority). */
+            leverage: components["schemas"]["Score"];
+            /** @description The nodes completing this would unblock. */
+            leverage_from: components["schemas"]["Explained"];
+            /** @description A container's largest child gravity. */
+            max_child_gravity?: components["schemas"]["Score"] | null;
+            /** @description Its seeding entity left the role it was broken down by (B10). */
+            membership_lost?: boolean;
+            /** @description A placeholder with no children that is not atomic (B10). */
+            needs_breakdown?: boolean;
+            /** @description Non-terminal with its due before today. */
+            overdue?: boolean;
+            /** @description Effective participations by kind. */
+            participations?: {
+                [key: string]: components["schemas"]["EffectiveParticipation"];
+            };
+            /** @description Rank, for nodes in the normalization set. */
+            rank?: components["schemas"]["Real"] | null;
+            /** @description Relevance and what produced it. */
+            relevance: components["schemas"]["RelevanceExplanation"];
+            /** @description A snooze that holds (B6). */
+            snoozed?: components["schemas"]["SnoozeTarget"] | null;
+            /** @description Why a terminal node's completing guards would now fail (D4). */
+            stale?: components["schemas"]["GuardFailure"][];
+            /** @description No owner (E1). */
+            unassigned?: boolean;
+        };
+        /**
+         * @description C8: one node in full. Its explanation lists (`derived.gravity_from`, `leverage_from`)
+         *     carry their largest entries up to `explanation_entry_count_max` with their totals; the rest
+         *     page through the node's explanations endpoint.
+         */
+        NodeDetail: {
+            /** @description The notes and links on it (G1), in key order. */
+            annotations?: components["schemas"]["Annotation"][];
+            /** @description A decision's answer, as recorded. */
+            answer?: components["schemas"]["AnswerValue"] | null;
+            /** @description Its children in key order, each with its state. */
+            children?: components["schemas"]["ChildEntry"][];
+            /** @description Every derived value (D3) with what explains it. */
+            derived: components["schemas"]["NodeDerived"];
+            /** @description What the journey edited on it, for a route-copied node (B4). */
+            local_edits?: components["schemas"]["LocalEdit"][];
+            /** @description The node: description, resources, participations as written, and its kind's payload. */
+            node: components["schemas"]["Node"];
+            /** @description Its overrides (D4). */
+            overrides?: components["schemas"]["Overrides"] | null;
+            /** @description Its parent, if any. */
+            parent?: components["schemas"]["NodeKey"] | null;
+            /** @description Where it sits. */
+            path: components["schemas"]["Path"];
+            /**
+             * Format: date
+             * @description Its pin (F2).
+             */
+            pin?: string | null;
+            /** @description Its stored state, provenance, and actual dates. */
+            record: components["schemas"]["NodeState"];
+        };
         /** @description A node field, by name. */
         NodeField: "id" | "parent" | "title" | "description" | "weight" | "relevant_when" | "due_by" | "not_before" | "estimate" | "placeholder" | "requires_artifact" | "final" | "auto_reach" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "choices" | "fills_role" | "feeds_milestone";
         /** @description A new value for one node field. */
@@ -1761,6 +2638,65 @@ export interface components {
         NodeKey: string;
         /** @description A node kind (PRD glossary: a fixed set). */
         NodeKind: "decision" | "deliverable" | "action" | "milestone" | "group";
+        /**
+         * @description One node as a row of the list, the next list, or the snapshot (C9, C10, I3): what it is,
+         *     where it sits, and its derived signals.
+         */
+        NodeRow: {
+            /** @description D2. */
+            actionable?: boolean;
+            /** @description Its ancestors, root first: the breadcrumb (C10). */
+            ancestors?: components["schemas"]["NodeKey"][];
+            /** @description Gating, Blocked. */
+            blocked?: boolean;
+            /**
+             * Format: date
+             * @description The latest it can finish.
+             */
+            due?: string | null;
+            /** @description Skipped through an ancestor (D1a). */
+            effectively_skipped?: boolean;
+            /** @description Gravity. */
+            gravity: components["schemas"]["Score"];
+            /** @description The node. */
+            key: components["schemas"]["NodeKey"];
+            /** @description Its kind. */
+            kind: components["schemas"]["NodeKind"];
+            /** @description Leverage: the viewer's, in a ranking for them. */
+            leverage: components["schemas"]["Score"];
+            /** @description B10. */
+            needs_breakdown?: boolean;
+            /** @description Non-terminal with its due before today (D3). */
+            overdue?: boolean;
+            /** @description Its owners (E2). */
+            owners?: components["schemas"]["EntityKey"][];
+            /** @description Its path. */
+            path: components["schemas"]["Path"];
+            /** @description Its rank and terms, for nodes in the normalization set. */
+            rank?: components["schemas"]["RankTerms"] | null;
+            /** @description Its relevance. */
+            relevance: components["schemas"]["Relevance"];
+            /**
+             * Format: uint32
+             * @description Days the plan can no longer be met by (F6).
+             */
+            shortfall_days?: number | null;
+            /**
+             * Format: int32
+             * @description Latest start minus today; none is no deadline.
+             */
+            slack_days?: number | null;
+            /** @description A snooze that holds (B6). */
+            snoozed?: components["schemas"]["SnoozeTarget"] | null;
+            /** @description A terminal node whose completing guards would now fail (D4). */
+            stale?: boolean;
+            /** @description Its stored state. */
+            state: components["schemas"]["State"];
+            /** @description Its title. */
+            title: components["schemas"]["Title"];
+            /** @description No owner (E1). */
+            unassigned?: boolean;
+        };
         /** @description One node's stored state in a journey. */
         NodeState: {
             /** @description A placeholder marked atomic, so it can complete without children (B10). */
@@ -1782,6 +2718,13 @@ export interface components {
             started_on?: string | null;
             /** @description The machine state (D1). */
             state: components["schemas"]["State"];
+        };
+        /** @description C18: an open decision and who owns it. */
+        OpenDecision: {
+            /** @description The decision. */
+            node: components["schemas"]["NodeKey"];
+            /** @description Its owners; empty when unassigned. */
+            owners?: components["schemas"]["EntityKey"][];
         };
         /** @description An override to apply (PRD glossary, Override; Gating; D1a; D4). */
         Override: {
@@ -1814,6 +2757,17 @@ export interface components {
             keep?: components["schemas"]["Reason"] | null;
         };
         /** @description A participation kind a graph declares beyond the built-in `owner` (A7). */
+        ParticipationKind: {
+            /** @description The id, unique in the graph. */
+            id: components["schemas"]["Slug"];
+            /** @description The stable key: optional in a file. */
+            key?: components["schemas"]["KindKey"] | null;
+            /** @description Held by several entities rather than one. */
+            multi?: boolean;
+            /** @description A label. */
+            title?: components["schemas"]["Title"] | null;
+        };
+        /** @description A participation kind a graph declares beyond the built-in `owner` (A7). */
         ParticipationKindResolved: {
             /** @description The id, unique in the graph. */
             id: components["schemas"]["Slug"];
@@ -1833,6 +2787,14 @@ export interface components {
         } | {
             new_role: components["schemas"]["RoleResolved"];
         } | "default_owner";
+        /** @description Where a node's effective participation of one kind comes from (E2's order). */
+        ParticipationOrigin: "explicit" | {
+            role: components["schemas"]["RoleKey"];
+        } | {
+            ancestor: components["schemas"]["NodeKey"];
+        } | {
+            default_owner: components["schemas"]["RoleKey"];
+        };
         /** @description One participation, by node and kind. */
         ParticipationRef: {
             /** @description The kind. */
@@ -1844,7 +2806,15 @@ export interface components {
          * @description Where a participation comes from (E2): a role reference, written as the role, or
          *     explicit entities, written as a list.
          */
+        ParticipationSource: components["schemas"]["Slug"] | components["schemas"]["EntityKey"][];
+        /**
+         * @description Where a participation comes from (E2): a role reference, written as the role, or
+         *     explicit entities, written as a list.
+         */
         ParticipationSourceResolved: components["schemas"]["RoleKey"] | components["schemas"]["EntityKey"][];
+        Participations: {
+            [key: string]: components["schemas"]["ParticipationSource"];
+        };
         ParticipationsResolved: {
             [key: string]: components["schemas"]["ParticipationSourceResolved"];
         };
@@ -1879,6 +2849,13 @@ export interface components {
             outcome: "already_applied";
             /** @description The original receipt. */
             receipt: components["schemas"]["PatchReceipt"];
+        };
+        /** @description J4: one patch's events, in order. */
+        PatchEvents: {
+            /** @description Its events on this page. */
+            events: components["schemas"]["Event"][];
+            /** @description The patch. */
+            patch_id: components["schemas"]["PatchId"];
         };
         /** @description Starts with "p_"; at most id_bytes_max (64) bytes. */
         PatchId: string;
@@ -1937,7 +2914,161 @@ export interface components {
          * @description The kinds of error that are not patch rejections (PRACTICES, Errors, panics, and
          *     rejections). A rejected patch answers its `Rejection` instead.
          */
-        ProblemCode: "bad_request" | "unsupported_media_type" | "payload_too_large" | "target_mismatch" | "not_found" | "no_such_endpoint" | "method_not_allowed" | "user_only" | "overloaded" | "subscriber_limit" | "store_busy" | "timed_out" | "engine_panic" | "internal";
+        ProblemCode: "bad_request" | "unsupported_media_type" | "payload_too_large" | "target_mismatch" | "cannot_draft" | "not_found" | "page_moved" | "no_such_endpoint" | "method_not_allowed" | "user_only" | "overloaded" | "subscriber_limit" | "store_busy" | "timed_out" | "engine_panic" | "internal";
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedDecisionView: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["DecisionView"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedExplanationPage: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["ExplanationPage"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedLevel: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["Level"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedListPage: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["ListPage"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedMine: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["Mine"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedNext: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["Next"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedNodeDetail: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["NodeDetail"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedSnapshot: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["Snapshot"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedStatusSummary: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["StatusSummary"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedTimeline: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["Timeline"];
+        };
+        /** @description A projection with what it was derived from (D3: computed per read, never stored). */
+        ProjectedTrace: {
+            /** @description The deployment revision it was derived over (E6). */
+            deployment_revision: components["schemas"]["Revision"];
+            /** @description The journey's revision it was derived from: a tick newer than this means refetch (H6). */
+            revision: components["schemas"]["Revision"];
+            /**
+             * Format: date
+             * @description The today it was derived for, in the deployment's zone (A9).
+             */
+            today: string;
+            /** @description The projection. */
+            value: components["schemas"]["Trace"];
+        };
         /** @description A proposal as stored (ARCHITECTURE, Schema outline: `proposals`). */
         Proposal: {
             /**
@@ -1960,6 +3091,52 @@ export interface components {
             /** @description Its status. */
             status: components["schemas"]["ProposalStatus"];
         };
+        /** @description What a write to a proposal answers (I6). */
+        ProposalAnswer: {
+            /** @constant */
+            outcome: "saved";
+            /** @description The proposal. */
+            proposal: components["schemas"]["Proposal"];
+            /** @description The receipt. */
+            receipt: components["schemas"]["PatchReceipt"];
+        } | {
+            /** @constant */
+            outcome: "already_saved";
+            /** @description The original receipt. */
+            receipt: components["schemas"]["PatchReceipt"];
+        } | {
+            /** @constant */
+            outcome: "existing";
+            /** @description The proposal. */
+            proposal: components["schemas"]["Proposal"];
+        };
+        /**
+         * @description `POST /proposals/{id}/apply`: applies the proposal as the caller, its confirming user
+         *     (H2), at the editing revision they reviewed.
+         */
+        ProposalApply: {
+            /** @description A note for each of the apply's events (J1). */
+            note?: components["schemas"]["Markdown"] | null;
+            /** @description The apply's patch id (H5). */
+            patch_id: components["schemas"]["PatchId"];
+            /** @description The proposal's editing revision the reviewer previewed. */
+            reviewed_revision: components["schemas"]["Revision"];
+        };
+        /**
+         * @description `POST /{domain}/proposals`: a new proposal for the path's domain (which may not exist yet:
+         *     a proposal can create a journey or route at revision 0).
+         */
+        ProposalCreate: {
+            /** @description Its content. */
+            draft: components["schemas"]["ProposalDraft"];
+            /**
+             * @description The proposal's id, generated by the client (I6): a create resubmitted under it answers
+             *     the proposal its caller already holds rather than a second one.
+             */
+            id: components["schemas"]["ProposalId"];
+            /** @description The write's patch id (H5). */
+            patch_id: components["schemas"]["PatchId"];
+        };
         /** @description A proposal's content: what creating or editing it carries. */
         ProposalDraft: {
             description?: components["schemas"]["Markdown"] | null;
@@ -1968,10 +3145,77 @@ export interface components {
             mutations?: components["schemas"]["Mutation"][];
             title: components["schemas"]["Title"];
         };
+        /**
+         * @description `PATCH /proposals/{id}`: the proposal's new content, against the editing revision the
+         *     editor saw (H5). Its destination's revision does not move.
+         */
+        ProposalEdit: {
+            /** @description The proposal's editing revision the editor saw. */
+            base_revision: components["schemas"]["Revision"];
+            /** @description Its content. */
+            draft: components["schemas"]["ProposalDraft"];
+            /** @description The write's patch id (H5). */
+            patch_id: components["schemas"]["PatchId"];
+        };
         /** @description Starts with "pr_"; at most id_bytes_max (64) bytes. */
         ProposalId: string;
+        /**
+         * @description What a proposal would do to its destination now (C14, I6), for review: the items still
+         *     unresolved, and the candidate the resolved mutations produce, with every violation strict
+         *     validation finds in it.
+         */
+        ProposalPreview: {
+            /** @description For a journey, what the change does to derived state (D7). */
+            consequences?: components["schemas"]["Consequences"] | null;
+            /** @description For a journey, its frontier after, in rank order. */
+            frontier?: components["schemas"]["NodeKey"][];
+            /**
+             * @description The destination's graph after: a journey's, or a route's draft. None when the
+             *     candidate is invalid, or for the deployment.
+             */
+            graph?: components["schemas"]["Graph"] | null;
+            /** @description Items that still need a choice; the preview leaves their effect out. */
+            unresolved?: components["schemas"]["UnresolvedItem"][];
+            /** @description Every violation of the candidate; empty when the resolved proposal would apply. */
+            violations?: components["schemas"]["Violation"][];
+        };
+        /**
+         * @description `POST /proposals/{id}/preview` (C14, D7, I6): what applying the proposal now would do, and,
+         *     when its destination moved since it was drafted, what moved.
+         */
+        ProposalReview: {
+            /**
+             * @description D7, by journey: what applying it would newly cause; a journey with nothing new is left
+             *     out.
+             */
+            consequences?: {
+                [key: string]: components["schemas"]["Consequences"];
+            };
+            /**
+             * @description Its items still unresolved, the violations of its candidate, and for a journey the
+             *     graph and frontier after.
+             */
+            preview: components["schemas"]["ProposalPreview"];
+            /** @description The proposal, at the editing revision a reviewer applies. */
+            proposal: components["schemas"]["Proposal"];
+            /**
+             * @description I6: present when the destination moved since drafting: applying it is stale until it
+             *     is refreshed and reviewed again.
+             */
+            stale?: components["schemas"]["StaleBase"] | null;
+        };
         /** @description A proposal's status. */
         ProposalStatus: "open" | "applied" | "discarded";
+        /**
+         * @description `POST /proposals/{id}/discard` and `POST /proposals/{id}/refresh`: against the editing
+         *     revision the caller saw.
+         */
+        ProposalStep: {
+            /** @description The proposal's editing revision the caller saw. */
+            base_revision: components["schemas"]["Revision"];
+            /** @description The write's patch id (H5). */
+            patch_id: components["schemas"]["PatchId"];
+        };
         /** @description A node's origin in a journey (PRD glossary, Provenance). */
         Provenance: "from_route" | "local" | "orphaned";
         /**
@@ -1986,6 +3230,19 @@ export interface components {
             leverage: components["schemas"]["Real"];
             other_owner_factor: components["schemas"]["Thousandths1000To1000000"];
             undecided_discount: components["schemas"]["Thousandths0To1000"];
+            urgency: components["schemas"]["Real"];
+        };
+        /** @description C8, C10: why a node ranks where it does: its rank and the terms it blends. */
+        RankTerms: {
+            /** @description Gravity over the largest in the normalization set. */
+            gravity_norm: components["schemas"]["Real"];
+            /** @description From negative slack over the horizon. */
+            late: components["schemas"]["Real"];
+            /** @description Leverage over the largest in the normalization set. */
+            leverage_norm: components["schemas"]["Real"];
+            /** @description The blend. */
+            rank: components["schemas"]["Real"];
+            /** @description From slack over the urgency horizon. */
             urgency: components["schemas"]["Real"];
         };
         Real: number;
@@ -2104,6 +3361,31 @@ export interface components {
             /** @description The violations. */
             violations: components["schemas"]["Violations"];
         };
+        /** @description A node's relevance (Gating): three-valued. */
+        Relevance: "relevant" | "not_relevant" | "undecided";
+        /** @description A relevance value and what produced it (C8: node detail names the ancestor or decision). */
+        RelevanceExplanation: {
+            /**
+             * @description The node whose condition decided it, when not the node itself; none when no
+             *     condition applies.
+             */
+            condition_on?: components["schemas"]["NodeKey"] | null;
+            /** @description The decisions that condition reads. */
+            decisions?: components["schemas"]["NodeKey"][];
+            /** @description A force include made it relevant. */
+            forced?: boolean;
+            /** @description The value. */
+            value: components["schemas"]["Relevance"];
+        };
+        /** @description `POST /journeys/{id}/relink` (B9): proposes re-linking the journey to a published version. */
+        RelinkRequest: {
+            /** @description The route version to follow once it is applied. */
+            lineage: components["schemas"]["Lineage"];
+            /** @description The proposal write's patch id (H5). */
+            patch_id: components["schemas"]["PatchId"];
+            /** @description The proposal's id, generated by the client (I6). */
+            proposal: components["schemas"]["ProposalId"];
+        };
         /**
          * @description Everything a node removal removes, as its author saw it (A18): the subtree, every edge
          *     incident to it, and everything attached to those nodes. If anything else is attached
@@ -2127,6 +3409,16 @@ export interface components {
         Resource: {
             example?: components["schemas"]["Url"];
             key: components["schemas"]["AttachmentKey"];
+            message_draft?: components["schemas"]["MessageTemplate"];
+            reference?: components["schemas"]["Url"];
+            template?: components["schemas"]["Url"];
+            tip?: components["schemas"]["Markdown"];
+            title?: components["schemas"]["Title"] | null;
+        } & (unknown | unknown | unknown | unknown | unknown);
+        /** @description Route-authored guidance on a node (A10), keyed so upgrades diff it (B7). */
+        Resource2: {
+            example?: components["schemas"]["Url"];
+            key?: components["schemas"]["AttachmentKey"] | null;
             message_draft?: components["schemas"]["MessageTemplate"];
             reference?: components["schemas"]["Url"];
             template?: components["schemas"]["Url"];
@@ -2221,6 +3513,17 @@ export interface components {
         } | {
             proposal: components["schemas"]["ProposalId"];
         };
+        /** @description A role (A6): a named slot, single or multi valued, filled per journey with entities. */
+        Role: {
+            /** @description The id, unique in the graph. */
+            id: components["schemas"]["Slug"];
+            /** @description The stable key: optional in a file. */
+            key?: components["schemas"]["RoleKey"] | null;
+            /** @description Filled by several entities rather than one. */
+            multi?: boolean;
+            /** @description A label. */
+            title?: components["schemas"]["Title"] | null;
+        };
         /** @description Starts with "r_"; at most id_bytes_max (64) bytes. */
         RoleKey: string;
         /**
@@ -2263,6 +3566,31 @@ export interface components {
             /** @description A label. */
             title?: components["schemas"]["Title"] | null;
         };
+        /** @description C2: what a container shows of its children. */
+        RollUp: {
+            /** @description Every relevant child that is not done is blocked (`all_blocked`), and there is one. */
+            all_blocked?: boolean;
+            /** @description A child is `active`. */
+            children_active?: boolean;
+            /** @description A child decision is actionable: "decision needed". */
+            decision_needed?: boolean;
+            /** @description The largest in-scope child gravity (Priority). */
+            max_child_gravity?: components["schemas"]["Score"] | null;
+            /**
+             * Format: int32
+             * @description The least slack among in-scope, open children; none when none has a deadline.
+             */
+            min_child_slack_days?: number | null;
+            /** @description A child needs breakdown. */
+            needs_breakdown?: boolean;
+            /** @description The distinct owners of its children. */
+            owners?: components["schemas"]["EntityKey"][];
+            /**
+             * @description A deliverable or action whose children and other dependencies are satisfied but which
+             *     is not terminal: "children complete, ready to finish".
+             */
+            ready_to_finish?: boolean;
+        };
         /**
          * @description A route domain: its fields, revision, published version numbers, and draft. Versions
          *     themselves are separate graphs, never part of the domain load.
@@ -2293,6 +3621,32 @@ export interface components {
             /** @description The draft graph (no state). */
             graph: components["schemas"]["Graph"];
         };
+        /**
+         * @description The file document (A13, A14; ARCHITECTURE, File format): a route version or draft as
+         *     written, unresolved. Nodes refer to each other by path and to roles and kinds by id;
+         *     keys may be left out for import to match by path against the version extended, or mint.
+         *     The JSON Schema in `schema/` describes this type.
+         */
+        RouteFile: {
+            /** @description The role that owns nodes no ancestor gives an owner (A6). */
+            default_owner?: components["schemas"]["Slug"] | null;
+            /** @description What the route is for. */
+            description?: components["schemas"]["Markdown"] | null;
+            /** @description The published version this one extends, or none for a new route. */
+            extends?: components["schemas"]["VersionNumber"] | null;
+            /** @description The file format version. */
+            format: components["schemas"]["FormatVersion"];
+            /** @description The route's name. */
+            name: components["schemas"]["Title"];
+            /** @description The nodes, each naming its parent by path. */
+            nodes: components["schemas"]["Node2"][];
+            /** @description The participation kinds beyond `owner`. */
+            participation_kinds?: components["schemas"]["ParticipationKind"][];
+            /** @description The roles. */
+            roles?: components["schemas"]["Role"][];
+            /** @description The route's id. */
+            route: components["schemas"]["RouteId"];
+        };
         /** @description A route's own fields, apart from its graphs. */
         RouteHeader: {
             /** @description What it is for. */
@@ -2306,6 +3660,18 @@ export interface components {
         };
         /** @description A route id: a slug, unique in the deployment. */
         RouteId: string;
+        /**
+         * @description `POST /routes/{id}/import` (A13): a route file, imported as a new route or a new draft of
+         *     the path's route, matched against the version it extends.
+         */
+        RouteImport: {
+            /** @description The file, as JSON (ARCHITECTURE, File format); its route must be the path's. */
+            file: components["schemas"]["RouteFile"];
+            /** @description A note for each of its events (J1). */
+            note?: components["schemas"]["Markdown"] | null;
+            /** @description The import's patch id (H5): the same file under the same id is the same patch. */
+            patch_id: components["schemas"]["PatchId"];
+        };
         /** @description An immutable published route version (A11). */
         RouteVersion: {
             /** @description The graph (no state). */
@@ -2320,6 +3686,21 @@ export interface components {
             /** @description The version number. */
             version: components["schemas"]["VersionNumber"];
         };
+        /**
+         * @description `POST /journeys/{id}/save-as-route` (B8): proposes saving the journey's structure as a
+         *     draft of a route, created when it does not exist.
+         */
+        SaveAsRouteRequest: {
+            /** @description The route's name, when it is created. */
+            name: components["schemas"]["Title"];
+            /** @description The proposal write's patch id (H5). */
+            patch_id: components["schemas"]["PatchId"];
+            /** @description The proposal's id, generated by the client (I6). */
+            proposal: components["schemas"]["ProposalId"];
+            /** @description The route the draft is of. */
+            route: components["schemas"]["RouteId"];
+        };
+        Score: number;
         /** @description Where search text was found in a journey. */
         SearchHit: {
             /** @constant */
@@ -2387,12 +3768,135 @@ export interface components {
         SignedDays: number;
         /** @description An id: lowercase letters, digits, '_' and '-', at most id_bytes_max (64) bytes. */
         Slug: string;
+        /**
+         * @description I3: the bounded agent view of a journey: answers, a page of in-scope nodes, the ranked
+         *     acting frontier's top N with the rest as keys, open decisions by rank, placeholders needing
+         *     breakdown, unassigned items, shortfalls, and counts, scoped to a subtree and depth.
+         */
+        Snapshot: {
+            /** @description The acting frontier's first `page_item_count_max` items, in rank order: the next list. */
+            acting_frontier: components["schemas"]["NodeRow"][];
+            /** @description The rest of the acting frontier, in rank order. */
+            acting_frontier_rest?: components["schemas"]["NodeKey"][];
+            /** @description The answers in effect in the subtree. */
+            answers?: {
+                [key: string]: components["schemas"]["AnswerValue"];
+            };
+            /** @description The counts. */
+            counts: components["schemas"]["SnapshotCounts"];
+            /** @description Placeholders needing breakdown (B10). */
+            needs_breakdown?: components["schemas"]["NodeKey"][];
+            /** @description Where the next page of nodes starts, when there is one. */
+            next?: components["schemas"]["Cursor"] | null;
+            /** @description A page of in-scope nodes within the depth, in tree order. */
+            nodes: components["schemas"]["SnapshotNode"][];
+            /** @description Open, in-scope decisions, in rank order. */
+            open_decisions?: components["schemas"]["NodeKey"][];
+            /** @description What it covers. */
+            scope: components["schemas"]["SnapshotScope"];
+            /** @description Nodes whose plan can no longer be met. */
+            shortfalls?: components["schemas"]["NodeKey"][];
+            /** @description The stalled diagnostic, when the journey is stalled. */
+            stalled?: components["schemas"]["Stalled"] | null;
+            /**
+             * Format: date
+             * @description The today it was derived for.
+             */
+            today: string;
+            /** @description Open, in-scope nodes no one owns. */
+            unassigned?: components["schemas"]["NodeKey"][];
+        };
+        /** @description I3: what a snapshot counts in its subtree, whatever its depth and page. */
+        SnapshotCounts: {
+            /**
+             * Format: uint32
+             * @description The acting frontier: its top N and the rest.
+             */
+            acting_frontier: number;
+            /**
+             * Format: uint32
+             * @description Blocked nodes.
+             */
+            blocked: number;
+            /** @description In-scope nodes by stored state; they add up to `in_scope`. */
+            by_state: {
+                [key: string]: number;
+            };
+            /**
+             * Format: uint32
+             * @description The frontier.
+             */
+            frontier: number;
+            /**
+             * Format: uint32
+             * @description In-scope (relevant or undecided) nodes.
+             */
+            in_scope: number;
+            /**
+             * Format: uint32
+             * @description In-scope nodes within the depth: the node list across its pages.
+             */
+            listed: number;
+            /**
+             * Format: uint32
+             * @description Not-relevant nodes.
+             */
+            not_relevant: number;
+        };
+        /** @description I3: one in-scope node in the snapshot, with its participations, blocking, and dates. */
+        SnapshotNode: {
+            /** @description What blocks it itself (Gating, Blocked). */
+            blocked_by?: components["schemas"]["Blocker"][];
+            /** @description The ancestors that block it, nearest first. */
+            blocked_through?: components["schemas"]["NodeKey"][];
+            /**
+             * Format: date
+             * @description The earliest it can start.
+             */
+            earliest_start?: string | null;
+            /**
+             * Format: date
+             * @description The latest it can start.
+             */
+            latest_start?: string | null;
+            /** @description Its effective participations by kind. */
+            participations?: {
+                [key: string]: components["schemas"]["EntityKey"][];
+            };
+            /** @description What it is and its signals. */
+            row: components["schemas"]["NodeRow"];
+        };
+        /** @description I3: which part of the journey a snapshot covers and which page of its nodes. */
+        SnapshotScope: {
+            /**
+             * @description Where the node list's page starts.
+             * @default 0
+             */
+            cursor: components["schemas"]["Cursor"];
+            /**
+             * Format: uint32
+             * @description How many levels below the subtree's node (or of roots, at depth 1) the node list goes;
+             *     every level when none.
+             */
+            depth?: number | null;
+            /** @description The subtree: this node and everything beneath it; the whole journey when none. */
+            subtree?: components["schemas"]["NodeKey"] | null;
+        };
         /** @description What a snooze waits for (B6): exactly one of a date or a node. */
         SnoozeTarget: {
             /** Format: date */
             date: string;
         } | {
             node: components["schemas"]["NodeKey"];
+        };
+        /** @description C9, C10: the single signal a list is sorted by; ties fall back to rank order. */
+        SortBy: "rank" | "slack" | "gravity" | "leverage" | "due" | "effort";
+        /** @description I6: a proposal's destination moved past the revision it was drafted against. */
+        StaleBase: {
+            /** @description The destination's revision the proposal names, and its current one. */
+            conflict: components["schemas"]["RevisionConflict"];
+            /** @description What the intervening events touched (H5). */
+            intervening: components["schemas"]["TouchedSet"];
         };
         /** @description A node's newly stale reasons. */
         StaleConsequence: {
@@ -2435,6 +3939,28 @@ export interface components {
          *     unless explicitly `skipped`.
          */
         State: "todo" | "active" | "done" | "skipped" | "open" | "decided" | "pending" | "reached" | "derived";
+        /** @description C18: the journey status summary for observers and reporting. */
+        StatusSummary: {
+            /** @description In-scope nodes by stored state. */
+            by_state: {
+                [key: string]: number;
+            };
+            /** @description Open, in-scope decisions with their owners, in rank order. */
+            open_decisions?: components["schemas"]["OpenDecision"][];
+            /** @description Overdue nodes, by key. */
+            overdue?: components["schemas"]["NodeKey"][];
+            /**
+             * Format: uint32
+             * @description In-scope nodes with work left on them.
+             */
+            remaining: number;
+            /** @description Nodes with a shortfall, by key. */
+            shortfalls?: components["schemas"]["NodeKey"][];
+            /** @description Stale nodes, by key. */
+            stale?: components["schemas"]["NodeKey"][];
+            /** @description In-scope milestones not yet reached that have a date, earliest first. */
+            upcoming_milestones?: components["schemas"]["UpcomingMilestone"][];
+        };
         /** @description What an event is about: its subject key (J1). */
         Subject: {
             node: components["schemas"]["NodeKey"];
@@ -2469,6 +3995,41 @@ export interface components {
         };
         /** @description An IANA time zone name. */
         TimeZoneName: string;
+        /**
+         * @description C13: milestones, pinned dates, and the derived due dates of open work on a time axis, with
+         *     overdue and shortfall marked and the `final` milestone as the end anchor. In scope only.
+         */
+        Timeline: {
+            /** @description The `final` milestone, when it is in scope. */
+            end?: components["schemas"]["NodeKey"] | null;
+            /** @description The dates, earliest first, then by key. */
+            entries: components["schemas"]["TimelineEntry"][];
+            /** @description In-scope milestones with no date yet. */
+            undated?: components["schemas"]["NodeKey"][];
+        };
+        /** @description C13: one date on the timeline. */
+        TimelineEntry: {
+            /**
+             * Format: date
+             * @description The date.
+             */
+            date: string;
+            /** @description The journey's `final` milestone: the end anchor. */
+            final?: boolean;
+            /** @description Its kind. */
+            kind: components["schemas"]["NodeKind"];
+            /** @description The node. */
+            node: components["schemas"]["NodeKey"];
+            /** @description Where the date comes from: a milestone's actual, a pin, or a derived due date. */
+            origin: components["schemas"]["DateOrigin"];
+            /** @description Non-terminal with its due before today. */
+            overdue?: boolean;
+            /**
+             * Format: uint32
+             * @description Days the plan can no longer be met by (F6).
+             */
+            shortfall_days?: number | null;
+        };
         /** @description Single-line text, at most title_bytes_max (256) bytes. */
         Title: string;
         /** @description `POST /users/me/tokens`: what to call the new agent token. */
@@ -2478,6 +4039,26 @@ export interface components {
         };
         /** @description A set of record addresses. */
         TouchedSet: components["schemas"]["RecordKey"][];
+        /**
+         * @description C7: what a node depends on and what depends on it, across levels, over the full structural
+         *     graph: terminal and not-relevant nodes included.
+         */
+        Trace: {
+            /**
+             * @description Its transitive dependents (its ancestors, the nodes whose relevance it determines), in
+             *     key order.
+             */
+            downstream: components["schemas"]["NodeKey"][];
+            /** @description The nodes in `downstream` that contribute to its gravity, in key order. */
+            gravity_contributors: components["schemas"]["NodeKey"][];
+            /** @description The node traced. */
+            node: components["schemas"]["NodeKey"];
+            /**
+             * @description Its transitive dependencies (gating decisions, stage openings, its children), in key
+             *     order.
+             */
+            upstream: components["schemas"]["NodeKey"][];
+        };
         /**
          * @description A state-machine transition (D1). Answering a decision is [`Mutation::Answer`]; the dates a
          *     start or reach records default to today and are edited with
@@ -2489,6 +4070,48 @@ export interface components {
                 reason: components["schemas"]["Reason"];
             };
         } | "reopen" | "reach";
+        /** @description One edge of the graph a canvas edge stands for: `dependent` waits on `requirement`. */
+        UnderlyingEdge: {
+            /** @description The node whose `requires`, condition, or opening it is. */
+            dependent: components["schemas"]["NodeKey"];
+            /** @description It blocks (D1); false for a stage opening with `gates: false`, which holds dates only. */
+            gates: boolean;
+            /** @description How it arose. */
+            origin: components["schemas"]["EdgeOrigin"];
+            /** @description The node waited on. */
+            requirement: components["schemas"]["NodeKey"];
+        };
+        /** @description A review item that blocks resolving its proposal. */
+        UnresolvedItem: {
+            /**
+             * Format: uint32
+             * @description The item's position in the proposal.
+             */
+            item: number;
+            /** @description Why. */
+            reason: components["schemas"]["UnresolvedReason"];
+        };
+        /** @description Why a review item blocks resolving its proposal. */
+        UnresolvedReason: "no_choice" | "not_offered" | "mixed_mapping" | "no_default_owner";
+        /** @description C18: a milestone not yet reached and its effective date. */
+        UpcomingMilestone: {
+            /** @description Its effective date (F1). */
+            date: components["schemas"]["EffectiveDate"];
+            /** @description The milestone. */
+            node: components["schemas"]["NodeKey"];
+        };
+        /**
+         * @description `POST /journeys/{id}/upgrade` (B7): proposes upgrading the journey to a newer version of
+         *     the route it follows.
+         */
+        UpgradeRequest: {
+            /** @description The proposal write's patch id (H5). */
+            patch_id: components["schemas"]["PatchId"];
+            /** @description The proposal's id, generated by the client (I6). */
+            proposal: components["schemas"]["ProposalId"];
+            /** @description The version to upgrade to. */
+            to: components["schemas"]["VersionNumber"];
+        };
         /** @description A URL: scheme:rest, no whitespace. */
         Url: string;
         /** @description Starts with "u_"; at most id_bytes_max (64) bytes. */
@@ -2734,6 +4357,112 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PatchAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    proposeToDeployment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalCreate"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
                 };
             };
             /** @description The request is malformed. */
@@ -3211,6 +4940,84 @@ export interface operations {
             };
         };
     };
+    getDecisionView: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedDecisionView"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
     getJourneyDocument: {
         parameters: {
             query?: never;
@@ -3261,6 +5068,624 @@ export interface operations {
             };
             /** @description No such resource. */
             404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getHistory: {
+        parameters: {
+            query?: {
+                /** @description Only the events that wrote anything on this node. */
+                node?: components["schemas"]["NodeKey"];
+                /** @description The page starts after this position in the log. */
+                after?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["History"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getJourneyLevel: {
+        parameters: {
+            query?: {
+                /** @description The kinds shown; every kind when none. */
+                kind?: components["schemas"]["NodeKind"][];
+                /** @description The container drilled into; the top level when none. */
+                container?: components["schemas"]["NodeKey"];
+            };
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedLevel"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getMine: {
+        parameters: {
+            query?: {
+                /** @description Only these participation kinds; every kind when none. */
+                kind?: components["schemas"]["KindKey"][];
+            };
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedMine"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getNext: {
+        parameters: {
+            query?: {
+                /** @description The signal to sort by; rank when none. */
+                sort?: components["schemas"]["SortBy"];
+                /** @description Only nodes the caller participates in (E4). */
+                mine?: boolean;
+                /** @description Only nodes of these kinds; every kind when none. */
+                kind?: components["schemas"]["NodeKind"][];
+                /** @description Only this node and the nodes beneath it. */
+                within?: components["schemas"]["NodeKey"];
+                /** @description Rank for the caller: prioritize for me (Priority). */
+                for_viewer?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedNext"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    listNodes: {
+        parameters: {
+            query?: {
+                /** @description Filters with no argument; every one given must hold. */
+                flag?: components["schemas"]["ListFlag"][];
+                /** @description Only nodes beneath this container. */
+                within?: components["schemas"]["NodeKey"];
+                /** @description Only nodes this entity owns. */
+                owner?: components["schemas"]["EntityKey"];
+                /** @description Only nodes in these stored states; any when none. */
+                state?: components["schemas"]["State"][];
+                /** @description Only nodes of these kinds; every kind when none. */
+                kind?: components["schemas"]["NodeKind"][];
+                /** @description Text found in the title, description, notes, or resources, ignoring ASCII case. */
+                text?: components["schemas"]["Title"];
+                /** @description The signal to sort by; rank when none. */
+                sort?: components["schemas"]["SortBy"];
+                /** @description Where the page starts: the previous page's `next`. A cursor is a position in the order at one journey revision, so a cursor past the start needs `revision`. */
+                cursor?: components["schemas"]["Cursor"];
+                /** @description The journey revision the previous page was read at (its `revision`); needed with a cursor past the start. When the journey has moved since, the page is refused 409 `page_moved`: start again from the first page. */
+                revision?: components["schemas"]["Revision"];
+            };
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedListPage"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The journey moved since the page the cursor came from: start again from the first page. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getNode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+                /** @description The node. */
+                key: components["schemas"]["NodeKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedNodeDetail"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    listExplanations: {
+        parameters: {
+            query?: {
+                /** @description Where the page starts: the previous page's `next`. A cursor is a position in the order at one journey revision, so a cursor past the start needs `revision`. */
+                cursor?: components["schemas"]["Cursor"];
+                /** @description The journey revision the previous page was read at (its `revision`); needed with a cursor past the start. When the journey has moved since, the page is refused 409 `page_moved`: start again from the first page. */
+                revision?: components["schemas"]["Revision"];
+            };
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+                /** @description The node. */
+                key: components["schemas"]["NodeKey"];
+                /** @description The value whose explanation list to page. */
+                field: components["schemas"]["ExplainedField"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedExplanationPage"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The journey moved since the page the cursor came from: start again from the first page. */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };
@@ -3407,6 +5832,1438 @@ export interface operations {
             };
         };
     };
+    proposeToJourney: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalCreate"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    proposeRelink: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RelinkRequest"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    proposeSaveAsRoute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SaveAsRouteRequest"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getJourneySnapshot: {
+        parameters: {
+            query?: {
+                /** @description This node and everything beneath it; the whole journey when none. */
+                subtree?: components["schemas"]["NodeKey"];
+                /** @description How many levels below the subtree's node (or of roots, at 1) the node list goes; every level when none. */
+                depth?: number;
+                /** @description Where the page starts: the previous page's `next`. A cursor is a position in the order at one journey revision, so a cursor past the start needs `revision`. */
+                cursor?: components["schemas"]["Cursor"];
+                /** @description The journey revision the previous page was read at (its `revision`); needed with a cursor past the start. When the journey has moved since, the page is refused 409 `page_moved`: start again from the first page. */
+                revision?: components["schemas"]["Revision"];
+            };
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedSnapshot"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The journey moved since the page the cursor came from: start again from the first page. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getStatusSummary: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedStatusSummary"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getTimeline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedTimeline"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    traceNode: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+                /** @description The node. */
+                key: components["schemas"]["NodeKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProjectedTrace"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    proposeUpgrade: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpgradeRequest"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                id: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    editProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                id: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalEdit"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    applyProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                id: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalApply"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    discardProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                id: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalStep"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    previewProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                id: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalReview"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    refreshProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                id: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalStep"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
     getRoute: {
         parameters: {
             query?: never;
@@ -3485,6 +7342,205 @@ export interface operations {
             };
         };
     };
+    exportRoute: {
+        parameters: {
+            query?: {
+                /** @description The published version to export; the draft when none. */
+                version?: components["schemas"]["VersionNumber"];
+            };
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RouteFile"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    importRoute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RouteImport"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
     patchRoute: {
         parameters: {
             query?: never;
@@ -3508,6 +7564,124 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["PatchAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    proposeToRoute: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalCreate"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
                 };
             };
             /** @description The request is malformed. */

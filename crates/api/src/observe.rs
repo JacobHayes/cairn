@@ -17,8 +17,10 @@ use tracing::Instrument;
 pub const REQUESTS: &str = "cairn_api_requests_total";
 /// Request latency in seconds, by endpoint and method.
 pub const REQUEST_DURATION: &str = "cairn_api_request_duration_seconds";
-/// Domain patches answered, by outcome: `applied`, `already_applied`, `invalid`, `stale`,
-/// `patch_id_reused`.
+/// Patches answered, by outcome: a domain patch, a proposal's apply, or a route import
+/// `applied` or `already_applied`; a proposal write `saved`, `already_saved`, or `existing`,
+/// or `not_drafted` when the engine could not draft it; any of them `invalid`, `stale`,
+/// `patch_id_reused`, `not_found` (a proposal, journey, or version it names), or `failed`.
 pub const PATCHES: &str = "cairn_api_patches_total";
 /// Engine panics caught in a request (PRACTICES, Programmer errors panic).
 pub const ENGINE_PANICS: &str = "cairn_engine_panics_total";

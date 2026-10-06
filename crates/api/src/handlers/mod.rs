@@ -2,13 +2,16 @@
 //! auth call) as the caller the auth layer named, and answers its wire shape. None decides
 //! anything the service does not: the API shapes the service's vocabulary for HTTP and
 //! never bypasses it (ARCHITECTURE, Service layer and composition).
+pub mod bulk;
+pub mod projections;
+pub mod proposals;
 pub mod reads;
 pub mod users;
 
 use axum::Json;
 use axum::extract::{Extension, State};
 use cairn_schema::{Actor, Domain, JourneyId, PatchTarget, Rejection, RouteId};
-use cairn_service::{DomainPatch, WriteError};
+use cairn_service::{DomainPatch, WriteError, Written};
 use cairn_store::Store;
 
 use crate::Api;
@@ -73,30 +76,66 @@ async fn submit<S: Store + 'static>(
     let patch_id = patch.id.clone();
     let submitted = DomainPatch::new(patch, note)
         .map_err(|error| ApiError::problem(ProblemCode::TargetMismatch, error.to_string()))?;
-    // On its own task, so the request duration limit can answer the caller without cutting
-    // a commit off between its store write and its announcement (H6); a resubmission by
-    // patch id finds the result (H5).
     let (service, call) = (api.service.clone(), api.call(actor));
-    let answer = tokio::spawn(async move { service.patch(&call, &submitted).await })
-        .await
-        .map_err(|error| {
-            tracing::error!(%error, "a patch task failed");
-            ApiError::problem(ProblemCode::Internal, "the patch task failed")
-        })?;
-    let outcome = match &answer {
-        Ok(cairn_service::Written::Applied { .. }) => "applied",
-        Ok(cairn_service::Written::AlreadyApplied { .. }) => "already_applied",
-        Err(WriteError::Rejected(Rejection::Invalid { .. })) => "invalid",
-        Err(WriteError::Rejected(Rejection::Stale { .. })) => "stale",
-        Err(WriteError::Rejected(Rejection::PatchIdReused { .. })) => "patch_id_reused",
-        Err(WriteError::Failed(_)) => "failed",
-    };
+    let answer = committed(async move { service.patch(&call, &submitted).await }).await?;
+    let outcome = written_outcome(&answer);
     tracing::info!(patch_id = %patch_id, %domain, outcome, "patch");
     observe::patch_outcome(outcome);
+    Ok(Json(answer?.into()))
+}
+
+/// Runs a write on its own task, so the request duration limit can answer the caller without
+/// cutting a commit off between its store write and its announcement (H6); a resubmission by
+/// patch id finds the result (H5).
+///
+/// # Errors
+///
+/// An internal problem when the task fails.
+pub(crate) async fn committed<T: Send + 'static>(
+    write: impl Future<Output = T> + Send + 'static,
+) -> Result<T, ApiError> {
+    tokio::spawn(write).await.map_err(|error| {
+        tracing::error!(%error, "a write task failed");
+        ApiError::problem(ProblemCode::Internal, "the write task failed")
+    })
+}
+
+/// A domain write's outcome, as the patch count and logs name it.
+pub(crate) fn written_outcome(answer: &Result<Written, WriteError>) -> &'static str {
     match answer {
-        Ok(written) => Ok(Json(written.into())),
-        Err(WriteError::Rejected(rejection)) => Err(ApiError::Rejected(rejection)),
-        Err(WriteError::Failed(error)) => Err(error.into()),
+        Ok(Written::Applied { .. }) => "applied",
+        Ok(Written::AlreadyApplied { .. }) => "already_applied",
+        Err(error) => refused_outcome(error),
+    }
+}
+
+/// A refused write's outcome from its answer, as the patch count and logs name it: a
+/// rejection by its kind, `not_found`, `not_drafted` for a request Cairn cannot draft, or
+/// `failed`.
+pub(crate) fn refusal_outcome(error: &ApiError) -> &'static str {
+    match error {
+        ApiError::Rejected(Rejection::Invalid { .. }) => "invalid",
+        ApiError::Rejected(Rejection::Stale { .. }) => "stale",
+        ApiError::Rejected(Rejection::PatchIdReused { .. }) => "patch_id_reused",
+        ApiError::Problem {
+            code: ProblemCode::NotFound,
+            ..
+        } => "not_found",
+        ApiError::Problem {
+            code: ProblemCode::CannotDraft,
+            ..
+        } => "not_drafted",
+        ApiError::Problem { .. } => "failed",
+    }
+}
+
+/// A refused write's outcome, as the patch count and logs name it.
+pub(crate) fn refused_outcome(error: &WriteError) -> &'static str {
+    match error {
+        WriteError::Rejected(Rejection::Invalid { .. }) => "invalid",
+        WriteError::Rejected(Rejection::Stale { .. }) => "stale",
+        WriteError::Rejected(Rejection::PatchIdReused { .. }) => "patch_id_reused",
+        WriteError::Failed(_) => "failed",
     }
 }
 

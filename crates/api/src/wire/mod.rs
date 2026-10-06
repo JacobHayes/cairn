@@ -3,9 +3,16 @@
 //! rejections) cross unchanged as the schema crate's types; these wrap them, and give the
 //! service's answers and the store's query results a wire shape.
 
+mod projections;
+mod proposals;
 mod reads;
 mod users;
 
+pub use projections::{ChildEntry, History, Mine, NodeDetail, Projected};
+pub use proposals::{
+    ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalReview, ProposalStep,
+    RelinkRequest, RouteImport, SaveAsRouteRequest, StaleBase, UpgradeRequest,
+};
 pub use reads::{
     EventPage, JourneyMatches, JourneyPage, JourneySummary, LoggedEvent, RouteDetail, SearchHit,
     SearchPage, VersionJourneys,
@@ -196,8 +203,15 @@ pub enum ProblemCode {
     PayloadTooLarge,
     /// The patch's target is not the domain the path names, or is a proposal.
     TargetMismatch,
+    /// Cairn cannot draft the upgrade, save as route, or re-link asked for: the journey follows
+    /// no route, the version is not newer, or the draft is past a proposal's limits (B7, B8,
+    /// B9).
+    CannotDraft,
     /// No such resource.
     NotFound,
+    /// The journey moved since the page a cursor came from was read, so the cursor no longer
+    /// names a place in its order: start again from the first page.
+    PageMoved,
     /// No endpoint at this path.
     NoSuchEndpoint,
     /// The endpoint takes another method.

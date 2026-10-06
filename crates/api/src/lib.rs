@@ -58,6 +58,9 @@ impl<S: Store + 'static> Api<S> {
     }
 }
 
+/// Endpoints and the handlers that serve them.
+type Served<S> = Vec<(&'static Endpoint, MethodRouter<Api<S>>)>;
+
 /// The API: every endpoint behind `auth`'s layer, auth's own routes beside them, the request
 /// limits, and observability, over `service`. `auth` must share the service's store.
 pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router {
@@ -67,7 +70,7 @@ pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router
         service,
         auth: auth.clone(),
     };
-    let served: [(&Endpoint, MethodRouter<Api<S>>); 19] = [
+    let mut served: Served<S> = vec![
         (&at::CAPABILITIES, get(handle::capabilities::<S>)),
         (&at::PATCH_JOURNEY, post(handle::patch_journey::<S>)),
         (&at::PATCH_ROUTE, post(handle::patch_route::<S>)),
@@ -88,6 +91,9 @@ pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router
         (&at::MINT_TOKEN, post(handle::users::mint_token::<S>)),
         (&at::REVOKE_TOKEN, delete(handle::users::revoke_token::<S>)),
     ];
+    served.extend(handle::projections::served::<S>());
+    served.extend(handle::proposals::served::<S>());
+    served.extend(handle::bulk::served::<S>());
     let mut routes = Router::new();
     for (endpoint, method_router) in served {
         routes = routes.route(endpoint.path, method_router);
