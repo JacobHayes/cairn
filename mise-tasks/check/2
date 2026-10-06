@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+#MISE description="Rung 2: unit tests for every Rust crate (property tests excluded: rung 3)"
+# PRACTICES, The validation ladder, rung 2. One suite per crate, so a crate whose tests
+# vanish fails the rung. Property tests live in `mod property` (in `tests/property_*.rs`)
+# and are skipped here by name; rung 3 runs them.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+LADDER_RUNG=2
+# shellcheck source=scripts/ladder-lib.sh
+source scripts/ladder-lib.sh
+
+ladder_require_tool cargo cargo --version
+# The counts below are read from cargo's output, which must not carry color codes (CI sets
+# CARGO_TERM_COLOR=always).
+export CARGO_TERM_COLOR=never
+ladder_require_tool node node --version
+
+# Every workspace crate is a suite, whatever test binaries it builds: unit, integration, and
+# doc tests together, run one crate at a time so each count belongs to its crate.
+# shellcheck disable=SC2016 # the backticks are a JavaScript template literal
+crates=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
+  let text = "";
+  process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
+    for (const item of JSON.parse(text).packages) console.log(item.name);
+  });')
+while read -r crate; do
+  [ -n "$crate" ] || continue
+  status=0
+  output=$(cargo test --locked -p "$crate" --all-features -- --skip property:: 2>&1) || status=$?
+  printf '%s\n' "$output"
+  [ "$status" -eq 0 ] || ladder_fail "cargo test reported failures in $crate"
+  count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
+  ladder_suite "$crate tests" "$count" tests
+done <<<"$crates"
+
+ladder_rung_end

@@ -33,13 +33,14 @@ jobs:
       - uses: jdx/mise-action@v5
       - run: mise run check
 
-  # Every rung that exists, as on push. The brief that adds rung 3 raises its property test
-  # case count here (PRACTICES, The validation ladder: a larger case count nightly).
+  # Every rung that exists, as on push, with rung 3's property tests at a larger case count
+  # (PRACTICES, The validation ladder).
   nightly:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
     env:
       MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
+      PROPTEST_CASES: 4096
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5

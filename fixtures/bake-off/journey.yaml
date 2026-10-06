@@ -1,0 +1,183 @@
+journey: j_bakeoff
+description: >-
+  A journey with no route. It starts empty; the assistant proposes a two-week
+  bake-off between two options (three decisions, four deliverables, one milestone, two
+  entities, and a role declared on the journey itself), the user applies the
+  proposal, and work starts.
+steps:
+- note: Create an empty journey, with no lineage.
+  today: "2026-10-05"
+  at: "2026-10-05T09:00:00Z"
+  actor:
+    user: u_owner
+  patch:
+    id: p_bo_01
+    target:
+      journey: j_bakeoff
+    base_revision: 0
+    mutations:
+    - op: create_journey
+      name: Two-week bake-off
+      description: Compare two options side by side for two weeks and pick one.
+- note: >-
+    The assistant drafts the structure as a proposal against the journey at
+    revision 1; drafting does not advance the journey.
+  today: "2026-10-05"
+  at: "2026-10-05T09:02:00Z"
+  actor:
+    user: u_owner
+    agent: ag_assistant
+  patch:
+    id: p_bo_02
+    target:
+      proposal:
+        id: pr_bakeoff
+        destination:
+          journey: j_bakeoff
+    base_revision: 0
+    mutations:
+    - op: create_proposal
+      proposal:
+        title: Structure a two-week bake-off between two options
+        destination_revision: 1
+        mutations:
+        - op: create_entity
+          entity:
+            key: e_owner
+            name: Bake-off Owner
+            emails:
+            - owner@example.org
+        - op: create_entity
+          entity:
+            key: e_judge
+            name: Second Judge
+        - op: add_role
+          role:
+            key: r_judges
+            id: judges
+            title: Judges
+            multi: true
+        - op: add_node
+          node:
+            key: n_criteria
+            id: criteria
+            kind: decision
+            title: Criteria
+            prompt: Which criteria decide the winner?
+            answer_type: text
+        - op: add_node
+          node:
+            key: n_judges
+            id: judges
+            kind: decision
+            title: Judges
+            prompt: Who judges the bake-off?
+            answer_type: entity_list
+            fills_role: r_judges
+        - op: add_node
+          node:
+            key: n_trial_a
+            id: trial-a
+            kind: deliverable
+            title: Trial of option A
+            estimate: 5
+            requires:
+            - n_criteria
+        - op: add_node
+          node:
+            key: n_trial_b
+            id: trial-b
+            kind: deliverable
+            title: Trial of option B
+            estimate: 5
+            requires:
+            - n_criteria
+        - op: add_node
+          node:
+            key: n_comparison
+            id: comparison
+            kind: deliverable
+            title: Side-by-side comparison
+            estimate: 2
+            requires:
+            - n_trial_a
+            - n_trial_b
+            participations:
+              k_owner:
+              - e_owner
+        - op: add_node
+          node:
+            key: n_summary
+            id: summary
+            kind: deliverable
+            title: Recommendation summary
+            requires_artifact: true
+            requires:
+            - n_comparison
+        - op: add_node
+          node:
+            key: n_wrap_up
+            id: wrap-up
+            kind: milestone
+            title: Bake-off ends
+            final: true
+            due_by:
+              after: journey.created_at
+              offset: 14
+        - op: add_node
+          node:
+            key: n_winner
+            id: winner
+            kind: decision
+            title: Winner
+            prompt: Which option wins?
+            answer_type: single_choice
+            choices:
+            - option-a
+            - option-b
+            requires:
+            - n_summary
+- note: >-
+    The owner reviews the proposal and applies it; its mutations commit with the
+    applied status in one patch.
+  today: "2026-10-05"
+  at: "2026-10-05T09:30:00Z"
+  actor:
+    user: u_owner
+  patch:
+    id: p_bo_03
+    target:
+      journey: j_bakeoff
+    base_revision: 1
+    mutations:
+    - op: apply_proposal
+      proposal: pr_bakeoff
+      reviewed_revision: 1
+- note: The criteria and judges are decided and both trials start.
+  today: "2026-10-06"
+  at: "2026-10-06T10:00:00Z"
+  actor:
+    user: u_owner
+  patch:
+    id: p_bo_04
+    target:
+      journey: j_bakeoff
+    base_revision: 2
+    deployment_revision: 1
+    mutations:
+    - op: answer
+      decision: n_criteria
+      value:
+        text: Setup time, cost per month, and how the team rates daily use.
+    - op: answer
+      decision: n_judges
+      value:
+        entity_list:
+        - e_judge
+        - e_owner
+    - op: transition
+      node: n_trial_a
+      transition: start
+    - op: transition
+      node: n_trial_b
+      transition: start

@@ -78,7 +78,7 @@ reset_tree
 scenario "Clean tree" 0 "No change."
 
 reset_tree
-cat >>"$tree/crates/scaffold/src/lib.rs" <<'EOF'
+cat >>"$tree/crates/schema/src/lib.rs" <<'EOF'
 
 /// Reads a count.
 ///
@@ -90,38 +90,48 @@ pub fn count_from_text(text: &str) -> u32 {
     text.parse().unwrap()
 }
 EOF
-scenario "Stray unwrap" nonzero 'Planted: a public function in the throwaway crate ending in `text.parse().unwrap()`.'
+scenario "Stray unwrap" nonzero 'Planted: a public function in the schema crate ending in `text.parse().unwrap()`.'
 
 reset_tree
-long_function 70 >>"$tree/crates/scaffold/src/lib.rs"
+long_function 70 >>"$tree/crates/schema/src/lib.rs"
 scenario "70-line function" 0 "Planted: a function whose body is 70 lines, the limit (PRACTICES, Code shape)."
 
 reset_tree
-long_function 71 >>"$tree/crates/scaffold/src/lib.rs"
+long_function 71 >>"$tree/crates/schema/src/lib.rs"
 scenario "71-line function" nonzero "Planted: the same function with a 71-line body."
 
 reset_tree
-printf '\n/// Badly spaced.\npub const   SPACED : u32=1;\n' >>"$tree/crates/scaffold/src/lib.rs"
+printf '\n/// Badly spaced.\npub const   SPACED : u32=1;\n' >>"$tree/crates/schema/src/lib.rs"
 scenario "Formatting error" nonzero 'Planted: `pub const   SPACED : u32=1;`.'
 
 reset_tree
-cat >"$tree/mise-tasks/check/2" <<'EOF'
+cat >"$tree/mise-tasks/check/4" <<'EOF'
 #!/usr/bin/env bash
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-LADDER_RUNG=2
+LADDER_RUNG=4
 source scripts/ladder-lib.sh
-output=$(cargo test --locked --workspace 2>&1)
-ladder_suite "unit tests" "$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")" tests
+output=$(cargo test --locked --workspace -- store_conformance:: 2>&1)
+ladder_suite "store conformance" "$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")" tests
 ladder_rung_end
 EOF
-chmod +x "$tree/mise-tasks/check/2"
-scenario "A rung that ran zero tests" nonzero "Planted: a rung 2 (\`mise-tasks/check/2\`) that runs \`cargo test\` over the workspace and reports how many tests ran. The workspace has no tests yet, so it reports zero."
+chmod +x "$tree/mise-tasks/check/4"
+scenario "A rung that ran zero tests" nonzero "Planted: a rung 4 (\`mise-tasks/check/4\`) that runs the workspace tests named \`store_conformance::\` and reports how many ran. No crate has such tests yet, so it reports zero."
 
 reset_tree
 mkdir -p "$tree/crates/engine/src"
-sed 's/cairn-scaffold/cairn-engine/; s/^description = .*/description = "Planted engine crate."/' \
-  "$tree/crates/scaffold/Cargo.toml" >"$tree/crates/engine/Cargo.toml"
+cat >"$tree/crates/engine/Cargo.toml" <<'EOF'
+[package]
+name = "cairn-engine"
+description = "Planted engine crate."
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+EOF
 cat >"$tree/crates/engine/src/lib.rs" <<'EOF'
 //! Planted engine crate.
 
@@ -139,8 +149,8 @@ EOF
 scenario "HashMap in the engine crate" nonzero 'Planted: a `crates/engine` crate (`cairn-engine`) whose public function returns a `std::collections::HashMap`.'
 
 reset_tree
-sed -i '/^\[lints\]$/,$d' "$tree/crates/scaffold/Cargo.toml"
-scenario "A crate that drops the workspace lints" nonzero 'Planted: the throwaway crate without `[lints] workspace = true`.'
+sed -i '/^\[lints\]$/,$d' "$tree/crates/schema/Cargo.toml"
+scenario "A crate that drops the workspace lints" nonzero 'Planted: the schema crate without `[lints] workspace = true`.'
 
 reset_tree
 # mise stops providing node, and a node that fails comes first on PATH, so no other node

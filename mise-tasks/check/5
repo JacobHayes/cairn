@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+#MISE description="Rung 5: regenerate the generated paths and fail if any file changed, appeared, or disappeared"
+# PRACTICES, The validation ladder, rung 5; ARCHITECTURE, Generated artifacts. Records every
+# file path and content hash under the generated paths, runs `mise run gen`, and compares.
+# Works the same in a jj working copy and in CI: it reads the files, not version control.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+LADDER_RUNG=5
+# shellcheck source=scripts/ladder-lib.sh
+source scripts/ladder-lib.sh
+
+ladder_require_tool sha256sum sha256sum --version
+
+generated_paths=(openapi schema web/client/generated web/wasm/generated)
+
+# One line per generated file: "<sha256>  <path>", sorted.
+inventory() {
+  local path
+  for path in "${generated_paths[@]}"; do
+    if [ -d "$path" ]; then find "$path" -type f -print0; fi
+  done | sort -z | xargs -0 --no-run-if-empty sha256sum
+}
+
+before=$(inventory)
+mise run gen
+after=$(inventory)
+
+if [ "$before" != "$after" ]; then
+  diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") || true
+  ladder_fail "generated files differ from their sources: run 'mise run gen' and commit the result"
+fi
+ladder_suite "generated files unchanged" "$(grep -c . <<<"$after" || true)" files
+ladder_rung_end

@@ -2,6 +2,48 @@
 
 Judgment calls made while implementing the briefs, for the user to review (`AGENTS.md`, Decide, record, keep going). Newest first. Each entry: date, brief, the question, the call, the alternatives, and what would change it.
 
+## 2026-10-06, brief 1.2: entity creates in another domain's patch advance the deployment revision
+
+- Question: E6 lets an entity create ride in any patch with no deployment revision check, and asks a journey patch that writes an entity reference to name the deployment revision it was validated against. Whether a create riding in a journey patch advances the deployment revision is left open, and the fixtures need an answer.
+- Call: yes, once per patch that creates entities (it writes deployment records, and A17's revision counts a domain's changes). A later patch referring to those entities names the resulting revision; a patch referring only to entities it creates itself names none. Each fixture scenario runs in a fresh deployment, and a fixture test checks the rule.
+- Alternatives: only deployment-domain patches advance the deployment revision (then a reference check could miss a create that landed in between).
+- What would change it: the engine or store (2.1, 3.1) committing riding creates without a deployment revision bump.
+
+## 2026-10-06, brief 1.2: an event's delta is the after-state of the records it wrote
+
+- Question: J1 asks each event to carry "the after-state delta needed to replay it", and J3's replay must be exact; ARCHITECTURE's change set is "entities put and removed by key" for a store that does not depend on the engine. The readiness scout left the delta's representation open.
+- Call: one record vocabulary (`Record`, addressed by `RecordKey`, mirroring the Schema outline's tables, with a node field addressable on its own) serves both. An event's delta is the ordered list of `Write`s its mutation made: `Put(record)` as after-state, `Remove(address)` (an address may cover a whole domain, graph, or node), or `CopyGraph` (publishing). Replay applies the writes and re-derives nothing; the change set is the receipt plus the events, and its writes are what a store persists. Side effects (a local-edit marker set by an edit, a snooze cleared by a transition, tombstones written by a removal) appear in the delta as writes, so replay never needs the rules that produced them.
+- Alternatives: a typed delta per event type (readable history, but replay re-implements each mutation's effects and must match apply exactly); deltas as full graph snapshots (exact but large).
+- What would change it: a store that needs coarser rows than per-field node writes, or history display (J4) needing the mutation as submitted beside its effects, which would add the mutation to the event.
+
+## 2026-10-06, brief 1.2: touched sets by record address, coarse when in doubt
+
+- Question: H5 retries a stale patch automatically when its touched set does not overlap the intervening events', "by key and field"; the scout left the granularity open, and some mutations' effects (create, publish, upgrade, apply a proposal) depend on content they do not name.
+- Call: a touched set is a set of record addresses. Node fields, edges, participations, resources, local-edit markers, and each kind of journey state are addressed separately, so an edit and a transition on one node, or edits to two fields, never overlap; a whole node overlaps everything on it (an edge belongs to both ends), so a removal overlaps any change to what it removes. A mutation whose effect depends on unnamed content, and any mutation the dispatch does not list, touches its whole domain: too coarse only costs an automatic retry, never correctness. A transition or answer also touches the node's snooze and answer; proposal edits touch only the proposal.
+- Alternatives: per-node granularity (simpler, fewer automatic retries); computing touched sets from the graph at apply (exact but not available to a client deciding whether to resubmit).
+- What would change it: retries in the multiplayer testbed (6.1) failing too often, which would refine the coarse cases.
+
+## 2026-10-06, brief 1.2: the file format names a node's parent rather than its full path
+
+- Question: PRD Identity and references says paths are how files refer to nodes. A file could give each node its full path, or its id and its parent's path.
+- Call: a node in a file has `id` and `parent` (the parent's path, absent for a root), and every reference (`requires`, conditions, rules, stage bounds, `feeds_milestone`) is a full path. The graph form has the same three fields with `parent` a key, so the two forms share one node type and one wire shape (ARCHITECTURE, File format: one schema). Nodes are a flat list, so parsing never recurses through containment (PRACTICES, No recursion); a canonical file lists them as written, and export (2.7) sorts.
+- Alternatives: `path: setup/access` on each node (the path is visible at a glance, but the graph form needs a different identity shape, and a node's id is repeated in its children's paths); nested `children:` (reads as a tree, but recursion in parsing and deep indentation at depth 16).
+- What would change it: authors finding parent-plus-id harder to read than full paths in practice.
+
+## 2026-10-06, brief 1.2: mutation semantics the PRD leaves implicit
+
+- Question: the PRD defines what can change but not every mutation's shape; three readings shape the engine.
+- Call: (1) start and reach take no date: apply records today (a derive input) and `set_recorded_date` edits it, so a mutation never carries a default the server must trust (F1, F2). (2) A guard bypass is an override mutation applied in the same patch as the transition it covers, so it is its own event as J1 lists ("guard bypassed"), and the engine records the specific failures present on it (D4). (3) In a journey, editing a node's weight or participations is state (B5, glossary), every other field edit is structural, and every change to a route is structural; applying a proposal is structural, since its content is not in the patch.
+- Alternatives: dates on the transitions; a bypass flag on the transition mutation (one event, which J1's separate event type argues against).
+- What would change it: the engine (2.1) finding a guard bypass in a separate mutation awkward to tie to its transition.
+
+## 2026-10-06, brief 1.2: values the limits table does not name take the nearest named limit
+
+- Question: PRACTICES (Explicit limits) puts a limit on everything, but its table names no limit for keys, client-generated ids, names (entity, route, journey, role and kind titles), emails, choice labels, condition values, reasons, URLs, or for collections such as emails per entity, attachments per node, or entities per deployment. Adding a limit needs the user's sign-off.
+- Call: no new limits. Keys and prefixed ids take the id slug limit (64 bytes, prefix included); single-line labels (names, emails, choice titles, condition values) the title limit (256 bytes); free text (reasons, prompts, help) and URLs the body limit (64 KiB). A collection the table does not name is bounded by the serialized graph cap (16 MiB, checked on the graph a patch produces) and, in any document, by the request-body cap (24 MiB), which every parse checks first.
+- Alternatives: new named limits (URL 2 KiB, emails per entity, attachments per node), which need sign-off; leaving those values unbounded, which PRACTICES forbids.
+- What would change it: a value that is legitimately longer than its borrowed limit (a long URL is the likeliest), or a collection that grows large inside the 16 MiB cap; either becomes a named limit after sign-off.
+
 ## 2026-10-06, brief 1.3: 6.1 drives the real HTTP server, on one current-thread runtime
 
 - Question: does 6.1's multiplayer testbed drive the real HTTP server (axum on tokio) under the patina shim, or call the service in-process (PRACTICES, Simulation with patina: Testbeds)?

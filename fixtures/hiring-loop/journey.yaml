@@ -1,0 +1,174 @@
+journey: j_hiring
+description: >-
+  A three-person panel fills a multi-valued role; the assistant breaks the
+  interviews placeholder into one interview per panel member with explicit
+  participations; the screen is skipped with a reason; the offer branch becomes relevant once the
+  decision is made.
+steps:
+- note: Start the loop and create the hiring manager and the panel.
+  today: "2026-10-01"
+  at: "2026-10-01T09:00:00Z"
+  actor:
+    user: u_manager
+  patch:
+    id: p_hl_01
+    target:
+      journey: j_hiring
+    base_revision: 0
+    mutations:
+    - op: create_journey
+      name: Hire a platform engineer
+      from:
+        route: hiring-loop
+        version: 1
+    - op: create_entity
+      entity:
+        key: e_manager
+        name: Hiring Manager
+        emails:
+        - manager@example.org
+    - op: create_entity
+      entity:
+        key: e_panelist_one
+        name: Panelist One
+    - op: create_entity
+      entity:
+        key: e_panelist_two
+        name: Panelist Two
+    - op: create_entity
+      entity:
+        key: e_panelist_three
+        name: Panelist Three
+    - op: fill_role
+      role: r_hiring_manager
+      entities:
+      - e_manager
+- note: The panel decision fills the multi-valued panel role.
+  today: "2026-10-01"
+  at: "2026-10-01T09:05:00Z"
+  actor:
+    user: u_manager
+  patch:
+    id: p_hl_02
+    target:
+      journey: j_hiring
+    base_revision: 1
+    deployment_revision: 1
+    mutations:
+    - op: answer
+      decision: n_choose_panel
+      value:
+        entity_list:
+        - e_panelist_one
+        - e_panelist_three
+        - e_panelist_two
+- note: The candidate came by referral, so the screen is skipped with a reason.
+  today: "2026-10-02"
+  at: "2026-10-02T10:00:00Z"
+  actor:
+    user: u_manager
+  patch:
+    id: p_hl_03
+    target:
+      journey: j_hiring
+    base_revision: 2
+    mutations:
+    - op: transition
+      node: n_screen
+      transition:
+        skip:
+          reason: Referred candidate; the screen happened informally.
+- note: >-
+    The assistant breaks the interviews placeholder into one interview per panel
+    member, each with an explicit interviewer.
+  today: "2026-10-03"
+  at: "2026-10-03T11:00:00Z"
+  actor:
+    user: u_manager
+    agent: ag_assistant
+  patch:
+    id: p_hl_04
+    target:
+      journey: j_hiring
+    base_revision: 3
+    deployment_revision: 1
+    mutations:
+    - op: add_node
+      node:
+        key: n_interview_one
+        id: interview-one
+        parent: n_interviews
+        kind: action
+        title: Interview with Panelist One
+        participations:
+          k_interviewer:
+          - e_panelist_one
+    - op: add_node
+      node:
+        key: n_interview_two
+        id: interview-two
+        parent: n_interviews
+        kind: action
+        title: Interview with Panelist Two
+        participations:
+          k_interviewer:
+          - e_panelist_two
+    - op: add_node
+      node:
+        key: n_interview_three
+        id: interview-three
+        parent: n_interviews
+        kind: action
+        title: Interview with Panelist Three
+        participations:
+          k_interviewer:
+          - e_panelist_three
+- note: The interviews, the scorecard, and the debrief are done.
+  today: "2026-10-09"
+  at: "2026-10-09T17:00:00Z"
+  actor:
+    user: u_manager
+  patch:
+    id: p_hl_05
+    target:
+      journey: j_hiring
+    base_revision: 4
+    mutations:
+    - op: transition
+      node: n_interview_one
+      transition: complete
+    - op: transition
+      node: n_interview_two
+      transition: complete
+    - op: transition
+      node: n_interview_three
+      transition: complete
+    - op: transition
+      node: n_interviews
+      transition: complete
+    - op: transition
+      node: n_debrief_scorecard
+      transition: complete
+    - op: transition
+      node: n_debrief_notes
+      transition: complete
+    - op: transition
+      node: n_debrief
+      transition: complete
+- note: >-
+    The offer decision is made; the offer letter becomes relevant and the close-out
+    does not.
+  today: "2026-10-10"
+  at: "2026-10-10T12:00:00Z"
+  actor:
+    user: u_manager
+  patch:
+    id: p_hl_06
+    target:
+      journey: j_hiring
+    base_revision: 5
+    mutations:
+    - op: answer
+      decision: n_make_offer
+      value:
+        boolean: true

@@ -1,0 +1,97 @@
+format: 1
+route: hiring-loop
+name: Hiring loop
+description: >-
+  Take one candidate from screen through a panel of interviews to an offer or a
+  close-out.
+default_owner: hiring_manager
+roles:
+- key: r_hiring_manager
+  id: hiring_manager
+  title: Hiring manager
+- key: r_panel
+  id: panel
+  title: Interview panel
+  multi: true
+participation_kinds:
+- key: k_interviewer
+  id: interviewer
+  title: Interviewer
+  multi: true
+nodes:
+- key: n_choose_panel
+  id: choose-panel
+  kind: decision
+  title: Interview panel
+  prompt: Who sits on the interview panel?
+  answer_type: entity_list
+  fills_role: panel
+- key: n_loop
+  id: loop
+  kind: group
+  title: Interview loop
+- key: n_screen
+  id: screen
+  parent: loop
+  kind: action
+  title: Phone screen
+  estimate: 1
+- key: n_onsite
+  id: onsite
+  parent: loop
+  kind: group
+  title: Onsite
+  requires:
+  - loop/screen
+- key: n_interviews
+  id: interviews
+  parent: loop/onsite
+  kind: deliverable
+  title: Panel interviews
+  description: One interview per panel member, broken down per journey.
+  placeholder: true
+  participations:
+    interviewer: panel
+- key: n_debrief
+  id: debrief
+  parent: loop/onsite
+  kind: action
+  title: Panel debrief
+  requires:
+  - loop/onsite/interviews
+- key: n_debrief_notes
+  id: notes
+  parent: loop/onsite/debrief
+  kind: action
+  title: Collect written feedback
+- key: n_debrief_scorecard
+  id: scorecard
+  parent: loop/onsite/debrief/notes
+  kind: action
+  title: Fill in the scorecard
+- key: n_make_offer
+  id: make-offer
+  kind: decision
+  title: Make an offer
+  prompt: Do we make the candidate an offer?
+  answer_type: boolean
+  requires:
+  - loop
+- key: n_offer
+  id: offer
+  kind: deliverable
+  title: Offer letter
+  requires_artifact: true
+  relevant_when:
+    equals:
+      decision: make-offer
+      value: true
+- key: n_close_out
+  id: close-out
+  kind: action
+  title: Close out with the candidate
+  relevant_when:
+    not:
+      equals:
+        decision: make-offer
+        value: true

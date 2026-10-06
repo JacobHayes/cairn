@@ -1,0 +1,134 @@
+format: 1
+route: product-launch
+name: Product launch
+description: >-
+  Ship a release on a fixed launch date, working back from it through a freeze, a
+  beta, and the launch materials.
+default_owner: launch_lead
+roles:
+- key: r_launch_lead
+  id: launch_lead
+  title: Launch lead
+- key: r_writers
+  id: writers
+  title: Writers
+  multi: true
+participation_kinds:
+- key: k_contributor
+  id: contributor
+  title: Contributor
+  multi: true
+nodes:
+- key: n_kickoff
+  id: kickoff
+  kind: milestone
+  title: Kickoff
+- key: n_code_freeze
+  id: code-freeze
+  kind: milestone
+  title: Code freeze
+  due_by:
+    before: launch
+    offset: 21
+- key: n_beta_start
+  id: beta-start
+  kind: milestone
+  title: Beta starts
+  auto_reach: true
+  not_before:
+    after: code-freeze
+    offset: 2
+- key: n_beta_end
+  id: beta-end
+  kind: milestone
+  title: Beta ends
+  due_by:
+    after: beta-start
+    offset: 10
+- key: n_launch
+  id: launch
+  kind: milestone
+  title: Launch
+  weight: 10
+  final: true
+- key: n_retro
+  id: retro
+  kind: milestone
+  title: Retrospective
+  not_before:
+    after: launch
+    offset: 5
+- key: n_build
+  id: build
+  kind: group
+  title: Build
+  opens_at: kickoff
+  closes_at: code-freeze
+- key: n_features
+  id: features
+  parent: build
+  kind: deliverable
+  title: Feature work
+  estimate: 15
+- key: n_hardening
+  id: hardening
+  parent: build
+  kind: action
+  title: Hardening pass
+  estimate: 4
+  requires:
+  - build/features
+- key: n_beta
+  id: beta
+  kind: group
+  title: Beta
+  opens_at: beta-start
+  closes_at: beta-end
+- key: n_beta_feedback
+  id: feedback
+  parent: beta
+  kind: action
+  title: Triage beta feedback
+  estimate: 5
+- key: n_materials
+  id: materials
+  kind: group
+  title: Launch materials
+  participations:
+    contributor: writers
+- key: n_docs
+  id: docs
+  parent: materials
+  kind: deliverable
+  title: Documentation
+  estimate: 5
+  requires_artifact: true
+  due_by:
+    before: launch
+    offset: 7
+- key: n_announcement
+  id: announcement
+  parent: materials
+  kind: deliverable
+  title: Announcement post
+  estimate: 2
+  due_by:
+    before: launch
+    offset: 3
+  not_before:
+    after: beta-end
+  resources:
+  - key: a_announcement_draft
+    title: Announcement draft
+    message_draft: "{{journey.name}} is live. Thanks to everyone who tried the beta."
+- key: n_go_no_go
+  id: go-no-go
+  kind: action
+  title: Go/no-go review
+  estimate: 1
+  requires:
+  - beta
+  - materials
+  due_by:
+    before: launch
+    offset: 1

@@ -1,0 +1,249 @@
+id: p_every-mutation
+target:
+  journey: j_sample
+base_revision: 7
+deployment_revision: 3
+mutations:
+- op: create_journey
+  name: Sample journey
+  description: A journey with every kind of change.
+  from:
+    route: sample
+    version: 1
+- op: edit_journey
+  name: Renamed journey
+- op: set_journey_status
+  status: completed
+- op: delete_journey
+- op: create_route
+  name: Sample route
+- op: edit_route
+  name: Renamed route
+  description: What the route is for.
+- op: set_route_retired
+  retired: true
+- op: set_route_retired
+  retired: false
+- op: open_draft
+  source: edit
+- op: open_draft
+  source: import
+- op: open_draft
+  source:
+    save_as_route:
+      journey: j_sample
+- op: discard_draft
+- op: publish_draft
+- op: add_node
+  node:
+    key: n_plan
+    id: plan
+    parent: n_setup
+    kind: deliverable
+    title: Plan
+    estimate: 3
+- op: set_node_field
+  node: n_plan
+  value:
+    title: Test plan
+- op: set_node_field
+  node: n_plan
+  value:
+    weight: 5
+- op: replace_node
+  node:
+    key: n_plan
+    id: plan
+    kind: action
+    title: Plan
+- op: remove_node
+  removal:
+    node: n_setup
+    descendants:
+    - n_plan
+    edges:
+    - node: n_plan
+      requires: n_access
+    resources:
+    - a_template
+    annotations:
+    - a_note
+    participations:
+    - node: n_plan
+      kind: k_owner
+- op: add_edge
+  edge:
+    node: n_plan
+    requires: n_access
+- op: remove_edge
+  edge:
+    node: n_plan
+    requires: n_access
+- op: add_role
+  role:
+    key: r_owner
+    id: owner_role
+- op: edit_role
+  role:
+    key: r_owner
+    id: owner_role
+    title: Owner
+    multi: true
+- op: remove_role
+  role: r_owner
+- op: add_participation_kind
+  kind:
+    key: k_informed
+    id: informed
+    multi: true
+- op: edit_participation_kind
+  kind:
+    key: k_informed
+    id: informed
+- op: remove_participation_kind
+  kind: k_informed
+- op: set_default_owner
+  role: r_owner
+- op: set_participation
+  node: n_plan
+  kind: k_owner
+  source: r_owner
+- op: clear_participation
+  node: n_plan
+  kind: k_owner
+- op: add_resource
+  node: n_plan
+  resource:
+    key: a_template
+    title: Template
+    template: https://example.org/plan-template
+- op: edit_resource
+  node: n_plan
+  resource:
+    key: a_template
+    tip: Start from the template.
+- op: remove_resource
+  node: n_plan
+  resource: a_template
+- op: transition
+  node: n_plan
+  transition: start
+- op: transition
+  node: n_plan
+  transition:
+    skip:
+      reason: Not needed this time.
+- op: transition
+  node: n_kickoff
+  transition: reach
+- op: answer
+  decision: n_scope
+  value:
+    single_choice: narrow
+- op: set_recorded_date
+  node: n_kickoff
+  end: finish
+  date: "2026-10-02"
+- op: fill_role
+  role: r_watchers
+  entities:
+  - e_one
+  - e_two
+- op: clear_role_fill
+  role: r_watchers
+- op: set_pin
+  node: n_meeting
+  date: "2026-11-10"
+- op: shift_pin
+  node: n_meeting
+  offset_days: -3
+- op: clear_pin
+  node: n_meeting
+- op: snooze
+  node: n_plan
+  until:
+    date: "2026-10-20"
+- op: unsnooze
+  node: n_plan
+- op: apply_override
+  node: n_plan
+  override:
+    keep:
+      reason: Still needed.
+- op: apply_override
+  node: n_plan
+  override:
+    guard_bypass:
+      guards:
+      - deps_done
+      reason: Signed off by phone.
+- op: remove_override
+  node: n_plan
+  kind: keep
+- op: set_atomic
+  node: n_workload
+  atomic: true
+- op: add_annotation
+  annotation:
+    key: a_note
+    node: n_plan
+    note: Waiting on access.
+- op: edit_annotation
+  annotation:
+    key: a_note
+    node: n_plan
+    artifact: https://example.org/plan
+- op: remove_annotation
+  annotation: a_note
+- op: upgrade
+  to: 2
+- op: relink
+  lineage:
+    route: sample
+    version: 3
+- op: set_provenance
+  node: n_plan
+  provenance: orphaned
+- op: mark_local_edit
+  node: n_plan
+  edit:
+    field: title
+  marked: false
+- op: create_entity
+  entity:
+    key: e_one
+    name: First person
+    emails:
+    - first@example.org
+- op: edit_entity
+  entity:
+    key: e_one
+    name: First Person
+- op: merge_entities
+  survivor: e_one
+  merged: e_two
+  journeys:
+    j_sample: 7
+- op: create_proposal
+  proposal:
+    title: Add a review step
+    destination_revision: 7
+    mutations:
+    - op: add_node
+      node:
+        key: n_review
+        id: review
+        kind: action
+        title: Review
+    items:
+    - item: exclusion
+      node: n_review
+      excluded: false
+- op: edit_proposal
+  proposal:
+    title: Add a review step
+    destination_revision: 7
+- op: apply_proposal
+  proposal: pr_review
+  reviewed_revision: 2
+- op: discard_proposal

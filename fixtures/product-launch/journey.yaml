@@ -1,0 +1,99 @@
+journey: j_launch
+description: "A launch pinned to a date: the freeze, beta, and materials deadlines all derive from it. Kickoff is reached, the launch pin is shifted a week when feature work slips, and the code freeze's actual date lands later than the chain from the launch pin allows."
+steps:
+- note: Start the launch, fill the roles directly, and pin the launch date.
+  today: "2026-09-01"
+  at: "2026-09-01T09:00:00Z"
+  actor:
+    user: u_launch_lead
+  patch:
+    id: p_pl_01
+    target:
+      journey: j_launch
+    base_revision: 0
+    mutations:
+    - op: create_journey
+      name: Launch the reporting release
+      from:
+        route: product-launch
+        version: 1
+    - op: create_entity
+      entity:
+        key: e_launch_lead
+        name: Launch Lead
+        emails:
+        - launch-lead@example.org
+    - op: create_entity
+      entity:
+        key: e_writer
+        name: Technical Writer
+    - op: fill_role
+      role: r_launch_lead
+      entities:
+      - e_launch_lead
+    - op: fill_role
+      role: r_writers
+      entities:
+      - e_writer
+    - op: set_pin
+      node: n_launch
+      date: "2026-11-16"
+- note: Kickoff is reached, recording its actual date, and feature work starts.
+  today: "2026-09-05"
+  at: "2026-09-05T10:00:00Z"
+  actor:
+    user: u_launch_lead
+  patch:
+    id: p_pl_02
+    target:
+      journey: j_launch
+    base_revision: 1
+    mutations:
+    - op: transition
+      node: n_kickoff
+      transition: reach
+    - op: transition
+      node: n_features
+      transition: start
+- note: >-
+    Feature work slips; the launch pin moves a week later, which moves every
+    deadline that derives from it.
+  today: "2026-10-01"
+  at: "2026-10-01T16:00:00Z"
+  actor:
+    user: u_launch_lead
+  patch:
+    id: p_pl_03
+    target:
+      journey: j_launch
+    base_revision: 2
+    mutations:
+    - op: shift_pin
+      node: n_launch
+      offset_days: 7
+- note: >-
+    Feature work and hardening finish; the code freeze is reached later than the
+    chain from the launch pin allows, which is a shortfall, not a rejection.
+  today: "2026-11-02"
+  at: "2026-11-02T18:00:00Z"
+  actor:
+    user: u_launch_lead
+  patch:
+    id: p_pl_04
+    target:
+      journey: j_launch
+    base_revision: 3
+    mutations:
+    - op: transition
+      node: n_features
+      transition: complete
+    - op: transition
+      node: n_hardening
+      transition: complete
+    - op: transition
+      node: n_code_freeze
+      transition: reach
+    - op: set_recorded_date
+      node: n_code_freeze
+      end: finish
+      date: "2026-11-02"

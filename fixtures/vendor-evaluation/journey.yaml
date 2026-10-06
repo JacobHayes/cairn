@@ -1,0 +1,224 @@
+journey: j_vendor_eval
+description: "One evaluation from the route's first version: the four up-front decisions, kickoff opening setup, the workload broken down, a gated decision answered once the plan exists, a snooze, an earlier pin on the final report, and the findings reviewer filled late."
+steps:
+- note: Start the journey from version 1 and create the people it refers to.
+  today: "2026-10-01"
+  at: "2026-10-01T14:00:00Z"
+  actor:
+    user: u_lead
+  patch:
+    id: p_ve_01
+    target:
+      journey: j_vendor_eval
+    base_revision: 0
+    mutations:
+    - op: create_journey
+      name: Evaluate the analytics vendor
+      from:
+        route: vendor-evaluation
+        version: 1
+    - op: create_entity
+      entity:
+        key: e_lead
+        name: Evaluation Lead
+        emails:
+        - lead@example.org
+    - op: create_entity
+      entity:
+        key: e_stakeholder_a
+        name: Stakeholder A
+    - op: create_entity
+      entity:
+        key: e_stakeholder_b
+        name: Stakeholder B
+- note: >-
+    Answer the up-front decisions; the owner and stakeholder roles fill and the
+    meeting date pins the decision meeting.
+  today: "2026-10-01"
+  at: "2026-10-01T14:10:00Z"
+  actor:
+    user: u_lead
+  patch:
+    id: p_ve_02
+    target:
+      journey: j_vendor_eval
+    base_revision: 1
+    deployment_revision: 1
+    mutations:
+    - op: answer
+      decision: n_purpose
+      value:
+        single_choice: purchase
+    - op: answer
+      decision: n_who_owns
+      value:
+        entity: e_lead
+    - op: answer
+      decision: n_who_informed
+      value:
+        entity_list:
+        - e_stakeholder_a
+        - e_stakeholder_b
+    - op: answer
+      decision: n_meeting_date
+      value:
+        date: "2026-11-20"
+    - op: answer
+      decision: n_partner_runs
+      value:
+        boolean: false
+- note: Kickoff is reached, which opens the setup stage.
+  today: "2026-10-05"
+  at: "2026-10-05T09:00:00Z"
+  actor:
+    user: u_lead
+  patch:
+    id: p_ve_03
+    target:
+      journey: j_vendor_eval
+    base_revision: 2
+    mutations:
+    - op: transition
+      node: n_kickoff
+      transition: reach
+- note: Start on environment access and leave a note on it.
+  today: "2026-10-06"
+  at: "2026-10-06T10:00:00Z"
+  actor:
+    user: u_lead
+  patch:
+    id: p_ve_04
+    target:
+      journey: j_vendor_eval
+    base_revision: 3
+    mutations:
+    - op: transition
+      node: n_access
+      transition: start
+    - op: add_annotation
+      annotation:
+        key: a_access_note
+        node: n_access
+        note: Request sent; waiting on the environment team.
+- note: >-
+    Access is done; an assistant breaks the workload placeholder into two
+    sub-deliverables.
+  today: "2026-10-08"
+  at: "2026-10-08T16:00:00Z"
+  actor:
+    user: u_lead
+    agent: ag_assistant
+  patch:
+    id: p_ve_05
+    target:
+      journey: j_vendor_eval
+    base_revision: 4
+    mutations:
+    - op: transition
+      node: n_access
+      transition: complete
+    - op: add_node
+      node:
+        key: n_workload_ingest
+        id: ingest
+        parent: n_workload
+        kind: deliverable
+        title: Ingest workload
+        estimate: 2
+    - op: add_node
+      node:
+        key: n_workload_query
+        id: query
+        parent: n_workload
+        kind: deliverable
+        title: Query workload
+        estimate: 2
+- note: >-
+    Both plan actions finish, then the plan; the gated comparison-set decision is
+    answered.
+  today: "2026-10-12"
+  at: "2026-10-12T15:00:00Z"
+  actor:
+    user: u_lead
+  patch:
+    id: p_ve_06
+    target:
+      journey: j_vendor_eval
+    base_revision: 5
+    mutations:
+    - op: transition
+      node: n_plan_draft
+      transition: complete
+    - op: transition
+      node: n_plan_review
+      transition: complete
+    - op: transition
+      node: n_plan
+      transition: complete
+    - op: answer
+      decision: n_comparison_set
+      value:
+        single_choice: prior-tool
+- note: >-
+    Snooze the baseline until the query workload is done, and pin the final report
+    earlier than its derived due date.
+  today: "2026-10-13"
+  at: "2026-10-13T11:00:00Z"
+  actor:
+    user: u_lead
+  patch:
+    id: p_ve_07
+    target:
+      journey: j_vendor_eval
+    base_revision: 6
+    mutations:
+    - op: snooze
+      node: n_baseline
+      until:
+        node: n_workload_query
+    - op: set_pin
+      node: n_final_report
+      date: "2026-11-02"
+- note: >-
+    The workload and the baseline finish, which completes testing and opens
+    reporting; the findings are written, and the findings reviewer is answered with a new
+    person created in the same patch.
+  today: "2026-10-26"
+  at: "2026-10-26T17:00:00Z"
+  actor:
+    user: u_lead
+  patch:
+    id: p_ve_08
+    target:
+      journey: j_vendor_eval
+    base_revision: 7
+    mutations:
+    - op: transition
+      node: n_workload_ingest
+      transition: complete
+    - op: transition
+      node: n_workload_query
+      transition: complete
+    - op: transition
+      node: n_workload
+      transition: complete
+    - op: transition
+      node: n_baseline
+      transition: complete
+    - op: transition
+      node: n_findings
+      transition: complete
+    - op: create_entity
+      entity:
+        key: e_reviewer
+        name: Findings Reviewer
+    - op: answer
+      decision: n_findings_reviewer
+      value:
+        entity: e_reviewer
+    - op: add_annotation
+      annotation:
+        key: a_report_link
+        node: n_final_report
+        title: Draft report
+        artifact: https://example.org/reports/analytics-vendor-draft

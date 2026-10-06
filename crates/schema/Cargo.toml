@@ -1,0 +1,33 @@
+[package]
+name = "cairn-schema"
+description = "The serde types every Cairn crate shares: identifiers, the graph and file documents, patches, events, rejections, and derived shapes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[features]
+# Property-test strategies for every type (`cairn_schema::testing`), for this crate's tests
+# and for the crates that build on these types.
+testing = ["dep:proptest"]
+
+[dependencies]
+jiff.workspace = true
+proptest = { workspace = true, optional = true }
+schemars.workspace = true
+serde.workspace = true
+serde-saphyr.workspace = true
+serde_json.workspace = true
+serde_path_to_error.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+cairn-schema = { workspace = true, features = ["testing"] }
+jsonschema.workspace = true
+patina-dst-proptest.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

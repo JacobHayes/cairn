@@ -17,32 +17,42 @@ No change.
 `mise run check` exit status: 0 (expected 0).
 
 ```
-ladder: rungs that exist: 1
+ladder: rungs that exist: 1 2 3 5
 ladder: summary
 ladder: rung 1: suite workspace lints inherited: 1 crates
-ladder: rung 1: suite rustfmt: 1 files
+ladder: rung 1: suite rustfmt: 44 files
 ladder: rung 1: suite clippy: 1 crates
-ladder: rung 1: passed in 0s
-ladder: check passed: rungs 1
+ladder: rung 1: passed in 7s
+ladder: rung 2: suite cairn-schema tests: 75 tests
+ladder: rung 2: passed in 20s
+ladder: rung 3: PROPTEST_CASES=256
+ladder: rung 3: suite tests/property_derived.rs: 3 tests
+ladder: rung 3: suite tests/property_documents.rs: 3 tests
+ladder: rung 3: suite tests/property_model.rs: 4 tests
+ladder: rung 3: suite tests/property_text.rs: 3 tests
+ladder: rung 3: suite tests/property_writes.rs: 9 tests
+ladder: rung 3: passed in 4s
+ladder: rung 5: suite generated files unchanged: 1 files
+ladder: rung 5: passed in 4s
+ladder: check passed: rungs 1 2 3 5
 ```
 
 ## Stray unwrap
 
-Planted: a public function in the throwaway crate ending in `text.parse().unwrap()`.
+Planted: a public function in the schema crate ending in `text.parse().unwrap()`.
 
 `mise run check` exit status: 1 (expected nonzero).
 
 ```
-ladder: rungs that exist: 1
+ladder: rungs that exist: 1 2 3 5
 error: used `unwrap()` on a `Result` value
-  --> crates/scaffold/src/lib.rs:14:5
-error: could not compile `cairn-scaffold` (lib) due to 1 previous error
-error: could not compile `cairn-scaffold` (lib test) due to 1 previous error
+   --> crates/schema/src/lib.rs:104:5
+error: could not compile `cairn-schema` (lib) due to 1 previous error
 ladder: summary
 ladder: rung 1: suite workspace lints inherited: 1 crates
-ladder: rung 1: suite rustfmt: 1 files
+ladder: rung 1: suite rustfmt: 44 files
 ladder: rung 1: FAILED: clippy reported errors
-ladder: rung 1: FAILED in 1s
+ladder: rung 1: FAILED in 2s
 ladder: check FAILED at rung 1; later rungs did not run
 [check] ERROR task failed
 ```
@@ -54,13 +64,24 @@ Planted: a function whose body is 70 lines, the limit (PRACTICES, Code shape).
 `mise run check` exit status: 0 (expected 0).
 
 ```
-ladder: rungs that exist: 1
+ladder: rungs that exist: 1 2 3 5
 ladder: summary
 ladder: rung 1: suite workspace lints inherited: 1 crates
-ladder: rung 1: suite rustfmt: 1 files
+ladder: rung 1: suite rustfmt: 44 files
 ladder: rung 1: suite clippy: 1 crates
-ladder: rung 1: passed in 0s
-ladder: check passed: rungs 1
+ladder: rung 1: passed in 3s
+ladder: rung 2: suite cairn-schema tests: 75 tests
+ladder: rung 2: passed in 6s
+ladder: rung 3: PROPTEST_CASES=256
+ladder: rung 3: suite tests/property_derived.rs: 3 tests
+ladder: rung 3: suite tests/property_documents.rs: 3 tests
+ladder: rung 3: suite tests/property_model.rs: 4 tests
+ladder: rung 3: suite tests/property_text.rs: 3 tests
+ladder: rung 3: suite tests/property_writes.rs: 9 tests
+ladder: rung 3: passed in 3s
+ladder: rung 5: suite generated files unchanged: 1 files
+ladder: rung 5: passed in 2s
+ladder: check passed: rungs 1 2 3 5
 ```
 
 ## 71-line function
@@ -70,16 +91,15 @@ Planted: the same function with a 71-line body.
 `mise run check` exit status: 1 (expected nonzero).
 
 ```
-ladder: rungs that exist: 1
+ladder: rungs that exist: 1 2 3 5
 error: this function has too many lines (71/70)
- --> crates/scaffold/src/lib.rs:9:1
-error: could not compile `cairn-scaffold` (lib) due to 1 previous error
-error: could not compile `cairn-scaffold` (lib test) due to 1 previous error
+  --> crates/schema/src/lib.rs:99:1
+error: could not compile `cairn-schema` (lib) due to 1 previous error
 ladder: summary
 ladder: rung 1: suite workspace lints inherited: 1 crates
-ladder: rung 1: suite rustfmt: 1 files
+ladder: rung 1: suite rustfmt: 44 files
 ladder: rung 1: FAILED: clippy reported errors
-ladder: rung 1: FAILED in 0s
+ladder: rung 1: FAILED in 2s
 ladder: check FAILED at rung 1; later rungs did not run
 [check] ERROR task failed
 ```
@@ -91,8 +111,8 @@ Planted: `pub const   SPACED : u32=1;`.
 `mise run check` exit status: 1 (expected nonzero).
 
 ```
-ladder: rungs that exist: 1
-Diff in crates/scaffold/src/lib.rs:5:
+ladder: rungs that exist: 1 2 3 5
+Diff in crates/schema/src/lib.rs:95:
 ladder: summary
 ladder: rung 1: suite workspace lints inherited: 1 crates
 ladder: rung 1: FAILED: rustfmt: files are not formatted (run: cargo fmt --all)
@@ -103,20 +123,29 @@ ladder: check FAILED at rung 1; later rungs did not run
 
 ## A rung that ran zero tests
 
-Planted: a rung 2 (`mise-tasks/check/2`) that runs `cargo test` over the workspace and reports how many tests ran. The workspace has no tests yet, so it reports zero.
+Planted: a rung 4 (`mise-tasks/check/4`) that runs the workspace tests named `store_conformance::` and reports how many ran. No crate has such tests yet, so it reports zero.
 
 `mise run check` exit status: 1 (expected nonzero).
 
 ```
-ladder: rungs that exist: 1 2
+ladder: rungs that exist: 1 2 3 4 5
 ladder: summary
 ladder: rung 1: suite workspace lints inherited: 1 crates
-ladder: rung 1: suite rustfmt: 1 files
+ladder: rung 1: suite rustfmt: 44 files
 ladder: rung 1: suite clippy: 1 crates
-ladder: rung 1: passed in 0s
-ladder: rung 2: FAILED: suite unit tests checked or ran 0 tests
-ladder: rung 2: FAILED in 0s
-ladder: check FAILED at rung 2; later rungs did not run
+ladder: rung 1: passed in 3s
+ladder: rung 2: suite cairn-schema tests: 75 tests
+ladder: rung 2: passed in 3s
+ladder: rung 3: PROPTEST_CASES=256
+ladder: rung 3: suite tests/property_derived.rs: 3 tests
+ladder: rung 3: suite tests/property_documents.rs: 3 tests
+ladder: rung 3: suite tests/property_model.rs: 4 tests
+ladder: rung 3: suite tests/property_text.rs: 3 tests
+ladder: rung 3: suite tests/property_writes.rs: 9 tests
+ladder: rung 3: passed in 3s
+ladder: rung 4: FAILED: suite store conformance checked or ran 0 tests
+ladder: rung 4: FAILED in 1s
+ladder: check FAILED at rung 4; later rungs did not run
 [check] ERROR task failed
 ```
 
@@ -127,7 +156,7 @@ Planted: a `crates/engine` crate (`cairn-engine`) whose public function returns 
 `mise run check` exit status: 1 (expected nonzero).
 
 ```
-ladder: rungs that exist: 1
+ladder: rungs that exist: 1 2 3 5
 error: use of a disallowed type `std::collections::HashMap`
  --> crates/engine/src/lib.rs:5:38
 error: use of a disallowed type `std::collections::HashMap`
@@ -136,7 +165,7 @@ error: could not compile `cairn-engine` (lib) due to 2 previous errors
 error: could not compile `cairn-engine` (lib test) due to 2 previous errors
 ladder: summary
 ladder: rung 1: suite workspace lints inherited: 2 crates
-ladder: rung 1: suite rustfmt: 2 files
+ladder: rung 1: suite rustfmt: 45 files
 ladder: rung 1: FAILED: clippy reported errors
 ladder: rung 1: FAILED in 0s
 ladder: check FAILED at rung 1; later rungs did not run
@@ -145,15 +174,15 @@ ladder: check FAILED at rung 1; later rungs did not run
 
 ## A crate that drops the workspace lints
 
-Planted: the throwaway crate without `[lints] workspace = true`.
+Planted: the schema crate without `[lints] workspace = true`.
 
 `mise run check` exit status: 1 (expected nonzero).
 
 ```
-ladder: rungs that exist: 1
+ladder: rungs that exist: 1 2 3 5
 ladder: summary
-ladder: rung 1: FAILED: cairn-scaffold does not inherit the workspace lints ([lints] workspace = true in crates/scaffold/Cargo.toml)
-ladder: rung 1: FAILED in 0s
+ladder: rung 1: FAILED: cairn-schema does not inherit the workspace lints ([lints] workspace = true in crates/schema/Cargo.toml)
+ladder: rung 1: FAILED in 1s
 ladder: check FAILED at rung 1; later rungs did not run
 [check] ERROR task failed
 ```
@@ -165,7 +194,7 @@ Planted: no file change; mise stops providing `node` (`MISE_DISABLE_TOOLS=node`)
 `mise run check` exit status: 1 (expected nonzero).
 
 ```
-ladder: rungs that exist: 1
+ladder: rungs that exist: 1 2 3 5
 ladder: summary
 ladder: rung 1: FAILED: tool missing: node ('node --version' did not run)
 ladder: rung 1: FAILED in 0s

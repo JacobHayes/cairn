@@ -1,0 +1,112 @@
+format: 1
+route: every-field
+name: Every field
+description: A route file that uses every field a node, role, kind, and resource can carry.
+extends: 2
+default_owner: lead
+roles:
+- key: r_lead
+  id: lead
+  title: Lead
+- id: reviewers
+  multi: true
+participation_kinds:
+- key: k_informed
+  id: informed
+  title: Informed
+  multi: true
+nodes:
+- key: n_kickoff
+  id: kickoff
+  kind: milestone
+  title: Kickoff
+  auto_reach: true
+- id: wrap-up
+  kind: milestone
+  title: Wrap-up
+  weight: 10
+  final: true
+  due_by:
+    after: journey.created_at
+    offset: 30
+- id: work
+  kind: group
+  title: Work
+  opens_at: kickoff
+  closes_at: wrap-up
+  gates: false
+  closes: false
+- id: scope
+  kind: decision
+  title: Scope
+  description: How much the work covers.
+  prompt: How wide is the scope?
+  answer_type: multi_choice
+  choices:
+  - narrow
+  - id: wide
+    title: Wide, with extras
+  help: Pick every part that applies.
+  not_before:
+    after: kickoff
+- id: lead-pick
+  kind: decision
+  title: Lead
+  prompt: Who leads the work?
+  answer_type: entity
+  fills_role: lead
+- id: target-date
+  kind: decision
+  title: Target date
+  prompt: When should the work wrap up?
+  answer_type: date
+  feeds_milestone: wrap-up
+- id: plan
+  parent: work
+  kind: deliverable
+  title: Plan
+  estimate: 3
+  placeholder: true
+  requires_artifact: true
+  requires:
+  - kickoff
+  relevant_when:
+    any:
+    - in:
+        decision: scope
+        values:
+        - narrow
+        - wide
+    - not:
+        answered: lead-pick
+  due_by:
+    before:
+    - target-date
+    - wrap-up
+    offset: 5
+  participations:
+    informed:
+    - e_observer
+    owner: lead
+    reviewer: []
+  resources:
+  - title: Tip
+    tip: Start from the last plan.
+  - key: a_template
+    template: https://example.org/plan-template
+  - example: https://example.org/plan-example
+  - reference: https://example.org/planning-guide
+  - title: Kickoff note
+    message_draft: >-
+      Hello {{roles.lead.name}}, {{journey.name}} starts now; scope is
+      {{answers.scope}}.
+- id: steps
+  parent: plan
+  kind: action
+  title: Steps
+  estimate: 1
+  placeholder: true
+  relevant_when:
+    equals:
+      decision: scope
+      value: wide
