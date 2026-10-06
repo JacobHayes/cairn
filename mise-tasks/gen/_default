@@ -1,0 +1,18 @@
+#!/usr/bin/env bash
+#MISE description="Regenerate the generated paths: runs every gen:<name> task"
+# ARCHITECTURE, Generated artifacts. A generator is a task file mise-tasks/gen/<name> that
+# writes only into its generated path; adding the file adds it here.
+set -euo pipefail
+cd "$(dirname "$0")"
+generators=()
+for path in *; do
+  [ "$path" = _default ] || generators+=("$path")
+done
+if [ ${#generators[@]} -eq 0 ]; then
+  echo "gen: no generators exist yet; the generated paths are empty"
+  exit 0
+fi
+for name in "${generators[@]}"; do
+  echo "gen: $name"
+  "./$name"
+done

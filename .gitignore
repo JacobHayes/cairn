@@ -1,0 +1,10 @@
+# Build outputs (ARCHITECTURE, Generated artifacts: the compiled .wasm and the web build are
+# never checked in). `target` has no trailing slash because it is often a symlink.
+target
+node_modules
+dist
+*.wasm
+*.tsbuildinfo
+
+# Per-checkout agent notes.
+AGENTS.local.md

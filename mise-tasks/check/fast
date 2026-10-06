@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+#MISE description="Rungs 1 to 3 of the validation ladder, those that exist: the inner loop"
+exec "$(dirname "$0")/../../scripts/ladder" 3

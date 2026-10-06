@@ -1,0 +1,3 @@
+#!/usr/bin/env bash
+#MISE description="Every rung of the validation ladder that exists, in order; stops at the first failure"
+exec "$(dirname "$0")/../../scripts/ladder"

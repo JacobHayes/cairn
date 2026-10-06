@@ -1,0 +1,10 @@
+# Pinned tools (PRACTICES, Dependencies are deliberate: each tool earns its place) and
+# settings. Tasks are files under mise-tasks/: `check` runs every rung of the validation
+# ladder that exists, `check:fast` rungs 1 to 3, `check:N` one rung, `gen` every generator.
+
+[tools]
+node = "26.10.0"
+rust = { version = "1.99.0", profile = "minimal", components = "clippy,rustfmt", targets = "wasm32-unknown-unknown" }
+# The wasm tool, as prebuilt release binaries. Its version must equal the `wasm-bindgen`
+# crate version the wasm brief (4.5) adds, which may swap it for wasm-pack.
+"github:wasm-bindgen/wasm-bindgen" = "0.2.129"

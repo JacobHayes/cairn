@@ -1,0 +1,18 @@
+# Thresholds and lists for the lints Cargo.toml's [workspace.lints] denies (PRACTICES,
+# Code conventions).
+
+# PRACTICES, Code shape: functions of at most 70 lines.
+too-many-lines-threshold = 70
+
+# Read only where rung 1 raises `clippy::disallowed_types`: the engine, whose iteration
+# order reaches outputs (PRACTICES, Deterministic by construction).
+disallowed-types = [
+  { path = "std::collections::HashMap", reason = "iteration order reaches outputs: use BTreeMap, IndexMap, or a sorted Vec" },
+  { path = "std::collections::HashSet", reason = "iteration order reaches outputs: use BTreeSet, IndexSet, or a sorted Vec" },
+]
+
+# Tests may unwrap, expect, index, and panic: a failed test is the intended outcome.
+allow-expect-in-tests = true
+allow-indexing-slicing-in-tests = true
+allow-panic-in-tests = true
+allow-unwrap-in-tests = true

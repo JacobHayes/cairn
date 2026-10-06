@@ -1,0 +1,9 @@
+{
+  "name": "cairn",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "workspaces": [
+    "web/*"
+  ]
+}

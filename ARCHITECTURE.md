@@ -99,7 +99,9 @@ cairn/
   openapi/         generated OpenAPI document
   schema/          generated JSON Schema for the file format
   DECISIONS.md     judgment calls awaiting the user's review (AGENTS.md)
-  mise.toml        tasks: gen, check, test ladder, sim, build, serve
+  mise.toml        pinned tools
+  mise-tasks/      tasks, one file each: gen, check and its rungs (check/<N>), sim, build, serve
+  scripts/         helpers the tasks share: the ladder runner
 ```
 
 ```mermaid

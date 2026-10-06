@@ -16,37 +16,37 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 
 ## The cut
 
-| Id | Title | Crates or packages | Depends on |
-|---|---|---|---|
-| 1.1 | Workspace, lints, tasks, CI | root, `mise.toml`, `.github/` | - |
-| 1.2 | Schema and fixtures | `crates/schema`, `fixtures/`, `schema/` | 1.1 |
-| 1.3 | Simulation spike: tokio and axum under the shim | `testbeds/spike` | 1.1 |
-| 2.1 | Engine core: model, apply, state machines, events, replay | `crates/engine` | 1.2 |
-| 2.2 | Relevance, effective dependencies, effective skip, participation | `crates/engine` | 2.1 |
-| 2.3 | Date network | `crates/engine` | 2.2 |
-| 2.4 | Auto-reach, blocking, frontier, snooze, stalled, stale, derived guards | `crates/engine` | 2.3 |
-| 2.5 | Gravity, leverage, rank | `crates/engine` | 2.4 |
-| 2.6 | Projections | `crates/engine` | 2.5 |
-| 2.7 | Route files, upgrade, save-as-route, re-link, proposal documents | `crates/engine` | 2.6 |
-| 3.1 | Store trait, memory and Turso backends, conformance suite | `crates/store`, `crates/store-turso` | 1.2 (beside phase 2) |
-| 3.2 | Auth providers, users, identities, agent tokens | `crates/auth` | 3.1 |
-| 4.1 | Service layer, composition root, capabilities, notifier | `crates/service` | 2.7, 3.1 |
-| 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 |
-| 4.3 | MCP server and shipped instructions | `crates/mcp`, `instructions/` | 4.2 |
-| 4.4 | Assistant | `crates/assistant` | 4.3 |
-| 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.2 |
-| 4.6 | Web client and app shell | `web/client`, `web/app` | 4.5 |
-| 4.7 | The binary | `crates/cairn` | 4.4, 4.6 |
-| 5.1 | Node detail and explanations; notes, links, artifacts | `web/app` | 4.6 |
-| 5.2 | Canvas, semantic zoom, trace, layout | `web/app` | 5.1 |
-| 5.3 | List, next, triage, decision walkthrough | `web/app` | 5.2 |
-| 5.4 | Decision view, timeline, status summary | `web/app` | 5.2 (beside 5.3) |
-| 5.5 | Journey index and overview, route screens, entities, identity | `web/app` | 5.3 |
-| 5.6 | Authoring | `web/app` | 5.5 |
-| 5.7 | Proposal review and its flows | `web/app` | 5.6 |
-| 5.8 | Assistant panel | `web/app` | 5.7, 4.4 |
-| 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 |
-| 6.2 | Durability testbed | `testbeds/durability` | 4.1 |
+| Id | Title | Crates or packages | Depends on | Status |
+|---|---|---|---|---|
+| 1.1 | Workspace, lints, tasks, CI | root, `mise.toml`, `.github/` | - | landed `mqnnskmq` |
+| 1.2 | Schema and fixtures | `crates/schema`, `fixtures/`, `schema/` | 1.1 | in progress |
+| 1.3 | Simulation spike: tokio and axum under the shim | `testbeds/spike` | 1.1 | in progress |
+| 2.1 | Engine core: model, apply, state machines, events, replay | `crates/engine` | 1.2 |  |
+| 2.2 | Relevance, effective dependencies, effective skip, participation | `crates/engine` | 2.1 |  |
+| 2.3 | Date network | `crates/engine` | 2.2 |  |
+| 2.4 | Auto-reach, blocking, frontier, snooze, stalled, stale, derived guards | `crates/engine` | 2.3 |  |
+| 2.5 | Gravity, leverage, rank | `crates/engine` | 2.4 |  |
+| 2.6 | Projections | `crates/engine` | 2.5 |  |
+| 2.7 | Route files, upgrade, save-as-route, re-link, proposal documents | `crates/engine` | 2.6 |  |
+| 3.1 | Store trait, memory and Turso backends, conformance suite | `crates/store`, `crates/store-turso` | 1.2 (beside phase 2) |  |
+| 3.2 | Auth providers, users, identities, agent tokens | `crates/auth` | 3.1 |  |
+| 4.1 | Service layer, composition root, capabilities, notifier | `crates/service` | 2.7, 3.1 |  |
+| 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 |  |
+| 4.3 | MCP server and shipped instructions | `crates/mcp`, `instructions/` | 4.2 |  |
+| 4.4 | Assistant | `crates/assistant` | 4.3 |  |
+| 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.2 |  |
+| 4.6 | Web client and app shell | `web/client`, `web/app` | 4.5 |  |
+| 4.7 | The binary | `crates/cairn` | 4.4, 4.6 |  |
+| 5.1 | Node detail and explanations; notes, links, artifacts | `web/app` | 4.6 |  |
+| 5.2 | Canvas, semantic zoom, trace, layout | `web/app` | 5.1 |  |
+| 5.3 | List, next, triage, decision walkthrough | `web/app` | 5.2 |  |
+| 5.4 | Decision view, timeline, status summary | `web/app` | 5.2 (beside 5.3) |  |
+| 5.5 | Journey index and overview, route screens, entities, identity | `web/app` | 5.3 |  |
+| 5.6 | Authoring | `web/app` | 5.5 |  |
+| 5.7 | Proposal review and its flows | `web/app` | 5.6 |  |
+| 5.8 | Assistant panel | `web/app` | 5.7, 4.4 |  |
+| 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 |  |
+| 6.2 | Durability testbed | `testbeds/durability` | 4.1 |  |
 
 Rule for links between screens: a screen only links to screens that already exist. The brief that builds a screen adds the entry points into it from earlier screens (5.7 adds "break down" to triage and the upgrade, save-as-route, and re-link entries to the overview; 5.8 mounts its panel on earlier screens).
 
