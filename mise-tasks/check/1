@@ -89,8 +89,13 @@ ladder_suite clippy "$checked" crates
 # PRACTICES, Simulation with patina: every `sometimes!`, `reachable!`, `always!`, and
 # `buggify!` site carries a literal kebab-case label. A campaign reads the labels declared
 # anywhere in a binary, and one holding a space breaks every campaign over it (DECISIONS.md,
-# 6.1, patina gap 5). The one reproducer of that gap is the exception.
-label_exceptions=(testbeds/multiplayer/gaps/src/bin/spaced_label.rs)
+# 6.1, patina gap 5). The exceptions: the one reproducer of that gap, and the durability
+# testbed's crash oracles, whose kebab-case labels are constants so a campaign, which draws
+# no crash, does not declare them (DECISIONS.md, 6.2, patina).
+label_exceptions=(
+  testbeds/multiplayer/gaps/src/bin/spaced_label.rs
+  testbeds/durability/src/restart.rs
+)
 for exception in "${label_exceptions[@]}"; do
   [ -f "$exception" ] || ladder_fail "the label exception $exception no longer exists"
 done

@@ -8,6 +8,11 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[features]
+# A test seam: open the store over an I/O implementation the caller supplies
+# (`TursoStore::open_with_io`), so a test can fail one fsync (DECISIONS.md, 6.2).
+io-seam = ["dep:turso_core"]
+
 [dependencies]
 cairn-schema.workspace = true
 cairn-store.workspace = true
@@ -15,8 +20,10 @@ serde.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }
 turso.workspace = true
+turso_core = { workspace = true, optional = true }
 
 [dev-dependencies]
+cairn-store-turso = { workspace = true, features = ["io-seam"] }
 cairn-schema = { workspace = true, features = ["testing"] }
 cairn-store = { workspace = true, features = ["conformance"] }
 patina-dst-proptest.workspace = true

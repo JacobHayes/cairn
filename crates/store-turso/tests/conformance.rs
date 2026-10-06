@@ -65,6 +65,7 @@ mod conformance {
 
     cairn_store::conformance_suite!(Turso::new(), run);
 
+    mod log_sync;
     mod races;
 
     /// The Turso-specific cases, one test each.
@@ -91,4 +92,13 @@ mod conformance {
         history_paging_never_skips_an_event_committed_late,
         a_resubmission_beside_a_commit_in_flight_is_answered_from_its_receipt,
     );
+
+    /// A known finding, not yet fixed (DECISIONS.md, 6.2: an acknowledged commit lost after a
+    /// failed log fsync; the durability testbed's `sim.sh` leg 6 reproduces it under patina).
+    /// Un-ignore it with the fix.
+    #[test]
+    #[ignore = "known finding (DECISIONS.md, 6.2): a commit whose log fsync failed stays visible"]
+    fn a_commit_whose_log_sync_fails_leaves_nothing_visible() {
+        run(log_sync::a_commit_whose_log_sync_fails_leaves_nothing_visible(&Turso::new()));
+    }
 }

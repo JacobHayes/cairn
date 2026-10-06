@@ -37,6 +37,9 @@ use cairn_store::{
     SessionRecord, Store, StoreError, UserRecord,
 };
 
+#[cfg(feature = "io-seam")]
+pub use turso_core;
+
 use pool::Pool;
 use sql::execute;
 
@@ -114,10 +117,33 @@ impl TursoStore {
     ///
     /// When the file cannot be opened or a migration fails.
     pub async fn open_with_faults(path: &Path, faults: Faults) -> Result<Self, StoreError> {
+        Self::open_built(path, faults, |builder| builder).await
+    }
+
+    /// Opens the store over the I/O implementation `io` instead of the platform's: a test
+    /// seam, so a test can fail one fsync (DECISIONS.md, 6.2).
+    ///
+    /// # Errors
+    ///
+    /// When the file cannot be opened or a migration fails.
+    #[cfg(feature = "io-seam")]
+    pub async fn open_with_io(
+        path: &Path,
+        faults: Faults,
+        io: std::sync::Arc<dyn turso_core::IO>,
+    ) -> Result<Self, StoreError> {
+        Self::open_built(path, faults, |builder| builder.with_io_impl(io)).await
+    }
+
+    async fn open_built(
+        path: &Path,
+        faults: Faults,
+        configure: impl FnOnce(turso::Builder) -> turso::Builder,
+    ) -> Result<Self, StoreError> {
         let path = path
             .to_str()
             .ok_or_else(|| StoreError::Backend(format!("{} is not UTF-8", path.display())))?;
-        let database = turso::Builder::new_local(path)
+        let database = configure(turso::Builder::new_local(path))
             .build()
             .await
             .map_err(|error| StoreError::Backend(format!("open {path}: {error}")))?;

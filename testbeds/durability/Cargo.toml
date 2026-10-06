@@ -1,0 +1,45 @@
+# Brief 6.2, the durability testbed: the service on the real Turso store under the patina
+# native shim's filesystem faults and crash-restart (PRACTICES, Simulation with patina:
+# Testbeds, `durability`). Its own Cargo workspace (the empty [workspace] table), like the
+# spike's, so `cargo patina build` resolves only this tree and the check ladder, which
+# covers the root workspace's `crates/*`, never builds it.
+[workspace]
+
+[package]
+name = "cairn-durability"
+description = "Durability testbed: after every crash-restart, state equals the replayed log and no acknowledged commit is missing."
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+repository = "https://github.com/JacobHayes/cairn"
+publish = false
+
+[dependencies]
+# The crates under test, by path: the service over the Turso store, and the engine's replay
+# the invariants compare against.
+cairn-engine = { path = "../../crates/engine" }
+cairn-schema = { path = "../../crates/schema" }
+cairn-service = { path = "../../crates/service" }
+cairn-store = { path = "../../crates/store" }
+cairn-store-turso = { path = "../../crates/store-turso" }
+# The deployment's time zone the service takes, at the root workspace's version.
+jiff = { version = "0.2.37", default-features = false, features = ["std"] }
+# The SDK at the revision Cargo.toml's [workspace.dependencies] and mise.toml pin.
+patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "6a2977e7bce794d15eabaa18258a5542115bd872" }
+# The Turso backend's runtime: one current-thread runtime with its timer (the spike's
+# working shape under the shim).
+tokio = { version = "1.53.2", default-features = false, features = ["rt", "time"] }
+
+# The crate-wide lints of the root workspace (Cargo.toml [workspace.lints]); this
+# workspace cannot inherit them. `mise run sim` runs clippy with warnings denied.
+[lints.rust]
+unsafe_code = "forbid"
+# `cargo patina build` injects these cfgs.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(patina)", "cfg(dst)", "cfg(patina_shim)"] }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+expect_used = "deny"
+too_many_lines = "deny"
+unwrap_used = "deny"

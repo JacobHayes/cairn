@@ -61,7 +61,7 @@ async fn promptly<F: Future>(future: F) -> F::Output {
         .expect("a store call waited on a commit in flight")
 }
 
-fn add_node(patch: &str, journey: &str, base: u32, key: &str) -> Commit {
+pub fn add_node(patch: &str, journey: &str, base: u32, key: &str) -> Commit {
     journey_patch(patch, journey, base)
         .event(
             EventType::NodeAdded,

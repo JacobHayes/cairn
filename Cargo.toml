@@ -73,6 +73,9 @@ sha2 = "0.11.0"
 # default allocator and full-text search; tokio for the Turso backend's pool alone.
 tokio = { version = "1.53.2", default-features = false }
 turso = { version = "=0.8.2", default-features = false }
+# Turso's engine crate, at the version `turso` pins, only to name its I/O trait in the Turso
+# backend's test seam (`io-seam`): tests wrap the platform I/O to fail one log fsync.
+turso_core = { version = "=0.8.2", default-features = false }
 # The browser host (ARCHITECTURE, Web UI): the Rust half of the wasm bindings. Pinned exactly,
 # because the `wasm-bindgen` CLI in mise.toml must be this same version to generate them.
 wasm-bindgen = "=0.2.129"
