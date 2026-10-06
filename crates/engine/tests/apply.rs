@@ -250,11 +250,31 @@ fn a_journey_weight_edit_is_state() {
     );
 }
 
+/// The vendor evaluation after its scenario, with the final review opened: every dependency
+/// of the final report is satisfied, so its other guards are what a completion meets.
+fn report_ready() -> cairn_engine::Records {
+    support::accepted_on(
+        &vendor_after(8),
+        "j_vendor_eval",
+        "- op: transition\n  node: n_review_opens\n  transition: reach\n",
+    )
+}
+
+/// [`report_ready`] without the final report's artifact link.
+fn report_ready_without_artifact() -> cairn_engine::Records {
+    support::accepted_on(
+        &report_ready(),
+        "j_vendor_eval",
+        "- op: remove_annotation\n  annotation: a_report_link\n",
+    )
+}
+
 #[test]
 fn an_artifact_guard_fails_on_the_graph_the_patch_produces() {
-    let records = vendor_after(8);
+    let records = report_ready();
     let complete = "- op: transition\n  node: n_final_report\n  transition: complete\n";
-    // The artifact link was added in step 8, so completing passes.
+    // The artifact link was added in step 8 and the final review is open, so completing
+    // passes.
     assert!(vendor_patch(&records, complete).is_ok());
     let without = format!("{complete}- op: remove_annotation\n  annotation: a_report_link\n");
     let Err(Rejection::Invalid { violations }) = vendor_patch(&records, &without) else {
@@ -270,7 +290,7 @@ fn an_artifact_guard_fails_on_the_graph_the_patch_produces() {
 
 #[test]
 fn an_artifact_on_another_node_does_not_satisfy_the_guard() {
-    let records = vendor_after(7);
+    let records = report_ready_without_artifact();
     let mutations = "\
 - op: add_annotation\n  annotation: {key: a_elsewhere, node: n_final_review, artifact: \"https://example.org/report\"}\n\
 - op: transition\n  node: n_final_report\n  transition: complete\n";
@@ -282,7 +302,7 @@ fn an_artifact_on_another_node_does_not_satisfy_the_guard() {
 
 #[test]
 fn a_bypass_records_the_failures_it_bypassed() {
-    let records = vendor_after(7);
+    let records = report_ready_without_artifact();
     let mutations = "\
 - op: transition\n  node: n_final_report\n  transition: complete\n\
 - op: apply_override\n  node: n_final_report\n  override: {guard_bypass: {guards: [has_artifact], reason: Linked in the meeting notes.}}\n";
@@ -413,7 +433,7 @@ fn clearing_a_participation_on_a_missing_node_is_a_violation() {
 
 #[test]
 fn a_completion_reopened_in_the_same_patch_still_meets_its_guards() {
-    let records = vendor_after(7);
+    let records = report_ready_without_artifact();
     let mutations = "\
 - op: transition\n  node: n_final_report\n  transition: complete\n\
 - op: transition\n  node: n_final_report\n  transition: reopen\n";
@@ -573,7 +593,7 @@ fn a_proposal_may_delete_its_existing_destination() {
 
 #[test]
 fn bypassed_failures_are_recorded_on_the_bypass_event() {
-    let records = vendor_after(7);
+    let records = report_ready_without_artifact();
     let mutations = "\
 - op: apply_override\n  node: n_final_report\n  override: {guard_bypass: {guards: [has_artifact], reason: Shared in the meeting.}}\n\
 - op: transition\n  node: n_final_report\n  transition: complete\n\

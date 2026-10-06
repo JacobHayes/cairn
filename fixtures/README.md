@@ -81,6 +81,27 @@ values, and `briefs/proof/2.3/prove.sh` checks this table against the engine's o
 | `reporting/review-opens` | 2026-11-06 | 2026-11-06 |
 | `testing` | 2026-11-06 | 2026-11-06 |
 
+What can be acted on after each step (brief 2.4): the frontier (every actionable node: relevant,
+open, not blocked, not a group) and, where it differs, the acting frontier (without snoozed
+nodes and `auto_reach` milestones whose date is ahead). Nothing in this route auto-reaches, so
+the values do not depend on the day they are read. The scenario matrix checks them, and
+`briefs/proof/2.4/prove.sh` checks this table against the engine's output.
+
+| After step | Frontier | Off the acting frontier |
+|---|---|---|
+| 1 (created) | `n_decision_meeting`, `n_kickoff`, `n_meeting_date`, `n_partner_runs`, `n_purpose`, `n_who_informed`, `n_who_owns` | |
+| 2 (up-front decisions) | `n_decision_meeting`, `n_kickoff` | |
+| 3 (kickoff reached) | `n_access`, `n_decision_meeting`, `n_workload` | |
+| 4 (access started) | `n_access`, `n_decision_meeting`, `n_workload` | |
+| 5 (access done, workload broken down) | `n_decision_meeting`, `n_plan_draft`, `n_workload_ingest`, `n_workload_query` | |
+| 6 (plan done, comparison set answered) | `n_baseline`, `n_decision_meeting`, `n_workload_ingest`, `n_workload_query` | |
+| 7 (baseline snoozed) | `n_baseline`, `n_decision_meeting`, `n_workload_ingest`, `n_workload_query` | `n_baseline` |
+| 8 (testing and findings done) | `n_decision_meeting`, `n_review_opens` | |
+
+Setup is not actionable until kickoff (steps 1 and 2: its contents wait on the stage's opening);
+the plan reaches the frontier only after its two actions, and the comparison set only after the
+plan.
+
 ## `hiring-loop/`
 
 A small route with deep containment (interview loop, onsite, debrief, notes, scorecard) and a

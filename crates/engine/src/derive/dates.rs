@@ -503,6 +503,45 @@ impl Dates {
         Some(NodeIndex::from_position(at))
     }
 
+    /// F1, F6: a milestone that reads as reached (pass 5) is finished work, so neither it nor
+    /// a group whose only unfinished work it was is overdue. Pass 4 cannot know it: auto-reach
+    /// reads the effective dates this pass derives.
+    pub(crate) fn settle_reached(&mut self, graph: &Graph, reached: impl Fn(&NodeKey) -> bool) {
+        let before = self.unfinished.clone();
+        let group = |key: &NodeKey| {
+            graph
+                .node(key)
+                .is_some_and(|node| node.kind() == NodeKind::Group)
+        };
+        for (at, key) in self.keys.iter().enumerate() {
+            if let Some(flag) = self.unfinished.get_mut(at) {
+                *flag = *flag && !reached(key) && !group(key);
+            }
+        }
+        for (at, key) in self.keys.iter().enumerate() {
+            if !self.unfinished.get(at).copied().unwrap_or(false) || group(key) {
+                continue;
+            }
+            let mut current = graph.tree().parent(key);
+            while let Some(parent) = current {
+                if let Ok(above) = self.keys.binary_search(parent)
+                    && before.get(above) == Some(&true)
+                    && let Some(flag) = self.unfinished.get_mut(above)
+                {
+                    *flag = true;
+                }
+                current = graph.tree().parent(parent);
+            }
+        }
+        // Only ever clears: nothing becomes unfinished.
+        assert!(
+            self.unfinished
+                .iter()
+                .zip(&before)
+                .all(|(after, before)| !after || *before)
+        );
+    }
+
     /// F3: the earliest the node can start.
     #[must_use]
     pub fn earliest_start(&self, key: &NodeKey) -> Option<Date> {

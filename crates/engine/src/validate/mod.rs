@@ -77,6 +77,7 @@ pub(crate) fn violation(code: ViolationCode, message: impl Into<String>) -> Viol
         bypassable: None,
         failures: std::collections::BTreeSet::new(),
         chains: None,
+        caused_by: std::collections::BTreeSet::new(),
     }
 }
 

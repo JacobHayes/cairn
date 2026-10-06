@@ -351,6 +351,7 @@ pub fn violation(code: ViolationCode, subject: Subject, message: String) -> Viol
         bypassable: None,
         failures: BTreeSet::new(),
         chains: None,
+        caused_by: std::collections::BTreeSet::new(),
     }
 }
 

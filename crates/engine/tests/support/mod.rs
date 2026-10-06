@@ -243,7 +243,17 @@ pub fn journey_graph(records: &Records, journey: &str) -> Graph {
 
 /// Derives a journey in the records at the fixed clock.
 pub fn derived(records: &Records, journey: &str) -> cairn_engine::Derived {
-    let inputs = cairn_engine::testing::derive_inputs(records.deployment.clone());
+    derived_on(records, journey, "2026-10-06".parse().unwrap())
+}
+
+/// Derives a journey in the records at `today`.
+pub fn derived_on(
+    records: &Records,
+    journey: &str,
+    today: cairn_schema::Date,
+) -> cairn_engine::Derived {
+    let mut inputs = cairn_engine::testing::derive_inputs(records.deployment.clone());
+    inputs.today = today;
     let created_on = records.journeys[&journey.parse().unwrap()]
         .header
         .created_on;
@@ -258,4 +268,15 @@ pub fn accepted_on(records: &Records, journey: &str, mutations: &str) -> Records
         Ok(applied) => applied.records().clone(),
         Err(rejection) => panic!("{rejection:#?}\n{mutations}"),
     }
+}
+
+/// `add_node` mutations, one per node written as a YAML flow mapping.
+pub fn add_nodes(nodes: &[&str]) -> String {
+    let mut mutations = String::new();
+    for node in nodes {
+        mutations.push_str("- op: add_node\n  node: ");
+        mutations.push_str(node);
+        mutations.push('\n');
+    }
+    mutations
 }

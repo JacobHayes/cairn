@@ -8,43 +8,12 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{GuardFailure, KeyRefs, Node, Payload, ViolationCode};
+use cairn_schema::ViolationCode;
 
 use super::Check;
-use crate::graph::{Document, Tree};
+use crate::derive::stale::{artifact_nodes, static_failures};
+use crate::graph::Tree;
 use crate::validate::at_node;
-
-/// The failures of the guards this stage owns, for a completed node.
-fn failures(document: &Document, tree: &Tree, node: &Node<KeyRefs>) -> BTreeSet<GuardFailure> {
-    let mut found = BTreeSet::new();
-    let (placeholder, requires_artifact) = match &node.payload {
-        Payload::Deliverable(deliverable) => {
-            (deliverable.placeholder, deliverable.requires_artifact)
-        }
-        Payload::Action(action) => (action.placeholder, false),
-        Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => (false, false),
-    };
-    let has_artifact = document.state.annotations.values().any(|annotation| {
-        annotation.is_artifact() && annotation.body.node.as_ref() == Some(&node.key)
-    });
-    if requires_artifact && !has_artifact {
-        found.insert(GuardFailure::MissingArtifact);
-    }
-    let atomic = document
-        .state
-        .nodes
-        .get(&node.key)
-        .is_some_and(|stored| stored.atomic);
-    if placeholder && !atomic && !tree.is_container(&node.key) {
-        found.insert(GuardFailure::NotBrokenDown);
-    }
-    // Only deliverables and actions have these guards (A16).
-    assert!(
-        found.is_empty() || matches!(node.payload, Payload::Deliverable(_) | Payload::Action(_))
-    );
-    assert!(found.len() <= 2);
-    found
-}
 
 /// Runs the guard checks.
 pub(super) fn check(check: &mut Check<'_, '_>) {
@@ -54,6 +23,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
     };
     let document = &journey.graph;
     let tree = Tree::build(document);
+    let artifacts = artifact_nodes(document);
     // Every completion the patch attempted, whatever the node's final state: a guard is
     // evaluated for the transition attempted, on the graph the patch produces (D4).
     for (key, ordinal) in &session.completed {
@@ -68,7 +38,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             .filter(|_| session.bypassed.contains_key(key))
             .map(|bypass| bypass.guards.clone())
             .unwrap_or_default();
-        for failure in failures(document, &tree, node) {
+        for failure in static_failures(document, &tree, node, &artifacts) {
             if covered.contains(&failure.guard()) {
                 check
                     .bypassed

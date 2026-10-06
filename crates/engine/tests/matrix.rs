@@ -221,7 +221,243 @@ const MATRIX: &[Entry] = &[
         brief: "2.3",
         run: relative_stage_windows,
     },
+    Entry {
+        scenario: "vendor evaluation: the frontier at each step",
+        prd: &["Illustrative example", "Gating", "Containment", "D2", "B6"],
+        brief: "2.4",
+        run: vendor_frontiers,
+    },
+    Entry {
+        scenario: "gated decisions answered out of order",
+        prd: &["Gating", "D4", "A17"],
+        brief: "2.4",
+        run: gated_decision_out_of_order,
+    },
+    Entry {
+        scenario: "relevance guard on completion",
+        prd: &["D4", "Gating"],
+        brief: "2.4",
+        run: relevance_guard_on_completion,
+    },
+    Entry {
+        scenario: "a node snooze holding, lifting, and holding again",
+        prd: &["B6", "D2", "D5"],
+        brief: "2.4",
+        run: node_snooze_holds_and_lifts,
+    },
+    Entry {
+        scenario: "an auto-reach milestone on its date",
+        prd: &["F1", "D2"],
+        brief: "2.4",
+        run: auto_reach_on_its_date,
+    },
+    Entry {
+        scenario: "an inserted dependency after a completion",
+        prd: &["D4", "D7"],
+        brief: "2.4",
+        run: inserted_dependency_goes_stale,
+    },
 ];
+
+/// The vendor evaluation's frontier and acting frontier after each step, as
+/// fixtures/README.md states them; the snoozed baseline leaves only the acting frontier.
+const VENDOR_FRONTIERS: [(usize, &[&str], &[&str]); 8] = {
+    const SECOND: &[&str] = &["n_decision_meeting", "n_kickoff"];
+    const KICKED_OFF: &[&str] = &["n_access", "n_decision_meeting", "n_workload"];
+    const PLANNED: &[&str] = &[
+        "n_baseline",
+        "n_decision_meeting",
+        "n_workload_ingest",
+        "n_workload_query",
+    ];
+    [
+        (
+            1,
+            &[
+                "n_decision_meeting",
+                "n_kickoff",
+                "n_meeting_date",
+                "n_partner_runs",
+                "n_purpose",
+                "n_who_informed",
+                "n_who_owns",
+            ],
+            &[],
+        ),
+        (2, SECOND, &[]),
+        (3, KICKED_OFF, &[]),
+        (4, KICKED_OFF, &[]),
+        (
+            5,
+            &[
+                "n_decision_meeting",
+                "n_plan_draft",
+                "n_workload_ingest",
+                "n_workload_query",
+            ],
+            &[],
+        ),
+        (6, PLANNED, &[]),
+        (7, PLANNED, &["n_baseline"]),
+        (8, &["n_decision_meeting", "n_review_opens"], &[]),
+    ]
+};
+
+fn keys_named(names: &[&str]) -> Vec<cairn_schema::NodeKey> {
+    names.iter().map(|name| key(name)).collect()
+}
+
+/// Illustrative example, Gating, Containment: the up-front decisions first, Setup only after
+/// kickoff, the plan's actions before the plan, the baseline once the comparison set is
+/// answered, and the snoozed baseline off the acting frontier (B6).
+fn vendor_frontiers() -> Run {
+    let run = Run::fixture("vendor-evaluation");
+    for (step, frontier, snoozed) in VENDOR_FRONTIERS {
+        let derived = support::derived(run.applied[step - 1].records(), "j_vendor_eval");
+        let blocking = derived.blocking();
+        assert_eq!(blocking.frontier(), keys_named(frontier), "step {step}");
+        let acting: Vec<_> = frontier
+            .iter()
+            .filter(|node| !snoozed.contains(node))
+            .copied()
+            .collect();
+        assert_eq!(
+            blocking.acting_frontier(),
+            keys_named(&acting),
+            "step {step}"
+        );
+    }
+    run
+}
+
+/// Gating 2, D4: answering the comparison set before the plan is done is rejected; with a
+/// bypass it is accepted and the bypass records the open plan; answered in order, it needs
+/// none.
+fn gated_decision_out_of_order() -> Run {
+    let mut run = Run::from(support::vendor_after(5));
+    let answer = "- op: answer\n  decision: n_comparison_set\n  value: {single_choice: none}\n";
+    let Rejection::Invalid { violations } = run.reject(VENDOR, answer) else {
+        panic!("rejected as invalid")
+    };
+    let found = &violations.as_slice()[0];
+    assert_eq!(found.bypassable, Some(cairn_schema::Guard::DepsDone));
+    assert!(
+        found
+            .failures
+            .contains(&GuardFailure::OpenDependency(key("n_plan")))
+    );
+    run.accept(VENDOR, &format!("{answer}- op: apply_override\n  node: n_comparison_set\n  override: {{guard_bypass: {{guards: [deps_done], reason: Decided in the planning meeting.}}}}\n"));
+    let recorded = &run.journey().state.overrides[&key("n_comparison_set")]
+        .bypass
+        .as_ref()
+        .unwrap()
+        .failures;
+    assert!(recorded.contains(&GuardFailure::OpenDependency(key("n_plan"))));
+    run.accept(
+        VENDOR,
+        "- op: transition\n  node: n_comparison_set\n  transition: reopen\n",
+    );
+    assert!(
+        run.journey()
+            .state
+            .overrides
+            .get(&key("n_comparison_set"))
+            .is_none_or(|o| o.bypass.is_none()),
+        "reopening clears the bypass"
+    );
+    run.accept(VENDOR, "- op: transition\n  node: n_plan_draft\n  transition: complete\n- op: transition\n  node: n_plan_review\n  transition: complete\n- op: transition\n  node: n_plan\n  transition: complete\n");
+    run.accept(VENDOR, answer);
+    run
+}
+
+/// D4: completing the baseline in the same patch as an answer that makes it not relevant is
+/// rejected, naming the answer; force include lets it complete.
+fn relevance_guard_on_completion() -> Run {
+    let mut run = Run::from(support::vendor_after(6));
+    let complete = "- op: transition\n  node: n_baseline\n  transition: complete\n";
+    let revise = "- op: answer\n  decision: n_comparison_set\n  value: {single_choice: none}\n";
+    let Rejection::Invalid { violations } = run.reject(VENDOR, &format!("{complete}{revise}"))
+    else {
+        panic!("rejected as invalid")
+    };
+    let found = violations
+        .as_slice()
+        .iter()
+        .find(|found| found.code == ViolationCode::NotRelevant)
+        .expect("the relevance guard");
+    assert_eq!(
+        (
+            found.at.mutation,
+            found.caused_by.iter().copied().collect::<Vec<_>>()
+        ),
+        (Some(0), vec![1])
+    );
+    run.accept(VENDOR, &format!("- op: apply_override\n  node: n_baseline\n  override: {{force_include: {{reason: Run it anyway.}}}}\n{complete}{revise}"));
+    assert_eq!(state_of(&run, "n_baseline"), State::Done);
+    run
+}
+
+/// B6: the baseline, snoozed until the query workload, lifts when the query is done and holds
+/// again when it reopens; a transition on the baseline clears the snooze, which replays.
+fn node_snooze_holds_and_lifts() -> Run {
+    let mut run = Run::from(support::vendor_after(7));
+    let snoozed = |run: &Run| {
+        derived(run)
+            .blocking()
+            .snoozed(&key("n_baseline"))
+            .is_some()
+    };
+    assert!(snoozed(&run));
+    run.accept(
+        VENDOR,
+        "- op: transition\n  node: n_workload_query\n  transition: complete\n",
+    );
+    assert!(!snoozed(&run));
+    run.accept(
+        VENDOR,
+        "- op: transition\n  node: n_workload_query\n  transition: reopen\n",
+    );
+    assert!(snoozed(&run));
+    run.accept(
+        VENDOR,
+        "- op: transition\n  node: n_baseline\n  transition: start\n",
+    );
+    assert!(!snoozed(&run) && run.journey().state.snoozes.is_empty());
+    run
+}
+
+/// F1: the launch's beta start auto-reaches on its effective date, with no event, and a day
+/// earlier it stays on the frontier but off the acting frontier.
+fn auto_reach_on_its_date() -> Run {
+    let run = Run::fixture("product-launch");
+    let beta = key("n_beta_start");
+    let date = derived(&run)
+        .dates()
+        .effective_date(&beta)
+        .expect("a date")
+        .date;
+    let on = |today| support::derived_on(run.records(), "j_launch", today);
+    let before = on(date.yesterday().unwrap());
+    assert!(!before.blocking().auto_reached(&beta));
+    assert!(before.blocking().frontier().contains(&beta));
+    assert!(!before.blocking().acting_frontier().contains(&beta));
+    assert!(on(date).blocking().auto_reached(&beta));
+    run
+}
+
+/// D4, D7: a dependency inserted after the findings were done leaves them stale, never
+/// rejected.
+fn inserted_dependency_goes_stale() -> Run {
+    let mut run = Run::from(support::vendor_after(8));
+    run.accept(VENDOR, "- op: add_node\n  node: {key: n_extra, id: extra, parent: n_reporting, kind: action, title: Extra}\n- op: add_edge\n  edge: {node: n_findings, requires: n_extra}\n");
+    let derived = derived(&run);
+    let graph = support::journey_graph(run.records(), "j_vendor_eval");
+    assert_eq!(
+        derived.stale(&graph, &key("n_findings")),
+        [GuardFailure::OpenDependency(key("n_extra"))].into()
+    );
+    run
+}
 
 #[test]
 fn every_scenario_leaves_its_expected_state_and_replays_exactly() {
@@ -553,7 +789,12 @@ fn date_decisions_that_pin() -> Run {
 }
 
 fn guard_bypasses() -> Run {
-    let mut run = Run::from(support::vendor_after(7));
+    let mut run = Run::from(support::vendor_after(8));
+    // The final review opens and the report's link goes: only its artifact guard fails.
+    run.accept(
+        VENDOR,
+        "- op: transition\n  node: n_review_opens\n  transition: reach\n- op: remove_annotation\n  annotation: a_report_link\n",
+    );
     run.accept(VENDOR, "- op: transition\n  node: n_final_report\n  transition: complete\n- op: apply_override\n  node: n_final_report\n  override: {guard_bypass: {guards: [has_artifact], reason: Shared in the meeting.}}\n");
     let overrides = &run.journey().state.overrides[&key("n_final_report")];
     let failures = &overrides.bypass.as_ref().unwrap().failures;
@@ -842,6 +1083,19 @@ fn skip_cascade_with_kept_work() -> Run {
         None,
         "skip travels containment only"
     );
+    // 2.4: the skipped plan holds the comparison set until its kept review is done (D1a).
+    assert!(derived.blocking().blocked(&key("n_comparison_set")));
+    assert_eq!(
+        derived.blocking().frontier(),
+        [key("n_decision_meeting"), key("n_plan_review")]
+    );
+    run.accept(
+        VENDOR,
+        "- op: transition\n  node: n_plan_review\n  transition: complete\n",
+    );
+    let released = self::derived(&run);
+    assert!(released.blocking().satisfies(&key("n_plan")));
+    assert!(released.blocking().actionable(&key("n_comparison_set")));
     run
 }
 
@@ -875,6 +1129,15 @@ fn empty_group_with_open_gate() -> Run {
         .map(|d| d.node)
         .collect();
     assert_eq!(after, [key("n_stage")]);
+    // 2.4: the empty stage blocks its dependent until its opening is reached.
+    assert!(derived.blocking().blocked(&key("n_after")));
+    run.accept(
+        journey,
+        "- op: transition\n  node: n_opens\n  transition: reach\n",
+    );
+    let opened = self::derived(&run);
+    assert!(opened.blocking().satisfies(&key("n_stage")));
+    assert_eq!(opened.blocking().frontier(), [key("n_after")]);
     run
 }
 

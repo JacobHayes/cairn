@@ -55,6 +55,10 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             journey: matches!(id, GraphId::Journey(_)),
         };
         let deployment = &check.session.candidate.deployment;
+        let found_before = check.violations.len();
         crate::validate::with_plan(&graph, deployment, &mut check.violations);
+        if matches!(id, GraphId::Journey(_)) && check.violations.len() > found_before {
+            check.journey_valid = false;
+        }
     }
 }

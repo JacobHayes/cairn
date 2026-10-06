@@ -49,6 +49,8 @@ pub(crate) struct Session<'a> {
     pub completed: BTreeMap<NodeKey, u32>,
     /// Nodes given a guard bypass in this patch, with the event holding it.
     pub bypassed: BTreeMap<NodeKey, u32>,
+    /// Nodes snoozed in this patch, with the mutation that snoozed them (B6).
+    pub snoozed: BTreeMap<NodeKey, u32>,
     /// Entities created in this patch (E6).
     pub created_entities: BTreeSet<EntityKey>,
     /// Route versions published in this patch.
@@ -188,6 +190,7 @@ impl<'a> Session<'a> {
             guarded: BTreeMap::new(),
             completed: BTreeMap::new(),
             bypassed: BTreeMap::new(),
+            snoozed: BTreeMap::new(),
             created_entities: BTreeSet::new(),
             published: Vec::new(),
             merge_checked: Vec::new(),

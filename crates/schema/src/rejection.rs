@@ -134,6 +134,10 @@ pub struct Violation {
     /// The contradictory chains, for `contradictory_chain` (F5).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub chains: Option<ChainList>,
+    /// The patch's other mutations that brought it about, beside `at.mutation` (D4: a
+    /// completion and the mutation that gave it an unfinished dependency in the same patch).
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub caused_by: BTreeSet<u32>,
 }
 
 /// A violation list with at least one entry (a rejection always says why).

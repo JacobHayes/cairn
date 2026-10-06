@@ -318,9 +318,17 @@ pub struct NodeDerived {
     /// Skipped through an ancestor's skip (D1a).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub effectively_skipped: bool,
-    /// What blocks it; empty when not blocked.
+    /// What blocks it itself: its own explicit requirements, condition gates, and stage
+    /// opening, and its children, each unsatisfied. What it inherits is listed once, on the
+    /// ancestor that holds it (`blocked_through`), never copied onto each descendant. A node
+    /// that is not blocked lists what its own requirements, conditions, and opening still
+    /// hold back beneath it.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocked_by: Vec<Blocker>,
+    /// The ancestors, nearest first, whose own unsatisfied requirements, openings, or
+    /// conditions block it through containment; each lists them in its own `blocked_by`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub blocked_through: Vec<NodeKey>,
     /// Relevant, not blocked, and non-terminal (D2).
     pub actionable: bool,
     /// No owner (E1).

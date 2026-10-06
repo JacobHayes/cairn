@@ -1,6 +1,7 @@
 //! Generated journeys built directly as documents (not through apply), for the derive passes'
 //! property and reference tests: deep containment, explicit edges, conditions, stage
-//! openings, stored states, answers, force includes, and keeps, all generic.
+//! openings, stored states, answers, force includes, keeps, `auto_reach` milestones, and date
+//! snoozes, all generic.
 //!
 //! Every generated graph is valid by construction. Nodes are created in depth-first
 //! preorder, so each subtree is a contiguous run of indices; a requirement, a condition's
@@ -421,7 +422,11 @@ impl Shape {
             }),
             NodeKind::Deliverable => Payload::Deliverable(Deliverable::default()),
             NodeKind::Action => Payload::Action(Action::default()),
-            NodeKind::Milestone => Payload::Milestone(Milestone::default()),
+            // Half the milestones auto-reach (F1); the estimate seed is a milestone's spare bits.
+            NodeKind::Milestone => Payload::Milestone(Milestone {
+                auto_reach: seed.dates.estimate.is_multiple_of(2),
+                ..Milestone::default()
+            }),
             NodeKind::Group => Payload::Group(self.stage(index, seed)),
         }
     }
@@ -550,6 +555,17 @@ impl Shape {
                 key(index),
                 AnswerValue::Boolean(seed.state.is_multiple_of(2)),
             );
+        }
+        // Some open work is snoozed until a day around the fixed clock (B6).
+        if !stored.state.is_terminal() && kind != NodeKind::Group && seed.state % 5 == 1 {
+            let until: cairn_schema::Date = parse("2026-10-01");
+            let days = i64::from(seed.state % 10);
+            let until = until
+                .checked_add(jiff::Span::new().days(days))
+                .unwrap_or_else(|e| panic!("{e}"));
+            state
+                .snoozes
+                .insert(key(index), cairn_schema::SnoozeTarget::Date(until));
         }
         state.nodes.insert(key(index), stored);
         let overrides = Overrides {

@@ -2,7 +2,9 @@
 //! Invariants; ARCHITECTURE, Read path: the reference test). Over generated deep trees, the
 //! entry chain agrees with the plain expansion that copies every inherited requirement and
 //! condition onto each descendant, both in what each node directly depends on and in what it
-//! transitively reaches, for gate edges and for all edges, in the full and pruned sets.
+//! transitively reaches, for gate edges and for all edges, in the full and pruned sets; and
+//! blocking (pass 5) read off the entry chain agrees with blocking read off the plain
+//! expansion: what satisfies dependencies and each node's `deps_done`.
 
 #[cfg(test)]
 mod property {
@@ -13,7 +15,7 @@ mod property {
     use cairn_engine::testing::derive_inputs;
     use cairn_engine::testing::generated::arb_journey;
     use cairn_engine::{Derived, Graph, derive};
-    use cairn_schema::{DependencyVia, Deployment, NodeKey, Payload};
+    use cairn_schema::{DependencyVia, Deployment, NodeKey, Payload, State};
     use patina_dst_proptest::prelude::*;
 
     type Dependency = (NodeKey, EdgeClass);
@@ -188,6 +190,76 @@ mod property {
         }
     }
 
+    /// D1, D1a, F1 over the plain expansion: what satisfies dependencies, to a fixed point
+    /// (one more round than there are nodes reaches it on an acyclic graph).
+    fn satisfies_plain(graph: &Graph, derived: &Derived) -> BTreeSet<NodeKey> {
+        let keys: Vec<&NodeKey> = graph.document().nodes.as_map().keys().collect();
+        let mut satisfied = BTreeSet::new();
+        for _ in 0..=keys.len() {
+            let next: BTreeSet<NodeKey> = keys
+                .iter()
+                .filter(|key| satisfies_now(graph, derived, key, &satisfied))
+                .map(|key| (*key).clone())
+                .collect();
+            if next == satisfied {
+                break;
+            }
+            satisfied = next;
+        }
+        satisfied
+    }
+
+    fn deps_done_plain(
+        graph: &Graph,
+        derived: &Derived,
+        key: &NodeKey,
+        satisfied: &BTreeSet<NodeKey>,
+    ) -> bool {
+        plain(graph, derived, key, EdgeSet::Pruned)
+            .iter()
+            .filter(|(_, class)| *class == EdgeClass::Gate)
+            .all(|(other, _)| satisfied.contains(other))
+    }
+
+    fn satisfies_now(
+        graph: &Graph,
+        derived: &Derived,
+        key: &NodeKey,
+        satisfied: &BTreeSet<NodeKey>,
+    ) -> bool {
+        let node = graph.node(key).unwrap();
+        let state = graph
+            .document()
+            .state
+            .nodes
+            .get(key)
+            .map_or(State::initial(node.kind()), |stored| stored.state);
+        if state == State::Skipped || derived.skips().skipped_by(key).is_some() {
+            return derived
+                .skips()
+                .kept_work(key)
+                .iter()
+                .all(|kept| satisfied.contains(kept));
+        }
+        if state.is_terminal() {
+            return true;
+        }
+        let deps_done = deps_done_plain(graph, derived, key, satisfied);
+        match &node.payload {
+            Payload::Group(_) => deps_done,
+            Payload::Milestone(milestone) => {
+                let relevant = derived.relevance().value(key) == cairn_schema::Relevance::Relevant;
+                let today = derive_inputs(Deployment::default()).today;
+                let arrived = derived
+                    .dates()
+                    .effective_date(key)
+                    .is_some_and(|date| date.date <= today);
+                deps_done && milestone.auto_reach && relevant && arrived
+            }
+            _ => false,
+        }
+    }
+
     proptest! {
         #[test]
         fn entry_chain_matches_the_plain_expansion(graph in arb_journey(1..=80)) {
@@ -204,6 +276,17 @@ mod property {
                         );
                     }
                 }
+            }
+        }
+
+        #[test]
+        fn blocking_over_the_entry_chain_matches_the_plain_expansion(graph in arb_journey(1..=80)) {
+            let derived = derived(&graph);
+            let satisfied = satisfies_plain(&graph, &derived);
+            let blocking = derived.blocking();
+            for key in graph.document().nodes.as_map().keys() {
+                prop_assert_eq!(blocking.satisfies(key), satisfied.contains(key), "{} satisfies", key);
+                prop_assert_eq!(blocking.deps_done(key), deps_done_plain(&graph, &derived, key, &satisfied), "{} deps_done", key);
             }
         }
 

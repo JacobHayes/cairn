@@ -154,7 +154,25 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
     if step == Move::Reopen && answered {
         writes.push(session.remove(GraphKey::Answer(node.clone())));
     }
+    if step == Move::Reopen {
+        writes.extend(clear_bypass(session, node));
+    }
     writes
+}
+
+/// D4: reopening a node clears its guard bypass, which accepted the failures of the
+/// completion it covered and of no later one.
+fn clear_bypass(session: &Session<'_>, node: &NodeKey) -> Option<Write> {
+    let mut next = overrides(session, node);
+    next.bypass.take()?;
+    Some(if next.is_empty() {
+        session.remove(GraphKey::Overrides(node.clone()))
+    } else {
+        session.put(GraphRecord::Overrides {
+            node: node.clone(),
+            overrides: next,
+        })
+    })
 }
 
 /// D4: remembers a guarded transition, for the guards stage and any bypass covering it.
@@ -355,9 +373,9 @@ fn shift_pin(session: &mut Session<'_>, node: &NodeKey, offset_days: SignedDays)
     })]
 }
 
-/// B6: only a node that can be acted on is snoozed, never on itself. Whether it is relevant
-/// and unblocked is derived and checked with derive (2.4); its kind and state are checked
-/// here.
+/// B6: only a node that can be acted on is snoozed, never on itself. Its kind and state are
+/// checked here; whether it is in scope is checked on the graph the patch produces (the
+/// derived stage), and a blocked node may be snoozed (Gating).
 fn snooze(
     session: &mut Session<'_>,
     node: &NodeKey,
@@ -378,6 +396,8 @@ fn snooze(
             "a node cannot be snoozed until itself (B6)",
         )
     } else {
+        // B6: whether the node is relevant is checked on the graph the patch produces.
+        session.snoozed.insert(node.clone(), session.ordinal);
         return vec![session.put(GraphRecord::Snooze {
             node: node.clone(),
             until: until.clone(),

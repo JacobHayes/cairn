@@ -484,7 +484,8 @@ fn every_shortfall_move_resolves_it() {
                     "{key: n_after, id: after, kind: milestone, title: After, requires: [n_work]}",
                 ])),
                 "- op: set_pin\n  node: n_work\n  date: \"2026-10-10\"\n\
-- op: transition\n  node: n_after\n  transition: reach\n",
+- op: transition\n  node: n_after\n  transition: reach\n\
+- op: apply_override\n  node: n_after\n  override: {guard_bypass: {guards: [deps_done], reason: Reached ahead of the work.}}\n",
             ),
             support::JOURNEY,
             "n_work",

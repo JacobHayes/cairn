@@ -165,18 +165,24 @@ pub fn arb_violation() -> BoxedStrategy<Violation> {
             Guard::BrokenDown,
         ])),
         prop::collection::btree_set(arb_guard_failure(), 0..2),
-        prop::option::of(chains),
+        (
+            prop::option::of(chains),
+            prop::collection::btree_set(0..8_u32, 0..2),
+        ),
     )
         .prop_map(
-            |(code, at, message, related, limit, bypassable, failures, chains)| Violation {
-                code,
-                at,
-                message,
-                related,
-                limit,
-                bypassable,
-                failures,
-                chains,
+            |(code, at, message, related, limit, bypassable, failures, (chains, caused_by))| {
+                Violation {
+                    code,
+                    at,
+                    message,
+                    related,
+                    limit,
+                    bypassable,
+                    failures,
+                    chains,
+                    caused_by,
+                }
             },
         )
         .boxed()
@@ -339,7 +345,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
     (
         arb_relevance(),
         flags,
-        blockers,
+        (blockers, prop::collection::vec(arb_node_key(), 0..2)),
         prop::collection::btree_map(arb_kind_key(), arb_participation(), 0..2),
         prop::collection::btree_set(arb_guard_failure(), 0..2),
         arb_node_dates(),
@@ -347,7 +353,8 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         arb_scores(),
     )
         .prop_map(
-            |(relevance, flags, blocked_by, participations, stale, dates, snoozed, scores)| {
+            |(relevance, flags, blocking, participations, stale, dates, snoozed, scores)| {
+                let (blocked_by, blocked_through) = blocking;
                 let flag = |index: usize| flags.get(index).copied().unwrap_or(false);
                 let (gravity, gravity_from, max_child_gravity, leverage, leverage_from, rank) =
                     scores;
@@ -355,6 +362,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     relevance,
                     effectively_skipped: flag(0),
                     blocked_by,
+                    blocked_through,
                     actionable: flag(1),
                     unassigned: flag(2),
                     participations,

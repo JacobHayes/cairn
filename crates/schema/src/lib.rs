@@ -50,8 +50,8 @@ pub use condition::{Clause, Comparison, Condition, ConditionValue, Membership};
 pub use derived::{
     Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DomainDocument,
     EffectiveDate, EffectiveParticipation, EngineVersion, Explained, NodeDates, NodeDerived,
-    ParticipationOrigin, RankConstants, Real, Relevance, RelevanceExplanation, Score, StallCause,
-    Stalled, TimeZoneName,
+    ParticipationOrigin, RankConstants, Real, Relevance, RelevanceExplanation, Score,
+    ShortfallConsequence, StaleConsequence, StallCause, Stalled, TimeZoneName,
 };
 pub use document::{
     ParseError, WriteError, from_json, from_yaml, to_json, to_json_pretty, to_yaml,

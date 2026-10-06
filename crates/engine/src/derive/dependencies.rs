@@ -41,6 +41,8 @@
 mod cycles;
 mod listing;
 
+pub(crate) use cycles::Waits;
+
 use std::collections::BTreeMap;
 
 use cairn_schema::limits::NODE_COUNT_MAX;
@@ -64,7 +66,8 @@ pub enum Point {
 }
 
 impl Point {
-    const ALL: [Point; 4] = [
+    /// Every point, in slot order.
+    pub(crate) const ALL: [Point; 4] = [
         Point::Start,
         Point::Finish,
         Point::Entry,

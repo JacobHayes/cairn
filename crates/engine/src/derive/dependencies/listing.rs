@@ -28,9 +28,34 @@ impl Dependencies {
         let Some(node) = self.node_index(key) else {
             return Vec::new();
         };
+        self.walk(key, vec![Instant::new(node, super::Point::Start)], set)
+    }
+
+    /// What waits at the node's entries, its own and inherited, in the set: what it passes
+    /// down to its descendants, whatever its own state or relevance (a not-relevant
+    /// container's requirement entry stays as a pass-through). For a node with no children,
+    /// its start's dependencies but its children's, which it has none of. Sorted.
+    #[must_use]
+    pub fn passed_down(&self, key: &NodeKey, set: EdgeSet) -> Vec<EffectiveDependency> {
+        let Some(node) = self.node_index(key) else {
+            return Vec::new();
+        };
+        let entries = if self.is_container(node) {
+            vec![
+                Instant::new(node, super::Point::Entry),
+                Instant::new(node, super::Point::ConditionEntry),
+            ]
+        } else {
+            vec![Instant::new(node, super::Point::Start)]
+        };
+        self.walk(key, entries, set)
+    }
+
+    /// The dependencies reached from `from` along the entry chains.
+    fn walk(&self, key: &NodeKey, from: Vec<Instant>, set: EdgeSet) -> Vec<EffectiveDependency> {
         let mut found = BTreeSet::new();
         let mut visited: BTreeSet<Instant> = BTreeSet::new();
-        let mut stack = vec![Instant::new(node, super::Point::Start)];
+        let mut stack = from;
         while let Some(instant) = stack.pop() {
             if !visited.insert(instant) {
                 continue;

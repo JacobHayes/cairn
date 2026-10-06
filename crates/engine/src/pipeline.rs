@@ -107,7 +107,7 @@ pub fn apply(records: &Records, patch: &Patch, inputs: &ApplyInputs) -> Result<A
     if !session.conflicts.is_empty() {
         return Err(stale(std::mem::take(&mut session.conflicts)));
     }
-    let check = stages::run(&session);
+    let check = stages::run(&session, &events);
     let (found, bypassed) = (check.violations, check.bypassed);
     let mut violations = std::mem::take(&mut session.violations);
     violations.extend(found);
