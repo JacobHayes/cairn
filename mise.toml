@@ -8,3 +8,7 @@ rust = { version = "1.99.0", profile = "minimal", components = "clippy,rustfmt",
 # The wasm tool, as prebuilt release binaries. Its version must equal the `wasm-bindgen`
 # crate version the wasm brief (4.5) adds, which may swap it for wasm-pack.
 "github:wasm-bindgen/wasm-bindgen" = "0.2.129"
+# The simulation track's runner (PRACTICES, Simulation with patina: Tooling), built from
+# source once at the same revision as the SDK git dependencies in Cargo.toml. Only
+# `mise run sim` uses it; the check ladder never does.
+"cargo:https://github.com/JacobHayes/patina" = { version = "rev:6a2977e7bce794d15eabaa18258a5542115bd872", crate = "cargo-patina", locked = true }

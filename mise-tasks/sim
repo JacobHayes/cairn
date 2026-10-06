@@ -1,0 +1,25 @@
+#!/usr/bin/env bash
+#MISE description="Simulation campaigns under patina: every testbeds/<name>/sim.sh; never part of check"
+# PRACTICES, Simulation with patina: exploratory, not a gate. Runs locally and nightly in CI.
+# A testbed joins by having an executable sim.sh. Fails, never skips, when cargo-patina is
+# missing or no testbed has one.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+
+if ! cargo patina --version >/dev/null 2>&1; then
+  echo "sim: FAILED: cargo-patina is missing (mise install builds it at the pinned revision)" >&2
+  exit 1
+fi
+testbeds=()
+for script in testbeds/*/sim.sh; do
+  [ -e "$script" ] && testbeds+=("$script")
+done
+if [ ${#testbeds[@]} -eq 0 ]; then
+  echo "sim: FAILED: no testbed has a sim.sh" >&2
+  exit 1
+fi
+for script in "${testbeds[@]}"; do
+  echo "sim: $script"
+  "$script"
+done
+echo "sim: passed: ${testbeds[*]}"

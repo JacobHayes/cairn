@@ -1,6 +1,7 @@
-# PRACTICES, The validation ladder: the full ladder on every push, plus a nightly run. Linux
-# runners only. mise installs the pinned tools; a tool that fails to install fails the job,
-# and rung 1 fails on any tool still missing, so nothing is skipped.
+# PRACTICES, The validation ladder: the full ladder on every push, plus a nightly run, and the
+# simulation campaigns nightly outside the gate. Linux runners only. mise installs the pinned
+# tools; a tool that fails to install fails the job, and rung 1 fails on any tool still
+# missing, so nothing is skipped.
 name: check
 
 on:
@@ -24,18 +25,32 @@ jobs:
   check:
     if: github.event_name != 'schedule'
     runs-on: ubuntu-latest
+    env:
+      # Only `mise run sim` uses cargo-patina, and it builds from source; the ladder skips it.
+      MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
       - run: mise run check
 
   # Every rung that exists, as on push. The brief that adds rung 3 raises its property test
-  # case count here (PRACTICES, The validation ladder: a larger case count nightly), and the
-  # simulation track adds `mise run sim` as its own job.
+  # case count here (PRACTICES, The validation ladder: a larger case count nightly).
   nightly:
     if: github.event_name == 'schedule'
     runs-on: ubuntu-latest
+    env:
+      MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
       - run: mise run check
+
+  # PRACTICES, Simulation with patina: the campaigns, nightly and on demand, never on push and
+  # never part of check. mise builds cargo-patina from source at the pinned revision.
+  sim:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: jdx/mise-action@v5
+      - run: mise run sim

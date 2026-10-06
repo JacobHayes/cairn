@@ -20,7 +20,7 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 |---|---|---|---|---|
 | 1.1 | Workspace, lints, tasks, CI | root, `mise.toml`, `.github/` | - | landed `mqnnskmq` |
 | 1.2 | Schema and fixtures | `crates/schema`, `fixtures/`, `schema/` | 1.1 | in progress |
-| 1.3 | Simulation spike: tokio and axum under the shim | `testbeds/spike` | 1.1 | in progress |
+| 1.3 | Simulation spike: tokio and axum under the shim | `testbeds/spike` | 1.1 | landed `yqvkwotm` |
 | 2.1 | Engine core: model, apply, state machines, events, replay | `crates/engine` | 1.2 |  |
 | 2.2 | Relevance, effective dependencies, effective skip, participation | `crates/engine` | 2.1 |  |
 | 2.3 | Date network | `crates/engine` | 2.2 |  |

@@ -21,14 +21,16 @@ Cairn is being built in feature briefs; nothing runs yet beyond the checks.
 Tools are pinned in `mise.toml`; tasks live in `mise-tasks/`.
 
 ```sh
-mise install          # pinned Rust toolchain, Node, and wasm tool
+mise install          # pinned Rust toolchain, Node, wasm tool, and cargo-patina
 mise run check        # every rung of the validation ladder that exists
 mise run check:fast   # rungs 1 to 3: the inner loop
 mise run check:1      # one rung
 mise run gen          # regenerate the generated paths
+mise run sim          # simulation campaigns under patina; not part of check
 ```
 
-CI (`.github/workflows/check.yml`) runs `mise run check` on every push and nightly.
+CI (`.github/workflows/check.yml`) runs `mise run check` on every push and nightly, and
+`mise run sim` nightly outside the gate.
 
 ## License
 

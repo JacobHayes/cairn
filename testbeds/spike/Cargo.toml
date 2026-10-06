@@ -1,0 +1,42 @@
+# Brief 1.3, the simulation spike: an axum server and a hyper client on tokio, run under the
+# patina native shim (PRACTICES, Simulation with patina). Its own Cargo workspace (the empty
+# [workspace] table) so `cargo patina build` resolves only this tree and the check ladder,
+# which covers the root workspace's `crates/*`, never builds it. Brief 6.2 folds it in or
+# deletes it.
+[workspace]
+
+[package]
+name = "cairn-spike"
+description = "Simulation spike: does tokio, axum, and an HTTP client run under the patina shim?"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+repository = "https://github.com/JacobHayes/cairn"
+publish = false
+
+[dependencies]
+# The HTTP server 4.2 uses (ARCHITECTURE), HTTP/1 only: the smallest axum that serves.
+axum = { version = "0.8", default-features = false, features = ["http1", "tokio"] }
+# The client side: hyper's own HTTP/1 connection over a tokio TcpStream, no pool, no DNS.
+bytes = "1"
+http-body-util = "0.1"
+hyper = { version = "1", features = ["client", "http1"] }
+hyper-util = { version = "0.1", features = ["tokio"] }
+# The SDK at the revision Cargo.toml's [workspace.dependencies] and mise.toml pin.
+patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "6a2977e7bce794d15eabaa18258a5542115bd872" }
+# The runtime under test, at the version patina's own tokio testbeds prove.
+tokio = { version = "=1.53.1", features = ["macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
+
+# The crate-wide lints of the root workspace (Cargo.toml [workspace.lints]); this
+# workspace cannot inherit them. `mise run sim` runs clippy with warnings denied.
+[lints.rust]
+unsafe_code = "forbid"
+# `cargo patina build` injects these cfgs.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(patina)", "cfg(dst)", "cfg(patina_shim)"] }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+expect_used = "deny"
+too_many_lines = "deny"
+unwrap_used = "deny"
