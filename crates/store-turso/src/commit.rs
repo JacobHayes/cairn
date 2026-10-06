@@ -1,8 +1,11 @@
 //! A commit as one MVCC transaction (ARCHITECTURE, Concurrency and notification): `BEGIN
 //! CONCURRENT`, whose first write is the domain's revision row, so commits to one domain
-//! conflict and commits to different domains do not wait on each other. A write-write
-//! conflict Turso reports is retried once from the start, then answered as a revision
-//! conflict.
+//! conflict and commits to different domains do not wait on each other. In process,
+//! commits on the same rows never meet in flight: each first takes its turn at what it
+//! writes (`queue`). A write-write conflict Turso still reports (a connection outside those
+//! turns) is retried once from the start, then answered by what has moved.
+
+use std::collections::BTreeSet;
 
 use cairn_schema::{
     Actor, Domain, Event, GraphId, JourneyHeader, PatchReceipt, PatchTarget, Record, Revision,
@@ -13,6 +16,7 @@ use cairn_store::{Commit, CommitError, CommitPoint, Committed, Faults, Precondit
 use turso::Connection;
 
 use crate::load;
+use crate::queue::Claim;
 use crate::sequence::Sequencer;
 use crate::sql::{
     Abort, SqlError, domain_columns, execute, first, int, json, json_enum, opt_int, opt_text, rows,
@@ -61,14 +65,33 @@ fn created(commit: &Commit) -> Result<Option<Created>, StoreError> {
     Ok(created)
 }
 
+/// H5: what a commit takes its turn at before it begins: every revision row it writes
+/// (its target's, and its dependencies' and the deployment's when it writes them) and its
+/// patch id, so a commit beside one in flight on any of them waits for it to end.
+pub(crate) fn claims(commit: &Commit, shape: &Shape) -> BTreeSet<Claim> {
+    let mut rows = vec![
+        shape.advances.clone(),
+        RevisionOf::Domain(shape.domain.clone()),
+    ];
+    rows.extend(dependencies(commit, shape));
+    if shape.bumps_deployment || shape.writes_deployment {
+        rows.push(RevisionOf::Domain(Domain::Deployment));
+    }
+    let patch = Claim::Patch(commit.change_set.receipt.patch_id.clone());
+    rows.into_iter()
+        .map(Claim::Revision)
+        .chain(std::iter::once(patch))
+        .collect()
+}
+
 /// Commits on `connection`, retrying once on a write-write conflict.
 pub(crate) async fn commit(
     connection: &Connection,
     faults: &Faults,
     log: &Sequencer,
     commit: &Commit,
+    shape: &Shape,
 ) -> Result<Committed, CommitError> {
-    let shape = Shape::of(commit)?;
     let created = created(commit)?;
     for _ in 0..2 {
         // The log positions are held until the attempt's transaction has ended.
@@ -77,7 +100,7 @@ pub(crate) async fn commit(
             connection,
             faults,
             commit,
-            &shape,
+            shape,
             created.as_ref(),
             positions.first(),
         );
@@ -93,7 +116,7 @@ pub(crate) async fn commit(
     if let Some(stored) = load::receipt(connection, &receipt.patch_id).await? {
         return backend::resubmission(&stored.receipt, receipt);
     }
-    Err(conflicted(connection, commit, &shape).await)
+    Err(conflicted(connection, commit, shape).await)
 }
 
 async fn rollback(connection: &Connection) {
@@ -299,18 +322,7 @@ async fn lock_dependencies(
     commit: &Commit,
     shape: &Shape,
 ) -> Result<(), Abort> {
-    let mut dependencies: Vec<RevisionOf> = backend::expected_revisions(commit, shape)
-        .into_iter()
-        .skip(1)
-        .map(|(of, _)| of)
-        .collect();
-    if let PatchTarget::Proposal { destination, .. } = &commit.target {
-        dependencies.push(RevisionOf::Domain(destination.clone()));
-    }
-    if shape.references_entities && shape.domain != Domain::Deployment {
-        dependencies.push(RevisionOf::Domain(Domain::Deployment));
-    }
-    for of in dependencies {
+    for of in dependencies(commit, shape) {
         let (sql, params) = match &of {
             RevisionOf::Domain(Domain::Journey(id)) => (
                 "UPDATE journeys SET revision = revision WHERE id = ?1",
@@ -332,6 +344,22 @@ async fn lock_dependencies(
         execute(connection, sql, params).await?;
     }
     Ok(())
+}
+
+/// The revision rows besides its target's that a commit writes without changing them.
+fn dependencies(commit: &Commit, shape: &Shape) -> Vec<RevisionOf> {
+    let mut dependencies: Vec<RevisionOf> = backend::expected_revisions(commit, shape)
+        .into_iter()
+        .skip(1)
+        .map(|(of, _)| of)
+        .collect();
+    if let PatchTarget::Proposal { destination, .. } = &commit.target {
+        dependencies.push(RevisionOf::Domain(destination.clone()));
+    }
+    if shape.references_entities && shape.domain != Domain::Deployment {
+        dependencies.push(RevisionOf::Domain(Domain::Deployment));
+    }
+    dependencies
 }
 
 /// H5: every revision the commit names that has moved.
@@ -568,32 +596,31 @@ async fn store_receipt(connection: &Connection, stored: &StoredReceipt) -> Resul
     Ok(())
 }
 
-/// The answer after a second write-write conflict (ARCHITECTURE, Concurrency): a revision
-/// conflict on the target, read now. A commit that conflicted twice lost to one still in
-/// flight, which is producing the revision after the base, so the conflict names at least
-/// that one.
+/// The answer after a second write-write conflict (ARCHITECTURE, Concurrency), which only a
+/// connection outside this process's turns can cause: stale with every revision the commit
+/// names that has moved and what intervened, read now. When none has, the commit it lost to
+/// is still in flight and nothing it did can be seen, so the commit fails rather than name a
+/// revision that may never exist with nothing intervening (H5; DECISIONS.md, the H5 fix).
 async fn conflicted(connection: &Connection, commit: &Commit, shape: &Shape) -> CommitError {
     let mut conflicts = Vec::new();
-    for (index, (of, expected)) in backend::expected_revisions(commit, shape)
-        .into_iter()
-        .enumerate()
-    {
+    for (of, expected) in backend::expected_revisions(commit, shape) {
         let now = match load::revision_of(connection, &of).await {
             Ok(now) => now,
             Err(error) => return CommitError::Failed(error),
         };
-        if index == 0 || now != expected {
-            let current = if now == expected {
-                expected.next()
-            } else {
-                now
-            };
+        if now != expected {
             conflicts.push(RevisionConflict {
                 of,
                 expected,
-                current,
+                current: now,
             });
         }
+    }
+    if conflicts.is_empty() {
+        return CommitError::Failed(StoreError::Backend(format!(
+            "{} conflicted twice with a commit still in flight that took no turn",
+            commit.target.domain()
+        )));
     }
     match intervening(connection, &conflicts).await {
         Ok(intervening) => backend::stale(conflicts, intervening),

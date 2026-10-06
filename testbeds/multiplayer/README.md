@@ -88,23 +88,26 @@ mise run sim          # every leg of sim.sh, from the repository root
 `sim.sh` (about 3 minutes): code (fmt, clippy, unit tests); build, and an audit whose
 unsupported symbols must be exactly `unsupported-symbols.txt` (gap 4); determinism (a seed
 recorded twice is byte-identical, its replay reports the same verdict); the smoke campaign
-(16 generations, `--buggify --sched-pct`, every oracle in reach fired, no failure but the known
-product finding); the faulted sweep (8 seeds of dropped, delayed, refused, and reset
+(16 generations, `--buggify --sched-pct`, every oracle in reach fired, no failure); the
+faulted sweep (8 seeds of dropped, delayed, refused, and reset
 connections, every run passing and resending, some patch answered from its receipt, no inert
 knob); and one leg per patina gap that fails once the gap stops reproducing.
 
-## The product finding
+## The product finding (fixed)
 
 H5, found by the smoke campaign in about one generation in eight and recorded in
-DECISIONS.md (brief 6.1): a patch resubmitted while its original is still committing is
-answered stale, naming the revision the original is producing with nothing intervening. The
-retry logic rebases it onto that revision; the engine answers that it names a revision that
-does not exist yet; the client rebases back, and so on until its 32-resubmission bound runs
-out in no time at all, and the caller is told the patch conflicted. Then the original lands.
-The same stale answer, given to any other patch beside a commit in flight, names that
-revision with nothing intervening even when the commit in flight touches what the patch does.
-Both are deterministic, ignored tests in `crates/service/tests/in_flight.rs` until fixed;
-`sim.sh` tolerates the campaign failing on `nothing-unacknowledged-applied` until then.
+DECISIONS.md (brief 6.1): a patch resubmitted while its original was still committing was
+answered stale, naming the revision the original was producing with nothing intervening. The
+retry logic rebased it onto that revision; the engine answered that it named a revision that
+did not exist yet; the client rebased back, and so on until its 32-resubmission bound ran
+out in no time at all, and the caller was told the patch conflicted. Then the original
+landed. The same stale answer, given to any other patch beside a commit in flight, named
+that revision with nothing intervening even when the commit in flight touched what the patch
+did. Fixed (DECISIONS.md, the same entry): a Turso commit first takes its turn at every
+revision row it writes and at its patch id, so one beside a commit in flight on them waits
+for it and then meets its receipt or what it really touched; and the client never rebases a
+patch backward. `crates/service/tests/in_flight.rs` holds both cases over both stores, and
+the campaign tolerates no finding.
 
 ## Patina gap report
 

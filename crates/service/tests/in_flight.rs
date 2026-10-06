@@ -1,10 +1,9 @@
 //! Domain patches beside a commit in flight: what the multiplayer testbed (6.1) found or
 //! guards, each minimized from a failing seed to the situation it reached and set up here
 //! explicitly with a gate on the store's commit points (PRACTICES, Simulation with patina).
-//! A commit held before it begins runs over both stores; one held open with everything
-//! written needs Turso, since the memory store commits under one lock. A case marked
-//! ignored is a product bug recorded in DECISIONS.md and not yet fixed; it fails until it
-//! is, and runs with `cargo test -p cairn-service --test in_flight -- --ignored`.
+//! Every case runs over both stores. A commit held open with everything written needs
+//! Turso, since the memory store commits under one lock; there the commit is held before
+//! it begins instead, the deepest point the memory store has.
 #![cfg(test)]
 
 mod support;
@@ -177,44 +176,87 @@ fn a_patch_that_loses_the_race_to_commit_is_rejected_stale_on_turso() {
     });
 }
 
-/// H5 (6.1 finding, DECISIONS.md): a patch resubmitted while its original is still
-/// committing (its answer was lost, or its caller stopped waiting) is the same patch, so it
-/// is answered from the original's receipt. Today it is answered stale, naming the revision
-/// the original is producing with nothing intervening; the client rebases it, and its
-/// caller is told it conflicted although it landed.
+/// The answer of the one of two patches that was applied, and the other's.
+fn split_applied(
+    answers: (Result<Written, WriteError>, Result<Written, WriteError>),
+) -> (Written, Result<Written, WriteError>) {
+    match answers {
+        (Ok(landed @ Written::Applied { .. }), other)
+        | (other, Ok(landed @ Written::Applied { .. })) => (landed, other),
+        neither => panic!("expected one patch applied, got {neither:#?}"),
+    }
+}
+
+/// H5 (6.1 finding, fixed; DECISIONS.md): a patch resubmitted while its original is still
+/// committing (its answer was lost, or its caller stopped waiting) is the same patch: it
+/// lands once, and the other submission is answered from its receipt. On Turso the
+/// original is held inside its transaction and the resubmission waits its turn; on the
+/// memory store, which commits whole, the original is held before it begins and the
+/// resubmission lands first.
+async fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt<
+    S: Store + 'static,
+>(
+    service: Service<S>,
+    gate: Arc<Gate>,
+) {
+    let original = rename("p_rename", 1, "Renamed");
+    let answers = beside_held(&service, &gate, original.clone(), original).await;
+    let (landed, again) = split_applied(answers);
+    let receipt = landed.receipt().clone();
+    assert_eq!(receipt.revision.get(), 2);
+    assert_eq!(again, Ok(Written::AlreadyApplied { receipt }));
+}
+
 #[test]
-#[ignore = "product bug found by 6.1 (DECISIONS.md): a resubmission beside its own original in flight is answered stale"]
-fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt() {
+fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt_on_memory() {
     support::run(async {
-        let (service, gate) = turso(CommitPoint::BeforeCommit).await;
-        let original = rename("p_rename", 1, "Renamed");
-        let (landed, again) = beside_held(&service, &gate, original.clone(), original).await;
-        let receipt = applied(landed).receipt().clone();
-        assert_eq!(again, Ok(Written::AlreadyApplied { receipt }));
+        let (service, gate) = memory(CommitPoint::BeforeBegin).await;
+        a_resubmission_while_its_original_commits_is_answered_from_its_receipt(service, gate).await;
     });
 }
 
-/// H5 (6.1 finding, DECISIONS.md): a stale answer is the client's only evidence for
-/// retrying on its own, so it names no revision without what that revision touched. Today
-/// a patch beside a commit in flight is answered stale naming the revision in flight with
-/// nothing intervening, although that commit renames the same node: the client takes it as
-/// safe to rebase onto that revision, and would land over the rename unseen.
 #[test]
-#[ignore = "product bug found by 6.1 (DECISIONS.md): a stale answer beside a commit in flight omits what that commit touches"]
-fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches() {
+fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt_on_turso() {
     support::run(async {
         let (service, gate) = turso(CommitPoint::BeforeCommit).await;
-        let second = rename("p_second", 1, "Second");
-        let touched = second.touched();
-        let (first, second) =
-            beside_held(&service, &gate, rename("p_first", 1, "First"), second).await;
-        applied(first);
-        match second {
-            Err(WriteError::Rejected(Rejection::Stale { intervening, .. })) => assert!(
-                intervening.overlaps(&touched),
-                "the rename in flight overlaps the second, so the answer must say so"
-            ),
-            other => panic!("expected a stale answer, got {other:#?}"),
-        }
+        a_resubmission_while_its_original_commits_is_answered_from_its_receipt(service, gate).await;
+    });
+}
+
+/// H5 (6.1 finding, fixed; DECISIONS.md): a stale answer is the client's only evidence for
+/// retrying on its own, so it names no revision without what that revision touched. Two
+/// renames of one node from revision 1, one held in flight: the other is answered stale
+/// carrying the held one's rename, never naming the revision in flight with nothing
+/// intervening, which the client would take as safe to rebase onto.
+async fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches<S: Store + 'static>(
+    service: Service<S>,
+    gate: Arc<Gate>,
+) {
+    let second = rename("p_second", 1, "Second");
+    let touched = second.touched();
+    let answers = beside_held(&service, &gate, rename("p_first", 1, "First"), second).await;
+    let (_, stale) = split_applied(answers);
+    match stale {
+        Err(WriteError::Rejected(Rejection::Stale { intervening, .. })) => assert!(
+            intervening.overlaps(&touched),
+            "the rename in flight overlaps the other, so the answer must say so"
+        ),
+        other => panic!("expected a stale answer, got {other:#?}"),
+    }
+}
+
+#[test]
+fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches_on_memory() {
+    support::run(async {
+        let (service, gate) = memory(CommitPoint::BeforeBegin).await;
+        a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches(service, gate).await;
+    });
+}
+
+#[test]
+fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches_on_turso() {
+    support::run(async {
+        let (service, gate) = turso(CommitPoint::BeforeCommit).await;
+        a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches(service, gate).await;
     });
 }

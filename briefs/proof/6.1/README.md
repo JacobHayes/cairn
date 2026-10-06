@@ -5,7 +5,7 @@ pinned revision. Before this brief nothing drove Cairn's HTTP server with more t
 at a time; now `mise run sim` runs four HTTP clients and one in-process agent patching one
 journey through Cairn's real server, store (Turso), and Rust client (H5's safe retry, H6's
 subscription tracking), under seeded network faults and fault sites, checks nine invariants
-at the end of every run, and found a product bug (DECISIONS.md, brief 6.1).
+at the end of every run, and found a product bug, since fixed (DECISIONS.md, brief 6.1).
 
 The `--allow-unsupported-symbols` list names exactly the symbols Turso links that the shim
 refuses (testbeds/multiplayer/README.md, gap 4).
@@ -21,10 +21,10 @@ client's last answer.
 | Run | Exit | Acknowledged | Surfaced (bound) | Resubmitted | Receipts | Resent | Writes (us) | Verdicts |
 |---|---|---|---|---|---|---|---|---|
 | Fault-free | 0 | 38 | 2 (0) | 3 | 0 | 0 | 87000 | pass multiplayer-outcome |
-| Connections reset | 0 | 37 | 3 (0) | 8 | 10 | 44 | 257000 | pass multiplayer-outcome |
+| Connections reset | 0 | 38 | 2 (0) | 12 | 10 | 56 | 267000 | pass multiplayer-outcome |
 | Connections refused | 0 | 38 | 2 (0) | 7 | 0 | 16 | 147000 | pass multiplayer-outcome |
-| Delayed and dropped segments | 0 | 36 | 4 (0) | 34 | 0 | 0 | 332000 | pass multiplayer-outcome |
-| Answers lost and commits held (buggify) | 0 | 36 | 4 (1) | 42 | 10 | 15 | 426000 | pass multiplayer-outcome |
+| Delayed and dropped segments | 0 | 36 | 4 (0) | 40 | 0 | 0 | 341000 | pass multiplayer-outcome |
+| Answers lost and commits held (buggify) | 0 | 34 | 6 (0) | 24 | 10 | 15 | 517000 | pass multiplayer-outcome |
 
 ### Fault-free
 
@@ -44,9 +44,9 @@ Each established stream operation is reset with probability 10%. Clients resend;
 ```
 $ cargo patina run target/patina/cairn-multiplayer --seed 1 --allow-unsupported-symbols "$(paste -sd, unsupported-symbols.txt)" --net-reset-permille 100 --
 exit status: 0 (expected 0)
-MULTIPLAYER_RESULT acknowledged=37 surfaced=3 surfaced_exhausted=0 resubmitted=8 receipts=10 transport_retries=44 journey_revision=37 deployment_revision=2 events=43 writes_us=257000 caught_up_us=33000
-PATINA_VERDICT seq=0 kind=pass label=multiplayer-outcome detail=acknowledged=37\ssurfaced=3\ssurfaced_exhausted=0\sresubmitted=8\sreceipts=10\stransport_retries=44\sjourney_revision=37\sdeployment_revision=2\sevents=43\swrites_us=257000\sca
-PATINA_NET_FAULT_REPORT send_ops=672 drops_applied=0 latency_applied=0 connects_refused=0 resets_injected=126 vacuous=0
+MULTIPLAYER_RESULT acknowledged=38 surfaced=2 surfaced_exhausted=0 resubmitted=12 receipts=10 transport_retries=56 journey_revision=38 deployment_revision=2 events=44 writes_us=267000 caught_up_us=238000
+PATINA_VERDICT seq=0 kind=pass label=multiplayer-outcome detail=acknowledged=38\ssurfaced=2\ssurfaced_exhausted=0\sresubmitted=12\sreceipts=10\stransport_retries=56\sjourney_revision=38\sdeployment_revision=2\sevents=44\swrites_us=267000\sc
+PATINA_NET_FAULT_REPORT send_ops=714 drops_applied=0 latency_applied=0 connects_refused=0 resets_injected=133 vacuous=0
 ```
 
 ### Connections refused
@@ -68,9 +68,9 @@ PATINA_NET_FAULT_REPORT send_ops=457 drops_applied=0 latency_applied=0 connects_
 ```
 $ cargo patina run target/patina/cairn-multiplayer --seed 1 --allow-unsupported-symbols "$(paste -sd, unsupported-symbols.txt)" --net-latency-nanos 2000000 --net-jitter-nanos 0..2000000 --net-drop-permille 100 --
 exit status: 0 (expected 0)
-MULTIPLAYER_RESULT acknowledged=36 surfaced=4 surfaced_exhausted=0 resubmitted=34 receipts=0 transport_retries=0 journey_revision=36 deployment_revision=2 events=42 writes_us=332000 caught_up_us=199000
-PATINA_VERDICT seq=0 kind=pass label=multiplayer-outcome detail=acknowledged=36\ssurfaced=4\ssurfaced_exhausted=0\sresubmitted=34\sreceipts=0\stransport_retries=0\sjourney_revision=36\sdeployment_revision=2\sevents=42\swrites_us=332000\scau
-PATINA_NET_FAULT_REPORT send_ops=604 drops_applied=68 latency_applied=604 connects_refused=0 resets_injected=0 vacuous=0
+MULTIPLAYER_RESULT acknowledged=36 surfaced=4 surfaced_exhausted=0 resubmitted=40 receipts=0 transport_retries=0 journey_revision=36 deployment_revision=2 events=42 writes_us=341000 caught_up_us=189000
+PATINA_VERDICT seq=0 kind=pass label=multiplayer-outcome detail=acknowledged=36\ssurfaced=4\ssurfaced_exhausted=0\sresubmitted=40\sreceipts=0\stransport_retries=0\sjourney_revision=36\sdeployment_revision=2\sevents=42\swrites_us=341000\scau
+PATINA_NET_FAULT_REPORT send_ops=628 drops_applied=68 latency_applied=628 connects_refused=0 resets_injected=0 vacuous=0
 ```
 
 ### Answers lost and commits held (buggify)
@@ -80,45 +80,46 @@ Every fault site active: clients drop first answers (`client-loses-response`), a
 ```
 $ cargo patina run target/patina/cairn-multiplayer --seed 1 --allow-unsupported-symbols "$(paste -sd, unsupported-symbols.txt)" --buggify=300 --buggify-activation-permille 1000 --
 exit status: 0 (expected 0)
-MULTIPLAYER_RESULT acknowledged=36 surfaced=4 surfaced_exhausted=1 resubmitted=42 receipts=10 transport_retries=15 journey_revision=36 deployment_revision=2 events=42 writes_us=426000 caught_up_us=74000
-PATINA_VERDICT seq=0 kind=pass label=multiplayer-outcome detail=acknowledged=36\ssurfaced=4\ssurfaced_exhausted=1\sresubmitted=42\sreceipts=10\stransport_retries=15\sjourney_revision=36\sdeployment_revision=2\sevents=42\swrites_us=426000\sc
-site=client-loses-response|fault|a1|e38|f10
-site=store-commit-stalls|fault|a1|e36|f5
-site=store-commit-stalls-past-timeout|fault|a1|e37|f11
-site=store-commit-waits|fault|a1|e80|f23
-site=store-commit-waits-past-timeout|fault|a1|e84|f22
+MULTIPLAYER_RESULT acknowledged=34 surfaced=6 surfaced_exhausted=0 resubmitted=24 receipts=10 transport_retries=15 journey_revision=34 deployment_revision=2 events=40 writes_us=517000 caught_up_us=233000
+PATINA_VERDICT seq=0 kind=pass label=multiplayer-outcome detail=acknowledged=34\ssurfaced=6\ssurfaced_exhausted=0\sresubmitted=24\sreceipts=10\stransport_retries=15\sjourney_revision=34\sdeployment_revision=2\sevents=40\swrites_us=517000\sc
+site=client-loses-response|fault|a1|e35|f9
+site=store-commit-stalls|fault|a1|e33|f5
+site=store-commit-stalls-past-timeout|fault|a1|e34|f9
+site=store-commit-waits|fault|a1|e59|f17
+site=store-commit-waits-past-timeout|fault|a1|e63|f18
 ```
 
 ## The smoke campaign
 
 `cargo patina campaign target/patina/cairn-multiplayer --gens 16 --buggify --sched-pct`, as
 `mise run sim` runs it: each generation draws its seed, buggify rates, and PCT depth from its
-number. Every failing generation breaks one invariant, the known product finding below; sim.sh
-fails on any other.
+number. Every generation passes.
 
 | Generation | Seed | Class | Violation |
 |---|---|---|---|
 | 0 | 5133223892554006150 | OK |  |
 | 1 | 9597900870906850753 | OK |  |
-| 2 | 6035836283997236584 | VIOLATION | nothing-unacknowledged-applied |
+| 2 | 6035836283997236584 | OK |  |
 | 3 | 8691428598475829734 | OK |  |
 | 4 | 18168833488500055323 | OK |  |
 | 5 | 5054684445830216172 | OK |  |
 | 6 | 4845366107860366670 | OK |  |
-| 7 | 10045940371587287147 | VIOLATION | nothing-unacknowledged-applied |
+| 7 | 10045940371587287147 | OK |  |
 | 8 | 15750659670342163110 | OK |  |
 | 9 | 2515526315548436616 | OK |  |
-| 10 | 15562124335752573802 | VIOLATION | nothing-unacknowledged-applied |
+| 10 | 15562124335752573802 | OK |  |
 | 11 | 9054712144660291901 | OK |  |
 | 12 | 7268061268671330085 | OK |  |
 | 13 | 11630555699695068297 | OK |  |
 | 14 | 590918895341496304 | OK |  |
 | 15 | 13898982658749762238 | OK |  |
 
-`PATINA_CAMPAIGN_COVERAGE oracle_sites=10 satisfied=10 unmet=0 gate=pass`
+`PATINA_CAMPAIGN_COVERAGE oracle_sites=12 satisfied=10 unmet=2 gate=waived`
 
 Every coverage oracle declared in the binary fired, the service's and client's own
-`reachable!` sites included; the fault sites are listed by the runs they fired in:
+`reachable!` sites included, except those `sim.sh` lists as out of this testbed's reach
+(`service-deployment-revision-unread` `service-duplicate-original-committed-meanwhile`; DECISIONS.md, 6.1 integration).
+The fault sites are listed by the runs they fired in:
 
 | Site | Kind | Generations |
 |---|---|---|
@@ -128,42 +129,90 @@ Every coverage oracle declared in the binary fired, the service's and client's o
 | `store-commit-waits` | fault | fired in 9 of 16 reached |
 | `store-commit-waits-past-timeout` | fault | fired in 9 of 16 reached |
 | `client-stale-patch-retried` | reachable | satisfied in 16 of 16 reached |
+| `service-deployment-revision-unread` | reachable | satisfied in 0 of 0 reached |
+| `service-duplicate-original-committed-meanwhile` | reachable | satisfied in 0 of 0 reached |
 | `service-patch-lost-at-commit` | reachable | satisfied in 16 of 16 reached |
 | `service-resubmission-answered-from-receipt` | reachable | satisfied in 11 of 11 reached |
-| `service-resubmission-raced-original` | reachable | satisfied in 1 of 1 reached |
+| `service-resubmission-raced-original` | reachable | satisfied in 10 of 10 reached |
 | `service-stale-patch-completed-with-intervening` | reachable | satisfied in 16 of 16 reached |
-| `client-overlapping-conflict-surfaced` | sometimes | satisfied in 11 of 16 reached |
-| `client-resubmission-answered-from-receipt` | sometimes | satisfied in 11 of 16 reached |
-| `client-stale-patch-retried-and-landed` | sometimes | satisfied in 12 of 16 reached |
-| `view-coalesced-tick` | sometimes | satisfied in 14 of 16 reached |
+| `client-overlapping-conflict-surfaced` | sometimes | satisfied in 16 of 16 reached |
+| `client-resubmission-answered-from-receipt` | sometimes | satisfied in 14 of 16 reached |
+| `client-stale-patch-retried-and-landed` | sometimes | satisfied in 16 of 16 reached |
+| `view-coalesced-tick` | sometimes | satisfied in 16 of 16 reached |
 | `view-deployment-tick-after-merge` | sometimes | satisfied in 16 of 16 reached |
 
-## The product finding, minimized
+## The planted bug, found and minimized
 
-Generation 2 reduced to the knobs it needs (`cargo patina minimize --generation 2
---no-trace-phase`): the failure needs only: --buggify=551 --buggify-activation-permille 408
+Turso's commit-time revision check skipping the target domain, planted in a build of its own:
+
+```diff
+382c382
+<         if now != expected {
+---
+>         if index > 0 && now != expected {
+```
+
+The same campaign over the planted build:
+
+| Generation | Seed | Class | Violation |
+|---|---|---|---|
+| 0 | 5133223892554006150 | VIOLATION | acknowledged-visible |
+| 1 | 9597900870906850753 | VIOLATION | acknowledged-visible |
+| 2 | 6035836283997236584 | VIOLATION | acknowledged-visible |
+| 3 | 8691428598475829734 | VIOLATION | acknowledged-visible |
+| 4 | 18168833488500055323 | VIOLATION | acknowledged-visible |
+| 5 | 5054684445830216172 | VIOLATION | acknowledged-visible |
+| 6 | 4845366107860366670 | VIOLATION | acknowledged-visible |
+| 7 | 10045940371587287147 | VIOLATION | acknowledged-visible |
+| 8 | 15750659670342163110 | VIOLATION | acknowledged-visible |
+| 9 | 2515526315548436616 | VIOLATION | acknowledged-visible |
+| 10 | 15562124335752573802 | VIOLATION | acknowledged-visible |
+| 11 | 9054712144660291901 | VIOLATION | acknowledged-visible |
+| 12 | 7268061268671330085 | VIOLATION | acknowledged-visible |
+| 13 | 11630555699695068297 | VIOLATION | acknowledged-visible |
+| 14 | 590918895341496304 | VIOLATION | acknowledged-visible |
+| 15 | 13898982658749762238 | VIOLATION | acknowledged-visible |
+
+Generation 0 reduced to the knobs it needs (`cargo patina minimize --generation 0
+--no-trace-phase`): the failure needs only: --buggify=737
 
 ```
-$ cargo patina run target/patina/cairn-multiplayer --seed 6035836283997236584 --allow-unsupported-symbols "$(paste -sd, unsupported-symbols.txt)" --buggify=551 --buggify-activation-permille 408
+$ cargo patina run target/patina/cairn-multiplayer-planted --seed 5133223892554006150 --allow-unsupported-symbols "$(paste -sd, unsupported-symbols.txt)" --buggify=737
 exit status: 1
-MULTIPLAYER_VIOLATION nothing-unacknowledged-applied p_c4_0 is in the log unacknowledged
-MULTIPLAYER_VIOLATION surfaced-not-applied p_c4_0 was surfaced as a conflict but applied
-MULTIPLAYER_RESULT acknowledged=2 surfaced=38 surfaced_exhausted=38 resubmitted=0 receipts=1 transport_retries=6 journey_revision=3 deployment_revision=2 events=9 writes_us=408000 caught_up_us=92000
-PATINA_VERDICT seq=0 kind=violation label=nothing-unacknowledged-applied detail=p_c4_0\sis\sin\sthe\slog\sunacknowledged
-PATINA_VERDICT seq=1 kind=violation label=surfaced-not-applied detail=p_c4_0\swas\ssurfaced\sas\sa\sconflict\sbut\sapplied
+PATINA_VERDICT seq=0 kind=violation label=acknowledged-visible detail=p_c3_0\sacknowledged\sat\sJourney(JourneyId("j_shared"))\srevision\s2;\snext\ssnapshot\sheld\sit:\strue;\slog\shas\sSome(Logged\s{\spatch:\sPatchId("p_c3_0"),\sdomain:\sJ
+PATINA_VERDICT seq=1 kind=violation label=revisions-gap-free detail=Journey(JourneyId("j_shared"))\sis\sat\srevision\s36\safter\s40\spatches
+PATINA_VERDICT seq=2 kind=violation label=retried-only-when-safe detail=p_c3_4\sdrafted\sat\srevision\s12\slanded\sat\s14\sover\sp_c3_3,\swhich\stouches\swhat\sit\sdoes
+PATINA_VERDICT seq=3 kind=violation label=replay-equals-state detail=the\sreplayed\sjourney\sdiffers\sfrom\sthe\sstore's
+MULTIPLAYER_VIOLATION acknowledged-visible p_c3_0 acknowledged at Journey(JourneyId("j_shared")) revision 2; next snapshot held it: true; log has Some(Logged { patch: PatchId("p_c3_0"), domain: Journey(JourneyId("j_shared")), revision: Revi
+MULTIPLAYER_VIOLATION acknowledged-visible p_c3_1 acknowledged at Journey(JourneyId("j_shared")) revision 3; next snapshot held it: true; log has Some(Logged { patch: PatchId("p_c3_1"), domain: Journey(JourneyId("j_shared")), revision: Revi
+MULTIPLAYER_VIOLATION acknowledged-visible p_c3_2 acknowledged at Journey(JourneyId("j_shared")) revision 5; next snapshot held it: true; log has Some(Logged { patch: PatchId("p_c3_2"), domain: Journey(JourneyId("j_shared")), revision: Revi
+MULTIPLAYER_VIOLATION acknowledged-visible p_c3_3 acknowledged at Journey(JourneyId("j_shared")) revision 9; next snapshot held it: true; log has Some(Logged { patch: PatchId("p_c3_3"), domain: Journey(JourneyId("j_shared")), revision: Revi
+... (41 violations in all)
 ```
 
-The agent's commit stalled past its 200 ms attempt timeout; the agent resubmitted the same
-patch while the original was still committing; the store answered the resubmission stale,
-naming the revision the original was producing, with nothing intervening; the client rebased
-and resubmitted until its bound ran out and surfaced the conflict; then the original landed.
-The caller was told a patch conflicted that is in the journey. Rewritten as a deterministic
-service test with the commit held open at a gate (`crates/service/tests/in_flight.rs`, ignored
-until fixed):
+A commit waits before it begins while another that loaded the same revision lands; with the
+check skipped it lands too, at the same revision. Rewritten as a deterministic service test
+with the commit held at a gate (`crates/service/tests/in_flight.rs`), failing with the bug
+planted and passing with it removed:
 
 ```
-$ cargo test -p cairn-service --test in_flight -- --ignored a_resubmission_while_its_original_commits
-  left: Err(Rejected(Stale { conflicts: [RevisionConflict { of: Domain(Journey(JourneyId("j_race"))), expected: Revision(1), current: Revision(2) }], intervening: TouchedSet({}) }))
- right: Ok(AlreadyApplied { receipt: PatchReceipt { patch_id: PatchId("p_rename"), domain: Journey(JourneyId("j_race")), content_hash: ContentHash("92bcac772af7c1f68e438786a77997488520994a64fa04dcc89c089a69cfff72"), revision: Revision(2) } 
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.23s
+$ cargo test -p cairn-service --test in_flight -- a_patch_that_loses_the_race_to_commit_is_rejected_stale_on_turso   # planted
+expected a stale answer, got Ok( Applied {
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.17s
+$ cargo test -p cairn-service --test in_flight -- a_patch_that_loses_the_race_to_commit_is_rejected_stale_on_turso   # removed
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.16s
+```
+
+## The product finding (fixed)
+
+The first campaigns found an H5 bug (DECISIONS.md, "a resubmission beside its own original in
+flight is answered stale"): a patch resubmitted while its original was still committing was
+answered stale, naming the revision in flight with nothing intervening, and its caller was
+told it conflicted although it landed. It is fixed: a Turso commit takes its turn at the rows
+it writes and at its patch id, and the client never rebases backward. Its two cases run in
+`crates/service/tests/in_flight.rs` over both stores:
+
+```
+$ cargo test -p cairn-service --test in_flight
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
 ```

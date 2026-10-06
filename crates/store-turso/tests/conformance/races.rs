@@ -1,8 +1,11 @@
 //! Turso-specific cases (readiness ruling for 3.1): commits in flight together, a long
 //! commit beside reads and another domain's commit, a crash in the middle of a commit, and
-//! the foreign-key gap the domain revision row closes (DECISIONS.md).
+//! the foreign-key gap the domain revision row closes (DECISIONS.md). A commit on rows one
+//! in flight writes waits its turn and then sees what that one did (the H5 fix,
+//! DECISIONS.md); a commit on other rows does not wait.
 
 use std::future::Future;
+use std::pin::pin;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
@@ -71,6 +74,9 @@ fn add_node(patch: &str, journey: &str, base: u32, key: &str) -> Commit {
         .commit()
 }
 
+/// How long a commit waiting its turn beside a held one is shown to keep waiting.
+const MEANWHILE: Duration = Duration::from_millis(50);
+
 /// Runs `held` until it reaches the gate, then `meanwhile` to completion, then releases the
 /// gate and lets `held` finish.
 async fn while_held<T, M: Future<Output = T>>(
@@ -84,6 +90,28 @@ async fn while_held<T, M: Future<Output = T>>(
         let result = meanwhile.await;
         gate.release.notify_one();
         result
+    };
+    both(store.commit(held), others).await
+}
+
+/// Runs `held` until it reaches the gate, then `meanwhile`, which must still be waiting for
+/// `held` a while later; then releases the gate and lets both finish.
+async fn beside_held<T, M: Future<Output = T>>(
+    store: &TursoStore,
+    gate: &Gate,
+    held: Commit,
+    meanwhile: M,
+) -> (Result<Committed, CommitError>, T) {
+    let others = async {
+        gate.reached.notified().await;
+        let mut meanwhile = pin!(meanwhile);
+        let early = tokio::time::timeout(MEANWHILE, meanwhile.as_mut()).await;
+        assert!(
+            early.is_err(),
+            "a commit beside the held one waits its turn"
+        );
+        gate.release.notify_one();
+        meanwhile.await
     };
     both(store.commit(held), others).await
 }
@@ -127,8 +155,8 @@ pub async fn a_long_commit_blocks_neither_reads_nor_another_journeys_commit(back
     assert_eq!((after.revision, after.graph.nodes.len()), (revision(2), 1));
 }
 
-/// Two creates of one journey, each inserting its revision row inside its own transaction
-/// (a unique key race): one journey results, and the other create is a revision conflict.
+/// Two creates of one journey (a unique key race on its revision row): the second waits its
+/// turn, then is a revision conflict; one journey results.
 pub async fn two_creates_of_one_journey_in_flight_yield_one_journey(backend: &Turso) {
     let faults = Faults::default();
     let store = backend.open(faults.clone()).await;
@@ -140,7 +168,7 @@ pub async fn two_creates_of_one_journey_in_flight_yield_one_journey(backend: &Tu
         vec![action("n_second", "second", None)],
     );
     let meanwhile = promptly(store.commit(second.commit()));
-    let (first, second) = while_held(&store, &gate, first.commit(), meanwhile).await;
+    let (first, second) = beside_held(&store, &gate, first.commit(), meanwhile).await;
     let outcomes = [&first, &second];
     let won = outcomes
         .iter()
@@ -159,8 +187,8 @@ pub async fn two_creates_of_one_journey_in_flight_yield_one_journey(backend: &Tu
 }
 
 /// E6: two entity creates of one key, riding in patches to two journeys at once (a unique
-/// key race on the entity and the deployment's revision row): one entity results, the
-/// deployment revision moves once, and the other patch does not commit.
+/// key race on the entity and the deployment's revision row): the second waits its turn,
+/// then finds the key taken; one entity results and the deployment revision moves once.
 pub async fn two_entity_creates_of_one_key_in_flight_yield_one_entity(backend: &Turso) {
     let faults = Faults::default();
     let store = backend.open(faults.clone()).await;
@@ -184,9 +212,15 @@ pub async fn two_entity_creates_of_one_key_in_flight_yield_one_entity(backend: &
     };
     let meanwhile = promptly(store.commit(ride("p_b", "j_two", "From two")));
     let (first, second) =
-        while_held(&store, &gate, ride("p_a", "j_one", "From one"), meanwhile).await;
+        beside_held(&store, &gate, ride("p_a", "j_one", "From one"), meanwhile).await;
     assert!(matches!(first, Ok(Committed::Applied(_))), "{first:?}");
-    assert!(second.is_err(), "{second:?}");
+    assert!(
+        matches!(
+            second,
+            Err(CommitError::Rejected(Rejection::Invalid { .. }))
+        ),
+        "{second:?}"
+    );
     let people = deployment(&store).await;
     assert_eq!(people.revision, revision(1));
     let names: Vec<_> = people
@@ -225,7 +259,7 @@ fn delete_journey(patch: &str, journey: &str, base: u32) -> Commit {
 
 /// A19 and the foreign-key gap (DECISIONS.md): a journey's hard delete (removing parent
 /// rows) racing a commit that adds a node to it (a child row) cannot leave an orphan,
-/// because both write the journey's revision row first and so conflict.
+/// because both write the journey's revision row: the add waits its turn and is stale.
 pub async fn a_delete_racing_a_child_insert_leaves_no_orphan(backend: &Turso) {
     let faults = Faults::default();
     let store = backend.open(faults.clone()).await;
@@ -236,7 +270,7 @@ pub async fn a_delete_racing_a_child_insert_leaves_no_orphan(backend: &Turso) {
     .await;
     let gate = Gate::at(CommitPoint::BetweenStateAndEvents, &faults);
     let meanwhile = promptly(store.commit(add_node("p_add", "j_one", 1, "n_b")));
-    let (deleted, added) = while_held(
+    let (deleted, added) = beside_held(
         &store,
         &gate,
         delete_journey("p_delete", "j_one", 1),
@@ -421,7 +455,8 @@ fn merge(patch: &str) -> Commit {
 
 /// E6: a journey patch starting to reference an entity and a merge of that entity, in
 /// flight together, do not both commit: the merge would miss the new reference. The patch
-/// writing the reference holds the deployment's revision row.
+/// writing the reference holds the deployment's revision row, so the merge waits its turn
+/// and is then stale on the journey that now references its entity.
 pub async fn a_reference_and_a_merge_in_flight_do_not_both_commit(backend: &Turso) {
     let faults = Faults::default();
     let store = backend.open(faults.clone()).await;
@@ -441,26 +476,24 @@ pub async fn a_reference_and_a_merge_in_flight_do_not_both_commit(backend: &Turs
     applied(&store, create_journey("p_one", "j_one", vec![who]).commit()).await;
     let gate = Gate::at(CommitPoint::BetweenStateAndEvents, &faults);
     let meanwhile = promptly(store.commit(merge("p_merge")));
-    let (referenced, merged) = while_held(
+    let (referenced, merged) = beside_held(
         &store,
         &gate,
         answer_with("p_answer", "j_one", 1, "e_b"),
         meanwhile,
     )
     .await;
-    let both_committed = matches!(referenced, Ok(Committed::Applied(_)))
-        && matches!(merged, Ok(Committed::Applied(_)));
-    assert!(!both_committed, "{referenced:?} {merged:?}");
     assert!(
         matches!(referenced, Ok(Committed::Applied(_))),
         "{referenced:?}"
     );
+    assert!(rejected_as_stale(&merged), "{merged:?}");
     let again = store.commit(merge("p_merge_again")).await;
     assert!(rejected_as_stale(&again), "{again:?}");
 }
 
-/// A19: a proposal created while its journey is hard-deleted does not survive it: the two
-/// do not both commit.
+/// A19: a proposal created while its journey is hard-deleted does not survive it: the
+/// delete waits its turn at the journey's revision row and takes the proposal with it.
 pub async fn a_proposal_and_its_journeys_deletion_in_flight_do_not_both_commit(backend: &Turso) {
     let faults = Faults::default();
     let store = backend.open(faults.clone()).await;
@@ -484,13 +517,14 @@ pub async fn a_proposal_and_its_journeys_deletion_in_flight_do_not_both_commit(b
             .commit();
     let gate = Gate::at(CommitPoint::BetweenStateAndEvents, &faults);
     let meanwhile = promptly(store.commit(delete_journey("p_delete", "j_one", 1)));
-    let (proposed, deleted) = while_held(&store, &gate, proposal, meanwhile).await;
-    let both_committed = matches!(proposed, Ok(Committed::Applied(_)))
-        && matches!(deleted, Ok(Committed::Applied(_)));
-    assert!(!both_committed, "{proposed:?} {deleted:?}");
-    let left = store.proposal(&id("pr_one")).await.unwrap();
-    let journey_left = journey(&store, "j_one").await;
-    assert_eq!(left.is_some(), journey_left.is_some());
+    let (proposed, deleted) = beside_held(&store, &gate, proposal, meanwhile).await;
+    assert!(
+        matches!(proposed, Ok(Committed::Applied(_))),
+        "{proposed:?}"
+    );
+    assert!(matches!(deleted, Ok(Committed::Applied(_))), "{deleted:?}");
+    assert_eq!(store.proposal(&id("pr_one")).await.unwrap(), None);
+    assert_eq!(journey(&store, "j_one").await, None);
 }
 
 /// J5: history pages by a cursor that never skips an event: an event that becomes visible
@@ -550,8 +584,8 @@ async fn read_after(store: &TursoStore, mut after: Option<u64>) -> (Vec<String>,
     }
 }
 
-/// H5: a committed patch resubmitted while a later commit to its journey is in flight is
-/// answered from its receipt, never as stale.
+/// H5: a committed patch resubmitted while a later commit to its journey is in flight waits
+/// its turn and is answered from its receipt, never as stale.
 pub async fn a_resubmission_beside_a_commit_in_flight_is_answered_from_its_receipt(
     backend: &Turso,
 ) {
@@ -566,7 +600,7 @@ pub async fn a_resubmission_beside_a_commit_in_flight_is_answered_from_its_recei
     applied(&store, first.clone()).await;
     let gate = Gate::at(CommitPoint::AfterRevisionRow, &faults);
     let meanwhile = promptly(store.commit(first));
-    let (later, again) = while_held(
+    let (later, again) = beside_held(
         &store,
         &gate,
         add_node("p_later", "j_one", 2, "n_later"),

@@ -11,7 +11,8 @@
 //!   first, so the original meets its own receipt (H5).
 //! - `store-commit-stalls` (short) and `store-commit-stalls-past-timeout` (once per run): a
 //!   commit holds its transaction open just before it commits, as a slow write does. Every
-//!   other commit to the domain conflicts with it in the meantime.
+//!   other commit to the domain waits its turn behind it in the meantime, a resubmission of
+//!   the same patch included, and then meets what it did (H5).
 
 use std::future::Future;
 use std::pin::Pin;

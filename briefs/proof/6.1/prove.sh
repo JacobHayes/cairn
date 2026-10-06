@@ -1,14 +1,17 @@
 #!/usr/bin/env bash
 # Generates briefs/proof/6.1/README.md: the multiplayer testbed (testbeds/multiplayer) built
 # shim-linked and run under patina: one seed fault-free and under each injected fault, the
-# smoke campaign's generations and oracle coverage, and the product finding it makes,
-# minimized to the knob that matters and rewritten as a deterministic service test. Exits
-# non-zero if any outcome differs from the one it expects.
+# smoke campaign's generations and oracle coverage, and the planted bug (Turso's revision
+# check skipping the target domain) found by the campaign, minimized to the knobs that
+# matter, and shown by its deterministic service test. The product finding 6.1 made is
+# fixed (DECISIONS.md); its service tests are shown passing. Exits non-zero if any outcome
+# differs from the one it expects.
 #
 # usage: briefs/proof/6.1/prove.sh
 #
-# Needs cargo-patina (mise install). Writes only the README and the testbed's target
-# directory.
+# Needs cargo-patina (mise install). Writes the README and the testbed's target directory.
+# For the planted build it plants the bug in crates/store-turso/src/commit.rs and restores
+# the file however the script ends.
 # shellcheck disable=SC2016 # backticks in single quotes are Markdown code spans
 set -euo pipefail
 repo=$(cd "$(dirname "$0")/../../.." && pwd)
@@ -95,49 +98,82 @@ scenario "Answers lost and commits held (buggify)" 0 '[ "$receipts" -gt 0 ] && [
   "Every fault site active: clients drop first answers (\`client-loses-response\`), and commits wait before they begin and stall before they commit (\`store-commit-*\`, testbeds/multiplayer/src/faults.rs). Dropped answers come back from receipts; held commits make more patches stale." \
   --buggify=300 --buggify-activation-permille 1000 --
 
-# The smoke campaign, as `mise run sim` runs it, generation by generation.
-rm -rf "$out/campaign"
-campaign_log=$(cargo patina campaign "$testbed" --gens 16 --buggify --sched-pct --out-dir "$out/campaign" \
-  --progress-every 1 --allow-unsupported-symbols "$allow" 2>&1) || true
-# The first violation each failing generation reported, by generation.
-violated=$(node -e '
-  for (const run of require(process.argv[1]).notable_runs) {
-    const label = (run.signature.match(/label=([a-z-]+)/) || [])[1];
-    if (label) console.log(`${run.generation} ${label}`);
-  }' "$testbed_dir/$out/campaign/campaign-state.json")
-generation_rows=$(grep '^PATINA_CAMPAIGN_GEN ' <<<"$campaign_log" | while read -r line; do
-  generation=$(field generation "$line")
-  label=$(awk -v generation="$generation" '$1 == generation { print $2 }' <<<"$violated")
-  printf '| %s | %s | %s | %s |\n' "$generation" "$(field seed "$line")" "$(field class "$line")" "$label"
-done)
+# The oracles sim.sh lists as out of this testbed's reach: the only ones allowed unmet.
+out_of_reach=$(sed -n '/^out_of_reach=(/,/^)/p' sim.sh | grep -E '^  [a-z-]+$' | tr -d ' ' | sort)
+
+# campaign BINARY DIR: the smoke campaign as `mise run sim` runs it, generation by generation.
+campaign() {
+  rm -rf "$2"
+  cargo patina campaign "$1" --gens 16 --buggify --sched-pct --out-dir "$2" \
+    --progress-every 1 --allow-unmet-sometimes --allow-unsupported-symbols "$allow" 2>&1 || true
+}
+# generation_rows LOG DIR: a table row per generation, with the first violation it reported.
+generation_rows() {
+  local violated
+  violated=$(node -e '
+    for (const run of require(process.argv[1]).notable_runs) {
+      const label = (run.signature.match(/label=([a-z-]+)/) || [])[1];
+      if (label) console.log(`${run.generation} ${label}`);
+    }' "$testbed_dir/$2/campaign-state.json")
+  grep '^PATINA_CAMPAIGN_GEN ' <<<"$1" | while read -r line; do
+    generation=$(field generation "$line")
+    label=$(awk -v generation="$generation" '$1 == generation { print $2 }' <<<"$violated")
+    printf '| %s | %s | %s | %s |\n' "$generation" "$(field seed "$line")" "$(field class "$line")" "$label"
+  done
+}
+
+# At head: every generation passes, and every oracle in reach fires.
+campaign_log=$(campaign "$testbed" "$out/campaign")
+head_rows=$(generation_rows "$campaign_log" "$out/campaign")
 coverage=$(grep -E '^PATINA_CAMPAIGN_COVERAGE ' <<<"$campaign_log" || true)
-grep -q 'gate=pass' <<<"$coverage" || mismatch "campaign coverage gate: $coverage"
+unmet=$(grep -oE "^  UNMET [a-z]+ '[^']+'" <<<"$campaign_log" | sed -E "s/.*'(.*)'/\1/" | sort -u || true)
+[ "$unmet" = "$out_of_reach" ] || mismatch "unmet oracles '$unmet', expected those out of reach '$out_of_reach'"
+if grep -q 'signature: VIOLATION' <<<"$campaign_log"; then
+  mismatch "the campaign at head found a violation"
+fi
 site_rows=$(node -e '
   const sites = require(process.argv[1]).sites;
   for (const site of sites.sort((a, b) => a.kind.localeCompare(b.kind) || a.label.localeCompare(b.label))) {
     const fired = site.kind === "fault" ? `fired in ${site.runs_fired}` : `satisfied in ${site.satisfied_gens}`;
     console.log(`| \`${site.label}\` | ${site.kind} | ${fired} of ${site.registered_gens} reached |`);
   }' "$testbed_dir/$out/campaign/sites.json")
-failing=$(grep -oE 'first_gen=[0-9]+' <<<"$campaign_log" | head -1 | cut -d= -f2 || true)
-[ -n "$failing" ] || mismatch "the campaign found no failing generation to minimize"
-violation_classes=$(grep -oE 'label=[a-z-]+' <<<"$(grep 'signature: VIOLATION' <<<"$campaign_log")" | sort -u | cut -d= -f2 | paste -sd' ')
-[ "$violation_classes" = "nothing-unacknowledged-applied" ] ||
-  mismatch "campaign violations other than the known finding: $violation_classes"
+fixed_log=$(cd "$repo" && cargo test --locked -q -p cairn-service --test in_flight 2>&1) ||
+  mismatch "the in-flight service tests fail at head"
 
-# The finding, minimized: the knobs first, then the repro run.
-minimized=$(cargo patina minimize --generation "$failing" --out-dir "$out/campaign" --no-trace-phase 2>&1) ||
+# The planted bug: Turso's commit-time revision check skips the target domain.
+planted_file=$repo/crates/store-turso/src/commit.rs
+cp "$planted_file" "$out/commit.rs.unplanted"
+restore() { cp "$out/commit.rs.unplanted" "$planted_file"; }
+trap restore EXIT
+sed -i '0,/        if now != expected {/s//        if index > 0 \&\& now != expected {/' "$planted_file"
+planted_diff=$(diff "$out/commit.rs.unplanted" "$planted_file" || true)
+[ -n "$planted_diff" ] || mismatch "the plant did not apply"
+planted=target/patina/cairn-multiplayer-planted
+cargo patina build . --output "$planted" >"$out/build-planted.log" 2>&1 || {
+  cat "$out/build-planted.log" >&2
+  exit 1
+}
+planted_log=$(campaign "$planted" "$out/planted")
+planted_rows=$(generation_rows "$planted_log" "$out/planted")
+failing=$(grep -oE 'first_gen=[0-9]+' <<<"$planted_log" | head -1 | cut -d= -f2 || true)
+[ -n "$failing" ] || mismatch "the planted campaign found no failing generation to minimize"
+minimized=$(cargo patina minimize --generation "$failing" --out-dir "$out/planted" --no-trace-phase 2>&1) ||
   mismatch "minimize --generation $failing failed"
-repro=$(cat "$out/campaign/minimized/generation-$failing.repro")
+repro=$(cat "$out/planted/minimized/generation-$failing.repro")
 needs=$(grep -oE 'the failure needs only: .*' <<<"$minimized" || true)
-read -r -a repro_args <<<"${repro#cargo patina run target/patina/cairn-multiplayer }"
+read -r -a repro_args <<<"${repro#cargo patina run target/patina/cairn-multiplayer-planted }"
 repro_status=0
-repro_log=$(cargo patina run "$testbed" "${repro_args[@]}" 2>&1 >/dev/null) || repro_status=$?
+repro_log=$(cargo patina run "$planted" "${repro_args[@]}" 2>&1 >/dev/null) || repro_status=$?
 [ "$repro_status" -eq 1 ] || mismatch "the minimized repro exited $repro_status"
 shown_repro=$(sed -E "s/--allow-unsupported-symbols [^ ]+/$shown_allow/" <<<"$repro")
+race_test=a_patch_that_loses_the_race_to_commit_is_rejected_stale_on_turso
 test_status=0
-test_log=$(cd "$repo" && cargo test --locked -q -p cairn-service --test in_flight -- --ignored \
-  a_resubmission_while_its_original_commits 2>&1) || test_status=$?
-[ "$test_status" -ne 0 ] || mismatch "the ignored regression test passed: the finding is fixed, update DECISIONS.md"
+test_log=$(cd "$repo" && cargo test --locked -q -p cairn-service --test in_flight -- "$race_test" 2>&1) || test_status=$?
+[ "$test_status" -ne 0 ] || mismatch "the race test passed with the bug planted"
+restore
+trap - EXIT
+unplanted_log=$(cd "$repo" && cargo test --locked -q -p cairn-service --test in_flight -- "$race_test" 2>&1) ||
+  mismatch "the race test fails with the plant removed"
 
 {
   cat <<'EOF'
@@ -148,7 +184,7 @@ pinned revision. Before this brief nothing drove Cairn's HTTP server with more t
 at a time; now `mise run sim` runs four HTTP clients and one in-process agent patching one
 journey through Cairn's real server, store (Turso), and Rust client (H5's safe retry, H6's
 subscription tracking), under seeded network faults and fault sites, checks nine invariants
-at the end of every run, and found a product bug (DECISIONS.md, brief 6.1).
+at the end of every run, and found a product bug, since fixed (DECISIONS.md, brief 6.1).
 
 The `--allow-unsupported-symbols` list names exactly the symbols Turso links that the shim
 refuses (testbeds/multiplayer/README.md, gap 4).
@@ -172,23 +208,36 @@ EOF
 
 \`cargo patina campaign target/patina/cairn-multiplayer --gens 16 --buggify --sched-pct\`, as
 \`mise run sim\` runs it: each generation draws its seed, buggify rates, and PCT depth from its
-number. Every failing generation breaks one invariant, the known product finding below; sim.sh
-fails on any other.
+number. Every generation passes.
 
 | Generation | Seed | Class | Violation |
 |---|---|---|---|
-$generation_rows
+$head_rows
 
 \`$coverage\`
 
 Every coverage oracle declared in the binary fired, the service's and client's own
-\`reachable!\` sites included; the fault sites are listed by the runs they fired in:
+\`reachable!\` sites included, except those \`sim.sh\` lists as out of this testbed's reach
+($(paste -sd' ' <<<"$out_of_reach" | sed -E 's/([a-z-]+)/`\1`/g'); DECISIONS.md, 6.1 integration).
+The fault sites are listed by the runs they fired in:
 
 | Site | Kind | Generations |
 |---|---|---|
 $site_rows
 
-## The product finding, minimized
+## The planted bug, found and minimized
+
+Turso's commit-time revision check skipping the target domain, planted in a build of its own:
+
+\`\`\`diff
+$planted_diff
+\`\`\`
+
+The same campaign over the planted build:
+
+| Generation | Seed | Class | Violation |
+|---|---|---|---|
+$planted_rows
 
 Generation $failing reduced to the knobs it needs (\`cargo patina minimize --generation $failing
 --no-trace-phase\`): $needs
@@ -196,20 +245,36 @@ Generation $failing reduced to the knobs it needs (\`cargo patina minimize --gen
 \`\`\`
 \$ $shown_repro
 exit status: $repro_status
-$(grep -E '^(PATINA_VERDICT|MULTIPLAYER_)' <<<"$repro_log" | cut -c1-240)
+$(grep -E '^PATINA_VERDICT' <<<"$repro_log" | cut -c1-240)
+$(grep -E '^MULTIPLAYER_VIOLATION' <<<"$repro_log" | head -4 | cut -c1-240)
+... ($(grep -cE '^MULTIPLAYER_VIOLATION' <<<"$repro_log") violations in all)
 \`\`\`
 
-The agent's commit stalled past its 200 ms attempt timeout; the agent resubmitted the same
-patch while the original was still committing; the store answered the resubmission stale,
-naming the revision the original was producing, with nothing intervening; the client rebased
-and resubmitted until its bound ran out and surfaced the conflict; then the original landed.
-The caller was told a patch conflicted that is in the journey. Rewritten as a deterministic
-service test with the commit held open at a gate (\`crates/service/tests/in_flight.rs\`, ignored
-until fixed):
+A commit waits before it begins while another that loaded the same revision lands; with the
+check skipped it lands too, at the same revision. Rewritten as a deterministic service test
+with the commit held at a gate (\`crates/service/tests/in_flight.rs\`), failing with the bug
+planted and passing with it removed:
 
 \`\`\`
-\$ cargo test -p cairn-service --test in_flight -- --ignored a_resubmission_while_its_original_commits
-$(grep -E '^(test result| +(left|right):)' <<<"$test_log" | cut -c1-240)
+\$ cargo test -p cairn-service --test in_flight -- $race_test   # planted
+$(grep -A1 'expected a stale answer' <<<"$test_log" | paste -sd' ' | tr -s ' ' | cut -c1-240)
+$(grep -E '^test result' <<<"$test_log")
+\$ cargo test -p cairn-service --test in_flight -- $race_test   # removed
+$(grep -E '^test result' <<<"$unplanted_log" | cut -c1-240)
+\`\`\`
+
+## The product finding (fixed)
+
+The first campaigns found an H5 bug (DECISIONS.md, "a resubmission beside its own original in
+flight is answered stale"): a patch resubmitted while its original was still committing was
+answered stale, naming the revision in flight with nothing intervening, and its caller was
+told it conflicted although it landed. It is fixed: a Turso commit takes its turn at the rows
+it writes and at its patch id, and the client never rebases backward. Its two cases run in
+\`crates/service/tests/in_flight.rs\` over both stores:
+
+\`\`\`
+\$ cargo test -p cairn-service --test in_flight
+$(grep -E '^test result' <<<"$fixed_log" | cut -c1-240)
 \`\`\`
 EOF
 } >"$readme"

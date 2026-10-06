@@ -32,11 +32,7 @@ command -v cargo-patina >/dev/null || fail "cargo-patina is missing: run mise in
 # run breaks first. Until each is fixed, a campaign generation failing on one of these is
 # reported, not fatal; any other failure is. When a fix lands, its label comes out of
 # this list and its ignored test in crates/service/tests/in_flight.rs is un-ignored.
-known_findings=(
-  # A resubmission beside its own original in flight is answered stale: the caller is
-  # told a patch conflicted that then lands.
-  nothing-unacknowledged-applied
-)
+known_findings=()
 
 # Coverage oracles in the binary that this testbed cannot reach, by label (DECISIONS.md,
 # 6.1 integration). The campaign's own gate is waived for these alone: any other oracle that

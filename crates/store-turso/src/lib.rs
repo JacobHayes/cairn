@@ -14,6 +14,7 @@ mod load;
 mod migrate;
 mod pool;
 mod queries;
+mod queue;
 mod records;
 mod sequence;
 mod sql;
@@ -43,6 +44,8 @@ use sql::execute;
 pub struct TursoStore {
     pool: Pool,
     faults: Faults,
+    /// Turns at what commits write, so commits on the same rows run one after another.
+    queues: queue::Queues,
     /// Positions in the event log and the auth log, in commit-visible order.
     events: sequence::Sequencer,
     auth_log: sequence::Sequencer,
@@ -134,6 +137,7 @@ impl TursoStore {
         Ok(Self {
             pool,
             faults,
+            queues: queue::Queues::default(),
             events,
             auth_log,
         })
@@ -158,6 +162,10 @@ impl Store for TursoStore {
         if let Some(wait) = self.faults.pause_at(cairn_store::CommitPoint::BeforeBegin) {
             wait.await;
         }
+        let shape = cairn_store::backend::Shape::of(&commit)?;
+        // Taken before the connection, so a commit waiting its turn holds none, and given
+        // back only after the transaction has ended.
+        let turns = self.queues.take(commit::claims(&commit, &shape)).await?;
         let lease = self.pool.acquire().await?;
         // Boxed: a commit's state machine is tens of kilobytes, too large to move by value.
         let result = Box::pin(commit::commit(
@@ -165,10 +173,12 @@ impl Store for TursoStore {
             &self.faults,
             &self.events,
             &commit,
+            &shape,
         ))
         .await;
         // Every path out of a commit ends its transaction.
         lease.release();
+        drop(turns);
         result
     }
 

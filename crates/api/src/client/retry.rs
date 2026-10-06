@@ -8,7 +8,10 @@
 //! between, it is stale again and compared again. It keeps its patch id: a stale patch
 //! left no receipt, so the id still names one change, and a resubmission whose response is
 //! lost is answered from its receipt like any other. Guards are evaluated at apply either
-//! way, so a retry that would now break an invariant is rejected, never widened.
+//! way, so a retry that would now break an invariant is rejected, never widened. It only
+//! ever moves forward: a conflict whose current revision is not past the one the patch
+//! named is surfaced, never rebased onto, so no answer can send it back and forth between
+//! two revisions (DECISIONS.md, the H5 fix).
 
 use std::future::Future;
 
@@ -24,7 +27,8 @@ pub const RESUBMISSION_COUNT_MAX: u32 = 32;
 /// H5: the patch to resubmit after it was answered stale with `conflicts` and
 /// `intervening`, or none when it is not safe: what intervened overlaps what it touches,
 /// or a revision moved that the patch names nowhere it could be rebased (a merge's
-/// journeys, a proposal's editing revision).
+/// journeys, a proposal's editing revision), or a conflict names a current revision not
+/// past the one the patch named (rebasing would move it backward).
 #[must_use]
 pub fn rebased(
     patch: &Patch,
@@ -37,6 +41,9 @@ pub fn rebased(
     let target = patch.target.domain();
     let mut rebased = patch.clone();
     for conflict in conflicts {
+        if conflict.current <= conflict.expected {
+            return None;
+        }
         match &conflict.of {
             RevisionOf::Domain(domain) if *domain == target => {
                 rebased.base_revision = conflict.current;
@@ -186,6 +193,16 @@ mod tests {
                 on_node("n_b"),
                 "the patch names no deployment revision to move",
             ),
+            (
+                &[conflict(journey("j_one"), 2, 1)][..],
+                TouchedSet::default(),
+                "the patch names a revision past the current one",
+            ),
+            (
+                &[conflict(journey("j_one"), 2, 2)][..],
+                TouchedSet::default(),
+                "the revision the patch names has not moved",
+            ),
         ];
         for (conflicts, intervening, why) in cases {
             assert_eq!(rebased(&original, conflicts, &intervening), None, "{why}");
@@ -238,6 +255,30 @@ mod tests {
         let (refused, sent) = run(always);
         assert!(refused.is_err());
         assert_eq!(sent.len(), RESUBMISSION_COUNT_MAX as usize + 1);
+    }
+
+    /// 6.1's finding: a stale answer naming a revision in flight with nothing intervening,
+    /// then the engine's answer that the resubmission names a revision past the current
+    /// one. The client rebases forward once and surfaces the second, never going back.
+    #[test]
+    fn submit_never_rebases_backward() {
+        let mut sent = Vec::new();
+        let refused = futures_block_on(submit(patch("{journey: j_one}", None), |patch| {
+            let named = patch.base_revision.get();
+            sent.push(named);
+            let current = if named == 2 { 3 } else { 2 };
+            std::future::ready(Err::<PatchAnswer, _>(Refused::<()>::Rejected(
+                Rejection::Stale {
+                    conflicts: vec![conflict(journey("j_one"), named, current)],
+                    intervening: TouchedSet::default(),
+                },
+            )))
+        }));
+        assert!(matches!(
+            refused,
+            Err(Refused::Rejected(Rejection::Stale { .. }))
+        ));
+        assert_eq!(sent, [2, 3]);
     }
 
     fn futures_block_on<F: Future>(future: F) -> F::Output {
