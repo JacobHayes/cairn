@@ -1,0 +1,394 @@
+# Cairn: Architecture
+
+Read `PRD.md` first. This document decides *how* the PRD is built and nothing about *what* is built. Where a PRD requirement forces a design choice, the requirement id is cited so the link is checkable.
+
+## Summary
+
+Cairn is one Rust binary around a pure engine. The **engine** holds every rule the PRD states - graph model, patches, invariants, derived state, the date network, projections, upgrade merge, and the file format - as I/O-free functions over in-memory graphs. The **shell** wraps it with storage, an HTTP API, an MCP endpoint, auth, the optional assistant, and the embedded web UI. The same engine compiles to wasm, so the browser holds a full journey and runs zoom, trace, filters, and proposal previews locally, and the UI can run entirely in-browser against an in-memory store for development, demos, and end-to-end tests.
+
+```mermaid
+flowchart LR
+    subgraph clients
+        ui[Web UI: React + wasm engine]
+        ext[External agents]
+    end
+    subgraph binary[cairn: one process]
+        api[HTTP API: axum]
+        mcp[MCP endpoint: rmcp]
+        asst[Assistant: optional]
+        svc[Service layer]
+        eng[Engine: pure, no I/O]
+        store[Store trait]
+        notify[Notifier trait]
+    end
+    db[(Turso: embedded, SQLite-compatible)]
+    ui --> api
+    ext --> mcp
+    ext --> api
+    api --> svc
+    mcp --> svc
+    asst --> svc
+    svc --> eng
+    svc --> store
+    svc --> notify
+    store --> db
+```
+
+The decisions that shape everything else:
+
+1. **Engine is pure, shell is plumbing.** No storage, HTTP, or clock inside the engine; today, timezone, rank constants, and the viewer are inputs (D6, J3).
+2. **Whole domain in memory.** Every read loads one journey or route in full and derives once; every write validates a full candidate graph. This rests on journeys being small and is enforced, not assumed (see Assumptions).
+3. **State and events, one transaction.** The patch applier is the only writer. It writes row deltas and one event per mutation together, or nothing (A17, J1, J2).
+4. **One engine, two hosts.** The server and the browser run the same crate. The browser is a first-class host, not a mock.
+5. **Pluggable edges.** Storage, auth, live-update notification, and the assistant provider are traits assembled once in a composition root; deployments and the browser host differ only there.
+
+## Assumptions and limits
+
+- **Journeys are small.** Tens to a few hundred nodes typically, a deployment of thousands of nodes across hundreds of journeys (non-functional requirements), and single-digit megabytes serialized. Consequences: whole-domain load per read, in-memory derive over the whole graph, the full journey sent to the browser in one response, no partial-graph writes, and no pagination on graph reads other than the agent snapshot (I3). Validation rejects a patch that would take a graph past a hard-coded node limit (2,000; see `PRACTICES.md`) so the assumption is a limit, not a hope. Beyond it, the changes would be incremental derive and paged graph reads; nothing in the storage schema would need to change.
+- **One deployment is one trust boundary** (H4). No RBAC, no per-journey visibility; every authenticated identity reads and writes everything.
+- **One process.** API, MCP, assistant, and UI serve from one binary over one embedded database file. Several instances, and the shared database they would need, are `Later`.
+- **Calendar days, deployment timezone** (A9). "Today" is computed once per request in the deployment's timezone and passed into the engine; users see the same slack, overdue, and rank. Timestamps on events render in the viewer's local zone; the day model does not.
+
+## Terms
+
+Architecture-scope terms, in addition to the PRD glossary. PRD terms keep their PRD meaning.
+
+| Term | Definition |
+|---|---|
+| **Engine** | The pure crate: graph model, patch applier, invariants, derive, date network, projections, upgrade merge, file format. No I/O. |
+| **Shell** | Everything around the engine: store, service layer, HTTP, MCP, auth, assistant, embedded UI. |
+| **Domain** | A patch target as in A17 (a journey, a route with its draft, or the deployment), loaded and revision-checked as one unit. A route's published versions are immutable graphs, loaded one at a time by id and never part of the route's domain load. |
+| **Derive** | The one engine pass that computes every D3 field for a loaded journey from stored state and derive inputs. |
+| **Derive inputs** | Today, the deployment timezone, the rank constants, the viewer's entities, if any (resolved by the host from the viewer's verified emails, H3; normally one), and the deployment context: the entities with their emails and the entity aliases at a deployment revision, which ownership, "mine", and the owner factor resolve through (E4, E6). Supplied by the host, never read by the engine. |
+| **Projection** | A read-only view over a derived journey: snapshot, aggregation level, trace, decision view, timeline, status summary, next list, mine. |
+| **Domain document** | A journey's full graph and state, with the derive inputs to derive it (including the deployment context and its revision) and the engine version. Nothing derived is in it: the browser derives it with the wasm engine and runs every projection locally. Proposals are not part of it. |
+| **Snapshot** | The I3 projection: a bounded, scoped, paginated view of a journey for agents. Cut from the same derived journey as the domain document. |
+| **Change set** | The persistence-neutral result of an accepted patch: entities put and removed by key, the events, the patch id, and the next revision. A `schema` type, so the store depends on `schema` and not the engine; in production only the engine's `apply` produces one, inside `Applied`. Each store maps it to its own rows or records. |
+| **Store** | The trait the service layer uses to load a domain, commit a patch result, and run index queries. Backends: Turso and memory. |
+| **Notifier** | The trait that announces "domain X is now at revision N" to subscribers. In-process in both hosts. |
+| **Composition root** | The one function per host that picks a store, a notifier, auth providers, and an assistant provider and assembles the service. |
+| **Capabilities document** | `GET /capabilities`: what this host offers (auth providers, assistant, MCP, SSE). The server always serves MCP and SSE; the browser host serves neither. The UI shows and hides features from it. |
+| **Host** | Something that assembles the engine with a composition root: the server binary or the browser bundle. |
+| **Generated artifacts** | Files derived from Rust types and checked in, only under the generated paths (Generated artifacts): the OpenAPI document, the TypeScript client types, the wasm bindings, the JSON Schema for the file format. |
+
+## Repository layout
+
+One repository, one Cargo workspace plus one npm workspace. Crate and package boundaries are the seams feature briefs cut along.
+
+```
+cairn/
+  crates/
+    engine/        pure domain: model, patch, validate, derive, dates, project, upgrade, format
+    wasm/          wasm-bindgen surface for the browser: engine projections and preview for every host; service over the memory store for the in-browser host
+    schema/        serde types shared by engine and shell: document, patch, API payloads; JSON Schema export
+    store/         Store and Notifier traits; memory backend; the store conformance test suite. No delta types of its own: it persists the change set from schema
+    store-turso/   Turso backend (the `turso` crate: Rust, SQLite file format, MVCC)
+    service/       service layer: load, call engine, commit; capabilities; composition root types. Runtime-free: no tokio, database driver, or transport dependency, so it builds for wasm32-unknown-unknown
+    auth/          AuthProvider trait; dev, oidc, builtin-oauth, tailscale providers; users and identities
+    api/           axum endpoints, utoipa OpenAPI, SSE
+    mcp/           rmcp server: tools, prompt metadata, instructions
+    assistant/     provider trait, tool loop, proposal drafting
+    cairn/         the binary: CLI, config, composition root, embedded assets
+  web/
+    app/           React UI (Vite); React Flow canvas; ELK in a worker
+    client/        TypeScript client: generated/ (openapi-typescript + openapi-fetch) plus the hand-written safe-retry and subscription wrapper (H5, H6)
+    wasm/          wasm package: generated/ (bindings from crates/wasm) plus the hand-written loader and the derive worker
+  instructions/    the shipped agent guide (I4), served by MCP and published as SKILL.md
+  fixtures/        2-3 generic seed routes with a journey scenario each (eg: vendor evaluation, hiring loop, product launch), plus one journey with no route
+  testbeds/        simulation testbeds (PRACTICES.md, Simulation)
+  openapi/         generated OpenAPI document
+  schema/          generated JSON Schema for the file format
+  DECISIONS.md     judgment calls awaiting the user's review (AGENTS.md)
+  mise.toml        tasks: gen, check, test ladder, sim, build, serve
+```
+
+```mermaid
+flowchart LR
+    schema --> engine
+    engine --> service
+    schema --> service
+    store --> service
+    store --> store_turso[store-turso]
+    service --> api
+    service --> mcp
+    service --> assistant
+    auth --> api
+    auth --> mcp
+    api --> cairn
+    mcp --> cairn
+    assistant --> cairn
+    store_turso --> cairn
+    service --> wasm
+    wasm --> web_wasm[web/wasm]
+    web_wasm --> web_app[web/app]
+```
+
+Engineering practices (assertion style, fault injection, simulation testing, the local validation ladder) live in a separate document, `PRACTICES.md`, and are referenced from here where they shape a design choice.
+
+## Engine
+
+### Model
+
+- One `Node` struct holding the fields every kind shares, with a kind-specific payload enum for the rest (A1a), so a field a kind cannot have is unrepresentable. Node kinds, per-kind states, transitions, guard outcomes, relevance (`Relevant | NotRelevant | Undecided`), provenance, override kinds, and attachment scopes are closed enums; matching on them is exhaustive.
+- Newtypes for `Key`, `Id`, `Path`, `Revision`, `PatchId`, `EntityKey`. Keys and ids cannot be confused at compile time (Identity and references).
+- A `Graph` holds nodes (tree by parent key plus an index by key and by path), explicit edges, roles, participation kinds, resources, and, for a journey, state: node states, answers, role fills, pins, snoozes, overrides, tombstones, attachments. Every graph also keeps the keys it has retired, so no key is ever reused (Invariants); tombstones are the upgrade-facing subset of these. Route versions and drafts are the same `Graph` with empty state.
+- A `Proposal` is separate from every graph: a client-generated id, a destination (a journey, a route, the deployment, or a journey or route the proposal creates), the destination base revision, its own editing revision, status, and its review items (I6, C14). Editing one never changes its destination's document or revision.
+- `Deployment` holds entities (with their emails, unique across entities, H3), entity aliases, and the deployment revision. Users and their identities are auth state, not deployment state (Auth).
+
+### Read path: derive
+
+`derive(journey, inputs) -> Derived` runs once per load and is the only place D3 fields are computed. Passes, in dependency order:
+
+1. **Relevance**: three-valued evaluation of each node's condition over answers (Gating), combined with ancestors; force-include applied; each value tagged with the ancestor or decision that produced it (C8).
+2. **Effective dependencies**: explicit edges plus implicit gates (containment, inherited requirements, condition gates, stage openings), each tagged with its source. The full structural edge set is kept beside the pruned one (not-relevant branches pruned; undecided kept): invariants and tracing read the full set, execution reads the pruned set. Effective skip (D1a) and kept work resolved here.
+   Every node in the effective graph has a start and a finish, the instants the date network uses (a decision or milestone has one instant, so both are it). A container also has an **entry**, the moment its work may begin, distinct from its start, which is when its own work begins after its children (PRD Containment). A requirement on a node waits at its entry if it is a container and at its start otherwise; its dependents wait for its finish. Containment is three edges per child: the child's entry or start waits for the parent's entry, the parent's start waits for the child's finish, and the parent's finish waits for its own start. An ancestor's requirement thus reaches every descendant through the chain of entries instead of being copied onto each one (copying is up to nodes x depth x 64 edges). Entry is internal: it is never shown, and explanations name the ancestor whose requirement applies. Condition gates travel the entry chain apart from explicit and stage requirements and stop at a force-included node, which drops its ancestors' conditions (Gating) but keeps their requirements. Every edge is typed as a gate (it blocks, D1) or date-only (a stage opening with `gates: false`); blocking, the acyclicity invariant, trace, and gravity read gates, and the date network reads both, where a date-only cycle is legal unless its weight is positive. Reaching a container's entry or start never completes it; only its own finish does. A reference test checks the entry chain against the plain expansion that copies each inherited requirement onto every descendant, on generated trees. Blocking, dates, gravity, and leverage all read this one graph, which stays O(nodes + explicit edges).
+3. **Participation**: E2 resolution order per node and kind; `unassigned`; the membership-loss flag (B10).
+4. **Date network**: bounds, chains, shortfall (next section).
+5. **Auto-reach, blocking, and actionable**: auto-reach (F1) from effective dates; `deps_done` over effective dependencies under D1/D1a; frontier; `snoozed` (B6, from current state); acting frontier; `stalled`; `needs_breakdown`.
+6. **Gravity and leverage**: over the effective dependency graph, with effective weight and owner factor (Priority). Leverage is computed for every node in the rank normalization set, not only the frontier: one pass over dependents counts, for each unfinished node, how many dependencies remain, and credits a node whose completion would leave none (cascading through derived group completion).
+7. **Rank and flags**: rank, overdue, stale (D4, checked against the transition each terminal node used).
+
+Each pass reads only the outputs of earlier passes. The types passed between them live in the engine crate.
+
+`Derived` is per node plus journey-level values, and every derived value carries its explanation inputs (contributing nodes, producing chain, producing decision). Nothing in `Derived` is ever stored (D3, J1). Explanations are the "why" behind each derived value on a node: the chain of rules and pins behind a due date, the downstream nodes that make up its gravity, the dependencies that block it. Inside the engine they are complete. The browser derives locally, so it has them all and nothing is sent. Server responses that include them (node detail for agents and the API) carry each list's largest entries up to the limit plus a total, and page the rest.
+
+Hosts may memoize `Derived` per (domain revision, deployment revision, inputs); today is an input, so a cached value expires at date rollover. D6 requires this to be invisible; the engine has no cache of its own.
+
+### Write path: apply
+
+`apply(domain, patch, inputs) -> Result<Applied, Rejection>` is the only way a graph changes (A17).
+
+```mermaid
+flowchart TB
+    A[check base revision] --> B[clone candidate graph]
+    B --> C[apply mutations in order, state-machine legality at each position]
+    C --> E[validation pipeline on the final candidate: structure, references, cycles, plan check, limits, derived guards]
+    E --> F{every stage passes, or its failures are bypassed?}
+    F -- no --> R[Rejection: every failure listed]
+    F -- yes --> G[Applied: change set + one event per mutation + new revision]
+```
+
+- Mutations apply in order to a candidate, and state-machine legality is checked at each mutation's position. Nothing else looks at an intermediate candidate, which may legally be invalid (A18 lets a later mutation repair a dangling reference), and derive never runs on one.
+- The validation pipeline runs once on the final candidate: structural invariants (Invariants), the plan check, limits, and the guards that need derived state (`deps_done`, relevance, D4), evaluated against one derive of that candidate with the inputs captured for this apply. A bypass records the specific failures present in that candidate. Violations are collected, not short-circuited, and reported by path (A15). Consequence: a guard cannot be satisfied only temporarily, and bulk transitions are accepted in any order.
+- `consequences(before, after)` is a pure engine function over two `Derived` values with the same inputs (D7). The service calls it for every accepted patch and every proposal preview; the result rides in the response and is never stored.
+- `Applied` is a value holding the change set: entities put and removed by key, the events (J1), and the next revision. It can only be constructed by the validation pipeline. The pipeline's stage list grows as the engine is built; nothing outside the engine's own tests commits an `Applied` until every stage exists. The host commits it; the engine never touches storage and knows nothing of rows.
+- Proposals (I6, C14) are patches with status. `apply` accepts a proposal's mutations the same way; a proposal document may hold unresolved items until apply, where strict validation runs.
+- Removing a node computes the cascade (A18) and includes it in the result so review can show it.
+
+### Date network
+
+One constraint model (F2). The engine builds a network on every derive:
+
+- **Instants**: start and finish for each deliverable, action, and group (a group's from its contents and stage bounds), plus an entry for each container (Read path); one instant per decision (when it is decided) and per milestone; one for the journey's `created_at` (F2).
+- **Constraints**: `B >= A + k` edges from date rules, dependencies (dependent entry or start after requirement finish), estimates (finish >= start + estimate), containment (child entry or start >= parent entry; child finish <= parent start; parent finish >= parent start + parent estimate), and stage bounds (contents' entries after `opens_at`; the group's finish before `closes_at`). Constraints from not-relevant nodes are dropped; through undecided nodes kept and labeled conditional; effective-skipped work has zero duration. The network may contain cycles: two rules that each place a milestone no earlier than a day before the other are a legal zero- or negative-weight cycle. Only a positive-weight cycle is a contradiction.
+- **Pins** fix an instant; a `feeds_milestone` answer is a pin (E3, F5). Pins and actuals are bounds on their own instant, not edges through a shared origin, so they never join otherwise separate components.
+- **Plan layer** (F5): the network of pins, rules, estimates, containment, stage bounds, and dependencies, with no actuals and no today. A **contradictory chain** is a positive-weight cycle in it, pinned or not. Two pins with a chain between them that needs more days than they allow are one too, found as an instant whose earliest bound from pins passes its latest. Checked during validation of any patch that changes constraints or pins; the rejection lists the chains found, up to a fixed limit, and says when it was cut short, each with constraints, sources, pins, and the shortfall in days.
+- **Execution layer** (F3, F6): what derive solves. Every constraint bounds both of its ends: given `B >= A + k`, a lower bound on A raises B's earliest date, and an upper bound on B lowers A's latest date. Earliest bounds are the longest paths forward over all constraints, seeded by pending pins, actuals, and today for unfinished work that someone does: an undecided decision and an unstarted deliverable or action start no earlier than today; a started one starts on its recorded start date and finishes no earlier than today (F2). Milestones and groups are not seeded with today: unfinished work upstream of them (a decision, deliverable, or action, directly or through other milestones and groups) already carries today to them, and with none upstream a pending milestone is an event whose date is not yet known rather than late work. Effectively skipped work seeds nothing, and not-relevant work is pruned, so a pending `auto_reach` milestone pinned yesterday whose dependencies are done gets no false shortfall, and date solving never waits on blocking; latest bounds are the longest paths backward over all constraints, seeded by pending pins and actuals. An actual is a fixed fact: it seeds both passes and is never moved, and a constraint it violates (against today, another actual, or a pin) is reported as a `shortfall` with its chain, never relaxed through. `shortfall` is also any instant whose earliest bound passes its latest; `overdue` is a due before today. The two passes do not feed each other. Because the plan has no positive cycle and facts are never relaxed, both always terminate with an answer. A derived bound is never treated as a fact. Null when nothing reaches the instant. Every bound carries the chain that produced it.
+
+The network is rebuilt and solved on every derive. Inherited requirements reach it through the chain of container entries (Read path), so it has O(nodes) instants and O(nodes + explicit edges) constraints. Both the plan check and the execution passes decompose the network into strongly connected components, process them in topological order, and run Bellman-Ford inside components that contain a cycle: positive-cycle detection for the plan check (every instant starting at zero, so contradictions with no pin are found), and bound relaxation for the execution passes. The worst case is O(instants x constraints) per pass and the common case is near-linear. Predecessor edges are kept for chains. A cost test at the hard-coded limits in `PRACTICES.md`, measured in operations rather than wall-clock time, is part of the date network's acceptance. Beside it, a benchmark of derive at the limits records elapsed time and peak memory, natively and in the browser's wasm, so the operation budget is checked against responsiveness; it is reported, not gated.
+
+### Projections
+
+All in the engine so every host produces the same views (I1, C2 risk mitigation):
+
+- `document(journey, inputs)`: the domain document the browser holds: graph, state, derive inputs including the deployment context, engine version.
+- `snapshot(derived, scope)`: the bounded I3 view with depth and subtree scoping, top-N acting frontier, counts, and keys.
+- `level(derived, shown_kinds, container)`: C2 aggregation: visible nodes, edges re-targeted to nearest visible ancestors with duplicates collapsed, roll-up badges, `max_child_gravity`, min child slack, distinct owners. Visibility is per kind (C2): the caller passes the shown kinds and the drilled-in container, and the rules for hoisting visible nodes, rolling up hidden ones, re-targeting edges, dropping edges that collapse onto one node, and marking hidden prerequisites are fixed in the engine.
+- `trace(derived, key)`: C7 upstream and downstream sets with gravity contributors marked.
+- `decision_view`, `timeline`, `status_summary`, `next` (with sort and filter), `list` (C9, with text search over the journey), `mine(viewer)`, `history(events)`, `explanations(derived, key, field, cursor)`.
+
+### Conditions
+
+A structured predicate tree, fixed operator set (A5), no parser:
+
+```yaml
+relevant_when:
+  all:
+    - equals: {decision: testing/who, value: partner}
+    - not: {answered: setup/waiver}
+```
+
+Operators: `equals`, `not_equals`, `in`, `contains`, `answered`, `all`, `any`, `not`. References resolve to decision keys at import or edit time and are validated for answer-type compatibility and the no-own-subtree rule (Invariants). The referenced set is static, which is what makes implicit gates, the decision view (C12), and explanations possible. Rendering to a sentence is generated for display and never parsed back. Growth beyond this set is a PRD change, not an engine one.
+
+### Upgrade, save-as-route, re-link
+
+Engine functions that take two graphs and return a proposal (B7, B8, B9): a three-way diff by key over nodes, edges, roles, kinds, conditions, rules, and resources, with per-field local-edit markers deciding merge outcome and conflicts listed with explicit resolutions. Orphans, tombstones, participation mapping, and node exclusion are proposal items the reviewer edits before apply (C14).
+
+### File format
+
+YAML on disk, JSON on the wire, one document schema (A13, A14). Files carry paths and ids for readability and keys for identity, plus the route id and the version extended. Export is deterministic (sorted, stable field order) so version-control diffs are clean. Round-trip is tested: parse, export, parse, compare. The JSON Schema for the document is a generated artifact.
+
+### Testing the engine
+
+The J3 replay harness and the scenario matrix run against the engine alone with a fixed clock and the memory store. Fixtures under `fixtures/` are shared with the in-browser host and server integration tests, so the same scenarios exercise all three.
+
+## Storage
+
+### Store trait
+
+Small and whole-domain oriented; nothing in it walks the graph.
+
+- `load(target) -> (document, revision)`: one read for every graph, by a typed target: `Journey(id)` (graph and state), `Route(id)` (the route record and its draft), `RouteVersion(id, number)` (one published version, immutable, whose revision never moves), or `Deployment`. Loads and size caps are per graph, so a route's history never weighs on its draft. Derive needs no events; history is a separate, paged query.
+- `commit(domain, preconditions, change_set) -> new revision`: one transaction: lock the domain's revision row; recheck the patch receipt (the service already looked it up before loading or applying, so a resubmission never reaches `apply`, H5); verify every revision precondition (the domain's base revision, plus the proposal's revision when applying one, I6, or, for an entity merge, the revisions of the journeys it was checked against and the unchanged set of journeys referencing its entities; for a journey patch writing an entity reference, the deployment revision it was validated against, E6), map the change set to rows, append events with patch id and ordinal, bump the revision. A domain that does not exist yet is at revision 0; its first commit takes base revision 0 and produces revision 1, and there is no separate create call. A hard-deleted journey leaves its id in a deleted-ids record, so a create at that id is rejected (A19). Deployment-scoped mutations riding in a journey patch (entity create, E6) write in the same transaction without a deployment revision check, are rejected if the key is already an entity or alias, and still bump the deployment revision and notify it, so entity views stay current (H6).
+- Index and history queries: the journeys referencing an entity (for checking a merge, E6), journey index filters (C16), route detail (C17), events by journey, node, user, type, patch, and time (J5), and text search across journeys over titles, descriptions, notes, and resources (the MCP `search` tool and the journey index; search within one journey is the engine's `list` projection, C9).
+- Proposals: their own records keyed by proposal id, with destination and revisions as in Model (H5, I6); edits go through `commit` with the proposal revision as the precondition, and the notifier ticks the proposal.
+- Outside any domain, with no events: assistant conversations, login sessions, and transient OAuth state (authorization codes, PKCE verifiers). Which entity a user is follows from entity emails, which are deployment state and change only through deployment patches (J2), because they decide what is "mine". Users, identities, and agent tokens are auth state outside any domain, logged by the auth crate. Agent tokens: a token is shown once when minted and only its hash is stored, so a leaked database does not leak usable tokens; mint and revoke are logged by the auth crate.
+
+The trait is async and names no runtime. The Turso backend runs on tokio; the memory backend runs anywhere, including the browser's event loop.
+
+A conformance suite in `crates/store` runs against every backend.
+
+### Backends
+
+| Backend | Use | Notes |
+|---|---|---|
+| **Turso** | local and hosted | The `turso` crate: Rust, embedded, SQLite file format. MVCC (`BEGIN CONCURRENT`), so a long write never blocks readers and writes to different domains never queue behind each other: no busy-timeout stalls. STRICT tables, CHECK constraints for enums and non-negative numbers, foreign keys; where Turso lacks one, the backend enforces the same rule inside the commit transaction, the conformance suite tests that enforcement, and the gap is recorded in `DECISIONS.md`. |
+| **Memory** | tests, fixtures, the in-browser host | The reference implementation the conformance suite is written against. Nothing persists: an in-browser session starts from the fixtures on every load. |
+
+No sqlx: it has no Turso driver, and Cairn needs little of it. Queries are runtime SQL (Cairn never planned on sqlx's compile-time macros), connections come from a small pool of our own within the limits, and migrations are numbered SQL files embedded in the binary and applied in order inside one transaction. The conformance suite checks the SQL.
+
+Later backends sit behind the same trait and conformance suite: Postgres, for managed backups and several instances; the schema is written to port.
+
+### Schema outline
+
+Relational rows, no graph-as-blob (A14). Structured field values (a condition tree, a date rule, an event delta, a proposal's mutation list) are JSON columns validated by the engine schema before write.
+
+- `routes` (id, name, retired, revision): the route domain row, locked at commit for the route and its draft
+- `graphs` (id, kind: route_version | route_draft | journey, route_id, version_number, lineage_version, status, revision for journeys, created_at, timezone-free timestamps)
+- Graph content, keyed by (graph_id, key): `nodes` (parent_key, id, kind, title, description, weight, estimate, flags, condition, date_rule, stage_bounds, decision fields), `edges`, `roles`, `participation_kinds`, `participations`, `resources`
+- Journey state, keyed by (graph_id, key): `node_states` (state, provenance, local_edits, atomic), `answers`, `role_fills`, `pins`, `snoozes`, `overrides`, `tombstones`, `attachments`
+- `proposals` (id, destination kind and id, destination base revision, revision, status, items, proposing agent, created_by)
+- Deployment: `entities`, `entity_emails` (unique email), `entity_aliases`, `deployment` (revision)
+- Outside domains: `conversations`; auth state: `users`, `user_identities` (provider, subject), `sessions`, `oauth_transient`, `agent_tokens` (hash, name, user, created, revoked), and the auth log
+- `patch_receipts` (patch_id, domain, content hash, resulting revision): what a resubmission by patch id is answered from; `retired_keys` (graph_id, key); `deleted_journeys` (id, deleted_at)
+- `events` (graph_id nullable for deployment events, route_id for route events, patch_id, ordinal, type, actor_user, agent, confirming_user, subject_key, delta, note, at)
+
+Uniqueness: (graph_id, key) on every content and state table; (graph_id, parent_key, id) on nodes. Publishing a draft copies its rows into a new `route_version` graph with keys preserved (A11); versions are never updated after.
+
+### Concurrency and notification
+
+- Coarse per-domain optimistic locking (H5): `commit` runs as one MVCC transaction (`BEGIN CONCURRENT`) whose first write is the domain's revision row, so commits to one domain conflict and commits to different domains do not wait on each other; a write-write conflict Turso reports is retried once from the start, then answered as a revision conflict. A conflict response carries the touched set of the intervening events. The safe automatic retry is client-side: refetch, compare that touched set with the patch's own, resubmit or show the changes.
+- `Notifier` publishes (domain, revision) after every commit, for journeys, routes, proposals, and the deployment. It is an in-process broadcast: with one process, every commit passes through it. An index view subscribes to every domain of a kind (all journeys, all routes) and is told which ones changed. On subscribe or reconnect the current revisions are sent at once, so a commit between a fetch and a subscription is never missed. Subscribers compare each tick with the revision they hold, per domain, and refetch only when it is newer (H6).
+
+## Service layer and composition
+
+`crates/service` is the only caller of the engine on the server: look up the patch receipt (a resubmitted patch id is answered from it, H5), load a domain, run `derive` or `apply`, commit, notify. Its functions are the shared vocabulary of the API, MCP, and assistant; those three shape their surfaces separately (next sections) but never bypass it.
+
+The **composition root** in `crates/cairn` builds one `Service` from config:
+
+```
+Capabilities {
+  store:      Turso(path)
+  auth:       [Dev | Oidc(config) | BuiltinOauth(config) | Tailscale(config)]
+  assistant:  None | Some(provider config)
+  public_url: the deployment's external base URL (links, OAuth redirects, MCP resource metadata)
+}
+```
+
+Optional subsystems are separate crates that contribute a router and a service to the root; absence is a `None` at the root, not a flag checked inside handlers. The crate that adds an optional subsystem also mounts it in the API and the binary's root. MCP and SSE are not optional on the server: a knob exists only when two deployments need different values, and none needs them off. The browser host has its own root in `crates/wasm`: the same service over the memory store, an in-process notifier, a single local identity, no assistant, no MCP. `GET /capabilities` publishes the assembled set so the UI renders from it (I5's "fully usable without the assistant" is this, not a special case).
+
+## HTTP API
+
+axum with utoipa. Rust request and response types are the source of truth; the OpenAPI document is generated from them and checked in (`openapi/`).
+
+- **Resources**: routes, versions, drafts, journeys, nodes, proposals, entities, users, events. Reads return projections: `GET /journeys/{id}/document` (graph and state, which the UI derives locally), `/snapshot` (I3), `/level`, `/trace/{key}`, `/decisions`, `/timeline`, `/summary`, `/next`, `/nodes/{key}` (C8 detail with explanations).
+- **One write verb**: `POST /{domain}/patches` with base revision and ordered mutations (A17); returns the new revision or the full rejection. Proposals: `POST /{domain}/proposals` with client-generated ids (I6), `PATCH`, `POST .../apply`, `POST .../discard`.
+- **Bulk and import**: route import and export (A13), save-as-route, re-link, upgrade preview and apply, entity merge, journey status changes, hard delete (A19). Each is a patch or a proposal underneath.
+- **SSE**: `GET /events/stream?domain=...` emits revision ticks from the notifier, starting with the current revisions. Clients refetch when a tick is newer than what they hold; no diffs are streamed.
+- **Size budgets**: each graph (a journey, a route draft or published version, the deployment record) serializes with its state to at most 16 MiB; the request body limit is larger and fixed, so a domain at its cap still fits an envelope; history is read by page and counts against neither. Explanation lists in responses are capped, say when they are cut short, and can be continued.
+- **Capabilities**: `GET /capabilities`.
+- Errors carry the engine's violation list by path unchanged (A15).
+
+Clients are generated artifacts: `web/client` via openapi-typescript and openapi-fetch; a Rust client via progenitor for integration tests and the CLI listed under `Later`.
+
+## MCP endpoint
+
+rmcp, Streamable HTTP at `/mcp`, sharing auth with the API (I2). The tool set is curated for an agent's loop rather than mirrored from HTTP; it shares the schema types and the service layer, not the surface shape.
+
+Tools, covering at least every I2 capability: `list_routes`, `get_route` (the draft, or a published version by number), `list_journeys`, `get_snapshot` (I3; the first call an agent should make), `get_level` (C2), `get_node` (detail with priority and date explanations), `list_frontier` (with filters for decisions needed, needs breakdown, unassigned, active, blocked, stale, overdue, shortfall, mine), `create_journey`, `open_draft`, `publish_draft`, `answer_decision`, `transition_node`, `snooze`, `unsnooze`, `assign`, `set_date` (pin, unpin, actual date), `override` (force include, keep, guard bypass), `apply_patch`, `create_proposal`, `get_proposal`, `edit_proposal`, `apply_proposal`, `resolve_date_conflict`, `manage_entity` (create, edit including emails, merge), `import_route`, `export_route`, `save_as_route`, `relink`, `upgrade`, `search`, `get_history`. Outputs are bounded and paginated where a list can grow.
+
+The I4 instructions ship in `instructions/` and are served as MCP prompt and instruction metadata and published as `SKILL.md`. Code-mode style execution is not in v1; if wanted, a `run` tool executing Monty against the in-process service is the path.
+
+## Assistant
+
+Optional (I5). Server-side tool loop over the MCP tool set in-process, so the assistant and an external agent are the same thing with a different transport (I7).
+
+The model provider is a trait, vendor-neutral: send a conversation with tool definitions, get back text and tool calls, in Cairn's own types. Each implementation translates to one wire protocol, and a deployment configures one (protocol, endpoint, model, credential). v1 ships three: the Anthropic Messages API; the OpenAI API with an API key; and a generic OpenAI-compatible chat-completions endpoint, which covers OpenRouter and self-hosted models. A deployment-wide API key is configuration and never stored in the database. The assistant runs on the deployment's credential, never a user's: it is part of the environment, like the store.
+
+Structural changes become proposals; state changes the user asks for apply directly and are reported. A direct write is one patch, and the write wrapper every assistant tool passes through checks its touched-node count: past ten (I5), the assistant drafts the whole change as one proposal instead. Each direct write is reported with its consequences (D7). The user can always ask for a proposal. Structural versus state is decided by mutation kind and destination: every write to a route or its draft is structural (PRD, Structural change). Every mutation records the assistant and the user it acts for; applying a proposal also records the confirming user (H2).
+
+## Auth
+
+`AuthProvider` is one trait: given a request, return an `Identity { provider, subject, display, verified_emails }` or nothing; a provider lists only emails its issuer marks verified. Providers are configured independently and can run together.
+
+| Provider | Mechanism |
+|---|---|
+| **Dev** | Static token or named dev user (H1). Local only. |
+| **OIDC** | Authorization-code login against the configured provider; session cookie for the browser. |
+| **Built-in OAuth** | Cairn's own authorization server, federating login to OIDC. Supports dynamic client registration and resource metadata so MCP clients connect with a login click and no IdP setup. Also mints long-lived agent tokens from the UI for scripts. No scopes; a token is an identity. |
+| **Tailscale** | Two modes. Direct: the listener is bound to the tailnet interface and the provider asks the local tailscaled socket who the peer is (whois). Proxy: trusted `Tailscale-User-*` identity headers from `tailscale serve` or an authenticating proxy, enabled explicitly and only when the listener is reachable solely by that proxy (loopback or unix socket). |
+
+Users and identities: a user owns many identities keyed by (provider, subject). Linking happens while signed in (sign in with the other provider to attach it); auto-link on a matching verified email is part of a provider's configuration, as are Tailscale proxy mode and the dev provider's off-loopback override: each is a security choice about that provider, not a behavior switch. Creating a user on first sign-in, linking an identity, and minting or revoking a token are auth operations, logged in the auth log, not domain patches. Merging two existing users is `Later` (PRD): linking a second identity while signed in covers the common case. A user is matched to an entity by verified email (H3); setting an entity's emails is a deployment patch.
+
+## Web UI
+
+React (Vite) with the wasm engine.
+
+- **Drafts survive a reload**: text being typed and forms not yet sent are kept per tab in session storage, so a reload or a crash loses nothing; anything sent is already committed on the server.
+- **Data flow**: one call fetches the domain document; the browser derives it and runs every projection locally (level, drill-in, trace, decision view, list filters and sorts, prioritize-for-me). Writes go to the API. A tick newer than the held revision triggers a refetch, as does a deployment tick (which refetches the deployment context; owners and entities feed rank) and date rollover. Derive and projections run in a web worker beside ELK's, so a dense journey never blocks input. Query cache keyed by (domain revision, deployment revision, today). Any number of tabs stay live this way (H6).
+- **Previews**: the browser applies a draft patch or proposal to its in-memory graph with the engine's `apply`, re-derives with the document's inputs, and shows the diff and the resulting frontier before sending (C14). Committed state always comes from the server.
+- **Version skew**: the UI is embedded in the binary, so a fresh load always matches the server, but a tab open across a deployment keeps its old wasm engine. The domain document carries the engine version; when it differs from the tab's, the tab stops deriving, previewing, writing, and retrying automatically (the old engine's touched sets may be wrong) and asks for a reload, keeping unsent edits.
+- **Canvas**: React Flow for pan, zoom, nested containers, custom cards, and dotted implicit edges (C1). Layout by ELK's layered algorithm in a web worker, in interactive mode with the previous revision's positions as hints so small edits move few nodes (C15). Positions are cached per revision in the browser, never stored.
+- **Screens**: canvas with semantic zoom and drill-in (C2 to C7), node detail (C8), list (C9), next (C10), triage and decision walkthrough (C11), decision view (C12), timeline (C13), proposal review (C14), journey index and overview (C16), route detail (C17), status summary (C18). Triage `pass` is client state only.
+- **In-browser host**: the same app over the wasm service, the memory store, and a local identity runs with no server: UI development with hot reload, a static demo site, and Playwright end-to-end tests against real semantics. Fixtures seed it on every load; nothing persists and each tab is independent.
+
+## Generated artifacts
+
+Rust types are the source of truth for the OpenAPI document, the TypeScript client types, the wasm bindings, and the file-format JSON Schema. They are the only generated files, and they live only in the generated paths: `openapi/`, `schema/`, `web/client/generated/`, and `web/wasm/generated/`. Every generated file carries a header saying so. The compiled `.wasm` binary and the web build are build outputs, never checked in, because they are not guaranteed to rebuild byte for byte. `mise run gen` regenerates the generated paths; the ladder's generation rung records every file path and content under them, regenerates, and fails if any file changed, appeared, or disappeared, which works the same in a jj working copy and in CI. A source change and its generated outputs land in the same commit.
+
+## Build, run, deploy
+
+- `cairn serve` runs the API, MCP, assistant (if configured), SSE, and the embedded UI on one port with its database file at a configured path. No container is required.
+- Configuration is a file plus environment overrides; deployment-specific values have no defaults so a missing one fails at startup.
+- Web assets and the wasm package are built by a mise task before `cargo build` and embedded with `rust-embed`. Dev loop: Vite serves the UI with hot reload and proxies API calls to a running binary, or runs the in-browser host with no binary.
+- Small cloud footprint: one binary on one VM with its database file on a volume.
+
+## Observability
+
+Structured logs (tracing) on the API, MCP, and assistant surfaces with request ids and patch ids; basic metrics (request counts and latencies per endpoint and tool, patch accept and reject counts, engine panic count, derive duration, store commit duration). No derived-state metrics are stored anywhere.
+
+## Naming in code
+
+The process-template concept is `route` everywhere: engine, store, API, MCP tools, UI. Where code needs a framework's HTTP or navigation route, it is qualified or uses the framework's type name, so a bare `route` always means the template. No lint rule unless drift appears.
+
+The domain-free rule is the PRD's (Non-functional requirements). Enforced by review, not tooling.
+
+## Requirement map
+
+Where each PRD section lands, for cutting feature briefs.
+
+| PRD | Component |
+|---|---|
+| Core concepts, Identity, Containment, Gating, Priority | `engine` model and derive |
+| A1 to A10, A14 to A18 | `engine` model, validate, apply; `schema` |
+| A11 to A13, A19 | `engine` format and versioning; `service`; `api` import/export |
+| B1 to B6, B10, B11 | `engine` apply; `api`; UI |
+| B7 to B9 | `engine` upgrade; proposal review UI |
+| C1 to C18 | `engine` projections; `web/app` |
+| D1 to D7 | `engine` state machines, derive, and consequences |
+| E1 to E6 | `engine` participation; deployment patches in `service` and `store` |
+| F1 to F7 | `engine` date network |
+| G1 to G3 | `engine` attachments; UI |
+| H1 to H6 | `auth`; `store` revisions; notifier and SSE in `api`; client retry and refetch in `web/app` |
+| I1 to I7 | `api`, `mcp`, `assistant`, `instructions` |
+| J1 to J5 | `engine` events; `store` events table; replay harness |
+
+## Open questions
+
+- Rank constants are configuration (per the PRD); their defaults are tuned against the seed fixtures. Limits are hard-coded and listed in `PRACTICES.md`.
+- Monty for code-mode tools and later scripted hooks: not in v1; the Rust stack keeps it cheap.
+
+## Related
+
+- `PRD.md` - product requirements, the source of truth
+- `PRACTICES.md` - engineering practices, limits, and the validation ladder
