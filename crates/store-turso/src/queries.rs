@@ -3,18 +3,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_schema::{Entity, EntityKey, JourneyId, Revision, RouteId};
+use cairn_schema::{Actor, Entity, EntityKey, Event, JourneyId, Revision, RouteId};
 use cairn_store::backend;
 use cairn_store::{
     EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page, RouteDetail,
     SearchHit, SearchQuery, StoreError, VersionJourneys,
 };
-use serde_json::json;
 use turso::{Connection, Value};
 
 use crate::load;
-use crate::sql::{corrupt, domain_columns, first, int, parse, rows, text, time};
-use crate::write::json_enum;
+use crate::sql::{corrupt, domain_columns, first, int, json_enum, parse, rows, text, time};
 
 const JOURNEY_GRAPH: &str = "journey/";
 
@@ -37,19 +35,11 @@ pub(crate) async fn journeys(
     let after = query.after.as_ref().map_or(Value::Null, text);
     let mut items = Vec::new();
     for row in rows(connection, select, vec![after]).await? {
-        let lineage = match (row.opt_parse::<RouteId>(3)?, row.opt_int(4)?) {
-            (Some(route), Some(version)) => Some(cairn_schema::Lineage {
-                route,
-                version: crate::sql::number(version)?,
-            }),
-            _ => None,
-        };
         let summary = JourneySummary {
             id: row.parse(0)?,
             name: row.parse(1)?,
-            status: serde_json::from_value(json!(row.text(2)?))
-                .map_err(|error| corrupt(&format!("journey status: {error}")))?,
-            lineage,
+            status: row.name(2)?,
+            lineage: load::lineage(&row, 3)?,
             revision: row.number(5)?,
             created_at: row.timestamp(6)?,
             latest_version: row.opt_int(7)?.map(crate::sql::number).transpose()?,
@@ -257,28 +247,21 @@ pub(crate) async fn events(
 
 /// An event row, rebuilt through its written form.
 fn logged_event(row: &crate::sql::Row) -> Result<LoggedEvent, StoreError> {
-    let mut actor = json!({"user": row.text(6)?});
-    if let Some(agent) = row.opt_text(7)? {
-        actor["agent"] = json!(agent);
-    }
-    let mut written = json!({
-        "patch_id": row.text(1)?,
-        "ordinal": row.int(2)?,
-        "log": crate::sql::domain_from(&row.text(3)?, row.opt_text(4)?)?,
-        "event_type": row.text(5)?,
-        "actor": actor,
-        "subject": row.json::<serde_json::Value>(9)?,
-        "at": row.timestamp(10)?.to_string(),
-        "delta": row.json::<serde_json::Value>(12)?,
-    });
-    if let Some(user) = row.opt_text(8)? {
-        written["confirming_user"] = json!(user);
-    }
-    if let Some(note) = row.opt_text(11)? {
-        written["note"] = json!(note);
-    }
-    let event =
-        serde_json::from_value(written).map_err(|error| corrupt(&format!("event: {error}")))?;
+    let event = Event {
+        patch_id: row.parse(1)?,
+        ordinal: row.number(2)?,
+        log: crate::sql::domain_from(&row.text(3)?, row.opt_text(4)?)?,
+        event_type: row.name(5)?,
+        actor: Actor {
+            user: row.parse(6)?,
+            agent: row.opt_parse(7)?,
+        },
+        confirming_user: row.opt_parse(8)?,
+        subject: row.json(9)?,
+        at: row.timestamp(10)?,
+        note: row.opt_parse(11)?,
+        delta: row.json(12)?,
+    };
     let seq = u64::try_from(row.int(0)?).map_err(|error| corrupt(&format!("seq: {error}")))?;
     Ok(LoggedEvent { seq, event })
 }

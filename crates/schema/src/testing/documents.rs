@@ -84,17 +84,7 @@ pub fn arb_route_file() -> impl Strategy<Value = RouteFile> {
 }
 
 fn arb_state() -> impl Strategy<Value = State> {
-    prop_oneof![
-        Just(State::Todo),
-        Just(State::Active),
-        Just(State::Done),
-        Just(State::Skipped),
-        Just(State::Open),
-        Just(State::Decided),
-        Just(State::Pending),
-        Just(State::Reached),
-        Just(State::Derived),
-    ]
+    prop::sample::select(State::ALL.to_vec())
 }
 
 /// A local-edit marker.

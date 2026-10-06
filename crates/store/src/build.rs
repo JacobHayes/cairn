@@ -23,6 +23,8 @@ use serde_json::json;
 
 use crate::commit::{Commit, Precondition};
 
+pub mod every;
+
 /// Parses an identifier or other text value.
 #[must_use]
 pub fn id<T: FromStr>(text: &str) -> T

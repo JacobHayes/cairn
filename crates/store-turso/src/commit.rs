@@ -5,8 +5,8 @@
 //! conflict.
 
 use cairn_schema::{
-    Domain, GraphId, JourneyHeader, PatchTarget, Record, Revision, RevisionConflict, RevisionOf,
-    RouteHeader, TouchedSet, Write,
+    Actor, Domain, Event, GraphId, JourneyHeader, PatchReceipt, PatchTarget, Record, Revision,
+    RevisionConflict, RevisionOf, RouteHeader, TouchedSet, Write,
 };
 use cairn_store::backend::{self, Shape, StoredReceipt};
 use cairn_store::{Commit, CommitError, CommitPoint, Committed, Faults, Precondition, StoreError};
@@ -15,7 +15,8 @@ use turso::Connection;
 use crate::load;
 use crate::sequence::Sequencer;
 use crate::sql::{
-    Abort, SqlError, domain_columns, execute, first, int, json, opt_int, opt_text, rows, text, time,
+    Abort, SqlError, domain_columns, execute, first, int, json, json_enum, opt_int, opt_text, rows,
+    text, time,
 };
 use crate::write::Writer;
 
@@ -484,7 +485,19 @@ async fn append_events(
 ) -> Result<(), Abort> {
     let numbered = (first_position..).zip(&commit.change_set.events);
     for ((seq, event), nodes) in numbered.zip(nodes) {
-        let (log_kind, log_id) = domain_columns(&event.log);
+        let Event {
+            patch_id,
+            ordinal,
+            log,
+            event_type,
+            actor: Actor { user, agent },
+            confirming_user,
+            subject,
+            at,
+            note,
+            delta,
+        } = event;
+        let (log_kind, log_id) = domain_columns(log);
         execute(
             connection,
             "INSERT INTO events (seq, patch_id, ordinal, log_kind, log_id, event_type, \
@@ -492,18 +505,18 @@ async fn append_events(
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             vec![
                 int(seq),
-                text(&event.patch_id),
-                int(event.ordinal),
+                text(patch_id),
+                int(*ordinal),
                 text(log_kind),
                 log_id,
-                crate::write::json_enum(&event.event_type)?,
-                text(&event.actor.user),
-                opt_text(event.actor.agent.as_ref()),
-                opt_text(event.confirming_user.as_ref()),
-                json(&event.subject)?,
-                time(event.at)?,
-                opt_text(event.note.as_ref()),
-                json(&event.delta)?,
+                json_enum(event_type)?,
+                text(user),
+                opt_text(agent.as_ref()),
+                opt_text(confirming_user.as_ref()),
+                json(subject)?,
+                time(*at)?,
+                opt_text(note.as_ref()),
+                json(delta)?,
             ],
         )
         .await?;
@@ -520,23 +533,35 @@ async fn append_events(
 }
 
 async fn store_receipt(connection: &Connection, stored: &StoredReceipt) -> Result<(), Abort> {
-    let receipt = &stored.receipt;
-    let (kind, id) = domain_columns(&receipt.domain);
+    let StoredReceipt {
+        receipt:
+            PatchReceipt {
+                patch_id,
+                domain,
+                content_hash,
+                revision,
+            },
+        proposal,
+        deployment_revision,
+        proposals,
+        deployment_touched,
+    } = stored;
+    let (kind, id) = domain_columns(domain);
     execute(
         connection,
         "INSERT INTO patch_receipts (patch_id, domain_kind, domain_id, proposal_id, content_hash, \
          revision, deployment_revision, proposals, deployment_touched) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)",
         vec![
-            text(&receipt.patch_id),
+            text(patch_id),
             text(kind),
             id,
-            opt_text(stored.proposal.as_ref()),
-            text(receipt.content_hash.as_str()),
-            int(receipt.revision.get()),
-            opt_int(stored.deployment_revision.map(Revision::get)),
-            json(&stored.proposals)?,
-            json(&stored.deployment_touched)?,
+            opt_text(proposal.as_ref()),
+            text(content_hash.as_str()),
+            int(revision.get()),
+            opt_int(deployment_revision.map(Revision::get)),
+            json(proposals)?,
+            json(deployment_touched)?,
         ],
     )
     .await?;

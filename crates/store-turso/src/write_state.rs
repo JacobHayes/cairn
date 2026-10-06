@@ -1,36 +1,20 @@
 //! Puts of journey state records, and removals by address inside a graph.
 
-use cairn_schema::{GraphKey, GraphRecord, NodeKey};
+use cairn_schema::{
+    Annotation, AnnotationBody, AnswerValue, GraphKey, GraphRecord, NodeKey, NodeState, Overrides,
+};
 use cairn_store::{CommitError, StoreError};
-use serde_json::Value as Json;
 use turso::Value;
 
-use crate::sql::{Abort, date, flag, json, opt_text, text, time};
-use crate::write::{
-    Writer, answer_entities, json_enum, retired_columns, snooze_columns, written_content,
-};
+use crate::sql::{Abort, date, flag, json, json_enum, opt_json, opt_text, opt_time, text, time};
+use crate::state::{annotation_columns, local_edit_columns};
+use crate::write::{Writer, answer_entities, retired_columns, snooze_columns};
 
 /// A statement and its parameters.
 type Statement = (String, Vec<Value>);
 
 fn malformed(reason: String) -> Abort {
     Abort::Answer(CommitError::Failed(StoreError::Malformed(reason)))
-}
-
-/// A local edit's aspect and target columns, from its written form. A marker without a
-/// target (the shape) is written as its name with an empty target.
-fn local_edit_columns(edit: &cairn_schema::LocalEdit) -> Result<(String, String), Abort> {
-    let written = serde_json::to_value(edit)
-        .map_err(|error| malformed(format!("a local edit does not serialize: {error}")))?;
-    if let Json::String(aspect) = written {
-        return Ok((aspect, String::new()));
-    }
-    if let Json::Object(fields) = written
-        && let Some((aspect, Json::String(target))) = fields.into_iter().next()
-    {
-        return Ok((aspect, target));
-    }
-    Err(malformed(format!("local edit {edit:?} has no aspect")))
 }
 
 async fn run_all(writer: &Writer<'_>, statements: Vec<Statement>) -> Result<(), Abort> {
@@ -42,155 +26,186 @@ async fn run_all(writer: &Writer<'_>, statements: Vec<Statement>) -> Result<(), 
 
 /// Puts a state record (or a retired key) into graph `id`.
 pub(crate) async fn put(writer: &Writer<'_>, id: &str, record: &GraphRecord) -> Result<(), Abort> {
-    let statements =
-        match record {
-            GraphRecord::Answer { decision, value } => {
-                let mut statements =
-                    vec![
-                (
-                    "INSERT OR REPLACE INTO answers (graph_id, decision, answer_type, value) \
-                     VALUES (?1, ?2, ?3, ?4)"
-                        .to_owned(),
-                    vec![text(id), text(decision), json_enum(&value.answer_type())?, json(value)?],
-                ),
-                (
-                    "DELETE FROM answer_entities WHERE graph_id = ?1 AND decision = ?2".to_owned(),
-                    vec![text(id), text(decision)],
-                ),
-            ];
-                for entity in answer_entities(value) {
-                    statements.push((
-                    "INSERT INTO answer_entities (graph_id, decision, entity) VALUES (?1, ?2, ?3)"
-                        .to_owned(),
-                    vec![text(id), text(decision), text(&entity)],
-                ));
-                }
-                statements
-            }
-            GraphRecord::RoleFill { role, entities } => {
-                let mut statements = vec![
-                    (
-                        "INSERT OR IGNORE INTO role_fills (graph_id, role) VALUES (?1, ?2)"
-                            .to_owned(),
-                        vec![text(id), text(role)],
-                    ),
-                    (
-                        "DELETE FROM role_fill_entities WHERE graph_id = ?1 AND role = ?2"
-                            .to_owned(),
-                        vec![text(id), text(role)],
-                    ),
-                ];
-                for entity in entities.iter() {
-                    statements.push((
-                    "INSERT INTO role_fill_entities (graph_id, role, entity) VALUES (?1, ?2, ?3)"
-                        .to_owned(),
-                    vec![text(id), text(role), text(entity)],
-                ));
-                }
-                statements
-            }
-            GraphRecord::Annotation(annotation) => vec![annotation_put(id, annotation)?],
-            other => vec![single_put(id, other)?],
-        };
-    run_all(writer, statements).await
+    run_all(writer, puts(id, record)?).await
 }
 
-/// The put of a state record held in one row.
-fn single_put(id: &str, record: &GraphRecord) -> Result<Statement, Abort> {
+/// One statement.
+fn statement(sql: &str, params: Vec<Value>) -> Statement {
+    (sql.to_owned(), params)
+}
+
+/// The statements putting a state record (or a retired key) into graph `id`.
+fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, Abort> {
     let graph = text(id);
-    let (sql, params): (&str, Vec<Value>) = match record {
+    Ok(match record {
         GraphRecord::RetiredKey(key) => {
             let (kind, key) = retired_columns(key);
-            (
+            vec![statement(
                 "INSERT OR IGNORE INTO retired_keys (graph_id, key, kind) VALUES (?1, ?2, ?3)",
                 vec![graph, text(&key), text(kind)],
-            )
+            )]
         }
-        GraphRecord::NodeState { node, state } => (
-            "INSERT OR REPLACE INTO node_states (graph_id, node, state, provenance, atomic, \
-             started_on, finished_on, skip_reason) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
-            vec![
-                graph,
-                text(node),
-                json_enum(&state.state)?,
-                json_enum(&state.provenance)?,
-                flag(state.atomic),
-                state.started_on.map_or(Value::Null, date),
-                state.finished_on.map_or(Value::Null, date),
-                opt_text(state.skip_reason.as_ref()),
-            ],
-        ),
+        GraphRecord::NodeState { node, state } => vec![node_state_put(id, node, state)?],
         GraphRecord::LocalEdit { node, edit } => {
             let (aspect, target) = local_edit_columns(edit)?;
-            (
+            vec![statement(
                 "INSERT OR IGNORE INTO local_edits (graph_id, node, aspect, target) \
                  VALUES (?1, ?2, ?3, ?4)",
-                vec![graph, text(node), text(&aspect), text(&target)],
-            )
+                vec![graph, text(node), text(aspect), text(&target)],
+            )]
         }
-        GraphRecord::Pin { node, date: day } => (
+        GraphRecord::Answer { decision, value } => answer_puts(id, decision, value)?,
+        GraphRecord::RoleFill { role, entities } => {
+            let params = || vec![text(id), text(role)];
+            let mut statements = vec![
+                statement(
+                    "INSERT OR IGNORE INTO role_fills (graph_id, role) VALUES (?1, ?2)",
+                    params(),
+                ),
+                statement(
+                    "DELETE FROM role_fill_entities WHERE graph_id = ?1 AND role = ?2",
+                    params(),
+                ),
+            ];
+            for entity in entities.iter() {
+                let mut values = params();
+                values.push(text(entity));
+                statements.push(statement(
+                    "INSERT INTO role_fill_entities (graph_id, role, entity) VALUES (?1, ?2, ?3)",
+                    values,
+                ));
+            }
+            statements
+        }
+        GraphRecord::Pin { node, date: day } => vec![statement(
             "INSERT OR REPLACE INTO pins (graph_id, node, date) VALUES (?1, ?2, ?3)",
             vec![graph, text(node), date(*day)],
-        ),
+        )],
         GraphRecord::Snooze { node, until } => {
             let (until_date, until_node) = snooze_columns(until);
-            (
+            vec![statement(
                 "INSERT OR REPLACE INTO snoozes (graph_id, node, until_date, until_node) \
                  VALUES (?1, ?2, ?3, ?4)",
                 vec![graph, text(node), until_date, until_node],
-            )
+            )]
         }
-        GraphRecord::Overrides { node, overrides } => (
-            "INSERT OR REPLACE INTO overrides (graph_id, node, force_include, keep, bypass) \
-             VALUES (?1, ?2, ?3, ?4, ?5)",
-            vec![
-                graph,
-                text(node),
-                opt_text(overrides.force_include.as_ref()),
-                opt_text(overrides.keep.as_ref()),
-                overrides
-                    .bypass
-                    .as_ref()
-                    .map(json)
-                    .transpose()?
-                    .unwrap_or(Value::Null),
-            ],
-        ),
-        GraphRecord::Tombstone(node) => (
+        GraphRecord::Overrides { node, overrides } => vec![overrides_put(id, node, overrides)?],
+        GraphRecord::Tombstone(node) => vec![statement(
             "INSERT OR IGNORE INTO tombstones (graph_id, node) VALUES (?1, ?2)",
             vec![graph, text(node)],
-        ),
-        content => {
-            return Err(malformed(format!(
-                "{content:?} is graph content, not state"
-            )));
+        )],
+        GraphRecord::Annotation(annotation) => vec![annotation_put(id, annotation)?],
+        GraphRecord::Node(_)
+        | GraphRecord::NodeField { .. }
+        | GraphRecord::Edge(_)
+        | GraphRecord::Role(_)
+        | GraphRecord::Kind(_)
+        | GraphRecord::DefaultOwner(_)
+        | GraphRecord::Participation { .. }
+        | GraphRecord::Resource { .. } => {
+            return Err(malformed(format!("{record:?} is graph content, not state")));
         }
-    };
-    Ok((sql.to_owned(), params))
+    })
 }
 
-fn annotation_put(id: &str, annotation: &cairn_schema::Annotation) -> Result<Statement, Abort> {
-    let body = &annotation.body;
-    let (kind, content) =
-        written_content(body, &["note", "artifact", "reference", "conversation"])?;
+fn node_state_put(id: &str, node: &NodeKey, state: &NodeState) -> Result<Statement, Abort> {
+    let NodeState {
+        state,
+        provenance,
+        atomic,
+        started_on,
+        finished_on,
+        skip_reason,
+    } = state;
+    Ok(statement(
+        "INSERT OR REPLACE INTO node_states (graph_id, node, state, provenance, atomic, \
+         started_on, finished_on, skip_reason) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+        vec![
+            text(id),
+            text(node),
+            json_enum(state)?,
+            json_enum(provenance)?,
+            flag(*atomic),
+            started_on.map_or(Value::Null, date),
+            finished_on.map_or(Value::Null, date),
+            opt_text(skip_reason.as_ref()),
+        ],
+    ))
+}
+
+fn answer_puts(id: &str, decision: &NodeKey, value: &AnswerValue) -> Result<Vec<Statement>, Abort> {
+    let params = || vec![text(id), text(decision)];
+    let mut values = params();
+    values.extend([json_enum(&value.answer_type())?, json(value)?]);
+    let mut statements = vec![
+        statement(
+            "INSERT OR REPLACE INTO answers (graph_id, decision, answer_type, value) \
+             VALUES (?1, ?2, ?3, ?4)",
+            values,
+        ),
+        statement(
+            "DELETE FROM answer_entities WHERE graph_id = ?1 AND decision = ?2",
+            params(),
+        ),
+    ];
+    for entity in answer_entities(value) {
+        let mut values = params();
+        values.push(text(&entity));
+        statements.push(statement(
+            "INSERT INTO answer_entities (graph_id, decision, entity) VALUES (?1, ?2, ?3)",
+            values,
+        ));
+    }
+    Ok(statements)
+}
+
+fn overrides_put(id: &str, node: &NodeKey, overrides: &Overrides) -> Result<Statement, Abort> {
+    let Overrides {
+        force_include,
+        keep,
+        bypass,
+    } = overrides;
+    Ok(statement(
+        "INSERT OR REPLACE INTO overrides (graph_id, node, force_include, keep, bypass) \
+         VALUES (?1, ?2, ?3, ?4, ?5)",
+        vec![
+            text(id),
+            text(node),
+            opt_text(force_include.as_ref()),
+            opt_text(keep.as_ref()),
+            opt_json(bypass.as_ref())?,
+        ],
+    ))
+}
+
+fn annotation_put(id: &str, annotation: &Annotation) -> Result<Statement, Abort> {
+    let Annotation {
+        body:
+            AnnotationBody {
+                key,
+                node,
+                title,
+                content,
+            },
+        created_by,
+        created_at,
+        edited_at,
+    } = annotation;
+    let (kind, content) = annotation_columns(content);
     Ok((
         "INSERT OR REPLACE INTO annotations (graph_id, key, node, title, type, content, \
          created_by, created_at, edited_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9)"
             .to_owned(),
         vec![
             text(id),
-            text(&body.key),
-            opt_text(body.node.as_ref()),
-            opt_text(body.title.as_ref()),
+            text(key),
+            opt_text(node.as_ref()),
+            opt_text(title.as_ref()),
             text(kind),
             text(&content),
-            text(&annotation.created_by),
-            time(annotation.created_at)?,
-            annotation
-                .edited_at
-                .map(time)
-                .transpose()?
-                .unwrap_or(Value::Null),
+            text(created_by),
+            time(*created_at)?,
+            opt_time(*edited_at)?,
         ],
     ))
 }
@@ -237,10 +252,20 @@ fn removal(id: &str, key: &GraphKey) -> Result<Vec<Statement>, Abort> {
                 "DELETE FROM local_edits WHERE graph_id = ?1 AND node = ?2 AND aspect = ?3 \
                  AND target = ?4"
                     .to_owned(),
-                vec![graph(), text(node), text(&aspect), text(&target)],
+                vec![graph(), text(node), text(aspect), text(&target)],
             )]
         }
-        other => keyed_removal(id, other),
+        GraphKey::Role(_)
+        | GraphKey::Kind(_)
+        | GraphKey::RetiredKey(_)
+        | GraphKey::NodeState(_)
+        | GraphKey::Answer(_)
+        | GraphKey::RoleFill(_)
+        | GraphKey::Pin(_)
+        | GraphKey::Snooze(_)
+        | GraphKey::Overrides(_)
+        | GraphKey::Tombstone(_)
+        | GraphKey::Annotation { .. } => keyed_removal(id, key),
     })
 }
 
@@ -267,7 +292,10 @@ fn keyed_removal(id: &str, key: &GraphKey) -> Vec<Statement> {
         GraphKey::Snooze(node) => vec![("snoozes", "node", node.as_str())],
         GraphKey::Overrides(node) => vec![("overrides", "node", node.as_str())],
         GraphKey::Tombstone(node) => vec![("tombstones", "node", node.as_str())],
-        GraphKey::Annotation { annotation, .. } => {
+        GraphKey::Annotation {
+            annotation,
+            node: _,
+        } => {
             vec![("annotations", "key", annotation.as_str())]
         }
         // Handled by `removal`.

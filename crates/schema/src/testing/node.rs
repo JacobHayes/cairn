@@ -175,15 +175,7 @@ pub fn arb_node<R: ArbRefs>() -> impl Strategy<Value = Node<R>> {
 
 /// A node field name.
 pub fn arb_node_field() -> impl Strategy<Value = NodeField> {
-    prop::sample::select(vec![
-        NodeField::Id,
-        NodeField::Parent,
-        NodeField::Title,
-        NodeField::Weight,
-        NodeField::DueBy,
-        NodeField::Estimate,
-        NodeField::Choices,
-    ])
+    prop::sample::select(NodeField::ALL.to_vec())
 }
 
 /// A set of explicit entities, possibly empty.

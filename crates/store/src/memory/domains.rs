@@ -343,7 +343,16 @@ fn put_graph_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
             }
             put_node(graph, changed)?;
         }
-        other => put_state_record(graph, other)?,
+        GraphRecord::RetiredKey(_)
+        | GraphRecord::NodeState { .. }
+        | GraphRecord::LocalEdit { .. }
+        | GraphRecord::Answer { .. }
+        | GraphRecord::RoleFill { .. }
+        | GraphRecord::Pin { .. }
+        | GraphRecord::Snooze { .. }
+        | GraphRecord::Overrides { .. }
+        | GraphRecord::Tombstone(_)
+        | GraphRecord::Annotation(_) => put_state_record(graph, record)?,
     }
     Ok(())
 }
@@ -394,7 +403,16 @@ fn put_state_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
                 .put(annotation.clone())
                 .map_err(|error| StoreError::Malformed(format!("annotations: {error}")))?;
         }
-        content => return malformed(format!("{content:?} is graph content, not state")),
+        GraphRecord::Node(_)
+        | GraphRecord::NodeField { .. }
+        | GraphRecord::Edge(_)
+        | GraphRecord::Role(_)
+        | GraphRecord::Kind(_)
+        | GraphRecord::DefaultOwner(_)
+        | GraphRecord::Participation { .. }
+        | GraphRecord::Resource { .. } => {
+            return malformed(format!("{record:?} is graph content, not state"));
+        }
     }
     Ok(())
 }
@@ -443,7 +461,16 @@ fn remove_graph_key(graph: &mut Graph, key: &GraphKey) -> Result<(), StoreError>
                 put_node(graph, changed)?;
             }
         }
-        other => remove_state_key(graph, other),
+        GraphKey::RetiredKey(_)
+        | GraphKey::NodeState(_)
+        | GraphKey::LocalEdit { .. }
+        | GraphKey::Answer(_)
+        | GraphKey::RoleFill(_)
+        | GraphKey::Pin(_)
+        | GraphKey::Snooze(_)
+        | GraphKey::Overrides(_)
+        | GraphKey::Tombstone(_)
+        | GraphKey::Annotation { .. } => remove_state_key(graph, key),
     }
     Ok(())
 }
@@ -489,7 +516,10 @@ fn remove_state_key(graph: &mut Graph, key: &GraphKey) {
         GraphKey::Tombstone(node) => {
             state.tombstones.remove(node);
         }
-        GraphKey::Annotation { annotation, .. } => {
+        GraphKey::Annotation {
+            annotation,
+            node: _,
+        } => {
             state.annotations.remove(annotation);
         }
         // Content keys are handled by remove_graph_key.

@@ -6,19 +6,15 @@ use std::collections::BTreeSet;
 use cairn_schema::{ConversationId, Email, Slug, Timestamp, Title, UserId};
 use cairn_store::backend;
 use cairn_store::{
-    AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
-    IdentityRecord, LoggedAuthEntry, OAuthStateRecord, Page, PageSize, SecretHash, SessionRecord,
-    StoreError, UserRecord,
+    AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationMessage, ConversationRecord,
+    ConversationSummary, IdentityRecord, LoggedAuthEntry, OAuthStateRecord, Page, PageSize,
+    SecretHash, SessionRecord, StoreError, UserRecord,
 };
-use serde_json::json;
 use turso::{Connection, Value};
 
-use crate::sql::{Row, corrupt, execute, first, int, opt_text, rows, text, time};
-use crate::write::json_enum;
-
-fn enum_from<T: serde::de::DeserializeOwned>(name: &str) -> Result<T, StoreError> {
-    serde_json::from_value(json!(name)).map_err(|error| corrupt(&format!("{error}")))
-}
+use crate::sql::{
+    Row, corrupt, execute, first, int, json_enum, opt_text, opt_time, rows, text, time,
+};
 
 async fn user_exists(connection: &Connection, user: &UserId) -> Result<(), StoreError> {
     match first(
@@ -34,10 +30,15 @@ async fn user_exists(connection: &Connection, user: &UserId) -> Result<(), Store
 }
 
 pub(crate) async fn put_user(connection: &Connection, user: &UserRecord) -> Result<(), StoreError> {
+    let UserRecord {
+        id,
+        name,
+        created_at,
+    } = user;
     execute(
         connection,
         "INSERT OR REPLACE INTO users (id, name, created_at) VALUES (?1, ?2, ?3)",
-        vec![text(&user.id), text(&user.name), time(user.created_at)?],
+        vec![text(id), text(name), time(*created_at)?],
     )
     .await?;
     Ok(())
@@ -62,18 +63,20 @@ pub(crate) async fn put_identity(
     connection: &Connection,
     identity: &IdentityRecord,
 ) -> Result<(), StoreError> {
-    user_exists(connection, &identity.user).await?;
-    let key = || vec![text(&identity.provider), text(&identity.subject)];
+    let IdentityRecord {
+        provider,
+        subject,
+        user,
+        verified_emails,
+        linked_at,
+    } = identity;
+    user_exists(connection, user).await?;
+    let key = || vec![text(provider), text(subject)];
     execute(
         connection,
         "INSERT OR REPLACE INTO user_identities (provider, subject, user_id, linked_at) \
          VALUES (?1, ?2, ?3, ?4)",
-        vec![
-            text(&identity.provider),
-            text(&identity.subject),
-            text(&identity.user),
-            time(identity.linked_at)?,
-        ],
+        vec![text(provider), text(subject), text(user), time(*linked_at)?],
     )
     .await?;
     execute(
@@ -82,7 +85,7 @@ pub(crate) async fn put_identity(
         key(),
     )
     .await?;
-    for email in &identity.verified_emails {
+    for email in verified_emails {
         let mut params = key();
         params.push(text(email));
         execute(
@@ -180,16 +183,22 @@ pub(crate) async fn put_session(
     connection: &Connection,
     session: &SessionRecord,
 ) -> Result<(), StoreError> {
-    user_exists(connection, &session.user).await?;
+    let SessionRecord {
+        token_hash,
+        user,
+        created_at,
+        expires_at,
+    } = session;
+    user_exists(connection, user).await?;
     execute(
         connection,
         "INSERT OR REPLACE INTO sessions (token_hash, user_id, created_at, expires_at) \
          VALUES (?1, ?2, ?3, ?4)",
         vec![
-            text(&session.token_hash),
-            text(&session.user),
-            time(session.created_at)?,
-            time(session.expires_at)?,
+            text(token_hash),
+            text(user),
+            time(*created_at)?,
+            time(*expires_at)?,
         ],
     )
     .await?;
@@ -226,15 +235,21 @@ pub(crate) async fn put_oauth_state(
     connection: &Connection,
     state: &OAuthStateRecord,
 ) -> Result<(), StoreError> {
+    let OAuthStateRecord {
+        key_hash,
+        kind,
+        payload,
+        expires_at,
+    } = state;
     execute(
         connection,
         "INSERT OR REPLACE INTO oauth_transient (key_hash, kind, payload, expires_at) \
          VALUES (?1, ?2, ?3, ?4)",
         vec![
-            text(&state.key_hash),
-            json_enum(&state.kind)?,
-            text(&state.payload),
-            time(state.expires_at)?,
+            text(key_hash),
+            json_enum(kind)?,
+            text(payload),
+            time(*expires_at)?,
         ],
     )
     .await?;
@@ -254,7 +269,7 @@ pub(crate) async fn take_oauth_state(
     execute(connection, sql, vec![text(key_hash)]).await?;
     let state = OAuthStateRecord {
         key_hash: key_hash.clone(),
-        kind: enum_from(&row.text(0)?)?,
+        kind: row.name(0)?,
         payload: row.parse(1)?,
         expires_at: row.timestamp(2)?,
     };
@@ -277,19 +292,22 @@ pub(crate) async fn put_agent_token(
     connection: &Connection,
     token: &AgentTokenRecord,
 ) -> Result<(), StoreError> {
-    user_exists(connection, &token.user).await?;
+    let AgentTokenRecord {
+        agent,
+        token_hash,
+        name,
+        user,
+        created_at,
+        revoked_at,
+    } = token;
+    user_exists(connection, user).await?;
     let select = "SELECT 1 FROM agent_tokens WHERE token_hash = ?1 AND agent <> ?2";
-    if first(
-        connection,
-        select,
-        vec![text(&token.token_hash), text(&token.agent)],
-    )
-    .await?
-    .is_some()
+    if first(connection, select, vec![text(token_hash), text(agent)])
+        .await?
+        .is_some()
     {
         return Err(StoreError::Malformed(format!(
-            "another agent token has the digest of {}'s",
-            token.agent
+            "another agent token has the digest of {agent}'s"
         )));
     }
     execute(
@@ -297,16 +315,12 @@ pub(crate) async fn put_agent_token(
         "INSERT OR REPLACE INTO agent_tokens (agent, token_hash, name, user_id, created_at, \
          revoked_at) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
         vec![
-            text(&token.agent),
-            text(&token.token_hash),
-            text(&token.name),
-            text(&token.user),
-            time(token.created_at)?,
-            token
-                .revoked_at
-                .map(time)
-                .transpose()?
-                .unwrap_or(Value::Null),
+            text(agent),
+            text(token_hash),
+            text(name),
+            text(user),
+            time(*created_at)?,
+            opt_time(*revoked_at)?,
         ],
     )
     .await?;
@@ -320,7 +334,7 @@ fn agent_token(row: &Row) -> Result<AgentTokenRecord, StoreError> {
         name: row.parse(2)?,
         user: row.parse(3)?,
         created_at: row.timestamp(4)?,
-        revoked_at: row.opt_int(5)?.map(crate::sql::timestamp).transpose()?,
+        revoked_at: row.opt_timestamp(5)?,
     })
 }
 
@@ -356,15 +370,21 @@ pub(crate) async fn append_auth_log(
     entry: &AuthLogEntry,
     seq: i64,
 ) -> Result<u64, StoreError> {
+    let AuthLogEntry {
+        at,
+        event,
+        user,
+        subject,
+    } = entry;
     execute(
         connection,
         "INSERT INTO auth_log (seq, at, event, user_id, subject) VALUES (?1, ?2, ?3, ?4, ?5)",
         vec![
             int(seq),
-            time(entry.at)?,
-            json_enum(&entry.event)?,
-            text(&entry.user),
-            opt_text(entry.subject.as_ref()),
+            time(*at)?,
+            json_enum(event)?,
+            text(user),
+            opt_text(subject.as_ref()),
         ],
     )
     .await?;
@@ -397,7 +417,7 @@ pub(crate) async fn auth_log(
             seq: u64::try_from(row.int(0)?).map_err(|error| corrupt(&format!("seq: {error}")))?,
             entry: AuthLogEntry {
                 at: row.timestamp(1)?,
-                event: enum_from(&row.text(2)?)?,
+                event: row.name(2)?,
                 user: row.parse(3)?,
                 subject: row.opt_parse(4)?,
             },
@@ -411,32 +431,45 @@ pub(crate) async fn put_conversation(
     conversation: &ConversationRecord,
 ) -> Result<(), StoreError> {
     backend::check_conversation_size(conversation)?;
+    let ConversationRecord {
+        id,
+        user,
+        title,
+        created_at,
+        updated_at,
+        messages,
+    } = conversation;
     execute(
         connection,
         "INSERT OR REPLACE INTO conversations (id, user_id, title, created_at, updated_at) \
          VALUES (?1, ?2, ?3, ?4, ?5)",
         vec![
-            text(&conversation.id),
-            text(&conversation.user),
-            opt_text(conversation.title.as_ref()),
-            time(conversation.created_at)?,
-            time(conversation.updated_at)?,
+            text(id),
+            text(user),
+            opt_text(title.as_ref()),
+            time(*created_at)?,
+            time(*updated_at)?,
         ],
     )
     .await?;
     let sql = "DELETE FROM conversation_messages WHERE conversation = ?1";
-    execute(connection, sql, vec![text(&conversation.id)]).await?;
-    for (position, message) in (0_i64..).zip(&conversation.messages) {
+    execute(connection, sql, vec![text(id)]).await?;
+    for (position, message) in (0_i64..).zip(messages) {
+        let ConversationMessage {
+            author,
+            at,
+            content,
+        } = message;
         execute(
             connection,
             "INSERT INTO conversation_messages (conversation, position, author, at, content) \
              VALUES (?1, ?2, ?3, ?4, ?5)",
             vec![
-                text(&conversation.id),
+                text(id),
                 int(position),
-                json_enum(&message.author)?,
-                time(message.at)?,
-                text(&message.content),
+                json_enum(author)?,
+                time(*at)?,
+                text(content),
             ],
         )
         .await?;
@@ -456,8 +489,8 @@ pub(crate) async fn conversation(
                   ORDER BY position";
     let mut messages = Vec::new();
     for message in rows(connection, select, vec![text(id)]).await? {
-        messages.push(cairn_store::ConversationMessage {
-            author: enum_from(&message.text(0)?)?,
+        messages.push(ConversationMessage {
+            author: message.name(0)?,
             at: message.timestamp(1)?,
             content: message.parse(2)?,
         });

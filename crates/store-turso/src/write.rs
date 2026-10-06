@@ -4,19 +4,19 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AnswerValue, Domain, GraphId, GraphRecord, Node, ParticipationSource, Record, RecordKey,
-    RetiredKey, Revision, SnoozeTarget, Write,
+    AnswerValue, Domain, Edge, Entity, GraphId, GraphRecord, JourneyHeader, Lineage, Node, NodeKey,
+    ParticipationKind, ParticipationSource, Proposal, ProposalDraft, Record, RecordKey, Resource,
+    RetiredKey, Revision, Role, RouteHeader, SnoozeTarget, Write,
     limits::{EDGE_COUNT_PER_NODE_MAX, KIND_COUNT_MAX},
     refs::KeyRefs,
 };
 use cairn_store::{CommitError, StoreError};
-use serde_json::Value as Json;
 use turso::{Connection, Value};
 
 use crate::graph::{self, NODE_COLUMNS};
 use crate::sql::{
-    Abort, date, domain_columns, execute, first, flag, graph_id, int, json, opt_int, opt_text,
-    text, time,
+    Abort, date, domain_columns, execute, first, flag, graph_id, int, json, json_enum, opt_int,
+    opt_text, text, time,
 };
 
 /// The tables holding one graph's records, children before parents.
@@ -115,60 +115,10 @@ impl<'connection> Writer<'connection> {
                     )));
                 }
                 let id = self.graph_row(graph).await?;
-                self.put_graph_record(&id, record).await
+                self.put_graph_record(&id, record).await?;
             }
-            Record::JourneyHeader(header) => {
-                let (route, version) = header
-                    .lineage
-                    .as_ref()
-                    .map_or((Value::Null, Value::Null), |lineage| {
-                        (text(&lineage.route), int(lineage.version.get()))
-                    });
-                self.run(
-                    "INSERT INTO journeys (id, revision, name, description, status, lineage_route, \
-                     lineage_version, created_at, created_on) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
-                     ON CONFLICT (id) DO UPDATE SET name = excluded.name, \
-                     description = excluded.description, status = excluded.status, \
-                     lineage_route = excluded.lineage_route, lineage_version = excluded.lineage_version, \
-                     created_at = excluded.created_at, created_on = excluded.created_on",
-                    vec![
-                        text(&header.id),
-                        int(self.revision.get()),
-                        text(&header.name),
-                        opt_text(header.description.as_ref()),
-                        json_enum(&header.status)?,
-                        route,
-                        version,
-                        time(header.created_at)?,
-                        date(header.created_on),
-                    ],
-                )
-                .await?;
-                Ok(())
-            }
-            Record::RouteHeader(header) => {
-                self.run(
-                    "INSERT INTO routes (id, revision, name, description, retired) \
-                     VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (id) DO UPDATE SET \
-                     name = excluded.name, description = excluded.description, \
-                     retired = excluded.retired",
-                    vec![
-                        text(&header.id),
-                        int(self.revision.get()),
-                        text(&header.name),
-                        opt_text(header.description.as_ref()),
-                        flag(header.retired),
-                    ],
-                )
-                .await?;
-                Ok(())
-            }
-            other => self.put_domain_record(other).await,
-        }
-    }
-
-    async fn put_domain_record(&mut self, record: &Record) -> Result<(), Abort> {
-        match record {
+            Record::JourneyHeader(header) => self.put_journey_header(header).await?,
+            Record::RouteHeader(header) => self.put_route_header(header).await?,
             Record::RouteDraft { route, extends } => {
                 self.run(
                     "INSERT OR REPLACE INTO route_drafts (route_id, extends) VALUES (?1, ?2)",
@@ -220,55 +170,132 @@ impl<'connection> Writer<'connection> {
                 .await?;
             }
             Record::Proposal(proposal) => self.put_proposal(proposal).await?,
-            Record::Graph { .. } | Record::JourneyHeader(_) | Record::RouteHeader(_) => {}
         }
         Ok(())
     }
 
-    async fn put_entity(&mut self, entity: &cairn_schema::Entity) -> Result<(), Abort> {
+    async fn put_journey_header(&mut self, header: &JourneyHeader) -> Result<(), Abort> {
+        let JourneyHeader {
+            id,
+            name,
+            description,
+            status,
+            lineage,
+            created_at,
+            created_on,
+        } = header;
+        let (route, version) = match lineage {
+            Some(Lineage { route, version }) => (text(route), int(version.get())),
+            None => (Value::Null, Value::Null),
+        };
+        self.run(
+            "INSERT INTO journeys (id, revision, name, description, status, lineage_route, \
+             lineage_version, created_at, created_on) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9) \
+             ON CONFLICT (id) DO UPDATE SET name = excluded.name, \
+             description = excluded.description, status = excluded.status, \
+             lineage_route = excluded.lineage_route, lineage_version = excluded.lineage_version, \
+             created_at = excluded.created_at, created_on = excluded.created_on",
+            vec![
+                text(id),
+                int(self.revision.get()),
+                text(name),
+                opt_text(description.as_ref()),
+                json_enum(status)?,
+                route,
+                version,
+                time(*created_at)?,
+                date(*created_on),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn put_route_header(&mut self, header: &RouteHeader) -> Result<(), Abort> {
+        let RouteHeader {
+            id,
+            name,
+            description,
+            retired,
+        } = header;
+        self.run(
+            "INSERT INTO routes (id, revision, name, description, retired) \
+             VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (id) DO UPDATE SET \
+             name = excluded.name, description = excluded.description, \
+             retired = excluded.retired",
+            vec![
+                text(id),
+                int(self.revision.get()),
+                text(name),
+                opt_text(description.as_ref()),
+                flag(*retired),
+            ],
+        )
+        .await?;
+        Ok(())
+    }
+
+    async fn put_entity(&mut self, entity: &Entity) -> Result<(), Abort> {
+        let Entity { key, name, emails } = entity;
         self.run(
             "INSERT INTO entities (key, name) VALUES (?1, ?2) \
              ON CONFLICT (key) DO UPDATE SET name = excluded.name",
-            vec![text(&entity.key), text(&entity.name)],
+            vec![text(key), text(name)],
         )
         .await?;
         self.run(
             "DELETE FROM entity_emails WHERE entity = ?1",
-            vec![text(&entity.key)],
+            vec![text(key)],
         )
         .await?;
-        for email in &entity.emails {
+        for email in emails {
             self.run(
                 "INSERT INTO entity_emails (entity, email) VALUES (?1, ?2)",
-                vec![text(&entity.key), text(email)],
+                vec![text(key), text(email)],
             )
             .await?;
         }
         Ok(())
     }
 
-    async fn put_proposal(&mut self, proposal: &cairn_schema::Proposal) -> Result<(), Abort> {
-        let (kind, id) = domain_columns(&proposal.destination);
-        let draft = &proposal.draft;
+    async fn put_proposal(&mut self, proposal: &Proposal) -> Result<(), Abort> {
+        let Proposal {
+            id: proposal_id,
+            destination,
+            revision,
+            status,
+            draft,
+            proposing_agent,
+            created_by,
+            created_at,
+        } = proposal;
+        let ProposalDraft {
+            title,
+            description,
+            destination_revision,
+            mutations,
+            items,
+        } = draft;
+        let (kind, id) = domain_columns(destination);
         self.run(
             "INSERT OR REPLACE INTO proposals (id, destination_kind, destination_id, revision, \
              status, title, description, destination_revision, mutations, items, \
              proposing_agent, created_by, created_at) \
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13)",
             vec![
-                text(&proposal.id),
+                text(proposal_id),
                 text(kind),
                 id,
-                int(proposal.revision.get()),
-                json_enum(&proposal.status)?,
-                text(&draft.title),
-                opt_text(draft.description.as_ref()),
-                int(draft.destination_revision.get()),
-                json(&draft.mutations)?,
-                json(&draft.items)?,
-                opt_text(proposal.proposing_agent.as_ref()),
-                text(&proposal.created_by),
-                time(proposal.created_at)?,
+                int(revision.get()),
+                json_enum(status)?,
+                text(title),
+                opt_text(description.as_ref()),
+                int(destination_revision.get()),
+                json(mutations)?,
+                json(items)?,
+                opt_text(proposing_agent.as_ref()),
+                text(created_by),
+                time(*created_at)?,
             ],
         )
         .await?;
@@ -305,25 +332,12 @@ impl<'connection> Writer<'connection> {
                 }
                 self.put_node(id, &changed).await
             }
-            GraphRecord::Edge(edge) => {
-                self.node_exists(id, &edge.node).await?;
-                self.run(
-                    "INSERT OR IGNORE INTO edges (graph_id, node, requires) VALUES (?1, ?2, ?3)",
-                    vec![text(id), text(&edge.node), text(&edge.requires)],
-                )
-                .await?;
-                let select = "SELECT count(*) FROM edges WHERE graph_id = ?1 AND node = ?2";
-                let held = self.count(select, vec![text(id), text(&edge.node)]).await?;
-                if held > i64::from(EDGE_COUNT_PER_NODE_MAX) {
-                    return Err(malformed(format!(
-                        "{} requires more than the edge limit",
-                        edge.node
-                    )));
-                }
-                Ok(())
+            GraphRecord::Edge(Edge { node, requires }) => self.put_edge(id, node, requires).await,
+            GraphRecord::Role(role) => self.put_labeled("roles", id, role_row(role)).await,
+            GraphRecord::Kind(kind) => {
+                self.put_labeled("participation_kinds", id, kind_row(kind))
+                    .await
             }
-            GraphRecord::Role(role) => self.put_labeled("roles", id, role).await,
-            GraphRecord::Kind(kind) => self.put_labeled("participation_kinds", id, kind).await,
             GraphRecord::DefaultOwner(role) => {
                 self.run(
                     "UPDATE graphs SET default_owner = ?2 WHERE id = ?1",
@@ -347,8 +361,34 @@ impl<'connection> Writer<'connection> {
                 self.node_exists(id, node).await?;
                 self.put_resource(id, node, resource).await
             }
-            state => crate::write_state::put(self, id, state).await,
+            GraphRecord::RetiredKey(_)
+            | GraphRecord::NodeState { .. }
+            | GraphRecord::LocalEdit { .. }
+            | GraphRecord::Answer { .. }
+            | GraphRecord::RoleFill { .. }
+            | GraphRecord::Pin { .. }
+            | GraphRecord::Snooze { .. }
+            | GraphRecord::Overrides { .. }
+            | GraphRecord::Tombstone(_)
+            | GraphRecord::Annotation(_) => crate::write_state::put(self, id, record).await,
         }
+    }
+
+    async fn put_edge(&self, id: &str, node: &NodeKey, requires: &NodeKey) -> Result<(), Abort> {
+        self.node_exists(id, node).await?;
+        self.run(
+            "INSERT OR IGNORE INTO edges (graph_id, node, requires) VALUES (?1, ?2, ?3)",
+            vec![text(id), text(node), text(requires)],
+        )
+        .await?;
+        let select = "SELECT count(*) FROM edges WHERE graph_id = ?1 AND node = ?2";
+        let held = self.count(select, vec![text(id), text(node)]).await?;
+        if held > i64::from(EDGE_COUNT_PER_NODE_MAX) {
+            return Err(malformed(format!(
+                "{node} requires more than the edge limit"
+            )));
+        }
+        Ok(())
     }
 
     /// Runs a statement for the state writes.
@@ -356,43 +396,25 @@ impl<'connection> Writer<'connection> {
         self.run(sql, params).await
     }
 
-    async fn put_labeled<T: serde::Serialize>(
-        &self,
-        table: &str,
-        id: &str,
-        value: &T,
-    ) -> Result<(), Abort> {
-        let fields = serde_json::to_value(value)
-            .map_err(|error| malformed(format!("a {table} row does not serialize: {error}")))?;
-        let field = |name: &str| fields.get(name).and_then(Json::as_str).map(str::to_owned);
-        let multi = fields.get("multi").and_then(Json::as_bool).unwrap_or(false);
+    /// A role's or kind's row: its key, id, title, and multi columns.
+    async fn put_labeled(&self, table: &str, id: &str, row: [Value; 4]) -> Result<(), Abort> {
         let sql = format!(
             "INSERT OR REPLACE INTO {table} (graph_id, key, id, title, multi) \
              VALUES (?1, ?2, ?3, ?4, ?5)"
         );
-        self.run(
-            &sql,
-            vec![
-                text(id),
-                opt_text(field("key")),
-                opt_text(field("id")),
-                opt_text(field("title")),
-                flag(multi),
-            ],
-        )
-        .await?;
+        let mut values = vec![text(id)];
+        values.extend(row);
+        self.run(&sql, values).await?;
         Ok(())
     }
 
     async fn put_node(&mut self, id: &str, node: &Node<KeyRefs>) -> Result<(), Abort> {
-        let fields = graph::node_fields(node)?;
         let mut values = vec![text(id)];
-        values.extend(graph::node_values(&fields)?);
-        let columns: Vec<_> = NODE_COLUMNS.iter().map(|(name, _, _)| *name).collect();
+        values.extend(graph::node_values(node)?);
         let slots: Vec<_> = (1..=values.len()).map(|slot| format!("?{slot}")).collect();
         let sql = format!(
             "INSERT OR REPLACE INTO nodes (graph_id, {}) VALUES ({})",
-            columns.join(", "),
+            NODE_COLUMNS.join(", "),
             slots.join(", ")
         );
         self.run(&sql, values).await?;
@@ -467,7 +489,7 @@ impl<'connection> Writer<'connection> {
         &self,
         id: &str,
         node: &cairn_schema::NodeKey,
-        resource: &cairn_schema::Resource<KeyRefs>,
+        resource: &Resource<KeyRefs>,
     ) -> Result<(), Abort> {
         let select =
             "SELECT position FROM resources WHERE graph_id = ?1 AND node = ?2 AND key = ?3";
@@ -493,13 +515,15 @@ impl<'connection> Writer<'connection> {
         &self,
         id: &str,
         node: &cairn_schema::NodeKey,
-        resource: &cairn_schema::Resource<KeyRefs>,
+        resource: &Resource<KeyRefs>,
         position: usize,
     ) -> Result<(), Abort> {
-        let (kind, body) = written_content(
-            resource,
-            &["tip", "template", "example", "reference", "message_draft"],
-        )?;
+        let Resource {
+            key,
+            title,
+            content,
+        } = resource;
+        let (kind, body) = graph::resource_columns(content);
         let position =
             i64::try_from(position).map_err(|_| malformed("resource position".to_owned()))?;
         self.run(
@@ -508,9 +532,9 @@ impl<'connection> Writer<'connection> {
             vec![
                 text(id),
                 text(node),
-                text(&resource.key),
+                text(key),
                 int(position),
-                opt_text(resource.title.as_ref()),
+                opt_text(title.as_ref()),
                 text(kind),
                 text(&body),
             ],
@@ -623,29 +647,26 @@ impl<'connection> Writer<'connection> {
     }
 }
 
-/// An enum's written name, for a text column.
-pub(crate) fn json_enum<T: serde::Serialize>(value: &T) -> Result<Value, StoreError> {
-    match serde_json::to_value(value) {
-        Ok(Json::String(name)) => Ok(Value::Text(name)),
-        other => Err(StoreError::Backend(format!(
-            "{other:?} is not an enum name"
-        ))),
-    }
+/// A role's key, id, title, and multi columns.
+fn role_row(role: &Role<KeyRefs>) -> [Value; 4] {
+    let Role {
+        key,
+        id,
+        title,
+        multi,
+    } = role;
+    [text(key), text(id), opt_text(title.as_ref()), flag(*multi)]
 }
 
-/// The one content field of an attachment's written form, among `fields`, and its text.
-pub(crate) fn written_content<T: serde::Serialize>(
-    value: &T,
-    fields: &[&'static str],
-) -> Result<(&'static str, String), Abort> {
-    let written = serde_json::to_value(value)
-        .map_err(|error| malformed(format!("an attachment does not serialize: {error}")))?;
-    for field in fields {
-        if let Some(content) = written.get(*field).and_then(Json::as_str) {
-            return Ok((field, content.to_owned()));
-        }
-    }
-    Err(malformed(format!("{written} holds none of {fields:?}")))
+/// A participation kind's key, id, title, and multi columns.
+fn kind_row(kind: &ParticipationKind<KeyRefs>) -> [Value; 4] {
+    let ParticipationKind {
+        key,
+        id,
+        title,
+        multi,
+    } = kind;
+    [text(key), text(id), opt_text(title.as_ref()), flag(*multi)]
 }
 
 /// The entities an answer names.
@@ -653,7 +674,11 @@ pub(crate) fn answer_entities(value: &AnswerValue) -> Vec<cairn_schema::EntityKe
     match value {
         AnswerValue::Entity(entity) => vec![entity.clone()],
         AnswerValue::EntityList(entities) => entities.iter().cloned().collect(),
-        _ => Vec::new(),
+        AnswerValue::Boolean(_)
+        | AnswerValue::SingleChoice(_)
+        | AnswerValue::MultiChoice(_)
+        | AnswerValue::Text(_)
+        | AnswerValue::Date(_) => Vec::new(),
     }
 }
 

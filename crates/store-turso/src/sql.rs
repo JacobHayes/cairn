@@ -138,6 +138,30 @@ impl Row {
         serde_json::from_str(&self.text(index)?)
             .map_err(|error| corrupt(&format!("column {index}: {error}")))
     }
+
+    pub fn opt_json<T: DeserializeOwned>(&self, index: usize) -> Result<Option<T>, StoreError> {
+        self.opt_text(index)?
+            .map(|text| serde_json::from_str(&text))
+            .transpose()
+            .map_err(|error| corrupt(&format!("column {index}: {error}")))
+    }
+
+    pub fn flag(&self, index: usize) -> Result<bool, StoreError> {
+        Ok(self.int(index)? != 0)
+    }
+
+    pub fn opt_flag(&self, index: usize) -> Result<Option<bool>, StoreError> {
+        Ok(self.opt_int(index)?.map(|flag| flag != 0))
+    }
+
+    pub fn opt_timestamp(&self, index: usize) -> Result<Option<Timestamp>, StoreError> {
+        self.opt_int(index)?.map(timestamp).transpose()
+    }
+
+    /// A unit enum from its name (see [`enum_name`]).
+    pub fn name<T: DeserializeOwned>(&self, index: usize) -> Result<T, StoreError> {
+        enum_from(&self.text(index)?)
+    }
 }
 
 pub(crate) fn corrupt(reason: &str) -> StoreError {
@@ -243,6 +267,39 @@ pub(crate) fn json<T: Serialize>(value: &T) -> Result<Value, StoreError> {
     serde_json::to_string(value)
         .map(Value::Text)
         .map_err(|error| StoreError::Backend(format!("a value does not serialize: {error}")))
+}
+
+/// A JSON column, or null.
+pub(crate) fn opt_json<T: Serialize>(value: Option<&T>) -> Result<Value, StoreError> {
+    value.map_or(Ok(Value::Null), json)
+}
+
+/// A timestamp, or null.
+pub(crate) fn opt_time(value: Option<Timestamp>) -> Result<Value, StoreError> {
+    value.map_or(Ok(Value::Null), time)
+}
+
+/// A unit enum's written name, for a text column. Serde's derive names every unit variant,
+/// so a unit variant added later round-trips with no change here; a variant that carries
+/// data has no name and fails the write.
+pub(crate) fn enum_name<T: Serialize>(value: &T) -> Result<String, StoreError> {
+    match serde_json::to_value(value) {
+        Ok(serde_json::Value::String(name)) => Ok(name),
+        other => Err(StoreError::Backend(format!(
+            "{other:?} is not an enum name"
+        ))),
+    }
+}
+
+/// A unit enum's name ([`enum_name`]) as a text value.
+pub(crate) fn json_enum<T: Serialize>(value: &T) -> Result<Value, StoreError> {
+    enum_name(value).map(Value::Text)
+}
+
+/// A unit enum from its written name ([`enum_name`]).
+pub(crate) fn enum_from<T: DeserializeOwned>(name: &str) -> Result<T, StoreError> {
+    serde_json::from_value(serde_json::Value::String(name.to_owned()))
+        .map_err(|error| corrupt(&format!("{name:?}: {error}")))
 }
 
 /// A graph's row id: `journey/<id>`, `draft/<route>`, or `version/<route>/<number>`.

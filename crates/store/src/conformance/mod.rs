@@ -23,6 +23,7 @@
 )]
 
 pub mod commits;
+pub mod every;
 pub mod queries;
 pub mod records;
 
@@ -111,6 +112,9 @@ macro_rules! conformance_suite {
             commits::a_create_at_a_deleted_journey_id_is_rejected,
             commits::a_proposal_revision_is_independent_of_its_destination,
             commits::an_entity_merge_is_stale_when_another_journey_references_its_entities,
+            every::every_field_and_variant_loads_back_equal,
+            every::a_cleared_overwrite_loads_back_equal_and_every_record_removes,
+            every::every_auth_and_conversation_field_and_variant_loads_back_equal,
             queries::aliases_resolve_to_their_entity,
             queries::current_revisions_list_every_domain_and_proposal,
             queries::the_journey_index_filters_by_status_route_version_reference_and_upgrade,

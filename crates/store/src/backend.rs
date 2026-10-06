@@ -8,8 +8,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::{
     ChangeSet, Deployment, Domain, EntityKey, EventType, Graph, GraphId, GraphRecord, JourneyId,
     JourneyState, Limit, Location, NodeKey, PatchReceipt, PatchTarget, ProposalId, Record,
-    RecordKey, Rejection, RetiredKey, Revision, RevisionConflict, RevisionOf, Slug, Subject,
-    TouchedSet, Violation, ViolationCode, Violations, Write, limits::GRAPH_BYTES_MAX,
+    RecordKey, Rejection, RetiredKey, RetiredKeys, Revision, RevisionConflict, RevisionOf, Slug,
+    Subject, TouchedSet, Violation, ViolationCode, Violations, Write, limits::GRAPH_BYTES_MAX,
 };
 
 use crate::commit::{Commit, CommitError, Committed, StoreError};
@@ -627,61 +627,77 @@ fn written_text<T: serde::Serialize>(value: &T) -> String {
 
 /// Every record of a graph, in an order a put can replay: content before state.
 pub fn graph_records(graph: &Graph) -> Vec<GraphRecord> {
+    let Graph {
+        default_owner,
+        roles,
+        participation_kinds,
+        nodes,
+        retired_keys:
+            RetiredKeys {
+                nodes: retired_nodes,
+                roles: retired_roles,
+                kinds: retired_kinds,
+            },
+        state,
+    } = graph;
     let mut records: Vec<GraphRecord> = Vec::new();
-    records.extend(graph.default_owner.clone().map(GraphRecord::DefaultOwner));
-    records.extend(graph.roles.values().cloned().map(GraphRecord::Role));
-    let kinds = graph.participation_kinds.values().cloned();
-    records.extend(kinds.map(GraphRecord::Kind));
-    records.extend(graph.nodes.values().cloned().map(GraphRecord::Node));
-    let retired = &graph.retired_keys;
-    let retired = (retired.nodes.iter().cloned().map(RetiredKey::Node))
-        .chain(retired.roles.iter().cloned().map(RetiredKey::Role))
-        .chain(retired.kinds.iter().cloned().map(RetiredKey::Kind));
+    records.extend(default_owner.clone().map(GraphRecord::DefaultOwner));
+    records.extend(roles.values().cloned().map(GraphRecord::Role));
+    records.extend(participation_kinds.values().cloned().map(GraphRecord::Kind));
+    records.extend(nodes.values().cloned().map(GraphRecord::Node));
+    let retired = (retired_nodes.iter().cloned().map(RetiredKey::Node))
+        .chain(retired_roles.iter().cloned().map(RetiredKey::Role))
+        .chain(retired_kinds.iter().cloned().map(RetiredKey::Kind));
     records.extend(retired.map(GraphRecord::RetiredKey));
-    records.extend(state_records(&graph.state));
+    records.extend(state_records(state));
     records
 }
 
 fn state_records(state: &JourneyState) -> Vec<GraphRecord> {
+    let JourneyState {
+        nodes,
+        local_edits,
+        answers,
+        role_fills,
+        pins,
+        snoozes,
+        overrides,
+        tombstones,
+        annotations,
+    } = state;
     let mut records = Vec::new();
-    for (node, value) in &state.nodes {
-        let (node, state) = (node.clone(), value.clone());
+    for (node, state) in nodes {
+        let (node, state) = (node.clone(), state.clone());
         records.push(GraphRecord::NodeState { node, state });
     }
-    for (node, edits) in &state.local_edits {
+    for (node, edits) in local_edits {
         for edit in edits {
             let (node, edit) = (node.clone(), edit.clone());
             records.push(GraphRecord::LocalEdit { node, edit });
         }
     }
-    for (decision, value) in &state.answers {
+    for (decision, value) in answers {
         let (decision, value) = (decision.clone(), value.clone());
         records.push(GraphRecord::Answer { decision, value });
     }
-    for (role, entities) in &state.role_fills {
+    for (role, entities) in role_fills {
         let (role, entities) = (role.clone(), entities.clone());
         records.push(GraphRecord::RoleFill { role, entities });
     }
-    for (node, date) in &state.pins {
+    for (node, date) in pins {
         let (node, date) = (node.clone(), *date);
         records.push(GraphRecord::Pin { node, date });
     }
-    for (node, until) in &state.snoozes {
+    for (node, until) in snoozes {
         let (node, until) = (node.clone(), until.clone());
         records.push(GraphRecord::Snooze { node, until });
     }
-    for (node, overrides) in &state.overrides {
+    for (node, overrides) in overrides {
         let (node, overrides) = (node.clone(), overrides.clone());
         records.push(GraphRecord::Overrides { node, overrides });
     }
-    records.extend(state.tombstones.iter().cloned().map(GraphRecord::Tombstone));
-    records.extend(
-        state
-            .annotations
-            .values()
-            .cloned()
-            .map(GraphRecord::Annotation),
-    );
+    records.extend(tombstones.iter().cloned().map(GraphRecord::Tombstone));
+    records.extend(annotations.values().cloned().map(GraphRecord::Annotation));
     records
 }
 

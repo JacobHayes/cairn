@@ -4,16 +4,15 @@ use std::collections::BTreeMap;
 
 use cairn_schema::{
     Deployment, Domain, Entity, GraphId, Journey, JourneyHeader, JourneyId, Lineage, PatchId,
-    PatchReceipt, Proposal, ProposalId, Revision, RevisionOf, Route, RouteDraft, RouteHeader,
-    RouteId, RouteVersion, VersionNumber,
+    PatchReceipt, Proposal, ProposalDraft, ProposalId, Revision, RevisionOf, Route, RouteDraft,
+    RouteHeader, RouteId, RouteVersion, VersionNumber,
 };
 use cairn_store::backend::StoredReceipt;
 use cairn_store::{Document, LoadTarget, Revisions, StoreError};
-use serde_json::json;
 use turso::Connection;
 
 use crate::graph;
-use crate::sql::{corrupt, domain_from, first, int, parse, rows, text};
+use crate::sql::{Row, corrupt, domain_from, first, int, parse, rows, text};
 
 pub(crate) async fn document(
     connection: &Connection,
@@ -39,24 +38,29 @@ pub(crate) async fn journey_row(
     let Some(row) = first(connection, select, vec![text(id)]).await? else {
         return Ok(None);
     };
-    let lineage = match (row.opt_parse::<RouteId>(3)?, row.opt_int(4)?) {
-        (Some(route), Some(version)) => Some(Lineage {
-            route,
-            version: crate::sql::number(version)?,
-        }),
-        _ => None,
-    };
+    let lineage = lineage(&row, 3)?;
     let header = JourneyHeader {
         id: id.clone(),
         name: row.parse(0)?,
         description: row.opt_parse(1)?,
-        status: serde_json::from_value(json!(row.text(2)?))
-            .map_err(|error| corrupt(&format!("journey status: {error}")))?,
+        status: row.name(2)?,
         lineage,
         created_at: row.timestamp(5)?,
         created_on: row.parse(6)?,
     };
     Ok(Some((header, row.number(7)?)))
+}
+
+/// A journey's lineage from its route and version columns, `at` and the next.
+pub(crate) fn lineage(row: &Row, at: usize) -> Result<Option<Lineage>, StoreError> {
+    match (row.opt_parse::<RouteId>(at)?, row.opt_int(at + 1)?) {
+        (Some(route), Some(version)) => Ok(Some(Lineage {
+            route,
+            version: crate::sql::number(version)?,
+        })),
+        (None, None) => Ok(None),
+        (Some(_), None) | (None, Some(_)) => Err(corrupt("a journey has half a lineage")),
+    }
 }
 
 pub(crate) async fn journey(
@@ -87,7 +91,7 @@ pub(crate) async fn route_row(
         id: id.clone(),
         name: row.parse(0)?,
         description: row.opt_parse(1)?,
-        retired: row.int(2)? != 0,
+        retired: row.flag(2)?,
     };
     Ok(Some((header, row.number(3)?)))
 }
@@ -203,31 +207,22 @@ pub(crate) async fn proposal(
     let Some(row) = first(connection, select, vec![text(id)]).await? else {
         return Ok(None);
     };
-    let destination = domain_from(&row.text(0)?, row.opt_text(1)?)?;
-    let mut draft = json!({
-        "title": row.text(4)?,
-        "destination_revision": row.int(6)?,
-        "mutations": row.json::<serde_json::Value>(7)?,
-        "items": row.json::<serde_json::Value>(8)?,
-    });
-    if let Some(description) = row.opt_text(5)? {
-        draft["description"] = json!(description);
-    }
-    let mut written = json!({
-        "id": id,
-        "destination": destination,
-        "revision": row.int(2)?,
-        "status": row.text(3)?,
-        "draft": draft,
-        "created_by": row.text(10)?,
-        "created_at": row.timestamp(11)?.to_string(),
-    });
-    if let Some(agent) = row.opt_text(9)? {
-        written["proposing_agent"] = json!(agent);
-    }
-    serde_json::from_value(written)
-        .map(Some)
-        .map_err(|error| corrupt(&format!("proposal {id}: {error}")))
+    Ok(Some(Proposal {
+        id: id.clone(),
+        destination: domain_from(&row.text(0)?, row.opt_text(1)?)?,
+        revision: row.number(2)?,
+        status: row.name(3)?,
+        draft: ProposalDraft {
+            title: row.parse(4)?,
+            description: row.opt_parse(5)?,
+            destination_revision: row.number(6)?,
+            mutations: row.json(7)?,
+            items: row.json(8)?,
+        },
+        proposing_agent: row.opt_parse(9)?,
+        created_by: row.parse(10)?,
+        created_at: row.timestamp(11)?,
+    }))
 }
 
 pub(crate) async fn receipt(
@@ -245,7 +240,7 @@ pub(crate) async fn receipt(
 pub(crate) const RECEIPT_COLUMNS: &str = "patch_id, domain_kind, domain_id, proposal_id, \
     content_hash, revision, deployment_revision, proposals, deployment_touched";
 
-pub(crate) fn stored_receipt(row: &crate::sql::Row) -> Result<StoredReceipt, StoreError> {
+pub(crate) fn stored_receipt(row: &Row) -> Result<StoredReceipt, StoreError> {
     Ok(StoredReceipt {
         receipt: PatchReceipt {
             patch_id: row.parse(0)?,
@@ -288,22 +283,24 @@ pub(crate) async fn revision_of(
 }
 
 pub(crate) async fn revisions(connection: &Connection) -> Result<Revisions, StoreError> {
-    let mut revisions = Revisions {
-        deployment: revision_of(connection, &RevisionOf::Domain(Domain::Deployment)).await?,
-        ..Revisions::default()
-    };
+    let mut journeys = BTreeMap::new();
     for row in rows(connection, "SELECT id, revision FROM journeys", Vec::new()).await? {
-        revisions.journeys.insert(row.parse(0)?, row.number(1)?);
+        journeys.insert(row.parse(0)?, row.number(1)?);
     }
+    let mut routes = BTreeMap::new();
     for row in rows(connection, "SELECT id, revision FROM routes", Vec::new()).await? {
-        revisions.routes.insert(row.parse(0)?, row.number(1)?);
+        routes.insert(row.parse(0)?, row.number(1)?);
     }
+    let mut proposals = BTreeMap::new();
     let select = "SELECT id, destination_kind, destination_id, revision FROM proposals";
     for row in rows(connection, select, Vec::new()).await? {
         let destination = domain_from(&row.text(1)?, row.opt_text(2)?)?;
-        revisions
-            .proposals
-            .insert(row.parse(0)?, (destination, row.number(3)?));
+        proposals.insert(row.parse(0)?, (destination, row.number(3)?));
     }
-    Ok(revisions)
+    Ok(Revisions {
+        deployment: revision_of(connection, &RevisionOf::Domain(Domain::Deployment)).await?,
+        journeys,
+        routes,
+        proposals,
+    })
 }
