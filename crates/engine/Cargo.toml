@@ -1,0 +1,29 @@
+[package]
+name = "cairn-engine"
+description = "The pure engine: the graph model, the patch applier with its validation pipeline, the state machines, events, and replay."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[features]
+# Property-test strategies (`cairn_engine::testing`): generated graphs and operation
+# sequences, for this crate's tests and for the crates that build on the engine.
+testing = ["dep:proptest", "cairn-schema/testing"]
+
+[dependencies]
+cairn-schema.workspace = true
+jiff.workspace = true
+proptest = { workspace = true, optional = true }
+
+[dev-dependencies]
+cairn-engine = { workspace = true, features = ["testing"] }
+patina-dst-proptest.workspace = true
+proptest.workspace = true
+schemars.workspace = true
+serde_json.workspace = true
+
+[lints]
+workspace = true

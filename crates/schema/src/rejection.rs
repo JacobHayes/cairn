@@ -71,6 +71,7 @@ pub enum ViolationCode {
     FilledThroughDecision,
     PinnedThroughDecision,
     // Domains and lifecycle.
+    MutationNotForTarget,
     LineageInvalid,
     ArchivedJourney,
     TargetExists,

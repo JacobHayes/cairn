@@ -19,19 +19,21 @@ No change.
 ```
 ladder: rungs that exist: 1 2 3 5
 ladder: summary
-ladder: rung 1: suite workspace lints inherited: 1 crates
-ladder: rung 1: suite rustfmt: 44 files
-ladder: rung 1: suite clippy: 1 crates
-ladder: rung 1: passed in 7s
+ladder: rung 1: suite workspace lints inherited: 2 crates
+ladder: rung 1: suite rustfmt: 87 files
+ladder: rung 1: suite clippy: 2 crates
+ladder: rung 1: passed in 11s
+ladder: rung 2: suite cairn-engine tests: 35 tests
 ladder: rung 2: suite cairn-schema tests: 75 tests
-ladder: rung 2: passed in 20s
+ladder: rung 2: passed in 25s
 ladder: rung 3: PROPTEST_CASES=256
+ladder: rung 3: suite tests/property_apply.rs: 2 tests
 ladder: rung 3: suite tests/property_derived.rs: 3 tests
 ladder: rung 3: suite tests/property_documents.rs: 3 tests
 ladder: rung 3: suite tests/property_model.rs: 4 tests
 ladder: rung 3: suite tests/property_text.rs: 3 tests
 ladder: rung 3: suite tests/property_writes.rs: 9 tests
-ladder: rung 3: passed in 4s
+ladder: rung 3: passed in 10s
 ladder: rung 5: suite generated files unchanged: 1 files
 ladder: rung 5: passed in 4s
 ladder: check passed: rungs 1 2 3 5
@@ -49,10 +51,10 @@ error: used `unwrap()` on a `Result` value
    --> crates/schema/src/lib.rs:104:5
 error: could not compile `cairn-schema` (lib) due to 1 previous error
 ladder: summary
-ladder: rung 1: suite workspace lints inherited: 1 crates
-ladder: rung 1: suite rustfmt: 44 files
+ladder: rung 1: suite workspace lints inherited: 2 crates
+ladder: rung 1: suite rustfmt: 87 files
 ladder: rung 1: FAILED: clippy reported errors
-ladder: rung 1: FAILED in 2s
+ladder: rung 1: FAILED in 3s
 ladder: check FAILED at rung 1; later rungs did not run
 [check] ERROR task failed
 ```
@@ -66,21 +68,23 @@ Planted: a function whose body is 70 lines, the limit (PRACTICES, Code shape).
 ```
 ladder: rungs that exist: 1 2 3 5
 ladder: summary
-ladder: rung 1: suite workspace lints inherited: 1 crates
-ladder: rung 1: suite rustfmt: 44 files
-ladder: rung 1: suite clippy: 1 crates
-ladder: rung 1: passed in 3s
+ladder: rung 1: suite workspace lints inherited: 2 crates
+ladder: rung 1: suite rustfmt: 87 files
+ladder: rung 1: suite clippy: 2 crates
+ladder: rung 1: passed in 11s
+ladder: rung 2: suite cairn-engine tests: 35 tests
 ladder: rung 2: suite cairn-schema tests: 75 tests
-ladder: rung 2: passed in 6s
+ladder: rung 2: passed in 33s
 ladder: rung 3: PROPTEST_CASES=256
+ladder: rung 3: suite tests/property_apply.rs: 2 tests
 ladder: rung 3: suite tests/property_derived.rs: 3 tests
 ladder: rung 3: suite tests/property_documents.rs: 3 tests
 ladder: rung 3: suite tests/property_model.rs: 4 tests
 ladder: rung 3: suite tests/property_text.rs: 3 tests
 ladder: rung 3: suite tests/property_writes.rs: 9 tests
-ladder: rung 3: passed in 3s
+ladder: rung 3: passed in 11s
 ladder: rung 5: suite generated files unchanged: 1 files
-ladder: rung 5: passed in 2s
+ladder: rung 5: passed in 5s
 ladder: check passed: rungs 1 2 3 5
 ```
 
@@ -96,8 +100,8 @@ error: this function has too many lines (71/70)
   --> crates/schema/src/lib.rs:99:1
 error: could not compile `cairn-schema` (lib) due to 1 previous error
 ladder: summary
-ladder: rung 1: suite workspace lints inherited: 1 crates
-ladder: rung 1: suite rustfmt: 44 files
+ladder: rung 1: suite workspace lints inherited: 2 crates
+ladder: rung 1: suite rustfmt: 87 files
 ladder: rung 1: FAILED: clippy reported errors
 ladder: rung 1: FAILED in 2s
 ladder: check FAILED at rung 1; later rungs did not run
@@ -114,7 +118,7 @@ Planted: `pub const   SPACED : u32=1;`.
 ladder: rungs that exist: 1 2 3 5
 Diff in crates/schema/src/lib.rs:95:
 ladder: summary
-ladder: rung 1: suite workspace lints inherited: 1 crates
+ladder: rung 1: suite workspace lints inherited: 2 crates
 ladder: rung 1: FAILED: rustfmt: files are not formatted (run: cargo fmt --all)
 ladder: rung 1: FAILED in 0s
 ladder: check FAILED at rung 1; later rungs did not run
@@ -130,44 +134,45 @@ Planted: a rung 4 (`mise-tasks/check/4`) that runs the workspace tests named `st
 ```
 ladder: rungs that exist: 1 2 3 4 5
 ladder: summary
-ladder: rung 1: suite workspace lints inherited: 1 crates
-ladder: rung 1: suite rustfmt: 44 files
-ladder: rung 1: suite clippy: 1 crates
-ladder: rung 1: passed in 3s
+ladder: rung 1: suite workspace lints inherited: 2 crates
+ladder: rung 1: suite rustfmt: 87 files
+ladder: rung 1: suite clippy: 2 crates
+ladder: rung 1: passed in 4s
+ladder: rung 2: suite cairn-engine tests: 35 tests
 ladder: rung 2: suite cairn-schema tests: 75 tests
 ladder: rung 2: passed in 3s
 ladder: rung 3: PROPTEST_CASES=256
+ladder: rung 3: suite tests/property_apply.rs: 2 tests
 ladder: rung 3: suite tests/property_derived.rs: 3 tests
 ladder: rung 3: suite tests/property_documents.rs: 3 tests
 ladder: rung 3: suite tests/property_model.rs: 4 tests
 ladder: rung 3: suite tests/property_text.rs: 3 tests
 ladder: rung 3: suite tests/property_writes.rs: 9 tests
-ladder: rung 3: passed in 3s
+ladder: rung 3: passed in 8s
 ladder: rung 4: FAILED: suite store conformance checked or ran 0 tests
-ladder: rung 4: FAILED in 1s
+ladder: rung 4: FAILED in 3s
 ladder: check FAILED at rung 4; later rungs did not run
 [check] ERROR task failed
 ```
 
 ## HashMap in the engine crate
 
-Planted: a `crates/engine` crate (`cairn-engine`) whose public function returns a `std::collections::HashMap`.
+Planted: a public function in the engine crate (`cairn-engine`) that returns a `std::collections::HashMap`.
 
 `mise run check` exit status: 1 (expected nonzero).
 
 ```
 ladder: rungs that exist: 1 2 3 5
 error: use of a disallowed type `std::collections::HashMap`
- --> crates/engine/src/lib.rs:5:38
+  --> crates/engine/src/lib.rs:29:38
 error: use of a disallowed type `std::collections::HashMap`
- --> crates/engine/src/lib.rs:6:22
+  --> crates/engine/src/lib.rs:30:22
 error: could not compile `cairn-engine` (lib) due to 2 previous errors
-error: could not compile `cairn-engine` (lib test) due to 2 previous errors
 ladder: summary
 ladder: rung 1: suite workspace lints inherited: 2 crates
-ladder: rung 1: suite rustfmt: 45 files
+ladder: rung 1: suite rustfmt: 87 files
 ladder: rung 1: FAILED: clippy reported errors
-ladder: rung 1: FAILED in 0s
+ladder: rung 1: FAILED in 1s
 ladder: check FAILED at rung 1; later rungs did not run
 [check] ERROR task failed
 ```
@@ -182,7 +187,7 @@ Planted: the schema crate without `[lints] workspace = true`.
 ladder: rungs that exist: 1 2 3 5
 ladder: summary
 ladder: rung 1: FAILED: cairn-schema does not inherit the workspace lints ([lints] workspace = true in crates/schema/Cargo.toml)
-ladder: rung 1: FAILED in 1s
+ladder: rung 1: FAILED in 0s
 ladder: check FAILED at rung 1; later rungs did not run
 [check] ERROR task failed
 ```

@@ -348,6 +348,18 @@ fn removal_keys(removal: &Removal) -> Vec<GraphKey> {
             .map(|node| GraphKey::RetiredKey(RetiredKey::Node(node.clone()))),
     );
     keys.extend(removal.edges.iter().cloned().map(GraphKey::Edge));
+    // A node that stays and loses a route-copied edge to the subtree is marked (B4).
+    let removed: Vec<&NodeKey> = removal.nodes().collect();
+    keys.extend(
+        removal
+            .edges
+            .iter()
+            .filter(|edge| !removed.contains(&&edge.node))
+            .map(|edge| GraphKey::LocalEdit {
+                node: edge.node.clone(),
+                edit: LocalEdit::Requires(edge.requires.clone()),
+            }),
+    );
     keys.extend(
         removal
             .annotations

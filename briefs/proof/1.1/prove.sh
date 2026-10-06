@@ -119,21 +119,7 @@ chmod +x "$tree/mise-tasks/check/4"
 scenario "A rung that ran zero tests" nonzero "Planted: a rung 4 (\`mise-tasks/check/4\`) that runs the workspace tests named \`store_conformance::\` and reports how many ran. No crate has such tests yet, so it reports zero."
 
 reset_tree
-mkdir -p "$tree/crates/engine/src"
-cat >"$tree/crates/engine/Cargo.toml" <<'EOF'
-[package]
-name = "cairn-engine"
-description = "Planted engine crate."
-version.workspace = true
-edition.workspace = true
-license.workspace = true
-publish.workspace = true
-
-[lints]
-workspace = true
-EOF
-cat >"$tree/crates/engine/src/lib.rs" <<'EOF'
-//! Planted engine crate.
+cat >>"$tree/crates/engine/src/lib.rs" <<'EOF'
 
 /// Counts each value.
 #[must_use]
@@ -145,8 +131,7 @@ pub fn count_each(values: &[u32]) -> std::collections::HashMap<u32, u32> {
     counts
 }
 EOF
-(cd "$tree" && mise exec -- cargo generate-lockfile --offline >/dev/null 2>&1)
-scenario "HashMap in the engine crate" nonzero 'Planted: a `crates/engine` crate (`cairn-engine`) whose public function returns a `std::collections::HashMap`.'
+scenario "HashMap in the engine crate" nonzero 'Planted: a public function in the engine crate (`cairn-engine`) that returns a `std::collections::HashMap`.'
 
 reset_tree
 sed -i '/^\[lints\]$/,$d' "$tree/crates/schema/Cargo.toml"

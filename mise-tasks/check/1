@@ -55,7 +55,9 @@ grep -v -e '^Formatting ' -e '^Spent ' <<<"$fmt_output" || true
 ladder_suite rustfmt "$(grep -c '^Formatting ' <<<"$fmt_output" || true)" files
 
 # clippy, warnings denied (pedantic included): once for the crates with no scoped lints,
-# once per scoped crate. JSON on stdout names each crate checked; diagnostics go to stderr.
+# once per scoped crate. `--no-deps` keeps a scoped crate's lints off the workspace crates it
+# depends on (the engine's on the schema crate). JSON on stdout names each crate checked;
+# diagnostics go to stderr.
 scoped=()
 general=()
 while IFS=$'\t' read -r name _; do
@@ -68,7 +70,7 @@ done <<<"$members"
 artifacts=""
 run_clippy() {
   local output
-  output=$(cargo clippy --locked --all-targets --all-features \
+  output=$(cargo clippy --locked --no-deps --all-targets --all-features \
     --message-format=json-render-diagnostics "$@") || ladder_fail "clippy reported errors"
   artifacts+=$'\n'"$output"
 }

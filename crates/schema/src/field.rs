@@ -65,6 +65,34 @@ pub enum NodeField {
     FeedsMilestone,
 }
 
+impl NodeField {
+    /// Every field, in declaration order.
+    pub const ALL: [NodeField; 22] = [
+        NodeField::Id,
+        NodeField::Parent,
+        NodeField::Title,
+        NodeField::Description,
+        NodeField::Weight,
+        NodeField::RelevantWhen,
+        NodeField::DueBy,
+        NodeField::NotBefore,
+        NodeField::Estimate,
+        NodeField::Placeholder,
+        NodeField::RequiresArtifact,
+        NodeField::Final,
+        NodeField::AutoReach,
+        NodeField::OpensAt,
+        NodeField::ClosesAt,
+        NodeField::Gates,
+        NodeField::Closes,
+        NodeField::Prompt,
+        NodeField::Help,
+        NodeField::Choices,
+        NodeField::FillsRole,
+        NodeField::FeedsMilestone,
+    ];
+}
+
 /// A new value for one node field.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,

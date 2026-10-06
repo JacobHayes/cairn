@@ -44,6 +44,19 @@ pub enum State {
 }
 
 impl State {
+    /// Every state, in declaration order.
+    pub const ALL: [State; 9] = [
+        State::Todo,
+        State::Active,
+        State::Done,
+        State::Skipped,
+        State::Open,
+        State::Decided,
+        State::Pending,
+        State::Reached,
+        State::Derived,
+    ];
+
     /// D1: whether `kind`'s machine has this state.
     #[must_use]
     pub const fn legal_for(self, kind: NodeKind) -> bool {
@@ -108,6 +121,9 @@ pub enum LocalEdit {
     Participation(KindKey),
     /// One of the node's resources.
     Resource(AttachmentKey),
+    /// The node's kind or, for a decision, its answer type: what a replacement changes that
+    /// no single field edit can (B7).
+    Shape,
 }
 
 /// One node's stored state in a journey.
@@ -128,6 +144,9 @@ pub struct NodeState {
     /// decision was decided or work was done (F2).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub finished_on: Option<Date>,
+    /// Why the node was skipped, while it is (D1: a skip requires a reason).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub skip_reason: Option<Reason>,
 }
 
 impl NodeState {
@@ -140,6 +159,7 @@ impl NodeState {
             atomic: false,
             started_on: None,
             finished_on: None,
+            skip_reason: None,
         }
     }
 }

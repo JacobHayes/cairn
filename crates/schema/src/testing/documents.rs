@@ -104,6 +104,7 @@ pub fn arb_local_edit() -> impl Strategy<Value = LocalEdit> {
         arb_node_key().prop_map(LocalEdit::Requires),
         arb_kind_key().prop_map(LocalEdit::Participation),
         arb_attachment_key().prop_map(LocalEdit::Resource),
+        Just(LocalEdit::Shape),
     ]
 }
 
@@ -119,14 +120,16 @@ pub fn arb_node_state() -> impl Strategy<Value = NodeState> {
         any::<bool>(),
         prop::option::of(arb_date()),
         prop::option::of(arb_date()),
+        prop::option::of(arb_reason()),
     )
         .prop_map(
-            |(state, provenance, atomic, started_on, finished_on)| NodeState {
+            |(state, provenance, atomic, started_on, finished_on, skip_reason)| NodeState {
                 state,
                 provenance,
                 atomic,
                 started_on,
                 finished_on,
+                skip_reason,
             },
         )
 }

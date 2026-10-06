@@ -121,6 +121,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "175812e0be2bccb6abe50bb8d566126198344f707e304f45c648fd8f2cc0365e"
 
 [[package]]
+name = "cairn-engine"
+version = "0.1.0"
+dependencies = [
+ "cairn-engine",
+ "cairn-schema",
+ "jiff",
+ "patina-dst-proptest",
+ "proptest",
+ "schemars",
+ "serde_json",
+]
+
+[[package]]
 name = "cairn-schema"
 version = "0.1.0"
 dependencies = [
