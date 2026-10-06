@@ -1,6 +1,7 @@
 //! Events (J1), the change set an accepted patch produces (ARCHITECTURE, Terms: Change set),
 //! and the patch receipt a resubmission is answered from (H5).
 
+use std::collections::BTreeSet;
 use std::fmt::{self, Write as _};
 
 use schemars::JsonSchema;
@@ -17,7 +18,7 @@ use crate::id::{
 };
 use crate::number::Revision;
 use crate::patch::{DraftSource, Mutation, Override, Patch, PatchTarget, Transition};
-use crate::record::Write;
+use crate::record::{GraphKey, RecordKey, Write};
 use crate::text::Markdown;
 use crate::touched::TouchedSet;
 use jiff::Timestamp;
@@ -160,6 +161,32 @@ impl Event {
     #[must_use]
     pub fn touched(&self) -> TouchedSet {
         self.delta.iter().flat_map(Write::keys).collect()
+    }
+
+    /// J4, J5: the nodes the event is about or wrote on: its subject, both ends of an edge,
+    /// and the node every record it wrote hangs off. A node's history is the events naming it.
+    #[must_use]
+    pub fn nodes(&self) -> BTreeSet<NodeKey> {
+        let mut nodes = BTreeSet::new();
+        match &self.subject {
+            Subject::Node(node) => {
+                nodes.insert(node.clone());
+            }
+            Subject::Edge(edge) => {
+                nodes.insert(edge.node.clone());
+                nodes.insert(edge.requires.clone());
+            }
+            _ => {}
+        }
+        for key in self.touched().as_set() {
+            if let RecordKey::InGraph { key, .. } = key {
+                nodes.extend(key.node_scope().cloned());
+                if let GraphKey::Edge(edge) = key {
+                    nodes.insert(edge.requires.clone());
+                }
+            }
+        }
+        nodes
     }
 }
 

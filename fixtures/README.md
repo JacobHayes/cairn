@@ -127,6 +127,16 @@ the 14-day horizon, so urgency is 0. The scenario matrix checks these values, an
 | 3 | `n_decision_meeting` | 10 | 0 | 45 | 0.1852 |
 | 3 | `n_workload` | 1 | 0 | none | 0.0185 |
 
+Projected after kickoff (brief 2.6), read at 2026-10-06: the canvas level with actions hidden
+(each visible node, and the nearest visible ancestor it is drawn in; C2), the actions that roll
+up into a visible node as its checklist (C4), and the first three items of the next list (C10).
+The scenario tests check these values, and `briefs/proof/2.6/prove.sh` checks these lines
+against the engine's output.
+
+- `vendor-evaluation`, after step 3, visible with actions hidden: `n_decision_meeting`, `n_kickoff`, `n_meeting_date`, `n_partner_runs`, `n_purpose`, `n_reporting`, `n_final_review` (in `n_reporting`), `n_final_report` (in `n_final_review`), `n_findings` (in `n_reporting`), `n_findings_reviewer` (in `n_reporting`), `n_review_opens` (in `n_reporting`), `n_setup`, `n_access` (in `n_setup`), `n_plan` (in `n_setup`), `n_workload` (in `n_setup`), `n_testing`, `n_baseline` (in `n_testing`), `n_comparison_set` (in `n_testing`), `n_partner_led` (in `n_testing`), `n_who_informed`, `n_who_owns`.
+- `vendor-evaluation`, after step 3, actions rolled up: `n_plan` holds `n_plan_draft`, `n_plan_review`; `n_partner_led` holds `n_criteria`, `n_partner_results`.
+- `vendor-evaluation`, after step 3, next: `n_access`, `n_decision_meeting`, `n_workload`.
+
 ## `hiring-loop/`
 
 A small route with deep containment (interview loop, onsite, debrief, notes, scorecard) and a
@@ -136,6 +146,13 @@ filling decision and is filled directly. The interviews deliverable is a placeho
 condition: the offer letter when it is yes, the close-out otherwise. The scenario fills the
 panel, skips the screen with a reason, has the assistant break the interviews into one
 interview per panelist with explicit participations, completes the onsite, and makes the offer.
+
+Projected at the end of the scenario (brief 2.6), read at 2026-10-06: the level with actions
+hidden, what rolls up, and the next list, which holds only the offer letter's decision.
+
+- `hiring-loop`, after step 6, visible with actions hidden: `n_choose_panel`, `n_loop`, `n_onsite` (in `n_loop`), `n_interviews` (in `n_onsite`), `n_make_offer`, `n_offer`.
+- `hiring-loop`, after step 6, actions rolled up: `n_loop` holds `n_screen`; `n_onsite` holds `n_debrief`, `n_debrief_notes`, `n_debrief_scorecard`; `n_interviews` holds `n_interview_one`, `n_interview_three`, `n_interview_two`.
+- `hiring-loop`, after step 6, next: `n_offer`.
 
 ## `product-launch/`
 
@@ -152,9 +169,24 @@ date later than the plan's chain allows: a shortfall, which is reported, never r
 Derived (brief 2.3): with the launch pinned to 2026-11-23, the freeze is due 21 days before it,
 on 2026-11-02; reached on 2026-11-04, it is short by 2 days, and so is the launch.
 
+Projected at the end of the scenario (brief 2.6), read at 2026-10-06: the level with actions
+hidden, what rolls up, and the first three items of the next list.
+
+- `product-launch`, after step 4, visible with actions hidden: `n_beta`, `n_beta_end`, `n_beta_start`, `n_build`, `n_features` (in `n_build`), `n_code_freeze`, `n_kickoff`, `n_launch`, `n_materials`, `n_announcement` (in `n_materials`), `n_docs` (in `n_materials`), `n_retro`.
+- `product-launch`, after step 4, actions rolled up: `n_beta` holds `n_beta_feedback`; `n_build` holds `n_hardening`.
+- `product-launch`, after step 4, next: `n_launch`, `n_docs`, `n_announcement`.
+
 ## `bake-off/`
 
 The PRD's ad-hoc sibling: a journey with no route. It is created empty; the assistant drafts a
 two-week bake-off between two options as a proposal (three decisions, four deliverables, one
 milestone, two entities, and a `judges` role declared on the journey); the owner applies it; the
 criteria and judges are decided and both trials start.
+
+Projected at the end of the scenario (brief 2.6), read at 2026-10-06: the level with actions
+hidden (the bake-off has no actions, so nothing rolls up), and the first three items of the
+next list.
+
+- `bake-off`, after step 4, visible with actions hidden: `n_comparison`, `n_criteria`, `n_judges`, `n_summary`, `n_trial_a`, `n_trial_b`, `n_winner`, `n_wrap_up`.
+- `bake-off`, after step 4, actions rolled up: nothing.
+- `bake-off`, after step 4, next: `n_trial_a`, `n_trial_b`, `n_wrap_up`.

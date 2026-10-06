@@ -46,6 +46,10 @@ pub const REQUEST_BYTES_MAX: u32 = 24 * 1024 * 1024;
 pub const CHAIN_COUNT_PER_REJECTION_MAX: u32 = 16;
 /// Explanation entries per derived value in a server response; the rest is a total.
 pub const EXPLANATION_ENTRY_COUNT_MAX: u32 = 50;
+/// Items in one page of a projection an agent pages (the snapshot's acting frontier and node
+/// list, the list, history): the snapshot top-N and history page limit, the same value the
+/// store pages its lists by. Callers page; the remainder is counts and keys.
+pub const PAGE_ITEM_COUNT_MAX: u32 = 200;
 
 // An import is about four mutations per node (PRACTICES, Explicit limits).
 const _: () = assert!(MUTATION_COUNT_PER_PATCH_MAX == 4 * NODE_COUNT_MAX);

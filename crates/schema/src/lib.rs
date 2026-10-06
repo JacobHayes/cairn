@@ -25,6 +25,7 @@ pub mod node;
 mod node_schema;
 pub mod number;
 pub mod patch;
+pub mod projection;
 pub mod proposal;
 pub mod record;
 pub mod refs;
@@ -82,6 +83,13 @@ pub use number::{Days, NumberError, Revision, SignedDays, VersionNumber, Weight}
 pub use patch::{
     ChangeClass, DraftSource, Mutation, Mutations, Override, ParticipationRef, Patch, PatchTarget,
     RecordedEnd, Removal, Transition,
+};
+pub use projection::{
+    Cursor, DecisionEntry, DecisionView, EdgeOrigin, ExplainedField, ExplanationPage, GroupState,
+    HistoryPage, Level, LevelEdge, LevelNode, ListFlag, ListPage, ListQuery, MineEntry, Next,
+    NextQuery, NodeRow, OpenDecision, PatchEvents, RankTerms, RenderedDraft, RenderedSegment,
+    RollUp, Snapshot, SnapshotCounts, SnapshotNode, SnapshotScope, SortBy, StatusSummary, Timeline,
+    TimelineEntry, Trace, UnderlyingEdge, UpcomingMilestone,
 };
 pub use proposal::{
     ConflictResolution, ParticipationMapping, Proposal, ProposalDraft, ProposalStatus, ReviewItem,

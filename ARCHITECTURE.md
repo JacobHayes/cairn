@@ -197,7 +197,8 @@ All in the engine so every host produces the same views (I1, C2 risk mitigation)
 - `snapshot(derived, scope)`: the bounded I3 view with depth and subtree scoping, top-N acting frontier, counts, and keys.
 - `level(derived, shown_kinds, container)`: C2 aggregation: visible nodes, edges re-targeted to nearest visible ancestors with duplicates collapsed, roll-up badges, `max_child_gravity`, min child slack, distinct owners. Visibility is per kind (C2): the caller passes the shown kinds and the drilled-in container, and the rules for hoisting visible nodes, rolling up hidden ones, re-targeting edges, dropping edges that collapse onto one node, and marking hidden prerequisites are fixed in the engine.
 - `trace(derived, key)`: C7 upstream and downstream sets with gravity contributors marked.
-- `decision_view`, `timeline`, `status_summary`, `next` (with sort and filter), `list` (C9, with text search over the journey), `mine(viewer)`, `history(events)`, `explanations(derived, key, field, cursor)`.
+- `decision_view`, `timeline`, `status_summary`, `next` (with sort and filter), `list` (C9, with text search over the journey), `mine(viewer)`, `history(events)`, `explanations(derived, key, field, cursor)`, and `render_draft` (A10, G3: a message draft with journey context, a marker for whatever has no value).
+- Each takes the journey's graph with its `Derived` (a `DerivedJourney`), and its inputs and outputs are schema types, so the API and the wasm host serialize them unchanged.
 
 ### Conditions
 

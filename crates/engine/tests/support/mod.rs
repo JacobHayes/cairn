@@ -280,3 +280,26 @@ pub fn add_nodes(nodes: &[&str]) -> String {
     }
     mutations
 }
+
+/// The vendor evaluation after its up-front decisions, with its owner `e_lead` then merged
+/// into a new entity `e_other` (E6): answers and fills keep the old key, which reads through.
+pub fn vendor_lead_merged() -> Records {
+    let records = vendor_after(2);
+    let created = vendor_patch(
+        &records,
+        "- op: create_entity\n  entity: {key: e_other, name: Other}\n",
+    )
+    .unwrap_or_else(|rejection| panic!("{rejection:#?}"));
+    let records = created.records();
+    let revision = records.journeys[&"j_vendor_eval".parse().unwrap()]
+        .revision
+        .get();
+    let merge = format!(
+        "- op: merge_entities\n  survivor: e_other\n  merged: e_lead\n  journeys: {{j_vendor_eval: {revision}}}\n"
+    );
+    let patch = patch_to(records, "deployment", &merge);
+    match apply(records, &patch, &fixed_inputs()) {
+        Ok(applied) => applied.records().clone(),
+        Err(rejection) => panic!("{rejection:#?}"),
+    }
+}

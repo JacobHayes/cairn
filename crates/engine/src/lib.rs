@@ -1,7 +1,7 @@
 //! The pure engine (ARCHITECTURE, Engine): the graph model, the one write path (`apply`),
-//! the per-kind state machines, events, and replay. No I/O: the clock, the actor, and every
-//! record a patch reads arrive as arguments, and an accepted patch comes back as a change
-//! set for the host to commit.
+//! the per-kind state machines, derive and its projections, events, and replay. No I/O: the
+//! clock, the actor, and every record a patch reads arrive as arguments, and an accepted
+//! patch comes back as a change set for the host to commit.
 #![forbid(unsafe_code)]
 
 pub mod derive;
@@ -11,6 +11,7 @@ pub mod file;
 pub mod graph;
 mod mutate;
 pub mod pipeline;
+pub mod project;
 pub mod records;
 pub mod replay;
 mod stages;
@@ -23,5 +24,6 @@ pub use derive::{Derived, check_plan, consequences, derive};
 pub use file::from_file;
 pub use graph::{Document, Graph, Tree};
 pub use pipeline::{Applied, ApplyInputs, apply};
+pub use project::{DerivedJourney, DraftContext, ProjectionError, history};
 pub use records::Records;
 pub use replay::replay;

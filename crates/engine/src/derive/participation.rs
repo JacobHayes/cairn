@@ -57,6 +57,8 @@ pub struct Participation {
     nodes: BTreeMap<NodeKey, BTreeMap<KindKey, Resolved>>,
     unassigned: BTreeSet<NodeKey>,
     membership_lost: BTreeMap<NodeKey, BTreeSet<KindKey>>,
+    /// Merged entities' old keys, each with the entity it resolves to (E6).
+    aliases: BTreeMap<EntityKey, EntityKey>,
 }
 
 impl Participation {
@@ -93,6 +95,13 @@ impl Participation {
     #[must_use]
     pub fn is_unassigned(&self, node: &NodeKey) -> bool {
         self.unassigned.contains(node)
+    }
+
+    /// E6: the entity a key names once aliases are followed, so a key from before a merge
+    /// reads through to the survivor; an unknown key stands for itself.
+    #[must_use]
+    pub fn canonical_entity<'a>(&'a self, key: &'a EntityKey) -> &'a EntityKey {
+        self.aliases.get(key).unwrap_or(key)
     }
 
     /// B10: the kinds whose seeding entity has left the role the node would inherit.
@@ -147,6 +156,11 @@ pub(crate) fn pass(
     let document = graph.document();
     let mut participation = Participation {
         roles: role_members(document, relevances, deployment),
+        aliases: deployment
+            .aliases
+            .keys()
+            .map(|old| (old.clone(), canonical(deployment, old)))
+            .collect(),
         ..Participation::default()
     };
     let kinds: Vec<KindKey> = std::iter::once(KindKey::owner())

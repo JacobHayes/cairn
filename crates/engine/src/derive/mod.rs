@@ -264,7 +264,7 @@ impl Derived {
 
 /// The node whose structure makes a dependency: the dependent itself for its own edges and
 /// its children, none for those; the ancestor whose requirement, condition, or opening it is.
-fn held_by(via: &DependencyVia) -> Option<&NodeKey> {
+pub(crate) fn held_by(via: &DependencyVia) -> Option<&NodeKey> {
     match via {
         DependencyVia::Explicit | DependencyVia::Containment => None,
         DependencyVia::Inherited { ancestor } => Some(ancestor),
