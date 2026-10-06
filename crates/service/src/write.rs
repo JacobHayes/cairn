@@ -137,7 +137,7 @@ impl<S: Store> Service<S> {
     pub async fn patch(&self, call: &Call, submitted: &DomainPatch) -> Result<Written, WriteError> {
         let patch = submitted.patch();
         if let Some(answer) = self.answer_from_receipt(patch).await? {
-            patina_dst::reachable!("service: a resubmitted patch id answered from its receipt");
+            patina_dst::reachable!("service-resubmission-answered-from-receipt");
             return answer;
         }
         if let Some(rejection) = unconfirmed(patch) {
@@ -180,10 +180,10 @@ impl<S: Store> Service<S> {
                 // H5: the same patch may have committed since the receipt was looked up, and
                 // its own commit is what moved the revision; the receipt answers it then.
                 if let Some(answer) = self.answer_from_receipt(patch).await? {
-                    patina_dst::reachable!("service: a duplicate's original committed meanwhile");
+                    patina_dst::reachable!("service-duplicate-original-committed-meanwhile");
                     return answer;
                 }
-                patina_dst::reachable!("service: a stale patch completed with what intervened");
+                patina_dst::reachable!("service-stale-patch-completed-with-intervening");
                 let intervening = self.store.intervening(&conflicts).await?;
                 Err(WriteError::Rejected(Rejection::Stale {
                     conflicts,
@@ -245,11 +245,11 @@ impl<S: Store> Service<S> {
                 })
             }
             Ok(Committed::AlreadyApplied(receipt)) => {
-                patina_dst::reachable!("service: a resubmission raced its original to commit");
+                patina_dst::reachable!("service-resubmission-raced-original");
                 Ok(Written::AlreadyApplied { receipt })
             }
             Err(CommitError::Rejected(rejection)) => {
-                patina_dst::reachable!("service: a patch accepted by apply lost at commit");
+                patina_dst::reachable!("service-patch-lost-at-commit");
                 Err(WriteError::Rejected(rejection))
             }
             Err(CommitError::Failed(error)) => Err(error.into()),
@@ -300,7 +300,7 @@ impl<S: Store> Service<S> {
         let committed = if let Ok(revisions) = self.store.revisions().await {
             revisions.deployment
         } else {
-            patina_dst::reachable!("service: the deployment revision could not be read back");
+            patina_dst::reachable!("service-deployment-revision-unread");
             computed
         };
         if committed > before.deployment.revision {

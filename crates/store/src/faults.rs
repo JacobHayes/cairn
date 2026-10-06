@@ -2,7 +2,8 @@
 //! sites for what the runtime cannot inject from outside). Inert unless armed: a store built
 //! with `Faults::default()` never fails or waits because of it. The conformance suite arms
 //! a failure between a commit's state rows and its events to show nothing is left behind,
-//! and a backend's own tests pause a commit midway to show what it does and does not block.
+//! a backend's own tests pause a commit midway to show what it does and does not block, and
+//! the service's tests and the multiplayer testbed (6.1) hold commits to make them overlap.
 
 use std::collections::BTreeSet;
 use std::future::Future;
@@ -12,6 +13,9 @@ use std::sync::{Arc, Mutex, PoisonError};
 /// A point inside a commit, in the order a commit passes them.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum CommitPoint {
+    /// Nothing is begun: the commit has its change set and waits, as for a connection. A
+    /// commit held here lets another that loaded the same revision land first.
+    BeforeBegin,
     /// The domain's revision row is written (the commit's first write) and nothing else.
     AfterRevisionRow,
     /// The state rows are written and the events are not.

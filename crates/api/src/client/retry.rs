@@ -101,7 +101,7 @@ where
                     };
                     return Err(Refused::Rejected(stale));
                 };
-                patina_dst::reachable!("client: a stale patch retried on its own");
+                patina_dst::reachable!("client-stale-patch-retried");
                 current = next;
                 resubmitted += 1;
             }

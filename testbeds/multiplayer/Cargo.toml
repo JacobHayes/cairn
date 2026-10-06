@@ -1,0 +1,50 @@
+# Brief 6.1, the multiplayer testbed: Cairn's real HTTP server over the Turso store and N
+# virtual clients using the real Rust client (H5's safe retry, H6's subscription tracking),
+# run under the patina native shim (PRACTICES, Simulation with patina). Its own Cargo
+# workspace (the empty [workspace] table), so `cargo patina build` resolves only this tree
+# and the check ladder, which covers the root workspace's `crates/*`, never builds it. Its
+# Cargo.lock started as a copy of the root's, so the crates under test resolve to the
+# versions `mise run check` tests.
+[workspace]
+
+[package]
+name = "cairn-multiplayer"
+description = "Simulation testbed: many clients patching one journey over HTTP through network faults."
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+repository = "https://github.com/JacobHayes/cairn"
+publish = false
+
+[dependencies]
+# The crates under test, by path: the API and its Rust client, the service, the Turso
+# store, auth (the dev provider), and the engine for replay (J3).
+cairn-api = { path = "../../crates/api" }
+cairn-auth = { path = "../../crates/auth" }
+cairn-engine = { path = "../../crates/engine" }
+cairn-schema = { path = "../../crates/schema" }
+cairn-service = { path = "../../crates/service" }
+cairn-store = { path = "../../crates/store" }
+cairn-store-turso = { path = "../../crates/store-turso" }
+# What the binary's composition root will also need: axum to serve the router, jiff for
+# the deployment's time zone, url for the public base URL auth is told.
+axum = { version = "0.8.9", default-features = false, features = ["http1", "tokio"] }
+jiff = { version = "0.2.37", default-features = false, features = ["std"] }
+url = "2.5.8"
+# The SDK at the revision the root Cargo.toml and mise.toml pin.
+patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "6a2977e7bce794d15eabaa18258a5542115bd872" }
+tokio = { version = "1.53.2", features = ["macros", "net", "rt", "sync", "time"] }
+
+# The crate-wide lints of the root workspace (Cargo.toml [workspace.lints]); this
+# workspace cannot inherit them. `mise run sim` runs clippy with warnings denied.
+[lints.rust]
+unsafe_code = "forbid"
+# `cargo patina build` injects these cfgs.
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(patina)", "cfg(dst)", "cfg(patina_shim)"] }
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+expect_used = "deny"
+too_many_lines = "deny"
+unwrap_used = "deny"

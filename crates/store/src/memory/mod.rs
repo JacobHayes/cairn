@@ -348,7 +348,13 @@ impl Store for MemoryStore {
         &self,
         commit: Commit,
     ) -> impl Future<Output = Result<Committed, CommitError>> + Send {
-        ready(self.commit_now(&commit))
+        let wait = self.faults.pause_at(CommitPoint::BeforeBegin);
+        async move {
+            if let Some(wait) = wait {
+                wait.await;
+            }
+            self.commit_now(&commit)
+        }
     }
 
     fn revisions(&self) -> impl Future<Output = Result<Revisions, StoreError>> + Send {

@@ -1,0 +1,18 @@
+# Reproducers for the patina gaps the multiplayer testbed found (README.md, Patina gap
+# report), one binary each. Its own Cargo workspace, built only by sim.sh's gap leg.
+[workspace]
+
+[package]
+name = "multiplayer-gaps"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+publish = false
+
+[dependencies]
+patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "6a2977e7bce794d15eabaa18258a5542115bd872" }
+
+[lints.rust]
+unsafe_code = "forbid"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(patina)", "cfg(dst)", "cfg(patina_shim)"] }

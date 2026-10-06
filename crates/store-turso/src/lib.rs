@@ -155,6 +155,9 @@ impl Store for TursoStore {
     }
 
     async fn commit(&self, commit: Commit) -> Result<Committed, CommitError> {
+        if let Some(wait) = self.faults.pause_at(cairn_store::CommitPoint::BeforeBegin) {
+            wait.await;
+        }
         let lease = self.pool.acquire().await?;
         // Boxed: a commit's state machine is tens of kilobytes, too large to move by value.
         let result = Box::pin(commit::commit(
