@@ -1,0 +1,29 @@
+[package]
+name = "cairn-service"
+description = "The service layer: the one caller of the engine (load, apply, commit, notify), the capabilities document, and the composition root types every host fills in. Runtime-free."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[dependencies]
+cairn-engine.workspace = true
+cairn-schema.workspace = true
+cairn-store.workspace = true
+jiff.workspace = true
+patina-dst.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+cairn-engine = { workspace = true, features = ["testing"] }
+cairn-store = { workspace = true, features = ["conformance"] }
+cairn-store-turso.workspace = true
+patina-dst-proptest.workspace = true
+proptest.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["rt", "time"] }
+
+[lints]
+workspace = true

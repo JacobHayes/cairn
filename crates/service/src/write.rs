@@ -1,0 +1,310 @@
+//! Domain patches (A17; ARCHITECTURE, Service layer and composition): receipt first, load,
+//! apply, consequences, commit, notify. The service never retries: a stale patch is answered
+//! with the revisions that moved and what their events touched, and the client decides
+//! (H5).
+
+use std::collections::BTreeMap;
+use std::fmt;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+
+use cairn_engine::{Applied, ApplyInputs, Records, apply};
+use cairn_schema::{
+    Consequences, Domain, JourneyId, Markdown, Patch, PatchReceipt, PatchTarget, Record, Rejection,
+    RevisionOf, Write,
+};
+use cairn_store::{Commit, CommitError, Committed, Store};
+
+use crate::{Call, Service, ServiceError, consequence, load};
+
+/// A patch to a journey, a route with its draft, or the deployment (A17), with the note its
+/// events carry (J1). A patch to a proposal goes through the proposal's own operations
+/// (4.8), so it is not a domain patch.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct DomainPatch {
+    patch: Patch,
+    note: Option<Markdown>,
+}
+
+impl DomainPatch {
+    /// The patch, with an optional note for each of its events.
+    ///
+    /// # Errors
+    ///
+    /// [`NotADomainPatch`] when it targets a proposal.
+    pub fn new(patch: Patch, note: Option<Markdown>) -> Result<Self, NotADomainPatch> {
+        if let PatchTarget::Proposal { .. } = patch.target {
+            return Err(NotADomainPatch);
+        }
+        Ok(Self { patch, note })
+    }
+
+    /// The patch.
+    #[must_use]
+    pub fn patch(&self) -> &Patch {
+        &self.patch
+    }
+}
+
+/// The patch targets a proposal, which is edited through its own lifecycle, not as a domain.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NotADomainPatch;
+
+impl fmt::Display for NotADomainPatch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("a proposal is edited through its own operations, not as a domain")
+    }
+}
+
+impl std::error::Error for NotADomainPatch {}
+
+/// What an accepted domain patch answers.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Written {
+    /// Committed now: the receipt, and what it newly caused in each journey it changed or
+    /// whose meaning it changed (D7; a journey with nothing new is left out).
+    Applied {
+        /// The receipt: patch id, domain, content hash, and the revision produced.
+        receipt: PatchReceipt,
+        /// D7, by journey.
+        consequences: BTreeMap<JourneyId, Consequences>,
+    },
+    /// The patch id was committed before with the same content (H5): answered from its
+    /// receipt, with no consequences, which are reported only the first time.
+    AlreadyApplied {
+        /// The original receipt.
+        receipt: PatchReceipt,
+    },
+}
+
+impl Written {
+    /// The receipt, whichever way it went.
+    #[must_use]
+    pub fn receipt(&self) -> &PatchReceipt {
+        match self {
+            Written::Applied { receipt, .. } | Written::AlreadyApplied { receipt } => receipt,
+        }
+    }
+}
+
+/// A domain patch that was not committed. Either way nothing was written.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum WriteError {
+    /// The patch is stale (with what intervened), reuses a patch id, or is invalid (every
+    /// violation): the engine's and the store's rejection shapes (A15, H5).
+    Rejected(Rejection),
+    /// The service or the store failed.
+    Failed(ServiceError),
+}
+
+impl From<ServiceError> for WriteError {
+    fn from(error: ServiceError) -> Self {
+        WriteError::Failed(error)
+    }
+}
+
+impl From<cairn_store::StoreError> for WriteError {
+    fn from(error: cairn_store::StoreError) -> Self {
+        WriteError::Failed(ServiceError::Store(error))
+    }
+}
+
+impl fmt::Display for WriteError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            WriteError::Rejected(rejection) => write!(formatter, "rejected: {rejection:?}"),
+            WriteError::Failed(error) => error.fmt(formatter),
+        }
+    }
+}
+
+impl std::error::Error for WriteError {}
+
+impl<S: Store> Service<S> {
+    /// A17: applies a domain patch as `call`'s actor (H2), at `call`'s today in the
+    /// deployment's zone, and commits it. In order: a patch id already committed is answered
+    /// from its receipt before anything is loaded (H5); the records it reads are loaded;
+    /// `apply` validates it (A15, D4); its consequences are derived (D7); the commit rechecks
+    /// every revision it read (H5, E6); and every revision the commit moved is announced
+    /// (H6).
+    ///
+    /// # Errors
+    ///
+    /// [`WriteError::Rejected`] for a stale, reused, or invalid patch;
+    /// [`WriteError::Failed`] when the store fails or the engine panics.
+    pub async fn patch(&self, call: &Call, submitted: &DomainPatch) -> Result<Written, WriteError> {
+        let patch = submitted.patch();
+        if let Some(answer) = self.answer_from_receipt(patch).await? {
+            patina_dst::reachable!("service: a resubmitted patch id answered from its receipt");
+            return answer;
+        }
+        let today = self.settings.today(call.now);
+        let loaded = load::records(&*self.store, patch).await?;
+        let inputs = ApplyInputs {
+            today,
+            at: call.now,
+            actor: call.actor.clone(),
+            note: submitted.note.clone(),
+        };
+        let accepted = engine(&patch.target.domain(), || {
+            apply(&loaded.records, patch, &inputs).map(|applied| {
+                let caused = consequence::of(
+                    &patch.target,
+                    &loaded.records,
+                    applied.records(),
+                    today,
+                    &self.settings,
+                );
+                (applied, caused)
+            })
+        })?;
+        match accepted {
+            Ok((applied, caused)) => self.commit(patch, &loaded, &applied, caused).await,
+            Err(Rejection::Stale { conflicts, .. }) => {
+                // H5: the same patch may have committed since the receipt was looked up, and
+                // its own commit is what moved the revision; the receipt answers it then.
+                if let Some(answer) = self.answer_from_receipt(patch).await? {
+                    patina_dst::reachable!("service: a duplicate's original committed meanwhile");
+                    return answer;
+                }
+                patina_dst::reachable!("service: a stale patch completed with what intervened");
+                let intervening = self.store.intervening(&conflicts).await?;
+                Err(WriteError::Rejected(Rejection::Stale {
+                    conflicts,
+                    intervening,
+                }))
+            }
+            Err(rejection) => Err(WriteError::Rejected(rejection)),
+        }
+    }
+
+    /// H5: the answer for a patch id already committed: the receipt for the same content,
+    /// a rejection for other content; none for an id never committed.
+    async fn answer_from_receipt(
+        &self,
+        patch: &Patch,
+    ) -> Result<Option<Result<Written, WriteError>>, WriteError> {
+        let Some(receipt) = self.store.receipt(&patch.id).await? else {
+            return Ok(None);
+        };
+        Ok(Some(if receipt.content_hash == patch.content_hash() {
+            Ok(Written::AlreadyApplied { receipt })
+        } else {
+            Err(WriteError::Rejected(Rejection::PatchIdReused {
+                patch_id: patch.id.clone(),
+            }))
+        }))
+    }
+
+    /// Commits what `apply` accepted, rechecking every revision it read, and announces it.
+    ///
+    /// # Panics
+    ///
+    /// When the store answers with a receipt other than the change set's.
+    async fn commit(
+        &self,
+        patch: &Patch,
+        loaded: &load::Loaded,
+        applied: &Applied,
+        caused: BTreeMap<JourneyId, Consequences>,
+    ) -> Result<Written, WriteError> {
+        let commit = Commit {
+            target: patch.target.clone(),
+            base_revision: patch.base_revision,
+            preconditions: loaded.preconditions(patch, applied.records()),
+            change_set: applied.change_set().clone(),
+        };
+        match self.store.commit(commit).await {
+            Ok(Committed::Applied(receipt)) => {
+                assert_eq!(
+                    receipt,
+                    applied.change_set().receipt,
+                    "the store keeps the receipt"
+                );
+                self.announce(&receipt, &loaded.records, applied).await;
+                Ok(Written::Applied {
+                    receipt,
+                    consequences: caused,
+                })
+            }
+            Ok(Committed::AlreadyApplied(receipt)) => {
+                patina_dst::reachable!("service: a resubmission raced its original to commit");
+                Ok(Written::AlreadyApplied { receipt })
+            }
+            Err(CommitError::Rejected(rejection)) => {
+                patina_dst::reachable!("service: a patch accepted by apply lost at commit");
+                Err(WriteError::Rejected(rejection))
+            }
+            Err(CommitError::Failed(error)) => Err(error.into()),
+        }
+    }
+
+    /// H6: announces every revision a commit moved: its domain's, and the deployment's when
+    /// an entity create riding in a journey or route patch moved it. The deployment's
+    /// revision is read back from the store, which another such commit may have moved further
+    /// in the meantime: announcing an older one would be ignored by a subscriber that heard
+    /// the newer, and announcing one never committed would hide the real one when it comes.
+    async fn announce(&self, receipt: &PatchReceipt, before: &Records, applied: &Applied) {
+        let domain = receipt.domain.clone();
+        self.notifier
+            .publish(&RevisionOf::Domain(domain.clone()), receipt.revision);
+        let creates_entities = applied.change_set().writes().any(|write| {
+            matches!(
+                write,
+                Write::Put(Record::Entity(_) | Record::EntityAlias { .. })
+            )
+        });
+        if domain == Domain::Deployment || !creates_entities {
+            return;
+        }
+        // The store's revision, or, when it cannot be read back, the one the engine's records
+        // computed: a riding create moves the deployment once per commit, so that is this
+        // commit's revision or a lower one already committed, never one that does not exist.
+        let computed = applied.records().deployment.revision;
+        let committed = if let Ok(revisions) = self.store.revisions().await {
+            revisions.deployment
+        } else {
+            patina_dst::reachable!("service: the deployment revision could not be read back");
+            computed
+        };
+        if committed > before.deployment.revision {
+            self.notifier
+                .publish(&RevisionOf::Domain(Domain::Deployment), committed);
+        }
+    }
+}
+
+/// Runs an engine call, catching a panic (PRACTICES, Programmer errors panic: the engine
+/// works on a private candidate and nothing commits, so the request fails and the host logs
+/// it with the domain).
+fn engine<T>(domain: &Domain, call: impl FnOnce() -> T) -> Result<T, ServiceError> {
+    catch_unwind(AssertUnwindSafe(call)).map_err(|payload| {
+        let message = payload
+            .downcast_ref::<&str>()
+            .map(|text| (*text).to_owned())
+            .or_else(|| payload.downcast_ref::<String>().cloned())
+            .unwrap_or_else(|| "a panic without a message".to_owned());
+        ServiceError::EnginePanic {
+            domain: domain.clone(),
+            message,
+        }
+    })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn an_engine_panic_becomes_an_error_naming_the_domain() {
+        let domain = Domain::Journey("j_one".parse().unwrap());
+        let caught = engine(&domain, || -> u32 { panic!("an engine assertion failed") });
+        assert_eq!(
+            caught,
+            Err(ServiceError::EnginePanic {
+                domain: domain.clone(),
+                message: "an engine assertion failed".to_owned(),
+            })
+        );
+        assert_eq!(engine(&domain, || 7), Ok(7));
+    }
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Rung 1: format, lint, typecheck (rustfmt, clippy, workspace lints)"
+#MISE description="Rung 1: format, lint, typecheck (rustfmt, clippy, workspace lints, the wasm32 build of the runtime-free crates)"
 # PRACTICES, The validation ladder, rung 1; Code conventions. Rung 1 runs tools, not tests:
 # it fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
 # eslint join this rung with the first TypeScript package (DECISIONS.md).
@@ -84,5 +84,17 @@ done
 checked=$(grep '"reason":"compiler-artifact"' <<<"$artifacts" \
   | grep -o '"package_id":"path+file://[^"]*"' | sort -u | wc -l)
 ladder_suite clippy "$checked" crates
+
+# ARCHITECTURE, Repository layout: the service is runtime-free (no tokio, database driver,
+# or transport), so it builds for the browser with the engine, schema, and store beneath it.
+# A dependency that pulls in a runtime fails here, not when the wasm host (4.5) arrives.
+wasm_crates=(cairn-service)
+wasm_packages=()
+for name in "${wasm_crates[@]}"; do
+  wasm_packages+=(-p "$name")
+done
+cargo check --locked --target wasm32-unknown-unknown "${wasm_packages[@]}" \
+  || ladder_fail "a runtime-free crate does not build for wasm32-unknown-unknown"
+ladder_suite "wasm32-unknown-unknown build" "${#wasm_crates[@]}" crates
 
 ladder_rung_end

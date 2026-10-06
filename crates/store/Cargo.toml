@@ -1,6 +1,6 @@
 [package]
 name = "cairn-store"
-description = "The Store trait, the in-memory backend, and the conformance suite every backend passes."
+description = "The Store and Notifier traits, the in-memory backend, the in-process notifier, and the conformance suite every backend passes."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

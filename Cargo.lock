@@ -481,6 +481,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "cairn-service"
+version = "0.1.0"
+dependencies = [
+ "cairn-engine",
+ "cairn-schema",
+ "cairn-store",
+ "cairn-store-turso",
+ "jiff",
+ "patina-dst",
+ "patina-dst-proptest",
+ "proptest",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "cairn-store"
 version = "0.1.0"
 dependencies = [

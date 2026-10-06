@@ -6,7 +6,7 @@ use std::future::Future;
 
 use cairn_schema::{
     ConversationId, Email, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal,
-    ProposalId, Revision, RouteId, Slug, Timestamp, Title, UserId,
+    ProposalId, Revision, RevisionConflict, RouteId, Slug, Timestamp, Title, TouchedSet, UserId,
 };
 
 use crate::commit::{Commit, CommitError, Committed, StoreError};
@@ -61,6 +61,14 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
 
     /// The current revisions of every domain and proposal, for a new subscriber (H6).
     fn revisions(&self) -> impl Future<Output = Result<Revisions, StoreError>> + Send;
+
+    /// H5: what the events of every commit that moved a revision past what `conflicts`
+    /// expected touched, as [`commit`](Store::commit) reports in a stale rejection. The
+    /// service completes the engine's own stale rejection (it sees no history) with it.
+    fn intervening(
+        &self,
+        conflicts: &[RevisionConflict],
+    ) -> impl Future<Output = Result<TouchedSet, StoreError>> + Send;
 
     /// C16: the journey index, by id, filtered and paged.
     fn journeys(

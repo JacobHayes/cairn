@@ -26,7 +26,7 @@ use std::path::Path;
 
 use cairn_schema::{
     ConversationId, Email, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal,
-    ProposalId, Revision, RouteId, Slug, Timestamp, Title, UserId,
+    ProposalId, Revision, RevisionConflict, RouteId, Slug, Timestamp, Title, TouchedSet, UserId,
 };
 use cairn_store::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, AuthStore, Commit, CommitError, Committed,
@@ -171,6 +171,10 @@ impl Store for TursoStore {
 
     async fn revisions(&self) -> Result<Revisions, StoreError> {
         read!(self, connection => load::revisions(connection))
+    }
+
+    async fn intervening(&self, conflicts: &[RevisionConflict]) -> Result<TouchedSet, StoreError> {
+        read!(self, connection => commit::intervening(connection, conflicts))
     }
 
     async fn journeys(

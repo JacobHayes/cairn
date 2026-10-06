@@ -1,6 +1,8 @@
 //! The store (ARCHITECTURE, Storage): the [`Store`] trait the service layer loads domains
 //! and commits change sets through, the in-memory backend that is its reference
-//! implementation, and the conformance suite every backend passes (feature `conformance`).
+//! implementation, the conformance suite every backend passes (feature `conformance`), and
+//! the [`Notifier`] that announces each commit's revisions, with its in-process
+//! implementation (H6).
 //!
 //! The store depends on `cairn-schema`, never on the engine: it persists the change set an
 //! accepted patch produced (its events' writes) and checks only what a commit must check
@@ -19,6 +21,7 @@ pub mod conformance;
 pub mod faults;
 pub mod limits;
 pub mod memory;
+pub mod notifier;
 pub mod query;
 pub mod records;
 pub mod store;
@@ -27,6 +30,9 @@ pub mod target;
 pub use commit::{Commit, CommitError, Committed, Precondition, StoreError};
 pub use faults::{CommitPoint, Faults, PauseHook};
 pub use memory::MemoryStore;
+pub use notifier::{
+    InProcessNotifier, Notifier, Ready, SubscriberLimit, Subscription, Take, Tick, Watch,
+};
 pub use query::{
     EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page, PageSize,
     Revisions, RouteDetail, SearchHit, SearchQuery, VersionJourneys,

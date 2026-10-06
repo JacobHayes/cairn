@@ -355,6 +355,13 @@ impl Store for MemoryStore {
         ready(Ok(self.revisions_now()))
     }
 
+    fn intervening(
+        &self,
+        conflicts: &[RevisionConflict],
+    ) -> impl Future<Output = Result<TouchedSet, StoreError>> + Send {
+        ready(Ok(self.state().intervening(conflicts)))
+    }
+
     fn journeys(
         &self,
         query: &JourneyQuery,

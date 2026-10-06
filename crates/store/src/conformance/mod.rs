@@ -96,6 +96,7 @@ macro_rules! conformance_suite {
         $crate::conformance_suite!(@cases $backend, $run;
             commits::a_first_commit_creates_the_domain_and_a_second_from_zero_conflicts,
             commits::a_revision_conflict_is_rejected_and_leaves_state_untouched,
+            commits::what_intervened_since_a_revision_is_reported_on_request,
             commits::a_failure_between_state_and_events_leaves_nothing,
             commits::a_commit_fails_whole_when_either_precondition_is_stale,
             commits::two_commits_to_one_journey_yield_one_success_and_one_conflict,

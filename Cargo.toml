@@ -14,6 +14,7 @@ publish = false
 cairn-auth = { path = "crates/auth" }
 cairn-engine = { path = "crates/engine" }
 cairn-schema = { path = "crates/schema" }
+cairn-service = { path = "crates/service" }
 cairn-store = { path = "crates/store" }
 cairn-store-turso = { path = "crates/store-turso" }
 # The auth crate (ARCHITECTURE, Auth): axum for the layer and the providers' own routes

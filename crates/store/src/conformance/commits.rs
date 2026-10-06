@@ -62,14 +62,21 @@ fn add_node(
     base: u32,
     added: cairn_schema::Node<cairn_schema::refs::KeyRefs>,
 ) -> crate::commit::Commit {
+    add_node_builder(patch, journey, base, added).commit()
+}
+
+fn add_node_builder(
+    patch: &str,
+    journey: &str,
+    base: u32,
+    added: cairn_schema::Node<cairn_schema::refs::KeyRefs>,
+) -> crate::build::PatchBuilder {
     let subject = Subject::Node(added.key.clone());
-    journey_patch(patch, journey, base)
-        .event(
-            EventType::NodeAdded,
-            subject,
-            vec![put_in(&journey_graph(journey), GraphRecord::Node(added))],
-        )
-        .commit()
+    journey_patch(patch, journey, base).event(
+        EventType::NodeAdded,
+        subject,
+        vec![put_in(&journey_graph(journey), GraphRecord::Node(added))],
+    )
 }
 
 /// A17, H5: a domain that does not exist is at revision 0; its first commit produces
@@ -150,6 +157,52 @@ pub async fn a_revision_conflict_is_rejected_and_leaves_state_untouched<B: Backe
     assert_eq!(intervening, second.change_set.touched());
     assert_eq!(snapshot(&store).await, before);
     assert_eq!(store.receipt(&id("p_three")).await.unwrap(), None);
+}
+
+/// H5: asked directly, the store reports what intervened since a revision exactly as a stale
+/// commit does: the touched set of every commit that moved it past the one expected,
+/// including deployment records written by an entity create riding in a journey patch.
+pub async fn what_intervened_since_a_revision_is_reported_on_request<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    let first = create_journey("p_one", "j_one", vec![action("n_a", "a", None)]).commit();
+    applied(&store, first.clone()).await;
+    let second = create_entity(
+        add_node_builder("p_two", "j_one", 1, action("n_b", "b", None)),
+        entity("e_rider", "Rider", &[]),
+    )
+    .commit();
+    applied(&store, second.clone()).await;
+
+    let since_one = store
+        .intervening(&[conflict(journey_of("j_one"), 1, 2)])
+        .await
+        .unwrap();
+    assert_eq!(since_one, second.change_set.touched());
+    let mut both = first.change_set.touched();
+    both.extend(second.change_set.touched());
+    let since_zero = store
+        .intervening(&[conflict(journey_of("j_one"), 0, 2)])
+        .await
+        .unwrap();
+    assert_eq!(since_zero, both);
+    let deployment = store
+        .intervening(&[conflict(RevisionOf::Domain(Domain::Deployment), 0, 1)])
+        .await
+        .unwrap();
+    assert!(
+        deployment
+            .as_set()
+            .iter()
+            .any(|key| key.domain() == Domain::Deployment)
+    );
+    assert!(
+        store
+            .intervening(&[conflict(journey_of("j_one"), 2, 2)])
+            .await
+            .unwrap()
+            .as_set()
+            .is_empty()
+    );
 }
 
 /// A17, J2: a failure after the state rows are written and before the events are leaves

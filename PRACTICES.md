@@ -216,7 +216,7 @@ flowchart TB
 
 | Rung | Check | Typical time |
 |---|---|---|
-| 1 | `rustfmt`, `clippy` (deny), TypeScript typecheck, `eslint` | seconds |
+| 1 | `rustfmt`, `clippy` (deny), TypeScript typecheck, `eslint`, the `wasm32-unknown-unknown` build of the runtime-free crates (the service and what it stands on) | seconds |
 | 2 | unit tests for every Rust crate, engine scenario matrix, replay harness (memory store) | seconds |
 | 3 | property tests, bounded case count locally (more in CI); cost tests at the limits, budgeted in operations, not wall-clock time | tens of seconds |
 | 4 | store conformance on memory and Turso; API and MCP tests in-process | tens of seconds |

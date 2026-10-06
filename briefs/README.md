@@ -27,11 +27,11 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 2.4 | Auto-reach, blocking, frontier, snooze, stalled, stale, derived guards | `crates/engine` | 2.3 | landed `nswmnoqu` |
 | 2.5 | Gravity, leverage, rank | `crates/engine` | 2.4 | landed `qwxsmqrs` |
 | 2.6 | Projections | `crates/engine` | 2.5 | in progress |
-| 2.7 | Route files, upgrade, save-as-route, re-link, proposal documents | `crates/engine` | 2.6 |  |
+| 2.7 | Route files, upgrade, save-as-route, re-link, proposal documents | `crates/engine` | 2.6 | in progress |
 | 3.1 | Store trait, memory and Turso backends, conformance suite | `crates/store`, `crates/store-turso` | 1.2 (beside phase 2) | landed `tvlztrmq` |
 | 3.2 | Auth providers, users, identities, agent tokens | `crates/auth` | 3.1 | landed `nspnswuo` |
-| 4.1 | Service layer, composition root, capabilities, notifier | `crates/service`, `crates/store` (notifier) | 2.4, 3.1 | in progress |
-| 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 |  |
+| 4.1 | Service layer, composition root, capabilities, notifier | `crates/service`, `crates/store` (notifier) | 2.4, 3.1 | landed `lsoqvyvx` |
+| 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 | in progress |
 | 4.3 | MCP server and shipped instructions | `crates/mcp`, `instructions/` | 4.9 |  |
 | 4.4 | Assistant | `crates/assistant` | 4.3 |  |
 | 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.9 |  |
