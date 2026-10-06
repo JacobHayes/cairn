@@ -10970,6 +10970,69 @@
         ],
         "type": "object"
       },
+      "RoutePage": {
+        "additionalProperties": false,
+        "description": "A page of the route index; `next` is where the next page starts, absent on the last.",
+        "properties": {
+          "items": {
+            "description": "The routes, in id order.",
+            "items": {
+              "$ref": "#/components/schemas/RouteSummary"
+            },
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RouteId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `after` for the next page."
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "type": "object"
+      },
+      "RouteSummary": {
+        "additionalProperties": false,
+        "description": "A route in the route index (I2).",
+        "properties": {
+          "draft_open": {
+            "description": "Whether it has an open draft.",
+            "type": "boolean"
+          },
+          "header": {
+            "$ref": "#/components/schemas/RouteHeader",
+            "description": "The route's fields."
+          },
+          "latest_version": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/VersionNumber"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its latest published version."
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "Its revision."
+          }
+        },
+        "required": [
+          "header",
+          "revision",
+          "draft_open"
+        ],
+        "type": "object"
+      },
       "RouteVersion": {
         "additionalProperties": false,
         "description": "An immutable published route version (A11).",
@@ -16722,6 +16785,105 @@
           }
         },
         "summary": "Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6)."
+      }
+    },
+    "/routes": {
+      "get": {
+        "operationId": "listRoutes",
+        "parameters": [
+          {
+            "description": "The page starts after this route.",
+            "explode": true,
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RouteId"
+            },
+            "style": "form"
+          },
+          {
+            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "explode": true,
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/RoutePage"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "The route index, paged (I2)."
       }
     },
     "/routes/{id}": {

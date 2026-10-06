@@ -157,6 +157,8 @@ pub static EXPLANATIONS: Endpoint = endpoint(
 );
 /// `GET /journeys/{id}/history`: the journey's events, or a node's, grouped by patch (J4).
 pub static HISTORY: Endpoint = endpoint(Method::GET, "/journeys/{id}/history", "getHistory");
+/// `GET /routes`: the route index (I2).
+pub static ROUTES: Endpoint = endpoint(Method::GET, "/routes", "listRoutes");
 /// `GET /routes/{id}`: a route with its draft.
 pub static ROUTE: Endpoint = endpoint(Method::GET, "/routes/{id}", "getRoute");
 /// `GET /routes/{id}/versions`: route detail, its versions and the journeys on each (C17).
@@ -192,7 +194,7 @@ pub static REVOKE_TOKEN: Endpoint = endpoint(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 45] = [
+pub static ALL: [&Endpoint; 46] = [
     &CAPABILITIES,
     &PATCH_JOURNEY,
     &PATCH_ROUTE,
@@ -226,6 +228,7 @@ pub static ALL: [&Endpoint; 45] = [
     &NODE,
     &EXPLANATIONS,
     &HISTORY,
+    &ROUTES,
     &ROUTE,
     &ROUTE_VERSIONS,
     &ROUTE_VERSION,

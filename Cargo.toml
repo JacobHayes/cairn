@@ -14,6 +14,7 @@ publish = false
 cairn-api = { path = "crates/api" }
 cairn-auth = { path = "crates/auth" }
 cairn-engine = { path = "crates/engine" }
+cairn-mcp = { path = "crates/mcp" }
 cairn-schema = { path = "crates/schema" }
 cairn-service = { path = "crates/service" }
 cairn-store = { path = "crates/store" }
@@ -51,6 +52,9 @@ metrics = "0.24.6"
 metrics-util = { version = "0.20.4", default-features = false, features = ["debugging"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 jsonschema = { version = "0.58.5", default-features = false }
+# The MCP endpoint (ARCHITECTURE, MCP endpoint names it): rmcp's server over Streamable HTTP
+# as a tower service the API mounts; its client only drives the endpoint in tests.
+rmcp = { version = "3.5.1", default-features = false }
 jiff = { version = "0.2.37", default-features = false, features = ["serde", "std"] }
 proptest = { version = "1.11.0", default-features = false, features = ["std", "bit-set"] }
 schemars = { version = "1.2.2", features = ["jiff02"] }

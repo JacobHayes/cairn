@@ -61,8 +61,9 @@ impl<S: Store + 'static> Api<S> {
 /// Endpoints and the handlers that serve them.
 type Served<S> = Vec<(&'static Endpoint, MethodRouter<Api<S>>)>;
 
-/// The API: every endpoint behind `auth`'s layer, auth's own routes beside them, the request
-/// limits, and observability, over `service`. `auth` must share the service's store.
+/// The API: every endpoint behind `auth`'s layer, with the MCP endpoint at `/mcp` when the
+/// service's capabilities offer it (I2), auth's own routes beside them, the request limits,
+/// and observability, over `service`. `auth` must share the service's store.
 pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router {
     use crate::endpoints as at;
     use crate::handlers as handle;
@@ -78,6 +79,7 @@ pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router
         (&at::JOURNEYS, get(handle::reads::journeys::<S>)),
         (&at::JOURNEY, get(handle::reads::journey::<S>)),
         (&at::DOCUMENT, get(handle::reads::document::<S>)),
+        (&at::ROUTES, get(handle::reads::routes::<S>)),
         (&at::ROUTE, get(handle::reads::route::<S>)),
         (&at::ROUTE_VERSIONS, get(handle::reads::route_versions::<S>)),
         (&at::ROUTE_VERSION, get(handle::reads::route_version::<S>)),
@@ -98,9 +100,18 @@ pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router
     for (endpoint, method_router) in served {
         routes = routes.route(endpoint.path, method_router);
     }
+    let mcp = api.service.capabilities().mcp.then(|| {
+        let tools = cairn_mcp::ToolSet::new(api.service.clone(), auth.accounts().clock().clone());
+        cairn_mcp::router(tools)
+    });
     let routes = routes
         .method_not_allowed_fallback(handle::method_not_allowed)
         .with_state(api);
+    // I2: the MCP endpoint, when the host offers it, behind the same auth layer and limits.
+    let routes = match mcp {
+        Some(mcp) => routes.merge(mcp),
+        None => routes,
+    };
     // The duration limit is the API's, inside the auth layer: auth's own routes and layer
     // wait on identity providers under their own limit.
     let routes = admission::timed(routes);

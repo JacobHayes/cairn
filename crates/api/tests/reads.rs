@@ -1,5 +1,5 @@
 //! The reads, the caller, and agent tokens over HTTP, in process against the memory store
-//! (PRACTICES, Shell: API tests): each answers what the service or auth holds (C16, C17,
+//! (PRACTICES, Shell: API tests): each answers what the service or auth holds (C16, C17, I2,
 //! E6, H2, H3, J5), the domain document derives as the server would, and each malformed
 //! read is answered with its problem.
 #![cfg(test)]
@@ -11,7 +11,7 @@ mod in_process {
     use cairn_api::error::status_of;
     use cairn_api::wire::{
         AgentToken, Capabilities, EventPage, JourneyPage, MintedToken, Problem, ProblemCode,
-        RouteDetail, SearchHit, SearchPage, Viewer,
+        RouteDetail, RoutePage, SearchHit, SearchPage, Viewer,
     };
     use cairn_engine::{Graph, derive};
     use cairn_schema::{Deployment, DomainDocument, Entity, Journey, Route, RouteVersion};
@@ -19,6 +19,41 @@ mod in_process {
     use crate::support::{self, World, get, post};
 
     const JOURNEY: &str = "/journeys/j_vendor_eval";
+
+    /// I2: the route index lists every route in id order, a page at a time, each with its
+    /// latest version and whether a draft is open.
+    #[tokio::test]
+    async fn the_route_index_pages_in_id_order() {
+        let world = World::start().await;
+        let ann = world.vendor_after(0).await;
+        let second = support::publish_fixture_route("hiring-loop");
+        let reply = post(
+            &ann,
+            "/routes/hiring-loop/patches",
+            &support::request(&second),
+        )
+        .await;
+        support::ok::<serde_json::Value>(&reply);
+
+        let first: RoutePage = get(&ann, "/routes?size=1").await;
+        let after = first.next.clone().unwrap();
+        let rest: RoutePage = get(&ann, &format!("/routes?after={after}")).await;
+        assert_eq!(rest.next, None);
+        let listed: Vec<(String, Option<u32>, bool)> = first
+            .items
+            .iter()
+            .chain(&rest.items)
+            .map(|route| {
+                let latest = route.latest_version.map(cairn_schema::VersionNumber::get);
+                (route.header.id.to_string(), latest, route.draft_open)
+            })
+            .collect();
+        let published = |id: &str| (id.to_owned(), Some(1), false);
+        assert_eq!(
+            listed,
+            [published("hiring-loop"), published("vendor-evaluation")]
+        );
+    }
 
     /// Every read answers what the service holds (C16, C17, E6, H3, J5), and capabilities
     /// what the host offers.

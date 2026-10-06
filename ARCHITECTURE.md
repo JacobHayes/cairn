@@ -116,8 +116,8 @@ flowchart LR
     service --> assistant
     auth --> api
     auth --> mcp
+    mcp --> api
     api --> cairn
-    mcp --> cairn
     assistant --> cairn
     store_turso --> cairn
     service --> wasm
@@ -308,7 +308,7 @@ Clients: `web/client`'s types are generated artifacts (openapi-typescript, with 
 
 ## MCP endpoint
 
-rmcp, Streamable HTTP at `/mcp`, sharing auth with the API (I2). The tool set is curated for an agent's loop rather than mirrored from HTTP; it shares the schema types and the service layer, not the surface shape.
+rmcp, Streamable HTTP at `/mcp`, sharing auth with the API (I2): the API mounts it inside its router, behind the auth layer and the request limits, when the capabilities offer MCP. It is stateless, each request one POST answered with one JSON body, so a call is held to the request duration like any other (DECISIONS.md, 4.3). The tool set is curated for an agent's loop rather than mirrored from HTTP; it shares the schema types and the service layer, not the surface shape. `ToolSet::call(actor, name, arguments)` runs a tool in process; the server and the assistant both go through it.
 
 Tools, covering at least every I2 capability: `list_routes`, `get_route` (the draft, or a published version by number), `list_journeys`, `get_snapshot` (I3; the first call an agent should make), `get_level` (C2), `get_node` (detail with priority and date explanations), `list_frontier` (with filters for decisions needed, needs breakdown, unassigned, active, blocked, stale, overdue, shortfall, mine), `create_journey`, `open_draft`, `publish_draft`, `answer_decision`, `transition_node`, `snooze`, `unsnooze`, `assign`, `set_date` (pin, unpin, actual date), `override` (force include, keep, guard bypass), `apply_patch`, `create_proposal`, `get_proposal`, `edit_proposal`, `apply_proposal`, `resolve_date_conflict`, `manage_entity` (create, edit including emails, merge), `import_route`, `export_route`, `save_as_route`, `relink`, `upgrade`, `search`, `get_history`. Outputs are bounded and paginated where a list can grow.
 

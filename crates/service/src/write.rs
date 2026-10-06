@@ -9,11 +9,11 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use cairn_engine::{Applied, ApplyInputs, Records, apply};
 use cairn_schema::{
-    Consequences, Domain, JourneyId, Location, Markdown, Mutation, Patch, PatchReceipt,
-    PatchTarget, Record, Rejection, Revision, RevisionOf, Violation, ViolationCode, Violations,
-    Write,
+    Consequences, Domain, EventType, JourneyId, Location, Markdown, Mutation, Patch, PatchReceipt,
+    PatchTarget, Record, Rejection, Revision, RevisionOf, Subject, Violation, ViolationCode,
+    Violations, Write,
 };
-use cairn_store::{Commit, CommitError, Committed, Store};
+use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize, Store};
 
 use crate::{Call, Service, ServiceError, consequence, load};
 
@@ -203,13 +203,52 @@ impl<S: Store> Service<S> {
         let Some(receipt) = self.store.receipt(&patch.id).await? else {
             return Ok(None);
         };
-        Ok(Some(if receipt.content_hash == patch.content_hash() {
+        let same = receipt.content_hash == patch.content_hash() || self.merged_as(patch).await?;
+        Ok(Some(if same {
             Ok(Written::AlreadyApplied { receipt })
         } else {
             Err(WriteError::Rejected(Rejection::PatchIdReused {
                 patch_id: patch.id.clone(),
             }))
         }))
+    }
+
+    /// H5, E6: whether `patch`, a lone entity merge whose id is committed, asks for the
+    /// merge that id committed. A merge names the journeys referencing either entity at
+    /// their revisions when it was drafted, which a client reads from the index, so a
+    /// resubmission after any of them moved carries other content for the same merge; it is
+    /// matched by what it merges (DECISIONS.md, 4.3): the committed patch's one event merged
+    /// the same entity into the same survivor.
+    async fn merged_as(&self, patch: &Patch) -> Result<bool, WriteError> {
+        let [
+            Mutation::MergeEntities {
+                survivor, merged, ..
+            },
+        ] = patch.mutations.as_slice()
+        else {
+            return Ok(false);
+        };
+        if patch.target != PatchTarget::Deployment {
+            return Ok(false);
+        }
+        let query = EventQuery {
+            log: Some(Domain::Deployment),
+            patch: Some(patch.id.clone()),
+            size: PageSize::new(2),
+            ..EventQuery::default()
+        };
+        let events = self.store.events(&query).await?.items;
+        let [logged] = events.as_slice() else {
+            return Ok(false);
+        };
+        let alias = Record::EntityAlias {
+            alias: merged.clone(),
+            entity: survivor.clone(),
+        };
+        let event = &logged.event;
+        Ok(event.event_type == EventType::EntitiesMerged
+            && event.subject == Subject::Entity(merged.clone())
+            && event.delta.contains(&Write::Put(alias)))
     }
 
     /// Commits what `apply` accepted, rechecking every revision it read, and announces it.

@@ -1,5 +1,5 @@
 //! The store-backed reads (ARCHITECTURE, Store trait): whole documents by id, the journey
-//! index (C16), route detail (C17), text search across journeys, events (J5), entity
+//! index (C16), the route index, route detail (C17), text search across journeys, events (J5), entity
 //! resolution (E6), and subscriptions (H6). None depends on who asks: one deployment is one
 //! trust boundary (H4), so reads take no call. Derived reads and projections, which depend on
 //! the caller's today and entities, are in `projections`.
@@ -7,16 +7,63 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Deployment, Entity, EntityKey, Journey, JourneyId, Route, RouteId, RouteVersion, VersionNumber,
+    Deployment, Entity, EntityKey, Journey, JourneyId, Revision, Route, RouteHeader, RouteId,
+    RouteVersion, VersionNumber,
 };
 use cairn_store::{
     Document, EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoadTarget, LoggedEvent,
-    Page, RouteDetail, SearchQuery, Store, Subscription, Watch,
+    Page, PageSize, RouteDetail, SearchQuery, Store, Subscription, Watch,
 };
 
 use crate::{Service, ServiceError};
 
+/// A route in the route index: its fields, revision, latest version, and whether a draft is
+/// open (A11).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct RouteSummary {
+    /// The route's fields.
+    pub header: RouteHeader,
+    /// Its revision.
+    pub revision: Revision,
+    /// Its latest published version, if any.
+    pub latest_version: Option<VersionNumber>,
+    /// Whether it has an open draft.
+    pub draft_open: bool,
+}
+
 impl<S: Store> Service<S> {
+    /// I2: the route index, in id order, paged: the routes after `after`, at most `size`.
+    /// Cost: the store's revisions of every domain (a row each), then one route load per
+    /// route on the page.
+    ///
+    /// # Errors
+    ///
+    /// When the store fails.
+    pub async fn routes(
+        &self,
+        after: Option<&RouteId>,
+        size: PageSize,
+    ) -> Result<Page<RouteSummary, RouteId>, ServiceError> {
+        let revisions = self.store.revisions().await?;
+        let ids = revisions
+            .routes
+            .into_keys()
+            .filter(|id| after.is_none_or(|after| id > after));
+        let mut items = Vec::with_capacity(size.len().saturating_add(1));
+        for id in ids.take(size.len().saturating_add(1)) {
+            // A route the revisions name always loads: routes are never deleted (A19).
+            if let Some(route) = self.route(&id).await? {
+                items.push(RouteSummary {
+                    latest_version: route.versions.last().copied(),
+                    draft_open: route.draft.is_some(),
+                    revision: route.revision,
+                    header: route.header,
+                });
+            }
+        }
+        Ok(Page::cut(items, size, |summary| summary.header.id.clone()))
+    }
+
     /// A journey with its graph and state (G1, B1), or none.
     ///
     /// # Errors

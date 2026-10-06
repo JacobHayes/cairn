@@ -549,6 +549,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/routes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The route index, paged (I2). */
+        get: operations["listRoutes"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/routes/{id}": {
         parameters: {
             query?: never;
@@ -3671,6 +3688,24 @@ export interface components {
             note?: components["schemas"]["Markdown"] | null;
             /** @description The import's patch id (H5): the same file under the same id is the same patch. */
             patch_id: components["schemas"]["PatchId"];
+        };
+        /** @description A page of the route index; `next` is where the next page starts, absent on the last. */
+        RoutePage: {
+            /** @description The routes, in id order. */
+            items: components["schemas"]["RouteSummary"][];
+            /** @description Pass as `after` for the next page. */
+            next?: components["schemas"]["RouteId"] | null;
+        };
+        /** @description A route in the route index (I2). */
+        RouteSummary: {
+            /** @description Whether it has an open draft. */
+            draft_open: boolean;
+            /** @description The route's fields. */
+            header: components["schemas"]["RouteHeader"];
+            /** @description Its latest published version. */
+            latest_version?: components["schemas"]["VersionNumber"] | null;
+            /** @description Its revision. */
+            revision: components["schemas"]["Revision"];
         };
         /** @description An immutable published route version (A11). */
         RouteVersion: {
@@ -7241,6 +7276,77 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    listRoutes: {
+        parameters: {
+            query?: {
+                /** @description The page starts after this route. */
+                after?: components["schemas"]["RouteId"];
+                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoutePage"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
                 };
             };
             /** @description The server failed; the request id names it in the logs. */

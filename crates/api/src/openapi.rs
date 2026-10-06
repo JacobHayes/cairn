@@ -15,7 +15,7 @@ use crate::query::{self, ParamSpec, schema_of};
 use crate::wire::{
     AgentToken, Capabilities, EventPage, History, JourneyPage, Mine, MintedToken, NodeDetail,
     PatchAnswer, PatchRequest, Problem, Projected, ProposalAnswer, ProposalApply, ProposalCreate,
-    ProposalEdit, ProposalReview, ProposalStep, RelinkRequest, RouteDetail, RouteImport,
+    ProposalEdit, ProposalReview, ProposalStep, RelinkRequest, RouteDetail, RouteImport, RoutePage,
     SaveAsRouteRequest, SearchPage, Tick, TokenRequest, UpgradeRequest, Viewer,
 };
 use cairn_schema::{
@@ -381,6 +381,10 @@ fn reads() -> Vec<Operation> {
                 "The domain document: the journey, the caller's derive inputs, and the engine \
                  version; nothing derived.",
             )
+        },
+        Operation {
+            query: query::ROUTE_PARAMS,
+            ..read::<RoutePage>(&at::ROUTES, "The route index, paged (I2).")
         },
         Operation {
             path: &[ROUTE_ID],

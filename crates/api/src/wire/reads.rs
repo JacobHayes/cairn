@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use cairn_schema::{
     AttachmentKey, Event, JourneyId, JourneyStatus, Lineage, NodeKey, Revision, RouteHeader,
-    Timestamp, Title, VersionNumber,
+    RouteId, Timestamp, Title, VersionNumber,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -68,6 +68,49 @@ pub struct JourneyPage {
     /// Pass as `after` for the next page.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub next: Option<JourneyId>,
+}
+
+/// A route in the route index (I2).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RouteSummary {
+    /// The route's fields.
+    pub header: RouteHeader,
+    /// Its revision.
+    pub revision: Revision,
+    /// Its latest published version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub latest_version: Option<VersionNumber>,
+    /// Whether it has an open draft.
+    pub draft_open: bool,
+}
+
+impl From<cairn_service::RouteSummary> for RouteSummary {
+    fn from(summary: cairn_service::RouteSummary) -> Self {
+        let cairn_service::RouteSummary {
+            header,
+            revision,
+            latest_version,
+            draft_open,
+        } = summary;
+        Self {
+            header,
+            revision,
+            latest_version,
+            draft_open,
+        }
+    }
+}
+
+/// A page of the route index; `next` is where the next page starts, absent on the last.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RoutePage {
+    /// The routes, in id order.
+    pub items: Vec<RouteSummary>,
+    /// Pass as `after` for the next page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<RouteId>,
 }
 
 /// C17: a route's published versions with the journeys on each.

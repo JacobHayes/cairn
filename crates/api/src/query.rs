@@ -90,6 +90,12 @@ pub const JOURNEY_PARAMS: &[ParamSpec] = &[
     SIZE,
 ];
 
+/// `GET /routes`.
+pub const ROUTE_PARAMS: &[ParamSpec] = &[
+    ParamSpec::one::<RouteId>("after", "The page starts after this route."),
+    SIZE,
+];
+
 /// `GET /search`.
 pub const SEARCH_PARAMS: &[ParamSpec] = &[
     ParamSpec::needed::<Title>(
@@ -339,6 +345,15 @@ pub fn journeys(params: &Params) -> Result<JourneyQuery, ApiError> {
         after: params.one("after")?,
         size: params.size()?,
     })
+}
+
+/// The route index's page: where it starts and its size.
+///
+/// # Errors
+///
+/// A bad request for a parameter that does not parse.
+pub fn routes(params: &Params) -> Result<(Option<RouteId>, PageSize), ApiError> {
+    Ok((params.one("after")?, params.size()?))
 }
 
 /// The search query.

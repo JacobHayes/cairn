@@ -2,6 +2,34 @@
 
 Judgment calls made while implementing the briefs, for the user to review (`AGENTS.md`, Decide, record, keep going). Newest first. Each entry: date, brief, the question, the call, the alternatives, and what would change it.
 
+## 2026-10-06, brief 4.3 (review round 1): DNS-rebinding protection is a Host allowlist in front of the whole router, built by 4.7
+
+- Question: the review found that turning rmcp's `Host` allowlist off leaves a gap the API shares: the dev provider without a token and Tailscale in direct mode authenticate on the peer, so a page whose name an attacker rebinds to the server's loopback or tailnet address can drive `/mcp` and the API as that user. The session cookie (host-scoped, `SameSite=Lax`) and the JSON content type do not help once the browser believes the request is same-origin. No brief carried a `Host` check.
+- Call: one `Host` allowlist in front of the whole router, built by the binary from the public URL's authority (and loopback names when the listener is bound to loopback), refusing any other `Host` before the auth layer; MCP keeps rmcp's own check off, since the listener's covers it. Added to 4.7's scope and acceptance. Until 4.7 nothing is served outside tests.
+- Alternatives: rmcp's check on `/mcp` only (the API stays open to the same attack); a check inside the auth providers that trust the peer (each would need the public URL, and the UI's routes would stay exposed).
+- What would change it: a deployment reached under several names, which would make the allowlist a list in the configuration (public URL aliases).
+
+## 2026-10-06, brief 4.3: the MCP endpoint is stateless JSON inside the API's router, behind its auth layer and limits
+
+- Question: ARCHITECTURE puts MCP at `/mcp` on Streamable HTTP, sharing auth with the API, and PRACTICES holds MCP requests to the 5 s request duration (SSE excepted). rmcp's server keeps a session per client and may answer over an SSE stream; it also checks the `Host` header against a loopback-only list unless told otherwise, and the API's router has no public URL to give it.
+- Call: `cairn_mcp::router` serves rmcp's Streamable HTTP service stateless (no session, `json_response`): every request is one POST answered with one JSON body, no stream stays open, so each call is held to the API's duration, body, and in-flight limits like any endpoint. The API merges it into its own routes, inside `auth.protect` and the duration layer, when the service's capabilities offer MCP (the server always; the browser host never). A write tool's call runs on its own task, as the API's writes do, so the duration limit never cuts a commit off before its announcement (H6); a read runs in the request and stops with it (review round 1). Every call is logged, counted, and timed by tool and outcome, a name no tool has under one `unknown` label. rmcp's `Host` allowlist is off: checking the deployment's own host belongs to the listener, which owns the public URL, for the API and MCP alike (see the review round 1 entry above; 4.7 builds it).
+- Alternatives: sessions with SSE responses (the stream would sit outside the duration limit and hold an in-flight slot, for no tool that needs server-initiated messages); a separate MCP listener (a second auth stack); passing the public URL into the router for rmcp's check (a knob the API's own endpoints would not share).
+- What would change it: a tool that streams progress or asks the client mid-call (elicitation), or DNS-rebinding protection added to the listener, which would then cover `/mcp` too.
+
+## 2026-10-06, brief 4.3: the tool list carries the mutation vocabulary once and no output schemas
+
+- Question: each tool's argument schema comes from the shared types, so every tool that takes mutations (`apply_patch`, `create_proposal`, `edit_proposal`, `resolve_date_conflict`) would spell out the whole mutation vocabulary, and the proposal content its review items; with output schemas too, `tools/list` came to 2.4 MB, which an agent loads into its context on connecting. I2 asks for a surface cloud agents can use with no setup.
+- Call: `apply_patch` spells out every mutation; the other tools that take mutations describe one as "an object whose `op` names it, as `apply_patch` defines them", and every tool but a proposal's describes review items in a sentence (Cairn drafts them; an agent's own proposal needs none). Shared definitions only those reached are dropped. Parsing is as strict either way, and a mismatch names its path. Output schemas are generated for every tool (`ToolDefinition::output_schema`) and the endpoint's tests hold every output to them, but they are not listed over MCP. The list is about 110 KB.
+- Alternatives: full schemas everywhere (2.4 MB); loose `object` arguments everywhere (agents guessing shapes, refused by path); the schemas as MCP resources fetched on demand (clients differ in whether they read resources).
+- What would change it: MCP clients that keep tool schemas out of the model's context, or a need for clients to validate structured output.
+
+## 2026-10-06, brief 4.3: a route index joins the service and the HTTP API
+
+- Question: I2's tool surface starts with "list/get routes", and ARCHITECTURE lists `list_routes`; the service and the API had route reads by id (4.1, 4.2) but no way to list routes, and every tool maps to a service operation, which the API's coverage test requires to have an endpoint (I1).
+- Call: `Service::routes(after, size)` pages every route in id order with its header, revision, latest version, and whether a draft is open, from the store's revisions of every domain and one route load per route on the page; `GET /routes?after=&size=` serves it (`listRoutes`), with its wire types in the OpenAPI document and the TypeScript client. No store query was added.
+- Alternatives: a store `routes` query in both backends (more than the scale needs: routes are tens); `list_routes` reading the store beside the service (the tool would bypass the service layer, which ARCHITECTURE forbids).
+- What would change it: deployments with thousands of routes, which would call for an indexed store query, or filters (retired, has draft) the route screens (5.5) ask for.
+
 ## 2026-10-06, brief 2.7 (review round 1): an empty draft carries its route's retired keys, and publishing retires what it left out
 
 - Question: a draft opened by an import or a saved journey starts empty, so it held none of the route's retired keys, and nothing retired the keys of the extended version that its content left out. A key could come back, and later versions lost the retirement history (Invariants: no key is ever reused).

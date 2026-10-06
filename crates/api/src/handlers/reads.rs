@@ -14,7 +14,7 @@ use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{Path, segment};
 use crate::query::{self, Params};
-use crate::wire::{EventPage, JourneyPage, RouteDetail, SearchPage};
+use crate::wire::{EventPage, JourneyPage, RouteDetail, RoutePage, SearchPage};
 
 /// `GET /journeys` (C16).
 pub async fn journeys<S: Store + 'static>(
@@ -52,6 +52,20 @@ pub async fn document<S: Store + 'static>(
     document
         .map(Json)
         .ok_or_else(|| ApiError::not_found(format_args!("journey {id}")))
+}
+
+/// `GET /routes` (I2).
+pub async fn routes<S: Store + 'static>(
+    State(api): State<Api<S>>,
+    RawQuery(raw): RawQuery,
+) -> Answer<RoutePage> {
+    let params = Params::parse(raw.as_deref(), query::ROUTE_PARAMS)?;
+    let (after, size) = query::routes(&params)?;
+    let page = api.service.routes(after.as_ref(), size).await?;
+    Ok(Json(RoutePage {
+        items: page.items.into_iter().map(Into::into).collect(),
+        next: page.next,
+    }))
 }
 
 /// `GET /routes/{id}`.

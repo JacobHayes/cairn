@@ -4,6 +4,7 @@
 
 #![allow(dead_code)]
 
+pub mod mcp;
 pub mod transcript;
 
 use std::collections::BTreeSet;
@@ -45,6 +46,11 @@ impl TestClock {
     pub fn set(&self, at: &str) {
         let at: Timestamp = at.parse().unwrap();
         self.0.store(at.as_second(), Ordering::SeqCst);
+    }
+
+    /// What it reads now.
+    pub fn now(&self) -> Timestamp {
+        Timestamp::from_second(self.0.load(Ordering::SeqCst)).unwrap()
     }
 
     pub fn set_to(&self, at: Timestamp) {
@@ -98,12 +104,24 @@ pub struct World {
     pub notifier: Arc<InProcessNotifier>,
     pub clock: TestClock,
     pub address: SocketAddr,
+    /// The API as served, for clients that call it in process (the MCP client).
+    pub router: axum::Router,
 }
 
 impl World {
     /// Starts a server over a fresh memory store on this runtime, its clock at the vendor
     /// evaluation's first step.
     pub async fn start() -> Self {
+        Self::begin(true).await
+    }
+
+    /// As [`World::start`], for a host that does not offer MCP, as the browser host does not
+    /// (capability gating: its root serves no MCP endpoint).
+    pub async fn start_without_mcp() -> Self {
+        Self::begin(false).await
+    }
+
+    async fn begin(mcp: bool) -> Self {
         let store = Arc::new(MemoryStore::new());
         let notifier = Arc::new(InProcessNotifier::new());
         let clock = TestClock::default();
@@ -131,9 +149,13 @@ impl World {
             store: Arc::clone(&store),
             notifier: notifier.clone(),
             settings: settings(),
-            capabilities: Capabilities::server(methods, false),
+            capabilities: Capabilities {
+                mcp,
+                ..Capabilities::server(methods, false)
+            },
         });
         let app = cairn_api::router(service.clone(), &auth);
+        let router = app.clone();
         tokio::spawn(async move {
             let app = app.into_make_service_with_connect_info::<SocketAddr>();
             axum::serve(listener, app).await.unwrap();
@@ -144,6 +166,7 @@ impl World {
             notifier,
             clock,
             address,
+            router,
         }
     }
 

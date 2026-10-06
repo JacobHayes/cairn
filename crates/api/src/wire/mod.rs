@@ -14,8 +14,8 @@ pub use proposals::{
     RelinkRequest, RouteImport, SaveAsRouteRequest, StaleBase, UpgradeRequest,
 };
 pub use reads::{
-    EventPage, JourneyMatches, JourneyPage, JourneySummary, LoggedEvent, RouteDetail, SearchHit,
-    SearchPage, VersionJourneys,
+    EventPage, JourneyMatches, JourneyPage, JourneySummary, LoggedEvent, RouteDetail, RoutePage,
+    RouteSummary, SearchHit, SearchPage, VersionJourneys,
 };
 pub use users::{AgentToken, MintedToken, TokenRequest, Viewer};
 
