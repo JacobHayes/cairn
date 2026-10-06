@@ -91,6 +91,11 @@ impl NodeIndex {
     pub fn get(self) -> usize {
         usize::try_from(self.0).unwrap_or(usize::MAX)
     }
+
+    /// The index at a position in key order.
+    pub(crate) fn from_position(at: usize) -> Self {
+        Self(u32::try_from(at).unwrap_or(u32::MAX))
+    }
 }
 
 /// One instant: a node and a point of it.
@@ -436,6 +441,12 @@ impl Dependencies {
     #[must_use]
     pub fn node_index(&self, key: &NodeKey) -> Option<NodeIndex> {
         self.index.get(key).copied()
+    }
+
+    /// Every node's key, in index order.
+    #[must_use]
+    pub(crate) fn keys(&self) -> &[NodeKey] {
+        &self.keys
     }
 
     /// The key of the node at `index`.

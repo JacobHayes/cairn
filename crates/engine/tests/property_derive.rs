@@ -16,7 +16,7 @@ mod property {
     use patina_dst_proptest::prelude::*;
 
     fn derived(graph: &Graph) -> Derived {
-        derive(graph, &derive_inputs(Deployment::default()))
+        derive(graph, None, &derive_inputs(Deployment::default()))
     }
 
     fn state(graph: &Graph, key: &NodeKey) -> State {
@@ -47,7 +47,7 @@ mod property {
                 stored.skip_reason = Some("Generated.".parse().unwrap());
             }
         }
-        Graph::new(document).unwrap()
+        Graph::new(document, &Deployment::default()).unwrap()
     }
 
     /// D1a by its definition: a non-terminal, in-scope node with a skipped proper ancestor

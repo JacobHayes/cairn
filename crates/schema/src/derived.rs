@@ -233,6 +233,32 @@ pub struct Bound {
     pub chain: Chain,
 }
 
+/// Where a milestone's effective date comes from (F1, F7: pin, actual, and derived dates are
+/// told apart).
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum DateOrigin {
+    /// The date it was reached.
+    Actual,
+    /// Its pin, set directly or by answering its feeding decision (E3).
+    Pin,
+    /// Its derived due date (F3).
+    Due,
+}
+
+/// A milestone's effective date (F1): its actual date if reached, else its pin, else its
+/// derived due. What other constraints see when they reference it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct EffectiveDate {
+    /// The date.
+    pub date: Date,
+    /// Where it comes from.
+    pub origin: DateOrigin,
+}
+
 /// A node's derived dates (F3, F6). Every bound is null when nothing reaches it.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -252,6 +278,9 @@ pub struct NodeDates {
     /// The plan can no longer be met (F6).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub shortfall: Option<ShortChain>,
+    /// A milestone's effective date (F1); none for other kinds, or when nothing gives one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub effective_date: Option<EffectiveDate>,
 }
 
 /// Where a node's effective participation of one kind comes from (E2's order).

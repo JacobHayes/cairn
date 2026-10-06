@@ -27,7 +27,7 @@ mod property {
                         events.extend(applied.events().iter().cloned());
                         records = applied.records().clone();
                         let graph = records.journeys[&journey_id()].graph.clone();
-                        prop_assert!(Graph::new(graph).is_ok(), "an accepted graph holds every invariant");
+                        prop_assert!(Graph::new(graph, &records.deployment).is_ok(), "an accepted graph holds every invariant");
                     }
                     Err(Rejection::Invalid { violations }) => {
                         prop_assert!(!violations.as_slice().is_empty());

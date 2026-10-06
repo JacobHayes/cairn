@@ -13,9 +13,10 @@ use crate::chain::{
     InstantPoint, ShortChain,
 };
 use crate::derived::{
-    Blocker, Bound, Consequences, Contribution, DeriveInputs, Derived, DomainDocument,
-    EffectiveParticipation, Explained, NodeDates, NodeDerived, ParticipationOrigin, RankConstants,
-    Real, Relevance, RelevanceExplanation, Score, StaleConsequence, StallCause, Stalled,
+    Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DomainDocument,
+    EffectiveDate, EffectiveParticipation, Explained, NodeDates, NodeDerived, ParticipationOrigin,
+    RankConstants, Real, Relevance, RelevanceExplanation, Score, StaleConsequence, StallCause,
+    Stalled,
 };
 use crate::limits::Limit;
 use crate::rejection::{
@@ -29,6 +30,7 @@ fn arb_instant() -> BoxedStrategy<Instant> {
         4 => (arb_node_key(), prop::sample::select(vec![InstantPoint::Start, InstantPoint::Finish]))
             .prop_map(|(node, point)| Instant::Node { node, point }),
         1 => Just(Instant::CreatedAt),
+        1 => arb_node_key().prop_map(|decision| Instant::Answer { decision }),
     ]
     .boxed()
 }
@@ -85,7 +87,12 @@ pub fn arb_chain() -> BoxedStrategy<Chain> {
     let fixed = (
         arb_instant(),
         arb_date(),
-        prop::sample::select(vec![FixedBy::Pin, FixedBy::Actual]),
+        prop::sample::select(vec![
+            FixedBy::Pin,
+            FixedBy::Actual,
+            FixedBy::Answer,
+            FixedBy::Today,
+        ]),
     )
         .prop_map(|(instant, date, fixed_by)| FixedDate {
             instant,
@@ -102,10 +109,15 @@ pub fn arb_chain() -> BoxedStrategy<Chain> {
 
 /// A chain with its shortfall.
 pub fn arb_short_chain() -> BoxedStrategy<ShortChain> {
-    (arb_chain(), 0u32..60)
-        .prop_map(|(chain, shortfall_days)| ShortChain {
+    (
+        arb_chain(),
+        0u32..60,
+        prop::collection::vec(super::arb_mutation(), 0..2),
+    )
+        .prop_map(|(chain, shortfall_days, resolutions)| ShortChain {
             chain,
             shortfall_days,
+            resolutions,
         })
         .boxed()
 }
@@ -240,14 +252,19 @@ fn arb_node_dates() -> BoxedStrategy<NodeDates> {
         bound(),
         prop::option::of(-60i32..60),
         prop::option::of(arb_short_chain()),
+        prop::option::of((
+            arb_date(),
+            prop::sample::select(vec![DateOrigin::Actual, DateOrigin::Pin, DateOrigin::Due]),
+        )),
     )
         .prop_map(
-            |(earliest_start, latest_start, due, slack_days, shortfall)| NodeDates {
+            |(earliest_start, latest_start, due, slack_days, shortfall, effective)| NodeDates {
                 earliest_start,
                 latest_start,
                 due,
                 slack_days,
                 shortfall,
+                effective_date: effective.map(|(date, origin)| EffectiveDate { date, origin }),
             },
         )
         .boxed()

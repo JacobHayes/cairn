@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::collections::{BoundedVec, ChainCountPerRejection};
 use crate::id::NodeKey;
+use crate::patch::Mutation;
 use jiff::civil::Date;
 
 /// Which instant of a node (F2): work has a start and a finish; a decision or milestone has
@@ -39,6 +40,12 @@ pub enum Instant {
     },
     /// The journey's `created_at`.
     CreatedAt,
+    /// A date decision's answer, a date rule's source (A8). It is the answered date, apart
+    /// from the decision's own instant, which is when it was decided (F2).
+    Answer {
+        /// The decision.
+        decision: NodeKey,
+    },
 }
 
 /// How a dependency arose (PRD glossary, Condition gate / implicit edge).
@@ -130,7 +137,8 @@ pub struct Constraint {
     pub conditional: bool,
 }
 
-/// What fixes an instant on a chain: a pin, or an actual date (F1, F6).
+/// What fixes an instant on a chain: a pin, an actual date, a date answer, or today (F1, F3,
+/// F6). A chain always ends at one of these.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -138,8 +146,13 @@ pub struct Constraint {
 pub enum FixedBy {
     /// A pin, which a resolution may move (F5).
     Pin,
-    /// An actual date, a fact that is never moved (F6).
+    /// An actual date, a fact that is never moved (F6): a recorded start or finish, or the
+    /// journey's `created_at`.
     Actual,
+    /// A date decision's answer, which a revised answer moves (A8).
+    Answer,
+    /// Today, which holds unfinished work back: it starts, or finishes, no earlier (F3).
+    Today,
 }
 
 /// A date fixed on a chain.
@@ -166,7 +179,7 @@ pub struct Chain {
 }
 
 /// A chain that requires a date to precede itself (F5), or a plan reality can no longer
-/// meet (F6), with how many days it is short.
+/// meet (F6), with how many days it is short and the moves that would resolve it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ShortChain {
@@ -174,6 +187,12 @@ pub struct ShortChain {
     pub chain: Chain,
     /// Days short.
     pub shortfall_days: u32,
+    /// The resolution moves (F5, F6): each an ordinary mutation that, applied alone, gives
+    /// this chain the days it lacks (shift, repin, or unpin a pin on it; revise the answer
+    /// behind a pin; adjust a rule's offset; revise an estimate; drop an explicit
+    /// requirement or a stage's close). Nothing applies them automatically.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub resolutions: Vec<Mutation>,
 }
 
 /// The contradictory chains a rejection lists (F5): at most

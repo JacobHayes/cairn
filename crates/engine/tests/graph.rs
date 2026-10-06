@@ -38,7 +38,7 @@ fn condition(json: &str) -> Option<Condition<KeyRefs>> {
 }
 
 fn codes(document: Document) -> Vec<ViolationCode> {
-    match Graph::new(document) {
+    match Graph::new(document, &cairn_schema::Deployment::default()) {
         Ok(_) => Vec::new(),
         Err(violations) => violations
             .as_slice()
@@ -363,7 +363,7 @@ fn three_independent_violations_report_three() {
 fn a_violation_names_the_path_of_the_node_it_is_about() {
     let mut document = vendor();
     edit(&mut document, "n_plan_draft", |n| requires(n, "n_plan"));
-    let violations = Graph::new(document).unwrap_err();
+    let violations = Graph::new(document, &cairn_schema::Deployment::default()).unwrap_err();
     let found = &violations.as_slice()[0];
     assert_eq!(
         found.at.path.as_ref().map(ToString::to_string).as_deref(),

@@ -58,6 +58,29 @@ Every other node (23 at step 8) is relevant at every point, with no condition ap
 | `reporting/review-opens`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
 | `reporting/final-review/final-report`, `reviewer` | none (role `findings_reviewer`) | none (role `findings_reviewer`) | none (role `findings_reviewer`) | `e_reviewer` (role `findings_reviewer`) |
 
+Due dates once the decision meeting is pinned (brief 2.3): answering the meeting date in step 2
+pins `decision-meeting` to 2026-11-20 (E3), and every unfinished node a bound reaches gets
+these latest starts and due dates. The final review closes at the meeting and opens 14 days
+before it; everything upstream is due by what it feeds. Latest bounds read backward from pins
+and actuals, so they do not depend on the day they are read. The scenario matrix checks these
+values, and `briefs/proof/2.3/prove.sh` checks this table against the engine's output.
+
+| Node | latest start | due |
+|---|---|---|
+| `setup/access` | 2026-10-29 | 2026-10-31 |
+| `testing/baseline` | 2026-11-03 | 2026-11-06 |
+| `testing/comparison-set` | 2026-11-03 | 2026-11-03 |
+| `decision-meeting` | 2026-11-20 | 2026-11-20 |
+| `reporting/final-review/final-report` | 2026-11-17 | 2026-11-20 |
+| `reporting/final-review` | 2026-11-20 | 2026-11-20 |
+| `reporting/findings` | 2026-11-15 | 2026-11-17 |
+| `kickoff` | 2026-10-29 | 2026-10-29 |
+| `setup/plan` | 2026-11-03 | 2026-11-03 |
+| `setup/plan/draft` | 2026-10-31 | 2026-11-02 |
+| `setup/plan/review` | 2026-11-02 | 2026-11-03 |
+| `reporting/review-opens` | 2026-11-06 | 2026-11-06 |
+| `testing` | 2026-11-06 | 2026-11-06 |
+
 ## `hiring-loop/`
 
 A small route with deep containment (interview loop, onsite, debrief, notes, scorecard) and a
@@ -80,6 +103,8 @@ role through a multi-valued `contributor` kind (owner, being single-valued, cann
 multi-valued role, A7). The scenario pins the launch date, reaches kickoff,
 shifts the launch pin a week when feature work slips, and records a code-freeze actual
 date later than the plan's chain allows: a shortfall, which is reported, never rejected.
+Derived (brief 2.3): with the launch pinned to 2026-11-23, the freeze is due 21 days before it,
+on 2026-11-02; reached on 2026-11-04, it is short by 2 days, and so is the launch.
 
 ## `bake-off/`
 

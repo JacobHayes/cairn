@@ -197,6 +197,30 @@ const MATRIX: &[Entry] = &[
         brief: "2.2",
         run: role_changes_rederive_participations,
     },
+    Entry {
+        scenario: "vendor evaluation: due dates from the pinned decision meeting",
+        prd: &["Illustrative example", "F1", "F3", "F4", "E3"],
+        brief: "2.3",
+        run: vendor_due_dates,
+    },
+    Entry {
+        scenario: "contradictory chains and each resolution move",
+        prd: &["F5", "E3"],
+        brief: "2.3",
+        run: contradictory_chain_resolutions,
+    },
+    Entry {
+        scenario: "late actual dates and shortfalls",
+        prd: &["F6", "F1"],
+        brief: "2.3",
+        run: late_actuals_and_shortfalls,
+    },
+    Entry {
+        scenario: "relative stage windows with sequential and parallel estimates",
+        prd: &["F4", "F5", "F2"],
+        brief: "2.3",
+        run: relative_stage_windows,
+    },
 ];
 
 #[test]
@@ -358,7 +382,7 @@ fn launch_fixture() -> Run {
     assert_eq!(freeze.state, State::Reached);
     assert_eq!(
         freeze.finished_on,
-        Some("2026-11-02".parse().unwrap()),
+        Some("2026-11-04".parse().unwrap()),
         "a late actual is recorded, never rejected (F6)"
     );
     run
@@ -882,6 +906,108 @@ fn role_changes_rederive_participations() -> Run {
         participation
             .membership_lost(&key("n_interview_one"))
             .is_empty()
+    );
+    run
+}
+
+/// The vendor evaluation's due dates once its decision meeting is pinned, as
+/// fixtures/README.md states them: the final review closes at the meeting and opens 14 days
+/// before it, and everything upstream is due by what it feeds (F3, F4).
+const VENDOR_DUE: [(&str, &str, &str); 12] = [
+    ("n_access", "2026-10-29", "2026-10-31"),
+    ("n_plan_draft", "2026-10-31", "2026-11-02"),
+    ("n_plan_review", "2026-11-02", "2026-11-03"),
+    ("n_plan", "2026-11-03", "2026-11-03"),
+    ("n_comparison_set", "2026-11-03", "2026-11-03"),
+    ("n_baseline", "2026-11-03", "2026-11-06"),
+    ("n_testing", "2026-11-06", "2026-11-06"),
+    ("n_findings", "2026-11-15", "2026-11-17"),
+    ("n_review_opens", "2026-11-06", "2026-11-06"),
+    ("n_final_report", "2026-11-17", "2026-11-20"),
+    ("n_final_review", "2026-11-20", "2026-11-20"),
+    ("n_decision_meeting", "2026-11-20", "2026-11-20"),
+];
+
+fn vendor_due_dates() -> Run {
+    let run = Run::fixture("vendor-evaluation");
+    let derived = support::derived(run.applied[1].records(), "j_vendor_eval");
+    let dates = derived.dates();
+    for (node, latest_start, due) in VENDOR_DUE {
+        let found = (dates.latest_start(&key(node)), dates.due(&key(node)));
+        let expected = (
+            Some(latest_start.parse().unwrap()),
+            Some(due.parse().unwrap()),
+        );
+        assert_eq!(found, expected, "{node}: latest start, due");
+    }
+    run
+}
+
+/// F5: the report pinned past its decision meeting is rejected; each move the rejection
+/// lists, applied with the pin, is accepted (and replays).
+fn contradictory_chain_resolutions() -> Run {
+    let mut run = Run::from(support::vendor_after(2));
+    let late_pin = "- op: set_pin\n  node: n_final_report\n  date: \"2026-11-25\"\n";
+    let Rejection::Invalid { violations } = run.reject(VENDOR, late_pin) else {
+        panic!("a contradictory chain is invalid, not stale");
+    };
+    let chains = violations.as_slice()[0].chains.clone().unwrap();
+    let moves = &chains.chains.as_slice()[0].resolutions;
+    assert!(moves.len() >= 4, "{moves:#?}");
+    for resolution in moves {
+        let resolution = cairn_schema::to_json(resolution).unwrap();
+        run.accept(VENDOR, &format!("{late_pin}- {resolution}\n"));
+    }
+    run
+}
+
+/// F6: the launch's code freeze is reached two days after the launch pin's chain allows; the
+/// shortfall names that chain, and an unrelated patch after it is accepted.
+fn late_actuals_and_shortfalls() -> Run {
+    let mut run = Run::fixture("product-launch");
+    let derived = derived(&run);
+    let freeze = derived.dates();
+    assert_eq!(freeze.shortfall_days(&key("n_code_freeze")), Some(2));
+    assert_eq!(freeze.shortfall_days(&key("n_launch")), Some(2));
+    run.accept(
+        "{journey: j_launch}",
+        "- op: add_annotation\n  annotation: {key: a_late, node: n_code_freeze, note: Slipped two days.}\n",
+    );
+    run
+}
+
+/// F4, F5: a stage that closes five days after it opens holds two three-day pieces of work
+/// side by side, but not one after the other.
+fn relative_stage_windows() -> Run {
+    let nodes = "- op: add_node\n  node: {key: n_opens, id: opens, kind: milestone, title: Opens}\n\
+- op: add_node\n  node: {key: n_closes, id: closes, kind: milestone, title: Closes, due_by: {after: n_opens, offset: 5}}\n\
+- op: add_node\n  node: {key: n_window, id: window, kind: group, title: Window, opens_at: n_opens, closes_at: n_closes}\n\
+- op: add_node\n  node: {key: n_first, id: first, parent: n_window, kind: action, title: First, estimate: 3}\n\
+- op: add_node\n  node: {key: n_second, id: second, parent: n_window, kind: action, title: Second, estimate: 3}\n";
+    let mut run = Run::from(support::journey(nodes));
+    let sequential = run.reject(
+        "{journey: j_test}",
+        "- op: add_edge\n  edge: {node: n_second, requires: n_first}\n",
+    );
+    let Rejection::Invalid { violations } = sequential else {
+        panic!("sequential work past the window is invalid");
+    };
+    let found = &violations.as_slice()[0];
+    assert_eq!(found.code, ViolationCode::ContradictoryChain);
+    assert_eq!(
+        found.chains.as_ref().unwrap().chains.as_slice()[0].shortfall_days,
+        1
+    );
+    run.accept(
+        "{journey: j_test}",
+        "- op: set_pin\n  node: n_opens\n  date: \"2026-11-02\"\n",
+    );
+    let derived = derived(&run);
+    let due = derived.dates().due(&key("n_second"));
+    assert_eq!(
+        due,
+        Some("2026-11-07".parse().unwrap()),
+        "parallel work fits the window"
     );
     run
 }

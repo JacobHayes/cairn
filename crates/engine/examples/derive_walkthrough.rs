@@ -99,14 +99,15 @@ fn seed(file: &RouteFile) -> Result<Records> {
 
 /// The journey's graph and its derive at the fixed clock.
 fn derived(records: &Records, journey: &JourneyId) -> Result<(Graph, Derived)> {
-    let document = records
-        .journeys
-        .get(journey)
-        .ok_or("no journey")?
-        .graph
-        .clone();
-    let graph = Graph::new(document).map_err(|v| format!("{v:?}"))?;
-    let derived = derive(&graph, &derive_inputs(records.deployment.clone()));
+    let document = records.journeys.get(journey).ok_or("no journey")?;
+    let created_on = document.header.created_on;
+    let document = document.graph.clone();
+    let graph = Graph::new(document, &records.deployment).map_err(|v| format!("{v:?}"))?;
+    let derived = derive(
+        &graph,
+        Some(created_on),
+        &derive_inputs(records.deployment.clone()),
+    );
     Ok((graph, derived))
 }
 

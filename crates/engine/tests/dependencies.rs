@@ -269,24 +269,10 @@ fn cycles_are_judged_on_gate_edges_with_implicit_ones_included() {
 /// every node's dependencies walks only its entry chains.
 #[test]
 fn the_graph_stays_linear_at_the_limits() {
-    use cairn_engine::testing::generated::{NodeSeed, build};
-    use cairn_schema::limits::{CONTAINMENT_DEPTH_MAX, NODE_COUNT_MAX};
-    let count = NODE_COUNT_MAX as usize;
-    let seeds: Vec<NodeSeed> = (0..count)
-        .map(|i| NodeSeed {
-            climb: if i % 24 == 23 { 4 } else { 0 },
-            kind: [2, 4, 6, 0, 1, 5][i % 6],
-            requires: (0..32)
-                .map(|j| u16::try_from((i * 131 + j * 977) % 65_536).unwrap())
-                .collect(),
-            condition: (i % 3 == 0).then(|| (u8::try_from(i % 6).unwrap(), 7, 11)),
-            opening: Some((u16::try_from(i).unwrap(), i % 2 == 0)),
-            state: u8::try_from(i % 4).unwrap(),
-            force: i % 50 == 0,
-            keep: false,
-            participation: (i % 7 == 0).then(|| (i % 2 == 0, u8::try_from(i % 5).unwrap())),
-        })
-        .collect();
+    use cairn_engine::testing::generated::{build, limit_seeds};
+    use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
+    let seeds = limit_seeds();
+    let count = seeds.len();
     let graph = build(&seeds);
     let document = graph.document();
     let depth = document
@@ -298,6 +284,7 @@ fn the_graph_stays_linear_at_the_limits() {
     assert_eq!(depth, Some(CONTAINMENT_DEPTH_MAX));
     let derived = cairn_engine::derive(
         &graph,
+        None,
         &cairn_engine::testing::derive_inputs(cairn_schema::Deployment::default()),
     );
     let dependencies = derived.dependencies();

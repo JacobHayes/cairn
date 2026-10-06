@@ -19,7 +19,7 @@ pub mod testing;
 pub mod transition;
 mod validate;
 
-pub use derive::{Derived, derive};
+pub use derive::{Derived, check_plan, derive};
 pub use file::from_file;
 pub use graph::{Document, Graph, Tree};
 pub use pipeline::{Applied, ApplyInputs, apply};

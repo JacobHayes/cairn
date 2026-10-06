@@ -74,8 +74,8 @@ steps:
 - note: >-
     Feature work and hardening finish; the code freeze is reached later than the
     chain from the launch pin allows, which is a shortfall, not a rejection.
-  today: "2026-11-02"
-  at: "2026-11-02T18:00:00Z"
+  today: "2026-11-04"
+  at: "2026-11-04T18:00:00Z"
   actor:
     user: u_launch_lead
   patch:
@@ -96,4 +96,4 @@ steps:
     - op: set_recorded_date
       node: n_code_freeze
       end: finish
-      date: "2026-11-02"
+      date: "2026-11-04"

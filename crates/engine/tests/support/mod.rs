@@ -238,13 +238,16 @@ pub fn after(name: &str, steps: usize) -> Records {
 /// The journey's graph, validated.
 pub fn journey_graph(records: &Records, journey: &str) -> Graph {
     let document = records.journeys[&journey.parse().unwrap()].graph.clone();
-    Graph::new(document).unwrap_or_else(|violations| panic!("{violations:#?}"))
+    Graph::new(document, &records.deployment).unwrap_or_else(|violations| panic!("{violations:#?}"))
 }
 
 /// Derives a journey in the records at the fixed clock.
 pub fn derived(records: &Records, journey: &str) -> cairn_engine::Derived {
     let inputs = cairn_engine::testing::derive_inputs(records.deployment.clone());
-    cairn_engine::derive(&journey_graph(records, journey), &inputs)
+    let created_on = records.journeys[&journey.parse().unwrap()]
+        .header
+        .created_on;
+    cairn_engine::derive(&journey_graph(records, journey), Some(created_on), &inputs)
 }
 
 /// Applies mutations, written as YAML, to a journey and returns the records they produce,

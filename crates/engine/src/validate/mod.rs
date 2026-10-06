@@ -8,9 +8,9 @@ mod references;
 pub(crate) mod state;
 mod structure;
 
-use cairn_schema::{Location, NodeKey, Subject, Violation, ViolationCode};
+use cairn_schema::{Deployment, Location, NodeKey, Subject, Violation, ViolationCode};
 
-use crate::graph::{Document, Tree};
+use crate::graph::{Document, Graph, Tree};
 
 /// One graph under validation.
 pub(crate) struct GraphCheck<'a> {
@@ -48,6 +48,21 @@ pub(crate) fn graph(document: &Document, tree: &Tree) -> Vec<Violation> {
         stage(&check, &mut violations);
     }
     violations
+}
+
+/// The graph stages on one graph, then, when they found nothing, the plan check (F5;
+/// ARCHITECTURE, Write path: structure, references, cycles, plan check): it derives
+/// relevance, which needs a graph that holds every other invariant.
+pub(crate) fn with_plan(check: &GraphCheck<'_>, deployment: &Deployment, out: &mut Vec<Violation>) {
+    let found_before = out.len();
+    for stage in GRAPH_STAGES {
+        stage(check, out);
+    }
+    if out.len() > found_before {
+        return;
+    }
+    let graph = Graph::trusted(check.document.clone(), check.tree.clone());
+    out.extend(crate::derive::dates::plan_violation(&graph, deployment));
 }
 
 /// A violation with no location yet.

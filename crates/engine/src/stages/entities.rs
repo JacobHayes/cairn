@@ -8,7 +8,7 @@ use cairn_schema::{Deployment, Subject, Violation, ViolationCode};
 use super::Check;
 use crate::entity::{self, Mention};
 use crate::graph::{Document, Tree};
-use crate::validate::{GRAPH_STAGES, GraphCheck, at_node, violation};
+use crate::validate::{GraphCheck, at_node, violation};
 
 /// Every entity mention in `document` that resolves to no entity.
 fn unresolved(document: &Document, tree: &Tree, deployment: &Deployment) -> Vec<Violation> {
@@ -59,9 +59,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             journey: true,
         };
         let mut broken = unresolved(document, &tree, &candidate.deployment);
-        for stage in GRAPH_STAGES {
-            stage(&graph, &mut broken);
-        }
+        crate::validate::with_plan(&graph, &candidate.deployment, &mut broken);
         for inner in broken {
             let mut found = violation(
                 ViolationCode::MergeBreaksJourney,
@@ -70,6 +68,8 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             found.at.mutation = None;
             found.related = vec![Subject::Journey(id.clone())];
             found.related.extend(inner.at.subject);
+            // F5: a merge that makes date constraints apply carries their chains.
+            found.chains = inner.chains;
             check.violations.push(found);
         }
     }

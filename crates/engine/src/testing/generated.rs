@@ -17,12 +17,12 @@ use std::ops::RangeInclusive;
 
 use proptest::prelude::*;
 
-use cairn_schema::limits::{CONTAINMENT_DEPTH_MAX, EDGE_COUNT_PER_NODE_MAX};
+use cairn_schema::limits::{CONTAINMENT_DEPTH_MAX, EDGE_COUNT_PER_NODE_MAX, NODE_COUNT_MAX};
 use cairn_schema::{
     Action, AnswerSpec, AnswerValue, BoundedSet, Clause, Comparison, Condition, ConditionValue,
-    Decision, Deliverable, Group, KeyRefs, KindKey, Milestone, Node, NodeKey, NodeKind, NodeState,
-    Overrides, ParticipationKind, ParticipationSource, Participations, Payload, Provenance, Role,
-    State,
+    DateRule, DateSource, Days, Decision, Deliverable, Direction, Group, KeyRefs, KindKey,
+    Milestone, Node, NodeKey, NodeKind, NodeState, OneOrMany, Overrides, ParticipationKind,
+    ParticipationSource, Participations, Payload, Provenance, Role, State,
 };
 
 use super::parse;
@@ -50,6 +50,51 @@ pub struct NodeSeed {
     /// A participation: of `owner` (true) or the multi-valued kind, and its source by index
     /// (the kind's role, or one of a few explicit lists, the empty one included).
     pub participation: Option<(bool, u8)>,
+    /// Dates: estimate, rules, a stage close, a pin, recorded dates.
+    pub dates: DateSeed,
+}
+
+/// A node's dates, by index and offset. Rules measure from milestones anywhere in the graph
+/// (or `created_at`), so they close loops the gate graph cannot; [`build`] drops the dates
+/// of nodes on any contradictory chain until the plan holds.
+#[derive(Clone, Debug, Default)]
+pub struct DateSeed {
+    /// A deliverable's or action's estimate, modulo 6 days.
+    pub estimate: u8,
+    /// `due_by`: its source by index among the milestones and `created_at`, `after` or
+    /// `before`, and the offset modulo 15 days.
+    pub due_by: Option<(u16, bool, u8)>,
+    /// `not_before`, the same way.
+    pub not_before: Option<(u16, bool, u8)>,
+    /// A group's closing milestone, by index among those outside it.
+    pub closes_at: Option<u16>,
+    /// A pin, days after 2026-09-20 modulo 60.
+    pub pin: Option<u8>,
+    /// Recorded dates for started or finished work: the start, days after 2026-09-20
+    /// modulo 20, and the finish, days after the start modulo 10.
+    pub recorded: (u8, u8),
+}
+
+fn arb_date_seed() -> impl Strategy<Value = DateSeed> {
+    let rule = || prop::option::weighted(0.25, (any::<u16>(), any::<bool>(), any::<u8>()));
+    (
+        any::<u8>(),
+        rule(),
+        rule(),
+        prop::option::weighted(0.3, any::<u16>()),
+        prop::option::weighted(0.15, any::<u8>()),
+        (any::<u8>(), any::<u8>()),
+    )
+        .prop_map(
+            |(estimate, due_by, not_before, closes_at, pin, recorded)| DateSeed {
+                estimate,
+                due_by,
+                not_before,
+                closes_at,
+                pin,
+                recorded,
+            },
+        )
 }
 
 fn arb_seed() -> impl Strategy<Value = NodeSeed> {
@@ -68,9 +113,17 @@ fn arb_seed() -> impl Strategy<Value = NodeSeed> {
             prop::bool::weighted(0.15),
             prop::option::weighted(0.25, (any::<bool>(), any::<u8>())),
         ),
+        arb_date_seed(),
     )
         .prop_map(
-            |((climb, kind), requires, condition, opening, (state, force, keep, participation))| {
+            |(
+                (climb, kind),
+                requires,
+                condition,
+                opening,
+                (state, force, keep, participation),
+                dates,
+            )| {
                 NodeSeed {
                     climb,
                     kind,
@@ -81,6 +134,7 @@ fn arb_seed() -> impl Strategy<Value = NodeSeed> {
                     force,
                     keep,
                     participation,
+                    dates,
                 }
             },
         )
@@ -107,8 +161,156 @@ pub fn build(seeds: &[NodeSeed]) -> Graph {
     }
     for (index, seed) in seeds.iter().enumerate() {
         shape.state(&mut document, index, seed);
+        shape.dates(&mut document, index, &seed.dates);
     }
-    Graph::new(document).unwrap_or_else(|violations| panic!("{violations:#?}"))
+    plan_held(document)
+}
+
+/// A graph at the limits (PRACTICES, Explicit limits: costed and tested at the limits):
+/// `node_count_max` nodes with containment at the depth limit, 32 requirements tried per
+/// node, conditions on a third of the nodes, a stage opening on every group, and stored
+/// states of every kind.
+#[must_use]
+pub fn limit_seeds() -> Vec<NodeSeed> {
+    let count = NODE_COUNT_MAX as usize;
+    (0..count)
+        .map(|i| NodeSeed {
+            climb: if i % 24 == 23 { 4 } else { 0 },
+            kind: [2, 4, 6, 0, 1, 5][i % 6],
+            requires: (0..32)
+                .map(|j| u16::try_from((i * 131 + j * 977) % 65_536).unwrap_or(0))
+                .collect(),
+            condition: (i % 3 == 0).then(|| (u8::try_from(i % 6).unwrap_or(0), 7, 11)),
+            opening: Some((u16::try_from(i).unwrap_or(0), i % 2 == 0)),
+            state: u8::try_from(i % 4).unwrap_or(0),
+            force: i % 50 == 0,
+            keep: false,
+            participation: (i % 7 == 0).then(|| (i % 2 == 0, u8::try_from(i % 5).unwrap_or(0))),
+            dates: DateSeed::default(),
+        })
+        .collect()
+}
+
+/// The date network at the limits: [`limit_seeds`]' graph, without conditions so every node
+/// is in scope, with both date rules on every node,
+/// each with `edge_count_per_node_max` milestone sources, a stage close on every group, and
+/// the same pin on every tenth milestone. Every rule offset is zero and there are no
+/// estimates, so the rules tie most instants into one strongly connected component without
+/// a positive cycle: Bellman-Ford's worst ground, at the constraint limit.
+///
+/// # Panics
+///
+/// When the graph breaks an invariant: a bug in this generator.
+#[must_use]
+pub fn date_limits() -> Graph {
+    // Every node in scope, so no constraint is pruned.
+    let seeds: Vec<NodeSeed> = limit_seeds()
+        .into_iter()
+        .map(|seed| NodeSeed {
+            condition: None,
+            ..seed
+        })
+        .collect();
+    let mut document = build(&seeds).into_document();
+    let milestones: Vec<NodeKey> = document
+        .nodes
+        .values()
+        .filter(|node| node.kind() == NodeKind::Milestone)
+        .map(|node| node.key.clone())
+        .collect();
+    let width = EDGE_COUNT_PER_NODE_MAX as usize;
+    let keys: Vec<NodeKey> = document.nodes.as_map().keys().cloned().collect();
+    for (at, key) in keys.iter().enumerate() {
+        let Some(mut node) = document.nodes.get(key).cloned() else {
+            continue;
+        };
+        let sources: Vec<DateSource<KeyRefs>> = (0..width)
+            .map(|step| &milestones[(at * 7 + step * 13) % milestones.len()])
+            .filter(|milestone| *milestone != key)
+            .map(|milestone| DateSource::Node(milestone.clone()))
+            .collect();
+        let rule = |direction| DateRule {
+            direction,
+            sources: OneOrMany::new(sources.clone()).unwrap_or_else(|e| panic!("{e}")),
+            offset: Days::try_from(0).unwrap_or_else(|e| panic!("{e}")),
+        };
+        node.due_by = Some(rule(Direction::After));
+        node.not_before = Some(rule(Direction::Before));
+        if let Payload::Group(group) = &mut node.payload {
+            group.closes_at = milestones
+                .iter()
+                .find(|milestone| !is_within(&document, milestone, key))
+                .cloned();
+        }
+        document.nodes.put(node).unwrap_or_else(|e| panic!("{e}"));
+    }
+    let pinned: cairn_schema::Date = parse("2026-11-02");
+    for milestone in milestones.iter().step_by(10) {
+        document.state.pins.insert(milestone.clone(), pinned);
+    }
+    Graph::new(document, &cairn_schema::Deployment::default())
+        .unwrap_or_else(|violations| panic!("{violations:#?}"))
+}
+
+/// True when `key` is `ancestor` or lies beneath it.
+fn is_within(document: &Document, key: &NodeKey, ancestor: &NodeKey) -> bool {
+    let mut current = Some(key);
+    while let Some(at) = current {
+        if at == ancestor {
+            return true;
+        }
+        current = document.nodes.get(at).and_then(|node| node.parent.as_ref());
+    }
+    false
+}
+
+/// The graph, with the dates of every node on a contradictory chain dropped until its plan
+/// holds (F5); a graph with no dates at all holds, so this ends.
+fn plan_held(mut document: Document) -> Graph {
+    let deployment = cairn_schema::Deployment::default();
+    loop {
+        let violations = match Graph::new(document.clone(), &deployment) {
+            Ok(graph) => return graph,
+            Err(violations) => violations,
+        };
+        let mut on_chains = BTreeSet::new();
+        for found in violations.as_slice() {
+            assert_eq!(
+                found.code,
+                cairn_schema::ViolationCode::ContradictoryChain,
+                "{found:#?}"
+            );
+            for subject in &found.related {
+                if let cairn_schema::Subject::Node(node) = subject {
+                    on_chains.insert(node.clone());
+                }
+            }
+        }
+        assert!(
+            !on_chains.is_empty(),
+            "a contradictory chain names its nodes"
+        );
+        for key in &on_chains {
+            undate(&mut document, key);
+        }
+    }
+}
+
+/// Drops a node's rules, estimate, stage close, and pin.
+fn undate(document: &mut Document, key: &NodeKey) {
+    document.state.pins.remove(key);
+    let Some(mut node) = document.nodes.get(key).cloned() else {
+        return;
+    };
+    node.due_by = None;
+    node.not_before = None;
+    match &mut node.payload {
+        Payload::Deliverable(deliverable) => deliverable.estimate = None,
+        Payload::Action(action) => action.estimate = None,
+        Payload::Group(group) => group.closes_at = None,
+        Payload::Decision(_) | Payload::Milestone(_) => {}
+    }
+    document.nodes.put(node).unwrap_or_else(|e| panic!("{e}"));
 }
 
 /// The tree the seeds make: each node's kind, parent, and the end of its subtree.
@@ -246,6 +448,79 @@ impl Shape {
             gates,
             ..Group::default()
         }
+    }
+
+    /// The node's dates from its seed.
+    fn dates(&self, document: &mut Document, index: usize, seed: &DateSeed) {
+        let milestones: Vec<usize> = (0..self.kinds.len())
+            .filter(|&other| other != index && self.kinds[other] == NodeKind::Milestone)
+            .collect();
+        let rule = |found: Option<(u16, bool, u8)>| {
+            let (pick, after, offset) = found?;
+            let at = usize::from(pick) % (milestones.len() + 1);
+            let source = milestones
+                .get(at)
+                .map_or(DateSource::CreatedAt, |&m| DateSource::Node(key(m)));
+            let rule = DateRule {
+                direction: if after {
+                    Direction::After
+                } else {
+                    Direction::Before
+                },
+                sources: OneOrMany::new(vec![source]).unwrap_or_else(|e| panic!("{e}")),
+                offset: Days::try_from(u32::from(offset % 15)).unwrap_or_else(|e| panic!("{e}")),
+            };
+            Some(rule)
+        };
+        let day = |days: u32| {
+            let start: cairn_schema::Date = parse("2026-09-20");
+            start
+                .checked_add(jiff::Span::new().days(i64::from(days)))
+                .unwrap_or_else(|e| panic!("{e}"))
+        };
+        let started = u32::from(seed.recorded.0 % 20);
+        let finished = started + u32::from(seed.recorded.1 % 10);
+        if let Some(stored) = document.state.nodes.get_mut(&key(index)) {
+            let (start, finish) = match stored.state {
+                State::Active => (Some(day(started)), None),
+                State::Done => (Some(day(started)), Some(day(finished))),
+                State::Decided | State::Reached => (None, Some(day(finished))),
+                State::Todo | State::Open | State::Pending | State::Derived | State::Skipped => {
+                    (None, None)
+                }
+            };
+            stored.started_on = start;
+            stored.finished_on = finish;
+        }
+        if let Some(pin) = seed.pin {
+            document
+                .state
+                .pins
+                .insert(key(index), day(u32::from(pin % 60)));
+        }
+        let Some(mut node) = document.nodes.get(&key(index)).cloned() else {
+            return;
+        };
+        node.due_by = rule(seed.due_by);
+        node.not_before = rule(seed.not_before);
+        let estimate = Days::try_from(u32::from(seed.estimate % 6)).ok();
+        let outside: Vec<usize> = milestones
+            .iter()
+            .copied()
+            .filter(|&other| other < index || other > self.ends[index])
+            .collect();
+        match &mut node.payload {
+            Payload::Deliverable(deliverable) => deliverable.estimate = estimate,
+            Payload::Action(action) => action.estimate = estimate,
+            Payload::Group(group) => {
+                group.closes_at = seed
+                    .closes_at
+                    .and_then(|pick| outside.get(usize::from(pick) % outside.len().max(1)))
+                    .map(|&milestone| key(milestone));
+            }
+            Payload::Decision(_) | Payload::Milestone(_) => {}
+        }
+        document.nodes.put(node).unwrap_or_else(|e| panic!("{e}"));
     }
 
     /// A stored state legal for the node's kind, its answer, and its overrides.

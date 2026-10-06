@@ -230,7 +230,13 @@ fn reverify(candidate: &Records, patch: &Patch, published: &[cairn_schema::Linea
     };
     for graph in graphs {
         let tree = crate::graph::Tree::build(graph);
-        let violations = crate::validate::graph(graph, &tree);
+        let check = crate::validate::GraphCheck {
+            document: graph,
+            tree: &tree,
+            journey: !graph.state.is_empty(),
+        };
+        let mut violations = Vec::new();
+        crate::validate::with_plan(&check, &candidate.deployment, &mut violations);
         assert!(
             violations.is_empty(),
             "an accepted patch committed an invalid graph: {violations:#?}"

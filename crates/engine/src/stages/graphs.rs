@@ -1,11 +1,12 @@
 //! Every graph the patch wrote holds the graph invariants (PRD Invariants: graph and
-//! journey): the patch's journey, its route's draft, and any version it published.
+//! journey), its plan layer's included (F5): the patch's journey, its route's draft, and any
+//! version it published.
 
 use cairn_schema::{GraphId, Lineage, PatchTarget};
 
 use super::Check;
 use crate::graph::Tree;
-use crate::validate::{GRAPH_STAGES, GraphCheck};
+use crate::validate::GraphCheck;
 
 /// The graphs a patch may have written.
 pub(super) fn written(check: &Check<'_, '_>) -> Vec<GraphId> {
@@ -53,8 +54,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             tree: &tree,
             journey: matches!(id, GraphId::Journey(_)),
         };
-        for stage in GRAPH_STAGES {
-            stage(&graph, &mut check.violations);
-        }
+        let deployment = &check.session.candidate.deployment;
+        crate::validate::with_plan(&graph, deployment, &mut check.violations);
     }
 }

@@ -11,7 +11,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::{CONTAINMENT_DEPTH_MAX, NODE_COUNT_MAX};
-use cairn_schema::{KeyRefs, Node, NodeKey, Path, Violation, Violations};
+use cairn_schema::{Deployment, KeyRefs, Node, NodeKey, Path, Violation, Violations};
 
 use crate::validate;
 
@@ -243,24 +243,42 @@ pub struct Graph {
 }
 
 impl Graph {
-    /// Validates a graph document (A15: every violation listed).
+    /// Validates a graph document (A15: every violation listed), its plan layer included
+    /// (F5). Relevance, which decides which date constraints apply, reads the deployment's
+    /// entity aliases, so a journey is checked against the deployment it lives in; a route,
+    /// which has no answers, against any.
     ///
     /// # Errors
     ///
-    /// Every structural or state invariant the document breaks.
-    pub fn new(document: Document) -> Result<Self, Violations> {
-        Self::checked(document, Vec::new())
+    /// Every structural or state invariant the document breaks, or its contradictory chains.
+    pub fn new(document: Document, deployment: &Deployment) -> Result<Self, Violations> {
+        Self::checked(document, Vec::new(), deployment)
     }
 
-    /// Validates a document, reporting `earlier` violations (found building it) first.
-    pub(crate) fn checked(document: Document, earlier: Vec<Violation>) -> Result<Self, Violations> {
+    /// Validates a document, reporting `earlier` violations (found building it) first. The
+    /// plan check needs derived relevance, so it runs once everything else holds.
+    pub(crate) fn checked(
+        document: Document,
+        earlier: Vec<Violation>,
+        deployment: &Deployment,
+    ) -> Result<Self, Violations> {
         let tree = Tree::build(&document);
         let mut violations = earlier;
         violations.extend(validate::graph(&document, &tree));
-        match Violations::new(violations) {
-            Ok(violations) => Err(violations),
-            Err(_) => Ok(Self { document, tree }),
+        if let Ok(violations) = Violations::new(violations) {
+            return Err(violations);
         }
+        let graph = Self { document, tree };
+        match crate::derive::dates::plan_violation(&graph, deployment) {
+            Some(contradiction) => Err(Violations::new(vec![contradiction])
+                .unwrap_or_else(|_| unreachable!("one violation"))),
+            None => Ok(graph),
+        }
+    }
+
+    /// A graph from a document whose graph stages the caller has just run clean.
+    pub(crate) fn trusted(document: Document, tree: Tree) -> Self {
+        Self { document, tree }
     }
 
     /// The document.

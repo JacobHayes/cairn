@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
-#MISE description="Rung 3: property tests (PROPTEST_CASES cases each, 256 by default)"
+#MISE description="Rung 3: property tests (PROPTEST_CASES cases each, 256 by default) and cost tests at the limits"
 # PRACTICES, The validation ladder, rung 3; Property tests. Property tests are the tests in
 # `tests/property_*.rs`, each inside `mod property`, run through patina-dst-proptest from a
 # fixed seed. One suite per property test file. CI's nightly run raises PROPTEST_CASES.
+# Cost tests are the tests in `tests/cost_*.rs`, each inside `mod cost`: a pass at the limits,
+# budgeted in operations, not wall-clock time. One suite per cost test file.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_RUNG=3
@@ -22,6 +24,11 @@ status=0
 output=$(cargo test --locked --workspace --all-features --test 'property_*' -- property:: 2>&1) || status=$?
 printf '%s\n' "$output"
 [ "$status" -eq 0 ] || ladder_fail "cargo test reported failures"
+status=0
+cost=$(cargo test --locked --workspace --all-features --test 'cost_*' -- cost:: 2>&1) || status=$?
+printf '%s\n' "$cost"
+[ "$status" -eq 0 ] || ladder_fail "cargo test reported failures in the cost tests"
+output+=$'\n'"$cost"
 
 suites=0
 while IFS=$'\t' read -r name count; do
@@ -29,10 +36,11 @@ while IFS=$'\t' read -r name count; do
   ladder_suite "$name" "$count" tests
   suites=$((suites + 1))
 done < <(awk '
-  /^ *Running tests\/property_[a-z0-9_]+\.rs/ { match($0, /tests\/property_[a-z0-9_]+\.rs/); name = substr($0, RSTART, RLENGTH); next }
+  /^ *Running tests\/(property|cost)_[a-z0-9_]+\.rs/ { match($0, /tests\/(property|cost)_[a-z0-9_]+\.rs/); name = substr($0, RSTART, RLENGTH); next }
   /^running [0-9]+ tests?$/ { if (name != "") print name "\t" $2; name = "" }' <<<"$output")
-# The property test files in the tree, so a file that stops building or running fails here.
-expected=$(find crates -path '*/tests/property_*.rs' | wc -l)
-[ "$suites" -eq "$expected" ] || ladder_fail "ran $suites property test files; the tree has $expected"
+# The property and cost test files in the tree, so a file that stops building or running
+# fails here.
+expected=$(find crates \( -path '*/tests/property_*.rs' -o -path '*/tests/cost_*.rs' \) | wc -l)
+[ "$suites" -eq "$expected" ] || ladder_fail "ran $suites property and cost test files; the tree has $expected"
 
 ladder_rung_end

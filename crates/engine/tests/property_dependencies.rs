@@ -19,7 +19,7 @@ mod property {
     type Dependency = (NodeKey, EdgeClass);
 
     fn derived(graph: &Graph) -> Derived {
-        derive(graph, &derive_inputs(Deployment::default()))
+        derive(graph, None, &derive_inputs(Deployment::default()))
     }
 
     fn forced(graph: &Graph, key: &NodeKey) -> bool {

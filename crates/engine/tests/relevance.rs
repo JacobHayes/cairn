@@ -222,9 +222,9 @@ fn answers_are_in_effect_while_decided_and_relevant() {
             owner
         })
         .unwrap();
-    let moved = cairn_engine::Graph::new(document).unwrap();
+    let moved = cairn_engine::Graph::new(document, &records.deployment).unwrap();
     let inputs = cairn_engine::testing::derive_inputs(records.deployment.clone());
-    let out_of_scope = cairn_engine::derive(&moved, &inputs);
+    let out_of_scope = cairn_engine::derive(&moved, None, &inputs);
     assert!(
         out_of_scope
             .relevance()

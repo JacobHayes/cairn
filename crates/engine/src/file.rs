@@ -89,7 +89,8 @@ pub fn from_file(file: &RouteFile, allocator: &mut dyn KeyAllocator) -> Result<G
     // A15: references that did not resolve were left out, so every invariant the rest of the
     // graph breaks is reported with them.
     violations.append(&mut resolver.violations);
-    Graph::checked(document, violations)
+    // A route has no answers, so no deployment changes its relevance.
+    Graph::checked(document, violations, &cairn_schema::Deployment::default())
 }
 
 fn collected(violations: Vec<Violation>) -> Violations {
