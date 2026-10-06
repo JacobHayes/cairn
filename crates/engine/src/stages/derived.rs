@@ -31,6 +31,7 @@ use crate::derive::relevance::Producer;
 use crate::derive::{Derived, EdgeSet, EffectiveDependency, derive_at};
 use crate::graph::{Graph, Tree};
 use crate::validate::at_node;
+use cairn_schema::RankConstants;
 
 /// What a write shapes, for naming the mutations behind a failure.
 enum Shape<'w> {
@@ -65,11 +66,13 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
     }
     let tree = Tree::build(&journey.graph);
     let graph = Graph::trusted(journey.graph.clone(), tree.clone());
+    // Nothing the guards read depends on the rank constants: the defaults stand in.
     let derived = derive_at(
         &graph,
         Some(journey.header.created_on),
         session.inputs.today,
         &session.candidate.deployment,
+        &RankConstants::default(),
     );
     for (key, ordinal) in &session.guarded {
         relevance(check, &graph, &derived, key, *ordinal);

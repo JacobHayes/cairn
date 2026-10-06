@@ -102,6 +102,31 @@ Setup is not actionable until kickoff (steps 1 and 2: its contents wait on the s
 the plan reaches the frontier only after its two actions, and the comparison set only after the
 plan.
 
+The frontier in rank order after the first three steps (brief 2.5), read on 2026-10-06 (the
+scenario matrix's clock), with each node's gravity, leverage, and slack (null is "no deadline")
+and its rank under the default constants, to four places. Rank is global: every owner is the evaluation's owner (or, at creation, no one), so the
+owner factor is 1 throughout. Kickoff leads while it gates Setup (its gravity holds Setup, the
+plan, and everything after them, the undecided baseline at half); the partner decision's gravity
+holds the partner-led subset at half while it is undecided; the four up-front decisions tie and
+fall back to key order; once kickoff is reached, environment access leads. Every slack is past
+the 14-day horizon, so urgency is 0. The scenario matrix checks these values, and
+`briefs/proof/2.5/prove.sh` checks this table against the engine's output.
+
+| After step | Node | Gravity | Leverage | Slack | Rank |
+|---|---|---|---|---|---|
+| 1 | `n_kickoff` | 15.5 | 2 | none | 0.4500 |
+| 1 | `n_partner_runs` | 10 | 0.5 | none | 0.2113 |
+| 1 | `n_decision_meeting` | 10 | 0 | none | 0.1613 |
+| 1 | `n_meeting_date` | 1 | 0 | none | 0.0161 |
+| 1 | `n_purpose` | 1 | 0 | none | 0.0161 |
+| 1 | `n_who_informed` | 1 | 0 | none | 0.0161 |
+| 1 | `n_who_owns` | 1 | 0 | none | 0.0161 |
+| 2 | `n_kickoff` | 15.5 | 2 | 23 | 0.4500 |
+| 2 | `n_decision_meeting` | 10 | 0 | 45 | 0.1613 |
+| 3 | `n_access` | 13.5 | 1 | 23 | 0.4500 |
+| 3 | `n_decision_meeting` | 10 | 0 | 45 | 0.1852 |
+| 3 | `n_workload` | 1 | 0 | none | 0.0185 |
+
 ## `hiring-loop/`
 
 A small route with deep containment (interview loop, onsite, debrief, notes, scorecard) and a

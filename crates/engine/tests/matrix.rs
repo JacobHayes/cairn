@@ -257,6 +257,18 @@ const MATRIX: &[Entry] = &[
         brief: "2.4",
         run: inserted_dependency_goes_stale,
     },
+    Entry {
+        scenario: "vendor evaluation: the ranked frontier at creation, after the up-front decisions, and after kickoff",
+        prd: &["Priority", "Illustrative example", "C10"],
+        brief: "2.5",
+        run: vendor_ranks,
+    },
+    Entry {
+        scenario: "prioritize for me re-ranks for a viewer and leaves the shared rank",
+        prd: &["Priority", "C10", "E4"],
+        brief: "2.5",
+        run: launch_ranked_for_a_viewer,
+    },
 ];
 
 /// The vendor evaluation's frontier and acting frontier after each step, as
@@ -327,6 +339,86 @@ fn vendor_frontiers() -> Run {
             "step {step}"
         );
     }
+    run
+}
+
+/// The vendor evaluation's ranked frontier after steps 1 to 3, each node with its rank in
+/// ten-thousandths, as fixtures/README.md states them.
+const VENDOR_RANKS: [(usize, &[(&str, u32)]); 3] = [
+    (
+        1,
+        &[
+            ("n_kickoff", 4500),
+            ("n_partner_runs", 2113),
+            ("n_decision_meeting", 1613),
+            ("n_meeting_date", 161),
+            ("n_purpose", 161),
+            ("n_who_informed", 161),
+            ("n_who_owns", 161),
+        ],
+    ),
+    (2, &[("n_kickoff", 4500), ("n_decision_meeting", 1613)]),
+    (
+        3,
+        &[
+            ("n_access", 4500),
+            ("n_decision_meeting", 1852),
+            ("n_workload", 185),
+        ],
+    ),
+];
+
+/// Priority, Illustrative example: kickoff leads while it gates Setup, the undecided
+/// partner-led subset gives its decision gravity at half, equal ranks fall back to key order,
+/// and once kickoff is reached, environment access leads.
+fn vendor_ranks() -> Run {
+    let run = Run::fixture("vendor-evaluation");
+    for (step, expected) in VENDOR_RANKS {
+        let derived = support::derived(run.applied[step - 1].records(), "j_vendor_eval");
+        let ranking = derived.ranking();
+        let ranked: Vec<(&str, u32)> = ranking
+            .frontier()
+            .iter()
+            .map(|node| (node.as_str(), ten_thousandths(ranking.rank(node).unwrap())))
+            .collect();
+        assert_eq!(ranked, expected, "step {step}");
+    }
+    run
+}
+
+fn ten_thousandths(rank: f64) -> u32 {
+    let scaled = (rank * 10_000.0).round();
+    assert!((0.0..=10_000.0).contains(&scaled));
+    // Checked: within [0, 10000].
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    let whole = scaled as u32;
+    whole
+}
+
+/// Priority, "prioritize for me": with the feature work given to a writer, kickoff frees
+/// someone else's work, so globally it out-levers the beta start and the launch outranks the
+/// beta start; for the writer, kickoff frees the writer's own work, so the beta start leads
+/// the launch. The shared rank stays as it was.
+fn launch_ranked_for_a_viewer() -> Run {
+    let mut run = Run::from(support::after("product-launch", 1));
+    run.accept(
+        "{journey: j_launch}",
+        "- op: set_participation\n  node: n_features\n  kind: k_owner\n  source: [e_writer]\n",
+    );
+    let derived = derived(&run);
+    let position = |frontier: &[cairn_schema::NodeKey], node: &str| {
+        frontier
+            .iter()
+            .position(|found| found == &key(node))
+            .unwrap()
+    };
+    let global = derived.ranking().clone();
+    assert!(position(global.frontier(), "n_launch") < position(global.frontier(), "n_beta_start"));
+    let writer = derived.rank_for(&std::collections::BTreeSet::from(["e_writer"
+        .parse()
+        .unwrap()]));
+    assert!(position(writer.frontier(), "n_beta_start") < position(writer.frontier(), "n_launch"));
+    assert_eq!(derived.ranking(), &global);
     run
 }
 

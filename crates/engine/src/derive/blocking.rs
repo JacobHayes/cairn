@@ -72,6 +72,9 @@ struct Flags {
     actionable: bool,
     /// F1: a pending `auto_reach` milestone that reads as reached.
     auto_reached: bool,
+    /// F1: a pending, relevant `auto_reach` milestone whose effective date is today or
+    /// earlier: it reads as reached once its dependencies are satisfied.
+    reaches_when_unblocked: bool,
     /// B10: a placeholder in scope and open, with no children, not marked atomic.
     needs_breakdown: bool,
     /// B6: the stored snooze, while it holds.
@@ -90,6 +93,9 @@ pub struct Blocking {
     frontier: Vec<NodeKey>,
     acting_frontier: Vec<NodeKey>,
     stalled: Option<Stalled>,
+    /// The instants in a topological order of the full set's gate edges, which pass 6 reads
+    /// backward.
+    order: Vec<Instant>,
     /// Instants ordered and edges read, for the cost test.
     operations: u64,
 }
@@ -119,7 +125,7 @@ impl Blocking {
         let (order, ordering) = topological_order(dependencies);
         let mut satisfied = vec![false; dependencies.node_count() * Point::ALL.len()];
         let mut auto_reached = vec![false; dependencies.node_count()];
-        for instant in order {
+        for &instant in &order {
             let value = sweep.instant(instant, &satisfied, &mut auto_reached);
             if let Some(slot) = satisfied.get_mut(instant.slot()) {
                 *slot = value;
@@ -138,6 +144,7 @@ impl Blocking {
             keys: dependencies.keys().to_vec(),
             satisfied,
             flags,
+            order,
             operations: ordering + sweep.operations.get(),
             ..Blocking::default()
         };
@@ -243,6 +250,15 @@ impl Blocking {
         self.flags_of(key).is_some_and(|flags| flags.auto_reached)
     }
 
+    /// F1: a pending, relevant `auto_reach` milestone whose effective date is today or
+    /// earlier, which reads as reached once its dependencies are satisfied (pass 6 completes
+    /// it in leverage's simulations).
+    #[must_use]
+    pub(crate) fn reaches_when_unblocked(&self, key: &NodeKey) -> bool {
+        self.flags_of(key)
+            .is_some_and(|flags| flags.reaches_when_unblocked)
+    }
+
     /// B10: a placeholder in scope and open, with no children, not marked atomic.
     #[must_use]
     pub fn needs_breakdown(&self, key: &NodeKey) -> bool {
@@ -273,6 +289,19 @@ impl Blocking {
     #[must_use]
     pub fn stalled(&self) -> Option<&Stalled> {
         self.stalled.as_ref()
+    }
+
+    /// Every node's key, in index order.
+    #[must_use]
+    pub(crate) fn keys(&self) -> &[NodeKey] {
+        &self.keys
+    }
+
+    /// The instants in a topological order of the full set's gate edges: each after every
+    /// instant it waits on in either set.
+    #[must_use]
+    pub(crate) fn order(&self) -> &[Instant] {
+        &self.order
     }
 
     /// Instants ordered and edges read by the pass, for the cost test.
@@ -380,6 +409,7 @@ impl Sweep<'_> {
             blocked: open && !deps_done,
             actionable: open && deps_done && !group && relevance == Relevance::Relevant,
             auto_reached: reached,
+            reaches_when_unblocked: self.reads_as_reached(node),
             needs_breakdown: open && self.unexpanded(node),
             snoozed: self.holding(key, satisfied),
         }

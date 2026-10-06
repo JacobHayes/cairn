@@ -225,7 +225,9 @@ pub fn arb_rejection() -> BoxedStrategy<Rejection> {
 }
 
 fn arb_score() -> BoxedStrategy<Score> {
-    (0u32..4_000).prop_map(Score::from_halves).boxed()
+    (0u64..4_000_000_000)
+        .prop_map(Score::from_millionths)
+        .boxed()
 }
 
 fn arb_explained() -> BoxedStrategy<Explained<Contribution>> {

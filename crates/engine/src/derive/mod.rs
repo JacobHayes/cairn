@@ -15,12 +15,16 @@
 //! 5. Auto-reach, blocking, and what can be acted on ([`blocking`]): what satisfies
 //!    dependencies, `deps_done`, blocked, actionable, the frontier, snoozes that hold, the
 //!    acting frontier, `stalled`, and `needs_breakdown`.
-//! 7. `stale` ([`stale`]; `overdue` is pass 4's): terminal nodes whose completing guards
-//!    would now fail. Pass 6 and rank are 2.5's.
+//! 6. Gravity and leverage ([`priority`]): each node's downstream set and gravity, its
+//!    largest child gravity, and for the rank normalization set what completing it would
+//!    unblock and its leverage.
+//! 7. Rank ([`rank`]): each ranked node's terms and rank, the frontiers in rank order, the
+//!    per-viewer recomputation, and effort-adjusted ordering; then `stale` ([`stale`];
+//!    `overdue` is pass 4's): terminal nodes whose completing guards would now fail.
 //!
-//! [`Derived`] holds the output of the passes that exist; later passes add their fields. It
-//! is the engine's own type: the schema's `Derived`, which crosses the API, is projected
-//! from it once every field it carries is derived (DECISIONS.md).
+//! [`Derived`] holds the output of every pass. It is the engine's own type, with explanation
+//! lists complete and listed on demand; the schema's `Derived`, which crosses the API, is
+//! projected from it by [`Derived::to_schema`] (DECISIONS.md).
 
 pub mod blocking;
 mod condition;
@@ -28,6 +32,9 @@ pub mod consequences;
 pub mod dates;
 pub mod dependencies;
 pub mod participation;
+pub mod priority;
+mod project;
+pub mod rank;
 pub mod relevance;
 pub mod skip;
 pub(crate) mod stale;
@@ -35,8 +42,8 @@ pub(crate) mod stale;
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Blocker, Date, DependencyVia, Deployment, DeriveInputs, GuardFailure, KeyRefs, Node, NodeKey,
-    State,
+    Blocker, Date, DependencyVia, Deployment, DeriveInputs, EntityKey, GuardFailure, KeyRefs, Node,
+    NodeKey, RankConstants, State,
 };
 
 use crate::graph::{Document, Graph};
@@ -45,12 +52,14 @@ pub use consequences::consequences;
 pub use dates::{Dates, PlanCheck, check_plan};
 pub use dependencies::{Dependencies, EdgeSet, EffectiveDependency};
 pub use participation::Participation;
+pub use priority::Priority;
+pub use rank::{RankTerms, Ranking};
 pub use relevance::{NodeRelevance, Producer, Relevances};
 pub use skip::Skips;
 
 /// A journey's derived values (D3): the output of every pass, with the inputs that explain
 /// each value. Never stored (D6, J1).
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq)]
 pub struct Derived {
     relevance: Relevances,
     dependencies: Dependencies,
@@ -58,6 +67,9 @@ pub struct Derived {
     participation: Participation,
     dates: Dates,
     blocking: Blocking,
+    priority: Priority,
+    ranking: Ranking,
+    rank_constants: RankConstants,
     stale: stale::Staleness,
     today: Date,
 }
@@ -97,6 +109,45 @@ impl Derived {
     #[must_use]
     pub fn blocking(&self) -> &Blocking {
         &self.blocking
+    }
+
+    /// Pass 6: gravity and leverage.
+    #[must_use]
+    pub fn priority(&self) -> &Priority {
+        &self.priority
+    }
+
+    /// Pass 7: the global ranking (Priority: rank is global), its terms, and the frontiers in
+    /// rank order.
+    #[must_use]
+    pub fn ranking(&self) -> &Ranking {
+        &self.ranking
+    }
+
+    /// Priority, "prioritize for me": the ranking with leverage's owner factor relative to the
+    /// viewer's entities (H3) instead of each node's owner. The global ranking is unchanged.
+    #[must_use]
+    pub fn rank_for(&self, viewer: &BTreeSet<EntityKey>) -> Ranking {
+        Ranking::pass(
+            &self.priority,
+            &self.dates,
+            &self.blocking,
+            &self.rank_constants,
+            |key| self.priority.leverage_for(key, viewer),
+        )
+    }
+
+    /// Priority, Effort-adjusted: the keys by gravity per estimated day, greatest first, nodes
+    /// with no or a zero estimate last, ties in global rank order. `graph` is the one derived.
+    #[must_use]
+    pub fn by_effort(&self, graph: &Graph, keys: &[NodeKey]) -> Vec<NodeKey> {
+        self.ranking.by_effort(graph, &self.priority, keys)
+    }
+
+    /// The rank constants it was derived with.
+    #[must_use]
+    pub fn rank_constants(&self) -> &RankConstants {
+        &self.rank_constants
     }
 
     /// The today it was derived for (D7: both sides of a consequence share it).
@@ -238,24 +289,35 @@ pub fn derive(journey: &Graph, created_on: Option<Date>, inputs: &DeriveInputs) 
         state.is_empty() || state.len() == document.nodes.len(),
         "every node of a journey has a stored state"
     );
-    derive_at(journey, created_on, inputs.today, &inputs.deployment)
+    derive_at(
+        journey,
+        created_on,
+        inputs.today,
+        &inputs.deployment,
+        &inputs.rank,
+    )
 }
 
-/// Derives a journey at `today` over `deployment`: every pass that reads no viewer or rank
-/// constant, which the validation pipeline's derived guards also run (ARCHITECTURE, Write
-/// path: one derive of the final candidate).
+/// Derives a journey at `today` over `deployment` with the rank constants: every pass that
+/// reads no viewer, which the validation pipeline's derived guards also run (ARCHITECTURE,
+/// Write path: one derive of the final candidate).
 #[must_use]
 pub(crate) fn derive_at(
     journey: &Graph,
     created_on: Option<Date>,
     today: Date,
     deployment: &Deployment,
+    rank: &RankConstants,
 ) -> Derived {
     let early = early(journey, deployment);
     let participation = participation::pass(journey, &early.relevance, deployment);
     let mut dates = Dates::pass(journey, &early, today, created_on);
     let blocking = Blocking::pass(journey, &early, &dates, today);
     dates.settle_reached(journey, |key| blocking.auto_reached(key));
+    let priority = Priority::pass(journey, &early, &participation, &blocking, rank);
+    let ranking = Ranking::pass(&priority, &dates, &blocking, rank, |key| {
+        priority.leverage(key)
+    });
     let stale = stale::Staleness::pass(journey, &early.relevance, &early.dependencies, &blocking);
     let Early {
         relevance,
@@ -269,6 +331,9 @@ pub(crate) fn derive_at(
         participation,
         dates,
         blocking,
+        priority,
+        ranking,
+        rank_constants: *rank,
         stale,
         today,
     }

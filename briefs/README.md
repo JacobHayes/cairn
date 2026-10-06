@@ -25,8 +25,8 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 2.2 | Relevance, effective dependencies, effective skip, participation | `crates/engine` | 2.1 | landed `wronlppq` |
 | 2.3 | Date network | `crates/engine` | 2.2 | landed `stuqtrqo` |
 | 2.4 | Auto-reach, blocking, frontier, snooze, stalled, stale, derived guards | `crates/engine` | 2.3 | landed `nswmnoqu` |
-| 2.5 | Gravity, leverage, rank | `crates/engine` | 2.4 | in progress |
-| 2.6 | Projections | `crates/engine` | 2.5 |  |
+| 2.5 | Gravity, leverage, rank | `crates/engine` | 2.4 | landed `qwxsmqrs` |
+| 2.6 | Projections | `crates/engine` | 2.5 | in progress |
 | 2.7 | Route files, upgrade, save-as-route, re-link, proposal documents | `crates/engine` | 2.6 |  |
 | 3.1 | Store trait, memory and Turso backends, conformance suite | `crates/store`, `crates/store-turso` | 1.2 (beside phase 2) | landed `tvlztrmq` |
 | 3.2 | Auth providers, users, identities, agent tokens | `crates/auth` | 3.1 | landed `nspnswuo` |

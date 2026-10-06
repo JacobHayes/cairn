@@ -13,7 +13,7 @@ use crate::chain::{Chain, DependencyVia, ShortChain};
 use crate::collections::{BoundedVec, ByDocumentSize, CollectionError};
 use crate::domain::{Deployment, Journey};
 use crate::id::{EntityKey, KindKey, NodeKey, RoleKey};
-use crate::limits::{EXPLANATION_ENTRY_COUNT_MAX, Limit};
+use crate::limits::{EXPLANATION_ENTRY_COUNT_MAX, Limit, WEIGHT_MAX};
 use crate::state::{GuardFailure, SnoozeTarget};
 use jiff::civil::Date;
 
@@ -61,47 +61,60 @@ pub struct Blocker {
     pub via: DependencyVia,
 }
 
-/// A derived weight sum in half-weight units (Priority: an undecided node counts at half),
-/// written as its value in weight units (`2.5`). Exact, and a `u32` at the limits.
+/// A derived weight sum (Priority: gravity, leverage, and their contributions) in millionths
+/// of a weight, written as its value in weight units (`2.5`). A weight is a whole number, and
+/// the undecided discount and the other-owner factor are counted in thousandths, so each term
+/// (weight x discount x factor) is a whole number of millionths: sums are exact, and at the
+/// limits (`node_count_max` x `weight_max` x the largest discount and factor, 2 x 10^15) they
+/// stay below [`Score::MAX`], where a value written as a JSON number reads back exactly.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Score(u32);
+pub struct Score(u64);
 
 impl Score {
-    /// A score of `halves` half-weights.
+    /// Millionths in one weight unit.
+    pub const UNIT: u64 = 1_000_000;
+    /// The largest score written as its value that reads back exactly (2^51 millionths): the
+    /// float nearest a value is within 2^-21 of it, so scaling it back is off by under half a
+    /// millionth.
+    pub const MAX: Score = Score(1 << 51);
+
+    /// A score of `millionths` millionths of a weight.
     #[must_use]
-    pub const fn from_halves(halves: u32) -> Self {
-        Self(halves)
+    pub const fn from_millionths(millionths: u64) -> Self {
+        Self(millionths)
     }
 
-    /// The score in half-weights.
+    /// The score in millionths of a weight.
     #[must_use]
-    pub const fn halves(self) -> u32 {
+    pub const fn millionths(self) -> u64 {
         self.0
+    }
+
+    /// The value in weight units, for display and the rank's float terms.
+    #[must_use]
+    pub fn value(self) -> f64 {
+        // At most 2^51 (asserted where scores are summed), so the conversion is exact.
+        #[allow(clippy::cast_precision_loss)]
+        let millionths = self.0 as f64;
+        millionths / 1_000_000.0
     }
 }
 
 impl Serialize for Score {
     fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        serializer.serialize_f64(f64::from(self.0) / 2.0)
+        serializer.serialize_f64(self.value())
     }
 }
 
 impl<'de> Deserialize<'de> for Score {
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         let value = f64::deserialize(deserializer)?;
-        let halves = value * 2.0;
-        let whole = halves.is_finite()
-            && halves >= 0.0
-            && halves.fract() == 0.0
-            && halves <= f64::from(u32::MAX);
-        if !whole {
-            return Err(serde::de::Error::custom(format!(
-                "{value} is not a non-negative multiple of 0.5"
-            )));
-        }
-        // Checked above: a whole number of halves within u32.
-        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
-        Ok(Self(halves as u32))
+        let millionths = whole(value * 1_000_000.0, Score::MAX.millionths()).ok_or_else(|| {
+            serde::de::Error::custom(format!(
+                "{value} is not a non-negative multiple of 0.000001 within 2^51 millionths"
+            ))
+        })?;
+        Ok(Self(millionths))
     }
 }
 
@@ -111,7 +124,91 @@ impl JsonSchema for Score {
     }
 
     fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
-        schemars::json_schema!({ "type": "number", "minimum": 0, "multipleOf": 0.5 })
+        schemars::json_schema!({ "type": "number", "minimum": 0 })
+    }
+}
+
+/// The whole number `scaled` is, when it is one within float error, non-negative, and at most
+/// `max`.
+fn whole(scaled: f64, max: u64) -> Option<u64> {
+    let rounded = scaled.round();
+    // Float error only: scaling a short decimal like 0.1 is off by about 1e-14, and a large
+    // value's nearest float by up to a quarter at 2^51 (about 2.2e-16 of it).
+    let close = (scaled - rounded).abs() <= 1e-9 + scaled.abs() * 2.3e-16;
+    #[allow(clippy::cast_precision_loss)]
+    let within = scaled >= 0.0 && rounded <= max as f64;
+    if !(scaled.is_finite() && close && within) {
+        return None;
+    }
+    // Checked above: a whole, non-negative number within `max`.
+    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+    Some(rounded as u64)
+}
+
+/// A rank constant counted in thousandths between `MIN` and `MAX` thousandths, written as
+/// its value (`0.5`): the undecided discount and the other-owner factor, which weights are
+/// multiplied by exactly (Priority).
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Thousandths<const MIN: u32, const MAX: u32>(u32);
+
+/// The undecided discount (Priority: `effective_weight`), from 0 to 1.
+pub type UndecidedDiscount = Thousandths<0, 1_000>;
+
+/// Leverage's factor for a target owned by someone else (Priority: `owner_factor`), from 1 to
+/// `weight_max`: the limits table names no bound for it, so it takes the nearest named one.
+pub type OwnerFactor = Thousandths<1_000, { WEIGHT_MAX * 1_000 }>;
+
+impl<const MIN: u32, const MAX: u32> Thousandths<MIN, MAX> {
+    /// The value in thousandths.
+    #[must_use]
+    pub const fn get(self) -> u32 {
+        self.0
+    }
+}
+
+impl<const MIN: u32, const MAX: u32> TryFrom<u32> for Thousandths<MIN, MAX> {
+    type Error = String;
+
+    fn try_from(thousandths: u32) -> Result<Self, String> {
+        if (MIN..=MAX).contains(&thousandths) {
+            Ok(Self(thousandths))
+        } else {
+            Err(format!(
+                "{thousandths} thousandths is outside {MIN} to {MAX} thousandths"
+            ))
+        }
+    }
+}
+
+impl<const MIN: u32, const MAX: u32> Serialize for Thousandths<MIN, MAX> {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        serializer.serialize_f64(f64::from(self.0) / 1_000.0)
+    }
+}
+
+impl<'de, const MIN: u32, const MAX: u32> Deserialize<'de> for Thousandths<MIN, MAX> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let value = f64::deserialize(deserializer)?;
+        let thousandths = whole(value * 1_000.0, u64::from(MAX))
+            .and_then(|whole| u32::try_from(whole).ok())
+            .ok_or_else(|| {
+                serde::de::Error::custom(format!(
+                    "{value} is not a multiple of 0.001 from {MIN} to {MAX} thousandths"
+                ))
+            })?;
+        Self::try_from(thousandths).map_err(serde::de::Error::custom)
+    }
+}
+
+impl<const MIN: u32, const MAX: u32> JsonSchema for Thousandths<MIN, MAX> {
+    fn schema_name() -> std::borrow::Cow<'static, str> {
+        format!("Thousandths{MIN}To{MAX}").into()
+    }
+
+    fn json_schema(_: &mut schemars::SchemaGenerator) -> schemars::Schema {
+        let minimum = f64::from(MIN) / 1_000.0;
+        let maximum = f64::from(MAX) / 1_000.0;
+        schemars::json_schema!({ "type": "number", "minimum": minimum, "maximum": maximum, "multipleOf": 0.001 })
     }
 }
 
@@ -463,9 +560,9 @@ pub struct Consequences {
 }
 
 /// The rank constants (Priority: normative formulas, configurable constants, defaults
-/// shown).
+/// shown). The four coefficients sum to a finite number, so every rank is finite.
 #[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
+#[serde(deny_unknown_fields, try_from = "RankConstantsWire")]
 pub struct RankConstants {
     /// Urgency's weight (0.40).
     pub urgency: Real,
@@ -477,6 +574,45 @@ pub struct RankConstants {
     pub leverage: Real,
     /// Days of slack over which urgency rises from 0 to 1 (14).
     pub horizon_days: u32,
+    /// An undecided node's weight factor in gravity and leverage (0.5).
+    pub undecided_discount: UndecidedDiscount,
+    /// Leverage's factor for a target owned by someone other than the node's owner (2).
+    pub other_owner_factor: OwnerFactor,
+}
+
+/// The rank constants as written, before their coefficients' sum is checked.
+#[derive(Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+struct RankConstantsWire {
+    urgency: Real,
+    late: Real,
+    gravity: Real,
+    leverage: Real,
+    horizon_days: u32,
+    undecided_discount: UndecidedDiscount,
+    other_owner_factor: OwnerFactor,
+}
+
+impl TryFrom<RankConstantsWire> for RankConstants {
+    type Error = String;
+
+    fn try_from(wire: RankConstantsWire) -> Result<Self, String> {
+        let sum = wire.urgency.get() + wire.late.get() + wire.gravity.get() + wire.leverage.get();
+        if !sum.is_finite() {
+            return Err(format!(
+                "the rank coefficients sum to {sum}: a rank must be a finite number"
+            ));
+        }
+        Ok(Self {
+            urgency: wire.urgency,
+            late: wire.late,
+            gravity: wire.gravity,
+            leverage: wire.leverage,
+            horizon_days: wire.horizon_days,
+            undecided_discount: wire.undecided_discount,
+            other_owner_factor: wire.other_owner_factor,
+        })
+    }
 }
 
 impl Default for RankConstants {
@@ -488,6 +624,8 @@ impl Default for RankConstants {
             gravity: Real(0.25),
             leverage: Real(0.20),
             horizon_days: 14,
+            undecided_discount: Thousandths(500),
+            other_owner_factor: Thousandths(2_000),
         }
     }
 }
@@ -595,13 +733,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn scores_are_exact_halves() {
+    fn scores_are_exact_millionths() {
         let score: Score = serde_json::from_str("2.5").unwrap();
-        assert_eq!(score.halves(), 5);
+        assert_eq!(score.millionths(), 2_500_000);
         assert_eq!(serde_json::to_string(&score).unwrap(), "2.5");
-        for bad in ["-1", "0.25", "1e20"] {
+        let largest = Score::from_millionths(Score::MAX.millionths() - 1);
+        let text = serde_json::to_string(&largest).unwrap();
+        assert_eq!(serde_json::from_str::<Score>(&text).unwrap(), largest);
+        for bad in ["-1", "0.0000001", "2.0000004", "-0.0000001", "1e20"] {
             assert!(serde_json::from_str::<Score>(bad).is_err(), "{bad}");
         }
+    }
+
+    #[test]
+    fn thousandths_are_exact_and_within_their_range() {
+        let discount: UndecidedDiscount = serde_json::from_str("0.1").unwrap();
+        assert_eq!(discount.get(), 100);
+        assert_eq!(serde_json::to_string(&discount).unwrap(), "0.1");
+        for bad in [
+            "1.5",
+            "-0.5",
+            "0.0005",
+            "-0.000001",
+            "0.5000009",
+            "1.0000009",
+        ] {
+            assert!(
+                serde_json::from_str::<UndecidedDiscount>(bad).is_err(),
+                "{bad}"
+            );
+        }
+        assert!(
+            serde_json::from_str::<OwnerFactor>("0.5").is_err(),
+            "below one"
+        );
+        assert!(
+            serde_json::from_str::<OwnerFactor>("1000").is_ok(),
+            "weight_max"
+        );
+        assert!(serde_json::from_str::<OwnerFactor>("1000.001").is_err());
     }
 
     #[test]
@@ -621,11 +791,16 @@ mod tests {
     fn reals_are_finite_and_non_negative() {
         for bad in [".nan", ".inf", "-.inf", "-0.5"] {
             let yaml = format!(
-                "urgency: {bad}\nlate: 0.15\ngravity: 0.25\nleverage: 0.2\nhorizon_days: 14\n"
+                "urgency: {bad}\nlate: 0.15\ngravity: 0.25\nleverage: 0.2\nhorizon_days: 14\nundecided_discount: 0.5\nother_owner_factor: 2\n"
             );
             assert!(crate::from_yaml::<RankConstants>(&yaml).is_err(), "{bad}");
         }
         assert!(Real::try_from(0.4).is_ok());
+        let overflowing = "urgency: 1e308\nlate: 0.15\ngravity: 1e308\nleverage: 0.2\nhorizon_days: 14\nundecided_discount: 0.5\nother_owner_factor: 2\n";
+        assert!(
+            crate::from_yaml::<RankConstants>(overflowing).is_err(),
+            "coefficients summing past any finite rank"
+        );
     }
 
     #[test]

@@ -1,7 +1,7 @@
 //! Generated journeys built directly as documents (not through apply), for the derive passes'
 //! property and reference tests: deep containment, explicit edges, conditions, stage
-//! openings, stored states, answers, force includes, keeps, `auto_reach` milestones, and date
-//! snoozes, all generic.
+//! openings, stored states, answers, force includes, keeps, `auto_reach` milestones, date
+//! snoozes, and weights, all generic.
 //!
 //! Every generated graph is valid by construction. Nodes are created in depth-first
 //! preorder, so each subtree is a contiguous run of indices; a requirement, a condition's
@@ -23,7 +23,7 @@ use cairn_schema::{
     Action, AnswerSpec, AnswerValue, BoundedSet, Clause, Comparison, Condition, ConditionValue,
     DateRule, DateSource, Days, Decision, Deliverable, Direction, Group, KeyRefs, KindKey,
     Milestone, Node, NodeKey, NodeKind, NodeState, OneOrMany, Overrides, ParticipationKind,
-    ParticipationSource, Participations, Payload, Provenance, Role, State,
+    ParticipationSource, Participations, Payload, Provenance, Role, State, Weight,
 };
 
 use super::parse;
@@ -314,6 +314,14 @@ fn undate(document: &mut Document, key: &NodeKey) {
     document.nodes.put(node).unwrap_or_else(|e| panic!("{e}"));
 }
 
+/// A weight from 0 to 5 for most nodes, from the recorded finish offset's high bits (its low
+/// bits are the offset, modulo 10); the rest keep their kind's default.
+fn weight(seed: &NodeSeed) -> Option<Weight> {
+    let bits = seed.dates.recorded.1 / 16;
+    (!bits.is_multiple_of(4))
+        .then(|| Weight::try_from(u32::from(bits % 6)).unwrap_or(Weight::DEFAULT))
+}
+
 /// The tree the seeds make: each node's kind, parent, and the end of its subtree.
 struct Shape {
     kinds: Vec<NodeKind>,
@@ -402,7 +410,7 @@ impl Shape {
             parent: self.parents[index].map(key),
             title: parse(&format!("Generated {index}")),
             description: None,
-            weight: None,
+            weight: weight(seed),
             requires: BoundedSet::new(requires).unwrap_or_default(),
             relevant_when: condition,
             due_by: None,
