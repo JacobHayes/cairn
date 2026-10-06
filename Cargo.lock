@@ -588,7 +588,9 @@ dependencies = [
 name = "cairn-wasm"
 version = "0.1.0"
 dependencies = [
+ "axum",
  "cairn-api",
+ "cairn-auth",
  "cairn-engine",
  "cairn-schema",
  "cairn-service",
@@ -597,6 +599,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_path_to_error",
+ "tokio",
  "wasm-bindgen",
 ]
 

@@ -41,6 +41,11 @@ wasm-bindgen.workspace = true
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
 cairn-api.workspace = true
 cairn-engine = { workspace = true, features = ["testing"] }
+# The fixture server (examples/fixture_server.rs) the web shell's server host is tested
+# against: the API over the fixtures, signed in by the dev provider.
+axum.workspace = true
+cairn-auth.workspace = true
+tokio = { workspace = true, features = ["net", "rt"] }
 
 [lints]
 workspace = true

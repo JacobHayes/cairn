@@ -2,6 +2,20 @@
 
 Judgment calls made while implementing the briefs, for the user to review (`AGENTS.md`, Decide, record, keep going). Newest first. Each entry: date, brief, the question, the call, the alternatives, and what would change it.
 
+## 2026-10-06, brief 4.6: the UI routes by the URL's hash, beside the API's paths on one origin
+
+- Question: ARCHITECTURE serves the API and the embedded UI on one port, and the API's paths sit at the root (`/journeys/{id}`, `/routes`, `/proposals`), the same words a screen's address would use; the in-browser host must also run as a static demo site. How do the UI's addresses avoid the API's?
+- Call: the app routes by hash (`/#/journeys/j_x`, React Router's `HashRouter`), so the path is always the page itself and every non-hash path stays the API's. The binary needs no SPA fallback and no path prefix; a static host serves one `index.html`; Vite's dev server proxies the API's top-level paths (listed in `web/app/vite.config.ts`) to a running server.
+- Alternatives: an `/api` prefix on the API (changes 4.2's documented paths and every client); history routing with a fallback for paths the API does not claim (collides on `/journeys/{id}`, and a static demo host cannot rewrite); a UI path prefix such as `/app/` (the binary and static hosts still need a fallback under it).
+- What would change it: the API moving under a prefix, or links into the UI that must survive being opened without JavaScript.
+
+## 2026-10-06, brief 4.6: an edit is drafted against the revision its author saw, and the shell's timing bounds borrow the stream's limits
+
+- Question: H5 retries a stale patch only when what intervened does not overlap it, and shows the changes otherwise; but a UI that bases each patch on the revision it holds when the author presses save would never be stale on a field someone else changed while they typed, since the live view (H6) has already moved on. And the shell needs timing and size bounds the limits table does not name: how long to wait before reopening a closed tick stream or retrying a failed refetch, how often to check for date rollover, how many journeys to keep derived after their view closes.
+- Call: (1) A draft records the journey revision its author saw when they started editing, kept with the text in session storage; the patch names that revision. A change to another node since is retried transparently; a change to the same field is shown, and the author keeps their edit on the revision the rejection reports (or the view's, if newer) or abandons it. (2) Reopening a closed stream and retrying a failed refetch wait from the SSE coalescing interval (250 ms), doubling up to the SSE write stall (15 s), the stream's own named limits (DECISIONS.md 1.2: the nearest named limit). Date rollover is checked once a minute against today in the deployment's zone (`Intl`), refetching once per new date. Up to 8 journeys stay derived after their view closes, the least recently shown released beyond that; a notice stack shows 3. These are constants in `web/client` and `web/app`, not configuration.
+- Alternatives: (1) the revision held at send time (every concurrent edit to one field silently overwrites the other); (2) EventSource's own reconnect only (a stream it gives up on, such as a 503 at the subscriber limit, never comes back); a fixed retry interval (hammers a server that is down); a timer at the next midnight in the zone (needs zone arithmetic the browser does not offer directly, for no visible gain over a minute); keeping every visited journey derived (memory grows with every journey a long-lived tab opens).
+- What would change it: screens that edit several fields at once (a form keeps one base revision for the form), or measured memory per derived journey that calls for a different bound.
+
 ## 2026-10-06, brief 4.5: the browser host's calls carry the schema's JSON, and the server's answer they match is the service's
 
 - Question: what crosses the wasm boundary, and what "the server's derive" is for the byte-equality acceptance, when the API serves a document and projections but no whole derive.

@@ -1,0 +1,23 @@
+{
+  "name": "@cairn/app",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "The web app: the React shell every screen builds on, one data layer over the server and the in-browser host, the locally derived document, the write path with H5's safe retry, and live views (H6).",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "dependencies": {
+    "@cairn/client": "*",
+    "@cairn/wasm": "*",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router": "8.4.0"
+  },
+  "devDependencies": {
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2"
+  }
+}

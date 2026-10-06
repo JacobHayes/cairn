@@ -1,7 +1,8 @@
 // The TypeScript client of the Cairn API (ARCHITECTURE, Repository layout: web/client): a
-// typed fetch client over the types generated from the OpenAPI document. The safe retry
-// and subscription wrapper (H5, H6) needs the engine's touched-set function through wasm,
-// so it joins with the web shell (4.6).
+// typed fetch client over the types generated from the OpenAPI document, and the
+// hand-written wrapper beside it: the safe retry (H5, retry.ts, over the engine's touched-set
+// function the caller passes in, and http.ts, its HTTP side), revision tracking per domain
+// (H6, tracker.ts), and the page's tick stream that feeds it (subscription.ts).
 import createClient, { type Client, type ClientOptions } from "openapi-fetch";
 
 import type { components, operations, paths } from "../generated/api.ts";
@@ -32,3 +33,8 @@ export function createCairnClient(
 export function appliedNow(answer: Schema<"PatchAnswer">): boolean {
   return answer.outcome === "applied";
 }
+
+export * from "./http.ts";
+export * from "./retry.ts";
+export * from "./subscription.ts";
+export * from "./tracker.ts";

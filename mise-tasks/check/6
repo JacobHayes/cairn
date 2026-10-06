@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
-#MISE description="Rung 6: in-browser end-to-end against the wasm host (Playwright in Chromium), one suite per web package with a playwright.config.ts"
+#MISE description="Rung 6: web unit tests (Vitest, one suite per web package with a vitest.config.ts) and in-browser end-to-end against the wasm host (Playwright in Chromium, one suite per web package with a playwright.config.ts)"
 # PRACTICES, The validation ladder, rung 6. The browser host's tests (brief 4.5) need the
 # module (mise run build:wasm) and the server's answers to compare with (the cairn-wasm-cases
 # binary, which walks the fixtures through the service natively); both are build outputs
-# under web/wasm/dist/. Each web package with a playwright.config.ts is a suite, and a suite
-# that runs no test, or any test that fails or is skipped, fails the rung. Web unit tests
-# join this rung with their first package (4.6, Vitest). The browsers are Playwright's own,
-# pinned with @playwright/test: `npx playwright install chromium` once per machine.
+# under web/wasm/dist/. The app's tests (brief 4.6) need the module and the fixture server.
+# Web unit tests (Vitest, from 4.6) run first, one suite per web package with a
+# vitest.config.ts; then each web package with a playwright.config.ts is a suite. A suite
+# that runs no test, or any test that fails or is skipped, fails the rung. The browsers are
+# Playwright's own, pinned with @playwright/test: `npx playwright install chromium` once per
+# machine.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_RUNG=6
@@ -17,11 +19,34 @@ ladder_require_tool cargo cargo --version
 ladder_require_tool node node --version
 ladder_require_tool wasm-bindgen wasm-bindgen --version
 ladder_require_tool playwright node_modules/.bin/playwright --version
+ladder_require_tool vitest node_modules/.bin/vitest --version
 export CARGO_TERM_COLOR=never
+
+for config in web/*/vitest.config.ts; do
+  package=$(dirname "$config")
+  report="$PWD/$package/dist/vitest.json"
+  mkdir -p "$package/dist"
+  rm -f "$report"
+  status=0
+  (cd "$package" && "$OLDPWD/node_modules/.bin/vitest" run --reporter=default --reporter=json \
+    --outputFile.json="$report") || status=$?
+  [ -f "$report" ] || ladder_fail "Vitest wrote no report for $package"
+  # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
+  read -r passed failed skipped < <(node -e '
+    const report = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8"));
+    console.log(`${report.numPassedTests} ${report.numFailedTests} ${report.numPendingTests + report.numTodoTests}`);' "$report")
+  [ "$status" -eq 0 ] && [ "$failed" -eq 0 ] || ladder_fail "$failed web unit tests failed in $package"
+  [ "$skipped" -eq 0 ] || ladder_fail "$skipped web unit tests were skipped in $package"
+  ladder_suite "web unit: $package" "$passed" tests
+done
 
 mise run build:wasm || ladder_fail "the browser host's module did not build"
 cargo run --quiet --locked --release -p cairn-wasm --features server --bin cairn-wasm-cases -- \
   web/wasm/dist/cases || ladder_fail "the server's agreement cases were not written"
+# The app's server-host tests (web/app, 4.6) run against the fixture server; built here so
+# Playwright's start of it is a run, not a build.
+cargo build --quiet --locked -p cairn-wasm --example fixture_server \
+  || ladder_fail "the fixture server did not build"
 
 for config in web/*/playwright.config.ts; do
   package=$(dirname "$config")
