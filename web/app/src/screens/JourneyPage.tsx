@@ -60,14 +60,23 @@ function Nodes({ view }: { view: Ready }) {
   );
 }
 
+/**
+ * The page for the journey the address names. Keyed by it, so going to another journey
+ * starts every row afresh: its drafts and rejections are that journey's, even where two
+ * journeys from one route share node keys.
+ */
 export function JourneyPage() {
   const { id = "" } = useParams();
+  return <JourneyScreen key={id} id={id} />;
+}
+
+function JourneyScreen({ id }: { id: string }) {
   const view = useJourney(id);
   switch (view.status) {
     case "loading":
       return <p className="muted">Deriving the journey...</p>;
     case "missing":
-      return <p className="callout">This journey does not exist. <Link to="/">All journeys</Link></p>;
+      return <p className="callout" data-testid="journey-missing">This journey does not exist. <Link to="/">All journeys</Link></p>;
     case "failed":
       return <p className="callout callout-bad">The journey could not be read: {view.message}</p>;
     case "skew":

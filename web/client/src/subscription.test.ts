@@ -137,6 +137,27 @@ describe("Subscription after a drop", () => {
   });
 });
 
+describe("Subscription over a transport that refuses", () => {
+  it("treats a stream that throws on opening as closed, and opens it again after the wait", async () => {
+    const { timers, fire } = manualTimers();
+    let attempts = 0;
+    const subscription = new Subscription((_watching, handlers) => {
+      attempts += 1;
+      if (attempts === 1) {
+        throw new Error("cannot watch that");
+      }
+      handlers.opened();
+      return () => undefined;
+    }, timers);
+    subscription.watch(["deployment"]);
+    await settled();
+    expect(subscription.status).toBe("reconnecting");
+    expect(fire()).toBe(REOPEN_DELAY_FIRST_MS);
+    expect(attempts).toBe(2);
+    expect(subscription.status).toBe("live");
+  });
+});
+
 describe("eventSourceTicks", () => {
   it("watches each name, reads tick events, and reports a source that gave up as closed", () => {
     const listeners: ((event: MessageEvent<string>) => void)[] = [];

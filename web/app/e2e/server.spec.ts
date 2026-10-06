@@ -74,7 +74,7 @@ test("a later page shows the edit", async ({ context }) => {
   await rename(one, "n_docs", renamed);
   await expect(title(two, "n_docs")).toHaveText(renamed);
   await two.getByRole("link", { name: "Journeys" }).click();
-  await expect(two.getByTestId("journey-row")).toHaveCount(4);
+  await expect(two.getByRole("link", { name: "Launch the reporting release" })).toBeVisible();
   await two.getByRole("link", { name: "Launch the reporting release" }).click();
   await expect(title(two, "n_docs")).toHaveText(renamed);
   await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
@@ -145,5 +145,73 @@ test("the server host is chosen when a server answers", async ({ page }) => {
   await page.goto("/#/");
   await expect(page.getByTestId("host")).toHaveAttribute("data-status", "server");
   await open(page, "server");
-  await expect(page.getByTestId("journey-row")).toHaveCount(4);
+  await expect(page.getByRole("link", { name: "Hire a platform engineer" })).toBeVisible();
+});
+
+test("an address that names no journey is shown missing, and the tab stays live", async ({ context }) => {
+  const [one, two] = [await context.newPage(), await context.newPage()];
+  await open(two, "server", "/journeys/not-a-journey");
+  await expect(two.getByTestId("journey-missing")).toBeVisible();
+  await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
+  await two.getByRole("link", { name: "Journeys", exact: true }).click();
+  await two.getByRole("link", { name: "Launch the reporting release" }).click();
+  await openJourney(one, "server", "j_launch");
+  const renamed = fresh("Announcement");
+  await rename(one, "n_announcement", renamed);
+  await expect(title(two, "n_announcement")).toHaveText(renamed);
+});
+
+test("typing is held while a save is in flight, so nothing typed is lost", async ({ page }) => {
+  await openJourney(page, "server", "j_launch");
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route("**/journeys/j_launch/patches", async (route) => {
+    await held;
+    await route.continue();
+  });
+  const renamed = fresh("Beta feedback");
+  await startRename(page, "n_beta_feedback", renamed);
+  await save(page, "n_beta_feedback");
+  await expect(nodeRow(page, "n_beta_feedback").getByRole("textbox")).toBeDisabled();
+  release();
+  await expect(title(page, "n_beta_feedback")).toHaveText(renamed);
+});
+
+/** Creates a journey from the hiring loop's route: its nodes share the hiring journey's keys. */
+async function journeyFromHiringRoute(request: APIRequestContext): Promise<string> {
+  const suffix = Math.random().toString(36).slice(2, 10);
+  const id = `j_copy_${suffix}`;
+  const patch = {
+    id: `p_copy_${suffix}`,
+    target: { journey: id },
+    base_revision: 0,
+    mutations: [{ op: "create_journey", name: `Hiring copy ${suffix}`, from: { route: "hiring-loop", version: 1 } }],
+  };
+  const response = await request.post(`/journeys/${id}/patches`, { data: { patch } });
+  expect(response.status()).toBe(200);
+  return id;
+}
+
+test("a draft follows its journey and its host, not the screen it was typed on", async ({ page }) => {
+  const copy = await journeyFromHiringRoute(page.request);
+  await openJourney(page, "server", copy);
+  await expect(nodeRow(page, "n_offer")).toBeVisible();
+  await page.goto(`/?host=server#/journeys/j_hiring`);
+  await expect(page.getByTestId("derivation")).toBeVisible();
+  const draft = fresh("Offer, j_hiring's draft");
+  await startRename(page, "n_offer", draft);
+  await page.evaluate((to) => {
+    location.hash = to;
+  }, `#/journeys/${copy}`);
+  await expect(page.getByTestId("journey-name")).toContainText("Hiring copy");
+  await expect(nodeRow(page, "n_offer").getByRole("textbox")).toHaveCount(0);
+  await page.evaluate(() => {
+    location.hash = "#/journeys/j_hiring";
+  });
+  await expect(nodeRow(page, "n_offer").getByRole("textbox")).toHaveValue(draft);
+  await page.goto(`/?host=browser#/journeys/j_hiring`);
+  await expect(page.getByTestId("derivation")).toBeVisible();
+  await expect(nodeRow(page, "n_offer").getByRole("textbox")).toHaveCount(0);
 });

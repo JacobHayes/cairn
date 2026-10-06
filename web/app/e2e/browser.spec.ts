@@ -40,3 +40,20 @@ test("a draft survives a reload", async ({ page }) => {
   await expect(page.getByTestId("derivation")).toBeVisible();
   await expect(nodeRow(page, "n_summary").getByRole("textbox")).toHaveValue(draft);
 });
+
+test("every fixture's journey is derived in the worker", async ({ page }) => {
+  await open(page, "browser");
+  const rows = page.getByTestId("journey-row");
+  await expect(rows).toHaveCount(4);
+  const listed = await rows.evaluateAll((found) =>
+    found.map((row) => ({
+      id: row.querySelector(".mono")?.textContent ?? "",
+      revision: Number(row.querySelector("td:last-child")?.textContent),
+    })),
+  );
+  expect(listed.map((journey) => journey.id)).toContain("j_vendor_eval");
+  for (const journey of listed) {
+    await openJourney(page, "browser", journey.id);
+    expect(await derivedRevision(page)).toBe(journey.revision);
+  }
+});

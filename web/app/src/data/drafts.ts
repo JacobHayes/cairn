@@ -4,6 +4,8 @@
 // window, a full quota) leaves the draft in memory only.
 import { useCallback, useState } from "react";
 
+import { useSession } from "./react.ts";
+
 const PREFIX = "cairn:draft:";
 
 function storage(): Storage | undefined {
@@ -38,15 +40,25 @@ export function writeDraft(key: string, value: unknown): void {
   }
 }
 
-/** A draft kept under `key` across reloads of this tab: the value and its setter. */
+/**
+ * A draft kept under `key` across reloads of this tab, on this tab's host (a draft typed
+ * against the in-browser host is not one for the server): the value and its setter. When
+ * `key` changes (a screen reused for another journey), the value is the new key's draft.
+ */
 export function useDraft<T>(key: string): [T | undefined, (value: T | undefined) => void] {
-  const [value, setValue] = useState<T | undefined>(() => readDraft<T>(key));
+  const scoped = `${useSession().host.kind}:${key}`;
+  const [state, setState] = useState(() => ({ key: scoped, value: readDraft<T>(scoped) }));
+  let current = state;
+  if (state.key !== scoped) {
+    current = { key: scoped, value: readDraft<T>(scoped) };
+    setState(current);
+  }
   const set = useCallback(
     (next: T | undefined) => {
-      writeDraft(key, next);
-      setValue(next);
+      writeDraft(scoped, next);
+      setState({ key: scoped, value: next });
     },
-    [key],
+    [scoped],
   );
-  return [value, set];
+  return [current.value, set];
 }

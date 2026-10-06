@@ -68,7 +68,6 @@ interface Entry {
   used: number;
   retryDelay: number;
   retryTimer: unknown;
-  rolledTo: string | undefined;
 }
 
 export interface JourneyStoreParts {
@@ -78,6 +77,9 @@ export interface JourneyStoreParts {
   skew: SkewLatch;
   timers: Timers;
 }
+
+/** The schema's `JourneyId`: what an address must name to be a journey at all. */
+export const JOURNEY_ID = /^j_[a-z0-9][a-z0-9_-]{0,61}$/;
 
 export const journeyOf = (id: string): RevisionOf => ({ domain: { journey: id } });
 
@@ -121,6 +123,11 @@ export class JourneyStore extends Emitter {
 
   /** Shows journey `id` until the returned function is called: watched, fetched, derived. */
   mount(id: string): () => void {
+    if (!JOURNEY_ID.test(id)) {
+      // Never watched: the stream refuses a malformed name, and with it every other watch.
+      this.#show(this.#entry(id), { status: "missing" });
+      return () => undefined;
+    }
     const entry = this.#entry(id);
     entry.mounted += 1;
     entry.used = ++this.#uses;
@@ -135,7 +142,10 @@ export class JourneyStore extends Emitter {
     };
   }
 
-  /** Date rollover: refetches every held journey whose today has passed in its zone. */
+  /**
+   * Date rollover: refetches every held journey whose today has passed in its zone, once
+   * per check while the host still answers the old date (its clock may lag the page's).
+   */
   rollover(now: Date): void {
     for (const entry of this.#entries.values()) {
       const held = entry.held;
@@ -148,8 +158,8 @@ export class JourneyStore extends Emitter {
       } catch {
         continue;
       }
-      if (today !== held.today && today !== entry.rolledTo) {
-        entry.rolledTo = today;
+      // Asked at every check until the host's today catches up with the page's clock.
+      if (today !== held.today) {
         this.#request(entry, { today });
       }
     }
@@ -169,7 +179,6 @@ export class JourneyStore extends Emitter {
         used: 0,
         retryDelay: REOPEN_DELAY_FIRST_MS,
         retryTimer: undefined,
-        rolledTo: undefined,
       };
       this.#entries.set(id, entry);
     }
@@ -184,7 +193,9 @@ export class JourneyStore extends Emitter {
     const domain = tick.of.domain;
     if (domain === "deployment") {
       for (const entry of this.#entries.values()) {
-        if (entry.held !== undefined && entry.held.deployment < tick.revision) {
+        // A first fetch in flight may have read the document before this deployment moved.
+        const behind = entry.held === undefined ? entry.running : entry.held.deployment < tick.revision;
+        if (behind) {
           this.#request(entry, { deployment: tick.revision });
         }
       }

@@ -54,8 +54,8 @@ client's, the tick stream's reopening, and the data layer over a fake host.
 
 | Package | Result |
 |---|---|
-| `web/client` | 27 passed, 0 failed |
-| `web/app` | 22 passed, 0 failed |
+| `web/client` | 28 passed, 0 failed |
+| `web/app` | 25 passed, 0 failed |
 
 The app's browser tests (Playwright in Chromium, rung 6), over both hosts:
 
@@ -65,6 +65,7 @@ The app's browser tests (Playwright in Chromium, rung 6), over both hosts:
 | browser | a journey's document is derived in the worker | passed |
 | browser | a patch applies through the page's service and the view follows | passed |
 | browser | a draft survives a reload | passed |
+| browser | every fixture's journey is derived in the worker | passed |
 | server | an edit in one page appears in another | passed |
 | server | edits to different nodes both land | passed |
 | server | edits to one field surface a conflict | passed |
@@ -72,6 +73,9 @@ The app's browser tests (Playwright in Chromium, rung 6), over both hosts:
 | server | a deployment tick refetches the deployment context and re-derives | passed |
 | server | version skew stops the tab and asks for a reload, keeping unsent edits | passed |
 | server | the server host is chosen when a server answers | passed |
+| server | an address that names no journey is shown missing, and the tab stays live | passed |
+| server | typing is held while a save is in flight, so nothing typed is lost | passed |
+| server | a draft follows its journey and its host, not the screen it was typed on | passed |
 
 ## The planted bug
 

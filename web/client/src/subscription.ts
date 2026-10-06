@@ -141,7 +141,7 @@ export class Subscription {
     }
     this.#setStatus(this.status === "idle" ? "connecting" : "reconnecting");
     let current = true;
-    const close = this.#open(names, {
+    const handlers: TickHandlers = {
       opened: () => {
         if (current) {
           this.#opened();
@@ -159,7 +159,18 @@ export class Subscription {
           this.#dropped(closed);
         }
       },
-    });
+    };
+    let close: () => void;
+    try {
+      close = this.#open(names, handlers);
+    } catch {
+      // A transport that refuses to open (the in-browser host throws for a name it cannot
+      // watch) is a closed stream: tried again after the wait, never an uncaught error.
+      close = () => undefined;
+      this.#close = close;
+      this.#dropped(true);
+      return;
+    }
     this.#close = () => {
       current = false;
       close();

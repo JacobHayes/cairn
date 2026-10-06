@@ -77,6 +77,7 @@ export function TitleEditor({ journey, node, title, revision }: TitleEditorProps
         <Field
           aria-label={`New title for ${title}`}
           value={draft.text}
+          disabled={saving}
           onChange={(event) => { setDraft({ ...draft, text: event.target.value }); }}
         />
         <Button primary disabled={saving || skew !== undefined} onClick={() => void save()}>

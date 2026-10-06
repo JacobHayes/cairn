@@ -167,3 +167,53 @@ describe("a journey's faults", () => {
     expect(deriver.released).toEqual(ids.slice(0, 2));
   });
 });
+
+describe("review round 1", () => {
+  it("re-derives a journey whose first fetch read the document before a deployment tick", async () => {
+    const { host, session } = await started({ j_one: 3, j_two: 3 });
+    session.journeys.mount("j_two");
+    await settled();
+    host.open();
+    await settled();
+    session.journeys.mount("j_one");
+    host.deploymentRevision = 2;
+    for (const id of ["j_one", "j_two"]) {
+      host.journeysHeld.set(id, { revision: 3, deployment: 2, today: TODAY, engine: ENGINE });
+    }
+    host.tick({ of: { domain: "deployment" }, revision: 2 });
+    await settled();
+    expect(revisionShown(session, "j_two")).toEqual([3, 2, TODAY]);
+    expect(revisionShown(session, "j_one")).toEqual([3, 2, TODAY]);
+  });
+
+  it("keeps asking at each rollover check until the host's today catches up", async () => {
+    const { host, session, pending, setNow } = await started();
+    session.journeys.mount("j_one");
+    await settled();
+    const check = async () => {
+      pending.shift()?.callback();
+      await settled();
+    };
+    await check();
+    setNow("2026-10-07T00:00:10Z");
+    await check();
+    expect(revisionShown(session, "j_one")).toEqual([3, 1, TODAY]);
+    host.journeysHeld.set("j_one", { revision: 3, deployment: 1, today: "2026-10-07", engine: ENGINE });
+    setNow("2026-10-07T00:01:10Z");
+    await check();
+    expect(revisionShown(session, "j_one")).toEqual([3, 1, "2026-10-07"]);
+    const fetched = host.fetches.get("j_one");
+    await check();
+    expect(host.fetches.get("j_one")).toBe(fetched);
+  });
+
+  it("shows an address that names no journey as missing, and never watches it", async () => {
+    const { host, session } = await started();
+    session.journeys.mount("not-a-journey");
+    session.journeys.mount("j_one");
+    await settled();
+    expect(session.journeys.view("not-a-journey").status).toBe("missing");
+    expect(host.streams.at(-1)?.watching).toEqual(["deployment", "journey:j_one"]);
+    expect(host.fetches.has("not-a-journey")).toBe(false);
+  });
+});
