@@ -31,7 +31,7 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 3.1 | Store trait, memory and Turso backends, conformance suite | `crates/store`, `crates/store-turso` | 1.2 (beside phase 2) | landed `tvlztrmq` |
 | 3.2 | Auth providers, users, identities, agent tokens | `crates/auth` | 3.1 | landed `nspnswuo` |
 | 4.1 | Service layer, composition root, capabilities, notifier | `crates/service`, `crates/store` (notifier) | 2.4, 3.1 | landed `lsoqvyvx` |
-| 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 | in progress |
+| 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 | landed `rortptsk` |
 | 4.3 | MCP server and shipped instructions | `crates/mcp`, `instructions/` | 4.9 |  |
 | 4.4 | Assistant | `crates/assistant` | 4.3 |  |
 | 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.9 |  |
@@ -47,8 +47,8 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 5.6 | Authoring | `web/app` | 5.5 |  |
 | 5.7 | Proposal review and its flows | `web/app` | 5.6 |  |
 | 5.8 | Assistant panel | `web/app` | 5.7, 4.4 |  |
-| 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 |  |
-| 6.2 | Durability testbed | `testbeds/durability` | 4.1 |  |
+| 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 | in progress |
+| 6.2 | Durability testbed | `testbeds/durability` | 4.1 | in progress |
 
 Rule for links between screens: a screen only links to screens that already exist. The brief that builds a screen adds the entry points into it from earlier screens (5.7 adds "break down" to triage and the upgrade, save-as-route, and re-link entries to the overview; 5.8 mounts its panel on earlier screens).
 

@@ -31,6 +31,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
+      # The npm workspace's tools (TypeScript, eslint, openapi-typescript) for rungs 1 and 5.
+      - run: npm ci
       - run: mise run check
 
   # Every rung that exists, as on push, with rung 3's property tests at a larger case count
@@ -44,6 +46,8 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
+      # The npm workspace's tools (TypeScript, eslint, openapi-typescript) for rungs 1 and 5.
+      - run: npm ci
       - run: mise run check
 
   # PRACTICES, Simulation with patina: the campaigns, nightly and on demand, never on push and

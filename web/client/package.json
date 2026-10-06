@@ -1,0 +1,16 @@
+{
+  "name": "@cairn/client",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "The TypeScript client of the Cairn API: types generated from openapi/ (generated/) and a typed fetch client over them.",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "dependencies": {
+    "openapi-fetch": "0.17.0"
+  },
+  "devDependencies": {
+    "openapi-typescript": "7.13.0"
+  }
+}

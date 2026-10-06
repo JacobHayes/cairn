@@ -85,7 +85,7 @@ cairn/
     store-turso/   Turso backend (the `turso` crate: Rust, SQLite file format, MVCC)
     service/       service layer: load, call engine, commit; capabilities; composition root types. Runtime-free: no tokio, database driver, or transport dependency, so it builds for wasm32-unknown-unknown
     auth/          AuthProvider trait; dev, oidc, builtin-oauth, tailscale providers; users and identities
-    api/           axum endpoints, utoipa OpenAPI, SSE
+    api/           axum endpoints, the generated OpenAPI document, SSE, the Rust client
     mcp/           rmcp server: tools, prompt metadata, instructions
     assistant/     provider trait, tool loop, proposal drafting
     cairn/         the binary: CLI, config, composition root, embedded assets
@@ -294,7 +294,7 @@ Optional subsystems are separate crates that contribute a router and a service t
 
 ## HTTP API
 
-axum with utoipa. Rust request and response types are the source of truth; the OpenAPI document is generated from them and checked in (`openapi/`).
+axum. Rust request and response types are the source of truth; the OpenAPI 3.1 document is generated from their JSON Schemas (schemars, which the schema crate already derives) and checked in (`openapi/`) (DECISIONS.md, 4.2).
 
 - **Resources**: routes, versions, drafts, journeys, nodes, proposals, entities, users, events. Reads return projections: `GET /journeys/{id}/document` (graph and state, which the UI derives locally), `/snapshot` (I3), `/level`, `/trace/{key}`, `/decisions`, `/timeline`, `/summary`, `/next`, `/nodes/{key}` (C8 detail with explanations).
 - **One write verb**: `POST /{domain}/patches` with base revision and ordered mutations (A17); returns the new revision or the full rejection. Proposals: `POST /{domain}/proposals` with client-generated ids (I6), `PATCH`, `POST .../apply`, `POST .../discard`.
@@ -304,7 +304,7 @@ axum with utoipa. Rust request and response types are the source of truth; the O
 - **Capabilities**: `GET /capabilities`.
 - Errors carry the engine's violation list by path unchanged (A15).
 
-Clients are generated artifacts: `web/client` via openapi-typescript and openapi-fetch; a Rust client via progenitor for integration tests and the CLI listed under `Later`.
+Clients: `web/client`'s types are generated artifacts (openapi-typescript, with openapi-fetch); the Rust client in `crates/api`, for integration tests, the testbeds, and the CLI listed under `Later`, is written over the shared Rust types and the same endpoint table the router serves (DECISIONS.md, 4.2).
 
 ## MCP endpoint
 

@@ -14,6 +14,7 @@
 mod call;
 mod compose;
 mod consequence;
+mod document;
 mod error;
 mod load;
 mod reads;

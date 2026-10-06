@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-#MISE description="Rung 1: format, lint, typecheck (rustfmt, clippy, workspace lints, the wasm32 build of the runtime-free crates)"
+#MISE description="Rung 1: format, lint, typecheck (rustfmt, clippy, workspace lints, the wasm32 build of the runtime-free crates, the TypeScript typecheck, eslint)"
 # PRACTICES, The validation ladder, rung 1; Code conventions. Rung 1 runs tools, not tests:
 # it fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
-# eslint join this rung with the first TypeScript package (DECISIONS.md).
+# eslint joined with the first TypeScript package, web/client (DECISIONS.md, 1.1).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_RUNG=1
@@ -96,5 +96,22 @@ done
 cargo check --locked --target wasm32-unknown-unknown "${wasm_packages[@]}" \
   || ladder_fail "a runtime-free crate does not build for wasm32-unknown-unknown"
 ladder_suite "wasm32-unknown-unknown build" "${#wasm_crates[@]}" crates
+
+# PRACTICES, Code conventions (TypeScript): the strict typecheck over every web package's
+# sources and generated types, and eslint with the type-aware rules over the hand-written
+# sources (generated code is not linted). Both come from the npm workspace: `npm ci`.
+for tool in tsc eslint; do
+  [ -x "node_modules/.bin/$tool" ] || ladder_fail "tool missing: $tool (run npm ci)"
+done
+node_modules/.bin/tsc -p tsconfig.json || ladder_fail "the TypeScript typecheck reported errors"
+typed=$(node_modules/.bin/tsc -p tsconfig.json --listFilesOnly | grep -c "^$PWD/web/" || true)
+ladder_suite "TypeScript typecheck" "$typed" files
+linted_json=$(node_modules/.bin/eslint --max-warnings 0 --format json .) || {
+  node_modules/.bin/eslint --max-warnings 0 . || true
+  ladder_fail "eslint reported problems"
+}
+# shellcheck disable=SC2016 # the backticks are a JavaScript template literal
+linted=$(node -e 'let text = ""; process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => console.log(JSON.parse(text).length));' <<<"$linted_json")
+ladder_suite eslint "$linted" files
 
 ladder_rung_end

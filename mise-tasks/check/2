@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-#MISE description="Rung 2: unit tests for every Rust crate (property and cost tests: rung 3; store conformance: rung 4)"
+#MISE description="Rung 2: unit tests for every Rust crate (property and cost tests: rung 3; store conformance and in-process API tests: rung 4)"
 # PRACTICES, The validation ladder, rung 2. One suite per crate, so a crate whose tests
 # vanish fails the rung. Property tests live in `mod property` (in `tests/property_*.rs`),
-# cost tests in `mod cost` (in `tests/cost_*.rs`), and the store conformance suite in `mod
-# conformance` (in `tests/conformance.rs`); all are skipped here by name, and rungs 3 and 4
-# run them.
+# cost tests in `mod cost` (in `tests/cost_*.rs`), the store conformance suite in `mod
+# conformance` (in `tests/conformance.rs`), and the API's in-process tests in `mod
+# in_process`; all are skipped here by name, and rungs 3 and 4 run them.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_RUNG=2
@@ -28,7 +28,7 @@ crates=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
 while read -r crate; do
   [ -n "$crate" ] || continue
   status=0
-  output=$(cargo test --locked -p "$crate" --all-features -- --skip property:: --skip conformance:: --skip cost:: 2>&1) || status=$?
+  output=$(cargo test --locked -p "$crate" --all-features -- --skip property:: --skip conformance:: --skip cost:: --skip in_process:: 2>&1) || status=$?
   printf '%s\n' "$output"
   [ "$status" -eq 0 ] || ladder_fail "cargo test reported failures in $crate"
   count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
