@@ -565,13 +565,17 @@ pub enum Mutation {
     },
 
     // Lineage (B4, B7, B9).
-    /// Move the journey to a newer version of its route; the merge's outcome rides in the
-    /// same patch as ordinary mutations (B7).
+    /// Move the journey to a newer version of its route, taking every clean outcome of the
+    /// three-way merge (route changes it did not edit, new nodes, orphans); conflict
+    /// resolutions and orphan removals ride after it in the same patch as ordinary mutations
+    /// (B7).
     Upgrade {
         /// The version upgraded to.
         to: VersionNumber,
     },
-    /// Link the journey to the version its saved route published (B9).
+    /// Link the journey to the version its saved route published (B9), in one event: the
+    /// lineage, each node the version holds route-copied and marked exactly where it differs,
+    /// every other node local, and the version's roles and kinds the journey lacks.
     Relink {
         /// The new lineage.
         lineage: Lineage,

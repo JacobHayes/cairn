@@ -33,7 +33,7 @@ pub fn arb_date_rule<R: ArbRefs>() -> impl Strategy<Value = DateRule<R>> {
         })
 }
 
-fn arb_choices() -> impl Strategy<Value = Choices> {
+pub(crate) fn arb_choices() -> impl Strategy<Value = Choices> {
     prop::collection::btree_map(arb_slug(), prop::option::of(arb_title()), 1..5).prop_map(
         |choices| {
             let list = choices

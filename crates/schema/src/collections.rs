@@ -102,6 +102,12 @@ impl<T, L: LimitOf> BoundedVec<T, L> {
         &self.0
     }
 
+    /// The items, to edit in place; the count, and so the bound, cannot change.
+    #[must_use]
+    pub fn as_mut_slice(&mut self) -> &mut [T] {
+        &mut self.0
+    }
+
     /// The number of items.
     #[must_use]
     pub fn len(&self) -> usize {

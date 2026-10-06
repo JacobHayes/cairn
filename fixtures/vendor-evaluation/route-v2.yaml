@@ -1,0 +1,229 @@
+format: 1
+route: vendor-evaluation
+name: Vendor evaluation
+description: >-
+  Evaluate a vendor's product against a comparison set and report a
+  recommendation at a decision meeting.
+extends: 1
+default_owner: eval_owner
+roles:
+- key: r_eval_owner
+  id: eval_owner
+  title: Evaluation owner
+- key: r_stakeholders
+  id: stakeholders
+  title: Stakeholders
+  multi: true
+- key: r_findings_reviewer
+  id: findings_reviewer
+  title: Findings reviewer
+participation_kinds:
+- key: k_informed
+  id: informed
+  title: Informed
+  multi: true
+- key: k_reviewer
+  id: reviewer
+  title: Reviewer
+nodes:
+- key: n_purpose
+  id: purpose
+  kind: decision
+  title: Purchase or research
+  prompt: Is this evaluation for a purchase, or research only?
+  answer_type: single_choice
+  choices:
+  - purchase
+  - id: research-only
+    title: Research only
+- key: n_who_owns
+  id: who-owns
+  kind: decision
+  title: Evaluation owner
+  prompt: Who owns the evaluation?
+  answer_type: entity
+  fills_role: eval_owner
+- key: n_who_informed
+  id: who-informed
+  kind: decision
+  title: Stakeholders
+  prompt: Who should be kept informed?
+  answer_type: entity_list
+  fills_role: stakeholders
+- key: n_meeting_date
+  id: meeting-date
+  kind: decision
+  title: Decision meeting date
+  prompt: When is the decision meeting?
+  answer_type: date
+  feeds_milestone: decision-meeting
+- key: n_partner_runs
+  id: partner-runs
+  kind: decision
+  title: Partner runs testing
+  prompt: Does a partner team run the testing?
+  answer_type: boolean
+- key: n_kickoff
+  id: kickoff
+  kind: milestone
+  title: Kickoff
+- key: n_decision_meeting
+  id: decision-meeting
+  kind: milestone
+  title: Decision meeting
+  description: Owned outside the evaluation; its date comes from the up-front date decision.
+  weight: 10
+  final: true
+- key: n_setup
+  id: setup
+  kind: group
+  title: Setup
+  opens_at: kickoff
+- key: n_access
+  id: access
+  parent: setup
+  kind: deliverable
+  title: Environment and data access
+  estimate: 2
+  resources:
+  - key: a_access_request
+    title: Access request
+    message_draft: "Hello, {{roles.eval_owner.name}} needs access to the evaluation environment for {{journey.name}}. The purpose is: {{answers.purpose}}."
+- key: n_plan
+  id: plan
+  parent: setup
+  kind: deliverable
+  title: Test plan
+  requires:
+  - setup/access
+  resources:
+  - key: a_plan_example_one
+    title: Example test plan
+    example: https://example.org/examples/test-plan-one
+  - key: a_plan_example_two
+    title: Another example test plan
+    example: https://example.org/examples/test-plan-two
+- key: n_plan_draft
+  id: draft
+  parent: setup/plan
+  kind: action
+  title: Draft the plan
+  estimate: 2
+- key: n_plan_review
+  id: review
+  parent: setup/plan
+  kind: action
+  title: Review the plan
+  estimate: 1
+  requires:
+  - setup/plan/draft
+- key: n_testing
+  id: testing
+  kind: group
+  title: Testing
+- key: n_comparison_set
+  id: comparison-set
+  parent: testing
+  kind: decision
+  title: Comparison set
+  prompt: Which comparison set does the evaluation measure against?
+  answer_type: single_choice
+  choices:
+  - prior-tool
+  - market-leader
+  - none
+  requires:
+  - setup/plan
+- key: n_baseline
+  id: baseline
+  parent: testing
+  kind: deliverable
+  title: Comparison baseline
+  estimate: 3
+  relevant_when:
+    equals:
+      decision: testing/comparison-set
+      value: prior-tool
+- key: n_partner_led
+  id: partner-led
+  parent: testing
+  kind: group
+  title: Partner-led
+  relevant_when:
+    equals:
+      decision: partner-runs
+      value: true
+- key: n_criteria
+  id: criteria
+  parent: testing/partner-led
+  kind: action
+  title: Review the partner's criteria
+- key: n_partner_results
+  id: partner-results
+  parent: testing/partner-led
+  kind: action
+  title: Read the partner's results
+  requires:
+  - testing/partner-led/criteria
+- key: n_reporting
+  id: reporting
+  kind: group
+  title: Reporting
+  requires:
+  - testing
+  participations:
+    informed: stakeholders
+- key: n_findings
+  id: findings
+  parent: reporting
+  kind: deliverable
+  title: Findings writeup
+  estimate: 2
+- key: n_findings_reviewer
+  id: findings-reviewer
+  parent: reporting
+  kind: decision
+  title: Findings reviewer
+  prompt: Who reviews the findings?
+  answer_type: entity
+  fills_role: findings_reviewer
+  requires:
+  - reporting/findings
+- key: n_review_opens
+  id: review-opens
+  parent: reporting
+  kind: milestone
+  title: Final review opens
+  due_by:
+    before: decision-meeting
+    offset: 14
+- key: n_final_review
+  id: final-review
+  parent: reporting
+  kind: group
+  title: Final review
+  opens_at: reporting/review-opens
+  closes_at: decision-meeting
+- key: n_final_report
+  id: final-report
+  parent: reporting/final-review
+  kind: deliverable
+  title: Final report
+  weight: 5
+  estimate: 3
+  requires_artifact: true
+  requires:
+  - reporting/findings
+  participations:
+    reviewer: findings_reviewer
+  resources:
+  - key: a_report_template
+    title: Report template
+    template: https://example.org/templates/evaluation-report
+- key: n_signoff
+  id: sign-off
+  parent: reporting
+  kind: action
+  title: Sign off the recommendation
+  requires:
+  - reporting/final-review

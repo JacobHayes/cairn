@@ -11,11 +11,10 @@ use std::collections::BTreeSet;
 use proptest::prelude::*;
 
 use cairn_schema::{
-    Actor, Edge, JourneyId, Mutation, Mutations, NodeKey, NodeKind, ParticipationRef, Patch,
-    PatchId, PatchTarget, Removal, Transition, from_yaml,
+    Actor, JourneyId, Mutation, Mutations, NodeKey, NodeKind, Patch, PatchId, PatchTarget,
+    Transition, from_yaml,
 };
 
-use crate::graph::Tree;
 use crate::pipeline::{ApplyInputs, apply};
 use crate::records::Records;
 use crate::transition::Move;
@@ -297,54 +296,7 @@ fn transition(node: &str, step: Move) -> Mutation {
 /// A removal naming everything the node's removal reaches (A18), so it is accepted unless
 /// something else forbids it.
 fn removal(graph: &cairn_schema::Graph, node: &NodeKey) -> Mutation {
-    let tree = Tree::build(graph);
-    let descendants: BTreeSet<NodeKey> = tree.descendants(node).into_iter().collect();
-    let inside = |key: &NodeKey| key == node || descendants.contains(key);
-    let mut removal = Removal {
-        node: node.clone(),
-        descendants: descendants.clone(),
-        edges: BTreeSet::new(),
-        resources: BTreeSet::new(),
-        annotations: BTreeSet::new(),
-        participations: BTreeSet::new(),
-    };
-    for dependent in graph.nodes.values() {
-        for requirement in dependent.requires.iter() {
-            if inside(&dependent.key) || inside(requirement) {
-                removal.edges.insert(Edge {
-                    node: dependent.key.clone(),
-                    requires: requirement.clone(),
-                });
-            }
-        }
-        if inside(&dependent.key) {
-            removal.resources.extend(
-                dependent
-                    .resources
-                    .iter()
-                    .map(|resource| resource.key.clone()),
-            );
-            removal
-                .participations
-                .extend(
-                    dependent
-                        .participations
-                        .as_map()
-                        .keys()
-                        .map(|kind| ParticipationRef {
-                            node: dependent.key.clone(),
-                            kind: kind.clone(),
-                        }),
-                );
-        }
+    Mutation::RemoveNode {
+        removal: crate::edit::full_removal(graph, node),
     }
-    let notes = graph
-        .state
-        .annotations
-        .values()
-        .filter(|note| note.body.node.as_ref().is_some_and(inside));
-    removal
-        .annotations
-        .extend(notes.map(|note| note.body.key.clone()));
-    Mutation::RemoveNode { removal }
 }

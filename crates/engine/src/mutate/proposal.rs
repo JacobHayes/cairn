@@ -167,7 +167,40 @@ pub(super) fn apply_to_destination(
     vec![Write::Put(Record::Proposal(applied))]
 }
 
-/// Runs a proposal's mutations in order, each applied to the candidate and appended to
+/// C14, I6: an item that still needs a choice, or whose choice it does not offer, blocks
+/// apply; each is listed, about its node where it has one.
+fn unresolved_items(
+    session: &mut Session<'_>,
+    found: &Proposal,
+    unresolved: &[cairn_schema::UnresolvedItem],
+) {
+    assert!(
+        !unresolved.is_empty(),
+        "only a blocked proposal is reported"
+    );
+    for blocked in unresolved {
+        let item = usize::try_from(blocked.item)
+            .ok()
+            .and_then(|index| found.draft.items.as_slice().get(index));
+        let node = item.and_then(crate::proposal::item_node);
+        let message = format!(
+            "review item {} is unresolved ({:?})",
+            blocked.item, blocked.reason
+        );
+        match node {
+            Some(node) => session.reject(ViolationCode::UnresolvedReviewItem, Some(node), message),
+            None => reject_about(
+                session,
+                ViolationCode::UnresolvedReviewItem,
+                &found.id,
+                &message,
+            ),
+        }
+    }
+}
+
+/// Runs a proposal's resolved mutations in order (its drafted mutations with its items'
+/// choices applied), each applied to the candidate and appended to
 /// `delta`; true when every one applied and the destination exists afterwards.
 fn run_mutations(
     session: &mut Session<'_>,
@@ -176,7 +209,29 @@ fn run_mutations(
     delta: &mut Vec<Write>,
 ) -> bool {
     let found_before = session.violations.len();
-    for (position, inner) in found.draft.mutations.as_slice().iter().enumerate() {
+    let mutations = match crate::proposal::resolve(&found.draft) {
+        Ok(mutations) => mutations,
+        Err(unresolved) => {
+            unresolved_items(session, found, &unresolved);
+            return false;
+        }
+    };
+    if cairn_schema::Limit::MutationCountPerPatch
+        .check(mutations.len())
+        .is_err()
+    {
+        reject_about(
+            session,
+            ViolationCode::LimitExceeded,
+            &found.id,
+            "the resolved proposal holds more mutations than one patch may",
+        );
+        if let Some(violation) = session.violations.last_mut() {
+            violation.limit = Some(cairn_schema::Limit::MutationCountPerPatch);
+        }
+        return false;
+    }
+    for (position, inner) in mutations.iter().enumerate() {
         session.inner = Some(u32::try_from(position).unwrap_or(u32::MAX));
         super::apply(session, inner, delta);
     }

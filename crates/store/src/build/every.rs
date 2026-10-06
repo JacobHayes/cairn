@@ -536,7 +536,8 @@ pub fn proposal(
     let mutations = json!([{"op": "add_node", "node": {
         "key": "n_review", "id": "review", "kind": "action", "title": "Review",
     }}]);
-    let items = json!([{"item": "orphan", "node": "n_gone", "keep": true}]);
+    let items =
+        json!([{"item": "orphan", "node": "n_gone", "keep": true, "removal": {"node": "n_gone"}}]);
     Proposal {
         id: id(key),
         destination,

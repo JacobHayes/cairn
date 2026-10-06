@@ -215,7 +215,7 @@ Operators: `equals`, `not_equals`, `in`, `contains`, `answered`, `all`, `any`, `
 
 ### Upgrade, save-as-route, re-link
 
-Engine functions that take two graphs and return a proposal (B7, B8, B9): a three-way diff by key over nodes, edges, roles, kinds, conditions, rules, and resources, with per-field local-edit markers deciding merge outcome and conflicts listed with explicit resolutions. Orphans, tombstones, participation mapping, and node exclusion are proposal items the reviewer edits before apply (C14).
+Engine functions that take two graphs and return a proposal (B7, B8, B9): a three-way diff by key over nodes, edges, roles, kinds, conditions, rules, and resources, with per-field local-edit markers deciding merge outcome and conflicts listed with explicit resolutions. Orphans, tombstones, participation mapping, and node exclusion are proposal items the reviewer edits before apply (C14). The upgrade mutation applies the merge's clean outcomes itself, from the two versions it loads, so a proposal stays within the patch limit; the re-link mutation sets lineage, provenance, and markers in one event. `resolve(proposal)` turns the items' choices into ordinary mutations after the drafted ones, and apply refuses a proposal whose items still need a choice; `preview` applies the resolved proposal to a copy of the destination for review.
 
 ### File format
 

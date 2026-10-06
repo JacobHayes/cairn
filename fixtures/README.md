@@ -137,6 +137,16 @@ against the engine's output.
 - `vendor-evaluation`, after step 3, actions rolled up: `n_plan` holds `n_plan_draft`, `n_plan_review`; `n_partner_led` holds `n_criteria`, `n_partner_results`.
 - `vendor-evaluation`, after step 3, next: `n_access`, `n_decision_meeting`, `n_workload`.
 
+Version 2 (brief 2.7), `route-v2.yaml`, extends version 1: the access deliverable is renamed
+("Environment and data access"), the workload placeholder is removed, a sign-off action is added
+under reporting (`n_signoff`, requiring the final review), and the baseline is relevant only when
+the comparison set is the prior tool. Upgrading the finished scenario journey, which has no local
+edits, to version 2 proposes the upgrade mutation and one item: the workload as an orphan, kept by
+default, whose removal would also remove its two journey-local children (`n_workload_ingest`,
+`n_workload_query`). There is no conflict and no kept edit; the rename, the condition, and the
+sign-off apply with the upgrade, and the workload stays done, orphaned. `crates/engine/tests/upgrade.rs`
+checks these items.
+
 ## `hiring-loop/`
 
 A small route with deep containment (interview loop, onsite, debrief, notes, scorecard) and a

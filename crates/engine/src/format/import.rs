@@ -1,11 +1,14 @@
-//! Building a graph from a file document with no base version (A13, A14; PRD, Identity and
-//! references): supplied keys are kept, missing ones are minted through the host's
-//! allocator, and every path and id is resolved to a key. The result is validated like any
-//! other graph, so every fixture loads through the model. Import against a base version, which
-//! matches keyless nodes by path to inherit their keys, is the route-file brief's (2.7).
+//! Building a graph from a file document (A13, A14; PRD, Identity and references): supplied
+//! keys are kept; against a base version, a keyless node takes the key of the base node at
+//! its path, a keyless role or kind the key of the base one with its id, and a keyless
+//! resource the key of the base node's resource with its title; the rest are minted through
+//! the host's allocator, never as a key the base holds or retired. Every path and id is
+//! resolved to a key, and the result is validated like any other graph, so every fixture
+//! loads through the model.
 //!
 //! Cost at the limits: one pass over the file's nodes, roles, and kinds to collect keys and
-//! paths, and one to resolve references by map lookup, O(n log n), then graph validation.
+//! paths (and one over the base's to match them), and one to resolve references by map
+//! lookup, O(n log n), then graph validation.
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -32,7 +35,35 @@ use crate::validate::violation;
 /// When the allocator keeps returning keys already in use, or the engine's own key
 /// accounting breaks.
 pub fn from_file(file: &RouteFile, allocator: &mut dyn KeyAllocator) -> Result<Graph, Violations> {
-    let mut keys = Keys::collect(file, allocator);
+    import(file, None, allocator)
+}
+
+/// A13: builds a graph from a route file against the version it extends: an unchanged node
+/// keeps its key by path, a moved node keeps the key it carries, an unknown path mints a new
+/// one.
+///
+/// # Errors
+///
+/// Every key repeated, path that does not resolve, and invariant the graph breaks.
+///
+/// # Panics
+///
+/// When the allocator keeps returning keys already in use, or the engine's own key
+/// accounting breaks.
+pub fn import(
+    file: &RouteFile,
+    base: Option<&Document>,
+    allocator: &mut dyn KeyAllocator,
+) -> Result<Graph, Violations> {
+    let matched;
+    let (file, reserved) = match base {
+        Some(base) => {
+            matched = super::matching::with_base_keys(file, base);
+            (&matched, super::matching::Reserved::of(base))
+        }
+        None => (file, super::matching::Reserved::default()),
+    };
+    let mut keys = Keys::collect(file, allocator, &reserved);
     let mut resolver = Resolver::new(file, &keys);
     let roles = file
         .roles
@@ -120,7 +151,11 @@ struct Keys {
 }
 
 impl Keys {
-    fn collect(file: &RouteFile, allocator: &mut dyn KeyAllocator) -> Self {
+    fn collect(
+        file: &RouteFile,
+        allocator: &mut dyn KeyAllocator,
+        reserved: &super::matching::Reserved,
+    ) -> Self {
         let nodes = file.nodes.as_slice();
         let resources: Vec<Option<AttachmentKey>> = nodes
             .iter()
@@ -140,11 +175,44 @@ impl Keys {
             .iter()
             .map(|kind| kind.key.clone())
             .collect();
+        let retired = &reserved.retired;
+        refuse_retired(
+            &supplied_nodes,
+            &retired.nodes,
+            Subject::Node,
+            &mut violations,
+        );
+        refuse_retired(&roles, &retired.roles, Subject::Role, &mut violations);
+        refuse_retired(&kinds, &retired.kinds, Subject::Kind, &mut violations);
         let keys = Keys {
-            nodes: fill(supplied_nodes, allocator, &mut violations, Subject::Node),
-            roles: fill(roles, allocator, &mut violations, Subject::Role),
-            kinds: fill(kinds, allocator, &mut violations, Subject::Kind),
-            resources: fill(resources, allocator, &mut violations, Subject::Attachment),
+            nodes: fill(
+                supplied_nodes,
+                allocator,
+                &mut violations,
+                Subject::Node,
+                &reserved.nodes,
+            ),
+            roles: fill(
+                roles,
+                allocator,
+                &mut violations,
+                Subject::Role,
+                &reserved.roles,
+            ),
+            kinds: fill(
+                kinds,
+                allocator,
+                &mut violations,
+                Subject::Kind,
+                &reserved.kinds,
+            ),
+            resources: fill(
+                resources,
+                allocator,
+                &mut violations,
+                Subject::Attachment,
+                &reserved.resources,
+            ),
             violations,
         };
         assert_eq!(keys.nodes.len(), nodes.len());
@@ -153,13 +221,35 @@ impl Keys {
     }
 }
 
+/// Invariants (no key is ever reused): a supplied key the base retired is rejected.
+fn refuse_retired<K: Ord + Clone + std::fmt::Display>(
+    supplied: &[Option<K>],
+    retired: &BTreeSet<K>,
+    subject: fn(K) -> Subject,
+    violations: &mut Vec<Violation>,
+) {
+    for key in supplied
+        .iter()
+        .flatten()
+        .filter(|key| retired.contains(*key))
+    {
+        let mut found = violation(
+            ViolationCode::RetiredKeyReused,
+            format!("the key {key} was retired from the route and cannot come back"),
+        );
+        found.at.subject = Some(subject(key.clone()));
+        violations.push(found);
+    }
+}
+
 /// Keeps each supplied key, reporting repeats, and mints the missing ones, skipping any body
-/// the allocator returns that is already in use.
+/// the allocator returns that is already in use or `reserved`.
 fn fill<K: Prefixed + Ord + Clone>(
     supplied: Vec<Option<K>>,
     allocator: &mut dyn KeyAllocator,
     violations: &mut Vec<Violation>,
     subject: fn(K) -> Subject,
+    reserved: &BTreeSet<K>,
 ) -> Vec<K> {
     let mut used: BTreeSet<K> = BTreeSet::new();
     for key in supplied.iter().flatten() {
@@ -172,13 +262,13 @@ fn fill<K: Prefixed + Ord + Clone>(
             violations.push(found);
         }
     }
-    let attempts_max = supplied.len() * 2 + 1;
+    let attempts_max = (supplied.len() + reserved.len()) * 2 + 1;
     let mut keys = Vec::with_capacity(supplied.len());
     for key in supplied {
         let key = key.unwrap_or_else(|| {
             for _ in 0..attempts_max {
                 let candidate: K = mint(allocator);
-                if used.insert(candidate.clone()) {
+                if !reserved.contains(&candidate) && used.insert(candidate.clone()) {
                     return candidate;
                 }
             }

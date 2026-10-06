@@ -303,3 +303,98 @@ pub fn vendor_lead_merged() -> Records {
         Err(rejection) => panic!("{rejection:#?}"),
     }
 }
+
+/// Creates proposal `id` for `destination` (a domain written as YAML) holding `draft`.
+pub fn propose(
+    records: &Records,
+    id: &str,
+    destination: &str,
+    draft: &cairn_schema::ProposalDraft,
+) -> Records {
+    let target = format!("{{proposal: {{id: {id}, destination: {destination}}}}}");
+    let mutation = cairn_schema::Mutation::CreateProposal {
+        proposal: draft.clone(),
+    };
+    let mutations = format!("- {}\n", cairn_schema::to_json(&mutation).unwrap());
+    let patch = patch_to(records, &target, &mutations);
+    match apply(records, &patch, &fixed_inputs()) {
+        Ok(applied) => applied.records().clone(),
+        Err(rejection) => panic!("{rejection:#?}"),
+    }
+}
+
+/// Applies proposal `id` to its destination at the revisions the records hold.
+pub fn apply_proposal(records: &Records, id: &str) -> Result<Applied, Rejection> {
+    let proposal = &records.proposals[&id.parse().unwrap()];
+    let target = cairn_schema::to_json(&match &proposal.destination {
+        cairn_schema::Domain::Journey(journey) => {
+            cairn_schema::PatchTarget::Journey(journey.clone())
+        }
+        cairn_schema::Domain::Route(route) => cairn_schema::PatchTarget::Route(route.clone()),
+        cairn_schema::Domain::Deployment => cairn_schema::PatchTarget::Deployment,
+    })
+    .unwrap();
+    let mutations = format!(
+        "- op: apply_proposal\n  proposal: {id}\n  reviewed_revision: {}\n",
+        proposal.revision.get()
+    );
+    let mut patch = patch_to(records, &target, &mutations);
+    patch.base_revision = proposal.draft.destination_revision;
+    apply(records, &patch, &fixed_inputs())
+}
+
+/// A proposal draft written as YAML.
+pub fn draft(yaml: &str) -> cairn_schema::ProposalDraft {
+    from_yaml(yaml).unwrap_or_else(|error| panic!("{error}\n{yaml}"))
+}
+
+/// The vendor evaluation's version 2 (fixtures/vendor-evaluation/route-v2.yaml).
+pub fn vendor_v2() -> cairn_schema::Graph {
+    let path = fixtures_root().join("vendor-evaluation/route-v2.yaml");
+    let file: RouteFile = from_yaml(&std::fs::read_to_string(path).unwrap()).unwrap();
+    from_file(&file, &mut SequentialKeys::default())
+        .unwrap_or_else(|violations| panic!("{violations:#?}"))
+        .into_document()
+}
+
+/// The records with `graph` published as the next version of the vendor evaluation route.
+pub fn publish_vendor(records: &Records, graph: cairn_schema::Graph) -> Records {
+    let mut records = records.clone();
+    let route: cairn_schema::RouteId = "vendor-evaluation".parse().unwrap();
+    let held = records.routes.get_mut(&route).unwrap();
+    let version = held.versions.iter().next_back().unwrap().next();
+    held.versions.insert(version);
+    records.versions.insert(
+        Lineage {
+            route: route.clone(),
+            version,
+        },
+        RouteVersion {
+            route,
+            version,
+            published_at: "2026-10-01T00:00:00Z".parse().unwrap(),
+            graph,
+        },
+    );
+    records
+}
+
+/// A node written as YAML.
+pub fn node(yaml: &str) -> cairn_schema::Node<cairn_schema::KeyRefs> {
+    from_yaml(yaml).unwrap_or_else(|error| panic!("{error}\n{yaml}"))
+}
+
+/// Applies mutations, written as YAML, to `target` (written as YAML) at its current
+/// revision, panicking on a rejection.
+pub fn accepted_to(records: &Records, target: &str, mutations: &str) -> Records {
+    let patch = patch_to(records, target, mutations);
+    match apply(records, &patch, &fixed_inputs()) {
+        Ok(applied) => applied.records().clone(),
+        Err(rejection) => panic!("{rejection:#?}\n{mutations}"),
+    }
+}
+
+/// Derive inputs at the fixed clock over the records' deployment.
+pub fn derive_inputs_of(records: &Records) -> cairn_schema::DeriveInputs {
+    cairn_engine::testing::derive_inputs(records.deployment.clone())
+}

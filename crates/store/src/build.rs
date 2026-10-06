@@ -574,7 +574,7 @@ pub fn proposal(key: &str, destination: &Domain, at_revision: u32) -> cairn_sche
             "mutations": [{"op": "add_node", "node": {
                 "key": "n_review", "id": "review", "kind": "action", "title": "Review",
             }}],
-            "items": [{"item": "orphan", "node": "n_gone", "keep": true}],
+            "items": [{"item": "orphan", "node": "n_gone", "keep": true, "removal": {"node": "n_gone"}}],
         },
         "proposing_agent": "ag_assistant",
         "created_by": "u_tester",

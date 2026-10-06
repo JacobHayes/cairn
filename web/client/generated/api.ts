@@ -508,15 +508,141 @@ export interface components {
          *     answer type gives meaning (a choice id, a date, an entity key, or plain text).
          */
         ConditionValue: boolean | components["schemas"]["ConditionText"];
-        /** @description How a reviewer resolves an upgrade conflict (B7). */
-        ConflictResolution: "keep_journey" | "take_route" | {
-            map_choice: {
-                /** @description The removed choice. */
-                from: components["schemas"]["Slug"];
-                /** @description The choice it maps to. */
-                to: components["schemas"]["Slug"];
+        /**
+         * @description What a conflict is about, with the journey's side and the route's (B7, B9). A side that
+         *     is absent is `None` (an absent edge is `false`).
+         */
+        Conflict: {
+            /** @constant */
+            about: "field";
+            /**
+             * @description The route's value names a node the journey does not hold, so it cannot be taken
+             *     (B4: a removed node's tombstone covers its subtree); only the journey's side is
+             *     offered.
+             */
+            dangling?: boolean;
+            /** @description The journey's value. */
+            journey: components["schemas"]["NodeFieldValueResolved"];
+            /** @description The node. */
+            node: components["schemas"]["NodeKey"];
+            /** @description The route's value. */
+            route: components["schemas"]["NodeFieldValueResolved"];
+        } | {
+            /** @constant */
+            about: "edge";
+            /** @description The edge. */
+            edge: components["schemas"]["Edge"];
+            /** @description Present in the journey. */
+            journey: boolean;
+            /** @description Present in the route. */
+            route: boolean;
+        } | {
+            /** @constant */
+            about: "participation";
+            /** @description The journey's source. */
+            journey?: components["schemas"]["ParticipationSourceResolved"] | null;
+            /** @description The kind. */
+            kind: components["schemas"]["KindKey"];
+            /** @description The node. */
+            node: components["schemas"]["NodeKey"];
+            /** @description The route's source. */
+            route?: components["schemas"]["ParticipationSourceResolved"] | null;
+        } | {
+            /** @constant */
+            about: "resource";
+            /**
+             * @description The route's value names a node the journey does not hold, so it cannot be taken
+             *     (B4: a removed node's tombstone covers its subtree); only the journey's side is
+             *     offered.
+             */
+            dangling?: boolean;
+            /** @description The journey's resource. */
+            journey?: components["schemas"]["Resource"] | null;
+            /** @description The node. */
+            node: components["schemas"]["NodeKey"];
+            /** @description The resource. */
+            resource: components["schemas"]["AttachmentKey"];
+            /** @description The route's resource. */
+            route?: components["schemas"]["Resource"] | null;
+        } | {
+            /** @constant */
+            about: "shape";
+            /** @description The journey has answered it, so taking an answer-type change reopens it. */
+            answered?: boolean;
+            /**
+             * @description The route's value names a node the journey does not hold, so it cannot be taken
+             *     (B4: a removed node's tombstone covers its subtree); only the journey's side is
+             *     offered.
+             */
+            dangling?: boolean;
+            /** @description The journey's node. */
+            journey: components["schemas"]["Node"];
+            /** @description The route's node. */
+            route: components["schemas"]["Node"];
+        } | {
+            /** @constant */
+            about: "answer";
+            /** @description The journey's answer. */
+            answer: components["schemas"]["AnswerValue"];
+            /** @description The route's choices. */
+            choices: components["schemas"]["Choices"];
+            /** @description The decision. */
+            decision: components["schemas"]["NodeKey"];
+        } | {
+            /** @constant */
+            about: "role";
+            /** @description The journey's role. */
+            journey?: components["schemas"]["RoleResolved"] | null;
+            /** @description What in the journey refers to it. */
+            references?: components["schemas"]["RoleReference"][];
+            /** @description The role. */
+            role: components["schemas"]["RoleKey"];
+            /** @description The route's role, none when it removed it. */
+            route?: components["schemas"]["RoleResolved"] | null;
+        } | {
+            /** @constant */
+            about: "kind";
+            /** @description The journey's kind. */
+            journey?: components["schemas"]["ParticipationKindResolved"] | null;
+            /** @description The kind. */
+            kind: components["schemas"]["KindKey"];
+            /** @description The journey's participations of the kind, by node. */
+            references?: {
+                [key: string]: components["schemas"]["ParticipationSourceResolved"];
             };
-        } | "clear_state" | "reopen";
+            /** @description The route's kind, none when it removed it. */
+            route?: components["schemas"]["ParticipationKindResolved"] | null;
+        } | {
+            /** @constant */
+            about: "default_owner";
+            /** @description The journey's. */
+            journey?: components["schemas"]["RoleKey"] | null;
+            /** @description The route's. */
+            route?: components["schemas"]["RoleKey"] | null;
+        };
+        /**
+         * @description How a reviewer resolves a conflict (B7, B9). Which resolutions a conflict offers depends
+         *     on what it is about ([`Conflict::offers`]); each becomes ordinary mutations when the
+         *     proposal is resolved.
+         */
+        ConflictResolution: "keep_journey" | "take_route" | {
+            map_choices: {
+                /** @description Removed choice to remaining choice. */
+                map: {
+                    [key: string]: components["schemas"]["Slug"];
+                };
+            };
+        } | "clear_state" | "reopen" | {
+            remap_role: {
+                /** @description The role the references move to. */
+                role: components["schemas"]["RoleKey"];
+            };
+        } | {
+            remap_kind: {
+                /** @description The kind the participations move to. */
+                kind: components["schemas"]["KindKey"];
+            };
+        } | "remove";
         /**
          * @description What an accepted patch or a proposal preview newly caused in derived state (D7),
          *     reported with the result and never stored.
@@ -1110,6 +1236,22 @@ export interface components {
             /** @description Whether its route has published a version newer than its own (C16). */
             upgrade_available: boolean;
         };
+        /**
+         * @description A journey's deviation from its route that an upgrade keeps, listed for the reviewer (B7:
+         *     locally edited and unchanged in the route).
+         */
+        Kept: {
+            node: {
+                /** @description What it edited. */
+                edit: components["schemas"]["LocalEdit"];
+                /** @description The node. */
+                node: components["schemas"]["NodeKey"];
+            };
+        } | {
+            role: components["schemas"]["RoleKey"];
+        } | {
+            kind: components["schemas"]["KindKey"];
+        } | "default_owner";
         /** @description Starts with "k_"; at most id_bytes_max (64) bytes. */
         KindKey: string;
         /**
@@ -1683,7 +1825,7 @@ export interface components {
             title?: components["schemas"]["Title"] | null;
         };
         /**
-         * @description What becomes of an explicit entity's participation when a journey is saved as a route
+         * @description What becomes of an explicit entity's participations when a journey is saved as a route
          *     (B8).
          */
         ParticipationMapping: "drop" | {
@@ -2011,34 +2153,31 @@ export interface components {
             /** @description Retired role keys. */
             roles?: components["schemas"]["RoleKey"][];
         };
-        /** @description One thing a reviewer looks at, and resolves where it needs a choice (C14). */
+        /**
+         * @description One thing a reviewer looks at, and resolves where it needs a choice (C14). Resolving a
+         *     proposal turns each choice into mutations; an item that still needs one blocks apply.
+         */
         ReviewItem: {
-            /** @description The field. */
-            field: components["schemas"]["NodeField"];
+            /** @description What it is about. */
+            conflict: components["schemas"]["Conflict"];
             /** @constant */
             item: "conflict";
-            /** @description The journey's value. */
-            journey?: components["schemas"]["NodeFieldValueResolved"] | null;
-            /** @description The node. */
-            node: components["schemas"]["NodeKey"];
             /** @description The reviewer's choice, once made. */
             resolution?: components["schemas"]["ConflictResolution"] | null;
-            /** @description The route's value. */
-            route?: components["schemas"]["NodeFieldValueResolved"] | null;
         } | {
-            /** @description The field. */
-            field: components["schemas"]["NodeField"];
             /** @constant */
             item: "kept_local_edit";
-            /** @description The node. */
-            node: components["schemas"]["NodeKey"];
+            /** @description What is kept. */
+            kept: components["schemas"]["Kept"];
         } | {
             /** @constant */
             item: "orphan";
-            /** @description Keep it (the default) or remove it with its journey-local descendants. */
+            /** @description Keep it (the default) or remove it with its descendants. */
             keep: boolean;
             /** @description The node. */
             node: components["schemas"]["NodeKey"];
+            /** @description What removing it removes, shown in review (A18). */
+            removal: components["schemas"]["Removal"];
         } | {
             /** @description The entity. */
             entity: components["schemas"]["EntityKey"];
@@ -2046,6 +2185,8 @@ export interface components {
             item: "participation";
             /** @description The reviewer's choice, once made. */
             mapping?: components["schemas"]["ParticipationMapping"] | null;
+            /** @description The participations naming it. */
+            uses: components["schemas"]["ParticipationRef"][];
         } | {
             /** @description Left out. */
             excluded: boolean;
@@ -2058,6 +2199,11 @@ export interface components {
             item: "cascade";
             /** @description The removal. */
             removal: components["schemas"]["Removal"];
+        } | {
+            /** @constant */
+            item: "violation";
+            /** @description The violation. */
+            violation: components["schemas"]["Violation"];
         };
         Revision: number;
         /** @description One revision a patch named that has moved on. */
@@ -2077,6 +2223,35 @@ export interface components {
         };
         /** @description Starts with "r_"; at most id_bytes_max (64) bytes. */
         RoleKey: string;
+        /**
+         * @description Something in a journey that refers to a role (A6, E3): what remapping or removing the
+         *     role rewrites (B7).
+         */
+        RoleReference: {
+            participation: {
+                /** @description The kind. */
+                kind: components["schemas"]["KindKey"];
+                /** @description The node. */
+                node: components["schemas"]["NodeKey"];
+            };
+        } | {
+            fills_role: {
+                /** @description The decision. */
+                node: components["schemas"]["NodeKey"];
+            };
+        } | {
+            fill: {
+                /** @description The entities. */
+                entities: components["schemas"]["EntityKey"][];
+            };
+        } | "default_owner" | {
+            draft: {
+                /** @description The node. */
+                node: components["schemas"]["NodeKey"];
+                /** @description The resource holding the draft, as the journey has it. */
+                resource: components["schemas"]["Resource"];
+            };
+        };
         /** @description A role (A6): a named slot, single or multi valued, filled per journey with entities. */
         RoleResolved: {
             /** @description The id, unique in the graph. */
@@ -2376,7 +2551,7 @@ export interface components {
          * @description What a violation breaks (PRD Invariants, D1, D4, A11, A18, A19, B6, E3, E6, H3).
          * @enum {string}
          */
-        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "entity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "entity_key_taken" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open";
+        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "entity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "entity_key_taken" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open" | "unresolved_review_item";
         /** @description A violation list with at least one entry (a rejection always says why). */
         Violations: components["schemas"]["Violation"][];
         /** @description What a stream watches: `deployment`, `journey:<id>`, `route:<id>`, `proposal:<id>`, `journeys`, `routes`, or `proposals`. */

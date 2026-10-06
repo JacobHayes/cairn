@@ -5,12 +5,12 @@ use proptest::prelude::*;
 use super::model::bounded_vec;
 use super::{
     arb_agent_id, arb_annotation, arb_annotation_body, arb_answer_value, arb_attachment_key,
-    arb_date, arb_entity, arb_entity_key, arb_entity_set, arb_guard, arb_journey_header,
-    arb_journey_id, arb_journey_status, arb_kind_key, arb_lineage, arb_local_edit, arb_markdown,
-    arb_node, arb_node_field, arb_node_field_value, arb_node_key, arb_node_state, arb_overrides,
-    arb_participation_kind, arb_patch_id, arb_proposal_id, arb_reason, arb_resource, arb_revision,
-    arb_role, arb_role_key, arb_route_header, arb_route_id, arb_slug, arb_snooze_target,
-    arb_timestamp, arb_title, arb_user_id, arb_version_number,
+    arb_choices, arb_date, arb_entity, arb_entity_key, arb_entity_set, arb_guard,
+    arb_journey_header, arb_journey_id, arb_journey_status, arb_kind_key, arb_lineage,
+    arb_local_edit, arb_markdown, arb_node, arb_node_field_value, arb_node_key, arb_node_state,
+    arb_overrides, arb_participation_kind, arb_patch_id, arb_proposal_id, arb_reason, arb_resource,
+    arb_revision, arb_role, arb_role_key, arb_route_header, arb_route_id, arb_slug,
+    arb_snooze_target, arb_timestamp, arb_title, arb_user_id, arb_version_number,
 };
 use crate::domain::{Domain, GraphId};
 use crate::event::{Actor, ChangeSet, Event, PatchReceipt, Subject};
@@ -22,7 +22,8 @@ use crate::patch::{
     Removal, Transition,
 };
 use crate::proposal::{
-    ConflictResolution, ParticipationMapping, Proposal, ProposalDraft, ProposalStatus, ReviewItem,
+    Conflict, ConflictResolution, Kept, ParticipationMapping, Proposal, ProposalDraft,
+    ProposalStatus, ReviewItem, RoleReference,
 };
 use crate::record::{GraphRecord, Record, RecordKey, RetiredKey, Write};
 use crate::refs::KeyRefs;
@@ -256,46 +257,202 @@ pub fn arb_domain_mutation() -> BoxedStrategy<Mutation> {
     .boxed()
 }
 
-/// A review item.
-pub fn arb_review_item() -> BoxedStrategy<ReviewItem> {
-    let resolution = prop_oneof![
+/// A conflict resolution.
+pub fn arb_conflict_resolution() -> BoxedStrategy<ConflictResolution> {
+    prop_oneof![
         Just(ConflictResolution::KeepJourney),
         Just(ConflictResolution::TakeRoute),
-        (arb_slug(), arb_slug()).prop_map(|(from, to)| ConflictResolution::MapChoice { from, to }),
+        prop::collection::btree_map(arb_slug(), arb_slug(), 0..2)
+            .prop_map(|map| ConflictResolution::MapChoices { map }),
         Just(ConflictResolution::ClearState),
         Just(ConflictResolution::Reopen),
-    ];
+        arb_role_key().prop_map(|role| ConflictResolution::RemapRole { role }),
+        arb_kind_key().prop_map(|kind| ConflictResolution::RemapKind { kind }),
+        Just(ConflictResolution::Remove),
+    ]
+    .boxed()
+}
+
+fn arb_source() -> BoxedStrategy<ParticipationSource<KeyRefs>> {
+    prop_oneof![
+        arb_role_key().prop_map(ParticipationSource::Role),
+        arb_entity_set().prop_map(ParticipationSource::Entities),
+    ]
+    .boxed()
+}
+
+fn arb_role_reference() -> BoxedStrategy<RoleReference> {
+    prop_oneof![
+        (arb_node_key(), arb_kind_key())
+            .prop_map(|(node, kind)| RoleReference::Participation { node, kind }),
+        arb_node_key().prop_map(|node| RoleReference::FillsRole { node }),
+        arb_entity_set().prop_map(|entities| RoleReference::Fill { entities }),
+        Just(RoleReference::DefaultOwner),
+        (arb_node_key(), arb_resource::<KeyRefs>())
+            .prop_map(|(node, resource)| RoleReference::Draft { node, resource }),
+    ]
+    .boxed()
+}
+
+/// A conflict, of every kind.
+pub fn arb_conflict() -> BoxedStrategy<Conflict> {
+    let value = || arb_node_field_value::<KeyRefs>();
+    prop_oneof![
+        (arb_node_key(), value(), value(), any::<bool>()).prop_map(
+            |(node, journey, route, dangling)| Conflict::Field {
+                dangling,
+                node,
+                journey,
+                route
+            }
+        ),
+        (arb_edge(), any::<bool>()).prop_map(|(edge, journey)| Conflict::Edge {
+            edge,
+            journey,
+            route: !journey
+        }),
+        (
+            arb_node_key(),
+            arb_kind_key(),
+            prop::option::of(arb_source()),
+            prop::option::of(arb_source())
+        )
+            .prop_map(|(node, kind, journey, route)| Conflict::Participation {
+                node,
+                kind,
+                journey,
+                route
+            }),
+        (
+            arb_node_key(),
+            arb_attachment_key(),
+            prop::option::of(arb_resource::<KeyRefs>()),
+            prop::option::of(arb_resource::<KeyRefs>())
+        )
+            .prop_map(|(node, resource, journey, route)| Conflict::Resource {
+                dangling: false,
+                node,
+                resource,
+                journey,
+                route
+            }),
+        (arb_node::<KeyRefs>(), arb_node::<KeyRefs>(), any::<bool>()).prop_map(
+            |(journey, route, answered)| Conflict::Shape {
+                dangling: false,
+                journey: Box::new(journey),
+                route: Box::new(route),
+                answered
+            }
+        ),
+        (arb_node_key(), arb_answer_value(), arb_choices()).prop_map(
+            |(decision, answer, choices)| Conflict::Answer {
+                decision,
+                answer,
+                choices
+            }
+        ),
+        arb_graph_conflict(),
+    ]
+    .boxed()
+}
+
+/// A conflict over a role, a kind, or the default owner.
+fn arb_graph_conflict() -> BoxedStrategy<Conflict> {
+    prop_oneof![
+        (
+            arb_role_key(),
+            prop::option::of(arb_role::<KeyRefs>()),
+            prop::option::of(arb_role::<KeyRefs>()),
+            prop::collection::btree_set(arb_role_reference(), 0..3)
+        )
+            .prop_map(|(role, journey, route, references)| Conflict::Role {
+                role,
+                journey,
+                route,
+                references
+            }),
+        (
+            arb_kind_key(),
+            prop::option::of(arb_participation_kind::<KeyRefs>()),
+            prop::option::of(arb_participation_kind::<KeyRefs>()),
+            prop::collection::btree_map(arb_node_key(), arb_source(), 0..2)
+        )
+            .prop_map(|(kind, journey, route, references)| Conflict::Kind {
+                kind,
+                journey,
+                route,
+                references
+            }),
+        (
+            prop::option::of(arb_role_key()),
+            prop::option::of(arb_role_key())
+        )
+            .prop_map(|(journey, route)| Conflict::DefaultOwner { journey, route }),
+    ]
+    .boxed()
+}
+
+/// A review item.
+pub fn arb_review_item() -> BoxedStrategy<ReviewItem> {
     let mapping = prop_oneof![
         Just(ParticipationMapping::Drop),
         arb_role_key().prop_map(ParticipationMapping::Role),
         arb_role::<KeyRefs>().prop_map(ParticipationMapping::NewRole),
         Just(ParticipationMapping::DefaultOwner),
     ];
+    let kept = prop_oneof![
+        (arb_node_key(), arb_local_edit()).prop_map(|(node, edit)| Kept::Node { node, edit }),
+        arb_role_key().prop_map(Kept::Role),
+        arb_kind_key().prop_map(Kept::Kind),
+        Just(Kept::DefaultOwner),
+    ];
+    let uses = prop::collection::btree_set(
+        (arb_node_key(), arb_kind_key()).prop_map(|(node, kind)| ParticipationRef { node, kind }),
+        1..3,
+    );
     prop_oneof![
-        (
-            arb_node_key(),
-            arb_node_field(),
-            prop::option::of(arb_node_field_value::<KeyRefs>()),
-            prop::option::of(arb_node_field_value::<KeyRefs>()),
-            prop::option::of(resolution)
-        )
-            .prop_map(
-                |(node, field, journey, route, resolution)| ReviewItem::Conflict {
-                    node,
-                    field,
-                    journey,
-                    route,
-                    resolution
-                }
-            ),
-        (arb_node_key(), arb_node_field())
-            .prop_map(|(node, field)| ReviewItem::KeptLocalEdit { node, field }),
-        (arb_node_key(), any::<bool>()).prop_map(|(node, keep)| ReviewItem::Orphan { node, keep }),
-        (arb_entity_key(), prop::option::of(mapping))
-            .prop_map(|(entity, mapping)| ReviewItem::Participation { entity, mapping }),
+        (arb_conflict(), prop::option::of(arb_conflict_resolution())).prop_map(
+            |(conflict, resolution)| ReviewItem::Conflict {
+                conflict,
+                resolution
+            }
+        ),
+        kept.prop_map(|kept| ReviewItem::KeptLocalEdit { kept }),
+        (arb_node_key(), any::<bool>(), arb_removal()).prop_map(|(node, keep, removal)| {
+            ReviewItem::Orphan {
+                node,
+                keep,
+                removal,
+            }
+        }),
+        (arb_entity_key(), uses, prop::option::of(mapping)).prop_map(|(entity, uses, mapping)| {
+            ReviewItem::Participation {
+                entity,
+                uses,
+                mapping,
+            }
+        }),
         (arb_node_key(), any::<bool>())
             .prop_map(|(node, excluded)| ReviewItem::Exclusion { node, excluded }),
         arb_removal().prop_map(|removal| ReviewItem::Cascade { removal }),
+        // A violation's chains carry mutations, which carry proposals, so the item's
+        // violation is built here, chainless, to keep the strategy from recursing.
+        (arb_node_key(), arb_title()).prop_map(|(node, message)| ReviewItem::Violation {
+            violation: crate::rejection::Violation {
+                code: crate::rejection::ViolationCode::DependencyCycle,
+                at: crate::rejection::Location {
+                    subject: Some(Subject::Node(node)),
+                    ..crate::rejection::Location::default()
+                },
+                message: message.to_string(),
+                related: Vec::new(),
+                limit: None,
+                bypassable: None,
+                failures: std::collections::BTreeSet::new(),
+                chains: None,
+                caused_by: std::collections::BTreeSet::new(),
+            }
+        }),
     ]
     .boxed()
 }

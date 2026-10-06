@@ -2,12 +2,9 @@
 //! participations, and resources, in a journey or a route's draft. In a journey, an edit to a
 //! route-copied node sets its local-edit marker (B4) in the same event.
 
-use std::collections::{BTreeMap, BTreeSet};
-
 use cairn_schema::{
-    AttachmentKey, Edge, GraphKey, GraphRecord, KeyRefs, Limit, LocalEdit, Mutation, Node,
-    NodeField, NodeFieldValue, NodeKey, NodeState, Payload, Provenance, Resource, RetiredKey,
-    Subject, ViolationCode, Write,
+    Edge, GraphKey, GraphRecord, KeyRefs, Limit, LocalEdit, Mutation, Node, NodeFieldValue,
+    NodeKey, NodeState, Provenance, RetiredKey, Subject, ViolationCode, Write,
 };
 
 use super::Session;
@@ -185,7 +182,7 @@ fn replace_node(session: &mut Session<'_>, node: &Node<KeyRefs>) -> Vec<Write> {
     };
     assert_eq!(old.key, node.key);
     let mut writes = vec![session.put(GraphRecord::Node(node.clone()))];
-    for edit in differences(&old, node) {
+    for edit in crate::edit::differences(&old, node) {
         writes.extend(session.marker(&node.key, edit));
     }
     let stored = session
@@ -206,57 +203,6 @@ fn replace_node(session: &mut Session<'_>, node: &Node<KeyRefs>) -> Vec<Write> {
         }
     }
     writes
-}
-
-/// What a replacement changes, as local-edit markers.
-fn differences(old: &Node<KeyRefs>, new: &Node<KeyRefs>) -> BTreeSet<LocalEdit> {
-    let mut edits = BTreeSet::new();
-    for field in NodeField::ALL {
-        if NodeFieldValue::read(field, old) != NodeFieldValue::read(field, new) {
-            edits.insert(LocalEdit::Field(field));
-        }
-    }
-    let requires = old
-        .requires
-        .as_set()
-        .symmetric_difference(new.requires.as_set());
-    edits.extend(requires.cloned().map(LocalEdit::Requires));
-    let (before, after) = (old.participations.as_map(), new.participations.as_map());
-    for kind in before.keys().chain(after.keys()) {
-        if before.get(kind) != after.get(kind) {
-            edits.insert(LocalEdit::Participation(kind.clone()));
-        }
-    }
-    // By key, so a node with many resources compares in O(r log r).
-    let (before, after) = (resources_by_key(old), resources_by_key(new));
-    for key in before.keys().chain(after.keys()) {
-        if before.get(key) != after.get(key) {
-            edits.insert(LocalEdit::Resource((*key).clone()));
-        }
-    }
-    let answer_type = |node: &Node<KeyRefs>| match &node.payload {
-        Payload::Decision(decision) => Some(decision.answer.answer_type()),
-        Payload::Deliverable(_)
-        | Payload::Action(_)
-        | Payload::Milestone(_)
-        | Payload::Group(_) => None,
-    };
-    if old.kind() != new.kind() || answer_type(old) != answer_type(new) {
-        // B7: a replacement's change of kind or answer type has no field of its own.
-        edits.insert(LocalEdit::Shape);
-    }
-    assert!(
-        old != new || edits.is_empty(),
-        "an unchanged node differs in nothing"
-    );
-    edits
-}
-
-fn resources_by_key(node: &Node<KeyRefs>) -> BTreeMap<&AttachmentKey, &Resource<KeyRefs>> {
-    node.resources
-        .iter()
-        .map(|resource| (&resource.key, resource))
-        .collect()
 }
 
 /// A3: an explicit edge, stored on its dependent; a journey marks the dependent (B4).

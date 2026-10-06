@@ -85,8 +85,9 @@ pub enum ViolationCode {
     EmailTaken,
     AliasCycle,
     MergeBreaksJourney,
-    // Proposals (I6).
+    // Proposals (I6, C14).
     ProposalNotOpen,
+    UnresolvedReviewItem,
 }
 
 /// Where a violation is (A15: listed by path; PRD Non-functional, Config-first: specific
