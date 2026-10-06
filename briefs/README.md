@@ -47,7 +47,7 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 5.6 | Authoring | `web/app` | 5.5 |  |
 | 5.7 | Proposal review and its flows | `web/app` | 5.6 |  |
 | 5.8 | Assistant panel | `web/app` | 5.7, 4.4 |  |
-| 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 | in progress |
+| 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 | landed `xmmkmpkw` |
 | 6.2 | Durability testbed | `testbeds/durability` | 4.1 | in progress |
 
 Rule for links between screens: a screen only links to screens that already exist. The brief that builds a screen adds the entry points into it from earlier screens (5.7 adds "break down" to triage and the upgrade, save-as-route, and re-link entries to the overview; 5.8 mounts its panel on earlier screens).

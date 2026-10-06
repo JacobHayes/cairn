@@ -254,7 +254,7 @@ impl<S: Store> Service<S> {
         carry(held.draft.items.as_slice(), draft.items.as_mut_slice());
         draft.title = held.draft.title.clone();
         draft.description = held.draft.description.clone();
-        patina_dst::reachable!("service: a proposal refreshed against its destination");
+        patina_dst::reachable!("service-proposal-refreshed-against-destination");
         Ok(self
             .edit_proposal(call, patch_id, &held.destination, id, base_revision, draft)
             .await?)

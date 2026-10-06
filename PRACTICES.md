@@ -74,7 +74,7 @@ They answer different questions and are not interchangeable.
 - `assert!` is the correctness check. It is on in every build, including release and wasm, and a failure is a panic with a message.
 - `patina_dst::always!(cond, "label")` is a simulation oracle. Under `patina` a violation is a labeled, structured verdict that the campaign classifier, deduplicator, and minimizer read; outside `patina` it compiles to a `debug_assert!`, which is off in release. So it never replaces an `assert!`.
 
-Rule: production crates use `assert!` for invariants, plus `sometimes!` coverage oracles and `buggify!` fault sites where simulation needs them. Testbeds use `always!`, `sometimes!`, and `verdict` because a labeled verdict is what makes a campaign's output triageable. A production crate may add an `always!` next to an `assert!` at a seam where the label helps triage (the commit path, the retry path); the `assert!` stays.
+Rule: production crates use `assert!` for invariants, plus `sometimes!` coverage oracles and `buggify!` fault sites where simulation needs them. Testbeds use `always!`, `sometimes!`, and `verdict` because a labeled verdict is what makes a campaign's output triageable. A production crate may add an `always!` next to an `assert!` at a seam where the label helps triage (the commit path, the retry path); the `assert!` stays. Every site's label is a kebab-case string literal, which rung 1 checks: a campaign reads every label declared in a binary, and one holding a space breaks all of them (DECISIONS.md, 6.1).
 
 ## Explicit limits
 
@@ -216,7 +216,7 @@ flowchart TB
 
 | Rung | Check | Typical time |
 |---|---|---|
-| 1 | `rustfmt`, `clippy` (deny), TypeScript typecheck, `eslint`, the `wasm32-unknown-unknown` build of the runtime-free crates (the service and what it stands on) | seconds |
+| 1 | `rustfmt`, `clippy` (deny), kebab-case patina site labels, TypeScript typecheck, `eslint`, the `wasm32-unknown-unknown` build of the runtime-free crates (the service and what it stands on) | seconds |
 | 2 | unit tests for every Rust crate, engine scenario matrix, replay harness (memory store) | seconds |
 | 3 | property tests, bounded case count locally (more in CI); cost tests at the limits, budgeted in operations, not wall-clock time | tens of seconds |
 | 4 | store conformance on memory and Turso; API and MCP tests in-process | tens of seconds |

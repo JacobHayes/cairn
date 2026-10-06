@@ -63,11 +63,13 @@ Coverage oracles (`sometimes!`, plus the `reachable!` sites in `cairn_api::clien
 own and landed, an overlapping conflict surfaced, a resubmission answered from its receipt
 (client and service), a coalesced tick, a deployment tick after the merge, a stale patch
 completed with what intervened, a patch that lost at commit, and a resubmission that raced its
-original to commit. Two of `cairn_service`'s sites are out of this testbed's reach and listed
-in `sim.sh` (`out_of_reach`): the announce fallback when the deployment's revision cannot be
-read back after an entity create riding in a journey patch (the testbed rides none and fails
-no read), and the receipt recheck after the engine answers stale (it needs the original to
-commit between a resubmission's receipt lookup and its load, and no site delays a load).
+original to commit. Some of `cairn_service`'s sites are out of this testbed's reach and
+listed in `sim.sh` (`out_of_reach`): the announce fallback when the deployment's revision
+cannot be read back after an entity create riding in a journey patch (the testbed rides none
+and fails no read); the receipt recheck after the engine answers stale (it needs the original
+to commit between a resubmission's receipt lookup and its load, and no site delays a load);
+the derived-read memo (the views refetch the journey document, never a derived read); and
+the proposal and route-import paths (the testbed drafts no proposal and imports no route).
 
 Arguments: `--clients N`, `--actions N`, `--tick-ms N` (default 1; 0 for no ticker). Exit
 codes: 0 pass, 1 violation, 3 abort (runtime, store, or listener), 4 liveness (a client gave

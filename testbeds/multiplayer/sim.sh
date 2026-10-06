@@ -44,6 +44,17 @@ out_of_reach=(
   # 4.1's receipt recheck after the engine answers stale: needs the original to commit
   # between a resubmission's receipt lookup and its load, and no site delays a load.
   service-duplicate-original-committed-meanwhile
+  # 4.8's derived-read memo: the views refetch the journey document, never a derived read.
+  service-derived-read-answered-from-memo
+  # 4.8's and 4.9's proposal and route-import paths: the testbed drafts no proposal and
+  # imports no route file.
+  service-import-resubmission-rebuilt-from-receipt
+  service-proposal-apply-answered-from-receipt
+  service-proposal-create-resubmitted
+  service-proposal-draft-answered-from-receipt
+  service-proposal-draft-resubmitted
+  service-proposal-patch-answered-from-receipt
+  service-proposal-refreshed-against-destination
 )
 
 # Builds the artifact first, so `target` (a managed symlink on some hosts) exists.

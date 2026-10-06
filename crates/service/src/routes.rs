@@ -129,9 +129,7 @@ impl<S: Store> Service<S> {
                 .await
             {
                 Ok(patch) if patch.content_hash() == receipt.content_hash => {
-                    patina_dst::reachable!(
-                        "service: a resubmitted import rebuilt from its receipt"
-                    );
+                    patina_dst::reachable!("service-import-resubmission-rebuilt-from-receipt");
                     Ok(Written::AlreadyApplied { receipt })
                 }
                 Ok(_) | Err(WriteError::Rejected(_)) => Err(reused),

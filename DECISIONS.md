@@ -90,9 +90,9 @@ Judgment calls made while implementing the briefs, for the user to review (`AGEN
 ## 2026-10-06, 6.1 integration: oracles the multiplayer testbed cannot reach are listed, not waived wholesale
 
 - Question: integrated over 4.1's review fixes, the smoke campaign's coverage gate fails on two `cairn_service` oracles that never fire: `service-deployment-revision-unread` (the announce fallback when the deployment's revision cannot be read back after an entity create riding in a journey patch) and `service-duplicate-original-committed-meanwhile` (the receipt recheck after the engine answers stale). The testbed rides no entity create and fails no read, and no fault site delays a load between a resubmission's receipt lookup and its load.
-- Call: `sim.sh` lists them by label in `out_of_reach`, with why; the campaign runs with patina's gate waived and the leg fails on any other oracle that never fires, and notes a listed one that fires.
+- Call: `sim.sh` lists them by label in `out_of_reach`, with why; the campaign runs with patina's gate waived and the leg fails on any other oracle that never fires, and notes a listed one that fires. Landing on main added 4.8's and 4.9's service oracles the testbed cannot reach either (the derived-read memo, which its views never use, and the proposal and route-import paths, which it never drives); they are listed the same way. Every site label is a kebab-case literal, which rung 1 now checks (`patina site labels`), so a sentence label fails `mise run check` instead of every campaign.
 - Alternatives: patina's `--allow-unmet-sometimes` alone (hides every other unmet oracle, as 6.1 rejected); new store read faults and a riding-create patch kind in the testbed (a testbed brief's work, bigger than the fix it would gate); removing the two oracles (loses them for a testbed that can reach them).
-- What would change it: a testbed with read faults or riding entity creates; then the label leaves the list.
+- What would change it: a testbed with read faults or riding entity creates, views reading derived projections, or agents drafting proposals; then the label leaves the list.
 
 ## 2026-10-06, brief 6.1: how the multiplayer testbed makes commits overlap
 

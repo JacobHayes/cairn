@@ -114,11 +114,11 @@ number. Every generation passes.
 | 14 | 590918895341496304 | OK |  |
 | 15 | 13898982658749762238 | OK |  |
 
-`PATINA_CAMPAIGN_COVERAGE oracle_sites=12 satisfied=10 unmet=2 gate=waived`
+`PATINA_CAMPAIGN_COVERAGE oracle_sites=20 satisfied=10 unmet=10 gate=waived`
 
 Every coverage oracle declared in the binary fired, the service's and client's own
 `reachable!` sites included, except those `sim.sh` lists as out of this testbed's reach
-(`service-deployment-revision-unread` `service-duplicate-original-committed-meanwhile`; DECISIONS.md, 6.1 integration).
+(`service-deployment-revision-unread` `service-derived-read-answered-from-memo` `service-duplicate-original-committed-meanwhile` `service-import-resubmission-rebuilt-from-receipt` `service-proposal-apply-answered-from-receipt` `service-proposal-create-resubmitted` `service-proposal-draft-answered-from-receipt` `service-proposal-draft-resubmitted` `service-proposal-patch-answered-from-receipt` `service-proposal-refreshed-against-destination`; DECISIONS.md, 6.1 integration).
 The fault sites are listed by the runs they fired in:
 
 | Site | Kind | Generations |
@@ -130,8 +130,16 @@ The fault sites are listed by the runs they fired in:
 | `store-commit-waits-past-timeout` | fault | fired in 9 of 16 reached |
 | `client-stale-patch-retried` | reachable | satisfied in 16 of 16 reached |
 | `service-deployment-revision-unread` | reachable | satisfied in 0 of 0 reached |
+| `service-derived-read-answered-from-memo` | reachable | satisfied in 0 of 0 reached |
 | `service-duplicate-original-committed-meanwhile` | reachable | satisfied in 0 of 0 reached |
+| `service-import-resubmission-rebuilt-from-receipt` | reachable | satisfied in 0 of 0 reached |
 | `service-patch-lost-at-commit` | reachable | satisfied in 16 of 16 reached |
+| `service-proposal-apply-answered-from-receipt` | reachable | satisfied in 0 of 0 reached |
+| `service-proposal-create-resubmitted` | reachable | satisfied in 0 of 0 reached |
+| `service-proposal-draft-answered-from-receipt` | reachable | satisfied in 0 of 0 reached |
+| `service-proposal-draft-resubmitted` | reachable | satisfied in 0 of 0 reached |
+| `service-proposal-patch-answered-from-receipt` | reachable | satisfied in 0 of 0 reached |
+| `service-proposal-refreshed-against-destination` | reachable | satisfied in 0 of 0 reached |
 | `service-resubmission-answered-from-receipt` | reachable | satisfied in 11 of 11 reached |
 | `service-resubmission-raced-original` | reachable | satisfied in 10 of 10 reached |
 | `service-stale-patch-completed-with-intervening` | reachable | satisfied in 16 of 16 reached |
@@ -198,9 +206,9 @@ planted and passing with it removed:
 ```
 $ cargo test -p cairn-service --test in_flight -- a_patch_that_loses_the_race_to_commit_is_rejected_stale_on_turso   # planted
 expected a stale answer, got Ok( Applied {
-test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.17s
+test result: FAILED. 0 passed; 1 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.19s
 $ cargo test -p cairn-service --test in_flight -- a_patch_that_loses_the_race_to_commit_is_rejected_stale_on_turso   # removed
-test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.16s
+test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 5 filtered out; finished in 0.20s
 ```
 
 ## The product finding (fixed)
@@ -214,5 +222,5 @@ it writes and at its patch id, and the client never rebases backward. Its two ca
 
 ```
 $ cargo test -p cairn-service --test in_flight
-test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.18s
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.21s
 ```

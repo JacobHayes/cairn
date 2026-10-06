@@ -109,7 +109,7 @@ impl<S: Store> Service<S> {
             && held.created_by == call.actor.user
             && held.proposing_agent == call.actor.agent
         {
-            patina_dst::reachable!("service: a proposal create resubmitted by its id");
+            patina_dst::reachable!("service-proposal-create-resubmitted");
             return Ok(ProposalWritten::Existing { proposal: held });
         }
         self.write_proposal(call, &patch, id).await
@@ -312,9 +312,7 @@ impl<S: Store> Service<S> {
             }),
         };
         if let Some(answer) = self.answer_from_receipt(&patch).await? {
-            patina_dst::reachable!(
-                "service: a resubmitted proposal apply answered from its receipt"
-            );
+            patina_dst::reachable!("service-proposal-apply-answered-from-receipt");
             return answer;
         }
         self.write(call, &patch, note).await
@@ -400,16 +398,14 @@ impl<S: Store> Service<S> {
                     patch_id: patch_id.clone(),
                 }));
             }
-            patina_dst::reachable!(
-                "service: a resubmitted proposal draft answered from its receipt"
-            );
+            patina_dst::reachable!("service-proposal-draft-answered-from-receipt");
             return Ok(Some(ProposalWritten::AlreadySaved { receipt }));
         }
         if edited_from.is_none()
             && let Some(held) = self.store.proposal(id).await?
             && authored(&held)
         {
-            patina_dst::reachable!("service: a proposal draft resubmitted by its id");
+            patina_dst::reachable!("service-proposal-draft-resubmitted");
             return Ok(Some(ProposalWritten::Existing { proposal: held }));
         }
         Ok(None)
@@ -421,9 +417,7 @@ impl<S: Store> Service<S> {
         patch: &Patch,
     ) -> Result<Option<Result<ProposalWritten, WriteError>>, WriteError> {
         Ok(self.answer_from_receipt(patch).await?.map(|answer| {
-            patina_dst::reachable!(
-                "service: a resubmitted proposal patch answered from its receipt"
-            );
+            patina_dst::reachable!("service-proposal-patch-answered-from-receipt");
             answer.map(|written| ProposalWritten::AlreadySaved {
                 receipt: written.receipt().clone(),
             })

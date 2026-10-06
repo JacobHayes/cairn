@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Rung 1: format, lint, typecheck (rustfmt, clippy, workspace lints, the wasm32 build of the runtime-free crates, the TypeScript typecheck, eslint)"
+#MISE description="Rung 1: format, lint, typecheck (rustfmt, clippy, workspace lints, patina site labels, the wasm32 build of the runtime-free crates, the TypeScript typecheck, eslint)"
 # PRACTICES, The validation ladder, rung 1; Code conventions. Rung 1 runs tools, not tests:
 # it fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
 # eslint joined with the first TypeScript package, web/client (DECISIONS.md, 1.1).
@@ -84,6 +84,51 @@ done
 checked=$(grep '"reason":"compiler-artifact"' <<<"$artifacts" \
   | grep -o '"package_id":"path+file://[^"]*"' | sort -u | wc -l)
 ladder_suite clippy "$checked" crates
+
+# PRACTICES, Simulation with patina: every `sometimes!`, `reachable!`, `always!`, and
+# `buggify!` site carries a literal kebab-case label. A campaign reads the labels declared
+# anywhere in a binary, and one holding a space breaks every campaign over it (DECISIONS.md,
+# 6.1, patina gap 5). The one reproducer of that gap is the exception.
+label_exceptions=(testbeds/multiplayer/gaps/src/bin/spaced_label.rs)
+for exception in "${label_exceptions[@]}"; do
+  [ -f "$exception" ] || ladder_fail "the label exception $exception no longer exists"
+done
+mapfile -t sources < <(find crates testbeds -name '*.rs' -not -path '*/target/*' | sort |
+  grep -vxF -f <(printf '%s\n' "${label_exceptions[@]}"))
+# shellcheck disable=SC2016 # the backticks are a JavaScript template literal
+labels=$(node -e '
+  const fs = require("fs");
+  const site = /(?<![A-Za-z0-9_])(sometimes|reachable|always|buggify)!\s*\(/g;
+  const kebab = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+  let count = 0;
+  const bad = [];
+  for (const file of process.argv.slice(1)) {
+    const text = fs.readFileSync(file, "utf8");
+    for (const match of text.matchAll(site)) {
+      // The arguments up to the closing parenthesis, and the string literals among them.
+      let depth = 0, at = match.index + match[0].length - 1, literal = null, literals = [];
+      for (; at < text.length; at++) {
+        const char = text[at];
+        if (literal !== null) {
+          if (char === "\\") { literal += text[++at]; continue; }
+          if (char === "\"") { literals.push(literal); literal = null; } else literal += char;
+          continue;
+        }
+        if (char === "\"") literal = "";
+        else if (char === "(") depth++;
+        else if (char === ")" && --depth === 0) break;
+      }
+      const line = text.slice(0, match.index).split("\n").length;
+      const label = literals.at(-1);
+      count++;
+      if (label === undefined || !kebab.test(label)) bad.push(`${file}:${line}: ${match[1]}! label ${JSON.stringify(label ?? null)}`);
+    }
+  }
+  for (const line of bad) console.error(line);
+  console.log(bad.length === 0 ? count : -1);
+' "${sources[@]}")
+[ "$labels" -ge 0 ] || ladder_fail "a patina site label is not a kebab-case literal (above)"
+ladder_suite "patina site labels" "$labels" sites
 
 # ARCHITECTURE, Repository layout: the service is runtime-free (no tokio, database driver,
 # or transport), so it builds for the browser with the engine, schema, and store beneath it.

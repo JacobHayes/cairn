@@ -376,7 +376,7 @@ impl<S: Store> Service<S> {
             viewer: crate::viewer::entities_of(&identities, &deployment),
         };
         if let Some(found) = self.memo.get(&key) {
-            patina_dst::reachable!("service: a derived read answered from the memo");
+            patina_dst::reachable!("service-derived-read-answered-from-memo");
             return Ok(found);
         }
         let inputs = self
