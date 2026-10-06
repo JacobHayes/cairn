@@ -22,8 +22,8 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 1.2 | Schema and fixtures | `crates/schema`, `fixtures/`, `schema/` | 1.1 | landed `swpkokyk` |
 | 1.3 | Simulation spike: tokio and axum under the shim | `testbeds/spike` | 1.1 | landed `yqvkwotm` |
 | 2.1 | Engine core: model, apply, state machines, events, replay | `crates/engine` | 1.2 | landed `tryzqvxr` |
-| 2.2 | Relevance, effective dependencies, effective skip, participation | `crates/engine` | 2.1 | in progress |
-| 2.3 | Date network | `crates/engine` | 2.2 |  |
+| 2.2 | Relevance, effective dependencies, effective skip, participation | `crates/engine` | 2.1 | landed `wronlppq` |
+| 2.3 | Date network | `crates/engine` | 2.2 | in progress |
 | 2.4 | Auto-reach, blocking, frontier, snooze, stalled, stale, derived guards | `crates/engine` | 2.3 |  |
 | 2.5 | Gravity, leverage, rank | `crates/engine` | 2.4 |  |
 | 2.6 | Projections | `crates/engine` | 2.5 |  |

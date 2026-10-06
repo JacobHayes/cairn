@@ -4,6 +4,8 @@
 //! generated sequence stays meaningful as the graph changes (nodes added and removed).
 #![allow(clippy::missing_panics_doc)]
 
+pub mod generated;
+
 use std::collections::BTreeSet;
 
 use proptest::prelude::*;
@@ -45,6 +47,18 @@ pub fn fixed_inputs() -> ApplyInputs {
             agent: None,
         },
         note: None,
+    }
+}
+
+/// Derive inputs at the fixed clock, over `deployment`, with the PRD's rank constants.
+#[must_use]
+pub fn derive_inputs(deployment: cairn_schema::Deployment) -> cairn_schema::DeriveInputs {
+    cairn_schema::DeriveInputs {
+        today: parse("2026-10-06"),
+        timezone: parse("UTC"),
+        rank: cairn_schema::RankConstants::default(),
+        viewer: BTreeSet::new(),
+        deployment,
     }
 }
 

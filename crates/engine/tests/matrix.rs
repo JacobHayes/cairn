@@ -1,8 +1,9 @@
 //! The J3 scenario matrix and replay harness: one entry per scenario, naming the PRD ids it
 //! covers and the brief that owns it. Each scenario checks the state it should leave, and
 //! the harness rebuilds the records from the events after every step and compares them field
-//! by field with what apply produced (J3). Scenarios that need derived state (dates, blocking,
-//! stale flags, snoozes holding) join with the briefs that derive it.
+//! by field with what apply produced (J3). Scenarios that need derived state join with the
+//! briefs that derive it: relevance, effective dependencies, effective skip, and
+//! participation from 2.2; dates, blocking, stale flags, and snoozes holding from 2.3 on.
 #![cfg(test)]
 
 mod support;
@@ -171,6 +172,30 @@ const MATRIX: &[Entry] = &[
         prd: &["H5", "A17"],
         brief: "2.1",
         run: concurrent_patches,
+    },
+    Entry {
+        scenario: "vendor evaluation: relevance and owners at each decision point",
+        prd: &["Illustrative example", "Gating", "A5", "E1", "E2", "E3"],
+        brief: "2.2",
+        run: vendor_decision_points,
+    },
+    Entry {
+        scenario: "group skip cascade with kept subtrees and waiting dependents",
+        prd: &["D1a", "Containment"],
+        brief: "2.2",
+        run: skip_cascade_with_kept_work,
+    },
+    Entry {
+        scenario: "empty groups with open gates",
+        prd: &["Containment", "F4"],
+        brief: "2.2",
+        run: empty_group_with_open_gate,
+    },
+    Entry {
+        scenario: "role changes with overrides: derived participations",
+        prd: &["E2", "E5", "B10"],
+        brief: "2.2",
+        run: role_changes_rederive_participations,
     },
 ];
 
@@ -660,6 +685,203 @@ fn concurrent_patches() -> Run {
     assert_eq!(
         (conflicts[0].expected.get(), conflicts[0].current.get()),
         (3, 4)
+    );
+    run
+}
+
+/// The journey's derive after the run's latest step.
+fn derived(run: &Run) -> cairn_engine::Derived {
+    let journey = run.records().journeys.keys().next().unwrap().to_string();
+    support::derived(run.records(), &journey)
+}
+
+/// The vendor evaluation's nodes with conditions on them or an ancestor.
+const CONDITIONED: [&str; 4] = [
+    "n_baseline",
+    "n_partner_led",
+    "n_criteria",
+    "n_partner_results",
+];
+
+/// A decision point: after a step, the conditioned nodes' relevance, every other node's
+/// owners, and the final report's reviewers.
+type DecisionPoint = (
+    usize,
+    [cairn_schema::Relevance; 4],
+    &'static [&'static str],
+    &'static [&'static str],
+);
+
+/// As fixtures/README.md states them.
+const VENDOR_POINTS: [DecisionPoint; 4] = {
+    use cairn_schema::Relevance::{NotRelevant, Relevant, Undecided};
+    [
+        (1, [Undecided; 4], &[], &[]),
+        (
+            2,
+            [Undecided, NotRelevant, NotRelevant, NotRelevant],
+            &["e_lead"],
+            &[],
+        ),
+        (
+            6,
+            [Relevant, NotRelevant, NotRelevant, NotRelevant],
+            &["e_lead"],
+            &[],
+        ),
+        (
+            8,
+            [Relevant, NotRelevant, NotRelevant, NotRelevant],
+            &["e_lead"],
+            &["e_reviewer"],
+        ),
+    ]
+};
+
+fn names(entities: &std::collections::BTreeSet<cairn_schema::EntityKey>) -> Vec<&str> {
+    entities
+        .iter()
+        .map(cairn_schema::EntityKey::as_str)
+        .collect()
+}
+
+/// The vendor evaluation's relevance and participations at each decision point (Gating, E2,
+/// E3): conditions undecided until their decisions are answered, owners unassigned until
+/// the owner decision fills the default owner's role, the reviewer filled late.
+fn vendor_decision_points() -> Run {
+    let run = Run::fixture("vendor-evaluation");
+    for (step, relevance, owners, reviewer) in VENDOR_POINTS {
+        let records = run.applied[step - 1].records();
+        let derived = support::derived(records, "j_vendor_eval");
+        let (relevances, participation) = (derived.relevance(), derived.participation());
+        for (node, expected) in CONDITIONED.iter().zip(relevance) {
+            assert_eq!(
+                relevances.value(&key(node)),
+                expected,
+                "step {step}: {node}"
+            );
+        }
+        let graph = support::vendor_graph(records);
+        let keys = graph.nodes.as_map().keys();
+        for other in keys.filter(|k| !CONDITIONED.contains(&k.as_str())) {
+            assert_eq!(
+                relevances.value(other),
+                cairn_schema::Relevance::Relevant,
+                "{other}"
+            );
+            let owner = participation.entities(other, &cairn_schema::KindKey::owner());
+            assert_eq!(names(owner), owners, "step {step}: {other}");
+        }
+        let report = key("n_final_report");
+        let reviewers = participation.entities(&report, &"k_reviewer".parse().unwrap());
+        assert_eq!(names(reviewers), reviewer, "step {step}");
+        let informed = participation.entities(&key("n_findings"), &"k_informed".parse().unwrap());
+        assert_eq!(informed.len(), if step == 1 { 0 } else { 2 }, "step {step}");
+    }
+    run
+}
+
+/// D1a: a skipped stage cascades to its non-terminal work, a kept action is the kept work
+/// beneath it and its effectively skipped parent, and a dependent of the skipped plan still
+/// waits on it (whether it is satisfied, kept work pending, is blocking's: 2.4).
+fn skip_cascade_with_kept_work() -> Run {
+    let mut run = Run::from(support::vendor_after(4));
+    run.accept(VENDOR, "- op: apply_override\n  node: n_plan_review\n  override: {keep: {reason: The review still happens.}}\n- op: transition\n  node: n_setup\n  transition: {skip: {reason: Setup is provided.}}\n");
+    let derived = derived(&run);
+    let skips = derived.skips();
+    for node in ["n_access", "n_plan", "n_plan_draft", "n_workload"] {
+        assert_eq!(
+            skips.skipped_by(&key(node)),
+            Some(&key("n_setup")),
+            "{node}"
+        );
+    }
+    assert_eq!(skips.skipped_by(&key("n_plan_review")), None);
+    for container in ["n_setup", "n_plan"] {
+        assert_eq!(
+            skips.kept_work(&key(container)),
+            &[key("n_plan_review")].into(),
+            "{container}"
+        );
+    }
+    let waiting = derived.dependencies().of(
+        &key("n_comparison_set"),
+        cairn_engine::derive::EdgeSet::Pruned,
+    );
+    assert!(
+        waiting
+            .iter()
+            .any(|dependency| dependency.node == key("n_plan"))
+    );
+    assert_eq!(
+        skips.skipped_by(&key("n_comparison_set")),
+        None,
+        "skip travels containment only"
+    );
+    run
+}
+
+/// Containment, F4: an empty stage still waits for its opening, and a dependent waits for
+/// the stage's finish (blocking on it is 2.4's).
+fn empty_group_with_open_gate() -> Run {
+    let mut run = Run::from(Records::default());
+    let journey = "{journey: j_test}";
+    run.accept(journey, "- op: create_journey\n  name: Test\n");
+    run.accept(journey, "- op: add_node\n  node: {key: n_opens, id: opens, kind: milestone, title: Opens}\n- op: add_node\n  node: {key: n_stage, id: stage, kind: group, title: Stage, opens_at: n_opens}\n- op: add_node\n  node: {key: n_after, id: after, kind: action, title: After, requires: [n_stage]}\n");
+    let derived = derived(&run);
+    let dependencies = derived.dependencies();
+    let pruned = cairn_engine::derive::EdgeSet::Pruned;
+    let stage: Vec<_> = dependencies
+        .of(&key("n_stage"), pruned)
+        .into_iter()
+        .map(|d| (d.node, d.via))
+        .collect();
+    assert_eq!(
+        stage,
+        [(
+            key("n_opens"),
+            cairn_schema::DependencyVia::StageOpening {
+                group: key("n_stage")
+            }
+        )]
+    );
+    let after: Vec<_> = dependencies
+        .of(&key("n_after"), pruned)
+        .into_iter()
+        .map(|d| d.node)
+        .collect();
+    assert_eq!(after, [key("n_stage")]);
+    run
+}
+
+/// E2, E5, B10: the panel loses a member after the per-member breakdown; the interviews
+/// follow the role, each explicit interviewer stays, and the one left out is flagged.
+fn role_changes_rederive_participations() -> Run {
+    let mut run = Run::from(support::after("hiring-loop", 4));
+    run.accept("{journey: j_hiring}", "- op: answer\n  decision: n_choose_panel\n  value: {entity_list: [e_panelist_one, e_panelist_two]}\n");
+    let derived = derived(&run);
+    let participation = derived.participation();
+    let interviewer = "k_interviewer".parse().unwrap();
+    assert_eq!(
+        participation
+            .entities(&key("n_interviews"), &interviewer)
+            .len(),
+        2
+    );
+    let three = key("n_interview_three");
+    assert_eq!(
+        participation.entities(&three, &interviewer).len(),
+        1,
+        "explicit stays (E5)"
+    );
+    assert!(
+        participation.membership_lost(&three).contains(&interviewer),
+        "B10"
+    );
+    assert!(
+        participation
+            .membership_lost(&key("n_interview_one"))
+            .is_empty()
     );
     run
 }

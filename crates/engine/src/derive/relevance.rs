@@ -1,0 +1,287 @@
+//! Pass 1, relevance (PRD Gating; A5; ARCHITECTURE, Read path: derive): each node's
+//! three-valued relevance and what produced it (C8: node detail names the ancestor or
+//! decision). A node's own condition evaluates in Kleene's logic over answers
+//! ([`super::condition`]) and combines with its parent's value, `not_relevant` dominating
+//! `undecided` dominating `relevant`; a node with no condition takes its parent's value. A
+//! force include makes the node relevant whatever its condition and ancestors say, and its
+//! descendants take `relevant` as their ancestor value while still evaluating their own
+//! conditions.
+//!
+//! Order: a node's value reads its parent's and those of the decisions its condition names,
+//! so nodes are evaluated in a topological order of those inputs (Kahn's algorithm). The
+//! order exists for every valid graph: each input is also a gate edge of the effective
+//! dependency graph (the condition entry chain, and a condition gate on the decision), which
+//! validation holds acyclic. A force-included node has no inputs.
+//!
+//! Cost at `node_count_max` (2,000 nodes, 16 clauses each): building the order is
+//! O(nodes + clauses), about 34,000 steps; each node's condition is evaluated once, a few
+//! dozen steps; memory is one record per node, with the decisions its producing condition
+//! reads (at most 16), a few hundred kilobytes.
+
+use std::collections::{BTreeMap, BTreeSet};
+
+use cairn_schema::{AnswerValue, Deployment, KeyRefs, Node, NodeKey, Relevance, State};
+
+use super::condition::{self, Term, Truth};
+use super::{forced, stored_state};
+use crate::graph::{Document, Graph};
+
+/// What produced a node's relevance (C8).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Producer {
+    /// No condition applies to the node or any ancestor: relevant by default.
+    Unconditioned,
+    /// The condition on `on` (the node itself or an ancestor), reading `decisions`.
+    Condition {
+        /// The node whose condition decided the value.
+        on: NodeKey,
+        /// The decisions that condition reads.
+        decisions: BTreeSet<NodeKey>,
+    },
+    /// A force include on `on` (the node itself or an ancestor).
+    Forced {
+        /// The node force-included.
+        on: NodeKey,
+    },
+}
+
+/// A node's relevance and its producer.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct NodeRelevance {
+    /// The value.
+    pub value: Relevance,
+    /// What produced it.
+    pub producer: Producer,
+}
+
+/// Every node's relevance (pass 1's output).
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct Relevances {
+    nodes: BTreeMap<NodeKey, NodeRelevance>,
+}
+
+impl Relevances {
+    /// The node's relevance and producer, when the node exists.
+    #[must_use]
+    pub fn get(&self, key: &NodeKey) -> Option<&NodeRelevance> {
+        self.nodes.get(key)
+    }
+
+    /// The node's relevance value.
+    ///
+    /// # Panics
+    ///
+    /// When the node is not in the derived graph: a caller's key always comes from it.
+    #[must_use]
+    pub fn value(&self, key: &NodeKey) -> Relevance {
+        let found = self.nodes.get(key);
+        assert!(found.is_some(), "{key} is not in the derived graph");
+        found.map_or(Relevance::NotRelevant, |found| found.value)
+    }
+
+    /// Relevant or undecided: in scope (PRD Containment, D1a).
+    #[must_use]
+    pub fn in_scope(&self, key: &NodeKey) -> bool {
+        self.value(key) != Relevance::NotRelevant
+    }
+
+    /// Every node's relevance, in key order.
+    pub fn iter(&self) -> impl Iterator<Item = (&NodeKey, &NodeRelevance)> {
+        self.nodes.iter()
+    }
+
+    /// E3: the decision's answer while it is in effect, decided and relevant. Role fills and
+    /// `feeds_milestone` pins follow it: a decision that leaves scope or is reopened no longer
+    /// fills or pins, and one that returns to relevant-and-decided does again.
+    ///
+    /// # Panics
+    ///
+    /// When the decision is not in the derived graph, or is decided with no answer, which
+    /// validation rejects.
+    #[must_use]
+    pub fn answer_in_effect<'g>(
+        &self,
+        document: &'g Document,
+        decision: &NodeKey,
+    ) -> Option<&'g AnswerValue> {
+        let node = document.nodes.get(decision)?;
+        let decided = stored_state(document, node) == State::Decided;
+        let relevant = self.value(decision) == Relevance::Relevant;
+        let answer = document.state.answers.get(decision);
+        assert!(
+            !decided || answer.is_some(),
+            "a decided decision holds its answer"
+        );
+        answer.filter(|_| decided && relevant)
+    }
+}
+
+/// The inputs of a node's relevance: its parent and the decisions its condition reads,
+/// none when it is force-included.
+fn inputs<'d>(document: &Document, node: &'d Node<KeyRefs>) -> BTreeSet<&'d NodeKey> {
+    if forced(document, &node.key) {
+        return BTreeSet::new();
+    }
+    let decisions = node.relevant_when.iter().flat_map(|c| c.decisions());
+    node.parent.iter().chain(decisions).collect()
+}
+
+/// Nodes in an order where each comes after its inputs (Kahn's algorithm).
+fn order(document: &Document) -> Vec<&NodeKey> {
+    let mut waiting: BTreeMap<&NodeKey, usize> = BTreeMap::new();
+    let mut dependents: BTreeMap<&NodeKey, Vec<&NodeKey>> = BTreeMap::new();
+    for node in document.nodes.values() {
+        let inputs = inputs(document, node);
+        waiting.insert(&node.key, inputs.len());
+        for input in inputs {
+            dependents.entry(input).or_default().push(&node.key);
+        }
+    }
+    let mut ready: Vec<&NodeKey> = waiting
+        .iter()
+        .filter(|(_, count)| **count == 0)
+        .map(|(key, _)| *key)
+        .collect();
+    let mut ordered = Vec::with_capacity(document.nodes.len());
+    while let Some(next) = ready.pop() {
+        ordered.push(next);
+        for dependent in dependents.get(next).into_iter().flatten() {
+            if let Some(count) = waiting.get_mut(dependent) {
+                *count -= 1;
+                if *count == 0 {
+                    ready.push(dependent);
+                }
+            }
+        }
+    }
+    assert_eq!(
+        ordered.len(),
+        document.nodes.len(),
+        "relevance inputs are acyclic in a valid graph"
+    );
+    ordered
+}
+
+/// Pass 1: every node's relevance. `inherited_skips` names, for each node under a skip it is
+/// not kept from, the skipped ancestor (D1a): an open decision there is effectively skipped,
+/// so a condition reads it as unanswered.
+#[must_use]
+pub(crate) fn pass(
+    graph: &Graph,
+    deployment: &Deployment,
+    inherited_skips: &BTreeMap<NodeKey, NodeKey>,
+) -> Relevances {
+    let document = graph.document();
+    let mut relevances = Relevances::default();
+    for key in order(document) {
+        let Some(node) = document.nodes.get(key) else {
+            continue;
+        };
+        let found = evaluate(document, node, &relevances, deployment, inherited_skips);
+        relevances.nodes.insert(key.clone(), found);
+    }
+    assert_eq!(relevances.nodes.len(), document.nodes.len());
+    relevances
+}
+
+/// One node's relevance, its inputs already evaluated.
+fn evaluate(
+    document: &Document,
+    node: &Node<KeyRefs>,
+    done: &Relevances,
+    deployment: &Deployment,
+    inherited_skips: &BTreeMap<NodeKey, NodeKey>,
+) -> NodeRelevance {
+    if forced(document, &node.key) {
+        return NodeRelevance {
+            value: Relevance::Relevant,
+            producer: Producer::Forced {
+                on: node.key.clone(),
+            },
+        };
+    }
+    let inherited = node.parent.as_ref().map_or(
+        NodeRelevance {
+            value: Relevance::Relevant,
+            producer: Producer::Unconditioned,
+        },
+        |parent| {
+            let found = done.get(parent);
+            assert!(found.is_some(), "a parent is evaluated before its children");
+            found.cloned().unwrap_or(NodeRelevance {
+                value: Relevance::NotRelevant,
+                producer: Producer::Unconditioned,
+            })
+        },
+    );
+    let Some(condition) = &node.relevant_when else {
+        return inherited;
+    };
+    let term = |decision: &NodeKey| term(document, done, inherited_skips, decision);
+    let own = match condition::evaluate(condition, term, deployment) {
+        Truth::True => Relevance::Relevant,
+        Truth::False => Relevance::NotRelevant,
+        Truth::Unknown => Relevance::Undecided,
+    };
+    let value = dominant(inherited.value, own);
+    if value != own {
+        return inherited;
+    }
+    NodeRelevance {
+        value,
+        producer: Producer::Condition {
+            on: node.key.clone(),
+            decisions: condition.decisions().into_iter().cloned().collect(),
+        },
+    }
+}
+
+/// Gating: `not_relevant` dominates `undecided`, which dominates `relevant`.
+fn dominant(first: Relevance, second: Relevance) -> Relevance {
+    let rank = |value: Relevance| match value {
+        Relevance::Relevant => 0,
+        Relevance::Undecided => 1,
+        Relevance::NotRelevant => 2,
+    };
+    if rank(second) > rank(first) {
+        second
+    } else {
+        first
+    }
+}
+
+/// What a decision contributes to a condition (Gating): its answer when decided and
+/// relevant; unknown when open, relevant, and not under a skip; unanswered otherwise
+/// (skipped, effectively skipped, not relevant, or itself undecided).
+fn term<'g>(
+    document: &'g Document,
+    done: &Relevances,
+    inherited_skips: &BTreeMap<NodeKey, NodeKey>,
+    decision: &NodeKey,
+) -> Term<'g> {
+    let found = done.get(decision);
+    assert!(
+        found.is_some(),
+        "a decision is evaluated before the conditions reading it"
+    );
+    if found.map(|found| found.value) != Some(Relevance::Relevant) {
+        return Term::Unanswered;
+    }
+    let Some(node) = document.nodes.get(decision) else {
+        return Term::Unanswered;
+    };
+    match stored_state(document, node) {
+        State::Decided => done
+            .answer_in_effect(document, decision)
+            .map_or(Term::Unanswered, Term::Answered),
+        State::Open if !inherited_skips.contains_key(decision) => Term::Unknown,
+        State::Open
+        | State::Skipped
+        | State::Todo
+        | State::Active
+        | State::Done
+        | State::Pending
+        | State::Reached
+        | State::Derived => Term::Unanswered,
+    }
+}

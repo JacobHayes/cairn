@@ -208,16 +208,7 @@ pub fn key(text: &str) -> cairn_schema::NodeKey {
 
 /// The vendor evaluation journey after its first `steps` scenario steps.
 pub fn vendor_after(steps: usize) -> Records {
-    let mut records = seeded("vendor-evaluation");
-    for scenario_step in scenario("vendor-evaluation")
-        .steps
-        .as_slice()
-        .iter()
-        .take(steps)
-    {
-        records = step(&records, scenario_step).records().clone();
-    }
-    records
+    after("vendor-evaluation", steps)
 }
 
 /// Applies mutations, written as YAML, to the vendor evaluation journey.
@@ -233,4 +224,35 @@ pub fn vendor_graph(records: &Records) -> &cairn_schema::Graph {
         .get(&"j_vendor_eval".parse().unwrap())
         .unwrap()
         .graph
+}
+
+/// A fixture's records after its first `steps` scenario steps.
+pub fn after(name: &str, steps: usize) -> Records {
+    let mut records = seeded(name);
+    for scenario_step in scenario(name).steps.as_slice().iter().take(steps) {
+        records = step(&records, scenario_step).records().clone();
+    }
+    records
+}
+
+/// The journey's graph, validated.
+pub fn journey_graph(records: &Records, journey: &str) -> Graph {
+    let document = records.journeys[&journey.parse().unwrap()].graph.clone();
+    Graph::new(document).unwrap_or_else(|violations| panic!("{violations:#?}"))
+}
+
+/// Derives a journey in the records at the fixed clock.
+pub fn derived(records: &Records, journey: &str) -> cairn_engine::Derived {
+    let inputs = cairn_engine::testing::derive_inputs(records.deployment.clone());
+    cairn_engine::derive(&journey_graph(records, journey), &inputs)
+}
+
+/// Applies mutations, written as YAML, to a journey and returns the records they produce,
+/// panicking on a rejection.
+pub fn accepted_on(records: &Records, journey: &str, mutations: &str) -> Records {
+    let patch = patch_to(records, &format!("{{journey: {journey}}}"), mutations);
+    match apply(records, &patch, &fixed_inputs()) {
+        Ok(applied) => applied.records().clone(),
+        Err(rejection) => panic!("{rejection:#?}\n{mutations}"),
+    }
 }

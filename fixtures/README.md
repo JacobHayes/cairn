@@ -34,6 +34,30 @@ is done, snoozes the baseline on a node, pins the report earlier than its derive
 finishes the workload and the baseline (which completes testing and opens reporting), and
 answers the reviewer with a person created in the same patch.
 
+Derived at each decision point (brief 2.2): the relevance and participations `derive` gives
+after steps 1, 2, 6, and 8. The scenario matrix (`crates/engine/tests/matrix.rs`) checks these
+values, and `briefs/proof/2.2/prove.sh` checks these tables against the engine's output.
+
+| Node | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
+|---|---|---|---|---|
+| `testing/baseline` | undecided, by its condition | undecided, by its condition | relevant, by its condition | relevant, by its condition |
+| `testing/partner-led` | undecided, by its condition | not relevant, by its condition | not relevant, by its condition | not relevant, by its condition |
+| `testing/partner-led/criteria` | undecided, by `testing/partner-led` | not relevant, by `testing/partner-led` | not relevant, by `testing/partner-led` | not relevant, by `testing/partner-led` |
+| `testing/partner-led/partner-results` | undecided, by `testing/partner-led` | not relevant, by `testing/partner-led` | not relevant, by `testing/partner-led` | not relevant, by `testing/partner-led` |
+
+Every other node (23 at step 8) is relevant at every point, with no condition applying.
+
+| Node and kind | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
+|---|---|---|---|---|
+| every node, `owner` | none (default owner `eval_owner`); all unassigned | `e_lead` (default owner `eval_owner`) | `e_lead` (default owner `eval_owner`) | `e_lead` (default owner `eval_owner`) |
+| `reporting`, `informed` | none (role `stakeholders`) | `e_stakeholder_a`, `e_stakeholder_b` (role `stakeholders`) | `e_stakeholder_a`, `e_stakeholder_b` (role `stakeholders`) | `e_stakeholder_a`, `e_stakeholder_b` (role `stakeholders`) |
+| `reporting/final-review`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
+| `reporting/final-review/final-report`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
+| `reporting/findings`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
+| `reporting/findings-reviewer`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
+| `reporting/review-opens`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
+| `reporting/final-review/final-report`, `reviewer` | none (role `findings_reviewer`) | none (role `findings_reviewer`) | none (role `findings_reviewer`) | `e_reviewer` (role `findings_reviewer`) |
+
 ## `hiring-loop/`
 
 A small route with deep containment (interview loop, onsite, debrief, notes, scorecard) and a

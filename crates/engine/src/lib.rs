@@ -4,6 +4,7 @@
 //! set for the host to commit.
 #![forbid(unsafe_code)]
 
+pub mod derive;
 mod edit;
 mod entity;
 pub mod file;
@@ -18,6 +19,7 @@ pub mod testing;
 pub mod transition;
 mod validate;
 
+pub use derive::{Derived, derive};
 pub use file::from_file;
 pub use graph::{Document, Graph, Tree};
 pub use pipeline::{Applied, ApplyInputs, apply};
