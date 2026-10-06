@@ -1,18 +1,20 @@
-//! The records a domain patch reads (ARCHITECTURE, Write path; DECISIONS.md 2.1: apply works
-//! over loaded records): the engine's `Records` assembled from store loads, and the
-//! revisions the commit must recheck. The engine never sees the store, and the store never
-//! sees the engine.
+//! The records a patch reads (ARCHITECTURE, Write path; DECISIONS.md 2.1: apply works over
+//! loaded records): the engine's `Records` assembled from store loads, and the revisions the
+//! commit must recheck. The engine never sees the store, and the store never sees the engine.
+//! A patch to a proposal (I6) loads the proposal; a patch that applies one loads it too, and
+//! everything its mutations read, as if the patch held them.
 //!
-//! Cost: one load for the deployment, one for the target, one per route version the patch
-//! reads, and for each entity merge one index query plus one load per journey referencing
-//! either entity (E6); every load is one graph within `graph_bytes_max`.
+//! Cost: one load for the deployment, one for the target, one per proposal the patch edits or
+//! applies, one per route version the patch reads, and for each entity merge one index query
+//! plus one load per journey referencing either entity (E6); every load is one graph within
+//! `graph_bytes_max`.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::Records;
 use cairn_schema::{
-    AnswerType, Domain, DraftSource, EntityKey, JourneyId, Lineage, Mutation, Patch, PatchTarget,
-    Payload, Revision, RevisionOf, RouteId,
+    AnswerType, Domain, EntityKey, JourneyId, Lineage, Mutation, Patch, PatchTarget, Payload,
+    ProposalId, Revision, RevisionOf,
 };
 use cairn_store::{Document, LoadTarget, Precondition, Store, StoreError};
 
@@ -62,6 +64,13 @@ impl Loaded {
                 expected,
             });
         }
+        // I6, H5: the proposal revision each reviewer applied must still be current at commit.
+        for (proposal, reviewed) in applied_proposals(patch) {
+            found.push(Precondition::Revision {
+                of: RevisionOf::Proposal(proposal.clone()),
+                expected: reviewed,
+            });
+        }
         for (entities, named) in &self.merges {
             for (journey, expected) in named {
                 found.push(Precondition::Revision {
@@ -79,19 +88,20 @@ impl Loaded {
 }
 
 /// Loads what `patch` reads: the deployment (always: entity references resolve through
-/// it), its target domain unless the patch creates it, the published route versions it
-/// copies or moves to, and for an entity merge every journey referencing either entity as
-/// well as every journey it names, so the engine sees any difference between the two (E6).
-///
-/// # Panics
-///
-/// When the patch targets a proposal: domain patches only.
+/// it), its target domain unless the patch creates it, the proposal it edits or applies, the
+/// published route versions it (or a proposal it applies) copies or moves from and to, and
+/// for an entity merge every journey referencing either entity as well as every journey it
+/// names, so the engine sees any difference between the two (E6).
 pub(crate) async fn records<S: Store>(store: &S, patch: &Patch) -> Result<Loaded, StoreError> {
     let mut records = Records::default();
     match store.load(&LoadTarget::Deployment).await? {
         Some(Document::Deployment(deployment)) => records.deployment = deployment,
         other => unreachable!("the deployment always loads, not {other:?}"),
     }
+    let mut proposals: Vec<ProposalId> = applied_proposals(patch)
+        .into_iter()
+        .map(|(id, _)| id.clone())
+        .collect();
     match &patch.target {
         PatchTarget::Journey(id) => {
             if let Some(journey) = journey(store, id).await? {
@@ -105,9 +115,17 @@ pub(crate) async fn records<S: Store>(store: &S, patch: &Patch) -> Result<Loaded
             }
         }
         PatchTarget::Deployment => {}
-        PatchTarget::Proposal { .. } => unreachable!("only domain patches are loaded"),
+        PatchTarget::Proposal { id, .. } => proposals.push(id.clone()),
     }
-    for lineage in versions_read(&records, patch) {
+    for id in proposals {
+        if let Some(proposal) = store.proposal(&id).await? {
+            records.proposals.insert(id, proposal);
+        }
+    }
+    let mutations = effective_mutations(&records, patch);
+    let read = versions_read(&records, patch, &mutations);
+    let merges = merges(&mutations);
+    for lineage in read {
         let target = LoadTarget::RouteVersion {
             route: lineage.route.clone(),
             version: lineage.version,
@@ -116,7 +134,6 @@ pub(crate) async fn records<S: Store>(store: &S, patch: &Patch) -> Result<Loaded
             records.versions.insert(lineage, version);
         }
     }
-    let merges = merges(patch);
     for (entities, named) in &merges {
         let referencing = store.journeys_referencing(entities).await?;
         for id in referencing.keys().chain(named.keys()) {
@@ -130,6 +147,81 @@ pub(crate) async fn records<S: Store>(store: &S, patch: &Patch) -> Result<Loaded
     Ok(Loaded { records, merges })
 }
 
+/// I6: the proposals a domain patch applies, with the revision each reviewer saw.
+fn applied_proposals(patch: &Patch) -> Vec<(&ProposalId, Revision)> {
+    patch
+        .mutations
+        .as_slice()
+        .iter()
+        .filter_map(|mutation| match mutation {
+            Mutation::ApplyProposal {
+                proposal,
+                reviewed_revision,
+            } => Some((proposal, *reviewed_revision)),
+            _ => None,
+        })
+        .collect()
+}
+
+/// The mutations the patch runs, in order: each proposal it applies stands for the mutations
+/// it was drafted with (the resolutions of its items read no version and merge nothing).
+fn effective_mutations<'a>(records: &'a Records, patch: &'a Patch) -> Vec<&'a Mutation> {
+    let mut found = Vec::new();
+    for mutation in patch.mutations.as_slice() {
+        match mutation {
+            Mutation::ApplyProposal { proposal, .. } => found.extend(
+                records
+                    .proposals
+                    .get(proposal)
+                    .map(|held| held.draft.mutations.as_slice())
+                    .unwrap_or_default(),
+            ),
+            other => found.push(other),
+        }
+    }
+    found
+}
+
+/// B7, B8, B9: what drafting an upgrade, a save as route, or a re-link reads: the deployment,
+/// the journey, the route it saves to (with its latest version, which a draft opened on it
+/// reads), and the versions `versions` names from what was loaded.
+pub(crate) async fn drafting<S: Store>(
+    store: &S,
+    id: &JourneyId,
+    route: Option<&cairn_schema::RouteId>,
+    versions: impl FnOnce(Option<&cairn_schema::Journey>) -> Vec<Lineage>,
+) -> Result<Records, StoreError> {
+    let mut records = Records::default();
+    match store.load(&LoadTarget::Deployment).await? {
+        Some(Document::Deployment(deployment)) => records.deployment = deployment,
+        other => unreachable!("the deployment always loads, not {other:?}"),
+    }
+    let held = journey(store, id).await?;
+    let mut read = versions(held.as_ref());
+    if let Some(held) = held {
+        records.journeys.insert(id.clone(), held);
+    }
+    if let Some(route) = route
+        && let Some(Document::Route(found)) = store.load(&LoadTarget::Route(route.clone())).await?
+    {
+        read.extend(found.versions.iter().next_back().map(|version| Lineage {
+            route: route.clone(),
+            version: *version,
+        }));
+        records.routes.insert(route.clone(), found);
+    }
+    for lineage in read {
+        let target = LoadTarget::RouteVersion {
+            route: lineage.route.clone(),
+            version: lineage.version,
+        };
+        if let Some(Document::RouteVersion(version)) = store.load(&target).await? {
+            records.versions.insert(lineage, version);
+        }
+    }
+    Ok(records)
+}
+
 async fn journey<S: Store>(
     store: &S,
     id: &JourneyId,
@@ -141,21 +233,22 @@ async fn journey<S: Store>(
     })
 }
 
-/// The published versions the patch's mutations read, in order: a journey created from one
-/// (B1), upgraded to one or re-linked to one (B7, B9), and the latest version a draft opened
-/// for editing copies (A11). A version that does not exist is simply not loaded, and the
-/// engine rejects the mutation naming it.
-fn versions_read(records: &Records, patch: &Patch) -> BTreeSet<Lineage> {
+/// The published versions `mutations` read, in order: a journey created from one (B1), the
+/// version it follows and the one it is upgraded to (B7: the merge reads both), one it is
+/// re-linked to (B9), and for a draft opened or published (A11, A13, B8) the route's latest
+/// version and the one its draft extends (an edit copies it, an import or a saved journey
+/// carries its retired keys, and a publish retires what the draft left out of it). A version
+/// that does not exist is simply not loaded, and the engine rejects the mutation naming it.
+fn versions_read(records: &Records, patch: &Patch, mutations: &[&Mutation]) -> BTreeSet<Lineage> {
     let mut read = BTreeSet::new();
-    let mut lineage_route: Option<RouteId> = match &patch.target {
+    let mut follows: Option<Lineage> = match &patch.target {
         PatchTarget::Journey(id) => records
             .journeys
             .get(id)
-            .and_then(|journey| journey.header.lineage.as_ref())
-            .map(|lineage| lineage.route.clone()),
+            .and_then(|journey| journey.header.lineage.clone()),
         PatchTarget::Route(_) | PatchTarget::Deployment | PatchTarget::Proposal { .. } => None,
     };
-    for mutation in patch.mutations.as_slice() {
+    for mutation in mutations {
         match (mutation, &patch.target) {
             (
                 Mutation::CreateJourney {
@@ -164,31 +257,30 @@ fn versions_read(records: &Records, patch: &Patch) -> BTreeSet<Lineage> {
                 | Mutation::Relink { lineage: from },
                 _,
             ) => {
-                lineage_route = Some(from.route.clone());
+                follows = Some(from.clone());
                 read.insert(from.clone());
             }
             (Mutation::Upgrade { to }, _) => {
-                if let Some(route) = &lineage_route {
-                    read.insert(Lineage {
-                        route: route.clone(),
+                if let Some(current) = follows.take() {
+                    let target = Lineage {
+                        route: current.route.clone(),
                         version: *to,
-                    });
+                    };
+                    read.insert(current);
+                    read.insert(target.clone());
+                    follows = Some(target);
                 }
             }
-            (
-                Mutation::OpenDraft {
-                    source: DraftSource::Edit,
-                },
-                PatchTarget::Route(id),
-            ) => {
-                let latest = records
-                    .routes
-                    .get(id)
-                    .and_then(|route| route.versions.iter().next_back());
-                if let Some(version) = latest {
+            (Mutation::OpenDraft { .. } | Mutation::PublishDraft, PatchTarget::Route(id)) => {
+                let route = records.routes.get(id);
+                let latest = route.and_then(|route| route.versions.iter().next_back());
+                let extends = route
+                    .and_then(|route| route.draft.as_ref())
+                    .and_then(|draft| draft.extends);
+                for version in latest.copied().into_iter().chain(extends) {
                     read.insert(Lineage {
                         route: id.clone(),
-                        version: *version,
+                        version,
                     });
                 }
             }
@@ -199,10 +291,8 @@ fn versions_read(records: &Records, patch: &Patch) -> BTreeSet<Lineage> {
 }
 
 /// E6: each entity merge's two entities and the journeys it names.
-fn merges(patch: &Patch) -> Vec<(BTreeSet<EntityKey>, BTreeMap<JourneyId, Revision>)> {
-    patch
-        .mutations
-        .as_slice()
+fn merges(mutations: &[&Mutation]) -> Vec<(BTreeSet<EntityKey>, BTreeMap<JourneyId, Revision>)> {
+    mutations
         .iter()
         .filter_map(|mutation| match mutation {
             Mutation::MergeEntities {

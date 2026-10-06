@@ -53,8 +53,15 @@ impl Derived {
         }
     }
 
-    /// One node's derived values (D3) with their explanation inputs.
-    fn node_derived(&self, graph: &Graph, key: &NodeKey) -> NodeDerived {
+    /// One node's derived values (D3) with their explanation inputs, explanation lists cut
+    /// to the response limit with their totals: what node detail (C8) carries, without
+    /// projecting every other node.
+    ///
+    /// # Panics
+    ///
+    /// When `graph` is not the one derived, or does not hold `key`.
+    #[must_use]
+    pub fn node_derived(&self, graph: &Graph, key: &NodeKey) -> NodeDerived {
         let blocking = &self.blocking;
         let priority = &self.priority;
         NodeDerived {

@@ -45,6 +45,36 @@ mod in_process {
     /// host reads.
     const NOT_OPERATIONS: [&str; 2] = ["new", "settings"];
 
+    /// The service operations brief 4.8 added, whose endpoints brief 4.9 adds (DECISIONS.md:
+    /// the service and API split at the engine's 2.4 boundary). 4.9 moves each into
+    /// `offered_by` with its endpoint and empties this list.
+    const AWAITING_ENDPOINTS: &[&str] = &[
+        "snapshot",
+        "level",
+        "trace",
+        "decision_view",
+        "timeline",
+        "status_summary",
+        "next",
+        "list",
+        "mine",
+        "node_detail",
+        "explanations",
+        "history",
+        "create_proposal",
+        "edit_proposal",
+        "discard_proposal",
+        "proposal",
+        "preview_proposal",
+        "apply_proposal",
+        "refresh_proposal",
+        "propose_upgrade",
+        "propose_save_as_route",
+        "propose_relink",
+        "import_route",
+        "export_route",
+    ];
+
     /// The public methods of every `impl<S: Store> Service<S>` block in the service's
     /// sources.
     fn service_methods() -> BTreeSet<String> {
@@ -84,6 +114,7 @@ mod in_process {
             .iter()
             .map(|(operation, _)| (*operation).to_owned())
             .chain(NOT_OPERATIONS.iter().map(|name| (*name).to_owned()))
+            .chain(AWAITING_ENDPOINTS.iter().map(|name| (*name).to_owned()))
             .collect();
         assert_eq!(service_methods(), listed);
 

@@ -14,16 +14,24 @@
 mod call;
 mod compose;
 mod consequence;
+mod derived;
 mod document;
+mod drafting;
 mod error;
 mod load;
+mod projections;
+mod proposals;
 mod reads;
+mod routes;
 mod viewer;
 mod write;
 
 pub use call::Call;
 pub use compose::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts};
+pub use drafting::ProposeError;
 pub use error::ServiceError;
+pub use projections::{ChildEntry, History, NodeDetail, Projected, ReadError};
+pub use proposals::{ProposalReview, ProposalWritten, StaleBase};
 pub use viewer::Viewer;
 pub use write::{DomainPatch, NotADomainPatch, WriteError, Written};
 
@@ -39,6 +47,8 @@ pub struct Service<S> {
     notifier: Arc<dyn Notifier>,
     settings: DeploymentSettings,
     capabilities: Capabilities,
+    /// Recent derivations, shared by every clone (D6: invisible).
+    memo: Arc<derived::Memo>,
 }
 
 impl<S> Clone for Service<S> {
@@ -48,6 +58,7 @@ impl<S> Clone for Service<S> {
             notifier: Arc::clone(&self.notifier),
             settings: self.settings.clone(),
             capabilities: self.capabilities.clone(),
+            memo: Arc::clone(&self.memo),
         }
     }
 }
@@ -71,6 +82,7 @@ impl<S: Store> Service<S> {
             notifier: parts.notifier,
             settings: parts.settings,
             capabilities: parts.capabilities,
+            memo: Arc::default(),
         }
     }
 

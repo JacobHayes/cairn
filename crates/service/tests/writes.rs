@@ -13,7 +13,7 @@ use cairn_store::{EventQuery, InProcessNotifier, Store, Take, Tick, Watch};
 
 use support::{
     applied, call, domain, engine_step, patch, publish_fixture_route, rejected, scenario,
-    step_call, step_patch,
+    step_call, step_patch, vendor_after,
 };
 
 /// Runs each case once over a fresh memory store and once over a fresh Turso store.
@@ -87,24 +87,6 @@ async fn create<S: Store>(service: &Service<S>, id: &str, nodes: &[&str]) {
         &mutations,
     );
     applied(service.patch(&call("u_lead", AT), &domain(created)).await);
-}
-
-/// Seeds the vendor evaluation's route and runs its scenario's first `steps` steps.
-async fn vendor_after<S: Store>(service: &Service<S>, steps: usize) {
-    let seed = publish_fixture_route("vendor-evaluation");
-    applied(
-        service
-            .patch(&call("u_author", "2026-09-01T12:00:00Z"), &domain(seed))
-            .await,
-    );
-    for step in scenario("vendor-evaluation")
-        .steps
-        .as_slice()
-        .iter()
-        .take(steps)
-    {
-        applied(service.patch(&step_call(step), &step_patch(step)).await);
-    }
 }
 
 fn codes(rejection: &Rejection) -> Vec<ViolationCode> {

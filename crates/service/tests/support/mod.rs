@@ -208,3 +208,26 @@ pub fn rejected(written: Result<Written, WriteError>) -> cairn_schema::Rejection
         other => panic!("expected a rejection, got {other:#?}"),
     }
 }
+
+/// Seeds the vendor evaluation's route and runs its scenario's first `steps` steps.
+pub async fn vendor_after<S: Store>(service: &Service<S>, steps: usize) {
+    let seed = publish_fixture_route("vendor-evaluation");
+    applied(
+        service
+            .patch(&call("u_author", "2026-09-01T12:00:00Z"), &domain(seed))
+            .await,
+    );
+    for step in scenario("vendor-evaluation")
+        .steps
+        .as_slice()
+        .iter()
+        .take(steps)
+    {
+        applied(service.patch(&step_call(step), &step_patch(step)).await);
+    }
+}
+
+/// A fresh Turso store under `root`, shared.
+pub async fn turso_store(root: &Path) -> Arc<TursoStore> {
+    Arc::new(TursoStore::open(&turso_path(root)).await.unwrap())
+}

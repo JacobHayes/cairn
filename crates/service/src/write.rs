@@ -9,8 +9,9 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use cairn_engine::{Applied, ApplyInputs, Records, apply};
 use cairn_schema::{
-    Consequences, Domain, JourneyId, Markdown, Patch, PatchReceipt, PatchTarget, Record, Rejection,
-    RevisionOf, Write,
+    Consequences, Domain, JourneyId, Location, Markdown, Mutation, Patch, PatchReceipt,
+    PatchTarget, Record, Rejection, Revision, RevisionOf, Violation, ViolationCode, Violations,
+    Write,
 };
 use cairn_store::{Commit, CommitError, Committed, Store};
 
@@ -122,7 +123,9 @@ impl std::error::Error for WriteError {}
 impl<S: Store> Service<S> {
     /// A17: applies a domain patch as `call`'s actor (H2), at `call`'s today in the
     /// deployment's zone, and commits it. In order: a patch id already committed is answered
-    /// from its receipt before anything is loaded (H5); the records it reads are loaded;
+    /// from its receipt before anything is loaded (H5); an upgrade or re-link, which changes
+    /// a journey only once confirmed through its proposal, is refused (B7, B9, I7); the
+    /// records it reads, including any proposal it applies, are loaded;
     /// `apply` validates it (A15, D4); its consequences are derived (D7); the commit rechecks
     /// every revision it read (H5, E6); and every revision the commit moved is announced
     /// (H6).
@@ -137,13 +140,27 @@ impl<S: Store> Service<S> {
             patina_dst::reachable!("service: a resubmitted patch id answered from its receipt");
             return answer;
         }
+        if let Some(rejection) = unconfirmed(patch) {
+            return Err(WriteError::Rejected(rejection));
+        }
+        self.write(call, patch, submitted.note.clone()).await
+    }
+
+    /// The write path after the receipt lookup, for a domain patch and a patch to a proposal
+    /// alike: load, apply, consequences, commit, announce.
+    pub(crate) async fn write(
+        &self,
+        call: &Call,
+        patch: &Patch,
+        note: Option<Markdown>,
+    ) -> Result<Written, WriteError> {
         let today = self.settings.today(call.now);
         let loaded = load::records(&*self.store, patch).await?;
         let inputs = ApplyInputs {
             today,
             at: call.now,
             actor: call.actor.clone(),
-            note: submitted.note.clone(),
+            note,
         };
         let accepted = engine(&patch.target.domain(), || {
             apply(&loaded.records, patch, &inputs).map(|applied| {
@@ -179,7 +196,7 @@ impl<S: Store> Service<S> {
 
     /// H5: the answer for a patch id already committed: the receipt for the same content,
     /// a rejection for other content; none for an id never committed.
-    async fn answer_from_receipt(
+    pub(crate) async fn answer_from_receipt(
         &self,
         patch: &Patch,
     ) -> Result<Option<Result<Written, WriteError>>, WriteError> {
@@ -220,7 +237,8 @@ impl<S: Store> Service<S> {
                     applied.change_set().receipt,
                     "the store keeps the receipt"
                 );
-                self.announce(&receipt, &loaded.records, applied).await;
+                self.announce(&patch.target, &receipt, &loaded.records, applied)
+                    .await;
                 Ok(Written::Applied {
                     receipt,
                     consequences: caused,
@@ -238,15 +256,34 @@ impl<S: Store> Service<S> {
         }
     }
 
-    /// H6: announces every revision a commit moved: its domain's, and the deployment's when
-    /// an entity create riding in a journey or route patch moved it. The deployment's
-    /// revision is read back from the store, which another such commit may have moved further
-    /// in the meantime: announcing an older one would be ignored by a subscriber that heard
-    /// the newer, and announcing one never committed would hide the real one when it comes.
-    async fn announce(&self, receipt: &PatchReceipt, before: &Records, applied: &Applied) {
+    /// H6: announces every revision a commit moved: its domain's, or for a patch to a
+    /// proposal the proposal's (I6: drafting never moves the destination); each proposal a
+    /// domain patch applied; and the deployment's when an entity create riding in a journey or
+    /// route patch moved it. The deployment's revision is read back from the store, which
+    /// another such commit may have moved further in the meantime: announcing an older one
+    /// would be ignored by a subscriber that heard the newer, and announcing one never
+    /// committed would hide the real one when it comes.
+    async fn announce(
+        &self,
+        target: &PatchTarget,
+        receipt: &PatchReceipt,
+        before: &Records,
+        applied: &Applied,
+    ) {
         let domain = receipt.domain.clone();
+        if let PatchTarget::Proposal { id, .. } = target {
+            self.notifier
+                .publish(&RevisionOf::Proposal(id.clone()), receipt.revision);
+            return;
+        }
         self.notifier
             .publish(&RevisionOf::Domain(domain.clone()), receipt.revision);
+        for (id, proposal) in &applied.records().proposals {
+            if before.proposals.get(id).map(|held| held.revision) != Some(proposal.revision) {
+                self.notifier
+                    .publish(&RevisionOf::Proposal(id.clone()), proposal.revision);
+            }
+        }
         let creates_entities = applied.change_set().writes().any(|write| {
             matches!(
                 write,
@@ -273,10 +310,60 @@ impl<S: Store> Service<S> {
     }
 }
 
+/// B7, B9, I7: an upgrade or a re-link changes a journey only once someone confirms it, by
+/// applying the proposal that drafted it; submitted directly, each is refused, one violation
+/// per mutation. A proposal's own mutations reach the engine through its apply, not here.
+fn unconfirmed(patch: &Patch) -> Option<Rejection> {
+    let found: Vec<Violation> = patch
+        .mutations
+        .as_slice()
+        .iter()
+        .enumerate()
+        .filter(|(_, mutation)| {
+            matches!(mutation, Mutation::Upgrade { .. } | Mutation::Relink { .. })
+        })
+        .map(|(position, _)| {
+            violation(
+                ViolationCode::MutationNotForTarget,
+                Some(u32::try_from(position).unwrap_or(u32::MAX)),
+                "an upgrade or re-link is applied by confirming its proposal (B7, B9)".to_owned(),
+            )
+        })
+        .collect();
+    Violations::new(found)
+        .ok()
+        .map(|violations| Rejection::Invalid { violations })
+}
+
+/// The revision before `revision`: the base a committed patch named, given the revision its
+/// receipt says it produced (A17: each patch moves its target by one).
+pub(crate) fn before(revision: Revision) -> Revision {
+    Revision::try_from(revision.get().saturating_sub(1)).unwrap_or(Revision::NONE)
+}
+
+/// A violation the service finds itself, before the engine sees the patch (A15: the same
+/// shape as the engine's).
+pub(crate) fn violation(code: ViolationCode, mutation: Option<u32>, message: String) -> Violation {
+    Violation {
+        code,
+        at: Location {
+            mutation,
+            ..Location::default()
+        },
+        message,
+        related: Vec::new(),
+        limit: None,
+        bypassable: None,
+        failures: std::collections::BTreeSet::new(),
+        chains: None,
+        caused_by: std::collections::BTreeSet::new(),
+    }
+}
+
 /// Runs an engine call, catching a panic (PRACTICES, Programmer errors panic: the engine
 /// works on a private candidate and nothing commits, so the request fails and the host logs
 /// it with the domain).
-fn engine<T>(domain: &Domain, call: impl FnOnce() -> T) -> Result<T, ServiceError> {
+pub(crate) fn engine<T>(domain: &Domain, call: impl FnOnce() -> T) -> Result<T, ServiceError> {
     catch_unwind(AssertUnwindSafe(call)).map_err(|payload| {
         let message = payload
             .downcast_ref::<&str>()
