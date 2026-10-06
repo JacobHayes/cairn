@@ -11,9 +11,11 @@ import {
   type ApplyRequest,
   type DerivationKey,
   type Derived,
+  type DraftRequest,
   type PreviewRequest,
   type ProjectionAnswer,
   type ProjectionRequest,
+  type RenderedDraft,
 } from "./types.ts";
 
 type Pending = { resolve: (text: string) => void; reject: (failure: HostFailure) => void };
@@ -106,6 +108,11 @@ export class DeriveWorker {
   /** One projection of the held journey. */
   async project<R extends ProjectionRequest>(journey: string, request: R): Promise<ProjectionAnswer<R>> {
     return parsed<ProjectionAnswer<R>>(await this.projectText(journey, request));
+  }
+
+  /** A10, G3: a message draft on the held journey rendered with its context. */
+  async renderDraft(journey: string, request: DraftRequest): Promise<RenderedDraft> {
+    return parsed<RenderedDraft>(await this.#ask({ op: "render_draft", journey, request }));
   }
 
   /** A proposal previewed against the held journey (C14), as the module wrote it. */

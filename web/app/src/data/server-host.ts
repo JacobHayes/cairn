@@ -51,6 +51,15 @@ export function serverHost(origin: string, engine: Engine): Host {
       answered(journey, () =>
         client.GET("/journeys/{id}/document", { params: { path: { id: journey } }, parseAs: "text" }),
       ),
+    history: (journey, node, after) =>
+      answered(journey, () =>
+        client.GET("/journeys/{id}/history", {
+          params: {
+            path: { id: journey },
+            query: { ...(node === undefined ? {} : { node }), ...(after === undefined ? {} : { after }) },
+          },
+        }),
+      ),
     send: (patch: Patch, note?: Markdown) => sendOver(client, note)(patch),
     openTicks: eventSourceTicks(origin),
   };

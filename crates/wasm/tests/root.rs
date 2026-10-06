@@ -168,3 +168,60 @@ fn a_clock_reading_that_runs_backwards_or_is_no_duration_is_refused_not_a_panic(
         "a forward reading still takes"
     );
 }
+
+/// J4: the root's history is the API's `History` for the same page, for the journey and for
+/// one node, and a journey it does not hold is missing.
+#[test]
+fn history_answers_as_the_api_for_the_journey_and_for_one_node() {
+    let root = BrowserRoot::seeded().unwrap();
+    let journey: cairn_schema::JourneyId = "j_vendor_eval".parse().unwrap();
+    let access: cairn_schema::NodeKey = "n_access".parse().unwrap();
+    for node in [None, Some(&access)] {
+        let served =
+            cairn_wasm::now_or_never(root.service().history(&journey, node, None)).unwrap();
+        let expected = serde_json::to_string(&wire::History::from(served)).unwrap();
+        let written = node.map_or(String::new(), ToString::to_string);
+        assert_eq!(
+            root.history("j_vendor_eval", &written, -1.0).unwrap(),
+            expected
+        );
+    }
+    let page: cairn_wasm::HistoryAnswer =
+        serde_json::from_str(&root.history("j_vendor_eval", "n_access", -1.0).unwrap()).unwrap();
+    let events = page.patches.iter().flat_map(|patch| &patch.events);
+    assert!(events.clone().count() > 0);
+    assert!(
+        events
+            .into_iter()
+            .all(|event| event.nodes().contains(&access))
+    );
+    let missing = root.history("j_absent", "", -1.0).unwrap_err();
+    assert!(matches!(thrown(&missing), HostError::Missing { .. }));
+    let fractional = root.history("j_vendor_eval", "", 1.5).unwrap_err();
+    assert!(matches!(thrown(&fractional), HostError::Unreadable { .. }));
+}
+
+/// A10, G3: a node's message draft renders with the journey's context, a placeholder with no
+/// value as a marker; a resource that is not a draft is missing.
+#[test]
+fn a_message_draft_renders_with_the_journey_context_in_the_derivation() {
+    let root = BrowserRoot::seeded().unwrap();
+    let text = root.document("j_vendor_eval", NOW).unwrap();
+    let derivation = cairn_wasm::Derivation::new(&text).unwrap();
+    let name = derivation.document().journey.header.name.to_string();
+    let request = r#"{"key":"n_access","resource":"a_access_request"}"#;
+    let rendered: cairn_schema::RenderedDraft =
+        serde_json::from_str(&derivation.render_draft(request).unwrap()).unwrap();
+    assert!(
+        rendered
+            .segments
+            .contains(&cairn_schema::RenderedSegment::Text(name))
+    );
+    assert!(
+        rendered.is_complete(),
+        "every placeholder of the fixture's draft has a value"
+    );
+    let template = r#"{"key":"n_final_report","resource":"a_report_template"}"#;
+    let refused = derivation.render_draft(template).unwrap_err();
+    assert!(matches!(thrown(&refused), HostError::Missing { .. }));
+}

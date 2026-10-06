@@ -39,8 +39,8 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 4.7 | The binary | `crates/cairn` | 4.4, 4.6 | in progress |
 | 4.8 | Service completion: priority, projections, proposals, route files | `crates/service` | 2.7, 4.1 | landed `lsmmlrpw` |
 | 4.9 | HTTP API completion: projections, proposals, route files | `crates/api`, `openapi/`, `web/client` | 4.8, 4.2 | landed `tsqvkvpw` |
-| 5.1 | Node detail and explanations; notes, links, artifacts | `web/app` | 4.6 | in progress |
-| 5.2 | Canvas, semantic zoom, trace, layout | `web/app` | 5.1 |  |
+| 5.1 | Node detail and explanations; notes, links, artifacts | `web/app` | 4.6 | landed `qrnonvxl` |
+| 5.2 | Canvas, semantic zoom, trace, layout | `web/app` | 5.1 | in progress |
 | 5.3 | List, next, triage, decision walkthrough | `web/app` | 5.2 |  |
 | 5.4 | Decision view, timeline, status summary | `web/app` | 5.2 (beside 5.3) |  |
 | 5.5 | Journey index and overview, route screens, entities, identity | `web/app` | 5.3 |  |

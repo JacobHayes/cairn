@@ -9,10 +9,12 @@
 
 use std::collections::BTreeSet;
 
-use cairn_engine::{Derived, DerivedJourney, Graph, ProjectionError, derive, engine_version};
+use cairn_engine::{
+    Derived, DerivedJourney, DraftContext, Graph, ProjectionError, derive, engine_version,
+};
 use cairn_schema::{
-    Cursor, DomainDocument, EngineVersion, ExplainedField, KindKey, ListQuery, NextQuery, NodeKey,
-    NodeKind, SnapshotScope,
+    AttachmentKey, Cursor, DomainDocument, EngineVersion, ExplainedField, KindKey, ListQuery,
+    NextQuery, NodeKey, NodeKind, RenderedDraft, ResourceContent, SnapshotScope, Url,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -116,6 +118,22 @@ pub enum Projection {
     },
 }
 
+/// A10, G3: a node's message draft to render with the journey's context. The server has no
+/// such read: a draft is rendered where the document is derived, which for the UI is the
+/// browser (ARCHITECTURE, Web UI: data flow).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct DraftRequest {
+    /// The node the resource is on.
+    pub key: NodeKey,
+    /// The resource, a message draft.
+    pub resource: AttachmentKey,
+    /// The link to the journey, which only the page knows (`{{journey.url}}`); none renders
+    /// a marker.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub url: Option<Url>,
+}
+
 /// A domain document with its journey validated and derived (D3): what every projection reads.
 #[wasm_bindgen]
 #[derive(Debug)]
@@ -183,6 +201,41 @@ impl Derivation {
             ),
         })
     }
+
+    /// A10, G3: the message draft `request` names, rendered with the journey's context:
+    /// its header, the page's link to it, and the deployment's entities.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError::Missing`] when the node, or a message draft by that key on it, is not in
+    /// the journey.
+    pub fn rendered(&self, request: &DraftRequest) -> Result<RenderedDraft, HostError> {
+        let missing = |message: String| HostError::Missing { message };
+        let node = self
+            .graph
+            .node(&request.key)
+            .ok_or_else(|| missing(format!("no node {}", request.key)))?;
+        let template = node
+            .resources
+            .iter()
+            .find(|resource| resource.key == request.resource)
+            .and_then(|resource| match &resource.content {
+                ResourceContent::MessageDraft(template) => Some(template),
+                _ => None,
+            })
+            .ok_or_else(|| {
+                missing(format!(
+                    "no message draft {} on {}",
+                    request.resource, request.key
+                ))
+            })?;
+        let context = DraftContext {
+            header: &self.document.journey.header,
+            url: request.url.as_ref(),
+            deployment: &self.document.inputs.deployment,
+        };
+        Ok(DerivedJourney::new(&self.graph, &self.derived).render_draft(template, &context))
+    }
 }
 
 #[wasm_bindgen]
@@ -211,6 +264,18 @@ impl Derivation {
     /// The JSON of a [`HostError`]: an unreadable request, or a node the journey lacks.
     pub fn project(&self, request: &str) -> Result<String, String> {
         Ok(self.projected(&read("projection", request)?)?)
+    }
+
+    /// A10, G3: a message draft rendered: `request` is the JSON of a [`DraftRequest`]; the
+    /// answer is the JSON of a [`RenderedDraft`].
+    ///
+    /// # Errors
+    ///
+    /// The JSON of a [`HostError`]: an unreadable request, or a node or draft the journey
+    /// lacks.
+    #[wasm_bindgen(js_name = renderDraft)]
+    pub fn render_draft(&self, request: &str) -> Result<String, String> {
+        Ok(json(&self.rendered(&read("draft request", request)?)?))
     }
 
     /// What it was derived from, as a query cache keys it (ARCHITECTURE, Web UI): the

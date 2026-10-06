@@ -3,7 +3,7 @@
 // as fetched and posts it once per revision; the worker derives it once and holds the
 // derivation by journey until a newer revision replaces it, answering projections, previews,
 // and local applies over it as the module's JSON text, which the page parses.
-import type { ApplyRequest, HostError, PreviewRequest, ProjectionRequest } from "./types.ts";
+import type { ApplyRequest, DraftRequest, HostError, PreviewRequest, ProjectionRequest } from "./types.ts";
 
 /** What the page asks the worker. */
 export type WorkerRequest =
@@ -11,6 +11,7 @@ export type WorkerRequest =
   | { op: "load"; document: string }
   | { op: "derived"; journey: string }
   | { op: "project"; journey: string; request: ProjectionRequest }
+  | { op: "render_draft"; journey: string; request: DraftRequest }
   | { op: "preview"; journey: string; request: PreviewRequest }
   | { op: "apply"; journey: string; request: ApplyRequest }
   | { op: "release"; journey: string }

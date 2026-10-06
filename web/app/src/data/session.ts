@@ -29,6 +29,8 @@ const realTimers: Timers = {
 
 export class Session {
   readonly host: Host;
+  /** The derive worker: projections and drafts over the journeys it holds. */
+  readonly deriver: Deriver;
   readonly capabilities: Capabilities;
   readonly subscription: Subscription;
   readonly skew = new SkewLatch();
@@ -42,6 +44,7 @@ export class Session {
 
   private constructor(parts: SessionParts, capabilities: Capabilities) {
     this.host = parts.host;
+    this.deriver = parts.deriver;
     this.capabilities = capabilities;
     this.#timers = parts.timers ?? realTimers;
     this.#now = parts.now ?? (() => new Date());

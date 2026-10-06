@@ -24,6 +24,7 @@ import {
   type ApplyRequest,
   type DerivationKey,
   type Derived,
+  type DraftRequest,
   type ExportRequest,
   type ImportRequest,
   type PreviewRequest,
@@ -77,6 +78,11 @@ export class DerivedDocument {
   /** One projection. */
   project<R extends ProjectionRequest>(request: R): ProjectionAnswer<R> {
     return parsed<ProjectionAnswer<R>>(this.projectText(request));
+  }
+
+  /** A10, G3: a node's message draft rendered with journey context, as the module wrote it. */
+  renderDraftText(request: DraftRequest): string {
+    return hosted(() => this.#derivation.renderDraft(JSON.stringify(request)));
   }
 
   /** Releases the derivation's memory in the module, unless the module trapped. */

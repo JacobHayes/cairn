@@ -29,6 +29,16 @@ export class BrowserRoot {
      */
     document(journey: string, now: string): string;
     /**
+     * J4: a page of a journey's history, or of `node`'s (empty for the whole journey), after
+     * the log position `after` (negative for the first page), as `GET /journeys/{id}/history`
+     * answers it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: no such journey, or an unreadable input.
+     */
+    history(journey: string, node: string, after: number): string;
+    /**
      * The journey index (C16), as `GET /journeys` answers it.
      *
      * # Errors
@@ -96,6 +106,16 @@ export class Derivation {
      * The JSON of a [`HostError`]: an unreadable request, or a node the journey lacks.
      */
     project(request: string): string;
+    /**
+     * A10, G3: a message draft rendered: `request` is the JSON of a [`DraftRequest`]; the
+     * answer is the JSON of a [`RenderedDraft`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: an unreadable request, or a node or draft the journey
+     * lacks.
+     */
+    renderDraft(request: string): string;
 }
 
 /**
@@ -201,6 +221,7 @@ export interface InitOutput {
     readonly browserroot_capabilities: (a: number, b: number) => void;
     readonly browserroot_deployment: (a: number, b: number) => void;
     readonly browserroot_document: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly browserroot_history: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
     readonly browserroot_journeys: (a: number, b: number) => void;
     readonly browserroot_new: (a: number) => void;
     readonly browserroot_patch: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
@@ -209,6 +230,7 @@ export interface InitOutput {
     readonly derivation_key: (a: number, b: number) => void;
     readonly derivation_new: (a: number, b: number, c: number) => void;
     readonly derivation_project: (a: number, b: number, c: number, d: number) => void;
+    readonly derivation_renderDraft: (a: number, b: number, c: number, d: number) => void;
     readonly engineVersion: (a: number) => void;
     readonly exportRoute: (a: number, b: number, c: number) => void;
     readonly importRoute: (a: number, b: number, c: number) => void;

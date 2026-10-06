@@ -21,6 +21,7 @@ function App({ session }: { session: Session }) {
           <Route element={<Shell />}>
             <Route index element={<JourneyIndex />} />
             <Route path="journeys/:id" element={<JourneyPage />} />
+            <Route path="journeys/:id/nodes/:key" element={<JourneyPage />} />
           </Route>
         </Routes>
       </HashRouter>

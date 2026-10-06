@@ -54,7 +54,7 @@ e2e_rows=$(node -e '
 
 # The pictures.
 rm -f "$proof"/*.png "$proof"/*.webm
-(cd web/app && CAIRN_PROOF_OUT=$proof "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts --reporter=line) \
+(cd web/app && CAIRN_PROOF_OUT=$proof "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/shell.proof.ts --reporter=line) \
   || miss "the proof run failed"
 rm -rf "$proof/video"
 for picture in 1-index-in-browser 2-journey-derived-in-worker 3a-patch-saved-with-consequences \

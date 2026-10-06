@@ -7,7 +7,7 @@ import type { Schema } from "@cairn/client";
 import { BrowserRoot, type RootSubscription } from "../generated/cairn_wasm.js";
 
 import { loadEngine, type Engine, type WasmSource } from "./engine.ts";
-import { hosted, parsed, stoppedBy, type PatchRequest, type Taken } from "./types.ts";
+import { hosted, parsed, stoppedBy, type HistoryPage, type PatchRequest, type Taken } from "./types.ts";
 
 /** Hears a subscription's ticks: the first time, the current revisions (`first`). */
 export type TickListener = (ticks: Schema<"Tick">[], first: boolean) => void;
@@ -53,6 +53,14 @@ export class InBrowserHost {
   /** A journey's domain document now, as the server answers it: the text to derive. */
   documentText(journey: string): string {
     return hosted(() => this.#root.document(journey, this.#clock()));
+  }
+
+  /**
+   * J4: a page of a journey's history, or of `node`'s, after the log position `after`, as
+   * `GET /journeys/{id}/history` answers it.
+   */
+  history(journey: string, node?: string, after?: number): HistoryPage {
+    return parsed<HistoryPage>(hosted(() => this.#root.history(journey, node ?? "", after ?? -1)));
   }
 
   /** The deployment (E6). */

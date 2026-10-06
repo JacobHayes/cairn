@@ -81,6 +81,8 @@ async function answer(request: WorkerRequest): Promise<string> {
       return holding(request.journey).derivation.derivedText();
     case "project":
       return holding(request.journey).derivation.projectText(request.request);
+    case "render_draft":
+      return holding(request.journey).derivation.renderDraftText(request.request);
     case "preview":
       return ready().previewText(holding(request.journey).document, request.request);
     case "apply":

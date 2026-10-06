@@ -24,7 +24,7 @@ mod root;
 #[cfg(feature = "server")]
 pub mod cases;
 
-pub use derivation::{Derivation, Projection, engine_version_text, read_document};
+pub use derivation::{Derivation, DraftRequest, Projection, engine_version_text, read_document};
 pub use error::HostError;
 pub use files::{ExportRequest, ImportRequest, export_route, exported, import_route, imported};
 pub use local::{
@@ -32,8 +32,8 @@ pub use local::{
     touched, touched_overlaps,
 };
 pub use root::{
-    BrowserRoot, JourneyPage, JourneySummary, PatchAnswer, PatchRequest, RootSubscription, Taken,
-    Tick,
+    BrowserRoot, HistoryAnswer, JourneyPage, JourneySummary, PatchAnswer, PatchRequest,
+    RootSubscription, Taken, Tick,
 };
 
 use std::future::Future;

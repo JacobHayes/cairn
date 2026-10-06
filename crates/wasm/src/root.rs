@@ -14,8 +14,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cairn_schema::{
-    Actor, Consequences, Domain, JourneyId, JourneyStatus, Lineage, Markdown, Patch, PatchReceipt,
-    ProposalId, RankConstants, Revision, RevisionOf, Timestamp, Title, VersionNumber,
+    Actor, Consequences, Domain, JourneyId, JourneyStatus, Lineage, Markdown, NodeKey, Patch,
+    PatchEvents, PatchReceipt, ProposalId, RankConstants, Revision, RevisionOf, Timestamp, Title,
+    VersionNumber,
 };
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, WriteError, Written,
@@ -163,6 +164,39 @@ fn failed(error: impl std::fmt::Display) -> HostError {
     }
 }
 
+/// J4: `GET /journeys/{id}/history`'s answer, the API's `History`: a page of events grouped
+/// by patch, and where the next page starts.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct HistoryAnswer {
+    /// At most a page of events, grouped by patch, in log order.
+    pub patches: Vec<PatchEvents>,
+    /// Pass as `after` for the next page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<u64>,
+}
+
+/// A log position from JavaScript's number: none when negative, else a whole number within
+/// the integers a double holds exactly.
+fn position(after: f64) -> Result<Option<u64>, HostError> {
+    const EXACT_MAX: f64 = 9_007_199_254_740_991.0;
+    if after < 0.0 {
+        return Ok(None);
+    }
+    if after.fract() != 0.0 || after > EXACT_MAX {
+        return Err(HostError::unreadable(
+            "after",
+            format!("{after} is not a log position"),
+        ));
+    }
+    #[expect(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        reason = "a whole number from 0 to 2^53 - 1, checked above"
+    )]
+    Ok(Some(after as u64))
+}
+
 /// The browser host's composition root.
 #[wasm_bindgen]
 #[derive(Debug)]
@@ -239,6 +273,30 @@ impl BrowserRoot {
             Ok(Written::AlreadyApplied { receipt }) => Ok(PatchAnswer::AlreadyApplied { receipt }),
             Err(WriteError::Rejected(rejection)) => Err(HostError::Rejected { rejection }),
             Err(WriteError::Failed(error)) => Err(failed(error)),
+        }
+    }
+
+    /// J4: a page of the journey's history, or of the events naming `node`, from the log
+    /// position `after`, as `GET /journeys/{id}/history` answers it.
+    ///
+    /// # Errors
+    ///
+    /// [`HostError::Missing`] when the journey does not exist; when the store fails.
+    pub fn history_page(
+        &self,
+        journey: &JourneyId,
+        node: Option<&NodeKey>,
+        after: Option<u64>,
+    ) -> Result<HistoryAnswer, HostError> {
+        match now_or_never(self.service.history(journey, node, after)) {
+            Ok(history) => Ok(HistoryAnswer {
+                patches: history.patches,
+                next: history.next,
+            }),
+            Err(cairn_service::ReadError::JourneyMissing(id)) => Err(HostError::Missing {
+                message: format!("no journey {id}"),
+            }),
+            Err(error) => Err(failed(error)),
         }
     }
 
@@ -326,6 +384,29 @@ impl BrowserRoot {
             }
             .into()),
         }
+    }
+
+    /// J4: a page of a journey's history, or of `node`'s (empty for the whole journey), after
+    /// the log position `after` (negative for the first page), as `GET /journeys/{id}/history`
+    /// answers it.
+    ///
+    /// # Errors
+    ///
+    /// The JSON of a [`HostError`]: no such journey, or an unreadable input.
+    pub fn history(&self, journey: &str, node: &str, after: f64) -> Result<String, String> {
+        let id: JourneyId = journey
+            .parse()
+            .map_err(|error| HostError::unreadable("journey", format!("{error:?}")))?;
+        let node: Option<NodeKey> = if node.is_empty() {
+            None
+        } else {
+            Some(
+                node.parse()
+                    .map_err(|error| HostError::unreadable("node", format!("{error:?}")))?,
+            )
+        };
+        let after = position(after)?;
+        Ok(json(&self.history_page(&id, node.as_ref(), after)?))
     }
 
     /// The deployment: its entities, aliases, and revision (E6).

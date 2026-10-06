@@ -2,7 +2,15 @@
 // either the server over HTTP (server-host.ts) or the in-browser host with no server
 // (browser-host.ts). Both answer the API's JSON, so everything above this reads either.
 import type { Answered, HttpFailure, OpenTicks, Overlaps, Schema } from "@cairn/client";
-import type { DerivationKey, Derived, ProjectionAnswer, ProjectionRequest } from "@cairn/wasm";
+import type {
+  DerivationKey,
+  Derived,
+  DraftRequest,
+  HistoryPage,
+  ProjectionAnswer,
+  ProjectionRequest,
+  RenderedDraft,
+} from "@cairn/wasm";
 
 export type Capabilities = Schema<"Capabilities">;
 export type Deployment = Schema<"Deployment">;
@@ -46,6 +54,8 @@ export interface Host {
   documentText(journey: string): Promise<string>;
   /** The deployment context (E6). */
   deployment(): Promise<Deployment>;
+  /** J4: a page of a journey's history, or of `node`'s, after the log position `after`. */
+  history(journey: string, node?: string, after?: number): Promise<HistoryPage>;
   /** Sends one patch, its events carrying `note` (J1). */
   send(patch: Patch, note?: Markdown): Promise<Answered<HttpFailure>>;
   /** H6: the host's revision ticks. */
@@ -57,5 +67,7 @@ export interface Deriver {
   load(document: string): Promise<DerivationKey>;
   derived(journey: string): Promise<Derived>;
   project<R extends ProjectionRequest>(journey: string, request: R): Promise<ProjectionAnswer<R>>;
+  /** A10, G3: a message draft rendered with the held journey's context. */
+  renderDraft(journey: string, request: DraftRequest): Promise<RenderedDraft>;
   release(journey: string): Promise<void>;
 }

@@ -50,6 +50,10 @@ export class FakeHost implements Host {
     return Promise.resolve({ revision: this.deploymentRevision });
   }
 
+  history() {
+    return Promise.resolve({ patches: [] });
+  }
+
   documentText(journey: string): Promise<string> {
     this.fetches.set(journey, (this.fetches.get(journey) ?? 0) + 1);
     const held = this.journeysHeld.get(journey);
@@ -123,6 +127,10 @@ export class FakeDeriver implements Deriver {
 
   project(): Promise<never> {
     return Promise.reject(new Error("no projections in the fake"));
+  }
+
+  renderDraft(): Promise<never> {
+    return Promise.reject(new Error("no drafts in the fake"));
   }
 
   release(journey: string): Promise<void> {

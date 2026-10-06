@@ -63,6 +63,25 @@ export interface ListQuery {
   cursor?: Schema<"Cursor">;
 }
 
+/** `crates/wasm` `DraftRequest`: a node's message draft to render with journey context (A10, G3). */
+export interface DraftRequest {
+  key: NodeKey;
+  resource: Schema<"AttachmentKey">;
+  /** The page's link to the journey, for `{{journey.url}}`; none renders a marker. */
+  url?: string;
+}
+
+/** `cairn_schema::RenderedSegment`: text, or a placeholder with no value, as written. */
+export type RenderedSegment = { text: string } | { missing: string };
+
+/** `cairn_schema::RenderedDraft`: a message draft rendered with journey context (A10, G3). */
+export interface RenderedDraft {
+  segments: RenderedSegment[];
+}
+
+/** `crates/wasm` `HistoryAnswer`, the API's `History`: a page of events grouped by patch (J4). */
+export type HistoryPage = Schema<"History">;
+
 /** D3: every node's derived values with their explanation inputs, the frontiers, the stalled diagnostic. */
 export type Derived = Schema<"Derived">;
 
