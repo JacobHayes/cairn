@@ -50,6 +50,10 @@ jobs:
   sim:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
+    env:
+      # mise builds cargo-patina with whatever cargo rustup resolves; without this the
+      # runner's default toolchain builds it and fails the pinned crate's rust-version.
+      RUSTUP_TOOLCHAIN: "1.99.0"
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
