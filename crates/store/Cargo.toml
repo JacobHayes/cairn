@@ -1,0 +1,24 @@
+[package]
+name = "cairn-store"
+description = "The Store trait, the in-memory backend, and the conformance suite every backend passes."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[features]
+# The conformance suite (`cairn_store::conformance`), for the tests of every backend.
+conformance = []
+
+[dependencies]
+cairn-schema.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+cairn-store = { workspace = true, features = ["conformance"] }
+
+[lints]
+workspace = true

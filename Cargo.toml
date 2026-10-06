@@ -13,6 +13,8 @@ publish = false
 [workspace.dependencies]
 cairn-engine = { path = "crates/engine" }
 cairn-schema = { path = "crates/schema" }
+cairn-store = { path = "crates/store" }
+cairn-store-turso = { path = "crates/store-turso" }
 jsonschema = { version = "0.58.5", default-features = false }
 jiff = { version = "0.2.37", default-features = false, features = ["serde", "std"] }
 proptest = { version = "1.11.0", default-features = false, features = ["std", "bit-set"] }
@@ -22,6 +24,10 @@ serde-saphyr = "1.3.0"
 serde_json = { version = "1.0", features = ["float_roundtrip"] }
 serde_path_to_error = "0.1.20"
 sha2 = "0.11.0"
+# The store backends (ARCHITECTURE, Backends): Turso pinned exactly while pre-1.0, without its
+# default allocator and full-text search; tokio for the Turso backend's pool alone.
+tokio = { version = "1.53.2", default-features = false }
+turso = { version = "=0.8.2", default-features = false }
 # The patina SDK (PRACTICES, Simulation with patina), all at one revision: the same one
 # `cargo-patina` is pinned to when the simulation track adds it to mise.toml. A crate opts
 # in with `patina-dst.workspace = true`; until one does, cargo resolves none of them.

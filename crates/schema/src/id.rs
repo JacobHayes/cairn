@@ -322,6 +322,10 @@ prefixed!(
     /// An agent's id (`ag_`): the agent token a change was made through, acting for a user.
     AgentId, "ag_"
 );
+prefixed!(
+    /// An assistant conversation's id (`cv_`), outside every domain.
+    ConversationId, "cv_"
+);
 
 impl KindKey {
     /// The built-in `owner` kind's key.

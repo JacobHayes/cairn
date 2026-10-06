@@ -58,6 +58,69 @@ Judgment calls made while implementing the briefs, for the user to review (`AGEN
 - Alternatives: padding each function to two assertions (restating what the types already guarantee).
 - What would change it: the user holding the per-function average literally, or simulation finding a bug an assertion on a smaller function would have caught.
 
+## 2026-10-06, brief 3.1: a Turso commit writes the revision row of every domain it depends on, and the store numbers the logs
+
+- Question: Turso's MVCC detects write-write conflicts only; a read is never checked against a concurrent write (write skew). Review round 1 found three consequences: a journey patch starting to reference an entity and a merge of that entity could both commit (the merge missing the reference, E6); a proposal created while its journey is hard-deleted could survive the deletion (A19); and a log position Turso numbers at insert could become visible after a higher one a reader had already paged past, so history paging skipped it (J5).
+- Call: a commit also writes, without changing it, the revision row of every domain or proposal a precondition names, of a proposal's destination, and of the deployment when it writes an entity reference, so any commit that would invalidate what it read conflicts with it (retried once, then stale). Log rows (events, the auth log) are numbered by the store from one sequencer per log in the process, held by a commit until its transaction ends; a reader reads below the lowest position still held, so every position it can see belongs to a transaction that ended before its read began. A proposal to a hard-deleted journey's id is rejected like a create. Turso cases: `a_reference_and_a_merge_in_flight_do_not_both_commit`, `a_proposal_and_its_journeys_deletion_in_flight_do_not_both_commit`, `history_paging_never_skips_an_event_committed_late`; each fails with its fix removed.
+- Alternatives: re-reading the preconditions just before COMMIT (still a race); one global commit counter (every commit serialized, which ARCHITECTURE rejects); history pages by time (not unique, not monotonic across commits).
+- What would change it: several processes sharing one database (`Later`), which would need the sequencer in the database; a Turso that checks reads (serializable MVCC).
+
+## 2026-10-06, brief 3.1: what a change set's writes mean to the store
+
+- Question: brief 1.2 made an event's delta a list of writes (put a record's after-state, remove an address, copy a graph) but left what a store does with each, and the engine (2.1, built alongside) must emit deltas that mean the same to every backend.
+- Call: a put stores the record at its address, replacing what was there; a whole node's put carries its edges out, participations, and resources, and replaces them. A removal removes everything its address covers: a node takes its fields, the edges at either end, its participations and resources, its state, pin, snooze, overrides, tombstone, and the notes on it (the touched-set rule, H5); a graph's removal clears it; a draft's removal takes its graph; a journey's domain removal takes its fields, graph, proposals, and events (A19). A copy puts every record of one graph into another. A node field is written, never removed; a published version is written once, by the copy that publishes it; routes, versions, the deployment, and deleted journey ids are never removed (A11, A19). Anything else is a malformed change set, refused whole. The memory backend is the reference and the conformance suite (`writes_follow_the_reference_semantics` and the rest) holds Turso to it.
+- Alternatives: per-record removal only (the engine would list every row a removal reaches, and a missed one would be an orphan); a removal of a node leaving its tombstone (the tombstone is written after the removal in the same delta instead).
+- What would change it: the engine needing a write the list lacks, or a removal that should leave something on the node behind.
+
+## 2026-10-06, brief 3.1: the revisions a commit moves besides its target's
+
+- Question: A17, E6, and H5 say which revision a patch checks, but a few commits write outside their target: entity creates riding in a journey or route patch, a journey's hard delete (its deleted id is a deployment record), and patches to proposals.
+- Call: a riding entity create moves the deployment revision once per commit (as brief 1.2's fixtures assume); the deleted-journey record does not, since it is not part of the deployment document and would only make concurrent journey patches stale. A patch to a proposal moves the proposal's revision, carried on the record it writes, which must be the base plus one; its destination's revision does not move. A journey's or route's first commit must write its fields. A published version's revision is always 1. Each stored receipt records what its commit moved (its target's revision, the deployment's, and the revision of any proposal it wrote, as applying one does) and what it wrote in the deployment, which is how a stale rejection finds what intervened, even after a hard delete has removed the events of a journey whose patch created an entity.
+- Alternatives: moving the deployment revision on a hard delete (the deployment log keeps the event either way); the store minting proposal revisions itself (then the record the engine wrote and the one stored would differ).
+- What would change it: a view of the deployment that lists deleted journeys, which would then need the revision to move.
+
+## 2026-10-06, brief 3.1: the Store trait is generic, with Send futures, not object-safe
+
+- Question: ARCHITECTURE asks for an async trait that names no runtime, with the composition root picking a backend. Async trait methods are not object-safe, and a multi-threaded server needs the futures to be `Send`.
+- Call: `Store` (with `AuthStore` and `ConversationStore`, its supertraits) declares each method as returning `impl Future + Send`; the service layer (4.1) is generic over `S: Store`, and each composition root names its backend's type. No `async-trait` or boxing dependency. The Turso backend boxes its commit internally, since a commit's state machine is tens of kilobytes.
+- Alternatives: `async-trait` boxing every call (a dependency and an allocation per call, for a choice made once per process); an enum over the two backends (the browser host would carry Turso).
+- What would change it: a host that must choose among more backends at run time without generics.
+
+## 2026-10-06, brief 3.1: the store's lists page by the history page limit
+
+- Question: PRACTICES (Explicit limits) names a page size only for history and the snapshot (200), but the journey index, text search, the auth log, and a user's conversations are lists that grow with use.
+- Call: every list the store returns pages at 200 items (`PAGE_ITEM_COUNT_MAX` in `crates/store/src/limits.rs`, beside the store connection limits), with a cursor; no new limit. Hits within one journey's search result are bounded by the graph's own cap. A conversation is stored whole and held to the 16 MiB graph cap.
+- Alternatives: new named limits for each list (sign-off needed); unbounded lists.
+- What would change it: an index that needs larger pages, or a conversation that outgrows the cap.
+
+## 2026-10-06, brief 3.1: the schema's journey row and graph registry
+
+- Question: ARCHITECTURE's Schema outline put a journey's fields and revision on its `graphs` row. A commit's first write is its domain's revision row, and a journey's fields arrive with its first commit, so the row a commit locks must exist (or be created) before the graph rows a commit writes.
+- Call: `journeys` holds the journey domain row (fields and revision), as `routes` does for a route, and `graphs` is the registry every content and state row belongs to; drafts and versions have their own small tables; the entities an answer, role fill, or participation names are rows of their own, which is how the journeys referencing an entity are found (E6); events have an `event_nodes` index for a node's history. ARCHITECTURE's outline is updated to match.
+- Alternatives: the outline as written, with nullable journey fields on `graphs` (CHECK constraints could not hold them).
+- What would change it: nothing expected; the layout is the implementer's within the outline.
+
+## 2026-10-06, brief 3.1: Turso checks no foreign key against a concurrent transaction, so the domain revision row serializes parents and children
+
+- Question: at the pinned `turso =0.8.2`, under MVCC (`BEGIN CONCURRENT`), a parent's delete and a child's insert made in two concurrent transactions both commit, leaving an orphan (the readiness scout's open probe item, reproduced by `conformance::turso_lets_a_child_insert_race_its_parents_delete`). ARCHITECTURE (Backends) asks for foreign keys, and for any rule Turso cannot hold to be enforced in the commit transaction, tested, and recorded here.
+- Call: the foreign keys stay, deferred to COMMIT (which Turso checks within one transaction), and the store never relies on them across transactions. Every parent row and its children belong to one domain, or the parent is never deleted (routes, published versions, users); every commit's first write is its domain's revision row, so two commits that could race a parent against its child conflict, and the loser is retried once and then answered stale. `conformance::a_delete_racing_a_child_insert_leaves_no_orphan` races a journey's hard delete against a node insert into it and finds no orphan rows. Unique keys need no such help: two concurrent inserts of one key conflict at commit (`two_creates_of_one_journey_in_flight_yield_one_journey`, `two_entity_creates_of_one_key_in_flight_yield_one_entity`).
+- Alternatives: WAL with `BEGIN IMMEDIATE` (every writer serialized, which ARCHITECTURE rejects); re-checking every foreign key at the end of each commit (still racy under snapshot isolation).
+- What would change it: a Turso release that checks foreign keys across transactions (the gap test starts failing), or a table whose parent can be deleted from another domain than its children.
+
+## 2026-10-06, brief 3.1: uniqueness a patch may pass through is checked at the end of the commit
+
+- Question: ARCHITECTURE's Schema outline makes (graph_id, parent_key, id) unique on nodes, and H3 makes emails unique across entities, but a valid patch can pass through a duplicate on the way (swapping two siblings' ids; moving an email from one entity to another, in either order), and neither SQLite nor Turso has a deferred unique constraint.
+- Call: both are checked inside the commit transaction, after its writes, on the graphs and deployment it produced, in both backends, and a duplicate rejects the patch (`duplicate_sibling_id`, `email_taken`); the tables keep plain indexes for the lookup. Primary keys stay unique constraints, since no patch passes through a duplicate key. Conformance cases: `sibling_ids_may_swap_within_a_commit_but_not_end_duplicated`, `emails_may_move_between_entities_within_a_commit_but_stay_unique`.
+- Alternatives: immediate unique indexes (they reject valid patches); ordering a change set's writes so no duplicate appears (the store would need the engine's knowledge of what each write means).
+- What would change it: deferred unique constraints in Turso, or a Postgres backend (which has them).
+
+## 2026-10-06, brief 3.1: a commit that conflicts twice is answered stale with the revision in flight
+
+- Question: ARCHITECTURE (Concurrency and notification) retries a Turso write-write conflict once, then answers a revision conflict. When the second attempt conflicts too, the commit it lost to is still in flight: no revision has moved yet, so there is no current revision to report.
+- Call: the answer is `stale`, listing the target with the revision the in-flight commit is producing (the base plus one), any other revision the patch named that has moved, and the touched set of whatever has committed since. The client's refetch-and-resubmit is the retry; no backoff knob.
+- Alternatives: report the revision read (then `expected` equals `current`, which reads as no conflict); retry with a backoff (a knob, and commits take milliseconds).
+- What would change it: the multiplayer testbed (6.1) seeing second conflicts often.
+
 ## 2026-10-06, brief 1.2: entity creates in another domain's patch advance the deployment revision
 
 - Question: E6 lets an entity create ride in any patch with no deployment revision check, and asks a journey patch that writes an entity reference to name the deployment revision it was validated against. Whether a create riding in a journey patch advances the deployment revision is left open, and the fixtures need an answer.

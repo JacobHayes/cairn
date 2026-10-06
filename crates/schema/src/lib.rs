@@ -62,8 +62,9 @@ pub use event::{Actor, ChangeSet, ContentHash, Event, EventType, PatchReceipt, S
 pub use field::{NodeField, NodeFieldValue};
 pub use graph::{Edge, FormatVersion, Graph, ParticipationKind, RetiredKeys, Role, RouteFile};
 pub use id::{
-    AgentId, AttachmentKey, EntityKey, IdError, JourneyId, KeyAllocator, KindKey, NodeKey, PatchId,
-    Path, Prefixed, ProposalId, RoleKey, RouteId, SequentialKeys, Slug, UserId, mint,
+    AgentId, AttachmentKey, ConversationId, EntityKey, IdError, JourneyId, KeyAllocator, KindKey,
+    NodeKey, PatchId, Path, Prefixed, ProposalId, RoleKey, RouteId, SequentialKeys, Slug, UserId,
+    mint,
 };
 pub use jiff::Timestamp;
 pub use jiff::civil::Date;

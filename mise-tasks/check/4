@@ -1,0 +1,30 @@
+#!/usr/bin/env bash
+#MISE description="Rung 4: the store conformance suite on every backend, one suite each"
+# PRACTICES, The validation ladder, rung 4; Testing > Shell: conformance and integration.
+# Each backend runs the suite from its crate's tests/conformance.rs, inside `mod
+# conformance` (rung 2 skips the module by name). The backends are listed here and each is
+# its own suite, so a backend whose suite stops building or running fails the rung rather
+# than hiding behind another's count.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+LADDER_RUNG=4
+# shellcheck source=scripts/ladder-lib.sh
+source scripts/ladder-lib.sh
+
+ladder_require_tool cargo cargo --version
+# The counts below are read from cargo's output, which must not carry color codes (CI sets
+# CARGO_TERM_COLOR=always).
+export CARGO_TERM_COLOR=never
+
+# backend<TAB>crate
+backends=$'memory\tcairn-store\nturso\tcairn-store-turso'
+while IFS=$'\t' read -r backend crate; do
+  status=0
+  output=$(cargo test --locked -p "$crate" --all-features --test conformance -- conformance:: 2>&1) || status=$?
+  printf '%s\n' "$output"
+  [ "$status" -eq 0 ] || ladder_fail "store conformance failed on the $backend backend"
+  count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
+  ladder_suite "store conformance: $backend" "$count" tests
+done <<<"$backends"
+
+ladder_rung_end
