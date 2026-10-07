@@ -56,9 +56,24 @@ export const INITIAL_STATE: Record<NodeKind, State> = {
   group: "derived",
 };
 
+/**
+ * Each journey's nodes by key, built once per document's node list (a document is never
+ * changed in place: a new revision is a new list), so a screen naming every node it lists
+ * looks each up in constant time rather than scanning the journey per name.
+ */
+const NODE_INDEXES = new WeakMap<GraphNode[], Map<string, GraphNode>>();
+
+const NO_NODES: GraphNode[] = [];
+
 /** A node of the journey by key. */
 export function nodeOf(view: Ready, key: string): GraphNode | undefined {
-  return (view.journey.graph.nodes ?? []).find((node) => node.key === key);
+  const nodes = view.journey.graph.nodes ?? NO_NODES;
+  let index = NODE_INDEXES.get(nodes);
+  if (index === undefined) {
+    index = new Map(nodes.map((node) => [node.key, node]));
+    NODE_INDEXES.set(nodes, index);
+  }
+  return index.get(key);
 }
 
 /** A node's title, or its key when the journey does not hold it. */

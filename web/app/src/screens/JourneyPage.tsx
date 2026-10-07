@@ -37,7 +37,7 @@ function Header({ ready, view, selected }: { ready: Ready; view: CanvasView; sel
           {ready.derived.frontier.length} on the frontier.
         </span>
       </div>
-      <JourneyNav journey={header.id} current="canvas" />
+      <JourneyNav journey={header.id} current="canvas" node={selected} />
       <KindToggles
         view={view}
         journey

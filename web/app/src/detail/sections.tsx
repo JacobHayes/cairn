@@ -74,7 +74,8 @@ export function About({ view, detail, edit }: { view: Ready; detail: NodeDetail;
   );
 }
 
-function roleTitle(view: Ready, role: string): string {
+/** A role by its title, or its key when it has none. */
+export function roleTitle(view: Ready, role: string): string {
   return (view.journey.graph.roles ?? []).find((each) => each.key === role)?.title ?? role;
 }
 

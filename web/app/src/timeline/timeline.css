@@ -1,0 +1,142 @@
+/* C13: the timeline. Each row is its label beside its track; every track and the axis share
+   one width, so a date falls at the same place in each, and today and the end anchor run down
+   them as one line. */
+.timeline-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.timeline-row {
+  display: grid;
+  grid-template-columns: minmax(12rem, 24rem) minmax(0, 1fr);
+  column-gap: var(--space-3);
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.timeline-row-axis {
+  border-bottom: 1px solid var(--color-muted);
+}
+
+.timeline-label {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 var(--space-2);
+  padding: var(--space-1) 0;
+  font-size: var(--text-small);
+}
+
+.timeline-label > a {
+  flex-basis: 100%;
+}
+
+.button.timeline-why {
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--color-accent);
+  font-size: var(--text-small);
+  text-decoration: underline;
+}
+
+.timeline-explain {
+  grid-column: 1 / -1;
+  padding-bottom: var(--space-2);
+}
+
+.timeline-track,
+.timeline-axis {
+  display: block;
+  overflow: visible;
+}
+
+.timeline-grid {
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+
+.timeline-after {
+  fill: var(--color-border);
+  opacity: 0.35;
+}
+
+.timeline-today {
+  stroke: var(--color-accent);
+  stroke-width: 2;
+  stroke-dasharray: 4 3;
+}
+
+.timeline-end {
+  stroke: var(--color-text);
+  stroke-width: 2;
+}
+
+.timeline-tick,
+.timeline-today-label,
+.timeline-end-label {
+  fill: var(--color-muted);
+  font-size: 11px;
+}
+
+.timeline-today-label {
+  fill: var(--color-accent);
+}
+
+.timeline-end-label {
+  fill: var(--color-text);
+  font-weight: 600;
+}
+
+/* F7: an actual is solid, a pin filled with the accent, a derived due date hollow. */
+.timeline-marker {
+  stroke-width: 2;
+}
+
+.timeline-marker-actual {
+  fill: var(--color-text);
+  stroke: var(--color-text);
+}
+
+.timeline-marker-pin {
+  fill: var(--color-accent);
+  stroke: var(--color-accent);
+}
+
+.timeline-marker-due {
+  fill: var(--color-surface);
+  stroke: var(--color-muted);
+}
+
+.timeline-marker-bad {
+  stroke: var(--color-bad);
+}
+
+.timeline-marker-due.timeline-marker-bad {
+  fill: var(--color-bad-surface);
+}
+
+.timeline-legend {
+  font-size: var(--text-small);
+  gap: var(--space-4);
+}
+
+.timeline-legend svg {
+  vertical-align: middle;
+}
+
+@media (max-width: 40rem) {
+  .timeline-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .timeline-row-axis > span {
+    display: none;
+  }
+
+  /* Half the tick labels, so they do not run into each other on a narrow track. */
+  .timeline-tick:nth-of-type(even) {
+    display: none;
+  }
+}

@@ -6,16 +6,25 @@ import { Link, useLocation } from "react-router";
 
 import { titleOf, type Ready } from "./model.ts";
 
-/** Node `key`'s detail on the journey's page. */
-export function nodePath(journey: string, key: string): string {
-  return `/journeys/${journey}/nodes/${key}`;
+/**
+ * The address of the journey screen a node's detail is open on (the canvas, the timeline,
+ * ...): `pathname` without its `/nodes/<key>`. Every screen opens the panel at its own address
+ * with `/nodes/<key>` added, so the panel's links and its close stay on that screen.
+ */
+export function screenPath(pathname: string): string {
+  return pathname.replace(/\/nodes\/[^/]*$/, "");
 }
 
-/** A link to another node's detail, by its title, keeping what the canvas shows (5.2). */
+/** Node `key`'s detail on the journey screen at `screen` (`screenPath`). */
+export function nodePath(screen: string, key: string): string {
+  return `${screen}/nodes/${key}`;
+}
+
+/** A link to another node's detail, by its title, keeping the screen and what it shows (5.2). */
 export function NodeLink({ view, node }: { view: Ready; node: string }) {
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   return (
-    <Link to={{ pathname: nodePath(view.journey.header.id, node), search }} data-node={node}>
+    <Link to={{ pathname: nodePath(screenPath(pathname), node), search }} data-node={node}>
       {titleOf(view, node)}
     </Link>
   );

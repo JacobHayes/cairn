@@ -13,6 +13,7 @@ import { DatesSection } from "./DatesSection.tsx";
 import { ForceInclude, ParticipationEditor, PinEditor, SnoozeEditor, WeightEditor } from "./editors.tsx";
 import { NodeHistory } from "./History.tsx";
 import { nodeDetail, type NodeDetail, type Ready } from "./model.ts";
+import { screenPath } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { ResourceList } from "./Resources.tsx";
 import { About, Blocking, Header, Participations, Priority, Relevance } from "./sections.tsx";
@@ -43,8 +44,9 @@ export function NodeDetailPanel({ view, nodeKey }: { view: Ready; nodeKey: strin
   const journey = view.journey.header.id;
   const detail = nodeDetail(view, nodeKey);
   const panel = useRef<HTMLElement>(null);
-  // Closing keeps what the canvas shows (5.2).
-  const close = { pathname: `/journeys/${journey}`, search: useLocation().search };
+  // Closing keeps the screen it is open on and what that screen shows (5.2).
+  const { pathname, search } = useLocation();
+  const close = { pathname: screenPath(pathname), search };
   // On a narrow screen the panel opens above the canvas, so bring it into view.
   useEffect(() => {
     if (globalThis.matchMedia(NARROW).matches) {

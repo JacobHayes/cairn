@@ -1,0 +1,97 @@
+/* The frame of a journey's read-mostly screens: the screen, with a node's detail beside it
+   (or above it on a narrow screen), as the canvas has it (canvas.css). */
+.shell-main:has(.journey-screen) {
+  max-width: none;
+}
+
+.journey-screen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.journey-screen.screen-split {
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 28rem);
+  align-items: start;
+}
+
+.screen-split > .detail-panel {
+  order: 2;
+  position: sticky;
+  top: var(--space-4);
+  max-height: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+}
+
+@media (max-width: 52rem) {
+  .journey-screen.screen-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .screen-split > .detail-panel {
+    order: 0;
+    position: static;
+    max-height: none;
+  }
+}
+
+/* The selected node's row on a screen's lists. */
+.journey-screen [data-selected="true"] {
+  background: var(--color-canvas);
+  outline: 2px solid var(--color-accent);
+  outline-offset: -2px;
+}
+
+/* Printing a screen (the status summary is the printable one, C18): the screen alone, in
+   black on white, with no navigation, controls, panel, or notices. Paper has no dark theme:
+   the color tokens are reset here, more specific than the theme's `:root` (tokens.css), so
+   every surface prints light whatever the screen's scheme. */
+@media print {
+  html:root {
+    color-scheme: light;
+    --color-canvas: #ffffff;
+    --color-surface: #ffffff;
+    --color-border: #999999;
+    --color-text: #000000;
+    --color-muted: #333333;
+    --color-accent: #000000;
+    --color-accent-text: #ffffff;
+    --color-good: #000000;
+    --color-warn: #000000;
+    --color-warn-surface: #ffffff;
+    --color-bad: #000000;
+    --color-bad-surface: #ffffff;
+  }
+
+  .journey-screen [data-selected="true"] {
+    background: none;
+    outline: none;
+  }
+
+  .shell-header,
+  .banner,
+  .notices,
+  .journey-nav,
+  .detail-panel,
+  .no-print {
+    display: none !important;
+  }
+
+  .shell-main {
+    max-width: none;
+    padding: 0;
+  }
+
+  .journey-screen.screen-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .journey-screen a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .panel {
+    break-inside: avoid;
+  }
+}

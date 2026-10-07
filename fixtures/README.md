@@ -200,3 +200,18 @@ next list.
 - `bake-off`, after step 4, visible with actions hidden: `n_comparison`, `n_criteria`, `n_judges`, `n_summary`, `n_trial_a`, `n_trial_b`, `n_winner`, `n_wrap_up`.
 - `bake-off`, after step 4, actions rolled up: nothing.
 - `bake-off`, after step 4, next: `n_trial_a`, `n_trial_b`, `n_wrap_up`.
+
+## Status summaries
+
+Each scenario's journey at its end, summarized for observers (brief 5.4, C18), read on
+2026-10-06: the in-scope nodes by stored state (`derived` is a group that is not skipped),
+how many are left to finish, the overdue, short, and stale nodes, the milestones not yet
+reached with their effective dates, and the open decisions in rank order. Nothing is
+overdue on that day; the product launch's late code freeze leaves it and the launch short
+(F6). The app's browser tests (`web/app/e2e/summary.spec.ts`) check these lines against the
+summary page on the in-browser host.
+
+- `vendor-evaluation`, status summary: todo 1, done 9, decided 7, pending 2, reached 1, derived 4; remaining 5; overdue none; short none; stale none; upcoming `n_review_opens` 2026-10-30, `n_decision_meeting` 2026-11-20; open decisions none.
+- `hiring-loop`, status summary: todo 1, done 7, skipped 1, decided 2, derived 2; remaining 1; overdue none; short none; stale none; upcoming none; open decisions none.
+- `product-launch`, status summary: todo 4, done 2, pending 4, reached 2, derived 3; remaining 10; overdue none; short `n_code_freeze`, `n_launch`; stale none; upcoming `n_beta_start` 2026-11-13, `n_beta_end` 2026-11-18, `n_launch` 2026-11-23; open decisions none.
+- `bake-off`, status summary: todo 2, active 2, open 1, decided 2, pending 1; remaining 6; overdue none; short none; stale none; upcoming `n_wrap_up` 2026-10-19; open decisions `n_winner`.

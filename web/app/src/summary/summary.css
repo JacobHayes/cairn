@@ -1,0 +1,49 @@
+/* C18: the status summary: the key figures in a row, then its parts in columns that reflow
+   on a narrow screen and on paper. */
+.summary-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(8rem, 1fr));
+  gap: var(--space-2);
+}
+
+.summary-figure {
+  display: flex;
+  flex-direction: column;
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+}
+
+.summary-figure-count {
+  font-size: var(--text-title);
+  font-weight: 600;
+}
+
+.summary-figure-bad .summary-figure-count {
+  color: var(--color-bad);
+}
+
+.summary-figure-warn .summary-figure-count {
+  color: var(--color-warn);
+}
+
+.summary-parts {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 24rem), 1fr));
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.summary-date {
+  white-space: nowrap;
+}
+
+.summary-number {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.summary .badge {
+  white-space: nowrap;
+}
