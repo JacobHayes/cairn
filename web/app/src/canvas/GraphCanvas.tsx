@@ -48,6 +48,12 @@ function nodesOf({ model, placement, overlay, heat, selected }: GraphCanvasProps
       position: { x: placed.x, y: placed.y },
       width: placed.width,
       height: placed.height,
+      // A card is drawn at the size it was laid out at, so it is measured already. Without
+      // this, React Flow takes each revision's new node objects for unmeasured ones: it drops
+      // their handle bounds and observes every card afresh from inside its resize callback,
+      // which Chromium reports as a ResizeObserver loop error on every edit. A card whose
+      // size does change stays observed and is measured again.
+      measured: { width: placed.width, height: placed.height },
       data: {
         card,
         overlay,

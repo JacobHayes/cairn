@@ -8,7 +8,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { LAYOUT_MOVED_FRACTION_MAX } from "../src/canvas/layout.ts";
 import { cardKeys, containers, lineBetween, marks, places, showKind, toggle } from "./canvas.ts";
 import { section } from "./detail.ts";
-import { derivedRevision, nodeCard, nodePanel, openFromCanvas, openJourney, renameOf, startRename } from "./shell.ts";
+import { derivedRevision, fresh, nodeCard, nodePanel, openFromCanvas, openJourney, rename, renameOf, startRename } from "./shell.ts";
 
 /** The vendor evaluation at the end of its scenario, as 2.6's proof walks it at its own steps. */
 const COMBINATIONS: { name: string; query: string; level: string; nodes: Record<string, string> }[] = [
@@ -202,6 +202,23 @@ test("C15: a view toggled to lays out as it does when opened directly", async ({
   await expect(nodeCard(toggled, "n_setup")).toHaveCount(0);
   await openJourney(direct, "browser", "j_vendor_eval", "?hide=group");
   await expect.poll(() => places(toggled)).toEqual(await places(direct));
+});
+
+// Every error event the window sees, including the browser's own reports (a ResizeObserver
+// loop) that never reach Playwright's pageerror.
+test("an edit redraws the canvas with no error in the page", async ({ page }) => {
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    Object.assign(window, { seenErrors: seen });
+    window.addEventListener("error", (event) => seen.push(event.message));
+  });
+  const seenErrors = () => page.evaluate(() => (window as unknown as { seenErrors: string[] }).seenErrors);
+  await openJourney(page, "browser", "j_launch");
+  const revision = await derivedRevision(page);
+  await rename(page, "n_docs", fresh("Docs"));
+  await expect.poll(() => derivedRevision(page)).toBe(revision + 1);
+  await page.evaluate(() => new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(resolve))));
+  expect(await seenErrors()).toEqual([]);
 });
 
 test("a rename started on one node does not follow the panel to another", async ({ page }) => {

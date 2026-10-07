@@ -37,6 +37,13 @@ export default defineConfig({
   // `mise run build:web` writes here, and the binary embeds it (crates/cairn/src/assets.rs);
   // beside it in dist/ sit the browser tests' reports, which are never embedded.
   build: { outDir: "dist/build", emptyOutDir: true },
+  // The dev server bundles dependencies it finds by crawling from index.html, which never
+  // follows `new Worker(new URL(...))`. A dependency only a worker imports (ELK's worker
+  // build, canvas/layout-worker.ts) was found when the first page started that worker: Vite
+  // bundled again and reloaded every open page, and a page still loading got 504s for the
+  // modules it had asked for, so the first browser tests on a cold cache failed at random.
+  // Crawling the workers too finds everything before the first page loads.
+  optimizeDeps: { entries: ["index.html", "src/**/*-worker.ts"] },
   server: {
     host: "127.0.0.1",
     port: Number(process.env["CAIRN_APP_PORT"] ?? "5173"),
