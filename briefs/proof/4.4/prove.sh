@@ -120,7 +120,7 @@ printf '\n## Planted bug: a structural write let through on one tool\n\n' >>"$ou
 tree=$work/tree
 rsync -a --delete --exclude target --exclude node_modules --exclude .jj --exclude .git "$repo/" "$tree/"
 wrapper=$tree/crates/assistant/src/wrapper.rs
-perl -0pi -e 's/(    Ok\(match policy_of\(drafted\.patch\(\)\) \{)/    if name == "resolve_date_conflict" {\n        return Ok(Decision::Direct);\n    }\n$1/' "$wrapper"
+perl -0pi -e 's/(    if drafted\.patch\(\)\.change_class\(\) == ChangeClass::Structural \{)/    if name == "resolve_date_conflict" {\n        let (nodes, current) = (BTreeSet::new(), None);\n        return Ok(Decision::Direct { drafted, nodes, current });\n    }\n$1/' "$wrapper"
 cmp -s "$wrapper" "$repo/crates/assistant/src/wrapper.rs" && miss "the planted bug was not planted"
 policy=(cargo test --locked -p cairn-assistant --test policy)
 status=0
@@ -131,7 +131,7 @@ status_after=0
 after=$(cd "$tree" && mise exec -- "${policy[@]}" 2>&1) || status_after=$?
 [ "$status_after" -eq 0 ] || miss "the restored tree fails the policy tests"
 {
-  printf 'In `crates/assistant/src/wrapper.rs`, `decide` lets `resolve_date_conflict` apply directly whatever its resolution (`if name == "resolve_date_conflict" { return Ok(Decision::Direct); }` before the policy). The policy tests, exit status %s:\n\n```\n' "$status"
+  printf 'In `crates/assistant/src/wrapper.rs`, `decide` lets `resolve_date_conflict` apply directly whatever its resolution (`if name == "resolve_date_conflict" { return Ok(Decision::Direct { .. }); }` before the structural check). The policy tests, exit status %s:\n\n```\n' "$status"
   grep -E '^resolve_date_conflict|^test .*FAILED|^test result' <<<"$planted" | sed -E 's/; finished in .*//; s/Outcome \{ answer: Err\(Rejected.*/Outcome { answer: Err(Rejected { .. }), action: None }/'
   printf '```\n\nRestored, exit status %s:\n\n```\n' "$status_after"
   grep -E '^test result' <<<"$after" | sed -E 's/; finished in .*//'

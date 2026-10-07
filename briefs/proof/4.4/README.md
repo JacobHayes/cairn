@@ -67,7 +67,7 @@ x-request-id: rq_…
 {
   "error": "no_such_endpoint",
   "message": "no endpoint at this path",
-  "request_id": "rq_f28b7cd8c80e757c"
+  "request_id": "rq_7d92dd4a73c62c52"
 }
 ```
 
@@ -87,7 +87,7 @@ x-request-id: rq_…
 {
   "error": "no_such_endpoint",
   "message": "no endpoint at this path",
-  "request_id": "rq_e77772dd20e86a3a"
+  "request_id": "rq_26c201dd1498f211"
 }
 ```
 
@@ -133,7 +133,7 @@ content-type: application/json
 x-request-id: rq_…
 
 {
-  "conversation": "cv_ebf927fc25ae78733b2b2fb58c8f77cb",
+  "conversation": "cv_16b481ff6a328f81bcdc457f57493639",
   "ended": {
     "status": "replied"
   },
@@ -155,7 +155,7 @@ content-type: application/json
 x-request-id: rq_…
 
 {
-  "conversation": "cv_5ef927bc32527cdaf8495f1059f497af",
+  "conversation": "cv_3f9ea48a43ee744b4b16240a71c51977",
   "ended": {
     "status": "replied"
   },
@@ -205,7 +205,7 @@ x-request-id: rq_…
       "tool": "apply_patch"
     }
   ],
-  "conversation": "cv_18e4b0c81a0565fb64c06045b4565fd3",
+  "conversation": "cv_60cdd7447a8c8cc1121edd67075c46e3",
   "ended": {
     "status": "replied"
   },
@@ -257,10 +257,10 @@ x-request-id: rq_…
       "event": {
         "actor": {
           "agent": "ag_assistant",
-          "user": "u_2e3a3e6db18d0919c185cdc9e6b13b07"
+          "user": "u_5890284141199da81d92aa7114ff31e3"
         },
         "at": "2026-10-01T14:00:00Z",
-        "confirming_user": "u_2e3a3e6db18d0919c185cdc9e6b13b07",
+        "confirming_user": "u_5890284141199da81d92aa7114ff31e3",
         "delta": [
           {
             "put": {
@@ -427,7 +427,7 @@ x-request-id: rq_…
       "tool": "apply_patch"
     }
   ],
-  "conversation": "cv_29031ce87201f818a8be07acea2d6f22",
+  "conversation": "cv_863c9d812116795ef041ae9943d97dfe",
   "ended": {
     "status": "replied"
   },
@@ -469,7 +469,7 @@ x-request-id: rq_…
       "tool": "snooze"
     }
   ],
-  "conversation": "cv_29031ce87201f818a8be07acea2d6f22",
+  "conversation": "cv_863c9d812116795ef041ae9943d97dfe",
   "ended": {
     "status": "provider_timed_out"
   }
@@ -490,7 +490,8 @@ Each protocol sends a conversation and its tools to a loopback server standing i
 ```
 test a_provider_error_is_reported_without_the_credential ... ok
 test each_protocol_round_trips_a_tool_call_against_its_fixture ... ok
-test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+test an_answer_past_the_response_size_is_refused ... ok
+test result: ok. 3 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
 ## The tests
@@ -499,10 +500,10 @@ test result: ok. 2 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 
 | Suite | Passed |
 |---|---|
-| `src/lib.rs` | 4 |
-| `tests/policy.rs` | 5 |
-| `tests/protocols.rs` | 2 |
-| `tests/turns.rs` | 10 |
+| `src/lib.rs` | 5 |
+| `tests/policy.rs` | 6 |
+| `tests/protocols.rs` | 3 |
+| `tests/turns.rs` | 16 |
 | `tests/assistant.rs` | 5 |
 
 `tests/policy.rs` decides every write tool the tool set lists, a structural variant wherever
@@ -517,18 +518,18 @@ conversations one per target per user.
 
 ## Planted bug: a structural write let through on one tool
 
-In `crates/assistant/src/wrapper.rs`, `decide` lets `resolve_date_conflict` apply directly whatever its resolution (`if name == "resolve_date_conflict" { return Ok(Decision::Direct); }` before the policy). The policy tests, exit status 101:
+In `crates/assistant/src/wrapper.rs`, `decide` lets `resolve_date_conflict` apply directly whatever its resolution (`if name == "resolve_date_conflict" { return Ok(Decision::Direct { .. }); }` before the structural check). The policy tests, exit status 101:
 
 ```
 test structural_writes_arrive_as_proposals_and_nothing_lands ... FAILED
 test every_write_tool_is_decided_by_mutation_kind_and_destination ... FAILED
 resolve_date_conflict: Outcome { answer: Err(Rejected { .. }), action: None }
 resolve_date_conflict: Ok(Direct), expected Propose(Structural)
-test result: FAILED. 3 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
+test result: FAILED. 4 passed; 2 failed; 0 ignored; 0 measured; 0 filtered out
 ```
 
 Restored, exit status 0:
 
 ```
-test result: ok. 5 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
+test result: ok. 6 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out
 ```

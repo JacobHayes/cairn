@@ -104,11 +104,24 @@ pub fn message(author: MessageAuthor, at: Timestamp, text: &str) -> Option<Conve
 
 /// The conversation as a provider is sent it: the user's words as user messages, and the
 /// assistant's replies with Cairn's reports of its writes as the assistant's, each run of
-/// one side joined into one message. It starts with the user, as every protocol asks.
+/// one side joined into one message. It holds the newest messages within `bytes_max`
+/// bytes of text, and starts with the user, as every protocol asks.
 #[must_use]
-pub fn dialogue(record: &ConversationRecord) -> Vec<Message> {
+pub fn dialogue(record: &ConversationRecord, bytes_max: u32) -> Vec<Message> {
+    let budget = usize::try_from(bytes_max).unwrap_or(usize::MAX);
+    let mut spent = 0_usize;
+    let kept = record
+        .messages
+        .iter()
+        .rev()
+        .take_while(|held| {
+            spent = spent.saturating_add(held.content.as_str().len());
+            spent <= budget
+        })
+        .count();
+    let newest = &record.messages[record.messages.len() - kept..];
     let mut messages: Vec<Message> = Vec::new();
-    for held in &record.messages {
+    for held in newest {
         let text = held.content.as_str();
         let user = held.author == MessageAuthor::User;
         match messages.last_mut() {
@@ -193,7 +206,7 @@ mod tests {
             (&[(Assistant, "x"), (User, "a")], &["user a"]),
         ];
         for (held, expected) in cases {
-            let shown: Vec<String> = dialogue(&record(held))
+            let shown: Vec<String> = dialogue(&record(held), u32::MAX)
                 .into_iter()
                 .map(|message| match message {
                     Message::User { text } => format!("user {text}"),
@@ -202,6 +215,35 @@ mod tests {
                 })
                 .collect();
             assert_eq!(shown, expected, "{held:?}");
+        }
+    }
+
+    #[test]
+    fn the_dialogue_replays_the_newest_messages_within_its_budget() {
+        use MessageAuthor::{Assistant, User};
+        let held = record(&[
+            (User, "aaaa"),
+            (Assistant, "bbbb"),
+            (User, "cccc"),
+            (Assistant, "dd"),
+        ]);
+        let cases = [(u32::MAX, 4), (10, 2), (6, 2), (2, 0)];
+        for (budget, count) in cases {
+            let replayed = dialogue(&held, budget);
+            let bytes: usize = replayed
+                .iter()
+                .map(|message| match message {
+                    Message::User { text } => text.len(),
+                    Message::Assistant(reply) => reply.text.as_ref().map_or(0, String::len),
+                    Message::ToolResults(_) => unreachable!(),
+                })
+                .sum();
+            assert!(bytes <= budget as usize, "{budget}");
+            assert_eq!(replayed.len(), count, "{budget}: {replayed:?}");
+            assert!(matches!(
+                replayed.first(),
+                None | Some(Message::User { .. })
+            ));
         }
     }
 

@@ -8,6 +8,11 @@ use std::time::Duration;
 /// proposal.
 pub const DIRECT_WRITE_NODE_COUNT_MAX: u32 = 10;
 
+/// Tool calls run from one model reply: a reply asking for more is answered with a refusal
+/// for each call past this, so a reply cannot run past the turn's limits on tool calls
+/// alone. Borrowed from the iteration limit (DECISIONS.md, 4.4).
+pub const TOOL_CALL_COUNT_PER_REPLY_MAX: u32 = TOOL_LOOP_ITERATION_COUNT_MAX;
+
 /// Provider calls in one turn: a runaway stop, not a budget. Structuring a journey is a few
 /// reads, one proposal, and a report.
 pub const TOOL_LOOP_ITERATION_COUNT_MAX: u32 = 32;
@@ -20,6 +25,11 @@ pub const PROVIDER_CALL_DURATION_MAX: Duration = Duration::from_secs(120);
 /// provider latency, with room.
 pub const TURN_DURATION_MAX: Duration = Duration::from_mins(10);
 
+/// What a turn keeps of its limit to save its conversation: its work ends this far before
+/// the turn limit. The API's request duration, borrowed: a store write past it is stuck
+/// (DECISIONS.md, 4.4 review round 2).
+pub const TURN_SAVE_RESERVE: Duration = Duration::from_secs(5);
+
 /// Turns in flight per process: each is an open request waiting on the provider, whose rate
 /// limit binds well before this. Overflow is refused, to be tried again.
 pub const TURN_IN_FLIGHT_COUNT_MAX: u32 = 32;
@@ -28,6 +38,15 @@ pub const TURN_IN_FLIGHT_COUNT_MAX: u32 = 32;
 /// to (DECISIONS.md, 4.4). Each message is a Markdown body, so a whole conversation stays
 /// inside the size the store keeps one in.
 pub const CONVERSATION_MESSAGE_COUNT_MAX: u32 = cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
+
+/// Bytes of a conversation replayed to the provider each turn, the newest kept: four
+/// message bodies, about 64 thousand tokens, well inside every current model's context
+/// (DECISIONS.md, 4.4: pending the owner's sign-off as a named limit).
+pub const DIALOGUE_REPLAY_BYTES_MAX: u32 = 4 * cairn_schema::limits::BODY_BYTES_MAX;
+
+/// Bytes of one provider response read: the largest body Cairn takes in a request, since a
+/// reply's tool calls are bounded by what the tools accept (DECISIONS.md, 4.4).
+pub const PROVIDER_RESPONSE_BYTES_MAX: u32 = cairn_schema::limits::REQUEST_BYTES_MAX;
 
 // A provider call fits in a turn, several times over.
 const _: () = assert!(PROVIDER_CALL_DURATION_MAX.as_secs() * 4 <= TURN_DURATION_MAX.as_secs());

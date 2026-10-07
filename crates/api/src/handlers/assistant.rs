@@ -65,9 +65,10 @@ async fn converse<S: Store + 'static>(
     let reply = assistant.turn(actor, target, request.message).await;
     reply.map(Json).map_err(|error| {
         let code = match &error {
-            TurnError::Overloaded => ProblemCode::Overloaded,
+            TurnError::Overloaded | TurnError::ConversationBusy => ProblemCode::Overloaded,
             TurnError::AgentCaller => ProblemCode::UserOnly,
             TurnError::TargetMissing(_) => ProblemCode::NotFound,
+            TurnError::TimedOut => ProblemCode::TimedOut,
             TurnError::Failed(_) => ProblemCode::Internal,
         };
         ApiError::problem(code, error.to_string())

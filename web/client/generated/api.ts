@@ -833,6 +833,13 @@ export interface components {
             proposal: components["schemas"]["ProposalId"];
             /** @description The tool. */
             tool: string;
+        } | {
+            /** @constant */
+            outcome: "discarded";
+            /** @description The proposal. */
+            proposal: components["schemas"]["ProposalId"];
+            /** @description The tool. */
+            tool: string;
         };
         /** @description Who made a change (H2): a user, or an agent acting for one. */
         Actor: {
@@ -948,6 +955,14 @@ export interface components {
             count?: number | null;
             /** @constant */
             reason: "too_many_nodes";
+        } | {
+            /**
+             * Format: uint32
+             * @description The nodes the turn's direct writes and this one would touch together.
+             */
+            count: number;
+            /** @constant */
+            reason: "too_many_nodes_this_turn";
         } | {
             /** @constant */
             reason: "asked";

@@ -4,8 +4,9 @@
 //! user, and repeats until the model answers without calling a tool, within the iteration,
 //! provider call, and turn limits. Its writes are reported whatever ends it.
 
+use std::collections::BTreeSet;
 use std::fmt::Write;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use cairn_auth::Clock;
@@ -21,11 +22,12 @@ use tokio::time::Instant;
 
 use crate::conversation::{self, Target};
 use crate::limits::{
-    DIRECT_WRITE_NODE_COUNT_MAX, PROVIDER_CALL_DURATION_MAX, TOOL_LOOP_ITERATION_COUNT_MAX,
-    TURN_DURATION_MAX, TURN_IN_FLIGHT_COUNT_MAX,
+    DIALOGUE_REPLAY_BYTES_MAX, DIRECT_WRITE_NODE_COUNT_MAX, PROVIDER_CALL_DURATION_MAX,
+    TOOL_CALL_COUNT_PER_REPLY_MAX, TOOL_LOOP_ITERATION_COUNT_MAX, TURN_DURATION_MAX,
+    TURN_IN_FLIGHT_COUNT_MAX, TURN_SAVE_RESERVE,
 };
 use crate::provider::{Exchange, Message, Provider, ProviderError, Reply, ToolResult, ToolSpec};
-use crate::wrapper::{self, Action, REFUSED_TOOLS};
+use crate::wrapper::{self, Action, Ledger, REFUSED_TOOLS};
 
 /// The agent id every assistant write records beside the user it acts for (H2).
 pub const ASSISTANT_AGENT: &str = "ag_assistant";
@@ -80,11 +82,16 @@ pub enum Ended {
 pub enum TurnError {
     /// `assistant_turns_in_flight` turns are already running: try again shortly.
     Overloaded,
+    /// A turn of this conversation is already running: try again once it has answered.
+    ConversationBusy,
     /// The caller is an agent: the assistant acts for a signed-in user, and an agent has the
     /// tools itself over MCP (I7).
     AgentCaller,
     /// The journey does not exist.
     TargetMissing(Target),
+    /// Reading the target or the conversation ran past the turn's limit: nothing was
+    /// written.
+    TimedOut,
     /// The store or the server failed: nothing more than what is reported was written.
     Failed(String),
 }
@@ -97,10 +104,15 @@ impl std::fmt::Display for TurnError {
                 "{TURN_IN_FLIGHT_COUNT_MAX} assistant turns are in flight \
                  (assistant_turns_in_flight)"
             ),
+            TurnError::ConversationBusy => formatter.write_str(
+                "a turn of this conversation is already running; try again once it answers",
+            ),
             TurnError::AgentCaller => formatter.write_str(
                 "the assistant acts for a signed-in user; an agent calls the tools over MCP",
             ),
             TurnError::TargetMissing(target) => write!(formatter, "no {target}"),
+            TurnError::TimedOut => formatter
+                .write_str("reading the target or the conversation ran past the turn's limit"),
             TurnError::Failed(message) => formatter.write_str(message),
         }
     }
@@ -116,6 +128,9 @@ pub struct Assistant<S> {
     provider: Arc<dyn Provider>,
     clock: Clock,
     in_flight: Arc<Semaphore>,
+    /// The conversations a turn is running in: one turn at a time each, so no turn's
+    /// messages are lost to another's save.
+    busy: Arc<Mutex<BTreeSet<ConversationId>>>,
 }
 
 impl<S> Clone for Assistant<S> {
@@ -126,6 +141,7 @@ impl<S> Clone for Assistant<S> {
             provider: Arc::clone(&self.provider),
             clock: self.clock.clone(),
             in_flight: Arc::clone(&self.in_flight),
+            busy: Arc::clone(&self.busy),
         }
     }
 }
@@ -146,6 +162,7 @@ impl<S: Store + 'static> Assistant<S> {
             provider,
             clock,
             in_flight: Arc::new(Semaphore::new(TURN_IN_FLIGHT_COUNT_MAX as usize)),
+            busy: Arc::default(),
         }
     }
 
@@ -186,10 +203,15 @@ impl<S: Store + 'static> Assistant<S> {
         let Ok(slot) = Arc::clone(&self.in_flight).try_acquire_owned() else {
             return Err(TurnError::Overloaded);
         };
+        let id = conversation::conversation_id(&target, &actor.user);
+        let Some(running) = Running::start(&self.busy, id) else {
+            return Err(TurnError::ConversationBusy);
+        };
         let this = self.clone();
         let user = actor.clone();
         let task = tokio::spawn(async move {
             let answer = this.run(&user, &target, &message).await;
+            drop(running);
             drop(slot);
             answer
         });
@@ -208,15 +230,20 @@ impl<S: Store + 'static> Assistant<S> {
         message: &Markdown,
     ) -> Result<TurnReply, TurnError> {
         let started = self.clock.now();
-        let deadline = Instant::now() + TURN_DURATION_MAX;
-        let context = self.context(user, target).await?;
+        // The turn's work ends a reserve before its limit, so its conversation is saved
+        // within it; every wait is held to one or the other (review 4.4 r2).
+        let end = Instant::now() + TURN_DURATION_MAX;
+        let deadline = end - TURN_SAVE_RESERVE;
+        let read = tokio::time::timeout_at(deadline, self.context(user, target)).await;
+        let (context, exists) = read.map_err(|_| TurnError::TimedOut)??;
         let failed = |error: cairn_store::StoreError| TurnError::Failed(error.to_string());
         let id = conversation::conversation_id(target, &user.user);
-        let mut record = match self.store.conversation(&id).await.map_err(failed)? {
-            Some(record) => record,
-            None => conversation::started(target, &user.user, started),
-        };
-        let mut messages = conversation::dialogue(&record);
+        let stored = tokio::time::timeout_at(deadline, self.store.conversation(&id)).await;
+        let stored = stored.map_err(|_| TurnError::TimedOut)?.map_err(failed)?;
+        let held = stored.is_some();
+        let mut record =
+            stored.unwrap_or_else(|| conversation::started(target, &user.user, started));
+        let mut messages = conversation::dialogue(&record, DIALOGUE_REPLAY_BYTES_MAX);
         let said = message.as_str().to_owned();
         match messages.last_mut() {
             Some(Message::User { text }) => {
@@ -255,7 +282,18 @@ impl<S: Store + 'static> Assistant<S> {
             reply.and_then(|text| conversation::message(MessageAuthor::Assistant, now, &text));
         kept.extend(reply.clone());
         conversation::append(&mut record, kept, now);
-        self.store.put_conversation(record).await.map_err(failed)?;
+        // A route that does not exist yet keeps no conversation until a turn drafts one:
+        // naming routes that do not exist stores nothing.
+        if exists || held || !actions.is_empty() {
+            let saved = tokio::time::timeout_at(end, self.store.put_conversation(record)).await;
+            match saved {
+                Ok(saved) => saved.map_err(failed)?,
+                // The writes stand and are answered; only the conversation is not kept.
+                Err(_) => {
+                    tracing::warn!(conversation = %id, "assistant conversation not saved in time");
+                }
+            }
+        }
         metrics::counter!("cairn_assistant_turns_total", "ended" => ended_label(&ended))
             .increment(1);
         tracing::info!(conversation = %id, ended = ended_label(&ended), writes = actions.len(), "assistant turn");
@@ -274,7 +312,8 @@ impl<S: Store + 'static> Assistant<S> {
         mut exchange: Exchange,
         deadline: Instant,
     ) -> (Option<String>, Vec<Action>, Ended) {
-        let mut actions = Vec::new();
+        let mut actions: Vec<Action> = Vec::new();
+        let mut ledger = Ledger::default();
         for _ in 0..TOOL_LOOP_ITERATION_COUNT_MAX {
             let reply = match self.ask(&exchange, deadline).await {
                 Ok(reply) => reply,
@@ -284,10 +323,43 @@ impl<S: Store + 'static> Assistant<S> {
                 return (reply.text, actions, Ended::Replied);
             }
             let mut results = Vec::with_capacity(reply.calls.len());
-            for call in &reply.calls {
-                let outcome =
-                    wrapper::run(&self.tools, acting, &call.name, call.arguments.clone()).await;
-                actions.extend(outcome.action);
+            for (index, call) in reply.calls.iter().enumerate() {
+                if Instant::now() >= deadline {
+                    return (None, actions, Ended::TurnTimedOut);
+                }
+                if index >= TOOL_CALL_COUNT_PER_REPLY_MAX as usize {
+                    let refused = ToolError::Refused {
+                        message: format!(
+                            "at most {TOOL_CALL_COUNT_PER_REPLY_MAX} tool calls run per reply \
+                             (assistant_tool_calls_per_reply)"
+                        ),
+                    };
+                    results.push(result(&call.id, Err(refused)));
+                    continue;
+                }
+                // On its own task, so a commit the deadline overtakes still completes.
+                let (tools, store, actor) =
+                    (self.tools.clone(), Arc::clone(&self.store), acting.clone());
+                let (name, arguments) = (call.name.clone(), call.arguments.clone());
+                let mut held = std::mem::take(&mut ledger);
+                let running = tokio::spawn(async move {
+                    let called = (name.as_str(), arguments);
+                    let store = store.as_ref();
+                    let outcome = wrapper::run(&tools, store, &actor, called, &mut held).await;
+                    (outcome, held)
+                });
+                let (outcome, held) = match tokio::time::timeout_at(deadline, running).await {
+                    Ok(Ok(ran)) => ran,
+                    Ok(Err(error)) if error.is_panic() => {
+                        std::panic::resume_unwind(error.into_panic())
+                    }
+                    Ok(Err(_)) | Err(_) => {
+                        patina_dst::sometimes!(true, "assistant-tool-call-past-deadline");
+                        return (None, actions, Ended::TurnTimedOut);
+                    }
+                };
+                ledger = held;
+                record(&mut actions, outcome.action);
                 results.push(result(&call.id, outcome.answer));
             }
             exchange.messages.push(Message::Assistant(reply));
@@ -327,7 +399,7 @@ impl<S: Store + 'static> Assistant<S> {
 
     /// The turn's context (I5: the assistant reads its target): the journey's snapshot (I3),
     /// or the route's draft, read as the user.
-    async fn context(&self, user: &Actor, target: &Target) -> Result<Value, TurnError> {
+    async fn context(&self, user: &Actor, target: &Target) -> Result<(Value, bool), TurnError> {
         let read = match target {
             Target::Journey(journey) => {
                 self.tools
@@ -341,14 +413,14 @@ impl<S: Store + 'static> Assistant<S> {
             }
         };
         match (read, target) {
-            (Ok(context), _) => Ok(context),
+            (Ok(context), _) => Ok((context, true)),
             (Err(ToolError::NotFound { .. }), Target::Journey(_)) => {
                 Err(TurnError::TargetMissing(target.clone()))
             }
             // A route authored in conversation may not exist yet, or have no draft open: its
             // first proposal creates them (A12).
             (Err(ToolError::NotFound { message }), Target::RouteDraft(_)) => {
-                Ok(json!({ "not_found": message }))
+                Ok((json!({ "not_found": message }), false))
             }
             (Err(error), _) => Err(TurnError::Failed(error.to_string())),
         }
@@ -458,9 +530,15 @@ fn report(action: &Action) -> String {
                 wrapper::Because::TooManyNodes { count: None } => {
                     "it may touch every node".to_owned()
                 }
+                wrapper::Because::TooManyNodesThisTurn { count } => {
+                    format!("the turn's direct writes would touch {count} nodes")
+                }
                 wrapper::Because::Asked => "the assistant drafted a proposal".to_owned(),
             };
             format!("Drafted `{tool}` as proposal `{proposal}` for review: {why}.")
+        }
+        Action::Discarded { tool, proposal } => {
+            format!("Discarded proposal `{proposal}` with `{tool}`.")
         }
     }
 }
@@ -491,4 +569,50 @@ fn ended_label(ended: &Ended) -> &'static str {
         Ended::IterationLimit => "iteration_limit",
         Ended::TurnTimedOut => "turn_timed_out",
     }
+}
+
+/// Adds `action` to the turn's: a later write to a proposal the turn already reported
+/// replaces that report, so each proposal is reported once, as it stands.
+fn record(actions: &mut Vec<Action>, action: Option<Action>) {
+    let Some(action) = action else { return };
+    let same = action.proposal().and_then(|proposal| {
+        actions
+            .iter()
+            .position(|held| held.proposal() == Some(proposal))
+    });
+    match same {
+        Some(position) => actions[position] = action,
+        None => actions.push(action),
+    }
+}
+
+/// A conversation marked busy while its turn runs, unmarked when dropped, however the
+/// turn ends.
+struct Running {
+    busy: Arc<Mutex<BTreeSet<ConversationId>>>,
+    id: ConversationId,
+}
+
+impl Running {
+    /// Marks `id` busy, unless a turn of it already is.
+    fn start(busy: &Arc<Mutex<BTreeSet<ConversationId>>>, id: ConversationId) -> Option<Self> {
+        let inserted = lock(busy).insert(id.clone());
+        inserted.then(|| Self {
+            busy: Arc::clone(busy),
+            id,
+        })
+    }
+}
+
+impl Drop for Running {
+    fn drop(&mut self) {
+        lock(&self.busy).remove(&self.id);
+    }
+}
+
+/// The set behind `mutex`, whether or not a holder panicked: it is plain data.
+fn lock<T>(mutex: &Mutex<T>) -> std::sync::MutexGuard<'_, T> {
+    mutex
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner)
 }

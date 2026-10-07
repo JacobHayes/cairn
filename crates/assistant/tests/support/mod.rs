@@ -34,10 +34,15 @@ pub struct World {
 impl World {
     /// An empty deployment with the assistant, whose provider plays nothing yet.
     pub fn new() -> Self {
+        Self::with_faults(cairn_store::Faults::default())
+    }
+
+    /// As [`World::new`], over a memory store whose commits `faults` can fail or hold.
+    pub fn with_faults(faults: cairn_store::Faults) -> Self {
         let zone = TimeZone::fixed(Offset::constant(-5));
         let settings =
             DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone, RankConstants::default());
-        let store = Arc::new(MemoryStore::new());
+        let store = Arc::new(MemoryStore::with_faults(faults));
         let service = Service::new(Parts {
             store: Arc::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),

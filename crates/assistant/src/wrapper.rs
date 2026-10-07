@@ -5,10 +5,12 @@
 //!
 //! - structural (PRD glossary, Structural change; every write to a route or its draft) is
 //!   drafted as one proposal instead, against the same destination and revision;
-//! - state touching more than [`DIRECT_WRITE_NODE_COUNT_MAX`] nodes is drafted as one
-//!   proposal too, so a misheard bulk request is seen whole before it lands;
+//! - state touching more than [`DIRECT_WRITE_NODE_COUNT_MAX`] nodes ([`touched_nodes`]) is
+//!   drafted as one proposal too, so a misheard bulk request is seen whole before it lands;
 //! - any other state change applies directly, as one patch, and is reported with its
-//!   consequences (D7).
+//!   consequences (D7), as long as the turn's direct writes together stay within the same
+//!   limit: a bulk request split into many calls is still one change, and what would carry
+//!   the turn past the limit is drafted as one proposal ([`Ledger`]).
 //!
 //! The proposal tools draft proposals already and pass through. Applying a proposal is the
 //! user's click (I7), and importing a route file is the user's too, so both are refused; so
@@ -19,15 +21,18 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_mcp::{ToolError, ToolSet};
 use cairn_schema::{
-    Actor, ChangeClass, Consequences, GraphKey, JourneyId, NodeKey, Patch, PatchReceipt,
-    ProposalId, RecordKey, Title,
+    Actor, ChangeClass, Consequences, Graph, JourneyId, NodeKey, Patch, PatchReceipt, PatchTarget,
+    ProposalId, Revision, Title,
 };
 use cairn_service::DomainPatch;
-use cairn_store::Store;
+use cairn_store::{Document, LoadTarget, Store};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+
+pub use crate::ledger::Ledger;
+pub use crate::touched::touched_nodes;
 
 use crate::limits::DIRECT_WRITE_NODE_COUNT_MAX;
 
@@ -81,6 +86,12 @@ pub enum Because {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         count: Option<u32>,
     },
+    /// It would carry the nodes the turn's direct writes touch past the limit one change
+    /// may (I5): with every later such write in the turn, one proposal.
+    TooManyNodesThisTurn {
+        /// The nodes the turn's direct writes and this one would touch together.
+        count: u32,
+    },
     /// The assistant drafted it as a proposal itself.
     Asked,
 }
@@ -109,6 +120,26 @@ pub enum Action {
         /// Why it is a proposal.
         because: Because,
     },
+    /// An open proposal discarded, at the assistant's hand.
+    Discarded {
+        /// The tool.
+        tool: String,
+        /// The proposal.
+        proposal: ProposalId,
+    },
+}
+
+impl Action {
+    /// The proposal it drafted or discarded, if it is about one.
+    #[must_use]
+    pub fn proposal(&self) -> Option<&ProposalId> {
+        match self {
+            Action::Applied { .. } => None,
+            Action::Proposed { proposal, .. } | Action::Discarded { proposal, .. } => {
+                Some(proposal)
+            }
+        }
+    }
 }
 
 /// What a tool call came to: what the model is told, and the write it made, if any.
@@ -120,14 +151,15 @@ pub struct Outcome {
     pub action: Option<Action>,
 }
 
-/// The policy for the tool `name` with `arguments`, with the domain patch a write drafted
-/// as a proposal would have submitted.
+/// The policy for the tool `name` with `arguments`, with the domain patch a write would
+/// submit, and for a direct write the nodes it touches, read against its journey in `store`.
 ///
 /// # Errors
 ///
 /// What working the patch out answers: arguments that do not match, or a failed read.
 pub async fn decide<S: Store + 'static>(
     tools: &ToolSet<S>,
+    store: &S,
     name: &str,
     arguments: &Value,
 ) -> Result<Decision, ToolError> {
@@ -149,9 +181,46 @@ pub async fn decide<S: Store + 'static>(
             "the assistant cannot tell what {name} would change, so it does not run it"
         )));
     };
-    Ok(match policy_of(drafted.patch()) {
-        Policy::Propose(because) => Decision::Propose(because, drafted),
-        _ => Decision::Direct,
+    if drafted.patch().change_class() == ChangeClass::Structural {
+        return Ok(Decision::Propose(Because::Structural, drafted));
+    }
+    let stored = stored_journey(store, drafted.patch()).await?;
+    let graph = stored.as_ref().map(|(graph, _)| graph);
+    let current = stored.as_ref().map(|(_, revision)| *revision);
+    Ok(match touched_nodes(drafted.patch(), graph) {
+        Some(nodes) if within_limit(nodes.len()) => Decision::Direct {
+            drafted,
+            nodes,
+            current,
+        },
+        nodes => {
+            let count = nodes.map(|nodes| u32::try_from(nodes.len()).unwrap_or(u32::MAX));
+            Decision::Propose(Because::TooManyNodes { count }, drafted)
+        }
+    })
+}
+
+/// Whether `count` nodes are within what one direct change may touch.
+pub(crate) fn within_limit(count: usize) -> bool {
+    u32::try_from(count).is_ok_and(|count| count <= DIRECT_WRITE_NODE_COUNT_MAX)
+}
+
+/// The journey `patch` targets, as stored, with its revision; `None` for another domain or
+/// a journey that does not exist yet.
+async fn stored_journey<S: Store>(
+    store: &S,
+    patch: &Patch,
+) -> Result<Option<(Graph, Revision)>, ToolError> {
+    let PatchTarget::Journey(journey) = &patch.target else {
+        return Ok(None);
+    };
+    let loaded = store.load(&LoadTarget::Journey(journey.clone())).await;
+    let loaded = loaded.map_err(|error| ToolError::Failed {
+        message: error.to_string(),
+    })?;
+    Ok(match loaded {
+        Some(Document::Journey(journey)) => Some((journey.graph, journey.revision)),
+        _ => None,
     })
 }
 
@@ -160,8 +229,15 @@ pub async fn decide<S: Store + 'static>(
 pub enum Decision {
     /// Passed through.
     Read,
-    /// Applied as one patch.
-    Direct,
+    /// Applied as one patch, if the turn's direct writes stay within the limit with it.
+    Direct {
+        /// The patch.
+        drafted: DomainPatch,
+        /// The nodes it touches.
+        nodes: BTreeSet<NodeKey>,
+        /// Its journey's current revision, when it targets one that exists.
+        current: Option<Revision>,
+    },
     /// Drafted as one proposal of this patch's mutations instead.
     Propose(Because, DomainPatch),
     /// A proposal tool: passed through.
@@ -176,7 +252,7 @@ impl Decision {
     pub fn policy(&self) -> Policy {
         match self {
             Decision::Read => Policy::Read,
-            Decision::Direct => Policy::Direct,
+            Decision::Direct { .. } => Policy::Direct,
             Decision::Propose(because, _) => Policy::Propose(because.clone()),
             Decision::Proposal => Policy::Proposal,
             Decision::Refused(why) => Policy::Refused(why.clone()),
@@ -184,75 +260,16 @@ impl Decision {
     }
 }
 
-/// I5: a patch is drafted as a proposal when it is structural or touches more than the
-/// direct-write node limit; otherwise it applies directly.
-#[must_use]
-pub fn policy_of(patch: &Patch) -> Policy {
-    if patch.change_class() == ChangeClass::Structural {
-        return Policy::Propose(Because::Structural);
-    }
-    match touched_node_count(patch) {
-        Some(count) if count <= DIRECT_WRITE_NODE_COUNT_MAX => Policy::Direct,
-        count => Policy::Propose(Because::TooManyNodes { count }),
-    }
-}
-
-/// The nodes `patch` writes, by its touched set (H5): every record it writes on a node
-/// counts that node once. `None` when it touches a whole domain or graph, so it may write
-/// every node.
-#[must_use]
-pub fn touched_node_count(patch: &Patch) -> Option<u32> {
-    let mut nodes: BTreeSet<&NodeKey> = BTreeSet::new();
-    let touched = patch.touched();
-    for key in touched.as_set() {
-        match key {
-            RecordKey::Domain(_) | RecordKey::Graph(_) | RecordKey::RouteDraft(_) => return None,
-            RecordKey::InGraph { key, .. } => nodes.extend(node_of(key)),
-            RecordKey::JourneyHeader(_)
-            | RecordKey::RouteHeader(_)
-            | RecordKey::RouteVersion { .. }
-            | RecordKey::DeletedJourney(_)
-            | RecordKey::Entity(_)
-            | RecordKey::EntityAlias(_)
-            | RecordKey::Proposal { .. } => {}
-        }
-    }
-    Some(u32::try_from(nodes.len()).unwrap_or(u32::MAX))
-}
-
-/// The node a record inside a graph hangs off, if it hangs off one.
-fn node_of(key: &GraphKey) -> Option<&NodeKey> {
-    match key {
-        GraphKey::Node(node)
-        | GraphKey::NodeField { node, .. }
-        | GraphKey::Participation { node, .. }
-        | GraphKey::Resource { node, .. }
-        | GraphKey::NodeState(node)
-        | GraphKey::LocalEdit { node, .. }
-        | GraphKey::Answer(node)
-        | GraphKey::Pin(node)
-        | GraphKey::Snooze(node)
-        | GraphKey::Overrides(node)
-        | GraphKey::Tombstone(node) => Some(node),
-        GraphKey::Edge(edge) => Some(&edge.node),
-        GraphKey::Annotation { node, .. } => node.as_ref(),
-        GraphKey::Role(_)
-        | GraphKey::Kind(_)
-        | GraphKey::DefaultOwner
-        | GraphKey::RetiredKey(_)
-        | GraphKey::RoleFill(_) => None,
-    }
-}
-
 /// Runs the tool call `name` with `arguments` for `actor` (the assistant acting for its
-/// user, H2) through the policy.
+/// user, H2) through the policy, keeping the turn's direct writes in `ledger`.
 pub async fn run<S: Store + 'static>(
     tools: &ToolSet<S>,
+    store: &S,
     actor: &Actor,
-    name: &str,
-    arguments: Value,
+    (name, arguments): (&str, Value),
+    ledger: &mut Ledger,
 ) -> Outcome {
-    let decision = match decide(tools, name, &arguments).await {
+    let decision = match decide(tools, store, name, &arguments).await {
         Ok(decision) => decision,
         Err(error) => {
             return Outcome {
@@ -269,24 +286,45 @@ pub async fn run<S: Store + 'static>(
         Decision::Propose(because, drafted) => {
             propose(tools, actor, name, &arguments, &drafted, because).await
         }
-        Decision::Direct => {
+        Decision::Direct {
+            drafted,
+            nodes,
+            current,
+        } => {
+            let domain = drafted.patch().target.domain();
+            let count = ledger.with(&domain, &nodes);
+            if !within_limit(count) {
+                let note = arguments.get("note").and_then(Value::as_str);
+                return ledger
+                    .overflow(tools, actor, (name, note), &drafted, current, &nodes)
+                    .await;
+            }
             let answer = tools.call(actor, name, arguments).await;
             let action = answer
                 .as_ref()
                 .ok()
                 .and_then(|output| applied(name, output));
+            if action.is_some() {
+                ledger.wrote(&domain, nodes);
+            }
             patina_dst::sometimes!(action.is_some(), "assistant-direct-write-applied");
             Outcome { answer, action }
         }
         Decision::Proposal => {
             let proposal = arguments.get("proposal").cloned();
+            let discards = arguments.get("change").and_then(Value::as_str) == Some("discard");
             let answer = tools.call(actor, name, arguments).await;
             let action = answer.as_ref().ok().and_then(|_| {
                 let proposal = serde_json::from_value(proposal?).ok()?;
-                Some(Action::Proposed {
-                    tool: name.to_owned(),
-                    proposal,
-                    because: Because::Asked,
+                let tool = name.to_owned();
+                Some(if discards {
+                    Action::Discarded { tool, proposal }
+                } else {
+                    Action::Proposed {
+                        tool,
+                        proposal,
+                        because: Because::Asked,
+                    }
                 })
             });
             Outcome { answer, action }
@@ -351,8 +389,13 @@ async fn propose<S: Store + 'static>(
 
 /// The proposal id a write drafted as a proposal is filed under: `pr_` and a digest of its
 /// patch id.
-fn proposal_id(patch: &Patch) -> ProposalId {
-    let digest = Sha256::digest(patch.id.as_str().as_bytes());
+pub(crate) fn proposal_id(patch: &Patch) -> ProposalId {
+    proposal_id_of(patch.id.as_str())
+}
+
+/// The proposal id filed under for `seed`: `pr_` and a digest of it.
+pub(crate) fn proposal_id_of(seed: &str) -> ProposalId {
+    let digest = Sha256::digest(seed.as_bytes());
     let hex = crate::hex(&digest[..12]);
     match format!("pr_{hex}").parse() {
         Ok(id) => id,
@@ -361,7 +404,7 @@ fn proposal_id(patch: &Patch) -> ProposalId {
 }
 
 /// A proposal's title: the first line of the write's note, or what drafted it.
-fn title(tool: &str, note: Option<&str>, count: usize) -> Title {
+pub(crate) fn title(tool: &str, note: Option<&str>, count: usize) -> Title {
     let line = note
         .and_then(|note| note.lines().find(|line| !line.trim().is_empty()))
         .map(|line| line.trim().chars().take(200).collect::<String>());

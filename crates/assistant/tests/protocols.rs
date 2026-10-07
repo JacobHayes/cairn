@@ -196,3 +196,27 @@ async fn a_provider_error_is_reported_without_the_credential() {
     };
     assert!(!format!("{config:?}").contains("test-key"));
 }
+
+/// PRACTICES, Explicit limits: a provider answer past the response size is refused, not
+/// read whole.
+#[tokio::test]
+async fn an_answer_past_the_response_size_is_refused() {
+    let limit = cairn_assistant::limits::PROVIDER_RESPONSE_BYTES_MAX as usize;
+    let router = Router::new().route(
+        "/v1/messages",
+        post(move || async move { "x".repeat(limit + 1) }),
+    );
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
+    let provider = provider(
+        Protocol::AnthropicMessages,
+        &format!("http://{address}/v1"),
+        "a-model",
+    );
+    let failed = provider.send(&first_exchange()).await;
+    let Err(ProviderError::Failed { message }) = failed else {
+        panic!("{failed:?}");
+    };
+    assert!(message.contains(&limit.to_string()), "{message}");
+}

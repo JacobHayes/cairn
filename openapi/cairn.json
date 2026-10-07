@@ -64,6 +64,29 @@
               "because"
             ],
             "type": "object"
+          },
+          {
+            "description": "An open proposal discarded, at the assistant's hand.",
+            "properties": {
+              "outcome": {
+                "const": "discarded",
+                "type": "string"
+              },
+              "proposal": {
+                "$ref": "#/components/schemas/ProposalId",
+                "description": "The proposal."
+              },
+              "tool": {
+                "description": "The tool.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "outcome",
+              "tool",
+              "proposal"
+            ],
+            "type": "object"
           }
         ]
       },
@@ -488,6 +511,26 @@
             },
             "required": [
               "reason"
+            ],
+            "type": "object"
+          },
+          {
+            "description": "It would carry the nodes the turn's direct writes touch past the limit one change\nmay (I5): with every later such write in the turn, one proposal.",
+            "properties": {
+              "count": {
+                "description": "The nodes the turn's direct writes and this one would touch together.",
+                "format": "uint32",
+                "minimum": 0,
+                "type": "integer"
+              },
+              "reason": {
+                "const": "too_many_nodes_this_turn",
+                "type": "string"
+              }
+            },
+            "required": [
+              "reason",
+              "count"
             ],
             "type": "object"
           },

@@ -13,6 +13,7 @@ use std::fmt;
 use serde_json::Value;
 use url::Url;
 
+use crate::limits::PROVIDER_RESPONSE_BYTES_MAX;
 use crate::provider::{Answer, Exchange, Protocol, Provider, ProviderError, Reply};
 
 /// A deployment-wide API key (ARCHITECTURE, Assistant): configuration, never stored in the
@@ -105,7 +106,7 @@ impl HttpProvider {
         }
         let response = request.send().await.map_err(transport)?;
         let status = response.status();
-        let bytes = response.bytes().await.map_err(transport)?;
+        let bytes = read_bounded(response, PROVIDER_RESPONSE_BYTES_MAX).await?;
         let answer: Value =
             serde_json::from_slice(&bytes).map_err(|error| ProviderError::Failed {
                 message: format!("status {status}: the answer is not JSON: {error}"),
@@ -127,6 +128,33 @@ impl Provider for HttpProvider {
     fn send<'a>(&'a self, exchange: &'a Exchange) -> Answer<'a> {
         Box::pin(self.call(exchange))
     }
+}
+
+/// The body of `response`, refused once it is past `bytes_max` bytes, read no further.
+async fn read_bounded(
+    mut response: reqwest::Response,
+    bytes_max: u32,
+) -> Result<Vec<u8>, ProviderError> {
+    let limit = usize::try_from(bytes_max).unwrap_or(usize::MAX);
+    let too_large = || ProviderError::Failed {
+        message: format!(
+            "the answer is over {bytes_max} bytes (assistant_provider_response_bytes)"
+        ),
+    };
+    let announced = response
+        .content_length()
+        .and_then(|length| usize::try_from(length).ok());
+    if announced.is_some_and(|length| length > limit) {
+        return Err(too_large());
+    }
+    let mut body = Vec::new();
+    while let Some(chunk) = response.chunk().await.map_err(transport)? {
+        if body.len() + chunk.len() > limit {
+            return Err(too_large());
+        }
+        body.extend_from_slice(&chunk);
+    }
+    Ok(body)
 }
 
 /// The bearer authorization header, when there is a key.
