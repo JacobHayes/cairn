@@ -2,7 +2,7 @@
 //! binary over it (web/app/playwright.config.ts): `cargo run -p cairn --example
 //! seed_fixtures -- <database>`.
 
-#[path = "../tests/support/seed.rs"]
+#[path = "../tests/integration/support/seed.rs"]
 mod seed;
 
 fn main() -> Result<(), String> {

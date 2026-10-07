@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 #MISE description="Rung 2: unit tests for every Rust crate (property and cost tests: rung 3; store conformance and in-process API tests: rung 4)"
 # PRACTICES, The validation ladder, rung 2. One suite per crate, so a crate whose tests
-# vanish fails the rung. Property tests live in `mod property` (in `tests/property_*.rs`),
-# cost tests in `mod cost` (in `tests/cost_*.rs`), the store conformance suite in `mod
-# conformance` (in `tests/conformance.rs`), the in-process tests of the API and the binary in
-# `mod in_process`, and the binary's tests that need the web build embedded in `mod binary`;
-# all are skipped here by name, and rungs 3, 4, and 6 run them.
+# vanish fails the rung. A crate's integration tests are modules of its one test binary,
+# tests/integration/main.rs, told apart by module path: property tests live in `mod
+# property` (in `property_*.rs`), cost tests in `mod cost` (in `cost_*.rs`), the store
+# conformance suite in `mod conformance` (in `conformance.rs`), the in-process tests of the
+# API and the binary in `mod in_process`, and the binary's tests that need the web build
+# embedded in `mod binary` (in its `binary.rs`, so `binary::binary::`); all are skipped here
+# by name, and rungs 3, 4, and 6 run them.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_RUNG=2
@@ -18,18 +20,29 @@ ladder_require_tool cargo cargo --version
 export CARGO_TERM_COLOR=never
 ladder_require_tool node node --version
 
-# Every workspace crate is a suite, whatever test binaries it builds: unit, integration, and
-# doc tests together, run one crate at a time so each count belongs to its crate.
+# Workspace members as "name<TAB>whether it has a library" lines.
 # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
 crates=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
   let text = "";
   process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
-    for (const item of JSON.parse(text).packages) console.log(item.name);
+    for (const item of JSON.parse(text).packages) {
+      const library = item.targets.some((target) => target.kind.some((kind) => kind === "lib" || kind === "rlib"));
+      console.log(`${item.name}\t${library}`);
+    }
   });')
-while read -r crate; do
+skips=(--skip property:: --skip conformance:: --skip cost:: --skip in_process:: --skip binary::binary::)
+# Every workspace crate is a suite, whatever test binaries it builds: unit, integration, and
+# doc tests together, run one crate at a time so each count belongs to its crate. `--tests`
+# builds only the targets that hold tests: a plain `cargo test` also links every example,
+# which rung 1's clippy already compiles. Doc tests are a second run.
+while IFS=$'\t' read -r crate library; do
   [ -n "$crate" ] || continue
   status=0
-  output=$(cargo test --locked -p "$crate" --all-features -- --skip property:: --skip conformance:: --skip cost:: --skip in_process:: --skip binary:: 2>&1) || status=$?
+  output=$(cargo test --locked -p "$crate" --all-features --tests -- "${skips[@]}" 2>&1) || status=$?
+  if [ "$status" -eq 0 ] && [ "$library" = true ]; then
+    doc=$(cargo test --locked -p "$crate" --all-features --doc -- "${skips[@]}" 2>&1) || status=$?
+    output+=$'\n'"$doc"
+  fi
   printf '%s\n' "$output"
   [ "$status" -eq 0 ] || ladder_fail "cargo test reported failures in $crate"
   count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")

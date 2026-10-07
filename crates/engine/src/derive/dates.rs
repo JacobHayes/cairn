@@ -60,7 +60,8 @@
 //! component after each contradictory chain it lists, at most
 //! `chain_count_per_rejection_max` + 1 times. Chains are not stored: each bound keeps the
 //! constraint that set it, and a chain is walked back from it when asked, at most one step
-//! per instant. The cost test (`tests/cost_dates.rs`) counts these operations at the limits.
+//! per instant. The cost test (`tests/integration/cost_dates.rs`) counts these operations at
+//! the limits.
 
 mod execution;
 mod explain;

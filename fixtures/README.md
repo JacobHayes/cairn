@@ -14,7 +14,7 @@ first patch
 creates its journey at base revision 0 from version 1 of the route beside it; the route
 file is that version. Route files carry every key, so scenario patches can refer to nodes,
 roles, and kinds by key. Every file is written in canonical form: parsing and writing it
-gives the same bytes, which `crates/schema/tests/fixtures.rs` checks.
+gives the same bytes, which `crates/schema/tests/integration/fixtures.rs` checks.
 
 ## `vendor-evaluation/`
 
@@ -35,7 +35,7 @@ finishes the workload and the baseline (which completes testing and opens report
 answers the reviewer with a person created in the same patch.
 
 Derived at each decision point (brief 2.2): the relevance and participations `derive` gives
-after steps 1, 2, 6, and 8. The scenario matrix (`crates/engine/tests/matrix.rs`) checks these
+after steps 1, 2, 6, and 8. The scenario matrix (`crates/engine/tests/integration/matrix.rs`) checks these
 values, and `briefs/proof/2.2/prove.sh` checks these tables against the engine's output.
 
 | Node | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
@@ -144,7 +144,7 @@ the comparison set is the prior tool. Upgrading the finished scenario journey, w
 edits, to version 2 proposes the upgrade mutation and one item: the workload as an orphan, kept by
 default, whose removal would also remove its two journey-local children (`n_workload_ingest`,
 `n_workload_query`). There is no conflict and no kept edit; the rename, the condition, and the
-sign-off apply with the upgrade, and the workload stays done, orphaned. `crates/engine/tests/upgrade.rs`
+sign-off apply with the upgrade, and the workload stays done, orphaned. `crates/engine/tests/integration/upgrade.rs`
 checks these items.
 
 ## `hiring-loop/`

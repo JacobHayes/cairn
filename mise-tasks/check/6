@@ -5,8 +5,9 @@
 # binary, which walks the fixtures through the service natively); both are build outputs
 # under web/wasm/dist/. The app's tests (brief 4.6) need the module and the fixture server.
 # The binary (brief 4.7) embeds the app's build (web/app/dist/build/): its own tests that start
-# it (`mod binary` in crates/cairn/tests/binary.rs) are a suite here, and the app's server-host
-# suite runs against it too (the `binary` project of web/app/playwright.config.ts).
+# it (`mod binary` in crates/cairn/tests/integration/binary.rs, so `binary::binary::`) are a
+# suite here, and the app's server-host suite runs against it too (the `binary` project of
+# web/app/playwright.config.ts).
 # Web unit tests (Vitest, from 4.6) run first, one suite per web package with a
 # vitest.config.ts; then each web package with a playwright.config.ts is a suite. A suite
 # that runs no test, or any test that fails or is skipped, fails the rung. The browsers are
@@ -59,7 +60,7 @@ cargo build --quiet --locked -p cairn-wasm --example fixture_server \
 cargo build --quiet --locked -p cairn --bin cairn --example seed_fixtures \
   || ladder_fail "the binary did not build"
 status=0
-output=$(cargo test --locked -p cairn --all-features --test binary -- binary:: 2>&1) || status=$?
+output=$(cargo test --locked -p cairn --all-features --test integration -- binary::binary:: 2>&1) || status=$?
 printf '%s\n' "$output"
 [ "$status" -eq 0 ] || ladder_fail "the binary's tests failed"
 count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")

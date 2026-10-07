@@ -23,10 +23,6 @@ name = "cairn-wasm-cases"
 path = "src/bin/cases.rs"
 required-features = ["server"]
 
-[[test]]
-name = "agreement"
-required-features = ["server"]
-
 [dependencies]
 cairn-engine.workspace = true
 cairn-schema.workspace = true

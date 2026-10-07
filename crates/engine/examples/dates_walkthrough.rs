@@ -319,7 +319,7 @@ fn rejected(fixture: &Fixture, out: &mut String) -> Result<()> {
     Ok(())
 }
 
-/// The cost test's counts, as `tests/cost_dates.rs` measures them.
+/// The cost test's counts, as `tests/integration/cost_dates.rs` measures them.
 fn cost(out: &mut String) -> Result<()> {
     let graph = date_limits();
     let deployment = Deployment::default();

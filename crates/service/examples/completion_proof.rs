@@ -13,7 +13,7 @@
     clippy::too_many_lines
 )]
 
-#[path = "../tests/support/mod.rs"]
+#[path = "../tests/integration/support/mod.rs"]
 mod support;
 
 use std::fmt::Write as _;

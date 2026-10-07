@@ -7,7 +7,7 @@
 //! usage: `cargo run -p cairn-service --example service_proof -- TURSO_FILE`
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
-#[path = "../tests/support/mod.rs"]
+#[path = "../tests/integration/support/mod.rs"]
 mod support;
 
 use std::collections::BTreeSet;

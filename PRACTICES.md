@@ -227,6 +227,8 @@ flowchart TB
 
 A rung that runs zero tests fails. Every rung's command reports how many tests each of its suites ran, and the rung fails if any suite it lists ran none, so one suite vanishing cannot hide behind another's count. Rung 1 runs tools, not tests: it fails if any tool is missing or reports nothing checked.
 
+Each crate's integration tests are one test binary, `tests/integration/main.rs`, with one module per file beside it, so the crate's dependencies are linked once rather than once per file. A new test file goes in `tests/integration/` and is declared in `main.rs` as `mod <file>;`. Rungs pick tests by module path, not by file: `mod property` in `property_*.rs` and `mod cost` in `cost_*.rs` for rung 3, `mod conformance` and `mod in_process` for rung 4, `mod binary` in the binary's `binary.rs` for rung 6, and the rest in rung 2.
+
 ### Growing the ladder
 
 The table above is the finished ladder. It is built incrementally, and at every point `mise run check` means every rung that exists then. The first brief to have tests for a rung adds that rung to `check`, at its fixed position, in the same change as those tests (rung 1 exists from the scaffold). Before that the rung does not exist, rather than existing and passing on nothing, so `check` never depends on a tool or service nothing uses yet, and once a rung exists a suite that silently stops running fails it.

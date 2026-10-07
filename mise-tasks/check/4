@@ -1,15 +1,16 @@
 #!/usr/bin/env bash
 #MISE description="Rung 4: the store conformance suite on every backend, one suite each, and the API's and the MCP endpoint's in-process tests"
 # PRACTICES, The validation ladder, rung 4; Testing > Shell: conformance and integration.
-# Each backend runs the suite from its crate's tests/conformance.rs, inside `mod
-# conformance` (rung 2 skips the module by name). The backends are listed here and each is
+# Each backend runs the suite from its crate's tests/integration/conformance.rs, inside `mod
+# conformance` (rung 2 skips the module by name; every crate's integration tests are one
+# binary, `--test integration`, and are picked by module path). The backends are listed here and each is
 # its own suite, so a backend whose suite stops building or running fails the rung rather
 # than hiding behind another's count. The API's tests run against a server on loopback
 # over the memory store, inside `mod in_process` (rung 2 skips the module by name). The MCP
 # endpoint's tests drive it through the same API, inside `mod mcp_in_process`, and are their
 # own suite so one cannot hide behind the other's count. The binary's server, assembled by
 # its composition root and served through its listener, runs in process too, inside `mod
-# in_process` in crates/cairn/tests/server.rs.
+# in_process` in crates/cairn/tests/integration/server.rs.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_RUNG=4
@@ -25,7 +26,7 @@ export CARGO_TERM_COLOR=never
 backends=$'memory\tcairn-store\nturso\tcairn-store-turso'
 while IFS=$'\t' read -r backend crate; do
   status=0
-  output=$(cargo test --locked -p "$crate" --all-features --test conformance -- conformance:: 2>&1) || status=$?
+  output=$(cargo test --locked -p "$crate" --all-features --test integration -- conformance:: 2>&1) || status=$?
   printf '%s\n' "$output"
   [ "$status" -eq 0 ] || ladder_fail "store conformance failed on the $backend backend"
   count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
@@ -40,14 +41,14 @@ count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' 
 ladder_suite "API in process" "$count" tests
 
 status=0
-output=$(cargo test --locked -p cairn-api --all-features --test mcp -- mcp_in_process:: 2>&1) || status=$?
+output=$(cargo test --locked -p cairn-api --all-features --test integration -- mcp_in_process:: 2>&1) || status=$?
 printf '%s\n' "$output"
 [ "$status" -eq 0 ] || ladder_fail "the MCP endpoint's in-process tests failed"
 count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
 ladder_suite "MCP in process" "$count" tests
 
 status=0
-output=$(cargo test --locked -p cairn --all-features --test server -- in_process:: 2>&1) || status=$?
+output=$(cargo test --locked -p cairn --all-features --test integration -- server::in_process:: 2>&1) || status=$?
 printf '%s\n' "$output"
 [ "$status" -eq 0 ] || ladder_fail "the binary's in-process tests failed"
 count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
