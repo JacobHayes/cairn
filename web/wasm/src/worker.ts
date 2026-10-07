@@ -93,6 +93,8 @@ async function answer(request: WorkerRequest): Promise<string> {
       return "";
     case "route_level":
       return ready().routeLevelText(request.request);
+    case "apply_route":
+      return ready().applyRouteText(request.request);
     case "memory":
       return String(ready().memoryBytes());
   }

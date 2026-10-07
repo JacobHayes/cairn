@@ -16,6 +16,7 @@ import {
   type ProjectionAnswer,
   type ProjectionRequest,
   type RenderedDraft,
+  type RouteApplyRequest,
   type RouteLevelRequest,
 } from "./types.ts";
 
@@ -134,6 +135,11 @@ export class DeriveWorker {
   /** A draft patch applied to the held journey locally, committing nothing. */
   async apply(journey: string, request: ApplyRequest): Promise<AppliedLocally> {
     return parsed<AppliedLocally>(await this.applyText(journey, request));
+  }
+
+  /** A draft patch applied to a route locally, committing nothing: the route as it would leave it. */
+  async applyRoute(request: RouteApplyRequest): Promise<Schema<"Route">> {
+    return parsed<Schema<"Route">>(await this.#ask({ op: "apply_route", request }));
   }
 
   /** C2: a route graph's canvas level (a route has no state; nothing is held). */

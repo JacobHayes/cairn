@@ -8,8 +8,9 @@
 # it (`mod binary` in crates/cairn/tests/integration/binary.rs, so `binary::binary::`) are a
 # suite here, and the app's server-host suite runs against it too (the `binary` project of
 # web/app/playwright.config.ts).
-# Web unit tests (Vitest, from 4.6) run first, one suite per web package with a
-# vitest.config.ts; then each web package with a playwright.config.ts is a suite. A suite
+# The module is built first: web unit tests (Vitest, from 4.6) run next, one suite per web
+# package with a vitest.config.ts, and the authoring tests (5.6) check the editors against
+# the module's engine; then each web package with a playwright.config.ts is a suite. A suite
 # that runs no test, or any test that fails or is skipped, fails the rung. The browsers are
 # Playwright's own, pinned with @playwright/test: `npx playwright install chromium` once per
 # machine.
@@ -25,6 +26,8 @@ ladder_require_tool wasm-bindgen wasm-bindgen --version
 ladder_require_tool playwright node_modules/.bin/playwright --version
 ladder_require_tool vitest node_modules/.bin/vitest --version
 export CARGO_TERM_COLOR=never
+
+mise run build:wasm || ladder_fail "the browser host's module did not build"
 
 for config in web/*/vitest.config.ts; do
   package=$(dirname "$config")
@@ -44,7 +47,6 @@ for config in web/*/vitest.config.ts; do
   ladder_suite "web unit: $package" "$passed" tests
 done
 
-mise run build:wasm || ladder_fail "the browser host's module did not build"
 cargo run --quiet --locked --release -p cairn-wasm --features server --bin cairn-wasm-cases -- \
   web/wasm/dist/cases || ladder_fail "the server's agreement cases were not written"
 # The app's server-host tests (web/app, 4.6) run against the fixture server; built here so

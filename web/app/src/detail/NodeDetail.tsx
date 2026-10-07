@@ -2,7 +2,7 @@
 // reads only the journey's document and its local derive (ARCHITECTURE, Web UI: the browser
 // has every explanation), so it follows the journey live (H6) with nothing of its own to
 // fetch. Sections start folded where they explain rather than act (progressive disclosure).
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { TitleEditor } from "../screens/TitleEditor.tsx";
@@ -40,7 +40,8 @@ function Dates({ view, detail }: { view: Ready; detail: NodeDetail }) {
 /** The width below which the panel sits above the canvas (canvas/canvas.css, `.canvas-split`). */
 const NARROW = "(max-width: 52rem)";
 
-export function NodeDetailPanel({ view, nodeKey }: { view: Ready; nodeKey: string }) {
+/** `extra` sits under the header: the node's structure, in a journey's edit mode (5.6). */
+export function NodeDetailPanel({ view, nodeKey, extra }: { view: Ready; nodeKey: string; extra?: ReactNode }) {
   const journey = view.journey.header.id;
   const detail = nodeDetail(view, nodeKey);
   const panel = useRef<HTMLElement>(null);
@@ -70,6 +71,7 @@ export function NodeDetailPanel({ view, nodeKey }: { view: Ready; nodeKey: strin
         </Link>
       </div>
       <Header view={view} detail={detail} />
+      {extra}
       <div data-testid="rename">
         <TitleEditor journey={journey} node={nodeKey} title={detail.node.title} revision={view.journey.revision} showTitle={false} />
       </div>

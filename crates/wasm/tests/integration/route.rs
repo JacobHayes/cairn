@@ -6,8 +6,11 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{EdgeOrigin, Level, NodeKind, Route, RouteVersion};
-use cairn_wasm::{BrowserRoot, HostError, RouteLevelRequest, route_level, route_level_of};
+use cairn_schema::{EdgeOrigin, Level, NodeKind, Rejection, Route, RouteVersion, ViolationCode};
+use cairn_wasm::{
+    BrowserRoot, HostError, RouteApplyRequest, RouteLevelRequest, apply_route_locally, route_level,
+    route_level_of,
+};
 
 fn version_one(root: &BrowserRoot) -> RouteVersion {
     serde_json::from_str(&root.route_version("vendor-evaluation", "1").unwrap()).unwrap()
@@ -93,4 +96,62 @@ fn hidden_actions_roll_up_into_their_deliverable() {
 fn an_unreadable_request_is_refused() {
     let refused: HostError = serde_json::from_str(&route_level("{}").unwrap_err()).unwrap();
     assert!(matches!(refused, HostError::Unreadable { .. }));
+}
+
+fn route_apply(route: Option<Route>, patch: &str) -> Result<Route, HostError> {
+    let deployment =
+        serde_json::from_str(&BrowserRoot::seeded().unwrap().deployment().unwrap()).unwrap();
+    apply_route_locally(&RouteApplyRequest {
+        route,
+        versions: Vec::new(),
+        deployment,
+        patch: serde_json::from_str(patch).unwrap(),
+        today: "2026-10-06".parse().unwrap(),
+        at: "2026-10-06T12:00:00Z".parse().unwrap(),
+        actor: serde_json::from_str(r#"{"user": "u_local"}"#).unwrap(),
+    })
+}
+
+/// Brief 5.6: a route authored by hand (A12) is previewed locally: a new route with an empty
+/// draft, a node added to the draft, and a node whose id a sibling holds refused with the
+/// engine's violation (A15), each without committing anything.
+#[test]
+fn a_route_draft_is_authored_locally_and_refused_with_its_violations() {
+    let created = route_apply(
+        None,
+        r#"{"id": "p_one", "target": {"route": "drafted"}, "base_revision": 0, "mutations": [
+            {"op": "create_route", "name": "Drafted"}, {"op": "open_draft", "source": "edit"}]}"#,
+    )
+    .unwrap();
+    assert!(created.draft.as_ref().unwrap().graph.nodes.is_empty());
+    let node = |key: &str| {
+        format!(
+            r#"{{"id": "p_{key}", "target": {{"route": "drafted"}}, "base_revision": {}, "mutations": [
+            {{"op": "add_node", "node": {{"key": "n_{key}", "id": "same", "kind": "milestone", "title": "Same"}}}}]}}"#,
+            created.revision
+        )
+    };
+    let added = route_apply(Some(created.clone()), &node("first")).unwrap();
+    assert_eq!(added.draft.as_ref().unwrap().graph.nodes.len(), 1);
+    assert!(added.revision > created.revision);
+    let mut again = added.clone();
+    again.revision = created.revision;
+    let refused = route_apply(Some(again), &node("second")).unwrap_err();
+    let HostError::Rejected { rejection } = refused else {
+        panic!("expected a rejection, got {refused:?}")
+    };
+    let Rejection::Invalid { violations } = rejection else {
+        panic!("expected violations, got {rejection:?}")
+    };
+    let codes: Vec<_> = violations
+        .as_slice()
+        .iter()
+        .map(|violation| violation.code)
+        .collect();
+    assert_eq!(codes, [ViolationCode::DuplicateSiblingId]);
+    let elsewhere = route_apply(
+        Some(created),
+        r#"{"id": "p_x", "target": {"route": "other"}, "base_revision": 1, "mutations": [{"op": "publish_draft"}]}"#,
+    );
+    assert!(matches!(elsewhere, Err(HostError::Missing { .. })));
 }

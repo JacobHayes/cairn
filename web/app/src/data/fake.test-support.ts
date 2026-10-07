@@ -175,6 +175,14 @@ export class FakeDeriver implements Deriver {
     return Promise.reject(new Error("no route levels in the fake"));
   }
 
+  apply(): Promise<never> {
+    return Promise.reject(new Error("no local applies in the fake"));
+  }
+
+  applyRoute(): Promise<never> {
+    return Promise.reject(new Error("no local applies in the fake"));
+  }
+
   release(journey: string): Promise<void> {
     this.released.push(journey);
     return Promise.resolve();

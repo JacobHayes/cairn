@@ -1,0 +1,60 @@
+/* Authoring (5.6): the structure editors' fields, problems, and nested condition clauses,
+   drawn with the design tokens so they read the same in light and dark. */
+.author-bar {
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+}
+
+.author-group {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: var(--space-3);
+  margin: 0;
+  min-width: 0;
+}
+
+.author-label {
+  font-size: var(--text-small);
+  font-weight: 600;
+  color: var(--color-muted);
+}
+
+.author-field[data-invalid="true"] {
+  border-left: 2px solid var(--color-bad);
+  padding-left: var(--space-2);
+}
+
+.author-problem {
+  color: var(--color-bad);
+  font-size: var(--text-small);
+}
+
+.author-clause {
+  border-left: 2px solid var(--color-border);
+  padding-left: var(--space-3);
+}
+
+.author-clauses {
+  padding-left: var(--space-2);
+}
+
+.author-panel .textarea {
+  min-height: 3.5rem;
+}
+
+/* A form's controls take the panel's width and wrap rather than push it wider. */
+.author-panel .field,
+.author-bar .field {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.author-panel .select,
+.author-bar .select {
+  max-width: 100%;
+}
+
+.author-panel .author-field > .field {
+  width: 100%;
+}

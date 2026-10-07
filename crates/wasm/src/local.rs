@@ -1,18 +1,20 @@
 //! Local writes over a domain document (ARCHITECTURE, Web UI: previews; Write path): a draft
-//! patch applied to the browser's in-memory journey with the engine's `apply`, a proposal
-//! previewed (C14), and a patch's touched set for the H5 safe retry. Nothing here commits:
-//! committed state always comes from the server. Each mirrors what the server's service does
-//! with the same records, so its answer is the server's byte for byte.
+//! patch applied to the browser's in-memory journey with the engine's `apply`, a draft patch
+//! applied to a route the browser holds (its draft has no state, so there is nothing to
+//! derive), a proposal previewed (C14), and a patch's touched set for the H5 safe retry.
+//! Nothing here commits: committed state always comes from the server. Each mirrors what the
+//! server's service does with the same records, so its answer is the server's byte for byte.
 //!
-//! Cost: an apply is one engine apply and, for its consequences, two derives; a preview is
-//! the engine's (one apply, two derives); a touched set is linear in the patch.
+//! Cost: an apply is one engine apply and, for its consequences, two derives; a route apply is
+//! one engine apply; a preview is the engine's (one apply, two derives); a touched set is
+//! linear in the patch.
 
 use std::collections::BTreeSet;
 
 use cairn_engine::{ApplyInputs, Graph, Records, consequences, derive};
 use cairn_schema::{
-    Actor, Consequences, Domain, DomainDocument, Markdown, Patch, PatchTarget, Proposal,
-    RouteVersion, Timestamp, TouchedSet,
+    Actor, Consequences, Date, Deployment, Domain, DomainDocument, Lineage, Markdown, Patch,
+    PatchTarget, Proposal, Route, RouteId, RouteVersion, Timestamp, TouchedSet,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -61,6 +63,81 @@ pub struct PreviewRequest {
     pub at: Timestamp,
     /// Who asks (H2).
     pub actor: Actor,
+}
+
+/// A draft patch to apply locally to a route (A11, A12: authoring a route's draft by hand),
+/// with what it reads and the clock and actor its events would carry.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RouteApplyRequest {
+    /// The route as `GET /routes/{id}` answers it, with its draft; none for a patch that
+    /// creates the route (base revision 0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub route: Option<Route>,
+    /// The published versions the patch reads (the latest, for a patch opening a draft from it).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub versions: Vec<RouteVersion>,
+    /// The deployment context (E6): entities a participation names.
+    pub deployment: Deployment,
+    /// The patch; it targets the route.
+    pub patch: Patch,
+    /// The deployment's today.
+    pub today: Date,
+    /// When it would commit.
+    pub at: Timestamp,
+    /// Who would submit it (H2).
+    pub actor: Actor,
+}
+
+/// A17 locally on a route: `request`'s patch applied to the route it holds (or to none, for
+/// a patch that creates it), answered with the route as the patch leaves it. A route has no
+/// state, so a route patch causes no consequences (D7).
+///
+/// # Errors
+///
+/// [`HostError::Rejected`] with the engine's rejection; [`HostError::Missing`] when the patch
+/// targets another domain than the route held.
+pub fn apply_route_locally(request: &RouteApplyRequest) -> Result<Route, HostError> {
+    let PatchTarget::Route(id) = &request.patch.target else {
+        return Err(HostError::Missing {
+            message: "a route apply takes a patch to a route".to_owned(),
+        });
+    };
+    let held = request.route.as_ref().map(|route| &route.header.id);
+    if held.is_some_and(|held| held != id) {
+        return Err(HostError::Missing {
+            message: format!(
+                "the request holds route {}, not {id}",
+                held.map_or("", RouteId::as_str)
+            ),
+        });
+    }
+    let mut records = Records {
+        deployment: request.deployment.clone(),
+        ..Records::default()
+    };
+    if let Some(route) = &request.route {
+        records.routes.insert(id.clone(), route.clone());
+    }
+    for version in &request.versions {
+        let lineage = Lineage {
+            route: version.route.clone(),
+            version: version.version,
+        };
+        records.versions.insert(lineage, version.clone());
+    }
+    let inputs = ApplyInputs {
+        today: request.today,
+        at: request.at,
+        actor: request.actor.clone(),
+        note: None,
+    };
+    let applied = cairn_engine::apply(&records, &request.patch, &inputs)
+        .map_err(|rejection| HostError::Rejected { rejection })?;
+    match applied.records().routes.get(id) {
+        Some(route) => Ok(route.clone()),
+        None => unreachable!("an accepted route patch leaves its route"),
+    }
 }
 
 /// The records a patch to the document's journey reads: the journey and the deployment.
@@ -203,6 +280,18 @@ pub fn apply(document: &str, request: &str) -> Result<String, String> {
     let document = read_document(document)?;
     let request: ApplyRequest = read("apply request", request)?;
     Ok(json(&apply_locally(&document, &request)?))
+}
+
+/// Applies a draft patch to a route without committing it: `request` is the JSON of a
+/// [`RouteApplyRequest`]; the answer is the JSON of the route as the patch leaves it.
+///
+/// # Errors
+///
+/// The JSON of a [`HostError`]: unreadable input, the rejection, or a patch to another domain.
+#[wasm_bindgen(js_name = applyRoute)]
+pub fn apply_route(request: &str) -> Result<String, String> {
+    let request: RouteApplyRequest = read("route apply request", request)?;
+    Ok(json(&apply_route_locally(&request)?))
 }
 
 /// Previews a proposal against `document`'s journey: `request` is the JSON of a

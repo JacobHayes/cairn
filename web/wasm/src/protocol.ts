@@ -3,8 +3,9 @@
 // as fetched and posts it once per revision; the worker derives it once and holds the
 // derivation by journey until a newer revision replaces it, answering projections, previews,
 // and local applies over it as the module's JSON text, which the page parses. A route's graph,
-// which has no state, is answered its canvas level in passing, holding nothing.
-import type { ApplyRequest, DraftRequest, HostError, PreviewRequest, ProjectionRequest, RouteLevelRequest } from "./types.ts";
+// which has no state, is answered its canvas level, or a draft patch applied to it, in
+// passing, holding nothing.
+import type { ApplyRequest, DraftRequest, HostError, PreviewRequest, ProjectionRequest, RouteApplyRequest, RouteLevelRequest } from "./types.ts";
 
 /** What the page asks the worker. */
 export type WorkerRequest =
@@ -17,6 +18,7 @@ export type WorkerRequest =
   | { op: "apply"; journey: string; request: ApplyRequest }
   | { op: "release"; journey: string }
   | { op: "route_level"; request: RouteLevelRequest }
+  | { op: "apply_route"; request: RouteApplyRequest }
   | { op: "memory" };
 
 /** A request with the id its reply carries. */

@@ -2,10 +2,16 @@
 // what it was derived from (revision, deployment revision, today: the query cache's key), the
 // toggles and the way out of a drilled-in container, the stalled surface, and a node's detail
 // (5.1) beside the canvas at the journey's address with the node's key. What the canvas shows
-// is in the address's query (canvas/settings.ts), so every link keeps it.
-import { useMemo } from "react";
+// is in the address's query (canvas/settings.ts), so every link keeps it. Edit mode (5.6)
+// adds the structure's editors: a palette above the canvas, the node's structure in its
+// detail, and drawing a requirement between two cards.
+import { useMemo, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
+import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
+import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
+import { EditToggle, JourneyAuthoringBar } from "../authoring/JourneyAuthoring.tsx";
+import { journeyAuthored } from "../authoring/target.ts";
 import { JourneyCanvas } from "../canvas/JourneyCanvas.tsx";
 import { KindToggles } from "../canvas/KindToggles.tsx";
 import { canvasPath, viewFrom, type CanvasView } from "../canvas/settings.ts";
@@ -18,7 +24,7 @@ import { JourneyNav } from "./JourneyNav.tsx";
 
 type Ready = Extract<JourneyView, { status: "ready" }>;
 
-function Header({ ready, view, selected }: { ready: Ready; view: CanvasView; selected: string | undefined }) {
+function Header({ ready, view, selected, bar }: { ready: Ready; view: CanvasView; selected: string | undefined; bar: ReactNode }) {
   const navigate = useNavigate();
   const { header } = ready.journey;
   const { key } = ready;
@@ -38,6 +44,8 @@ function Header({ ready, view, selected }: { ready: Ready; view: CanvasView; sel
         </span>
       </div>
       <JourneyNav journey={header.id} current="canvas" node={selected} />
+      <EditToggle journey={header.id} view={view} selected={selected} />
+      {bar}
       <KindToggles
         view={view}
         journey
@@ -65,6 +73,9 @@ function JourneyScreen({ id, selected }: { id: string; selected: string | undefi
   const { search } = useLocation();
   const view = useMemo(() => viewFrom(new URLSearchParams(search)), [search]);
   const journey = useJourney(id);
+  const navigate = useNavigate();
+  const authored = useMemo(() => (journey.status === "ready" && view.edit ? journeyAuthored(journey) : undefined), [journey, view.edit]);
+  const drawing = useEdgeDrawing(authored);
   switch (journey.status) {
     case "loading":
       return <p className="muted">Deriving the journey...</p>;
@@ -77,14 +88,18 @@ function JourneyScreen({ id, selected }: { id: string; selected: string | undefi
     case "ready":
       break;
   }
+  const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
+  const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(canvasPath(id, view))} />;
   return (
-    <div className={selected === undefined ? "canvas-page" : "canvas-page canvas-split"}>
-      {/* Keyed by journey and node, so every form and rejection in it is that node's. */}
-      {selected === undefined ? null : <NodeDetailPanel key={`${id}:${selected}`} view={journey} nodeKey={selected} />}
-      <div className="stack">
-        <Header ready={journey} view={view} selected={selected} />
-        <JourneyCanvas ready={journey} view={view} selected={selected} />
+    <ConnectContext value={authored === undefined ? undefined : drawing.connecting}>
+      <div className={selected === undefined ? "canvas-page" : "canvas-page canvas-split"}>
+        {/* Keyed by journey and node, so every form and rejection in it is that node's. */}
+        {selected === undefined ? null : <NodeDetailPanel key={`${id}:${selected}`} view={journey} nodeKey={selected} extra={structure} />}
+        <div className="stack">
+          <Header ready={journey} view={view} selected={selected} bar={authored === undefined ? null : <JourneyAuthoringBar authored={authored} view={view} drawing={drawing} />} />
+          <JourneyCanvas ready={journey} view={view} selected={selected} onPick={authored === undefined ? undefined : drawing.pick} />
+        </div>
       </div>
-    </div>
+    </ConnectContext>
   );
 }

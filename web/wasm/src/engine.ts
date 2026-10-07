@@ -5,6 +5,7 @@
 import init, {
   Derivation,
   apply,
+  applyRoute,
   engineVersion,
   exportRoute,
   importRoute,
@@ -33,6 +34,7 @@ import {
   type PreviewRequest,
   type ProjectionAnswer,
   type ProjectionRequest,
+  type RouteApplyRequest,
   type RouteLevelRequest,
 } from "./types.ts";
 
@@ -129,6 +131,16 @@ export class Engine {
   /** Applies a draft patch to the document's journey locally, committing nothing. */
   apply(documentText: string, request: ApplyRequest): AppliedLocally {
     return parsed<AppliedLocally>(this.applyText(documentText, request));
+  }
+
+  /** Applies a draft patch to a route locally (A12: a route authored by hand), as the module wrote it. */
+  applyRouteText(request: RouteApplyRequest): string {
+    return hosted(() => applyRoute(JSON.stringify(request)));
+  }
+
+  /** Applies a draft patch to a route locally, committing nothing: the route as the patch leaves it. */
+  applyRoute(request: RouteApplyRequest): Schema<"Route"> {
+    return parsed<Schema<"Route">>(this.applyRouteText(request));
   }
 
   /** Previews a proposal against the document's journey (C14), as the module wrote it. */

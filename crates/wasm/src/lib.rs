@@ -3,10 +3,10 @@
 //!
 //! For every host, the engine over JSON: a domain document read with its engine version
 //! checked first ([`read_document`]: version skew), derived once ([`Derivation`]) and
-//! projected ([`Projection`]), a draft patch applied locally ([`apply`]), a proposal
-//! previewed ([`preview`]), a patch's touched set for the H5 safe retry ([`touched`]), route
-//! files exported and imported ([`export_route`], [`import_route`]), and a route graph's
-//! canvas level ([`route_level`]). Every input and
+//! projected ([`Projection`]), a draft patch applied locally to a journey ([`apply`]) or a
+//! route ([`apply_route`]), a proposal previewed ([`preview`]), a patch's touched set for the
+//! H5 safe retry ([`touched`]), route files exported and imported ([`export_route`],
+//! [`import_route`]), and a route graph's canvas level ([`route_level`]). Every input and
 //! output is the schema's JSON, so each value is the server's byte for byte.
 //!
 //! For the in-browser host, its composition root ([`BrowserRoot`]): the service over the
@@ -34,8 +34,8 @@ pub use files::{
     route_file_text,
 };
 pub use local::{
-    AppliedLocally, ApplyRequest, PreviewRequest, apply, apply_locally, preview, preview_locally,
-    touched, touched_overlaps,
+    AppliedLocally, ApplyRequest, PreviewRequest, RouteApplyRequest, apply, apply_locally,
+    apply_route, apply_route_locally, preview, preview_locally, touched, touched_overlaps,
 };
 pub use reads::{
     JourneyIndexQuery, LinkedIdentity, RouteDetail, RouteImport, RoutePage, RouteSummary,

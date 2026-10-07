@@ -220,6 +220,16 @@ export class RootSubscription {
 export function apply(document: string, request: string): string;
 
 /**
+ * Applies a draft patch to a route without committing it: `request` is the JSON of a
+ * [`RouteApplyRequest`]; the answer is the JSON of the route as the patch leaves it.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`]: unreadable input, the rejection, or a patch to another domain.
+ */
+export function applyRoute(request: string): string;
+
+/**
  * The engine version this module was built from: what a host compares a document's with
  * before deriving, previewing, or writing with it.
  */
@@ -321,6 +331,7 @@ export interface InitOutput {
     readonly __wbg_derivation_free: (a: number, b: number) => void;
     readonly __wbg_rootsubscription_free: (a: number, b: number) => void;
     readonly apply: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly applyRoute: (a: number, b: number, c: number) => void;
     readonly browserroot_capabilities: (a: number, b: number) => void;
     readonly browserroot_deployment: (a: number, b: number) => void;
     readonly browserroot_document: (a: number, b: number, c: number, d: number, e: number, f: number) => void;

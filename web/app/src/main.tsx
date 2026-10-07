@@ -51,6 +51,7 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route path="journeys/:id/summary/nodes/:key" element={<SummaryPage />} />
               <Route path="routes" element={<RouteIndex />} />
               <Route path="routes/:id" element={<RouteCanvasPage />} />
+              <Route path="routes/:id/nodes/:key" element={<RouteCanvasPage />} />
               <Route path="routes/:id/versions" element={<RouteDetailPage />} />
               <Route path="entities" element={<Entities />} />
               <Route path="me" element={<Identity />} />

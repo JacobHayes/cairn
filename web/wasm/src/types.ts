@@ -116,6 +116,17 @@ export interface AppliedLocally {
   consequences: Schema<"Consequences">;
 }
 
+/** `crates/wasm` `RouteApplyRequest`: a draft patch to apply locally to a route, or to none for one creating it. */
+export interface RouteApplyRequest {
+  route?: Schema<"Route">;
+  versions?: Schema<"RouteVersion">[];
+  deployment: Schema<"Deployment">;
+  patch: Schema<"Patch">;
+  today: string;
+  at: string;
+  actor: Schema<"Actor">;
+}
+
 /** `crates/wasm` `PreviewRequest`: a proposal to preview against the document's journey. */
 export interface PreviewRequest {
   proposal: Schema<"Proposal">;

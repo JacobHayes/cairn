@@ -2,16 +2,22 @@
 // open or one is asked for, drawn with no journey state: kinds, titles, a decision's prompt,
 // explicit edges solid and implicit gates dotted, semantic zoom (C2) and drill-in (C4) by the
 // same engine rules as a journey's canvas (the derive worker answers its level). It follows
-// the route live (H6). Authoring on it is 5.6's; route detail and versions (5.5) link here.
+// the route live (H6). A draft is authored here by hand (5.6: the palette, a node's structure
+// beside the canvas, edges drawn between cards); a version is read only, with the offer to
+// open a draft. Route detail and versions (5.5) link here.
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
+import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
+import { OpenDraftOffer, RouteAuthoringBar, RouteNodePanel } from "../authoring/RouteAuthoring.tsx";
+import { routeAuthored, type Authored } from "../authoring/target.ts";
 import { GraphCanvas } from "../canvas/GraphCanvas.tsx";
+import { refitKey } from "../canvas/refit.ts";
 import { useLaidOut } from "../canvas/hooks.ts";
 import { KindToggles } from "../canvas/KindToggles.tsx";
 import { cardsOf, linesOf, type CanvasModel } from "../canvas/model.ts";
 import type { CardActions } from "../canvas/NodeCard.tsx";
-import { layoutViewOf, paramsOf, viewFrom, type CanvasView } from "../canvas/settings.ts";
+import { layoutViewOf, paramsOf, searchOf, viewFrom, type CanvasView } from "../canvas/settings.ts";
 import type { Level, Route } from "../data/host.ts";
 import { useDeployment, useSession } from "../data/react.ts";
 import type { Schema } from "@cairn/client";
@@ -35,6 +41,11 @@ export function routeCanvasPath(route: string, version: number | undefined, view
   }
   const query = params.toString();
   return `/routes/${route}${query === "" ? "" : `?${query}`}`;
+}
+
+/** A draft node's panel beside the route's canvas, keeping what the canvas shows. */
+export function routeNodePath(route: string, view: CanvasView, node: string): string {
+  return `/routes/${route}/nodes/${node}${searchOf(view)}`;
 }
 
 /** Route `id`'s draft, or `version` (the latest when no draft is open), read again as it moves. */
@@ -127,19 +138,27 @@ function useRouteModel(shown: Shown | undefined, view: CanvasView): { model: Can
   return { model, error: answer !== undefined && "error" in answer ? answer.error : undefined };
 }
 
-function RouteCanvas({ shown, view, version }: { shown: Shown; view: CanvasView; version: number | undefined }) {
+function RouteCanvas({ shown, view, version, selected, onPick }: { shown: Shown; view: CanvasView; version: number | undefined; selected: string | undefined; onPick: ((key: string) => boolean) | undefined }) {
   const navigate = useNavigate();
   const id = shown.route.header.id;
   const { model, error } = useRouteModel(shown, view);
   const { laidOut, error: layoutError } = useLaidOut(`route:${id}:${String(shown.of)}`, layoutViewOf(view), model);
   const actions = useMemo<CardActions>(
     () => ({
-      open: undefined,
+      // A draft's node opens its structure (5.6); a version has nothing to open.
+      open:
+        shown.of === "draft"
+          ? (key) => {
+              if (onPick?.(key) !== true) {
+                void navigate(routeNodePath(id, view, key));
+              }
+            }
+          : undefined,
       drill: (key) => void navigate(routeCanvasPath(id, version, { ...view, container: key })),
       trace: undefined,
       title: (key) => (shown.graph.nodes ?? []).find((node) => node.key === key)?.title ?? key,
     }),
-    [navigate, id, version, view, shown],
+    [navigate, id, version, view, shown, onPick],
   );
   if (error !== undefined || layoutError !== undefined) {
     return <p className="callout callout-bad">The canvas could not be drawn: {error ?? layoutError}</p>;
@@ -148,12 +167,23 @@ function RouteCanvas({ shown, view, version }: { shown: Shown; view: CanvasView;
     return <p className="muted">Laying out the canvas...</p>;
   }
   return (
-    <GraphCanvas model={laidOut.model} placement={laidOut.placement} overlay={undefined} heat={false} selected={undefined} actions={actions} viewKey={laidOut.view} label={`${shown.route.header.name}: canvas`} />
+    <GraphCanvas model={laidOut.model} placement={laidOut.placement} overlay={undefined} heat={false} selected={selected} actions={actions} viewKey={refitKey(laidOut, shown.of === "draft")} label={`${shown.route.header.name}: canvas`} />
   );
 }
 
+/** The draft as authoring sees it: none for a version, or before the deployment is read. */
+function useDraftAuthored(shown: Shown | undefined): Authored | undefined {
+  const deployment = useDeployment();
+  return useMemo(() => {
+    if (shown?.of !== "draft" || deployment === undefined) {
+      return undefined;
+    }
+    return routeAuthored(shown.route, deployment, new Date().toISOString().slice(0, 10));
+  }, [shown, deployment]);
+}
+
 export function RouteCanvasPage() {
-  const { id = "" } = useParams();
+  const { id = "", key: selected } = useParams();
   const { search } = useLocation();
   const navigate = useNavigate();
   const params = useMemo(() => new URLSearchParams(search), [search]);
@@ -161,6 +191,8 @@ export function RouteCanvasPage() {
   const asked = params.get("version");
   const version = asked === null ? undefined : Number(asked);
   const read = useRouteGraph(id, version);
+  const authored = useDraftAuthored(read.status === "ready" ? read.shown : undefined);
+  const drawing = useEdgeDrawing(authored);
   if (read.status === "loading") {
     return <p className="muted">Reading the route...</p>;
   }
@@ -168,23 +200,30 @@ export function RouteCanvasPage() {
     return <p className="callout callout-bad">The route could not be read: {read.message}</p>;
   }
   const { shown } = read;
+  const close = routeCanvasPath(id, version, view);
+  const panel = authored === undefined || selected === undefined ? undefined : <RouteNodePanel authored={authored} nodeKey={selected} close={close} onRemoved={() => void navigate(close)} />;
   return (
-    <div className="canvas-page">
-      <section className="stack" aria-label={shown.route.header.name}>
-        <div className="row">
-          <h1 className="title" data-testid="route-name">{shown.route.header.name}</h1>
-          <span className="muted" data-testid="route-graph" data-status={String(shown.of)}>
-            {shown.of === "draft" ? "The draft" : `Version ${String(shown.of)}`}
-            {shown.of !== "draft" && shown.route.draft == null ? " (no draft is open)" : ""}; a route has no journey state.
-          </span>
-          <Link to={routeDetailPath(id)}>Versions and journeys</Link>
-        </div>
-        <KindToggles view={view} journey={false} onChange={(next) => void navigate(routeCanvasPath(id, version, next))} />
-        <nav className="crumbs" aria-label="Drilled into" data-testid="crumbs">
-          {view.container === undefined ? <strong>Whole route</strong> : <Link to={routeCanvasPath(id, version, { ...view, container: undefined })}>Whole route</Link>}
-        </nav>
-        <RouteCanvas shown={shown} view={view} version={version} />
-      </section>
-    </div>
+    <ConnectContext value={authored === undefined ? undefined : drawing.connecting}>
+      <div className={panel === undefined ? "canvas-page" : "canvas-page canvas-split"}>
+        {panel}
+        <section className="stack" aria-label={shown.route.header.name}>
+          <div className="row">
+            <h1 className="title" data-testid="route-name">{shown.route.header.name}</h1>
+            <span className="muted" data-testid="route-graph" data-status={String(shown.of)}>
+              {shown.of === "draft" ? "The draft" : `Version ${String(shown.of)}`}
+              {shown.of !== "draft" && shown.route.draft == null ? " (no draft is open)" : ""}; a route has no journey state.
+            </span>
+            <Link to={routeDetailPath(id)}>Versions and journeys</Link>
+          </div>
+          {shown.of !== "draft" && shown.route.draft == null ? <OpenDraftOffer route={shown.route} /> : null}
+          {authored === undefined ? null : <RouteAuthoringBar authored={authored} container={view.container} drawing={drawing} onAdded={(key) => void navigate(routeNodePath(id, view, key))} />}
+          <KindToggles view={view} journey={false} onChange={(next) => void navigate(routeCanvasPath(id, version, next))} />
+          <nav className="crumbs" aria-label="Drilled into" data-testid="crumbs">
+            {view.container === undefined ? <strong>Whole route</strong> : <Link to={routeCanvasPath(id, version, { ...view, container: undefined })}>Whole route</Link>}
+          </nav>
+          <RouteCanvas shown={shown} view={view} version={version} selected={selected} onPick={authored === undefined ? undefined : drawing.pick} />
+        </section>
+      </div>
+    </ConnectContext>
   );
 }

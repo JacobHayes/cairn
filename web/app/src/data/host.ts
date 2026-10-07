@@ -3,6 +3,8 @@
 // (browser-host.ts). Both answer the API's JSON, so everything above this reads either.
 import type { Answered, HttpFailure, OpenTicks, Overlaps, Schema } from "@cairn/client";
 import type {
+  AppliedLocally,
+  ApplyRequest,
   DerivationKey,
   JourneyIndexQuery,
   Derived,
@@ -11,6 +13,7 @@ import type {
   ProjectionAnswer,
   ProjectionRequest,
   RenderedDraft,
+  RouteApplyRequest,
   RouteLevelRequest,
 } from "@cairn/wasm";
 
@@ -106,5 +109,9 @@ export interface Deriver {
   renderDraft(journey: string, request: DraftRequest): Promise<RenderedDraft>;
   /** C2: a route graph's canvas level (a route has no state to hold). */
   routeLevel(request: RouteLevelRequest): Promise<Level>;
+  /** A draft patch applied to the held journey, committing nothing (ARCHITECTURE, Web UI: previews). */
+  apply(journey: string, request: ApplyRequest): Promise<AppliedLocally>;
+  /** A draft patch applied to a route, committing nothing: the route as it would leave it. */
+  applyRoute(request: RouteApplyRequest): Promise<Route>;
   release(journey: string): Promise<void>;
 }

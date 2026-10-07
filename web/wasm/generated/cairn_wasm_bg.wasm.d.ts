@@ -6,6 +6,7 @@ export const __wbg_browserroot_free: (a: number, b: number) => void;
 export const __wbg_derivation_free: (a: number, b: number) => void;
 export const __wbg_rootsubscription_free: (a: number, b: number) => void;
 export const apply: (a: number, b: number, c: number, d: number, e: number) => void;
+export const applyRoute: (a: number, b: number, c: number) => void;
 export const browserroot_capabilities: (a: number, b: number) => void;
 export const browserroot_deployment: (a: number, b: number) => void;
 export const browserroot_document: (a: number, b: number, c: number, d: number, e: number, f: number) => void;

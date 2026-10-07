@@ -1,13 +1,15 @@
 // What the canvas shows lives in its address, so a view is shareable, survives a reload, and
 // follows the back button: the kinds hidden (C2), the container drilled into (C4), whether
-// not-relevant and undecided nodes are hidden (C1), the heat overlay (C6), and the trace of
-// the open node (C7). Every setting at its default leaves the address bare.
+// not-relevant and undecided nodes are hidden (C1), the heat overlay (C6), the trace of the
+// open node (C7), and on a journey whether its structure is being edited (5.6). Every setting
+// at its default leaves the address bare.
 import type { NodeKind } from "../detail/model.ts";
 import { DEFAULT_SETTINGS, KINDS, type CanvasSettings } from "./model.ts";
 
-/** The canvas's settings and whether the open node is traced. */
+/** The canvas's settings, whether the open node is traced, and whether the structure is edited. */
 export interface CanvasView extends CanvasSettings {
   trace: boolean;
+  edit: boolean;
 }
 
 const HIDE = "hide";
@@ -16,6 +18,7 @@ const NOT_RELEVANT = "notrelevant";
 const UNDECIDED = "undecided";
 const HEAT = "heat";
 const TRACE = "trace";
+const EDIT = "edit";
 
 /** The canvas's settings in an address's query. */
 export function viewFrom(params: URLSearchParams): CanvasView {
@@ -27,6 +30,7 @@ export function viewFrom(params: URLSearchParams): CanvasView {
     undecided: params.get(UNDECIDED) !== "hide",
     heat: params.get(HEAT) === "on",
     trace: params.get(TRACE) === "on",
+    edit: params.get(EDIT) === "on",
   };
 }
 
@@ -52,6 +56,9 @@ export function paramsOf(view: CanvasView): URLSearchParams {
   if (view.trace) {
     params.set(TRACE, "on");
   }
+  if (view.edit) {
+    params.set(EDIT, "on");
+  }
   return params;
 }
 
@@ -67,7 +74,7 @@ export function withKind(view: CanvasView, kind: NodeKind, shown: boolean): Canv
 }
 
 /** The view a fresh canvas opens with. */
-export const DEFAULT_VIEW: CanvasView = { ...DEFAULT_SETTINGS, trace: false };
+export const DEFAULT_VIEW: CanvasView = { ...DEFAULT_SETTINGS, trace: false, edit: false };
 
 /** What a layout depends on besides the graph: the kinds, the container, the relevance shown. */
 export function layoutViewOf(view: CanvasSettings): string {

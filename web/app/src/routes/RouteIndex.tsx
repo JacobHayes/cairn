@@ -1,7 +1,7 @@
 // The route index: every route with its latest version, whether a draft is open, and whether
 // it is retired (A19: hidden from new-journey creation, its journeys still upgrading), each
-// linking to its detail (C17); and a route file imported as a new route or draft (A13). Kept
-// current (H6).
+// linking to its detail (C17); a route file imported as a new route or draft (A13); and a new
+// route started empty, to author by hand (A12). Kept current (H6).
 import { Link } from "react-router";
 
 import { routeIndex, type RouteSummary } from "../data/reads.ts";
@@ -11,6 +11,7 @@ import "../journeys/journeys.css";
 import { Badge, Panel } from "../ui/kit.tsx";
 import { routeDetailPath } from "./address.ts";
 import { ImportFile } from "./ImportFile.tsx";
+import { NewRoute } from "./NewRoute.tsx";
 
 function RouteRow({ route }: { route: RouteSummary }) {
   const { header } = route;
@@ -38,6 +39,7 @@ export function RouteIndex() {
   return (
     <Panel aria-label="Routes">
       <h1 className="title">Routes</h1>
+      <NewRoute />
       <ImportFile />
       {view.status === "loading" ? <p className="muted">Loading the routes...</p> : null}
       {view.status === "failed" ? <p className="callout callout-bad">The routes could not be read: {view.message}</p> : null}

@@ -17,6 +17,7 @@ import { traceOverlay } from "./overlay.ts";
 import { withRelevanceShown } from "./relevance.ts";
 import { canvasPath, layoutViewOf, type CanvasView } from "./settings.ts";
 import { TraceBar } from "./Surfaces.tsx";
+import { refitKey } from "./refit.ts";
 
 /** The level request for what the canvas shows (C2). */
 export function levelRequest(view: CanvasView): Extract<ProjectionRequest, { projection: "level" }> {
@@ -49,10 +50,12 @@ export interface JourneyCanvasProps {
   ready: Ready;
   view: CanvasView;
   selected: string | undefined;
+  /** In edit mode, a card picked while an edge is drawn ends the edge instead of opening (5.6); true when it took the pick. */
+  onPick?: ((key: string) => boolean) | undefined;
 }
 
 /** The journey's canvas, laid out, with the open node's trace when it is traced. */
-export function JourneyCanvas({ ready, view, selected }: JourneyCanvasProps) {
+export function JourneyCanvas({ ready, view, selected, onPick }: JourneyCanvasProps) {
   const navigate = useNavigate();
   const journey = ready.journey.header.id;
   const { model, error } = useJourneyModel(ready, view);
@@ -65,12 +68,16 @@ export function JourneyCanvas({ ready, view, selected }: JourneyCanvasProps) {
   );
   const actions = useMemo<CardActions>(
     () => ({
-      open: (key) => void navigate(canvasPath(journey, view, key)),
+      open: (key) => {
+        if (onPick?.(key) !== true) {
+          void navigate(canvasPath(journey, view, key));
+        }
+      },
       drill: (key) => void navigate(canvasPath(journey, { ...view, container: key, trace: false }, selected)),
       trace: (key) => void navigate(canvasPath(journey, { ...view, trace: true }, key)),
       title: (key) => titleOf(ready, key),
     }),
-    [navigate, journey, view, selected, ready],
+    [navigate, journey, view, selected, ready, onPick],
   );
   if (error !== undefined || layoutError !== undefined) {
     return <p className="callout callout-bad">The canvas could not be drawn: {error ?? layoutError}</p>;
@@ -88,7 +95,7 @@ export function JourneyCanvas({ ready, view, selected }: JourneyCanvasProps) {
         heat={view.heat}
         selected={selected}
         actions={actions}
-        viewKey={laidOut.view}
+        viewKey={refitKey(laidOut, view.edit)}
         label={`${ready.journey.header.name}: canvas`}
       />
     </>
