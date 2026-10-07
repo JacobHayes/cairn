@@ -10,7 +10,7 @@ mod in_process {
     use cairn_schema::{Domain, JourneyId, Patch, Rejection, RevisionOf, ViolationCode};
     use cairn_service::Call;
 
-    use crate::support::{self, World, transcript};
+    use crate::support::{self, World};
 
     const GROUP: &str = "{key: n_g, id: g, kind: group, title: G}";
     const CHILD: &str = "{key: n_c, id: c, kind: action, title: C, parent: n_g}";
@@ -56,19 +56,12 @@ mod in_process {
         let world = World::start().await;
         let (ann, bob) = (world.client("ann"), world.client("bob"));
         tree(&ann).await;
-        transcript::note("Bob notes the journey first, at revision 1:");
         landed(bob.patch(note("p_bob", "a_bob", 1), None).await);
-        transcript::note(
-            "Ann's note, drafted at revision 1 too, is stale; what intervened (Bob's note) cannot overlap it, so the client resubmits it at revision 2:",
-        );
         let retried = landed(ann.patch(note("p_ann", "a_ann", 1), None).await);
         assert_eq!(retried.resubmitted, 1);
         assert_eq!(retried.answer.receipt().revision.get(), 3);
         let journey = ann.journey(&"j_tree".parse().unwrap()).await.unwrap();
         assert_eq!(journey.graph.state.annotations.len(), 2);
-        transcript::note(
-            "Its response lost, Ann's client sends the patch again; it is answered from its receipt:",
-        );
         let mut again = note("p_ann", "a_ann", 1);
         again.base_revision = 2.try_into().unwrap();
         let answer = ann.submit(again, None).await.unwrap();
@@ -206,7 +199,6 @@ mod in_process {
         tree(&world.client("ann")).await;
         let mut ann = View::open(world.client("ann"), "j_tree").await;
         let mut bob = View::open(world.client("bob"), "j_tree").await;
-        transcript::note("Ann notes the journey; Bob's view hears the tick and refetches:");
         landed(ann.client.patch(note("p_ann", "a_ann", 1), None).await);
         assert_eq!(bob.follow().await.of, journey_of("j_tree"));
         assert_eq!(bob.tracker.held(&journey_of("j_tree")).unwrap().get(), 2);
@@ -264,7 +256,6 @@ mod in_process {
             1,
             "- op: merge_entities\n  survivor: e_stakeholder_a\n  merged: e_stakeholder_b\n  journeys: {j_vendor_eval: 2}\n",
         );
-        transcript::note("Ann merges two entities; her view hears the deployment move:");
         landed(view.client.patch(merge, None).await);
         let heard = view.follow().await;
         assert_eq!(

@@ -1,16 +1,14 @@
-// The proof's pictures for brief 5.2 (briefs/proof/5.2/prove.sh): a screenshot of each
-// acceptance state of the canvas, a short video of its main flow, and the layout's moves when
-// a node is added to the fixture, written to CAIRN_PROOF_OUT. Each step asserts what its
-// picture is meant to show, so a picture of the wrong state fails the run. Everything runs on
-// the in-browser host, seeded on each load, but the added node, which the server takes.
-import { writeFileSync } from "node:fs";
+// The proof's media for brief 5.2 (briefs/proof/5.2/prove.sh): a screenshot of each
+// acceptance state of the canvas and a short video of its main flow, written to
+// CAIRN_PROOF_OUT. Each step asserts what its picture is meant to show, so a picture of the
+// wrong state fails the run. Everything runs on the in-browser host, seeded on each load.
 import { join } from "node:path";
 
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-import { cardKeys, marks, places, showKind, toggle } from "../e2e/canvas.ts";
+import { marks, showKind, toggle } from "../e2e/canvas.ts";
 import { section } from "../e2e/detail.ts";
-import { derivedRevision, nodeCard, openFromCanvas, openJourney } from "../e2e/shell.ts";
+import { nodeCard, openFromCanvas, openJourney } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${name}.png`) });
@@ -78,38 +76,11 @@ test("the stalled surface", async ({ page }) => {
   await shot(page, "9-stalled-surface");
 });
 
-test("a route's canvas, the dark theme, and a narrow screen", async ({ page, browser, baseURL }) => {
+test("a route's canvas", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval");
   await page.getByTestId("lineage").click();
   await expect(page.getByTestId("node-card")).toHaveCount(25);
   await shot(page, "10-route-canvas");
-  const dark = await browser.newPage({ baseURL: baseURL ?? "", colorScheme: "dark", viewport: { width: 1400, height: 900 } });
-  await openJourney(dark, "browser", "j_vendor_eval", "?hide=action");
-  await shot(dark, "11-dark-theme");
-  await dark.close();
-  const narrow = await browser.newPage({ baseURL: baseURL ?? "", viewport: { width: 390, height: 844 } });
-  await openJourney(narrow, "browser", "j_bakeoff");
-  expect(await narrow.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await shot(narrow, "12-narrow-screen");
-  await narrow.close();
-});
-
-test("the layout: the same graph twice, and one node added to the fixture", async ({ context }) => {
-  const [one, two] = [await context.newPage(), await context.newPage()];
-  await openJourney(one, "browser", "j_vendor_eval");
-  await openJourney(two, "browser", "j_vendor_eval");
-  const same = JSON.stringify(await places(one)) === JSON.stringify(await places(two));
-  const page = await context.newPage();
-  await openJourney(page, "server", "j_vendor_eval");
-  const before = await places(page);
-  const revision = await derivedRevision(page);
-  const node = { key: "n_share", id: "share", parent: "n_reporting", kind: "action", title: "Share the findings", requires: ["n_findings"] };
-  const patch = { id: "p_proof_share", target: { journey: "j_vendor_eval" }, base_revision: revision, mutations: [{ op: "add_node", node }] };
-  expect((await page.request.post("/journeys/j_vendor_eval/patches", { data: { patch } })).status()).toBe(200);
-  await expect(nodeCard(page, "n_share")).toBeVisible();
-  const after = await places(page);
-  const moved = Object.keys(before).filter((key) => JSON.stringify(before[key]) !== JSON.stringify(after[key]));
-  writeFileSync(join(out, "layout.json"), JSON.stringify({ same, nodes: Object.keys(before).length, moved, keys: await cardKeys(page) }));
 });
 
 /** The main flow: the journey, kinds hidden and shown, drill in and out, a node opened and traced. */

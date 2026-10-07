@@ -71,7 +71,7 @@ mod in_process {
     /// The vendor evaluation after its first three steps, and `pr_note` created by an agent
     /// of ann's and edited once, to revision 2; answers the agent.
     async fn drafted_by_agent(world: &World) -> Transport {
-        world.vendor_quietly(3).await;
+        world.vendor_after(3).await;
         let agent = agent_of(world, "ann").await;
         let proposals = format!("{JOURNEY}/proposals");
         ok::<ProposalAnswer>(&post(&agent, &proposals, &create_body("p_pr")).await);
@@ -171,7 +171,7 @@ mod in_process {
     #[tokio::test]
     async fn proposals_for_every_domain_are_created_and_previewed() {
         let world = World::start().await;
-        let ann = world.vendor_quietly(3).await;
+        let ann = world.vendor_after(3).await;
         for (_, target, id, draft) in crate::support::proposals_of_every_domain(&ann).await {
             let create = json!({"patch_id": format!("p_{id}"), "id": id, "draft": draft});
             let created = saved(ok(&post(&ann, &target, &create).await));
@@ -205,7 +205,7 @@ mod in_process {
     #[tokio::test]
     async fn a_discarded_proposal_is_closed() {
         let world = World::start().await;
-        let ann = world.vendor_quietly(3).await;
+        let ann = world.vendor_after(3).await;
         let create = create_body("p_pr");
         ok::<ProposalAnswer>(&post(&ann, &format!("{JOURNEY}/proposals"), &create).await);
         let discard = json!({"patch_id": "p_discard", "base_revision": 1});
@@ -223,7 +223,7 @@ mod in_process {
     #[tokio::test]
     async fn an_apply_against_a_moved_journey_is_stale_until_refreshed() {
         let world = World::start().await;
-        let ann = world.vendor_quietly(3).await;
+        let ann = world.vendor_after(3).await;
         let create = create_body("p_pr");
         ok::<ProposalAnswer>(&post(&ann, &format!("{JOURNEY}/proposals"), &create).await);
         let other = crate::support::patch(
@@ -294,7 +294,7 @@ mod in_process {
     #[tokio::test]
     async fn each_malformed_proposal_request_answers_its_problem() {
         let world = World::start().await;
-        let ann = world.vendor_quietly(2).await;
+        let ann = world.vendor_after(2).await;
         let step = json!({"patch_id": "p_step", "base_revision": 1});
         let nested = json!({
             "patch_id": "p_nested",

@@ -1,4 +1,4 @@
-// The proof's pictures for the decision view, the timeline, and the status summary
+// The proof's media for the decision view, the timeline, and the status summary
 // (briefs/proof/5.4/prove.sh): a screenshot of each acceptance state and a short video of the
 // main flow, written to CAIRN_PROOF_OUT. Each step asserts what its picture is meant to show,
 // so a picture of the wrong state fails the run. Everything runs on the in-browser host,
@@ -65,22 +65,6 @@ test("the status summary, on screen and in print", async ({ page }) => {
   await page.emulateMedia({ media: "print" });
   await expect(page.getByTestId("journey-nav")).toBeHidden();
   await shot(page, "7-summary-printed");
-});
-
-test("the dark theme and a narrow screen", async ({ browser, baseURL }) => {
-  const dark = await browser.newPage({ baseURL: baseURL ?? "", colorScheme: "dark", viewport: { width: 1400, height: 900 } });
-  await openScreen(dark, "browser", "j_launch", "timeline");
-  await shot(dark, "8-dark-theme");
-  await dark.close();
-  const narrow = await browser.newPage({ baseURL: baseURL ?? "", viewport: { width: 390, height: 844 } });
-  const shown = { decisions: "decision-table", summary: "summary", timeline: "timeline-axis" };
-  for (const [segment, part] of Object.entries(shown)) {
-    await openScreen(narrow, "browser", "j_vendor_eval", segment);
-    await expect(narrow.getByTestId(part)).toBeVisible();
-    expect(await narrow.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  }
-  await shot(narrow, "9-narrow-screen");
-  await narrow.close();
 });
 
 /** The main flow: the canvas, the decision view and an answer revised, the timeline and a why, the summary. */

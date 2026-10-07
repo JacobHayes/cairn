@@ -36,7 +36,7 @@ answers the reviewer with a person created in the same patch.
 
 Derived at each decision point (brief 2.2): the relevance and participations `derive` gives
 after steps 1, 2, 6, and 8. The scenario matrix (`crates/engine/tests/integration/matrix.rs`) checks these
-values, and `briefs/proof/2.2/prove.sh` checks these tables against the engine's output.
+values.
 
 | Node | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
 |---|---|---|---|---|
@@ -63,7 +63,7 @@ pins `decision-meeting` to 2026-11-20 (E3), and every unfinished node a bound re
 these latest starts and due dates. The final review closes at the meeting and opens 14 days
 before it; everything upstream is due by what it feeds. Latest bounds read backward from pins
 and actuals, so they do not depend on the day they are read. The scenario matrix checks these
-values, and `briefs/proof/2.3/prove.sh` checks this table against the engine's output.
+values.
 
 | Node | latest start | due |
 |---|---|---|
@@ -84,8 +84,7 @@ values, and `briefs/proof/2.3/prove.sh` checks this table against the engine's o
 What can be acted on after each step (brief 2.4): the frontier (every actionable node: relevant,
 open, not blocked, not a group) and, where it differs, the acting frontier (without snoozed
 nodes and `auto_reach` milestones whose date is ahead). Nothing in this route auto-reaches, so
-the values do not depend on the day they are read. The scenario matrix checks them, and
-`briefs/proof/2.4/prove.sh` checks this table against the engine's output.
+the values do not depend on the day they are read. The scenario matrix checks them.
 
 | After step | Frontier | Off the acting frontier |
 |---|---|---|
@@ -109,8 +108,8 @@ owner factor is 1 throughout. Kickoff leads while it gates Setup (its gravity ho
 plan, and everything after them, the undecided baseline at half); the partner decision's gravity
 holds the partner-led subset at half while it is undecided; the four up-front decisions tie and
 fall back to key order; once kickoff is reached, environment access leads. Every slack is past
-the 14-day horizon, so urgency is 0. The scenario matrix checks these values, and
-`briefs/proof/2.5/prove.sh` checks this table against the engine's output.
+the 14-day horizon, so urgency is 0. The scenario matrix checks the ranks
+(`crates/engine/tests/integration/matrix.rs`).
 
 | After step | Node | Gravity | Leverage | Slack | Rank |
 |---|---|---|---|---|---|
@@ -130,8 +129,7 @@ the 14-day horizon, so urgency is 0. The scenario matrix checks these values, an
 Projected after kickoff (brief 2.6), read at 2026-10-06: the canvas level with actions hidden
 (each visible node, and the nearest visible ancestor it is drawn in; C2), the actions that roll
 up into a visible node as its checklist (C4), and the first three items of the next list (C10).
-The scenario tests check these values, and `briefs/proof/2.6/prove.sh` checks these lines
-against the engine's output.
+`crates/engine/tests/integration/fixture_projections.rs` checks these values.
 
 - `vendor-evaluation`, after step 3, visible with actions hidden: `n_decision_meeting`, `n_kickoff`, `n_meeting_date`, `n_partner_runs`, `n_purpose`, `n_reporting`, `n_final_review` (in `n_reporting`), `n_final_report` (in `n_final_review`), `n_findings` (in `n_reporting`), `n_findings_reviewer` (in `n_reporting`), `n_review_opens` (in `n_reporting`), `n_setup`, `n_access` (in `n_setup`), `n_plan` (in `n_setup`), `n_workload` (in `n_setup`), `n_testing`, `n_baseline` (in `n_testing`), `n_comparison_set` (in `n_testing`), `n_partner_led` (in `n_testing`), `n_who_informed`, `n_who_owns`.
 - `vendor-evaluation`, after step 3, actions rolled up: `n_plan` holds `n_plan_draft`, `n_plan_review`; `n_partner_led` holds `n_criteria`, `n_partner_results`.

@@ -1,11 +1,9 @@
 //! The client's HTTP transport: one HTTP/1.1 connection per request to the server's socket
-//! address, over tokio, with an optional observer that sees every exchange (the proof's
-//! transcripts). Plain HTTP to a known address is what the tests and the multiplayer
+//! address, over tokio. Plain HTTP to a known address is what the tests and the multiplayer
 //! testbed need; TLS and name resolution wait for a client that leaves the machine.
 
 use std::fmt;
 use std::net::SocketAddr;
-use std::sync::Arc;
 
 use axum::body::Bytes;
 use axum::http::header::{AUTHORIZATION, CONTENT_TYPE, HOST};
@@ -14,28 +12,6 @@ use http_body_util::{BodyExt, Full};
 use hyper::body::Incoming;
 use hyper_util::rt::TokioIo;
 use serde::de::DeserializeOwned;
-
-/// One request and its response, as an observer sees it.
-#[derive(Clone, Debug)]
-pub struct Exchange {
-    /// The method.
-    pub method: Method,
-    /// The path and query.
-    pub target: String,
-    /// The headers sent.
-    pub request_headers: HeaderMap,
-    /// The body sent.
-    pub request_body: Bytes,
-    /// The status answered.
-    pub status: StatusCode,
-    /// The headers answered.
-    pub response_headers: HeaderMap,
-    /// The body answered; for a stream, what was read of it.
-    pub response_body: Bytes,
-}
-
-/// What sees each exchange.
-pub type Observer = Arc<dyn Fn(&Exchange) + Send + Sync>;
 
 /// A response read whole.
 #[derive(Clone, Debug)]
@@ -86,7 +62,6 @@ fn failed(what: &str) -> impl Fn(hyper::Error) -> TransportError + '_ {
 pub struct Transport {
     address: SocketAddr,
     token: Option<String>,
-    observer: Option<Observer>,
 }
 
 impl fmt::Debug for Transport {
@@ -102,18 +77,7 @@ impl Transport {
     /// To the server at `address`, presenting `token` as a bearer token when given.
     #[must_use]
     pub fn new(address: SocketAddr, token: Option<String>) -> Self {
-        Self {
-            address,
-            token,
-            observer: None,
-        }
-    }
-
-    /// The same, with `observer` seeing every exchange.
-    #[must_use]
-    pub fn observed(mut self, observer: Observer) -> Self {
-        self.observer = Some(observer);
-        self
+        Self { address, token }
     }
 
     /// The server's address.
@@ -156,36 +120,18 @@ impl Transport {
         content_type: Option<HeaderValue>,
         body: Bytes,
     ) -> Result<Reply, TransportError> {
-        let request = self.request(method, target, content_type, body.clone())?;
-        let (method, request_headers) = (request.method().clone(), request.headers().clone());
+        let request = self.request(method, target, content_type, body)?;
         let response = self.open(request).await?;
         let (parts, incoming) = response.into_parts();
         let collected = incoming
             .collect()
             .await
             .map_err(failed("reading the body"))?;
-        let reply = Reply {
+        Ok(Reply {
             status: parts.status,
             headers: parts.headers,
             body: collected.to_bytes(),
-        };
-        self.observe(&Exchange {
-            method,
-            target: target.to_owned(),
-            request_headers,
-            request_body: body,
-            status: reply.status,
-            response_headers: reply.headers.clone(),
-            response_body: reply.body.clone(),
-        });
-        Ok(reply)
-    }
-
-    /// Shows an exchange to the observer, if there is one.
-    pub fn observe(&self, exchange: &Exchange) {
-        if let Some(observer) = &self.observer {
-            observer(exchange);
-        }
+        })
     }
 
     /// A request to `target` with the caller's credentials.

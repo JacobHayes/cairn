@@ -19,7 +19,6 @@ mod oidc {
     use cairn_store::AuthStore;
 
     use crate::support::issuer::{Advertise, Issuer, Person, Spoil};
-    use crate::support::transcript;
     use crate::support::{
         LOCAL, World, app, base, cookie_header, cookies_set, loopback, request, send, whoami,
         with_cookie,
@@ -153,7 +152,6 @@ mod oidc {
             display: ANN.name.parse().unwrap(),
             verified_emails: [ANN.email.parse().unwrap()].into(),
         };
-        transcript::show("The identity linked", &held);
         assert_eq!(held.len(), 1);
         assert_eq!(
             (&held[0].provider, &held[0].subject),
@@ -185,7 +183,6 @@ mod oidc {
             Spoil::Nonce,
         ];
         for spoil in spoils {
-            transcript::show("An ID token spoiled this way", &spoil);
             let refused = sign_in(&setup, &ANN, spoil, "").await;
             assert_eq!(refused, Err(StatusCode::UNAUTHORIZED), "{spoil:?}");
         }

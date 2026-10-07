@@ -14,7 +14,6 @@ mod layer {
     use cairn_auth::{AuthProvider, DevConfig, DevProvider, Listener};
     use cairn_store::{AuthEvent, AuthStore};
 
-    use crate::support::transcript;
     use crate::support::{
         LOCAL, REMOTE, World, app, cookie_header, cookies_set, loopback, public, request, send,
         whoami, with_cookie,
@@ -56,11 +55,9 @@ mod layer {
         assert_eq!(first, again);
         assert_eq!(first.agent, None);
         let user = world.store.user(&first.user).await.unwrap().unwrap();
-        transcript::show("The user created", &user);
         assert_eq!(user.name.as_str(), "dev user");
         let logged = [AuthEvent::UserCreated, AuthEvent::IdentityLinked];
         assert_eq!(world.log().await, logged);
-        transcript::show("The auth log", &logged);
     }
 
     /// Dev mode is refused off loopback without the override: it does not start on a
@@ -70,10 +67,6 @@ mod layer {
         let unix = DevProvider::new(dev("dev", None), Listener::Unix);
         assert!(unix.is_ok());
         let refused = DevProvider::new(dev("dev", None), public());
-        transcript::show(
-            "The dev provider on 0.0.0.0:8080 without the override",
-            &refused,
-        );
         assert!(refused.is_err());
         let overridden = DevConfig {
             allow_off_loopback: true,

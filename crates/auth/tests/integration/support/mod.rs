@@ -4,7 +4,6 @@
 #![allow(dead_code)]
 
 pub mod issuer;
-pub mod transcript;
 
 use std::net::SocketAddr;
 use std::sync::Arc;
@@ -111,16 +110,9 @@ pub fn request(uri: &str, peer: &str) -> axum::http::request::Builder {
 pub const LOCAL: &str = "127.0.0.1:50000";
 pub const REMOTE: &str = "192.0.2.7:50000";
 
-/// Sends `request` through the router, recording the exchange in the proof's transcript
-/// when one is being written.
+/// Sends `request` through the router.
 pub async fn send(router: &Router, request: Request<Body>) -> Response<Body> {
-    transcript::request(&request);
-    let response = router.clone().oneshot(request).await.unwrap();
-    let (parts, body) = response.into_parts();
-    let bytes = body.collect().await.unwrap().to_bytes();
-    let response = Response::from_parts(parts, Body::from(bytes.clone()));
-    transcript::response(&response, &bytes);
-    response
+    router.clone().oneshot(request).await.unwrap()
 }
 
 /// The actor `/whoami` answers for `request`, or the status it was refused with.

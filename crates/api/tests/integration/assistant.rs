@@ -5,7 +5,6 @@
 #![cfg(test)]
 
 mod in_process {
-    use std::fmt::Write as _;
     use std::net::SocketAddr;
     use std::sync::Arc;
     use std::time::Duration;
@@ -23,7 +22,6 @@ mod in_process {
 
     use cairn_schema::Mutation;
 
-    use crate::support::transcript::note;
     use cairn_api::client::Transport;
 
     use crate::support::{World, get, ok, post, scenario};
@@ -70,7 +68,7 @@ mod in_process {
     #[tokio::test]
     async fn the_capabilities_say_whether_the_assistant_is_served() {
         let without = World::start().await;
-        let ann = without.vendor_quietly(1).await;
+        let ann = without.vendor_after(1).await;
         let capabilities: Capabilities = get(&ann, "/capabilities").await;
         assert!(!capabilities.assistant);
         let said = json!({ "message": "Hello." });
@@ -84,7 +82,7 @@ mod in_process {
 
         let provider = scripted(vec![Step::say("Hello."), Step::say("Hello again.")]);
         let with = with_assistant(&provider).await;
-        let ann = with.vendor_quietly(1).await;
+        let ann = with.vendor_after(1).await;
         let capabilities: Capabilities = get(&ann, "/capabilities").await;
         assert!(capabilities.assistant);
         let endpoints = [
@@ -114,7 +112,7 @@ mod in_process {
             Step::say("Kickoff is reached; the extra step is proposed."),
         ]);
         let world = with_assistant(&provider).await;
-        let ann = world.vendor_quietly(2).await;
+        let ann = world.vendor_after(2).await;
         let said = json!({ "message": "Kickoff happened; add an extra step." });
         let reply = post(&ann, &at::ASSISTANT_JOURNEY.path_with(&[JOURNEY]), &said).await;
         assert_eq!(
@@ -140,7 +138,7 @@ mod in_process {
     async fn an_agent_token_is_refused_and_a_missing_journey_not_found() {
         let provider = scripted(Vec::new());
         let world = with_assistant(&provider).await;
-        let ann = world.vendor_quietly(1).await;
+        let ann = world.vendor_after(1).await;
         let minted = post(&ann, "/users/me/tokens", &json!({ "name": "Helper" })).await;
         let minted: MintedToken = ok(&minted);
         let helper = world.bearer(&minted.token);
@@ -176,7 +174,7 @@ mod in_process {
         };
         let provider = scripted(vec![Step::Slow(Duration::from_secs(30), slow), Step::Hang]);
         let world = with_assistant(&provider).await;
-        world.vendor_quietly(1).await;
+        world.vendor_after(1).await;
         let turn = |message: &str| {
             let body = json!({ "message": message }).to_string();
             let request = Request::post(at::ASSISTANT_JOURNEY.path_with(&[JOURNEY]))
@@ -211,22 +209,7 @@ mod in_process {
         serde_json::to_value(proposal.mutations.as_slice()).unwrap()
     }
 
-    /// Notes what the scripted model does in the turn that follows.
-    fn scripted_note(what: &str, calls: &[(&str, &Value)]) {
-        let mut text = format!("*The scripted model {what}:*\n");
-        for (tool, arguments) in calls {
-            let shown = serde_json::to_string(arguments).unwrap();
-            let shown: String = if shown.len() > 400 {
-                format!("{}… ({} bytes)", &shown[..400], shown.len())
-            } else {
-                shown
-            };
-            let _ = write!(text, "\n- `{tool}` with `{shown}`");
-        }
-        note(&text);
-    }
-
-    /// I5, I7, H2, D7, PRD Success criteria: the proof's conversation over HTTP. An empty
+    /// I5, I7, H2, D7, PRD Success criteria: a conversation over HTTP. An empty
     /// journey with no route is structured through one proposal the user applies; a state
     /// change applies directly with its consequences; a request touching more than ten
     /// nodes becomes one proposal; and a provider that stops answering is reported.
@@ -234,14 +217,10 @@ mod in_process {
     async fn a_conversation_structures_reports_proposes_and_times_out() {
         let provider = scripted(Vec::new());
         let world = with_assistant(&provider).await;
-        let ann = world.vendor_quietly(1).await;
+        let ann = world.vendor_after(1).await;
         let bakeoff = scenario("bake-off");
         let empty = json!({ "patch": bakeoff.steps.as_slice()[0].patch });
-        ok::<Value>(&post(&world.quiet("ann"), "/journeys/j_bakeoff/patches", &empty).await);
-        note(
-            "*Set up, not shown: the empty bake-off journey created by its first scenario step \
-             (`POST /journeys/j_bakeoff/patches`), at revision 1, with no route.*",
-        );
+        ok::<Value>(&post(&ann, "/journeys/j_bakeoff/patches", &empty).await);
 
         structure_an_ad_hoc_journey(&world, &provider, &ann).await;
         answer_directly(&world, &provider, &ann).await;
@@ -255,17 +234,11 @@ mod in_process {
         provider: &ScriptedProvider,
         ann: &Transport,
     ) {
-        note("### 1. Structure an ad-hoc journey through a proposal");
         let structure = json!({ "patch": { "id": "p_bakeoff_structure",
             "target": { "journey": "j_bakeoff" }, "base_revision": 1,
             "mutations": proposed("bake-off", 1) },
             "note": "Structure a two-week bake-off between two options" });
         let read = json!({ "journey": "j_bakeoff" });
-        scripted_note(
-            "reads the journey, then writes the structure as a patch, which the write wrapper \
-             turns into a proposal because it is structural",
-            &[("get_snapshot", &read), ("apply_patch", &structure)],
-        );
         provider.push([
             Step::call("get_snapshot", read.clone()),
             Step::call("apply_patch", structure),
@@ -283,15 +256,10 @@ mod in_process {
             1,
             "drafting moves nothing"
         );
-        note("The user reviews the proposal and applies it, which records them as confirming:");
         let apply = json!({ "patch_id": "p_apply_bakeoff", "reviewed_revision": 1 });
         let applied = post(ann, &format!("/proposals/{proposal}/apply"), &apply).await;
         ok::<Value>(&applied);
         assert_eq!(world.revision("j_bakeoff").await, 2);
-        note(
-            "Its events name the assistant acting for the user who asked, and the user who \
-             confirmed (H2):",
-        );
         let events: Value = get(ann, "/events?patch=p_apply_bakeoff&size=1").await;
         let event = &events["items"][0]["event"];
         assert_eq!(event["actor"]["agent"], "ag_assistant");
@@ -300,7 +268,6 @@ mod in_process {
 
     /// The up-front decisions answered directly, reported with what they caused (D7).
     async fn answer_directly(world: &World, provider: &ScriptedProvider, ann: &Transport) {
-        note("### 2. A direct state change, reported with its consequences");
         // The bake-off's entities moved the deployment to revision 2.
         let mut answers = proposed_answers();
         for answer in answers.as_array_mut().unwrap() {
@@ -310,10 +277,6 @@ mod in_process {
         }
         let answer = json!({ "patch": { "id": "p_up_front", "target": { "journey": JOURNEY },
             "base_revision": 1, "deployment_revision": 2, "mutations": answers } });
-        scripted_note(
-            "answers the up-front decisions in one patch",
-            &[("apply_patch", &answer)],
-        );
         provider.push([
             Step::call("apply_patch", answer),
             Step::say("Answered. The decision meeting on the 6th leaves the work before it short."),
@@ -331,7 +294,6 @@ mod in_process {
 
     /// Eleven weight overrides drafted as one proposal, nothing landing (I5).
     async fn reweigh_in_bulk(world: &World, provider: &ScriptedProvider, ann: &Transport) {
-        note("### 3. A request touching more than ten nodes becomes one proposal");
         let nodes = [
             "n_access",
             "n_plan",
@@ -351,10 +313,6 @@ mod in_process {
             .collect();
         let reweigh = json!({ "patch": { "id": "p_reweigh", "target": { "journey": JOURNEY },
             "base_revision": 2, "mutations": weights } });
-        scripted_note(
-            "overrides eleven nodes' weights in one patch",
-            &[("apply_patch", &reweigh)],
-        );
         provider.push([
             Step::call("apply_patch", reweigh),
             Step::say("That touches eleven nodes, so it is a proposal for you to review."),
@@ -368,14 +326,8 @@ mod in_process {
 
     /// A provider that stops answering, after a write that stands.
     async fn time_out(world: &World, provider: &ScriptedProvider, ann: &Transport) {
-        note("### 4. A provider that stops answering");
         let snooze = json!({ "journey": JOURNEY, "node": "n_access", "until": { "date":
             "2026-10-05" }, "patch_id": "p_snooze_access", "base_revision": 2 });
-        scripted_note(
-            "snoozes the access request, then never answers again (its next call outlasts the \
-             120 s provider call limit)",
-            &[("snooze", &snooze)],
-        );
         provider.push([Step::call("snooze", snooze), Step::Hang]);
         let said = json!({ "message": "Snooze the access request until Monday, then tell me \
             what is next." });

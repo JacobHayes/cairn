@@ -5,7 +5,6 @@
 #![allow(dead_code)]
 
 pub mod mcp;
-pub mod transcript;
 
 use std::collections::BTreeSet;
 use std::net::SocketAddr;
@@ -180,44 +179,28 @@ impl World {
         }
     }
 
-    /// A transport signed in as `member` of the team, its exchanges transcribed.
+    /// A transport signed in as `member` of the team.
     pub fn signed_in(&self, member: &str) -> Transport {
         self.bearer(&format!("team-{member}"))
     }
 
-    /// The typed client, signed in as `member` of the team, its exchanges transcribed.
+    /// The typed client, signed in as `member` of the team.
     pub fn client(&self, member: &str) -> cairn_api::client::Client {
         cairn_api::client::Client::new(self.signed_in(member))
     }
 
-    /// A transport presenting `token`, its exchanges transcribed.
+    /// A transport presenting `token`.
     pub fn bearer(&self, token: &str) -> Transport {
-        Transport::new(self.address, Some(token.to_owned())).observed(transcript::observer())
+        Transport::new(self.address, Some(token.to_owned()))
     }
 
     /// Publishes the vendor evaluation's route as `ann` and runs its scenario's first
     /// `steps` steps, each at its own time; answers `ann`'s transport.
     pub async fn vendor_after(&self, steps: usize) -> Transport {
-        self.vendor(steps, false).await
-    }
-
-    /// As [`World::vendor_after`], with the steps left out of the transcript but for a note:
-    /// set-up a proof does not show.
-    pub async fn vendor_quietly(&self, steps: usize) -> Transport {
-        self.vendor(steps, true).await
-    }
-
-    async fn vendor(&self, steps: usize, quietly: bool) -> Transport {
         let ann = self.signed_in("ann");
         let seed = publish_fixture_route("vendor-evaluation");
-        let quiet = self.quiet("ann");
-        let reply = post(&quiet, "/routes/vendor-evaluation/patches", &request(&seed)).await;
+        let reply = post(&ann, "/routes/vendor-evaluation/patches", &request(&seed)).await;
         ok::<serde_json::Value>(&reply);
-        transcript::note(
-            "*Set up, not shown: the vendor evaluation's route published as version 1 by one \
-             route patch (`POST /routes/vendor-evaluation/patches`).*",
-        );
-        let stepping = if quietly { &quiet } else { &ann };
         for step in scenario("vendor-evaluation")
             .steps
             .as_slice()
@@ -226,20 +209,7 @@ impl World {
         {
             self.clock.set_to(step.at);
             let body = serde_json::json!({ "patch": step.patch, "note": step.note });
-            ok::<serde_json::Value>(
-                &post(stepping, "/journeys/j_vendor_eval/patches", &body).await,
-            );
-        }
-        if quietly && steps > 0 {
-            let which = if steps == 1 {
-                "first scenario step, a journey patch".to_owned()
-            } else {
-                format!("scenario steps 1 to {steps}, journey patches")
-            };
-            transcript::note(&format!(
-                "*Set up, not shown: the vendor evaluation's {which} as ann (`POST \
-                 /journeys/j_vendor_eval/patches`).*"
-            ));
+            ok::<serde_json::Value>(&post(&ann, "/journeys/j_vendor_eval/patches", &body).await);
         }
         ann
     }
@@ -254,14 +224,9 @@ impl World {
         journey.unwrap().revision.get()
     }
 
-    /// A transport signed in as `member`, its exchanges left out of the transcript.
-    pub fn quiet(&self, member: &str) -> Transport {
-        Transport::new(self.address, Some(format!("team-{member}")))
-    }
-
     /// A transport with no credentials.
     pub fn anonymous(&self) -> Transport {
-        Transport::new(self.address, None).observed(transcript::observer())
+        Transport::new(self.address, None)
     }
 }
 

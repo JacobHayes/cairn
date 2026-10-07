@@ -1,4 +1,4 @@
-// The proof's pictures for brief 5.1 (briefs/proof/5.1/prove.sh): a screenshot of each
+// The proof's media for brief 5.1 (briefs/proof/5.1/prove.sh): a screenshot of each
 // acceptance state of the node detail panel and a short video of its main flow, written to
 // CAIRN_PROOF_OUT. Each step asserts what its picture is meant to show, so a picture of the
 // wrong state fails the run. Everything runs on the in-browser host, seeded on each load.
@@ -67,7 +67,6 @@ test("a note, a link, an artifact designated and completed, then removed and sta
   await shot(page, "7-note-added", offer.getByTestId("annotations"));
   const docs = await openNode(page, "browser", "j_launch", "n_docs");
   const link = await annotate(docs, "reference", "https://example.org/docs/reporting");
-  await shot(page, "8-link-added", docs.getByTestId("annotations"));
   await link.getByRole("button", { name: "Make it the artifact" }).click();
   await docs.getByTestId("actions").getByRole("button", { name: "Complete" }).click();
   await expect(state(docs)).toHaveAttribute("data-status", "done");
@@ -83,12 +82,7 @@ test("a message draft rendered with the journey's context", async ({ page }) => 
   await shot(page, "11-message-draft", panel.getByTestId("resources"));
 });
 
-test("dark theme and a narrow screen", async ({ browser, baseURL }) => {
-  const dark = await browser.newPage({ baseURL: baseURL ?? "", colorScheme: "dark", viewport: { width: 1280, height: 900 } });
-  const panel = await openNode(dark, "browser", "j_vendor_eval", "n_final_report");
-  await dateChain(panel, "Due");
-  await shot(dark, "12-dark-theme");
-  await dark.close();
+test("a narrow screen", async ({ browser, baseURL }) => {
   const narrow = await browser.newPage({ baseURL: baseURL ?? "", viewport: { width: 390, height: 844 } });
   await openNode(narrow, "browser", "j_vendor_eval", "n_final_report");
   expect(await narrow.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);

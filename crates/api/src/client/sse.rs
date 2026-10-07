@@ -2,11 +2,11 @@
 //! `field: value` lines ended by a blank line; a line starting with `:` is a comment).
 
 use axum::body::Bytes;
-use axum::http::{HeaderMap, Method, StatusCode};
+use axum::http::{Method, StatusCode};
 use http_body_util::BodyExt;
 use hyper::body::Incoming;
 
-use super::transport::{Exchange, Reply, Transport, TransportError};
+use super::transport::{Reply, Transport, TransportError};
 
 /// One event as it arrived.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -28,17 +28,11 @@ pub enum Opened {
     Refused(Reply),
 }
 
-/// A stream being read. Dropping it closes the connection, and shows the observer what was
-/// read.
+/// A stream being read. Dropping it closes the connection.
 #[derive(Debug)]
 pub struct EventStream {
-    transport: Transport,
-    target: String,
-    request_headers: HeaderMap,
-    response_headers: HeaderMap,
     body: Incoming,
     pending: Vec<u8>,
-    read: Vec<u8>,
 }
 
 impl Transport {
@@ -49,7 +43,6 @@ impl Transport {
     /// When the server cannot be reached, or a refusal not read.
     pub async fn stream(&self, target: &str) -> Result<Opened, TransportError> {
         let request = self.request(Method::GET, target, None, Bytes::new())?;
-        let request_headers = request.headers().clone();
         let response = self.open(request).await?;
         let (parts, body) = response.into_parts();
         if parts.status != StatusCode::OK {
@@ -57,30 +50,15 @@ impl Transport {
                 .collect()
                 .await
                 .map_err(|error| TransportError(format!("reading the refusal: {error}")))?;
-            let reply = Reply {
+            return Ok(Opened::Refused(Reply {
                 status: parts.status,
                 headers: parts.headers,
                 body: collected.to_bytes(),
-            };
-            self.observe(&Exchange {
-                method: Method::GET,
-                target: target.to_owned(),
-                request_headers,
-                request_body: Bytes::new(),
-                status: reply.status,
-                response_headers: reply.headers.clone(),
-                response_body: reply.body.clone(),
-            });
-            return Ok(Opened::Refused(reply));
+            }));
         }
         Ok(Opened::Stream(Box::new(EventStream {
-            transport: self.clone(),
-            target: target.to_owned(),
-            request_headers,
-            response_headers: parts.headers,
             body,
             pending: Vec::new(),
-            read: Vec::new(),
         })))
     }
 }
@@ -101,7 +79,6 @@ impl EventStream {
             };
             let frame = frame.map_err(|error| TransportError(format!("the stream: {error}")))?;
             if let Ok(data) = frame.into_data() {
-                self.read.extend_from_slice(&data);
                 self.pending
                     .extend(data.iter().copied().filter(|byte| *byte != b'\r'));
             }
@@ -132,19 +109,5 @@ impl EventStream {
         event.data = data.join("\n");
         event.comment = comments.join("\n");
         Some(event)
-    }
-}
-
-impl Drop for EventStream {
-    fn drop(&mut self) {
-        self.transport.observe(&Exchange {
-            method: Method::GET,
-            target: self.target.clone(),
-            request_headers: std::mem::take(&mut self.request_headers),
-            request_body: Bytes::new(),
-            status: StatusCode::OK,
-            response_headers: std::mem::take(&mut self.response_headers),
-            response_body: Bytes::from(std::mem::take(&mut self.read)),
-        });
     }
 }

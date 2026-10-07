@@ -1,9 +1,8 @@
-//! Walks the fixtures through derive's passes 1 to 3 and prints the proof for brief 2.2 as
-//! Markdown: the vendor evaluation's relevance and participations at each decision point,
-//! the effective dependencies of nested nodes with each implicit edge's source, an effective
-//! skip with kept work, and a role change re-deriving participations in the hiring loop.
-//! `briefs/proof/2.2/prove.sh` runs it, and checks that `fixtures/README.md` states the
-//! decision-point tables it prints.
+//! Walks the fixtures through derive's passes 1 to 3 and prints, as Markdown, the values brief
+//! 2.2's proof quotes: the vendor evaluation's relevance and participations at each decision
+//! point, the effective dependencies of nested nodes with each implicit edge's source, an
+//! effective skip with kept work, and a role change re-deriving participations in the hiring
+//! loop.
 //!
 //! usage: `cargo run -p cairn-engine --example derive_walkthrough -- FIXTURES_DIR`
 

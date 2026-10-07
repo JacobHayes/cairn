@@ -15,4 +15,4 @@ pub use api::{Client, ClientError, Subscription};
 pub use retry::{Landed, Refused};
 pub use sse::{EventStream, Opened, SseEvent};
 pub use tracker::Tracker;
-pub use transport::{Exchange, Observer, Reply, Transport, TransportError};
+pub use transport::{Reply, Transport, TransportError};

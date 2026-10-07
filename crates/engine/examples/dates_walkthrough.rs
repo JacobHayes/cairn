@@ -1,11 +1,9 @@
-//! Walks the fixtures through derive's pass 4 and prints the proof for brief 2.3 as
-//! Markdown: the vendor evaluation's due dates once its decision meeting is pinned, its
-//! bounds before and after the final report is pinned, the product launch's bounds before
-//! and after its code freeze is reached late (a shortfall, not a rejection), the report
-//! pinned past the meeting rejected with its chain, shortfall, and resolution moves, and the
-//! cost test's operation counts at the limits. Each step is derived at that step's today.
-//! `briefs/proof/2.3/prove.sh` runs it, and checks that `fixtures/README.md` states the due
-//! date table it prints.
+//! Walks the fixtures through derive's pass 4 and prints, as Markdown, the values brief 2.3's
+//! proof quotes: the vendor evaluation's due dates once its decision meeting is pinned, its
+//! bounds before and after the final report is pinned, the product launch's bounds before and
+//! after its code freeze is reached late (a shortfall, not a rejection), the report pinned past
+//! the meeting rejected with its chain, shortfall, and resolution moves, and the cost test's
+//! operation counts at the limits. Each step is derived at that step's today.
 //!
 //! usage: `cargo run -p cairn-engine --example dates_walkthrough -- FIXTURES_DIR`
 

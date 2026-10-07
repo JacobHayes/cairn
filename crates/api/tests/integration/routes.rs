@@ -42,8 +42,7 @@ mod in_process {
     /// The journey after its first three steps with two local edits (B4), and version 2
     /// imported and published; answers ann's transport.
     async fn version_two_published(world: &World) -> Transport {
-        let ann = world.vendor_quietly(3).await;
-        let quiet = world.quiet("ann");
+        let ann = world.vendor_after(3).await;
         let edits = support::patch(
             "p_local_edits",
             "{journey: j_vendor_eval}",
@@ -51,10 +50,10 @@ mod in_process {
             "- op: set_node_field\n  node: n_access\n  value: {title: Access to the test environment}\n- op: set_node_field\n  node: n_findings\n  value: {estimate: 4}\n",
         );
         let target = format!("{JOURNEY}/patches");
-        ok::<PatchAnswer>(&post(&quiet, &target, &support::request(&edits)).await);
+        ok::<PatchAnswer>(&post(&ann, &target, &support::request(&edits)).await);
         let import = json!({"patch_id": "p_import_v2", "file": route_v2()});
-        ok::<PatchAnswer>(&post(&quiet, &format!("{ROUTE}/import"), &import).await);
-        let route: Route = get(&quiet, ROUTE).await;
+        ok::<PatchAnswer>(&post(&ann, &format!("{ROUTE}/import"), &import).await);
+        let route: Route = get(&ann, ROUTE).await;
         let publish = support::patch(
             "p_publish_v2",
             "{route: vendor-evaluation}",
@@ -62,13 +61,7 @@ mod in_process {
             "- op: publish_draft\n",
         );
         let target = format!("{ROUTE}/patches");
-        ok::<PatchAnswer>(&post(&quiet, &target, &support::request(&publish)).await);
-        support::transcript::note(
-            "*Set up, not shown: two local edits to the journey (`n_access` retitled, \
-             `n_findings` re-estimated) by one journey patch, and `fixtures/vendor-evaluation/\
-             route-v2.yaml` imported (`POST /routes/vendor-evaluation/import`) and published as \
-             version 2 by a route patch.*",
-        );
+        ok::<PatchAnswer>(&post(&ann, &target, &support::request(&publish)).await);
         ann
     }
 
@@ -78,7 +71,7 @@ mod in_process {
     #[tokio::test]
     async fn an_export_imports_back_as_a_new_draft() {
         let world = World::start().await;
-        let ann = world.vendor_quietly(1).await;
+        let ann = world.vendor_after(1).await;
         let exported: RouteFile = get(&ann, &format!("{ROUTE}/export?version=1")).await;
         assert_eq!(
             exported.extends.map(cairn_schema::VersionNumber::get),
@@ -173,7 +166,7 @@ mod in_process {
     #[tokio::test]
     async fn save_as_route_and_relink_are_drafted_as_proposals() {
         let world = World::start().await;
-        let ann = world.vendor_quietly(3).await;
+        let ann = world.vendor_after(3).await;
         let save = json!({
             "patch_id": "p_save",
             "proposal": "pr_save",
@@ -204,7 +197,7 @@ mod in_process {
     #[tokio::test]
     async fn each_request_that_cannot_be_drafted_answers_its_problem() {
         let world = World::start().await;
-        let ann = world.vendor_quietly(1).await;
+        let ann = world.vendor_after(1).await;
         let free = support::patch(
             "p_free",
             "{journey: j_free}",

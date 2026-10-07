@@ -1,7 +1,7 @@
-//! Walks the vendor evaluation fixture through the engine and prints the proof for brief 2.1
-//! as Markdown: the route file built into a graph, each scenario step applied with the state
-//! it changed and the events it emitted, a patch rejected with every violation by path, and
-//! replay rebuilding the same records. `briefs/proof/2.1/prove.sh` runs it.
+//! Walks the vendor evaluation fixture through the engine and prints, as Markdown, the values
+//! brief 2.1's proof quotes: the route file built into a graph, each scenario step applied with
+//! the state it changed and the events it emitted, a patch rejected with every violation by
+//! path, and replay rebuilding the same records.
 //!
 //! usage: `cargo run -p cairn-engine --example walkthrough -- FIXTURES_DIR`
 

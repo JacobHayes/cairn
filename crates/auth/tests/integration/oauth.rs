@@ -19,7 +19,6 @@ mod oauth {
     use serde_json::{Value, json};
 
     use crate::support::issuer::{Issuer, Person, Spoil};
-    use crate::support::transcript;
     use crate::support::{
         LOCAL, World, app, base, body, cookie_header, cookies_set, loopback, request, send, whoami,
         with_cookie,
@@ -266,7 +265,6 @@ mod oauth {
         let user = whoami(&setup.router, session).await.unwrap();
         assert_eq!(agent.user, user.user);
         let tokens = setup.world.accounts.tokens_of(&user.user).await.unwrap();
-        transcript::show("The user's tokens", &tokens);
         assert_eq!(Some(&tokens[0].agent), agent.agent.as_ref());
         assert_eq!(tokens[0].name.as_str(), "Test client");
     }

@@ -19,7 +19,6 @@ mod tailscale {
     use cairn_store::AuthStore;
     use serde_json::json;
 
-    use crate::support::transcript;
     use crate::support::{LOCAL, REMOTE, World, app, loopback, public, request, whoami};
 
     const ANN_PEER: &str = "100.101.102.103:41641";
@@ -111,7 +110,6 @@ mod tailscale {
         let router = app(&world.auth(tailnet(), vec![provider]));
         let ann = whoami(&router, get_from(ANN_PEER)).await.unwrap();
         let identities = world.store.identities_of(&ann.user).await.unwrap();
-        transcript::show("The identity linked", &identities);
         assert_eq!(identities[0].subject.as_str(), "ann@example.org");
         let email = "ann@example.org".parse().unwrap();
         assert!(identities[0].verified_emails.contains(&email));

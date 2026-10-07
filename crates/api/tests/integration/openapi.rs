@@ -376,7 +376,7 @@ mod in_process {
     async fn proposals_of_every_domain_validate_against_the_document() {
         let document = cairn_api::openapi::document();
         let world = World::start().await;
-        let ann = world.vendor_quietly(3).await;
+        let ann = world.vendor_after(3).await;
         for (endpoint, target, id, draft) in crate::support::proposals_of_every_domain(&ann).await {
             let create = json!({"patch_id": format!("p_{id}"), "id": id, "draft": draft});
             conforms(&document, endpoint, &post(&ann, &target, &create).await);

@@ -1,5 +1,5 @@
-// The proof's pictures (briefs/proof/4.6/prove.sh): a screenshot of each acceptance state of
-// the shell and a short video of its main flow, written to CAIRN_PROOF_OUT. Each step also
+// The proof's media for brief 4.6 (briefs/proof/4.6/prove.sh): a screenshot of each acceptance
+// state of the shell and a short video of its main flow, written to CAIRN_PROOF_OUT. Each step also
 // asserts what the picture is meant to show, so a picture of the wrong state fails the run.
 // The proof run starts its own fixture server, so its titles need not be unique.
 import { join } from "node:path";

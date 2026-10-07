@@ -36,10 +36,10 @@ mod in_process {
         }
     }
 
-    /// Creates `j_wide` as ann, out of the transcript: a root and a chain of `count` actions,
-    /// each requiring the one before, so every leaf is downstream of the root.
+    /// Creates `j_wide` as ann: a root and a chain of `count` actions, each requiring the
+    /// one before, so every leaf is downstream of the root.
     async fn wide(world: &World, count: usize) {
-        let transport = &world.quiet("ann");
+        let transport = &world.signed_in("ann");
         let mut mutations = String::from(
             "- op: create_journey\n  name: Wide\n- op: add_node\n  node: {key: n_root, id: root, kind: action, title: Root}\n",
         );
@@ -60,11 +60,6 @@ mod in_process {
         )
         .await;
         support::ok::<serde_json::Value>(&reply);
-        support::transcript::note(&format!(
-            "*Set up, not shown: journey `j_wide` created by one patch (`POST \
-             /journeys/j_wide/patches`): an action `n_root` and a chain of {count} actions \
-             after it, each requiring the one before.*"
-        ));
     }
 
     /// The wire form of the service's projection.
@@ -77,7 +72,7 @@ mod in_process {
     #[tokio::test]
     async fn every_projection_answers_what_the_service_derives() {
         let world = World::start().await;
-        let ann = world.vendor_quietly(3).await;
+        let ann = world.vendor_after(3).await;
         world.clock.set(NOW);
         let call = &call_of(&ann).await;
         let service = &world.service;
@@ -214,11 +209,6 @@ mod in_process {
         );
         let leverage = &detail.value.derived.leverage_from;
         assert!(leverage.entries.len() <= cap);
-        support::transcript::note(&format!(
-            "*Above, cut: `derived.gravity_from` carries {} entries and `total: {}`.*",
-            gravity.entries.len(),
-            gravity.total
-        ));
 
         let mut entries = Vec::new();
         let mut target = "/journeys/j_wide/nodes/n_root/explanations/gravity".to_owned();
@@ -236,13 +226,6 @@ mod in_process {
                     "detail's first page"
                 );
             }
-            support::transcript::note(&format!(
-                "*Above: {} entries, next cursor {}.*",
-                page.value.entries.len(),
-                page.value
-                    .next
-                    .map_or("none".to_owned(), |next| next.position().to_string())
-            ));
             entries.extend(page.value.entries.into_iter().map(|entry| entry.node));
             let Some(next) = page.value.next else { break };
             target = format!(
@@ -312,7 +295,7 @@ mod in_process {
     #[tokio::test]
     async fn each_malformed_derived_read_answers_its_problem() {
         let world = World::start().await;
-        let ann = world.vendor_quietly(2).await;
+        let ann = world.vendor_after(2).await;
         let cases = [
             ("/journeys/j_missing/next", ProblemCode::NotFound),
             ("/journeys/j_missing/history", ProblemCode::NotFound),

@@ -4,7 +4,7 @@
 // patch, refuses stale ones, and notifies its subscriber; a document from another engine
 // version, or a trap, stops the module; the worker keeps a journey's newest document and
 // fails loudly; and the derive benchmark at the limits runs in the browser. Set
-// CAIRN_PROOF_OUT to a directory to keep what each check found, for the proof.
+// CAIRN_PROOF_OUT to a directory to keep the benchmark's figures, for the proof's table.
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -28,7 +28,7 @@ function serverJourneys(): string[] {
   return [...journeys].sort();
 }
 
-/** Keeps what a check found when the proof asks for it. */
+/** Keeps the benchmark's figures when the proof asks for them. */
 function keep(name: string, found: unknown): void {
   const out = process.env["CAIRN_PROOF_OUT"];
   if (out !== undefined) {
@@ -51,10 +51,9 @@ test.beforeEach(async ({ page }) => {
   await harness(page);
 });
 
-for (const [position, entry] of index.entries()) {
+for (const entry of index) {
   test(`the browser host agrees with the server: ${entry.label}`, async ({ page }) => {
     const found: GroupResult = await page.evaluate((file) => window.cairnHarness.runGroup(file), entry.file);
-    keep(`group-${String(position).padStart(2, "0")}`, found);
     const differing = found.results.filter((result) => !result.equal);
     expect(differing, `${entry.label}: calls that differ from the server`).toEqual([]);
     expect(found.results.length).toBe(entry.cases);
@@ -63,7 +62,6 @@ for (const [position, entry] of index.entries()) {
 
 test("the in-browser root loads each fixture, applies a patch, refuses stale ones, and notifies", async ({ page }) => {
   const found = await page.evaluate(() => window.cairnHarness.rootScenario());
-  keep("root", found);
   const loaded = found["loaded"] as { journey: string; derivedBytes: number }[];
   expect(loaded.map((journey) => journey.journey).sort()).toEqual(serverJourneys());
   expect(loaded.every((journey) => journey.derivedBytes > 0)).toBe(true);
@@ -83,7 +81,6 @@ test("the in-browser root loads each fixture, applies a patch, refuses stale one
 
 test("a document from another engine version stops deriving, previewing, writing, and retrying", async ({ page }) => {
   const found = await page.evaluate(() => window.cairnHarness.skew());
-  keep("skew", found);
   const refused = { error: "version_skew", document: "9.0.0", engine: found["engine"] };
   expect(found["before"]).toEqual({ project: true, touched: true });
   expect(found["accepts"]).toBe(false);

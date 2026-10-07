@@ -12,7 +12,6 @@ mod tokens {
     use cairn_schema::{Actor, Title};
     use cairn_store::{AuthEvent, AuthStore, MemoryStore, UserRecord};
 
-    use crate::support::transcript;
     use crate::support::{LOCAL, World, app, base, loopback, request, whoami};
 
     fn oauth(world: &World) -> Arc<dyn AuthProvider> {
@@ -57,9 +56,6 @@ mod tokens {
             .mint_token(&ann, named("nightly"))
             .await
             .unwrap();
-        transcript::show("Minted (the secret is shown once, to its holder)", &minted);
-        let stored = world.store.agent_tokens_of(&ann.user).await.unwrap();
-        transcript::show("What the store holds", &stored);
         let actor = whoami(&router, bearer(minted.token.expose()))
             .await
             .unwrap();
@@ -87,10 +83,8 @@ mod tokens {
         assert_eq!(refused, Err(StatusCode::UNAUTHORIZED));
         let listed = world.accounts.tokens_of(&ann.user).await.unwrap();
         assert!(listed[0].revoked_at.is_some());
-        transcript::show("The user's tokens after revoking", &listed);
         let logged = [AuthEvent::TokenMinted, AuthEvent::TokenRevoked];
         assert_eq!(world.log().await, logged);
-        transcript::show("The auth log", &logged);
     }
 
     /// A stored token is never readable in plain text: the store holds its digest, and the

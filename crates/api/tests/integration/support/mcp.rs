@@ -1,14 +1,9 @@
 //! An MCP client in process: rmcp's own client, its Streamable HTTP transport carried by a
 //! client that hands each request to the API's router as served (auth layer, limits, and
-//! all) instead of a socket, so a test drives `/mcp` exactly as a remote agent would. With
-//! `CAIRN_MCP_TRANSCRIPT` naming a directory, every exchange is appended to a Markdown file
-//! named after the test, as the JSON-RPC request and the result (for the proof).
+//! all) instead of a socket, so a test drives `/mcp` exactly as a remote agent would.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
-use std::fmt::Write as _;
-use std::io::Write as _;
 use std::net::SocketAddr;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use axum::Router;
@@ -31,16 +26,13 @@ use rmcp::transport::streamable_http_client::{
     AuthRequiredError, StreamableHttpClient, StreamableHttpClientTransportConfig,
     StreamableHttpError, StreamableHttpPostResponse,
 };
-use serde_json::{Value, json};
+use serde_json::Value;
 use tower::ServiceExt as _;
 
 use super::World;
 
 /// The URL the client is configured with; requests go to the router, not to this host.
 const URL: &str = "http://cairn.test/mcp";
-
-/// Lines of a result shown in a transcript before the rest is summarized.
-const RESULT_LINE_COUNT_SHOWN: usize = 40;
 
 /// A failure inside the in-process client.
 #[derive(Debug)]
@@ -89,7 +81,6 @@ impl InProcess {
         let status = response.status();
         let headers = response.headers().clone();
         let bytes = response.into_body().collect().await.unwrap().to_bytes();
-        record(&message, status, &bytes);
         answer(status, &headers, &bytes)
     }
 }
@@ -262,80 +253,4 @@ impl Agent {
         assert_eq!(result.is_error, Some(true), "{name}: {error}");
         error
     }
-}
-
-fn transcript() -> Option<PathBuf> {
-    let directory = PathBuf::from(std::env::var_os("CAIRN_MCP_TRANSCRIPT")?);
-    let test = std::thread::current().name()?.replace("::", "__");
-    Some(directory.join(format!("{test}.md")))
-}
-
-/// Writes `text` into the transcript as it is: a heading or a sentence between exchanges.
-pub fn note(text: &str) {
-    append(&format!("{text}\n\n"));
-}
-
-fn append(text: &str) {
-    let Some(path) = transcript() else { return };
-    let mut file = std::fs::OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .unwrap();
-    file.write_all(text.as_bytes()).unwrap();
-}
-
-/// One exchange in the transcript: a tool call as its name, arguments, and result; any
-/// other request as its method. Notifications and the session's set-up are left out.
-fn record(message: &ClientJsonRpcMessage, status: StatusCode, body: &[u8]) {
-    if transcript().is_none() {
-        return;
-    }
-    let request = serde_json::to_value(message).unwrap();
-    let method = request["method"].as_str().unwrap_or_default();
-    if method.starts_with("notifications/") || method == "initialize" || method.is_empty() {
-        return;
-    }
-    let params = &request["params"];
-    let mut text = String::new();
-    if method == "tools/call" {
-        let arguments = serde_json::to_string_pretty(&params["arguments"]).unwrap();
-        let name = params["name"].as_str().unwrap_or_default();
-        write!(text, "**→ `{name}`**\n\n```json\n{arguments}\n```\n\n").unwrap();
-    } else {
-        write!(text, "**→ `{method}`**\n\n").unwrap();
-    }
-    let response: Value = serde_json::from_slice(body).unwrap_or(json!(null));
-    let result = &response["result"];
-    let shown = match (&result["structuredContent"], &response["error"]) {
-        (Value::Null, Value::Null) => shown_result(result),
-        (Value::Null, error) => shown_result(error),
-        (structured, _) => shown_result(structured),
-    };
-    let error = if result["isError"] == json!(true) {
-        " (a tool error)"
-    } else {
-        ""
-    };
-    write!(
-        text,
-        "**← HTTP {}{error}**\n\n```json\n{shown}\n```\n\n",
-        status.as_u16()
-    )
-    .unwrap();
-    append(&text);
-}
-
-/// A result, pretty, its first lines and a count of the rest.
-fn shown_result(value: &Value) -> String {
-    let pretty = serde_json::to_string_pretty(value).unwrap();
-    let lines: Vec<&str> = pretty.lines().collect();
-    if lines.len() <= RESULT_LINE_COUNT_SHOWN {
-        return pretty;
-    }
-    let rest = lines.len() - RESULT_LINE_COUNT_SHOWN;
-    format!(
-        "{}\n… {rest} more lines",
-        lines[..RESULT_LINE_COUNT_SHOWN].join("\n")
-    )
 }

@@ -67,17 +67,10 @@ mod in_process {
             "- op: add_annotation\n  annotation: {key: a_seen, note: Seen.}\n",
         );
         let bob = world.signed_in("bob");
-        support::transcript::note("Bob notes the journey while Ann's stream is open:");
         support::ok::<serde_json::Value>(
             &post(&bob, "/journeys/j_vendor_eval/patches", &request(&note)).await,
         );
         assert_eq!(next_tick(&mut stream).await, current(journey, revision(3)));
-        support::transcript::note(
-            "Ann's stream, opened before Bob's note and shown as it was read: the current \
-             revision of each domain it watches at once (0 for a journey that does not exist), \
-             then a tick when Bob's note committed:",
-        );
-        drop(stream);
     }
 
     /// The process holds at most `SSE_SUBSCRIBER_COUNT_MAX` subscribers; past that a stream

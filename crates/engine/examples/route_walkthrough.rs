@@ -3,7 +3,7 @@
 //! byte for byte; the finished journey, with two local edits, upgraded to version 2 (the
 //! proposal's items, the conflict's offered resolutions, the preview, and the applied
 //! result); the journey saved as a route, published, created again, and re-linked. Every
-//! patch goes through `apply`. `briefs/proof/2.7/prove.sh` runs it.
+//! patch goes through `apply`. The values in `briefs/proof/2.7/README.md` come from it.
 //!
 //! usage: `cargo run -p cairn-engine --example route_walkthrough -- FIXTURES_DIR`
 

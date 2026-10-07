@@ -1,11 +1,10 @@
-//! Walks the fixtures through derive's pass 5 and the derived guards and prints the proof for
-//! brief 2.4 as Markdown: the vendor evaluation's frontier after each step, the frontier and
-//! acting frontier before and after a completion, a blocked node with its origin blockers
-//! listed once, a snooze holding then lifting, a stalled journey with what it waits on, a
-//! guard rejection and a bypass, the consequences of a patch, an auto-reach milestone on its
-//! date, and the pass's operation count at the limits. Every patch here goes through
-//! `apply`; every derive is at the step's today. `briefs/proof/2.4/prove.sh` runs it and
-//! checks that `fixtures/README.md` states the frontier table it prints.
+//! Walks the fixtures through derive's pass 5 and the derived guards and prints, as Markdown,
+//! the values brief 2.4's proof quotes: the vendor evaluation's frontier after each step, the
+//! frontier and acting frontier before and after a completion, a blocked node with its origin
+//! blockers listed once, a snooze holding then lifting, a stalled journey with what it waits
+//! on, a guard rejection and a bypass, the consequences of a patch, an auto-reach milestone on
+//! its date, and the pass's operation count at the limits. Every patch here goes through
+//! `apply`; every derive is at the step's today.
 //!
 //! usage: `cargo run -p cairn-engine --example blocking_walkthrough -- FIXTURES_DIR`
 

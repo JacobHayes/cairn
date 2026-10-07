@@ -15,7 +15,7 @@ mod mcp_in_process {
     use cairn_schema::{Mutation, NextQuery};
     use serde_json::{Value, json};
 
-    use crate::support::mcp::{Agent, note};
+    use crate::support::mcp::Agent;
     use crate::support::{self, World, post};
 
     const JOURNEY: &str = "j_vendor_eval";
@@ -25,7 +25,7 @@ mod mcp_in_process {
     #[tokio::test]
     async fn every_tool_answers_through_the_endpoint() {
         let world = World::start().await;
-        world.vendor_quietly(2).await;
+        world.vendor_after(2).await;
         let agent = Agent::connect(&world, "team-ann").await;
         reads(&agent).await;
         let revision = journey_writes(&agent, 2).await;
@@ -258,18 +258,12 @@ mod mcp_in_process {
     #[tokio::test]
     async fn an_agent_answers_the_decisions_and_breaks_down_the_placeholder() {
         let world = World::start().await;
-        world.vendor_quietly(1).await;
-        note(
-            "*Set up, not shown: the vendor evaluation's route published as version 1, and the \
-             journey started from it with its people created (scenario step 1), through the \
-             HTTP API.*",
-        );
+        world.vendor_after(1).await;
         let agent = Agent::connect(&world, "team-ann").await;
         let revision = answer_what_is_needed(&agent).await;
         refused_with_both_mistakes(&agent, revision).await;
         break_down_the_placeholder(&agent, revision).await;
 
-        note("### 5. The acting frontier now");
         let frontier = agent
             .ok("list_frontier", json!({ "journey": JOURNEY }))
             .await;
@@ -299,7 +293,6 @@ mod mcp_in_process {
     /// Reads the snapshot first, lists the decisions needed, and answers each in rank order
     /// with the scenario's answer; the journey's revision after.
     async fn answer_what_is_needed(agent: &Agent) -> u64 {
-        note("### 1. Read the state first");
         let snapshot = json!({ "journey": JOURNEY, "depth": 1 });
         let snapshot = agent.ok("get_snapshot", snapshot).await;
         let open: Vec<String> = strings(&snapshot["snapshot"]["open_decisions"]);
@@ -308,7 +301,6 @@ mod mcp_in_process {
         let ranked: Vec<&String> = open.iter().filter(|key| needed.contains(key)).collect();
         assert_eq!(ranked, needed.iter().collect::<Vec<_>>(), "in rank order");
 
-        note("### 2. Answer each decision that can be answered now, in rank order");
         let answers = scenario_answers();
         let mut revision = snapshot["revision"].as_u64().unwrap();
         for decision in &needed {
@@ -324,7 +316,6 @@ mod mcp_in_process {
 
     /// A15: a patch with two independent mistakes is refused with both.
     async fn refused_with_both_mistakes(agent: &Agent, revision: u64) {
-        note("### 3. A patch with two mistakes is refused with both");
         let mistakes = json!({ "id": "p_mistakes", "target": { "journey": JOURNEY },
             "base_revision": revision, "mutations": [
                 { "op": "transition", "node": "n_workload", "transition": "complete" },
@@ -343,7 +334,6 @@ mod mcp_in_process {
 
     /// B10, I6: the placeholder broken down by a proposal, reviewed, and applied.
     async fn break_down_the_placeholder(agent: &Agent, revision: u64) {
-        note("### 4. Propose a breakdown of the placeholder, review it, and apply it");
         let snapshot = json!({ "journey": JOURNEY, "depth": 1 });
         let snapshot = agent.ok("get_snapshot", snapshot).await;
         assert_eq!(
@@ -398,7 +388,7 @@ mod mcp_in_process {
     #[tokio::test]
     async fn the_endpoint_shares_the_api_auth() {
         let world = World::start().await;
-        world.vendor_quietly(2).await;
+        world.vendor_after(2).await;
         let initialize = json!({ "jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {
             "protocolVersion": "2025-06-18", "capabilities": {},
             "clientInfo": { "name": "test", "version": "1" } } });

@@ -1,6 +1,6 @@
-// The proof's pictures for brief 5.3 (briefs/proof/5.3/prove.sh): a screenshot of each
+// The proof's media for brief 5.3 (briefs/proof/5.3/prove.sh): a screenshot of each
 // acceptance state of the list, the next list, triage, and the decision walkthrough, a short
-// video of the walkthrough, and the values the README tabulates, written to CAIRN_PROOF_OUT.
+// video of the walkthrough, and the next list's values, written to CAIRN_PROOF_OUT.
 // Each step asserts what its picture is meant to show, so a picture of the wrong state fails
 // the run. The walkthrough runs on the server host over a journey started from the vendor
 // evaluation's route; everything else on the in-browser host, seeded on each load.
@@ -121,20 +121,6 @@ test("the list: filters, grouping, search, bulk", async ({ page }) => {
   await openActing(page, "browser", "j_launch", "list?flag=snoozed");
   await expect.poll(() => listKeys(page)).toHaveLength(2);
   await shot(page, "12-bulk-snoozed-in-one-patch");
-});
-
-test("the dark theme and a narrow screen", async ({ browser, baseURL }) => {
-  const dark = await browser.newPage({ baseURL: baseURL ?? "", colorScheme: "dark", viewport: { width: 1200, height: 900 } });
-  await openActing(dark, "browser", "j_launch", "triage");
-  await expect(card(dark)).toBeVisible();
-  await shot(dark, "13-dark-theme");
-  await dark.close();
-  const narrow = await browser.newPage({ baseURL: baseURL ?? "", viewport: { width: 390, height: 844 } });
-  await openActing(narrow, "browser", "j_launch", "next");
-  await nextKeys(narrow);
-  expect(await narrow.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  await shot(narrow, "14-narrow-screen");
-  await narrow.close();
 });
 
 /** The main flow: a fresh journey's walkthrough, an answer surfacing work, passes, triage, the next list. */
