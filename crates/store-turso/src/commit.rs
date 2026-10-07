@@ -15,6 +15,7 @@ use cairn_store::backend::{self, Shape, StoredReceipt};
 use cairn_store::{Commit, CommitError, CommitPoint, Committed, Faults, Precondition, StoreError};
 use turso::Connection;
 
+use crate::durable::Durability;
 use crate::load;
 use crate::queue::Claim;
 use crate::sequence::Sequencer;
@@ -84,9 +85,11 @@ pub(crate) fn claims(commit: &Commit, shape: &Shape) -> BTreeSet<Claim> {
         .collect()
 }
 
-/// Commits on `connection`, retrying once on a write-write conflict.
+/// Commits on `connection`, retrying once on a write-write conflict. A commit that fails
+/// other than by a conflict or a constraint is answered once the store has settled.
 pub(crate) async fn commit(
     connection: &Connection,
+    durability: &Durability,
     faults: &Faults,
     log: &Sequencer,
     commit: &Commit,
@@ -98,6 +101,7 @@ pub(crate) async fn commit(
         let positions = log.reserve(commit.change_set.events.len());
         let attempted = attempt(
             connection,
+            durability,
             faults,
             commit,
             shape,
@@ -125,8 +129,30 @@ async fn rollback(connection: &Connection) {
     let _ = execute(connection, "ROLLBACK", Vec::new()).await;
 }
 
+/// The answer to a commit whose `COMMIT` failed other than by a conflict or a constraint,
+/// once the store has settled (`durable`): Turso keeps a commit whose log record it appended,
+/// so after a barrier has synced the log past it, the commit is applied when its receipt
+/// is there, and failed when it is not.
+async fn settled(
+    connection: &Connection,
+    durability: &Durability,
+    receipt: PatchReceipt,
+    reason: String,
+) -> Result<Committed, Abort> {
+    durability.settle(connection).await?;
+    if load::receipt(connection, &receipt.patch_id)
+        .await?
+        .is_none()
+    {
+        return Err(StoreError::Backend(reason).into());
+    }
+    patina_dst::reachable!("turso-failed-commit-applied-once-synced");
+    Ok(Committed::Applied(receipt))
+}
+
 async fn attempt(
     connection: &Connection,
+    durability: &Durability,
     faults: &Faults,
     commit: &Commit,
     shape: &Shape,
@@ -139,16 +165,23 @@ async fn attempt(
         Ok(Committed::Applied(receipt)) => match execute(connection, "COMMIT", Vec::new()).await {
             Ok(_) => Ok(Committed::Applied(receipt)),
             Err(error) => {
+                // A conflict or a constraint fails the commit before its log record is
+                // written; anything else may fail it after (the log's sync).
+                if matches!(error, SqlError::Other(_)) {
+                    durability.unsettle();
+                }
                 rollback(connection).await;
-                Err(match error {
-                    SqlError::Conflict(_) => Abort::Conflict,
+                match error {
+                    SqlError::Conflict(_) => Err(Abort::Conflict),
                     SqlError::Constraint(reason) => {
-                        Abort::Answer(CommitError::Failed(StoreError::Malformed(format!(
-                            "the commit leaves a row without its parent: {reason}"
+                        Err(Abort::Answer(CommitError::Failed(StoreError::Malformed(
+                            format!("the commit leaves a row without its parent: {reason}"),
                         ))))
                     }
-                    other @ SqlError::Other(_) => other.into(),
-                })
+                    SqlError::Other(reason) => {
+                        settled(connection, durability, receipt, reason).await
+                    }
+                }
             }
         },
         Ok(answered) => {

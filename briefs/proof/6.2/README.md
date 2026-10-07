@@ -10,17 +10,19 @@ submitted, and that the state loaded equals the engine's replay of the log.
 
 ## An injected fault changes the outcome
 
-Seed 31. A failed fsync alone is retried; a crash alone is recovered; both together lose
-an acknowledged commit. Step 2's log fsync fails, the store answers `Failed`, the client
-resubmits, and the resubmission is answered from a receipt that never reached the disk;
-the crash before step 3's log sync then takes the commit away (DECISIONS.md, 6.2).
+Seed 12. Under fs errors its first commit's log fsync fails. Before the store was fixed,
+such a commit was answered from a receipt that never reached the disk, and a crash before
+the next log sync took the acknowledged commit away (DECISIONS.md, 6.2, found at seed 31
+through a retry). Now the store syncs the log with a barrier commit before it answers
+("Settled", reported by the run without a crash), so the crash after it loses nothing
+(DECISIONS.md, the log sync fix). With the fix removed, the run with both loses step 0.
 
-| Run | Faults | Verdict | Retried write | Restart | Violation |
-|---|---|---|---|---|---|
-| fault-free | none | pass durability-outcome | - | - | - |
-| a failed fsync | --fs-error-permille 5 | pass durability-outcome | step=2 error=store backend failed: I/O error (sync): operation interrupted | - | - |
-| a crash-restart | --fs-crash-at write:40 | pass durability-outcome | - | in_flight=3 landed=false last_point=AfterRevisionRow torn_tail=false log_bytes=23460 ledger_torn_bytes=0 | - |
-| both | --fs-error-permille 5 --fs-crash-at write:40 | violation durability-acknowledged-commit-present | step=2 error=store backend failed: I/O error (sync): operation interrupted | - | durability-acknowledged-commit-present after-restart: step 2 was acknowledged at revision 1 and has no events |
+| Run | Faults | Verdict | Retried write | Settled | Restart | Violation |
+|---|---|---|---|---|---|---|
+| fault-free | none | pass durability-outcome | - | no | - | - |
+| a failed fsync | --fs-error-permille 5 | pass durability-outcome | - | yes | - | - |
+| a crash-restart | --fs-crash-at sync:28 | pass durability-outcome | - | no | - | - |
+| both | --fs-error-permille 5 --fs-crash-at sync:28 | pass durability-outcome | - | no | - | - |
 
 ## Crash-restart at each commit point
 
@@ -31,13 +33,13 @@ step in flight, and finishes.
 
 | Crash | Restart | Verdict |
 |---|---|---|
-| `sync:38` | in_flight=2 landed=false last_point=BetweenStateAndEvents torn_tail=false log_bytes=19737 ledger_torn_bytes=0 | pass durability-outcome |
-| `sync:39` | in_flight=2 landed=false last_point=BeforeCommit torn_tail=false log_bytes=19737 ledger_torn_bytes=0 | pass durability-outcome |
-| `sync:40` | in_flight=2 landed=true last_point=BeforeCommit torn_tail=false log_bytes=20195 ledger_torn_bytes=0 | pass durability-outcome |
-| `sync:41` | no step in flight | pass durability-outcome |
-| `sync:42` | in_flight=3 landed=false last_point=none torn_tail=false log_bytes=20195 ledger_torn_bytes=0 | pass durability-outcome |
-| `sync:43` | in_flight=3 landed=false last_point=BeforeBegin torn_tail=false log_bytes=20195 ledger_torn_bytes=0 | pass durability-outcome |
-| `sync:44` | in_flight=3 landed=false last_point=AfterRevisionRow torn_tail=false log_bytes=20195 ledger_torn_bytes=0 | pass durability-outcome |
+| `sync:38` | in_flight=2 landed=false last_point=AfterRevisionRow torn_tail=false log_bytes=19967 ledger_torn_bytes=0 | pass durability-outcome |
+| `sync:39` | in_flight=2 landed=false last_point=BetweenStateAndEvents torn_tail=false log_bytes=19967 ledger_torn_bytes=0 | pass durability-outcome |
+| `sync:40` | in_flight=2 landed=false last_point=BeforeCommit torn_tail=false log_bytes=19967 ledger_torn_bytes=0 | pass durability-outcome |
+| `sync:41` | in_flight=2 landed=true last_point=BeforeCommit torn_tail=false log_bytes=20425 ledger_torn_bytes=0 | pass durability-outcome |
+| `sync:42` | no step in flight | pass durability-outcome |
+| `sync:43` | in_flight=3 landed=false last_point=none torn_tail=false log_bytes=20425 ledger_torn_bytes=0 | pass durability-outcome |
+| `sync:44` | in_flight=3 landed=false last_point=BeforeBegin torn_tail=false log_bytes=20425 ledger_torn_bytes=0 | pass durability-outcome |
 
 ## Smoke campaign
 
@@ -51,10 +53,10 @@ generations=16 failures=0 novel_signatures=0
 
 | Site | Kind | Generations reached | Generations satisfied | Fires |
 |---|---|---|---|---|
-| `durability-client-loses-acknowledgement` | fault | 13 | 0 | 92 |
-| `durability-failed-write-retried` | reachable | 1 | 1 | 0 |
-| `durability-reopen-between-steps` | fault | 13 | 0 | 81 |
-| `service-resubmission-answered-from-receipt` | reachable | 8 | 8 | 0 |
+| `durability-client-loses-acknowledgement` | fault | 12 | 0 | 97 |
+| `durability-failed-write-retried` | reachable | 0 | 0 | 0 |
+| `durability-reopen-between-steps` | fault | 13 | 0 | 83 |
+| `service-resubmission-answered-from-receipt` | reachable | 7 | 7 | 0 |
 
 The crash oracles cannot fire in a campaign, which draws no crash; the sweep below
 gates them (README, Findings).
@@ -65,29 +67,28 @@ Seed 1, byte-granular tearing, crash after every 11th write and sync: 28 of
 28 crash-restarts recovered and completed with every invariant holding. The
 restart oracles that fired, by number of runs:
 
-- `durability-crash-between-state-and-events`: 2 runs
-- `durability-crash-interrupted-commit-landed`: 4 runs
+- `durability-crash-between-state-and-events`: 4 runs
+- `durability-crash-interrupted-commit-landed`: 2 runs
 - `durability-crash-interrupted-commit-lost`: 18 runs
 - `durability-restart-recovered-commits`: 23 runs
 
 ## Planted bug
 
 The client bug `--bug ack-before-commit` records each step as acknowledged before it
-submits it. Seed 1 fault-free: `pass durability-outcome`. With a crash after the 40th sync:
+submits it. Seed 1 fault-free: `pass durability-outcome`. With a crash after the 41st sync:
 `violation durability-acknowledged-commit-present`:
 
 ```
 DURABILITY_VIOLATION durability-acknowledged-commit-present after-restart: step 6 was acknowledged at revision 1 and has no events
 ```
 
-## The finding as a store test
+## The finding as store tests
 
-`crates/store-turso/tests/conformance/log_sync.rs` wraps the platform I/O to fail one
-log fsync. It is ignored in the ladder until the fix; run on purpose it fails:
+`crates/store-turso/tests/conformance/log_sync.rs` wraps the platform I/O to fail log
+fsyncs: one, which a barrier then covers, and two, which fail the store closed until it
+is reopened. Both run in the ladder (rung 4):
 
 ```
-thread 'conformance::a_commit_whose_log_sync_fails_leaves_nothing_visible' panicked at crates/store-turso/tests/conformance/log_sync.rs:130:5:
-assertion `left == right` failed
-  left: Some(PatchReceipt { patch_id: PatchId("p_two"), domain: Journey(JourneyId("j_one")), content_hash: ContentHash("000000000000000000000000000000000000000000000000000000065739fd00"), revision: Revision(2) })
- right: None
+test conformance::a_commit_whose_log_sync_fails_is_answered_once_the_log_is_synced ... ok
+test conformance::a_commit_whose_log_sync_fails_leaves_nothing_visible ... ok
 ```

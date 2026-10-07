@@ -22,6 +22,11 @@ use crate::target::{Document, LoadTarget};
 
 /// Where domains, proposals, events, and the records outside any domain live. Async, naming
 /// no runtime; every future is `Send` so a multi-threaded host can hold one across awaits.
+///
+/// Nothing is answered from a write that may not have reached the store's storage: not a
+/// read, not a receipt, not a commit. A backend that cannot tell whether a failed commit
+/// reached it settles that before it answers anything, or errs on every call until it is
+/// reopened (DECISIONS.md, the log sync fix).
 pub trait Store: AuthStore + ConversationStore + Send + Sync {
     /// One read of one graph by typed target: a journey, a route with its draft, a published
     /// version, or the deployment. `None` when it does not exist; the deployment always

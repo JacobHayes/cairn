@@ -68,19 +68,20 @@ mod conformance {
     mod log_sync;
     mod races;
 
-    /// The Turso-specific cases, one test each.
+    /// The Turso-specific cases in a module, one test each.
     macro_rules! turso_cases {
-        ($($case:ident),* $(,)?) => {
+        ($module:ident: $($case:ident),* $(,)?) => {
             $(
                 #[test]
                 fn $case() {
-                    run(races::$case(&Turso::new()));
+                    run($module::$case(&Turso::new()));
                 }
             )*
         };
     }
 
     turso_cases!(
+        races:
         a_long_commit_blocks_neither_reads_nor_another_journeys_commit,
         two_creates_of_one_journey_in_flight_yield_one_journey,
         two_entity_creates_of_one_key_in_flight_yield_one_entity,
@@ -93,12 +94,14 @@ mod conformance {
         a_resubmission_beside_a_commit_in_flight_is_answered_from_its_receipt,
     );
 
-    /// A known finding, not yet fixed (DECISIONS.md, 6.2: an acknowledged commit lost after a
-    /// failed log fsync; the durability testbed's `sim.sh` leg 6 reproduces it under patina).
-    /// Un-ignore it with the fix.
-    #[test]
-    #[ignore = "known finding (DECISIONS.md, 6.2): a commit whose log fsync failed stays visible"]
-    fn a_commit_whose_log_sync_fails_leaves_nothing_visible() {
-        run(log_sync::a_commit_whose_log_sync_fails_leaves_nothing_visible(&Turso::new()));
-    }
+    // DECISIONS.md, the log sync fix: what a commit whose log fsync fails leaves.
+    turso_cases!(
+        log_sync:
+        a_commit_whose_log_sync_fails_is_answered_once_the_log_is_synced,
+        a_commit_whose_log_sync_fails_leaves_nothing_visible,
+        a_commit_in_flight_when_the_store_fails_closed_is_not_applied,
+        a_record_write_whose_log_sync_fails_is_settled_before_the_next_answer,
+        a_record_write_whose_log_sync_and_barrier_fail_closes_the_store,
+        an_open_syncs_the_log_before_it_answers,
+    );
 }

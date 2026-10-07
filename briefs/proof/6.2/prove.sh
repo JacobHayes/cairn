@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
 # Generates briefs/proof/6.2/README.md: the durability testbed (testbeds/durability) built
-# shim-linked and run under patina. One seed fault-free, under a failed fsync, under a
-# crash-restart, and under both, which loses an acknowledged commit (the store finding,
-# DECISIONS.md); a crash-restart sample; a smoke campaign's generations and oracles; a
-# crash sweep and the oracles it fired; the planted client bug passing fault-free and
-# caught by a crash; and the finding's deterministic store test, ignored in the ladder,
-# failing when run. Exits non-zero if any outcome differs from the one it expects.
+# shim-linked and run under patina. One seed fault-free, under a failed log fsync, under a
+# crash-restart, and under both, which lost an acknowledged commit until the store was
+# fixed (DECISIONS.md, 6.2 and the log sync fix); a crash-restart sample; a smoke
+# campaign's generations and oracles; a crash sweep and the oracles it fired; the planted
+# client bug passing fault-free and caught by a crash; and the finding's deterministic
+# store tests passing. Exits non-zero if any outcome differs from the one it expects.
 #
 # usage: briefs/proof/6.2/prove.sh
 #
@@ -48,20 +48,21 @@ fault_case() {
   local title=$1 expected=$2
   shift 2
   local log got
-  log=$(run --seed 31 "$@")
+  log=$(run --seed 12 "$@")
   got=$(verdict "$log")
   [ "$got" = "$expected" ] || mismatch "$title: expected '$expected', got '$got'"
-  local retry restart violation
+  local retry restart violation settled=no
   retry=$(line DURABILITY_RETRY "$log")
   restart=$(line DURABILITY_RESTART "$log")
   violation=$(line DURABILITY_VIOLATION "$log")
-  faults_rows+=("| $title | ${*:-none} | $got | ${retry:--} | ${restart:--} | ${violation:--} |")
+  grep -h '^PATINA_SDK_REPORT ' <<<"$log" | tr ' ' '\n' |
+    grep -E '^site=turso-failed-commit-applied-once-synced\|reachable\|.*\|r1\|' >/dev/null && settled=yes
+  faults_rows+=("| $title | ${*:-none} | $got | ${retry:--} | $settled | ${restart:--} | ${violation:--} |")
 }
 fault_case "fault-free" "pass durability-outcome"
 fault_case "a failed fsync" "pass durability-outcome" --fs-error-permille 5
-fault_case "a crash-restart" "pass durability-outcome" --fs-crash-at write:40
-fault_case "both" "violation durability-acknowledged-commit-present" \
-  --fs-error-permille 5 --fs-crash-at write:40
+fault_case "a crash-restart" "pass durability-outcome" --fs-crash-at sync:28
+fault_case "both" "pass durability-outcome" --fs-error-permille 5 --fs-crash-at sync:28
 
 # 2. Crash-restarts after seven consecutive syncs (one step's worth), seed 1.
 restart_rows=()
@@ -103,17 +104,17 @@ fired_list=$(grep -v '^$' <<<"$fired" | sort | uniq -c | awk '{ printf "- `%s`: 
 
 # 5. The planted client bug.
 planted_free=$(verdict "$(run --seed 1 -- --bug ack-before-commit)")
-planted_crash_log=$(run --seed 1 --fs-crash-at sync:40 -- --bug ack-before-commit)
+planted_crash_log=$(run --seed 1 --fs-crash-at sync:41 -- --bug ack-before-commit)
 planted_crash=$(verdict "$planted_crash_log")
 [ "$planted_free" = "pass durability-outcome" ] || mismatch "planted, fault-free: $planted_free"
 [ "$planted_crash" = "violation durability-acknowledged-commit-present" ] || mismatch "planted, crash: $planted_crash"
 
-# 6. The finding's store test, ignored in the ladder, run on purpose.
+# 6. The finding's store tests, in the ladder (rung 4).
 cd "$repo"
 test_log=$(cargo test --locked -p cairn-store-turso --all-features --test conformance -- \
-  conformance::a_commit_whose_log_sync_fails_leaves_nothing_visible --include-ignored 2>&1 || true)
-grep -q 'test result: FAILED. 0 passed; 1 failed' <<<"$test_log" || mismatch "the finding's test did not fail"
-test_failure=$(grep -A3 'panicked at' <<<"$test_log" | sed -E 's/ \([0-9]+\)//; s/at .*(crates\/)/at \1/')
+  conformance::a_commit_whose_log_sync_fails 2>&1 || true)
+grep -q 'test result: ok. 2 passed; 0 failed' <<<"$test_log" || mismatch "the finding's tests did not pass"
+test_results=$(grep -E '^test conformance::' <<<"$test_log")
 
 {
   echo '# Proof: brief 6.2, durability testbed'
@@ -128,13 +129,15 @@ test_failure=$(grep -A3 'panicked at' <<<"$test_log" | sed -E 's/ \([0-9]+\)//; 
   echo
   echo '## An injected fault changes the outcome'
   echo
-  echo 'Seed 31. A failed fsync alone is retried; a crash alone is recovered; both together lose'
-  echo 'an acknowledged commit. Step 2'"'"'s log fsync fails, the store answers `Failed`, the client'
-  echo 'resubmits, and the resubmission is answered from a receipt that never reached the disk;'
-  echo 'the crash before step 3'"'"'s log sync then takes the commit away (DECISIONS.md, 6.2).'
+  echo 'Seed 12. Under fs errors its first commit'"'"'s log fsync fails. Before the store was fixed,'
+  echo 'such a commit was answered from a receipt that never reached the disk, and a crash before'
+  echo 'the next log sync took the acknowledged commit away (DECISIONS.md, 6.2, found at seed 31'
+  echo 'through a retry). Now the store syncs the log with a barrier commit before it answers'
+  echo '("Settled", reported by the run without a crash), so the crash after it loses nothing'
+  echo '(DECISIONS.md, the log sync fix). With the fix removed, the run with both loses step 0.'
   echo
-  echo '| Run | Faults | Verdict | Retried write | Restart | Violation |'
-  echo '|---|---|---|---|---|---|'
+  echo '| Run | Faults | Verdict | Retried write | Settled | Restart | Violation |'
+  echo '|---|---|---|---|---|---|---|'
   printf '%s\n' "${faults_rows[@]}"
   echo
   echo '## Crash-restart at each commit point'
@@ -174,20 +177,21 @@ test_failure=$(grep -A3 'panicked at' <<<"$test_log" | sed -E 's/ \([0-9]+\)//; 
   echo '## Planted bug'
   echo
   echo 'The client bug `--bug ack-before-commit` records each step as acknowledged before it'
-  echo 'submits it. Seed 1 fault-free: `'"$planted_free"'`. With a crash after the 40th sync:'
+  echo 'submits it. Seed 1 fault-free: `'"$planted_free"'`. With a crash after the 41st sync:'
   echo '`'"$planted_crash"'`:'
   echo
   echo '```'
   grep '^DURABILITY_VIOLATION' <<<"$planted_crash_log"
   echo '```'
   echo
-  echo '## The finding as a store test'
+  echo '## The finding as store tests'
   echo
-  echo '`crates/store-turso/tests/conformance/log_sync.rs` wraps the platform I/O to fail one'
-  echo 'log fsync. It is ignored in the ladder until the fix; run on purpose it fails:'
+  echo '`crates/store-turso/tests/conformance/log_sync.rs` wraps the platform I/O to fail log'
+  echo 'fsyncs: one, which a barrier then covers, and two, which fail the store closed until it'
+  echo 'is reopened. Both run in the ladder (rung 4):'
   echo
   echo '```'
-  echo "$test_failure"
+  echo "$test_results"
   echo '```'
 } >"$readme"
 

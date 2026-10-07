@@ -23,7 +23,7 @@ use tokio::sync::Notify;
 use super::Turso;
 
 /// Holds the first commit to reach `point` there until released.
-struct Gate {
+pub(super) struct Gate {
     point: CommitPoint,
     armed: AtomicBool,
     reached: Notify,
@@ -31,7 +31,7 @@ struct Gate {
 }
 
 impl Gate {
-    fn at(point: CommitPoint, faults: &Faults) -> Arc<Gate> {
+    pub(super) fn at(point: CommitPoint, faults: &Faults) -> Arc<Gate> {
         let gate = Arc::new(Gate {
             point,
             armed: AtomicBool::new(true),
@@ -79,7 +79,7 @@ const MEANWHILE: Duration = Duration::from_millis(50);
 
 /// Runs `held` until it reaches the gate, then `meanwhile` to completion, then releases the
 /// gate and lets `held` finish.
-async fn while_held<T, M: Future<Output = T>>(
+pub(super) async fn while_held<T, M: Future<Output = T>>(
     store: &TursoStore,
     gate: &Gate,
     held: Commit,

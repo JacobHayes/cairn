@@ -527,6 +527,7 @@ dependencies = [
  "cairn-schema",
  "cairn-store",
  "jiff",
+ "metrics",
  "patina-dst",
  "serde",
 ]
@@ -546,6 +547,8 @@ version = "0.1.0"
 dependencies = [
  "cairn-schema",
  "cairn-store",
+ "metrics",
+ "patina-dst",
  "serde",
  "serde_json",
  "tokio",

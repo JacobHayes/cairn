@@ -68,8 +68,10 @@ listed in `sim.sh` (`out_of_reach`): the announce fallback when the deployment's
 cannot be read back after an entity create riding in a journey patch (the testbed rides none
 and fails no read); the receipt recheck after the engine answers stale (it needs the original
 to commit between a resubmission's receipt lookup and its load, and no site delays a load);
-the derived-read memo (the views refetch the journey document, never a derived read); and
-the proposal and route-import paths (the testbed drafts no proposal and imports no route).
+the derived-read memo (the views refetch the journey document, never a derived read); the
+proposal and route-import paths (the testbed drafts no proposal and imports no route); and
+the assistant's tool loop, turn limits, and write wrapper (the testbed never drives the
+assistant).
 
 Arguments: `--clients N`, `--actions N`, `--tick-ms N` (default 1; 0 for no ticker). Exit
 codes: 0 pass, 1 violation, 3 abort (runtime, store, or listener), 4 liveness (a client gave

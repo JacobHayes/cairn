@@ -251,6 +251,8 @@ A conformance suite in `crates/store` runs against every backend.
 | **Turso** | local and hosted | The `turso` crate: Rust, embedded, SQLite file format. MVCC (`BEGIN CONCURRENT`), so a long write never blocks readers and writes to different domains never queue behind each other: no busy-timeout stalls. STRICT tables, CHECK constraints for enums and non-negative numbers, foreign keys; where Turso lacks one, the backend enforces the same rule inside the commit transaction, the conformance suite tests that enforcement, and the gap is recorded in `DECISIONS.md`. |
 | **Memory** | tests, fixtures, the in-browser host | The reference implementation the conformance suite is written against. Nothing persists: an in-browser session starts from the fixtures on every load. |
 
+Nothing is answered from a write that may not be on disk. Turso keeps a commit whose log sync failed, so after a `COMMIT` fails other than by a conflict or a constraint, the Turso backend syncs its log with a barrier commit before it answers anything, and then answers the failed commit by whether it is there. When the barrier fails too, the store fails closed (every call errs) until it is reopened, and every open settles the log with a barrier first (DECISIONS.md).
+
 No sqlx: it has no Turso driver, and Cairn needs little of it. Queries are runtime SQL (Cairn never planned on sqlx's compile-time macros), connections come from a small pool of our own within the limits, and migrations are numbered SQL files embedded in the binary and applied in order inside one transaction. The conformance suite checks the SQL.
 
 Later backends sit behind the same trait and conformance suite: Postgres, for managed backups and several instances; the schema is written to port.
@@ -267,7 +269,7 @@ Relational rows, no graph-as-blob (A14). Structured field values (a condition tr
 - `proposals` (id, destination kind and id, destination base revision, revision, status, items, proposing agent, created_by)
 - Deployment: `entities`, `entity_emails` (unique email), `entity_aliases`, `deployment` (revision)
 - Outside domains: `conversations` with `conversation_messages`; auth state: `users`, `user_identities` (provider, subject) with `identity_emails`, `sessions`, `oauth_transient`, `agent_tokens` (hash, name, user, created, revoked), and `auth_log`; secrets only as SHA-256 digests
-- `patch_receipts` (patch_id, domain, content hash, resulting revision): what a resubmission by patch id is answered from; `retired_keys` (graph_id, key); `deleted_journeys` (id, deleted_at)
+- `patch_receipts` (patch_id, domain, content hash, resulting revision): what a resubmission by patch id is answered from; `retired_keys` (graph_id, key); `deleted_journeys` (id, deleted_at); `log_barrier` (one counting row the Turso backend rewrites to sync its log, Backends)
 - `events` (seq, the log: journey, route, or deployment, patch_id, ordinal, type, actor_user, agent, confirming_user, subject, delta, note, at), with `event_nodes` (seq, node) for the history of one node
 
 Uniqueness: (graph_id, key) on every content and state table; (graph_id, parent_key, id) on nodes and each email on one entity, checked at the end of the commit, since a patch may pass through a duplicate on the way (DECISIONS.md). Publishing a draft copies its rows into a new `route_version` graph with keys preserved (A11); versions are never updated after.

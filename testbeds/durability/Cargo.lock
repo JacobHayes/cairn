@@ -328,6 +328,7 @@ dependencies = [
  "cairn-schema",
  "cairn-store",
  "jiff",
+ "metrics",
  "patina-dst",
  "serde",
 ]
@@ -347,6 +348,8 @@ version = "0.1.0"
 dependencies = [
  "cairn-schema",
  "cairn-store",
+ "metrics",
+ "patina-dst",
  "serde",
  "serde_json",
  "tokio",
@@ -1268,6 +1271,16 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "metrics"
+version = "0.24.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "89550ee9f79e88fef3119de263694973a8adb26c21d75322164fb8c493039fe2"
+dependencies = [
+ "portable-atomic",
+ "rapidhash",
 ]
 
 [[package]]

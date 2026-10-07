@@ -55,25 +55,37 @@ mise run sim     # every leg of sim.sh, from the repository root
 3. A crash-restart run recorded twice is byte-identical and replays its verdict.
 4. Smoke campaign: 32 generations of buggify, fs errors and short I/O (bands at 30 per
    mille of their default), and swarm. Every generation passes, and every oracle fires but
-   a named out-of-reach list (two writers in flight, proposals, imports, derived reads).
+   a named out-of-reach list (two writers in flight, proposals, imports, derived reads, and
+   a failed write retried, which leg 6 gates).
 5. Crash sweep: crash-restart after every 11th write and sync, whole-block and byte
    tearing, seeds 1 and 2 (112 runs). Every run restarts and completes with the invariants
    holding, and the crash oracles fire: a crash between a commit's state rows and its
    events, an interrupted commit lost whole, one that had landed, a restart recovering
    acknowledged commits.
-6. The same sweep with fs errors at 5 per mille: no invariant breaks but through the known
-   store finding below, whose pinned reproduction must still fail.
+6. The same sweep with fs errors at 5 per mille: no invariant breaks, and some commit whose
+   log sync failed is answered applied once a barrier synced it
+   (`turso-failed-commit-applied-once-synced`), and some failed write is retried. The store
+   finding below is pinned as a regression run (seed 12, a crash at `sync:28` after its
+   first commit's log fsync failed), which must complete; with the fix removed it loses
+   that acknowledged commit.
 7. Known gaps still reproduce.
 
 ## Findings
 
-All in `DECISIONS.md` (brief 6.2).
+All in `DECISIONS.md` (brief 6.2, and the log sync fix).
 
-- **Store: an acknowledged commit is lost after a failed log fsync.** Turso keeps a commit
-  visible after its log `fsync` fails and its `COMMIT` errors; the resubmission is answered
-  from that receipt and acknowledged; a crash before the next log sync loses it. Seed 31,
-  `--fs-error-permille 5 --fs-crash-at write:40`. Its deterministic test,
-  `crates/store-turso/tests/conformance/log_sync.rs`, is ignored until the fix.
+- **Store: an acknowledged commit is lost after a failed log fsync (fixed).** Turso keeps a
+  commit visible after its log `fsync` fails and its `COMMIT` errors; the resubmission was
+  answered from that receipt and acknowledged; a crash before the next log sync lost it.
+  Found at seed 31, `--fs-error-permille 5 --fs-crash-at write:40`. The store now answers
+  nothing after such a failure until a barrier commit has synced the log past it, and
+  fails closed until reopened when it cannot. Its deterministic tests are
+  `crates/store-turso/tests/conformance/log_sync.rs`; leg 6 pins seed 12 at `sync:28`.
+- **Patina: a removed directory stops crash points.** Once the guest removes a directory
+  (Turso's temporary directory, when a connection that wrote is dropped), no later
+  `--fs-crash-at` point fires and the run ends uncrashed. So the store's open runs its
+  barrier on a pooled connection, which keeps its temporary directory. An in-process
+  reopen still drops the pool, so a run that reopens is not crashed after it.
 - **Turso: opens under injected faults.** A log size error at open panics; a short read of
   the log header fails the open; an open retried in-process after a failed one panics in
   the page cache; `EINTR` is reported, not retried.

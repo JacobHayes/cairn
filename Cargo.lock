@@ -678,6 +678,7 @@ dependencies = [
  "cairn-store",
  "cairn-store-turso",
  "metrics",
+ "patina-dst",
  "patina-dst-proptest",
  "serde",
  "serde_json",

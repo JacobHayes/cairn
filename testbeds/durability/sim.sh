@@ -14,7 +14,8 @@
 #      byte-granular tearing, over two seeds; every run restarts and completes with the
 #      invariants holding, and every crash oracle fires somewhere in the sweep;
 #   6. crash under errors: the sweep's crash points with fs errors too; no run breaks an
-#      invariant but through the one known store finding, which must still reproduce (a
+#      invariant, a commit whose log sync failed is answered once a barrier synced it, a
+#      failed write is retried, and the pinned run of the fixed store finding passes (a
 #      store that does not open on a failing disk is an honest outcome);
 #   7. known Turso and patina gaps (README, Findings): each must still reproduce exactly as
 #      recorded. One that stops reproducing fails this leg, so a Turso or patina bump that
@@ -99,6 +100,10 @@ out_of_reach=(
   service-proposal-draft-resubmitted
   service-proposal-patch-answered-from-receipt
   service-proposal-refreshed-against-destination
+  # A write that failed and was retried: most commits that fail at the log now settle as
+  # applied, and the campaign's dampened fs errors leave one failed too rarely; leg 6's
+  # sweep under errors gates it.
+  durability-failed-write-retried
 )
 rm -rf "$out/campaign"
 cargo patina campaign "$bed" --gens 32 --buggify --faults --fault-scale-permille 30 --swarm \
@@ -181,21 +186,14 @@ missing=$(comm -23 <(sort <<<"$crash_oracles") <(printf '%s\n' "$fired"))
 [ -z "$missing" ] || fail "crash sweep: oracles never fired: $missing"
 say "leg 5 passed: crash sweep, $runs crash-restarts, every one recovered; fired: $(paste -sd, <<<"$fired")"
 
-# A run breaks an invariant here only through the known store finding (README, Findings:
-# an acknowledged commit lost after a failed log fsync): the commit's log sync failed, the
-# retry was answered from a receipt that was never made durable, and the crash lost it.
-# Any other violation, or another failure, fails the leg; so does the finding no longer
-# reproducing, which means the store was fixed and this leg and the README are stale.
+# No run breaks an invariant (README, Findings: the store no longer answers from a commit
+# whose log sync failed until a barrier has synced it), and somewhere in the sweep a commit
+# whose log sync failed is answered applied once a barrier synced it. A store that does not
+# open on a failing disk is an honest outcome.
 sweep crash-errors --fs-error-permille 5
-known=0
 while read -r status err; do
   if grep -q '^PATINA_VERDICT .*kind=violation' "$err"; then
-    labels=$(grep -o '^PATINA_VERDICT .*kind=violation label=[^ ]*' "$err" | sed 's/.*label=//' | sort -u)
-    if [ "$labels" != durability-acknowledged-commit-present ] ||
-      ! grep -q '^DURABILITY_RETRY .*I/O error (sync)' "$err"; then
-      fail "crash under errors: an invariant broke other than by the known finding: $err"
-    fi
-    known=$((known + 1))
+    fail "crash under errors: an invariant broke: $err"
   elif [ "$status" != 0 ]; then
     # A store that did not open ends the run before the crash point it was given.
     if ! grep -q '^DURABILITY_RESULT outcome=unavailable ' "$err" ||
@@ -204,16 +202,47 @@ while read -r status err; do
     fi
   fi
 done <"$out/crash-errors.runs"
-# The finding, minimized: step 2's log fsync fails, the resubmission is answered from the
-# receipt, and the crash lands before step 3's log sync.
-run --seed 31 --fs-error-permille 5 --fs-crash-at write:40 >/dev/null 2>"$out/finding.err" || true
-if ! grep -q '^PATINA_VERDICT .*kind=violation label=durability-acknowledged-commit-present' "$out/finding.err" ||
-  ! grep -q '^DURABILITY_RETRY step=2 .*I/O error (sync)' "$out/finding.err"; then
-  fail "store finding 'lost-unsynced-ack' no longer reproduces ($out/finding.err): update README.md, DECISIONS.md, this leg, and un-ignore its test in crates/store-turso/tests/conformance.rs"
-fi
 mapfile -t error_logs < <(awk '{print $2}' "$out/crash-errors.runs")
+settled_label=turso-failed-commit-applied-once-synced
+# reached LABEL FILES...: whether any of the runs' reports reached the reachable! site LABEL.
+reached() {
+  local label=$1
+  shift
+  grep -h '^PATINA_SDK_REPORT ' "$@" | tr ' ' '\n' |
+    grep -E "^site=$label\|reachable\|.*\|r1\|" >/dev/null
+}
+reached "$settled_label" "${error_logs[@]}" ||
+  fail "crash under errors: no commit was settled after its log sync failed"
+reached durability-failed-write-retried "${error_logs[@]}" ||
+  fail "crash under errors: no failed write was retried"
+# The finding the testbed found (DECISIONS.md, 6.2), pinned as a regression at the store's
+# current order of operations: seed 12's first commit fails its log fsync, and the crash
+# lands before any later log sync. With the store answering that commit applied before a
+# barrier synced it (the fix removed), this run loses the acknowledged commit. Its run
+# without the crash shows the failed log sync was settled.
+pinned_crash=28
+run --seed 12 --fs-error-permille 5 --fs-crash-at "sync:$pinned_crash" >/dev/null 2>"$out/finding.err" ||
+  fail "the pinned log sync finding broke an invariant again: $out/finding.err"
+run --seed 12 --fs-error-permille 5 --record "$out/finding-uncrashed.patina" >/dev/null \
+  2>"$out/finding-uncrashed.err" || fail "the pinned log sync run failed without its crash: $out/finding-uncrashed.err"
+# The crashed run is the uncrashed one up to its crash: the successful syncs before the
+# uncrashed run's first failed log fsync must be fewer than the crash point.
+# (Each awk reads its input whole, so no stage of a pipeline dies of a closed pipe.)
+log_fd=$(cargo patina trace events "$out/finding-uncrashed.patina" --kind fs_open |
+  awk '/path=[^ ]*cairn\.db-log flags=read\|write/ && !found {
+    found = 1
+    for (i = 1; i < NF; i++) if ($i == "→") print $(i + 1)
+  }')
+synced_before=$(cargo patina trace events "$out/finding-uncrashed.patina" --kind fs_sync |
+  awk -v fd="fd=$log_fd" '!/error/ { synced++ } /error/ && $0 ~ fd " " && !found { found = 1; print synced + 0 }')
+if ! grep -q '^PATINA_FS_CRASH_RESTART .*result=restarted' "$out/finding.err" ||
+  ! grep -q '^DURABILITY_RESULT outcome=complete ' "$out/finding.err" ||
+  ! reached "$settled_label" "$out/finding-uncrashed.err" ||
+  [ -z "$synced_before" ] || [ "$synced_before" -ge "$pinned_crash" ]; then
+  fail "the pinned log sync run no longer fails a log sync before its crash ($out/finding.err): find a new seed"
+fi
 complete=$(grep -l '^DURABILITY_RESULT outcome=complete ' "${error_logs[@]}" | wc -l)
-say "leg 6 passed: crash under errors, $complete of $(wc -l <"$out/crash-errors.runs") runs completed; $known lost an acknowledged commit after a failed log fsync, as the pinned run does (known finding); no other violation"
+say "leg 6 passed: crash under errors, $complete of $(wc -l <"$out/crash-errors.runs") runs completed, no invariant broke; a commit whose log sync failed was answered once synced (the pinned run too), and a failed write was retried"
 
 # gap NAME PATTERN ARGS...: a run with ARGS must still print PATINA.
 gap() {
