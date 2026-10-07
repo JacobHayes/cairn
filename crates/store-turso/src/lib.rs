@@ -41,6 +41,10 @@ use cairn_store::{
 pub use turso_core;
 
 use pool::Pool;
+
+/// Store commit latency in seconds, by outcome: `committed`, or `refused` (stale, a reused
+/// patch id, or a failure) (ARCHITECTURE, Observability).
+pub const COMMIT_DURATION: &str = "cairn_store_commit_duration_seconds";
 use sql::execute;
 
 /// The Turso store over one database file.
@@ -168,23 +172,9 @@ impl TursoStore {
             auth_log,
         })
     }
-}
 
-impl Store for TursoStore {
-    async fn load(&self, target: &LoadTarget) -> Result<Option<Document>, StoreError> {
-        read!(self, connection => load::document(connection, target))
-    }
-
-    async fn proposal(&self, id: &ProposalId) -> Result<Option<Proposal>, StoreError> {
-        read!(self, connection => load::proposal(connection, id))
-    }
-
-    async fn receipt(&self, patch: &PatchId) -> Result<Option<PatchReceipt>, StoreError> {
-        let stored = read!(self, connection => load::receipt(connection, patch))?;
-        Ok(stored.map(|stored| stored.receipt))
-    }
-
-    async fn commit(&self, commit: Commit) -> Result<Committed, CommitError> {
+    /// A commit (the trait's), untimed: the trait's `commit` records its duration.
+    async fn commit_timed(&self, commit: Commit) -> Result<Committed, CommitError> {
         if let Some(wait) = self.faults.pause_at(cairn_store::CommitPoint::BeforeBegin) {
             wait.await;
         }
@@ -205,6 +195,35 @@ impl Store for TursoStore {
         // Every path out of a commit ends its transaction.
         lease.release();
         drop(turns);
+        result
+    }
+}
+
+impl Store for TursoStore {
+    async fn load(&self, target: &LoadTarget) -> Result<Option<Document>, StoreError> {
+        read!(self, connection => load::document(connection, target))
+    }
+
+    async fn proposal(&self, id: &ProposalId) -> Result<Option<Proposal>, StoreError> {
+        read!(self, connection => load::proposal(connection, id))
+    }
+
+    async fn receipt(&self, patch: &PatchId) -> Result<Option<PatchReceipt>, StoreError> {
+        let stored = read!(self, connection => load::receipt(connection, patch))?;
+        Ok(stored.map(|stored| stored.receipt))
+    }
+
+    async fn commit(&self, commit: Commit) -> Result<Committed, CommitError> {
+        let started = std::time::Instant::now();
+        // Boxed, as the commit itself is: the wrapper stays small to hold.
+        let result = Box::pin(self.commit_timed(commit)).await;
+        let outcome = if result.is_ok() {
+            "committed"
+        } else {
+            "refused"
+        };
+        metrics::histogram!(COMMIT_DURATION, "outcome" => outcome)
+            .record(started.elapsed().as_secs_f64());
         result
     }
 

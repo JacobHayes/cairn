@@ -13,6 +13,7 @@ cairn-engine.workspace = true
 cairn-schema.workspace = true
 cairn-store.workspace = true
 jiff.workspace = true
+metrics.workspace = true
 patina-dst.workspace = true
 serde.workspace = true
 

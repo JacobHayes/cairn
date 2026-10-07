@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Build the web app the binary embeds: the browser host's module (build:wasm), then the app's Vite build into web/app/dist/build/"
+# ARCHITECTURE, Build, run, deploy: web assets and the wasm package are built before `cargo
+# build` and embedded with rust-embed (crates/cairn/src/assets.rs). Build outputs, never
+# checked in.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+mise run build:wasm
+(cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts)
+[ -f web/app/dist/build/index.html ] || { echo "build:web: the build wrote no index.html" >&2; exit 1; }

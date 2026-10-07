@@ -87,6 +87,23 @@ pub fn router_with_assistant<S: Store + 'static>(
     auth: &Auth<S>,
     assistant: Option<Assistant<S>>,
 ) -> Router {
+    router_beside(service, auth, assistant, Router::new())
+}
+
+/// [`router_with_assistant`], with a host's own routes `beside` it (the binary's UI and
+/// metrics) held to the same request limits and observed alike: the in-flight limit is one
+/// per process, so everything served on the port shares it. `beside` brings its own auth,
+/// if any, and must claim no path the API does.
+///
+/// # Panics
+///
+/// As [`router_with_assistant`], or when `beside` claims an API path.
+pub fn router_beside<S: Store + 'static>(
+    service: Service<S>,
+    auth: &Auth<S>,
+    assistant: Option<Assistant<S>>,
+    beside: Router,
+) -> Router {
     use crate::endpoints as at;
     use crate::handlers as handle;
     assert_eq!(
@@ -159,6 +176,7 @@ pub fn router_with_assistant<S: Store + 'static>(
     let app = auth
         .protect(routes)
         .merge(auth.router())
+        .merge(beside)
         .fallback(handle::no_such_endpoint);
     admission::limited(app).layer(middleware::from_fn(observe::request))
 }

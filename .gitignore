@@ -5,6 +5,8 @@ node_modules
 dist
 *.wasm
 *.tsbuildinfo
+# The development deployment's database (cairn.dev.toml, mise run serve).
+.cairn
 
 # Per-checkout agent notes.
 AGENTS.local.md

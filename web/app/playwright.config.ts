@@ -1,8 +1,11 @@
 // Rung 6's end-to-end tests of the app shell (PRACTICES, The validation ladder): Chromium
 // against the app served by Vite, over the in-browser host (`?host=browser`) and over the
 // server host (`?host=server`), Vite proxying the API to the fixture server
-// (crates/wasm/examples/fixture_server.rs). Each run serves on free ports, so runs beside one
-// another do not collide. `mise run check:6` builds the module and the fixture server first.
+// (crates/wasm/examples/fixture_server.rs); and the server host's suite again against the
+// real binary, serving its embedded build and the API on one port over a database seeded
+// with the fixtures (scripts/e2e-binary; brief 4.7). Each run serves on free ports, so runs
+// beside one another do not collide; CAIRN_E2E_PORT names the binary's instead. `mise run
+// check:6` builds the module, the web build, the fixture server, and the binary first.
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";
 
@@ -29,8 +32,10 @@ function freePort(): Promise<number> {
 // Chosen once, in the runner; its workers inherit them through the environment.
 process.env["CAIRN_APP_PORT"] ??= String(await freePort());
 process.env["CAIRN_SERVER_PORT"] ??= String(await freePort());
+process.env["CAIRN_E2E_PORT"] ??= String(await freePort());
 const appPort = process.env["CAIRN_APP_PORT"];
 const serverPort = process.env["CAIRN_SERVER_PORT"];
+const binaryPort = process.env["CAIRN_E2E_PORT"];
 const server = `http://127.0.0.1:${serverPort}`;
 const repo = fileURLToPath(new URL("../..", import.meta.url));
 
@@ -44,12 +49,27 @@ export default defineConfig({
   forbidOnly: true,
   reporter: [["list"]],
   use: { baseURL: `http://127.0.0.1:${appPort}` },
-  projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
+  projects: [
+    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    {
+      name: "binary",
+      testMatch: "server.spec.ts",
+      use: { ...devices["Desktop Chrome"], baseURL: `http://127.0.0.1:${binaryPort}` },
+    },
+  ],
   webServer: [
     {
       command: `cargo run --quiet --locked -p cairn-wasm --example fixture_server -- ${serverPort}`,
       cwd: repo,
       url: `${server}/capabilities`,
+      timeout: 600_000,
+      reuseExistingServer: false,
+      stdout: "ignore",
+    },
+    {
+      command: `scripts/e2e-binary ${binaryPort}`,
+      cwd: repo,
+      url: `http://127.0.0.1:${binaryPort}/capabilities`,
       timeout: 600_000,
       reuseExistingServer: false,
       stdout: "ignore",

@@ -79,7 +79,7 @@ pub async fn request(request: Request, next: Next) -> Response {
     });
     let labels = [
         ("endpoint", endpoint),
-        ("method", method.as_str().to_owned()),
+        ("method", method_label(&method).to_owned()),
     ];
     let mut counted = labels.to_vec();
     counted.push(("status", status.as_u16().to_string()));
@@ -89,6 +89,25 @@ pub async fn request(request: Request, next: Next) -> Response {
         response.headers_mut().insert(REQUEST_ID_HEADER, value);
     }
     response
+}
+
+/// A request method as a metric label: one of HTTP's own methods, or `other` for any
+/// extension method a client invents, so labels stay a fixed set however clients call
+/// (PRACTICES, Explicit limits: a series per invented method would grow without bound).
+fn method_label(method: &axum::http::Method) -> &'static str {
+    use axum::http::Method;
+    match *method {
+        Method::GET => "GET",
+        Method::HEAD => "HEAD",
+        Method::POST => "POST",
+        Method::PUT => "PUT",
+        Method::PATCH => "PATCH",
+        Method::DELETE => "DELETE",
+        Method::OPTIONS => "OPTIONS",
+        Method::CONNECT => "CONNECT",
+        Method::TRACE => "TRACE",
+        _ => "other",
+    }
 }
 
 /// Counts a domain patch's outcome.
@@ -109,5 +128,16 @@ mod tests {
             .unwrap()
             .block_on(REQUEST_ID.scope("rq_1".to_owned(), async { current_request_id() }));
         assert_eq!(inside.as_deref(), Some("rq_1"));
+    }
+
+    #[test]
+    fn invented_methods_share_one_label() {
+        use axum::http::Method;
+        let invented: Vec<_> = ["CUSTOMMETHOD1", "CUSTOMMETHOD2", "PURGE"]
+            .into_iter()
+            .map(|name| method_label(&Method::from_bytes(name.as_bytes()).unwrap()))
+            .collect();
+        assert_eq!(invented, ["other", "other", "other"]);
+        assert_eq!(method_label(&Method::PATCH), "PATCH");
     }
 }

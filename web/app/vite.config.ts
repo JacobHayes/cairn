@@ -34,6 +34,9 @@ export default defineConfig({
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [react()],
   logLevel: "warn",
+  // `mise run build:web` writes here, and the binary embeds it (crates/cairn/src/assets.rs);
+  // beside it in dist/ sit the browser tests' reports, which are never embedded.
+  build: { outDir: "dist/build", emptyOutDir: true },
   server: {
     host: "127.0.0.1",
     port: Number(process.env["CAIRN_APP_PORT"] ?? "5173"),

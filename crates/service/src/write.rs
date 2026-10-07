@@ -403,7 +403,11 @@ pub(crate) fn violation(code: ViolationCode, mutation: Option<u32>, message: Str
 /// works on a private candidate and nothing commits, so the request fails and the host logs
 /// it with the domain).
 pub(crate) fn engine<T>(domain: &Domain, call: impl FnOnce() -> T) -> Result<T, ServiceError> {
-    catch_unwind(AssertUnwindSafe(call)).map_err(|payload| {
+    catch_unwind(AssertUnwindSafe(|| {
+        let _inside = crate::observe::EngineCall::enter();
+        call()
+    }))
+    .map_err(|payload| {
         let message = payload
             .downcast_ref::<&str>()
             .map(|text| (*text).to_owned())

@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#MISE description="Run Cairn locally: build the web app, then cairn serve with cairn.dev.toml (or CAIRN_CONFIG) on http://127.0.0.1:8080/"
+# PRD Non-functional: Deployable, runnable locally with one command. The development
+# configuration signs every request in as the dev user and keeps its database under .cairn/.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+mise run build:web
+mkdir -p .cairn
+exec cargo run --locked -p cairn -- serve --config "${CAIRN_CONFIG:-cairn.dev.toml}"

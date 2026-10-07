@@ -73,7 +73,9 @@ impl Derivation {
             Ok(graph) => graph,
             Err(violations) => panic!("a stored journey is valid: {violations:?}"),
         };
-        let derived = derive(&graph, Some(journey.header.created_on), inputs);
+        let derived = crate::observe::timed_derive(|| {
+            derive(&graph, Some(journey.header.created_on), inputs)
+        });
         assert_eq!(derived.today(), key.today);
         Self {
             key,

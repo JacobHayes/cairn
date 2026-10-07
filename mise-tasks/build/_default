@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Build the release binary with the web build embedded: build:web, then cargo build --release -p cairn"
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+mise run build:web
+cargo build --locked --release -p cairn
+target_dir=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
+  let text = "";
+  process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => console.log(JSON.parse(text).target_directory));')
+echo "built $target_dir/release/cairn"

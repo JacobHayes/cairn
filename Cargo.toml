@@ -53,6 +53,17 @@ futures-core = "0.3.34"
 metrics = "0.24.6"
 metrics-util = { version = "0.20.4", default-features = false, features = ["debugging"] }
 tracing = { version = "0.1.44", default-features = false, features = ["std"] }
+# The binary (ARCHITECTURE, Build, run, deploy; Observability): clap for its commands; toml
+# for the configuration file; rust-embed to embed the web build, with each file's media
+# type; socket2 to set TCP_USER_TIMEOUT and keepalive on accepted connections (in the tree
+# under tokio); tracing-subscriber for JSON logs; the Prometheus exporter for `/metrics`,
+# without its own HTTP listener or push gateway.
+clap = { version = "4.6.7", features = ["derive"] }
+metrics-exporter-prometheus = { version = "0.18.3", default-features = false }
+rust-embed = { version = "8.13.0", features = ["mime-guess"] }
+socket2 = { version = "0.6.5", features = ["all"] }
+toml = { version = "1.1.6", default-features = false, features = ["parse", "serde", "std"] }
+tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "json", "std"] }
 jsonschema = { version = "0.58.5", default-features = false }
 # The MCP endpoint (ARCHITECTURE, MCP endpoint names it): rmcp's server over Streamable HTTP
 # as a tower service the API mounts; its client only drives the endpoint in tests.

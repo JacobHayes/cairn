@@ -16,6 +16,7 @@ io-seam = ["dep:turso_core"]
 [dependencies]
 cairn-schema.workspace = true
 cairn-store.workspace = true
+metrics.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tokio = { workspace = true, features = ["sync", "time"] }

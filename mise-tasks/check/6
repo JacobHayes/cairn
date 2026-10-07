@@ -1,9 +1,12 @@
 #!/usr/bin/env bash
-#MISE description="Rung 6: web unit tests (Vitest, one suite per web package with a vitest.config.ts) and in-browser end-to-end against the wasm host (Playwright in Chromium, one suite per web package with a playwright.config.ts)"
+#MISE description="Rung 6: web unit tests (Vitest, one suite per web package with a vitest.config.ts), the binary with its web build embedded, and in-browser end-to-end against the wasm host and the binary (Playwright in Chromium, one suite per web package with a playwright.config.ts)"
 # PRACTICES, The validation ladder, rung 6. The browser host's tests (brief 4.5) need the
 # module (mise run build:wasm) and the server's answers to compare with (the cairn-wasm-cases
 # binary, which walks the fixtures through the service natively); both are build outputs
 # under web/wasm/dist/. The app's tests (brief 4.6) need the module and the fixture server.
+# The binary (brief 4.7) embeds the app's build (web/app/dist/build/): its own tests that start
+# it (`mod binary` in crates/cairn/tests/binary.rs) are a suite here, and the app's server-host
+# suite runs against it too (the `binary` project of web/app/playwright.config.ts).
 # Web unit tests (Vitest, from 4.6) run first, one suite per web package with a
 # vitest.config.ts; then each web package with a playwright.config.ts is a suite. A suite
 # that runs no test, or any test that fails or is skipped, fails the rung. The browsers are
@@ -47,6 +50,20 @@ cargo run --quiet --locked --release -p cairn-wasm --features server --bin cairn
 # Playwright's start of it is a run, not a build.
 cargo build --quiet --locked -p cairn-wasm --example fixture_server \
   || ladder_fail "the fixture server did not build"
+
+# The web build the binary embeds, then the binary over it and the example that seeds its
+# database for the browser tests.
+(cd web/app && "$OLDPWD/node_modules/.bin/vite" build --config vite.config.ts) \
+  || ladder_fail "the app's web build failed"
+[ -f web/app/dist/build/index.html ] || ladder_fail "the app's web build wrote no index.html"
+cargo build --quiet --locked -p cairn --bin cairn --example seed_fixtures \
+  || ladder_fail "the binary did not build"
+status=0
+output=$(cargo test --locked -p cairn --all-features --test binary -- binary:: 2>&1) || status=$?
+printf '%s\n' "$output"
+[ "$status" -eq 0 ] || ladder_fail "the binary's tests failed"
+count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
+ladder_suite "binary" "$count" tests
 
 for config in web/*/playwright.config.ts; do
   package=$(dirname "$config")

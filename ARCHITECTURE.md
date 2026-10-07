@@ -360,6 +360,7 @@ Rust types are the source of truth for the OpenAPI document, the TypeScript clie
 
 - `cairn serve` runs the API, MCP, assistant (if configured), SSE, and the embedded UI on one port with its database file at a configured path. No container is required.
 - Configuration is a file plus environment overrides; deployment-specific values have no defaults so a missing one fails at startup.
+- The listener sets `TCP_USER_TIMEOUT` to the SSE write stall, with keepalive, so a peer that stops taking writes is disconnected at the socket, and a `Host` allowlist (the public URL's name, plus loopback names on a loopback listener) sits in front of the whole router, before auth, against DNS rebinding (DECISIONS.md, 4.2, 4.3, 4.7). TLS termination, supervision, and containers are a proxy's and the host's.
 - Web assets and the wasm package are built by a mise task before `cargo build` and embedded with `rust-embed`. Dev loop: Vite serves the UI with hot reload and proxies API calls to a running binary, or runs the in-browser host with no binary.
 - Small cloud footprint: one binary on one VM with its database file on a volume.
 

@@ -67,7 +67,9 @@ fn between(
             Err(violations) => panic!("a stored or accepted journey is valid: {violations:?}"),
         };
         let inputs = settings.derive_inputs(today, BTreeSet::new(), deployment.clone());
-        let derived = derive(&graph, Some(journey.header.created_on), &inputs);
+        let derived = crate::observe::timed_derive(|| {
+            derive(&graph, Some(journey.header.created_on), &inputs)
+        });
         (graph, derived)
     };
     let (before_graph, before_derived) = side(before);
