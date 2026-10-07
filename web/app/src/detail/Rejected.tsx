@@ -8,7 +8,7 @@ import { useDraft } from "../data/drafts.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { rebasedOnto } from "../screens/TitleEditor.tsx";
 import { Button, Field } from "../ui/kit.tsx";
-import type { Mutation, Ready } from "./model.ts";
+import { titleOf, type Mutation, type Ready } from "./model.ts";
 import { ShortfallView } from "./ShortfallView.tsx";
 import type { Attempt, NodeWrite, Seen } from "./write.ts";
 
@@ -40,19 +40,25 @@ export function withMove(attempt: Attempt, move: Mutation): Mutation[] {
   return [...attempt.mutations, move];
 }
 
+/** The node a violation is on, when it is on one: a patch over several nodes names which (C9). */
+export function violatingNode(violation: Violation): string | undefined {
+  const subject = violation.at.subject;
+  return subject != null && typeof subject === "object" && "node" in subject ? subject.node : undefined;
+}
+
 /** D4: the guards a bypass would accept the rejected patch past, each once, on the node it is for. */
 export function bypassable(violations: Violation[]): { node: string; guards: Guard[] }[] {
   const byNode = new Map<string, Guard[]>();
   for (const violation of violations) {
-    const subject = violation.at.subject;
-    if (violation.bypassable == null || subject == null || typeof subject !== "object" || !("node" in subject)) {
+    const node = violatingNode(violation);
+    if (violation.bypassable == null || node === undefined) {
       continue;
     }
-    const guards = byNode.get(subject.node) ?? [];
+    const guards = byNode.get(node) ?? [];
     if (!guards.includes(violation.bypassable)) {
       guards.push(violation.bypassable);
     }
-    byNode.set(subject.node, guards);
+    byNode.set(node, guards);
   }
   return [...byNode].map(([node, guards]) => ({ node, guards }));
 }
@@ -116,11 +122,15 @@ function Invalid({ view, write, violations, onResolved }: Resolving & { violatio
     <div className="callout callout-bad stack" role="alert" data-testid="invalid">
       {others.length === 0 ? null : (
         <ul className="detail-list">
-          {others.map((violation, at) => (
-            <li key={at} data-testid="violation" data-code={violation.code}>
-              {violation.message}
-            </li>
-          ))}
+          {others.map((violation, at) => {
+            const node = violatingNode(violation);
+            return (
+              <li key={at} data-testid="violation" data-code={violation.code} data-node={node}>
+                {node === undefined ? null : <strong>{titleOf(view, node)}: </strong>}
+                {violation.message}
+              </li>
+            );
+          })}
         </ul>
       )}
       <DateConflictResolver view={view} write={write} violations={chains} onResolved={onResolved} />

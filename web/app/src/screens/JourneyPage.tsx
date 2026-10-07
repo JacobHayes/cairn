@@ -14,6 +14,7 @@ import type { JourneyView } from "../data/journeys.ts";
 import { useJourney } from "../data/react.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { Badge } from "../ui/kit.tsx";
+import { JourneyNav } from "./JourneyNav.tsx";
 
 type Ready = Extract<JourneyView, { status: "ready" }>;
 
@@ -36,6 +37,7 @@ function Header({ ready, view, selected }: { ready: Ready; view: CanvasView; sel
           {ready.derived.frontier.length} on the frontier.
         </span>
       </div>
+      <JourneyNav journey={header.id} current="canvas" />
       <KindToggles
         view={view}
         journey

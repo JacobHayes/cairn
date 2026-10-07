@@ -1,0 +1,100 @@
+// The acting surfaces' addresses: every setting survives the round trip, the defaults leave
+// the address bare, values the screen does not know are dropped, and each screen's settings
+// become the engine's query (C9, C10, C11).
+import { describe, expect, it } from "vitest";
+
+import {
+  DEFAULT_LIST,
+  DEFAULT_NEXT,
+  DEFAULT_TRIAGE,
+  listFrom,
+  listParams,
+  listQueryOf,
+  nextFrom,
+  nextParams,
+  nextQueryOf,
+  triageFrom,
+  triageParams,
+  triageQueryOf,
+  walkthroughPath,
+  type ListSettings,
+} from "./address.ts";
+
+const everything: ListSettings = {
+  flags: ["mine", "overdue", "snoozed_and_overdue"],
+  within: "n_setup",
+  owner: "e_lead",
+  states: ["todo", "active"],
+  kinds: ["deliverable", "action"],
+  text: "plan",
+  sort: "slack",
+  grouped: true,
+};
+
+describe("the list's address (C9)", () => {
+  it("keeps every setting", () => {
+    expect(listFrom(listParams(everything))).toEqual(everything);
+  });
+
+  it("is bare at the defaults", () => {
+    expect(listParams(DEFAULT_LIST).toString()).toBe("");
+  });
+
+  it("drops filters, states, kinds, and sorts it does not know", () => {
+    const settings = listFrom(new URLSearchParams("flag=mine,bogus&state=todo,lost&kind=group,shape&sort=weight"));
+    expect([settings.flags, settings.states, settings.kinds, settings.sort]).toEqual([["mine"], ["todo"], ["group"], "rank"]);
+  });
+
+  it("asks the engine for every filter at once, a page from its cursor", () => {
+    expect(listQueryOf({ ...everything, text: "  plan  " }, 200)).toEqual({
+      flags: everything.flags,
+      within: "n_setup",
+      owner: "e_lead",
+      states: everything.states,
+      kinds: everything.kinds,
+      text: "plan",
+      sort: "slack",
+      cursor: 200,
+    });
+  });
+
+  it("asks for no text when the search is blank", () => {
+    expect(listQueryOf({ ...DEFAULT_LIST, text: "   " })).not.toHaveProperty("text");
+  });
+});
+
+describe("the next list's address (C10)", () => {
+  const settings = { sort: "leverage" as const, mine: true, kinds: ["decision" as const, "milestone" as const], forMe: true };
+
+  it("keeps every setting, and is bare at the defaults", () => {
+    expect(nextFrom(nextParams(settings))).toEqual(settings);
+    expect(nextParams(DEFAULT_NEXT).toString()).toBe("");
+  });
+
+  it("asks for prioritize for me as the ranking for the viewer", () => {
+    expect(nextQueryOf(settings)).toEqual({ sort: "leverage", mine: true, kinds: ["decision", "milestone"], for_viewer: true });
+  });
+
+  it("offers no group kind: groups are never on the frontier", () => {
+    expect(nextFrom(new URLSearchParams("kind=group,action")).kinds).toEqual(["action"]);
+  });
+});
+
+describe("triage's address (C11)", () => {
+  it("keeps the mode and filters, and is bare at the defaults", () => {
+    const settings = { decisions: false, mine: true, kinds: ["action" as const] };
+    expect(triageFrom(triageParams(settings))).toEqual(settings);
+    expect(triageParams(DEFAULT_TRIAGE).toString()).toBe("");
+  });
+
+  it("reads the frontier in rank order, decisions only in the walkthrough", () => {
+    expect(triageQueryOf({ decisions: true, mine: false, kinds: ["action"] })).toEqual({ sort: "rank", mine: false, kinds: ["decision"] });
+    expect(triageQueryOf({ decisions: false, mine: true, kinds: [] })).toEqual({ sort: "rank", mine: true, kinds: [] });
+  });
+
+  it("opens the walkthrough at its own address", () => {
+    const [path = "", query = ""] = walkthroughPath("j_new").split("?");
+    expect(path).toBe("/journeys/j_new/triage");
+    expect(triageFrom(new URLSearchParams(query)).decisions).toBe(true);
+  });
+});

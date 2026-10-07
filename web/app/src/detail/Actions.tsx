@@ -17,7 +17,7 @@ const LABEL: Record<Move, string> = {
   reopen: "Reopen",
 };
 
-function SkipForm({ write, node, form }: { write: NodeWrite; node: string; form: ReturnType<typeof useFormDraft<string>> }) {
+export function SkipForm({ write, node, form }: { write: NodeWrite; node: string; form: ReturnType<typeof useFormDraft<string>> }) {
   const reason = form.draft?.value ?? "";
   const onDone = form.close;
   return (

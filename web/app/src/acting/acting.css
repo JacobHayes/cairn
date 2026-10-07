@@ -1,0 +1,85 @@
+/* The acting surfaces (C9 to C11): the list's table, the next list's items, the triage card,
+   drawn with the design system's tokens in light and dark. Quiet: nothing animates. */
+
+.journey-nav {
+  gap: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.journey-nav [aria-current="page"] {
+  border-bottom: 2px solid var(--color-accent);
+}
+
+.acting-controls {
+  gap: var(--space-3);
+}
+
+.checks {
+  border: none;
+  margin: 0;
+  padding: 0;
+  gap: var(--space-3);
+}
+
+.checks legend {
+  float: left;
+  margin-right: var(--space-2);
+}
+
+.check {
+  white-space: nowrap;
+}
+
+.crumb {
+  overflow-wrap: anywhere;
+}
+
+.next-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.next-position {
+  min-width: 1.5rem;
+  font-weight: 700;
+  color: var(--color-muted);
+}
+
+.next-title {
+  font-weight: 600;
+}
+
+.list-node {
+  display: flex;
+  flex-direction: column;
+}
+
+.list-group th {
+  background: var(--color-canvas);
+  color: var(--color-text);
+}
+
+.bulk-bar {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  border-color: var(--color-accent);
+}
+
+.triage-card {
+  border-color: var(--color-accent);
+  max-width: 48rem;
+}
+
+.acts .stack {
+  gap: var(--space-2);
+}
+
+@media (max-width: 52rem) {
+  .list-table th:nth-child(n + 6),
+  .list-table td:nth-child(n + 6) {
+    display: none;
+  }
+}

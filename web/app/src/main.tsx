@@ -5,6 +5,9 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { HashRouter, Route, Routes } from "react-router";
 
+import { ListScreen } from "./acting/ListScreen.tsx";
+import { NextScreen } from "./acting/NextScreen.tsx";
+import { TriageScreen } from "./acting/TriageScreen.tsx";
 import { boot } from "./boot.ts";
 import { LayoutsContext } from "./canvas/hooks.ts";
 import { Layouts, LayoutWorker } from "./canvas/layouts.ts";
@@ -26,6 +29,9 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route index element={<JourneyIndex />} />
               <Route path="journeys/:id" element={<JourneyPage />} />
               <Route path="journeys/:id/nodes/:key" element={<JourneyPage />} />
+              <Route path="journeys/:id/next" element={<NextScreen />} />
+              <Route path="journeys/:id/list" element={<ListScreen />} />
+              <Route path="journeys/:id/triage" element={<TriageScreen />} />
               <Route path="routes/:id" element={<RouteCanvasPage />} />
             </Route>
           </Routes>

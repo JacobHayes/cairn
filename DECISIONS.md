@@ -2,6 +2,20 @@
 
 Judgment calls made while implementing the briefs, for the user to review (`AGENTS.md`, Decide, record, keep going). Newest first. Each entry: date, brief, the question, the call, the alternatives, and what would change it.
 
+## 2026-10-07, brief 5.3: the walkthrough opens on every decision actionable at the start, and names what an answer surfaces beyond decisions
+
+- Question: the brief's acceptance has the walkthrough open "on the four up-front decisions" and has answering the partner decision surface "the partner-led nodes in the same pass". The vendor evaluation starts with five decisions actionable (the fixture README's four up-front decisions and whether a partner runs the testing), and the partner-led nodes are actions, which a decisions-only mode never shows as cards.
+- Call: the walkthrough is C11's decisions-only filter over the acting frontier, so it opens on every decision actionable at that moment: five here, the partner decision first by gravity. A triage pass remembers the acting frontier, every kind, as it was when the pass began; whatever has reached it since is named above the card ("new to act on since this pass began"), in the walkthrough too, and triage of every kind holds it as a card in rank order within the same pass. The brief's acceptance now says "the up-front decisions".
+- Alternatives: showing surfaced work as cards in the walkthrough (it would stop being decisions-only); naming nothing (an answer's effect on work stays invisible until the person switches mode).
+- What would change it: a fixture whose up-front decisions are exactly four, or a wish to walk newly unblocked work inside the walkthrough itself.
+
+## 2026-10-07, brief 5.3: "what would unblock the earliest decisions" is each open decision's immediate dependencies, earliest start first
+
+- Question: C11 has the walkthrough, when no decision is actionable, show "the milestones and dependencies that would unblock the earliest ones" without saying what earliest orders by or how far upstream to look.
+- Call: the open, in-scope decisions off the acting frontier, by derived earliest start (F3), none last, then key; the first five, each with its immediate unsatisfied dependencies: its own (explicit, condition gate, stage opening) and those an ancestor holds for it (named as that ancestor's), never an ancestor's own children, plus a snooze's target or date when one holds; milestones first.
+- Alternatives: rank order (rank orders the frontier, and these are off it); the whole upstream chain (the canvas's trace already draws it, and one step is what to finish next).
+- What would change it: people asking why a decision waits when its immediate blocker is itself blocked, which would add the chain to the nearest actionable node.
+
 ## 2026-10-07, brief 2.1 (follow-up): a direct fill of a decision-filled role is routed by the client, as a fed milestone's pin is
 
 - Question: E3 says "fill directly" on a role with a filling decision "answers the decision", and brief 2.1 lists "role fills routed through their filling decision". The engine rejects `fill_role` and `clear_role_fill` on such a role with `filled_through_decision`, naming the decision, and no entry said who routes the fill. The same rule for a fed milestone's pin was settled as client routing (5.1, inline resolution: pinning answers the decision, unpinning reopens it; the engine rejects a direct pin edit as `pinned_through_decision`).
