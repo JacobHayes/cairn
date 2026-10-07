@@ -112,6 +112,16 @@ unwrap_used = "deny"
 # Configured in clippy.toml, raised to deny only for the engine by rung 1.
 disallowed_types = "allow"
 
+# Debug builds, and the test profile that inherits them: line tables for the workspace's
+# own crates, so panics and backtraces still name file and line, and no debug info for
+# dependencies. With full debug info every test binary was hundreds of megabytes, each with
+# its own copy of Turso's. Raise it locally to step through code in a debugger.
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false
+
 # The browser host's build (brief 4.5): the release profile, its symbols stripped and linked
 # as one unit, so the module the page downloads is small. Only the wasm build task uses it.
 [profile.wasm]
