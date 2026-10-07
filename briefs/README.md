@@ -36,7 +36,7 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 4.4 | Assistant | `crates/assistant` | 4.3 | landed `kqzpynyw` |
 | 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.9 | landed `yxqzuwls` |
 | 4.6 | Web client and app shell | `web/client`, `web/app` | 4.5 | landed `ypwxzlvn` |
-| 4.7 | The binary | `crates/cairn` | 4.4, 4.6 |  |
+| 4.7 | The binary | `crates/cairn` | 4.4, 4.6 | in progress |
 | 4.8 | Service completion: priority, projections, proposals, route files | `crates/service` | 2.7, 4.1 | landed `lsmmlrpw` |
 | 4.9 | HTTP API completion: projections, proposals, route files | `crates/api`, `openapi/`, `web/client` | 4.8, 4.2 | landed `tsqvkvpw` |
 | 5.1 | Node detail and explanations; notes, links, artifacts | `web/app` | 4.6 | in progress |
@@ -48,7 +48,7 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 5.7 | Proposal review and its flows | `web/app` | 5.6 |  |
 | 5.8 | Assistant panel | `web/app` | 5.7, 4.4 |  |
 | 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 | landed `xmmkmpkw` |
-| 6.2 | Durability testbed | `testbeds/durability` | 4.1 | in progress |
+| 6.2 | Durability testbed | `testbeds/durability` | 4.1 | landed `ppsstxmk` |
 
 Rule for links between screens: a screen only links to screens that already exist. The brief that builds a screen adds the entry points into it from earlier screens (5.7 adds "break down" to triage and the upgrade, save-as-route, and re-link entries to the overview; 5.8 mounts its panel on earlier screens).
 

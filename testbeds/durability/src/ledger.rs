@@ -9,7 +9,7 @@
 //! memory is the oracle's input, so it reads truth or the run stops.
 
 use std::fs::{File, OpenOptions};
-use std::io::{self, Read};
+use std::io::{self, Read, Seek, SeekFrom};
 use std::os::unix::fs::FileExt;
 use std::path::{Path, PathBuf};
 
@@ -125,9 +125,11 @@ impl Ledger {
                 .truncate(false)
                 .open(&path)
         })?;
+        // From the start on every attempt: a read that fails partway has moved the offset.
         let bytes = retry("read the ledger", || {
             let mut bytes = Vec::new();
             let mut reader = &file;
+            reader.seek(SeekFrom::Start(0))?;
             reader.read_to_end(&mut bytes)?;
             Ok(bytes)
         })?;
@@ -139,9 +141,7 @@ impl Ledger {
         }
         retry("sync the ledger", || file.sync_all())?;
         sync_directory(directory)?;
-        if let Some(parent) = directory.parent() {
-            sync_directory(parent)?;
-        }
+        sync_directory(parent_of(directory))?;
         Ok(Ledger {
             file,
             end,
@@ -171,6 +171,16 @@ impl Ledger {
         }
         self.entries.push(entry);
         Ok(())
+    }
+}
+
+/// The directory that holds `directory`'s own entry: its parent, the working directory for
+/// a bare relative name, or the root itself.
+fn parent_of(directory: &Path) -> &Path {
+    match directory.parent() {
+        Some(parent) if parent.as_os_str().is_empty() => Path::new("."),
+        Some(parent) => parent,
+        None => directory,
     }
 }
 
@@ -234,6 +244,23 @@ mod tests {
                 point: "BetweenStateAndEvents".to_owned(),
             },
         ]
+    }
+
+    #[test]
+    fn a_directorys_entry_is_in_its_parent_or_the_working_directory() {
+        let cases = [
+            ("/data/bed", "/data"),
+            ("bed", "."),
+            ("data/bed", "data"),
+            ("/", "/"),
+        ];
+        for (directory, parent) in cases {
+            assert_eq!(
+                parent_of(Path::new(directory)),
+                Path::new(parent),
+                "{directory}"
+            );
+        }
     }
 
     #[test]
