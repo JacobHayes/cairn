@@ -20,12 +20,19 @@ use axum::routing::get;
 /// The app's page.
 pub const INDEX: &str = "index.html";
 
-/// The web build, embedded from `web/app/dist/build/` (read from there at run time in a
-/// debug build, embedded in a release one).
+/// The web build, embedded from `web/app/dist/build/` in every build, debug ones included
+/// (rust-embed's `debug-embed`): a debug build that read the folder at run time would read
+/// it from the absolute path it was compiled at, and a compile restored from the build cache
+/// may have been made in another checkout.
 #[derive(rust_embed::RustEmbed)]
 #[folder = "../../web/app/dist/build/"]
 #[allow_missing = true]
 struct WebBuild;
+
+/// The web build's digest from build.rs: reading it makes the folder's contents an input of
+/// this crate's compile, so a build cache keyed on the compile's inputs (mbx) recompiles
+/// when the web build appears or changes rather than restoring the old embedding.
+const _: &str = env!("CAIRN_WEB_BUILD_DIGEST");
 
 /// One file of the web build.
 #[derive(Clone, Debug, PartialEq, Eq)]

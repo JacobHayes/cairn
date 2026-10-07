@@ -24,7 +24,9 @@ clap.workspace = true
 jiff = { workspace = true, features = ["tz-system", "tzdb-zoneinfo"] }
 metrics.workspace = true
 metrics-exporter-prometheus.workspace = true
-rust-embed.workspace = true
+# debug-embed: debug builds embed the web build too, rather than read it at run time from an
+# absolute path baked into the compile, which a cached compile can carry from another checkout.
+rust-embed = { workspace = true, features = ["debug-embed"] }
 serde.workspace = true
 socket2.workspace = true
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
