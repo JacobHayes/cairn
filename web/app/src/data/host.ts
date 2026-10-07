@@ -15,7 +15,10 @@ import type {
   RenderedDraft,
   RouteApplyRequest,
   RouteLevelRequest,
+  PreviewRequest,
 } from "@cairn/wasm";
+
+import type { ProposalHost } from "./proposals.ts";
 
 export type Capabilities = Schema<"Capabilities">;
 export type Deployment = Schema<"Deployment">;
@@ -88,6 +91,8 @@ export interface Host {
   history(journey: string, node?: string, after?: number): Promise<HistoryPage>;
   /** Sends one patch, its events carrying `note` (J1). */
   send(patch: Patch, note?: Markdown): Promise<Answered<HttpFailure>>;
+  /** I6, C14: proposals, and the upgrade, save-as-route, and re-link drafts (B7, B8, B9). */
+  readonly proposals: ProposalHost;
   /** H6: the host's revision ticks. */
   readonly openTicks: OpenTicks;
 }
@@ -111,6 +116,8 @@ export interface Deriver {
   routeLevel(request: RouteLevelRequest): Promise<Level>;
   /** A draft patch applied to the held journey, committing nothing (ARCHITECTURE, Web UI: previews). */
   apply(journey: string, request: ApplyRequest): Promise<AppliedLocally>;
+  /** C14: a proposal previewed against the held journey, committing nothing (ARCHITECTURE, Web UI: previews). */
+  preview(journey: string, request: PreviewRequest): Promise<Schema<"ProposalPreview">>;
   /** A draft patch applied to a route, committing nothing: the route as it would leave it. */
   applyRoute(request: RouteApplyRequest): Promise<Route>;
   release(journey: string): Promise<void>;

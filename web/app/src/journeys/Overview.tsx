@@ -2,7 +2,8 @@
 // with whether an upgrade is available (the host's field), its own notes and links (G1), and
 // its life: complete (suggested once nothing in scope is left, or the final milestone is
 // reached, B11), reopen, archive, un-archive, and hard delete behind its name typed back
-// (A19). The upgrade, save-as-route, and re-link entry points are 5.7's. Kept current (H6).
+// (A19); and the proposals that upgrade it, save it as a route, and re-link it (B7, B8, B9).
+// Kept current (H6).
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
@@ -12,6 +13,7 @@ import { useLive, useSession } from "../data/react.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
 import type { Ready } from "../detail/model.ts";
 import { routeDetailPath } from "../routes/address.ts";
+import { JourneyFlows } from "../proposals/Entries.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Panel } from "../ui/kit.tsx";
 import { UpgradeMark } from "./JourneyIndex.tsx";
@@ -79,6 +81,7 @@ function OverviewBody({ ready }: { ready: Ready }) {
         <HeaderEditor ready={ready} />
       </Panel>
       <StatusPanel ready={ready} suggested={suggested} />
+      <JourneyFlows ready={ready} />
       <Panel aria-label="The journey's notes and links">
         <AnnotationList view={ready} node={null} annotations={annotations} summary={String(annotations.length)} />
       </Panel>

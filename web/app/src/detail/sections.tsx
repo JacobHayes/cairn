@@ -10,6 +10,8 @@ import { answerWords, guardFailureText, namer, originText, viaText } from "./exp
 import { flagsOf, type NodeDetail, type Ready } from "./model.ts";
 import { useContributions } from "./contributions.ts";
 import { Contributions, NodeLink, Section } from "./parts.tsx";
+import { BreakDown } from "../proposals/Entries.tsx";
+import { breakable } from "../proposals/model.ts";
 
 /** The node's title, kind, state, path, D3 flags, provenance (from route, local, orphaned), and local edits. */
 export function Header({ view, detail }: { view: Ready; detail: NodeDetail }) {
@@ -161,7 +163,7 @@ export function Blocking({ view, detail, edit }: { view: Ready; detail: NodeDeta
     snoozed == null ? undefined : "snoozed",
   ].filter((part) => part !== undefined);
   return (
-    <Section title="Blocking and flags" summary={summary.join(", ")} open={stale.length > 0} testId="blocking">
+    <Section title="Blocking and flags" summary={summary.join(", ")} open={stale.length > 0 || detail.derived.needs_breakdown === true} testId="blocking">
       {blockedBy.length === 0 ? null : (
         <ul className="detail-list" data-testid="blocked-by">
           {blockedBy.map((blocker) => (
@@ -192,6 +194,7 @@ export function Blocking({ view, detail, edit }: { view: Ready; detail: NodeDeta
       )}
       {detail.derived.unassigned === true ? <span>No owner (unassigned).</span> : null}
       {detail.derived.needs_breakdown === true ? <span>A placeholder with nothing beneath it: needs breakdown.</span> : null}
+      {breakable(detail.node) ? <BreakDown ready={view} node={detail.node} /> : null}
       {edit}
     </Section>
   );

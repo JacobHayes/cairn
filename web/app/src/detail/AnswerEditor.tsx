@@ -72,7 +72,8 @@ function Checks({ options, chosen, onChange }: { options: [string, string][]; ch
   );
 }
 
-function Input({ view, node, value, onChange }: { view: Ready; node: GraphNode; value: AnswerValue; onChange: (value: AnswerValue) => void }) {
+/** An answer of the decision's type, as typed (also the proposal editor's, 5.7). */
+export function Input({ view, node, value, onChange }: { view: Ready; node: GraphNode; value: AnswerValue; onChange: (value: AnswerValue) => void }) {
   const choices: [string, string][] = (node.choices ?? []).map((choice) => [choiceId(choice), choiceTitle(choice)]);
   const entities: [string, string][] = (view.inputs.deployment.entities ?? []).map((entity) => [entity.key, entity.name]);
   const select = (options: [string, string][], chosen: string, wrap: (id: string) => AnswerValue) => (

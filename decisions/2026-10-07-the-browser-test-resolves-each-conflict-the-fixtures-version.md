@@ -1,0 +1,6 @@
+# The browser test resolves each conflict the fixture's version 2 raises; every conflict kind's resolutions are checked against the engine
+
+- Question: the acceptance asks to "upgrade the scenario journey, resolve each conflict type, apply" over the fixture's version 2. Version 2 against the scenario journey raises no conflict at all (fixtures/README.md); with local edits it raises field conflicts (a title, a condition), an orphan with its cascade, and kept edits, but no edge, participation, resource, shape, answer, role, kind, or default-owner conflict.
+- Call: the browser test edits the journey where version 2 also changed (the access title, the baseline condition) and where it did not (kickoff's title), proposes the upgrade, keeps one conflict, takes the route on the other, removes the orphan with its two pieces, and applies. Every conflict kind and variant is covered in a unit test that previews each resolution with the real engine and checks the review offers exactly what the engine accepts.
+- Alternatives: a second fixture version built to raise every kind (a fixture change outside this brief that the engine's tests already cover per kind).
+- What would change it: a fixture version that raises every kind against the scenario journey, which the browser test would then walk.

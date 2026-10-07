@@ -4,6 +4,7 @@
 import type { Answered, HttpFailure, Patch, Tick, TickHandlers, Timers } from "@cairn/client";
 import type { DerivationKey, Derived } from "@cairn/wasm";
 
+import type { ProposalHost } from "./proposals.ts";
 import { Missing, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type RouteFile, type Viewer } from "./host.ts";
 
 export const ENGINE = "1.0.0";
@@ -137,9 +138,19 @@ export class FakeHost implements Host {
     stream.handlers.tick({ of: { domain: "deployment" }, revision: this.deploymentRevision });
   }
 
+  /** No proposals: each is missing, and each write fails. */
+  readonly proposals: ProposalHost = noProposals();
+
   tick(tick: Tick): void {
     this.streams.at(-1)?.handlers.tick(tick);
   }
+}
+
+/** A host with no proposals: each is missing, and each write fails. */
+function noProposals(): ProposalHost {
+  const missing = (id: string) => Promise.reject(new Missing(id));
+  const failed = () => Promise.resolve({ outcome: "failed" as const, error: { status: 0, message: "no proposals in the fake" } });
+  return { get: missing, preview: missing, create: failed, edit: failed, discard: failed, refresh: failed, apply: failed, upgrade: failed, saveAsRoute: failed, relink: failed };
 }
 
 /** Derives a fake document into its key, as the worker would. */
@@ -181,6 +192,10 @@ export class FakeDeriver implements Deriver {
 
   applyRoute(): Promise<never> {
     return Promise.reject(new Error("no local applies in the fake"));
+  }
+
+  preview(): Promise<never> {
+    return Promise.reject(new Error("no previews in the fake"));
   }
 
   release(journey: string): Promise<void> {

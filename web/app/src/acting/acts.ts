@@ -7,7 +7,7 @@ import type { Schema } from "@cairn/client";
 import { movesFrom, nodeOf, recordOf, transition, type GraphNode, type Mutation, type NodeDerived, type Ready, type State } from "../detail/model.ts";
 
 /** One action a card or row offers. */
-export type Act = "answer" | "start" | "done" | "reach" | "skip" | "snooze" | "atomic" | "canvas";
+export type Act = "answer" | "start" | "done" | "reach" | "skip" | "snooze" | "breakdown" | "atomic" | "canvas";
 
 /** What the acting surfaces read about one node. */
 export interface Facts {
@@ -39,13 +39,13 @@ export function selectionOf(view: Ready, keys: Iterable<string>): Facts[] {
 
 /**
  * C11: the actions a card offers for its node's kind, in the order offered. A placeholder that
- * needs breaking down offers mark atomic and snooze and no done (B10; break down arrives with
- * the proposal editor); once it has children or is atomic it reverts to its kind's actions.
+ * needs breaking down offers break down (which opens a proposal), mark atomic, and snooze, and
+ * no done (B10); once it has children or is atomic it reverts to its kind's actions.
  * Pass and assign owner (D2) are every card's, not the kind's.
  */
 export function actsFor({ node, state, derived }: Facts): Act[] {
   if (derived.needs_breakdown === true) {
-    return ["atomic", "snooze"];
+    return ["breakdown", "atomic", "snooze"];
   }
   const moves = movesFrom(node.kind, state);
   switch (node.kind) {

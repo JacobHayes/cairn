@@ -130,7 +130,7 @@ const number = (value: string): number | null => (value.trim() === "" ? null : N
 const key = (value: string): string | null => (value === "" ? null : value);
 
 /** The field's value in the draft, as `set_node_field` writes it (crates/schema `NodeFieldValue`). */
-function valueOf(field: NodeField, draft: NodeDraft): Schema<"NodeFieldValueResolved"> {
+export function valueOf(field: NodeField, draft: NodeDraft): Schema<"NodeFieldValueResolved"> {
   const values: Record<NodeField, unknown> = {
     id: draft.id,
     parent: undefined,

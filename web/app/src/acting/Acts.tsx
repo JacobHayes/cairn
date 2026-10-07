@@ -1,8 +1,9 @@
 // C11's per-kind actions on one node, inline on a triage card and on a next list row (C10),
 // each one patch through the shell's write path, its rejection shown beside it (A15; D4 with
 // its bypass). Answering and snoozing are node detail's own editors (5.1), so a draft started
-// here is the one the panel shows. An unassigned node offers to assign its owner (D2); a card
-// offers pass, which writes nothing (C11).
+// here is the one the panel shows. A placeholder breaks down into pieces that open a proposal
+// (B10). An unassigned node offers to assign its owner (D2); a card offers pass, which writes
+// nothing (C11).
 import { useState } from "react";
 import { Link } from "react-router";
 
@@ -16,6 +17,7 @@ import { Rejected } from "../detail/Rejected.tsx";
 import { entityName } from "../detail/sections.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
+import { BreakDown } from "../proposals/Entries.tsx";
 import { actsFor, assignOwner, doneMutations, hasArtifact, type Act, type Facts } from "./acts.ts";
 
 /** G2, C11: done for a deliverable that requires an artifact and has none: its link and the completion, one patch. */
@@ -83,6 +85,8 @@ function ActButton({ view, write, facts, act, onSkip }: { view: Ready; write: No
       return <Button primary disabled={write.disabled} onClick={run([transition(key, "reach")])}>Mark reached</Button>;
     case "skip":
       return <Button disabled={write.disabled} onClick={onSkip}>Skip</Button>;
+    case "breakdown":
+      return <BreakDown ready={view} node={facts.node} />;
     case "atomic":
       return <Button primary disabled={write.disabled} onClick={run([{ op: "set_atomic", node: key, atomic: true }])}>Mark atomic</Button>;
     case "canvas":

@@ -84,3 +84,24 @@ export function traceOverlay(trace: Trace, model: CanvasModel, title: string): C
   const outside = [...trace.upstream, ...trace.downstream].filter((key) => !drawn.has(key)).sort();
   return { title, marks, lines, dim: true, outside };
 }
+
+/**
+ * C14: marks by node drawn over a canvas (proposal review's diff): each card shows the mark of
+ * the node it stands for, or of one rolled up into it; lines into or out of a marked card are
+ * lit; nothing dims, so what a change leaves alone stays readable. A marked node with no card
+ * is listed as outside.
+ */
+export function marksOverlay(title: string, marks: Record<string, OverlayMark>, model: CanvasModel): CanvasOverlay {
+  const shown: Record<string, OverlayMark> = {};
+  for (const card of model.cards) {
+    const key = standsFor(card).find((each) => marks[each] !== undefined);
+    const mark = key === undefined ? undefined : marks[key];
+    if (mark !== undefined) {
+      shown[card.key] = mark;
+    }
+  }
+  const lines = model.lines.filter((line) => shown[line.from] !== undefined || shown[line.to] !== undefined).map((line) => line.id);
+  const drawn = new Set(model.cards.flatMap(standsFor));
+  const outside = Object.keys(marks).filter((key) => !drawn.has(key)).sort();
+  return { title, marks: shown, lines, dim: false, outside };
+}

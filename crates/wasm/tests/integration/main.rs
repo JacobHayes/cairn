@@ -12,5 +12,6 @@
 #[cfg(feature = "server")]
 mod agreement;
 mod document;
+mod proposals;
 mod root;
 mod route;

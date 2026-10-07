@@ -24,7 +24,7 @@ describe("C11: each kind's actions", () => {
     ["a deliverable to do", facts("n_work"), ["start", "done", "snooze", "skip", "canvas"]],
     ["a deliverable under way", facts("n_work", { state: "active" }), ["done", "snooze", "skip", "canvas"]],
     ["a milestone", facts("n_meet"), ["reach", "skip", "snooze", "canvas"]],
-    ["a placeholder to break down", facts("n_hold"), ["atomic", "snooze"]],
+    ["a placeholder to break down", facts("n_hold"), ["breakdown", "atomic", "snooze"]],
     ["a placeholder marked atomic", facts("n_hold", { derived: { ...derivedOf("n_hold"), needs_breakdown: false } }), ["start", "done", "snooze", "skip", "canvas"]],
   ];
   it.each(cases)("%s", (_, given, expected) => {

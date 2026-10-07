@@ -146,7 +146,7 @@ test("C11: the walkthrough opens on the decisions at the start; answering the pa
   await expect.poll(() => passOrder(page)).toContain("n_criteria");
 });
 
-test("C11, B10: a placeholder's card offers mark atomic and no done until it is atomic", async ({ page }) => {
+test("C11, B10: a placeholder's card offers break down and mark atomic, and no done until it is atomic", async ({ page }) => {
   const journey = await startVendorJourney(page);
   await openActing(page, "server", journey, "triage");
   await expect(card(page)).toHaveAttribute("data-node", "n_kickoff");
@@ -157,7 +157,7 @@ test("C11, B10: a placeholder's card offers mark atomic and no done until it is 
     await card(page).getByTestId("pass").click();
   }
   const acts = card(page).getByTestId("acts");
-  await expect(acts).toHaveAttribute("data-acts", "atomic snooze");
+  await expect(acts).toHaveAttribute("data-acts", "breakdown atomic snooze");
   await acts.getByRole("button", { name: "Mark atomic" }).click();
   await expect(acts).toHaveAttribute("data-acts", /\bdone\b/);
 });

@@ -45,7 +45,7 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 5.4 | Decision view, timeline, status summary | `web/app` | 5.2 (beside 5.3) | landed |
 | 5.5 | Journey index and overview, route screens, entities, identity | `web/app` | 5.3 | landed |
 | 5.6 | Authoring | `web/app` | 5.5 | landed |
-| 5.7 | Proposal review and its flows | `web/app` | 5.6 |  |
+| 5.7 | Proposal review and its flows | `web/app` | 5.6 | landed |
 | 5.8 | Assistant panel | `web/app` | 5.7, 4.4 |  |
 | 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 | landed |
 | 6.2 | Durability testbed | `testbeds/durability` | 4.1 | landed |

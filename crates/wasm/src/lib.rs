@@ -10,7 +10,8 @@
 //! output is the schema's JSON, so each value is the server's byte for byte.
 //!
 //! For the in-browser host, its composition root ([`BrowserRoot`]): the service over the
-//! memory store seeded from the fixtures, the in-process notifier, and one local identity.
+//! memory store seeded from the fixtures, the in-process notifier, and one local identity,
+//! with the API's reads, writes, and proposals.
 //!
 //! A failure is thrown to JavaScript as the JSON of a [`HostError`]. A panic aborts the
 //! module (PRACTICES, Programmer errors panic); its message goes to the console first.
@@ -20,6 +21,7 @@ mod error;
 mod files;
 pub mod fixtures;
 mod local;
+mod proposals;
 mod reads;
 mod root;
 mod route;
@@ -36,6 +38,10 @@ pub use files::{
 pub use local::{
     AppliedLocally, ApplyRequest, PreviewRequest, RouteApplyRequest, apply, apply_locally,
     apply_route, apply_route_locally, preview, preview_locally, touched, touched_overlaps,
+};
+pub use proposals::{
+    ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalReview, ProposalStep,
+    RelinkRequest, SaveAsRouteRequest, StaleBase, UpgradeRequest,
 };
 pub use reads::{
     JourneyIndexQuery, LinkedIdentity, RouteDetail, RouteImport, RoutePage, RouteSummary,

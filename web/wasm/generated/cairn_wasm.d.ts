@@ -9,6 +9,15 @@ export class BrowserRoot {
     free(): void;
     [Symbol.dispose](): void;
     /**
+     * I6: applies proposal `id`: `request` is the JSON of a [`ProposalApply`]; the answer
+     * is the JSON of a [`PatchAnswer`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`], the rejection among them.
+     */
+    applyProposal(id: string, request: string, now: string): string;
+    /**
      * The capabilities document: one local sign-in, no assistant, MCP, or SSE.
      */
     capabilities(): string;
@@ -21,6 +30,14 @@ export class BrowserRoot {
      */
     deployment(): string;
     /**
+     * I6: discards proposal `id`: `request` is the JSON of a [`ProposalStep`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`], the rejection among them.
+     */
+    discardProposal(id: string, request: string, now: string): string;
+    /**
      * A journey's domain document at `now`, as `GET /journeys/{id}/document` answers it.
      *
      * # Errors
@@ -28,6 +45,14 @@ export class BrowserRoot {
      * The JSON of a [`HostError`]: no such journey, or an unreadable input.
      */
     document(journey: string, now: string): string;
+    /**
+     * I6: edits proposal `id`: `request` is the JSON of a [`ProposalEdit`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`], the rejection among them.
+     */
+    editProposal(id: string, request: string, now: string): string;
     /**
      * A13: version `version` of route `route` as a file, or its draft when `version` is
      * empty, as `GET /routes/{id}/export` answers it.
@@ -91,6 +116,66 @@ export class BrowserRoot {
      * The JSON of a [`HostError`], the rejection among them.
      */
     patch(request: string, now: string): string;
+    /**
+     * C14, I6: previews proposal `id` at `now`; the answer is the JSON of a
+     * [`ProposalReview`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`].
+     */
+    previewProposal(id: string, now: string): string;
+    /**
+     * I6: proposal `id`, as `GET /proposals/{id}` answers it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: no such proposal, or an unreadable input.
+     */
+    proposal(id: string): string;
+    /**
+     * B9: proposes re-linking `journey`: `request` is the JSON of a [`RelinkRequest`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`].
+     */
+    proposeRelink(journey: string, request: string, now: string): string;
+    /**
+     * B8: proposes saving `journey` as a route: `request` is the JSON of a
+     * [`SaveAsRouteRequest`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`].
+     */
+    proposeSaveAsRoute(journey: string, request: string, now: string): string;
+    /**
+     * B7: proposes upgrading `journey`: `request` is the JSON of an [`UpgradeRequest`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`].
+     */
+    proposeUpgrade(journey: string, request: string, now: string): string;
+    /**
+     * I6: creates a proposal for `destination` (the JSON of a `Domain`) at `now`: `request`
+     * is the JSON of a [`ProposalCreate`]; the answer is the JSON of a [`ProposalAnswer`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`], the rejection among them.
+     */
+    propose(destination: string, request: string, now: string): string;
+    /**
+     * I6: refreshes proposal `id` on its destination as it stands: `request` is the JSON of
+     * a [`ProposalStep`].
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`], the rejection among them.
+     */
+    refreshProposal(id: string, request: string, now: string): string;
     /**
      * C17: route `route`'s versions with the journeys on each, as
      * `GET /routes/{id}/versions` answers it.
@@ -332,9 +417,12 @@ export interface InitOutput {
     readonly __wbg_rootsubscription_free: (a: number, b: number) => void;
     readonly apply: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly applyRoute: (a: number, b: number, c: number) => void;
+    readonly browserroot_applyProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
     readonly browserroot_capabilities: (a: number, b: number) => void;
     readonly browserroot_deployment: (a: number, b: number) => void;
+    readonly browserroot_discardProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
     readonly browserroot_document: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly browserroot_editProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
     readonly browserroot_exportFile: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly browserroot_history: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
     readonly browserroot_importFile: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
@@ -342,6 +430,13 @@ export interface InitOutput {
     readonly browserroot_journeys: (a: number, b: number) => void;
     readonly browserroot_new: (a: number) => void;
     readonly browserroot_patch: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly browserroot_previewProposal: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly browserroot_proposal: (a: number, b: number, c: number, d: number) => void;
+    readonly browserroot_propose: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+    readonly browserroot_proposeRelink: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+    readonly browserroot_proposeSaveAsRoute: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+    readonly browserroot_proposeUpgrade: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
+    readonly browserroot_refreshProposal: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => void;
     readonly browserroot_route: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_routeDetail: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_routeVersion: (a: number, b: number, c: number, d: number, e: number, f: number) => void;

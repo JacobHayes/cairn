@@ -127,6 +127,65 @@ export class InBrowserHost {
     return answer;
   }
 
+  /** I6: a proposal by id, as `GET /proposals/{id}` answers it. */
+  proposal(id: string): Schema<"Proposal"> {
+    return parsed<Schema<"Proposal">>(hosted(() => this.#root.proposal(id)));
+  }
+
+  /** I6: creates a proposal for `destination`, as `POST /{domain}/proposals` answers it. */
+  propose(destination: Schema<"Domain">, request: Schema<"ProposalCreate">): Schema<"ProposalAnswer"> {
+    return this.#proposalWrite(() => this.#root.propose(JSON.stringify(destination), JSON.stringify(request), this.#clock()));
+  }
+
+  /** I6: edits a proposal against the editing revision its editor saw, as `PATCH /proposals/{id}` answers it. */
+  editProposal(id: string, request: Schema<"ProposalEdit">): Schema<"ProposalAnswer"> {
+    return this.#proposalWrite(() => this.#root.editProposal(id, JSON.stringify(request), this.#clock()));
+  }
+
+  /** I6: discards a proposal, as `POST /proposals/{id}/discard` answers it. */
+  discardProposal(id: string, request: Schema<"ProposalStep">): Schema<"ProposalAnswer"> {
+    return this.#proposalWrite(() => this.#root.discardProposal(id, JSON.stringify(request), this.#clock()));
+  }
+
+  /** I6: drafts a proposal again on its destination as it stands, as `POST /proposals/{id}/refresh` answers it. */
+  refreshProposal(id: string, request: Schema<"ProposalStep">): Schema<"ProposalAnswer"> {
+    return this.#proposalWrite(() => this.#root.refreshProposal(id, JSON.stringify(request), this.#clock()));
+  }
+
+  /** C14, I6: what applying a proposal now would do, as `POST /proposals/{id}/preview` answers it. */
+  previewProposal(id: string): Schema<"ProposalReview"> {
+    return parsed<Schema<"ProposalReview">>(hosted(() => this.#root.previewProposal(id, this.#clock())));
+  }
+
+  /** I6, H2: applies a proposal as the local user, as `POST /proposals/{id}/apply` answers it. */
+  applyProposal(id: string, request: Schema<"ProposalApply">): Schema<"PatchAnswer"> {
+    const answer = parsed<Schema<"PatchAnswer">>(hosted(() => this.#root.applyProposal(id, JSON.stringify(request), this.#clock())));
+    this.#deliverAll();
+    return answer;
+  }
+
+  /** B7: proposes upgrading a journey, as `POST /journeys/{id}/upgrade` answers it. */
+  proposeUpgrade(journey: string, request: Schema<"UpgradeRequest">): Schema<"ProposalAnswer"> {
+    return this.#proposalWrite(() => this.#root.proposeUpgrade(journey, JSON.stringify(request), this.#clock()));
+  }
+
+  /** B8: proposes saving a journey as a route, as `POST /journeys/{id}/save-as-route` answers it. */
+  proposeSaveAsRoute(journey: string, request: Schema<"SaveAsRouteRequest">): Schema<"ProposalAnswer"> {
+    return this.#proposalWrite(() => this.#root.proposeSaveAsRoute(journey, JSON.stringify(request), this.#clock()));
+  }
+
+  /** B9: proposes re-linking a journey, as `POST /journeys/{id}/relink` answers it. */
+  proposeRelink(journey: string, request: Schema<"RelinkRequest">): Schema<"ProposalAnswer"> {
+    return this.#proposalWrite(() => this.#root.proposeRelink(journey, JSON.stringify(request), this.#clock()));
+  }
+
+  /** A proposal write's answer; subscribers hear what it moved. */
+  #proposalWrite(call: () => string): Schema<"ProposalAnswer"> {
+    const answer = parsed<Schema<"ProposalAnswer">>(hosted(call));
+    this.#deliverAll();
+    return answer;
+  }
+
   /**
    * H6: subscribes `listener` to what `watching` names (`deployment`, `journey:<id>`,
    * `route:<id>`, `proposal:<id>`, `journeys`, `routes`, `proposals`). It hears the current

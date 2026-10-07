@@ -6,6 +6,7 @@ import type { Answered, HttpFailure, OpenTicks } from "@cairn/client";
 import { HostFailure, type InBrowserHost } from "@cairn/wasm";
 
 import { Missing, ReadFailed, type Host, type Markdown, type Patch, type RouteImport } from "./host.ts";
+import { browserProposals } from "./proposals.ts";
 import { filesOf } from "./server-host.ts";
 
 /** A failure of the root as the data layer reads one: what it says, with no HTTP status. */
@@ -89,6 +90,7 @@ export function browserHost(root: InBrowserHost): Host {
     routeVersion: (route, version) => read(`${route} version ${String(version)}`, () => root.routeVersion(route, version)),
     history: (journey, node, after) => read(journey, () => root.history(journey, node, after)),
     send: (patch, note) => send(root, patch, note),
+    proposals: browserProposals(root),
     openTicks: ticksOf(root),
   };
 }

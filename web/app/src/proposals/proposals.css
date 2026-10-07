@@ -1,0 +1,64 @@
+/* Proposal review: the diff canvas, its legend, and the lists beside it, drawn with the design
+   tokens so they read the same in light and dark. */
+.proposal-page {
+  max-width: var(--measure);
+}
+
+.proposal-canvas .canvas {
+  height: 28rem;
+}
+
+.proposal-legend {
+  font-size: var(--text-small);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  padding: 0 var(--space-2);
+}
+
+.proposal-columns {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.proposal-items,
+.proposal-changes {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.proposal-change {
+  border-bottom: 1px solid var(--color-border);
+  padding: var(--space-2) 0;
+}
+
+.proposal-picked {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.proposal-page button.link {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--color-accent);
+  cursor: pointer;
+  font: inherit;
+  text-decoration: underline;
+}
+
+.proposal-columns > * {
+  min-width: 0;
+}
+
+.proposal-page .field,
+.proposal-page .select {
+  max-width: 100%;
+}
+
+.proposal-item,
+.proposal-change {
+  overflow-wrap: anywhere;
+}

@@ -98,7 +98,7 @@ export function WorkFields({ props }: { props: FieldsProps }) {
 }
 
 /** A4: a choice decision's choices, each an id and a label. */
-function ChoicesEditor({ props }: { props: FieldsProps }) {
+export function ChoicesEditor({ props }: { props: FieldsProps }) {
   const choices = props.draft.choices;
   const set = (next: Choice[]) => {
     props.change({ choices: next });

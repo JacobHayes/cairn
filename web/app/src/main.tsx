@@ -18,6 +18,7 @@ import { MineScreen } from "./journeys/MineScreen.tsx";
 import { NewJourney } from "./journeys/NewJourney.tsx";
 import { Overview } from "./journeys/Overview.tsx";
 import { Entities } from "./people/Entities.tsx";
+import { ProposalScreen } from "./proposals/ProposalScreen.tsx";
 import { Identity } from "./people/Identity.tsx";
 import { RouteDetailPage } from "./routes/RouteDetail.tsx";
 import { RouteIndex } from "./routes/RouteIndex.tsx";
@@ -55,6 +56,7 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route path="routes/:id/versions" element={<RouteDetailPage />} />
               <Route path="entities" element={<Entities />} />
               <Route path="me" element={<Identity />} />
+              <Route path="proposals/:id" element={<ProposalScreen />} />
             </Route>
           </Routes>
         </HashRouter>
