@@ -91,6 +91,8 @@ async function answer(request: WorkerRequest): Promise<string> {
       held.get(request.journey)?.derivation.free();
       held.delete(request.journey);
       return "";
+    case "route_level":
+      return ready().routeLevelText(request.request);
     case "memory":
       return String(ready().memoryBytes());
   }

@@ -11,6 +11,8 @@
   "dependencies": {
     "@cairn/client": "*",
     "@cairn/wasm": "*",
+    "@xyflow/react": "12.12.0",
+    "elkjs": "0.12.0",
     "react": "19.3.0",
     "react-dom": "19.3.0",
     "react-router": "8.4.0"

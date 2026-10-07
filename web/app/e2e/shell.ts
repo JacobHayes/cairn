@@ -1,5 +1,5 @@
 // What the app's browser tests share: opening a screen on a host, and reading and editing a
-// journey page the way a person does.
+// journey page the way a person does: a node's card on the canvas, its detail beside it.
 import { expect, type Page } from "@playwright/test";
 
 export type HostKind = "server" | "browser";
@@ -10,32 +10,55 @@ export async function open(page: Page, host: HostKind, hash = "/"): Promise<void
   await expect(page.getByTestId("host")).toBeVisible();
 }
 
-/** A journey's page, once derived. */
-export async function openJourney(page: Page, host: HostKind, journey: string): Promise<void> {
-  await open(page, host, `/journeys/${journey}`);
+/** A journey's page, once derived and its canvas drawn. */
+export async function openJourney(page: Page, host: HostKind, journey: string, query = ""): Promise<void> {
+  await open(page, host, `/journeys/${journey}${query}`);
   await expect(page.getByTestId("derivation")).toBeVisible();
+  await expect(page.getByTestId("node-card").first()).toBeVisible();
 }
 
-export function nodeRow(page: Page, node: string) {
-  return page.locator(`[data-testid="node-row"][data-node="${node}"]`);
+/** Node `node`'s card on the journey's canvas. */
+export function nodeCard(page: Page, node: string) {
+  return page.locator(`[data-testid="node-card"][data-node="${node}"]`);
 }
 
-/** Starts renaming `node` and types `text`, without saving. */
+/** Node `node`'s detail panel. */
+export function nodePanel(page: Page, node: string) {
+  return page.locator(`[data-testid="node-detail"][data-node="${node}"]`);
+}
+
+/** Opens `node`'s detail from its card on the canvas, unless it is open already. */
+export async function openFromCanvas(page: Page, node: string) {
+  const panel = nodePanel(page, node);
+  if (!(await panel.isVisible())) {
+    await nodeCard(page, node).getByTestId("card-open").click();
+  }
+  await expect(panel).toBeVisible();
+  return panel;
+}
+
+/** The title editor in `node`'s detail panel. */
+export function renameOf(page: Page, node: string) {
+  return nodePanel(page, node).getByTestId("rename");
+}
+
+/** Starts renaming `node` from its detail and types `text`, without saving. */
 export async function startRename(page: Page, node: string, text: string): Promise<void> {
-  const row = nodeRow(page, node);
-  await row.getByRole("button", { name: /^Rename/ }).click();
-  await row.getByRole("textbox").fill(text);
+  await openFromCanvas(page, node);
+  const editor = renameOf(page, node);
+  await editor.getByRole("button", { name: /^Rename/ }).click();
+  await editor.getByRole("textbox").fill(text);
 }
 
 export async function save(page: Page, node: string): Promise<void> {
-  await nodeRow(page, node).getByRole("button", { name: "Save" }).click();
+  await renameOf(page, node).getByRole("button", { name: "Save" }).click();
 }
 
-/** Renames `node` to `text` and waits for the page to show it. */
+/** Renames `node` to `text` and waits for its card to show it. */
 export async function rename(page: Page, node: string, text: string): Promise<void> {
   await startRename(page, node, text);
   await save(page, node);
-  await expect(nodeRow(page, node).getByTestId("title")).toHaveText(text);
+  await expect(nodeCard(page, node).getByTestId("title")).toHaveText(text);
 }
 
 /** The revision the page's derivation is at. */

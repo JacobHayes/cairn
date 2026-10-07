@@ -40,9 +40,11 @@ export interface TitleEditorProps {
   title: string;
   /** The journey revision the view holds now. */
   revision: number;
+  /** Show the title beside its rename button (off where the title is shown already). */
+  showTitle?: boolean;
 }
 
-export function TitleEditor({ journey, node, title, revision }: TitleEditorProps) {
+export function TitleEditor({ journey, node, title, revision, showTitle = true }: TitleEditorProps) {
   const session = useSession();
   const skew = useSkew();
   const [draft, setDraft] = useDraft<TitleDraft>(`title:${journey}:${node}`);
@@ -51,7 +53,7 @@ export function TitleEditor({ journey, node, title, revision }: TitleEditorProps
   if (draft === undefined) {
     return (
       <span className="row">
-        <span data-testid="title">{title}</span>
+        {showTitle ? <span data-testid="title">{title}</span> : null}
         <Button aria-label={`Rename ${title}`} onClick={() => { setDraft({ text: title, base: revision }); }}>
           Rename
         </Button>

@@ -9,6 +9,7 @@ import init, {
   exportRoute,
   importRoute,
   preview,
+  routeLevel,
   touched,
   touchedOverlaps,
 } from "../generated/cairn_wasm.js";
@@ -30,6 +31,7 @@ import {
   type PreviewRequest,
   type ProjectionAnswer,
   type ProjectionRequest,
+  type RouteLevelRequest,
 } from "./types.ts";
 
 /** Where the module's `.wasm` is, or its bytes. */
@@ -170,6 +172,16 @@ export class Engine {
   /** A13: the graph a route file's import would open as a draft. */
   importRoute(request: ImportRequest): Schema<"Graph"> {
     return parsed<Schema<"Graph">>(this.importRouteText(request));
+  }
+
+  /** C2: a route graph's canvas level, as the module wrote it (a route has no state to derive). */
+  routeLevelText(request: RouteLevelRequest): string {
+    return hosted(() => routeLevel(JSON.stringify(request)));
+  }
+
+  /** C2: a route graph's canvas level. */
+  routeLevel(request: RouteLevelRequest): Schema<"Level"> {
+    return parsed<Schema<"Level">>(this.routeLevelText(request));
   }
 
   /** The module's linear memory in bytes: the peak so far, since it never shrinks. */

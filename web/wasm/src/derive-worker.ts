@@ -16,6 +16,7 @@ import {
   type ProjectionAnswer,
   type ProjectionRequest,
   type RenderedDraft,
+  type RouteLevelRequest,
 } from "./types.ts";
 
 type Pending = { resolve: (text: string) => void; reject: (failure: HostFailure) => void };
@@ -133,6 +134,11 @@ export class DeriveWorker {
   /** A draft patch applied to the held journey locally, committing nothing. */
   async apply(journey: string, request: ApplyRequest): Promise<AppliedLocally> {
     return parsed<AppliedLocally>(await this.applyText(journey, request));
+  }
+
+  /** C2: a route graph's canvas level (a route has no state; nothing is held). */
+  async routeLevel(request: RouteLevelRequest): Promise<Schema<"Level">> {
+    return parsed<Schema<"Level">>(await this.#ask({ op: "route_level", request }));
   }
 
   /** Drops the held journey. */

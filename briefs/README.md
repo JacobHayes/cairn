@@ -18,37 +18,37 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 
 | Id | Title | Crates or packages | Depends on | Status |
 |---|---|---|---|---|
-| 1.1 | Workspace, lints, tasks, CI | root, `mise.toml`, `.github/` | - | landed `mqnnskmq` |
-| 1.2 | Schema and fixtures | `crates/schema`, `fixtures/`, `schema/` | 1.1 | landed `swpkokyk` |
-| 1.3 | Simulation spike: tokio and axum under the shim | `testbeds/spike` | 1.1 | landed `yqvkwotm` |
-| 2.1 | Engine core: model, apply, state machines, events, replay | `crates/engine` | 1.2 | landed `tryzqvxr` |
-| 2.2 | Relevance, effective dependencies, effective skip, participation | `crates/engine` | 2.1 | landed `wronlppq` |
-| 2.3 | Date network | `crates/engine` | 2.2 | landed `stuqtrqo` |
-| 2.4 | Auto-reach, blocking, frontier, snooze, stalled, stale, derived guards | `crates/engine` | 2.3 | landed `nswmnoqu` |
-| 2.5 | Gravity, leverage, rank | `crates/engine` | 2.4 | landed `qwxsmqrs` |
-| 2.6 | Projections | `crates/engine` | 2.5 | landed `woqmvzmn` |
-| 2.7 | Route files, upgrade, save-as-route, re-link, proposal documents | `crates/engine` | 2.6 | landed `uurlpzzk` |
-| 3.1 | Store trait, memory and Turso backends, conformance suite | `crates/store`, `crates/store-turso` | 1.2 (beside phase 2) | landed `tvlztrmq` |
-| 3.2 | Auth providers, users, identities, agent tokens | `crates/auth` | 3.1 | landed `nspnswuo` |
-| 4.1 | Service layer, composition root, capabilities, notifier | `crates/service`, `crates/store` (notifier) | 2.4, 3.1 | landed `lsoqvyvx` |
-| 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 | landed `rortptsk` |
-| 4.3 | MCP server and shipped instructions | `crates/mcp`, `instructions/` | 4.9 | landed `mmoznlnt` |
-| 4.4 | Assistant | `crates/assistant` | 4.3 | landed `kqzpynyw` |
-| 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.9 | landed `yxqzuwls` |
-| 4.6 | Web client and app shell | `web/client`, `web/app` | 4.5 | landed `ypwxzlvn` |
-| 4.7 | The binary | `crates/cairn` | 4.4, 4.6 | landed `xnnqkuyo` |
-| 4.8 | Service completion: priority, projections, proposals, route files | `crates/service` | 2.7, 4.1 | landed `lsmmlrpw` |
-| 4.9 | HTTP API completion: projections, proposals, route files | `crates/api`, `openapi/`, `web/client` | 4.8, 4.2 | landed `tsqvkvpw` |
-| 5.1 | Node detail and explanations; notes, links, artifacts | `web/app` | 4.6 | landed `qrnonvxl` |
-| 5.2 | Canvas, semantic zoom, trace, layout | `web/app` | 5.1 | in progress |
+| 1.1 | Workspace, lints, tasks, CI | root, `mise.toml`, `.github/` | - | landed |
+| 1.2 | Schema and fixtures | `crates/schema`, `fixtures/`, `schema/` | 1.1 | landed |
+| 1.3 | Simulation spike: tokio and axum under the shim | `testbeds/spike` | 1.1 | landed |
+| 2.1 | Engine core: model, apply, state machines, events, replay | `crates/engine` | 1.2 | landed |
+| 2.2 | Relevance, effective dependencies, effective skip, participation | `crates/engine` | 2.1 | landed |
+| 2.3 | Date network | `crates/engine` | 2.2 | landed |
+| 2.4 | Auto-reach, blocking, frontier, snooze, stalled, stale, derived guards | `crates/engine` | 2.3 | landed |
+| 2.5 | Gravity, leverage, rank | `crates/engine` | 2.4 | landed |
+| 2.6 | Projections | `crates/engine` | 2.5 | landed |
+| 2.7 | Route files, upgrade, save-as-route, re-link, proposal documents | `crates/engine` | 2.6 | landed |
+| 3.1 | Store trait, memory and Turso backends, conformance suite | `crates/store`, `crates/store-turso` | 1.2 (beside phase 2) | landed |
+| 3.2 | Auth providers, users, identities, agent tokens | `crates/auth` | 3.1 | landed |
+| 4.1 | Service layer, composition root, capabilities, notifier | `crates/service`, `crates/store` (notifier) | 2.4, 3.1 | landed |
+| 4.2 | HTTP API, OpenAPI, SSE, TypeScript client | `crates/api`, `openapi/`, `web/client` | 4.1, 3.2 | landed |
+| 4.3 | MCP server and shipped instructions | `crates/mcp`, `instructions/` | 4.9 | landed |
+| 4.4 | Assistant | `crates/assistant` | 4.3 | landed |
+| 4.5 | Wasm host: engine package, derive worker, in-browser root | `crates/wasm`, `web/wasm` | 4.9 | landed |
+| 4.6 | Web client and app shell | `web/client`, `web/app` | 4.5 | landed |
+| 4.7 | The binary | `crates/cairn` | 4.4, 4.6 | landed |
+| 4.8 | Service completion: priority, projections, proposals, route files | `crates/service` | 2.7, 4.1 | landed |
+| 4.9 | HTTP API completion: projections, proposals, route files | `crates/api`, `openapi/`, `web/client` | 4.8, 4.2 | landed |
+| 5.1 | Node detail and explanations; notes, links, artifacts | `web/app` | 4.6 | landed |
+| 5.2 | Canvas, semantic zoom, trace, layout | `web/app` | 5.1 | landed |
 | 5.3 | List, next, triage, decision walkthrough | `web/app` | 5.2 |  |
 | 5.4 | Decision view, timeline, status summary | `web/app` | 5.2 (beside 5.3) |  |
 | 5.5 | Journey index and overview, route screens, entities, identity | `web/app` | 5.3 |  |
 | 5.6 | Authoring | `web/app` | 5.5 |  |
 | 5.7 | Proposal review and its flows | `web/app` | 5.6 |  |
 | 5.8 | Assistant panel | `web/app` | 5.7, 4.4 |  |
-| 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 | landed `xmmkmpkw` |
-| 6.2 | Durability testbed | `testbeds/durability` | 4.1 | landed `ppsstxmk` |
+| 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 | landed |
+| 6.2 | Durability testbed | `testbeds/durability` | 4.1 | landed |
 
 Rule for links between screens: a screen only links to screens that already exist. The brief that builds a screen adds the entry points into it from earlier screens (5.7 adds "break down" to triage and the upgrade, save-as-route, and re-link entries to the overview; 5.8 mounts its panel on earlier screens).
 

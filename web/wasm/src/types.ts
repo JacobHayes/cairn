@@ -93,6 +93,15 @@ export interface DerivationKey {
   today: string;
 }
 
+/** `crates/wasm` `RouteLevelRequest`: one canvas level of a route's graph, which has no state (C2). */
+export interface RouteLevelRequest {
+  graph: Schema<"Graph">;
+  deployment: Schema<"Deployment">;
+  today: string;
+  shown: Schema<"NodeKind">[];
+  container?: NodeKey;
+}
+
 /** `crates/wasm` `ApplyRequest`: a draft patch to apply locally. */
 export interface ApplyRequest {
   patch: Schema<"Patch">;

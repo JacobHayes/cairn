@@ -3,8 +3,9 @@
 // has every explanation), so it follows the journey live (H6) with nothing of its own to
 // fetch. Sections start folded where they explain rather than act (progressive disclosure).
 import { useEffect, useRef } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 
+import { TitleEditor } from "../screens/TitleEditor.tsx";
 import { Actions } from "./Actions.tsx";
 import { AttachmentList } from "./Attachments.tsx";
 import { Checklist } from "./Checklist.tsx";
@@ -35,14 +36,16 @@ function Dates({ view, detail }: { view: Ready; detail: NodeDetail }) {
   );
 }
 
-/** The width below which the panel sits above the list (tokens.css, `.split`). */
+/** The width below which the panel sits above the canvas (canvas/canvas.css, `.canvas-split`). */
 const NARROW = "(max-width: 52rem)";
 
 export function NodeDetailPanel({ view, nodeKey }: { view: Ready; nodeKey: string }) {
   const journey = view.journey.header.id;
   const detail = nodeDetail(view, nodeKey);
   const panel = useRef<HTMLElement>(null);
-  // On a narrow screen the panel opens above the list, so bring it into view.
+  // Closing keeps what the canvas shows (5.2).
+  const close = { pathname: `/journeys/${journey}`, search: useLocation().search };
+  // On a narrow screen the panel opens above the canvas, so bring it into view.
   useEffect(() => {
     if (globalThis.matchMedia(NARROW).matches) {
       panel.current?.scrollIntoView({ block: "start" });
@@ -52,7 +55,7 @@ export function NodeDetailPanel({ view, nodeKey }: { view: Ready; nodeKey: strin
     return (
       <aside className="detail-panel panel" data-testid="node-detail-missing">
         <p className="callout">This journey has no node {nodeKey}.</p>
-        <Link to={`/journeys/${journey}`}>Close</Link>
+        <Link to={close}>Close</Link>
       </aside>
     );
   }
@@ -60,11 +63,14 @@ export function NodeDetailPanel({ view, nodeKey }: { view: Ready; nodeKey: strin
     <aside ref={panel} className="detail-panel panel stack" aria-label={detail.node.title} data-testid="node-detail" data-node={nodeKey}>
       <div className="row">
         <span className="shell-spacer" />
-        <Link to={`/journeys/${journey}`} aria-label="Close the node detail">
+        <Link to={close} aria-label="Close the node detail">
           Close
         </Link>
       </div>
       <Header view={view} detail={detail} />
+      <div data-testid="rename">
+        <TitleEditor journey={journey} node={nodeKey} title={detail.node.title} revision={view.journey.revision} showTitle={false} />
+      </div>
       <Actions view={view} detail={detail} />
       <About view={view} detail={detail} />
       <Checklist view={view} detail={detail} />

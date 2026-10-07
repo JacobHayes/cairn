@@ -63,6 +63,16 @@ export class InBrowserHost {
     return parsed<HistoryPage>(hosted(() => this.#root.history(journey, node ?? "", after ?? -1)));
   }
 
+  /** A route with its draft (A11), as `GET /routes/{id}` answers it. */
+  route(route: string): Schema<"Route"> {
+    return parsed<Schema<"Route">>(hosted(() => this.#root.route(route)));
+  }
+
+  /** One published version of a route (A11), as `GET /routes/{id}/versions/{version}` answers it. */
+  routeVersion(route: string, version: number): Schema<"RouteVersion"> {
+    return parsed<Schema<"RouteVersion">>(hosted(() => this.#root.routeVersion(route, String(version))));
+  }
+
   /** The deployment (E6). */
   deployment(): Schema<"Deployment"> {
     return parsed<Schema<"Deployment">>(hosted(() => this.#root.deployment()));

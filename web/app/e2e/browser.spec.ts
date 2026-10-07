@@ -3,7 +3,7 @@
 // page's own service, and a draft that survives a reload.
 import { expect, test } from "@playwright/test";
 
-import { derivedRevision, fresh, nodeRow, open, openJourney, rename, startRename } from "./shell.ts";
+import { derivedRevision, fresh, open, openJourney, rename, renameOf, startRename } from "./shell.ts";
 
 test("the journey index lists every fixture's journey", async ({ page }) => {
   await open(page, "browser");
@@ -19,8 +19,8 @@ test("a journey's document is derived in the worker", async ({ page }) => {
   await page.getByRole("link", { name: "Hire a platform engineer" }).click();
   await expect(page.getByTestId("journey-name")).toHaveText("Hire a platform engineer");
   expect(await derivedRevision(page)).toBe(6);
-  await expect(page.getByTestId("node-row")).toHaveCount(14);
-  await expect(page.getByText("frontier", { exact: true }).first()).toBeVisible();
+  await expect(page.getByTestId("node-card")).toHaveCount(14);
+  await expect(page.locator("[data-testid=node-card][data-here]").first()).toBeVisible();
   expect(page.workers().length).toBeGreaterThan(0);
 });
 
@@ -38,7 +38,7 @@ test("a draft survives a reload", async ({ page }) => {
   await startRename(page, "n_summary", draft);
   await page.reload();
   await expect(page.getByTestId("derivation")).toBeVisible();
-  await expect(nodeRow(page, "n_summary").getByRole("textbox")).toHaveValue(draft);
+  await expect(renameOf(page, "n_summary").getByRole("textbox")).toHaveValue(draft);
 });
 
 test("every fixture's journey is derived in the worker", async ({ page }) => {

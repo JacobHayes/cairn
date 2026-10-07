@@ -1,16 +1,13 @@
 // What the node detail's browser tests and proof share: opening a node's detail the way a
-// person does (from the journey's node list), and its sections, forms, and dates.
+// person does (from its card on the journey's canvas), and its sections, forms, and dates.
 import { expect, type Locator, type Page } from "@playwright/test";
 
-import { openJourney, type HostKind } from "./shell.ts";
+import { openFromCanvas, openJourney, type HostKind } from "./shell.ts";
 
-/** Opens journey `journey` on `host`, then node `node`'s detail from its row. */
+/** Opens journey `journey` on `host`, then node `node`'s detail from its card on the canvas. */
 export async function openNode(page: Page, host: HostKind, journey: string, node: string): Promise<Locator> {
   await openJourney(page, host, journey);
-  await page.locator(`[data-testid="node-row"][data-node="${node}"]`).getByRole("link").click();
-  const panel = page.locator(`[data-testid="node-detail"][data-node="${node}"]`);
-  await expect(panel).toBeVisible();
-  return panel;
+  return openFromCanvas(page, node);
 }
 
 /** A section of the panel, unfolded. */

@@ -1,0 +1,365 @@
+/* The canvas (5.2): cards, lines, toggles, and the overlays, drawn with the design system's
+   tokens in light and dark. Quiet by rule (C6): nothing animates or flashes. Card line heights
+   match cards.ts, which sized the layout. */
+
+.shell-main:has(.canvas-page) {
+  max-width: none;
+}
+
+.canvas-page {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--space-3);
+}
+
+.canvas-page.canvas-split {
+  grid-template-columns: minmax(0, 1fr) minmax(20rem, 28rem);
+  align-items: start;
+}
+
+.canvas-split > .detail-panel {
+  order: 2;
+  position: sticky;
+  top: var(--space-4);
+  max-height: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+}
+
+@media (max-width: 52rem) {
+  .canvas-page.canvas-split {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .canvas-split > .detail-panel {
+    order: 0;
+    position: static;
+    max-height: none;
+  }
+}
+
+.canvas {
+  height: max(28rem, calc(100vh - 16rem));
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-canvas);
+  overflow: hidden;
+}
+
+.canvas .react-flow {
+  --xy-background-color: var(--color-canvas);
+  --xy-background-pattern-color: var(--color-border);
+  --xy-edge-stroke: var(--color-muted);
+  --xy-controls-button-background-color: var(--color-surface);
+  --xy-controls-button-color: var(--color-text);
+  --xy-controls-button-border-color: var(--color-border);
+  background: var(--color-canvas);
+}
+
+.toggles {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+  align-items: center;
+}
+
+.toggle {
+  display: inline-flex;
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--text-small);
+}
+
+.crumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  align-items: center;
+  font-size: var(--text-small);
+}
+
+/* Cards. */
+
+.card {
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  border-style: solid;
+  border-color: var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font-size: var(--text-small);
+  line-height: 18px;
+  position: relative;
+}
+
+.card-container {
+  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+}
+
+.card-group {
+  border-style: solid;
+}
+
+.card-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.card-line {
+  height: 18px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.card-line-wrap {
+  white-space: normal;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+}
+
+.card-head {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.card-kind {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 0.6875rem;
+  color: var(--color-muted);
+}
+
+.card-state {
+  font-size: 0.6875rem;
+  color: var(--color-muted);
+}
+
+.card-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.card-open,
+.card-drill,
+.card-marker {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.card-open {
+  width: 100%;
+  overflow: hidden;
+}
+
+.card-open:hover,
+.card-open:focus-visible {
+  text-decoration: underline;
+}
+
+.card-drill {
+  color: var(--color-accent);
+  font-size: 0.6875rem;
+}
+
+.card-marker {
+  color: var(--color-warn);
+  text-decoration: underline dotted;
+}
+
+.card-prompt {
+  font-style: italic;
+}
+
+.card-dates .badge,
+.card-badges .badge {
+  font-size: 0.6875rem;
+  line-height: 16px;
+  padding: 0 6px;
+}
+
+.card-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 4px;
+  overflow: hidden;
+  align-content: flex-start;
+}
+
+.card-checklist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+}
+
+.card-check {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  margin-right: 6px;
+  border: 1px solid var(--color-muted);
+  border-radius: 2px;
+  vertical-align: middle;
+}
+
+.card-check-done {
+  background: var(--color-good);
+  border-color: var(--color-good);
+}
+
+.card-handle {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* C1: not relevant grays out; undecided ghosts. */
+.card-not-relevant {
+  filter: grayscale(1);
+  opacity: 0.55;
+  background: var(--color-canvas);
+}
+
+.card-undecided {
+  border-style: dashed;
+  opacity: 0.7;
+  background: transparent;
+}
+
+/* C5: I am here. */
+.card-here {
+  border-color: var(--color-accent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 22%, transparent);
+}
+
+.card-mine {
+  border-left-color: var(--color-accent);
+}
+
+.card-selected {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 3px;
+}
+
+.card-rank {
+  position: absolute;
+  top: -10px;
+  right: -10px;
+  min-width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  padding: 0 5px;
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  font-size: 0.75rem;
+  font-weight: 700;
+  line-height: 20px;
+  text-align: center;
+}
+
+/* C6: heat numbers hang on the card's top edge, right of an overlay's mark. */
+.card-heat {
+  position: absolute;
+  top: -11px;
+  right: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--color-warn-surface);
+  color: var(--color-warn);
+  border: 1px solid currentColor;
+  font-size: 0.6875rem;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+/* Overlays (C7's trace; proposal review's diff). */
+.card-mark {
+  position: absolute;
+  top: -11px;
+  left: 10px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  background: var(--color-surface);
+  font-size: 0.6875rem;
+  line-height: 18px;
+  white-space: nowrap;
+}
+
+.card-mark-accent {
+  color: var(--color-accent);
+}
+
+.card-mark-good {
+  color: var(--color-good);
+}
+
+.card-mark-warn {
+  color: var(--color-warn);
+}
+
+.card-mark-bad {
+  color: var(--color-bad);
+}
+
+.card-marked {
+  border-color: currentColor;
+}
+
+.card-marked-accent {
+  border-color: var(--color-accent);
+}
+
+.card-marked-good {
+  border-color: var(--color-good);
+}
+
+.card-marked-warn {
+  border-color: var(--color-warn);
+}
+
+.card-dim {
+  opacity: 0.25;
+}
+
+/* Lines (C1): solid explicit, dotted implicit; a stage opening that only holds dates is lighter. */
+.line .react-flow__edge-path {
+  stroke: var(--color-muted);
+  stroke-width: 1.5;
+}
+
+.line-dates-only .react-flow__edge-path {
+  stroke-opacity: 0.55;
+}
+
+.line-lit .react-flow__edge-path {
+  stroke: var(--color-accent);
+  stroke-width: 2.5;
+}
+
+.line-dim {
+  opacity: 0.2;
+}
+
+.edge-source {
+  position: absolute;
+  padding: 0 4px;
+  border-radius: 4px;
+  background: var(--color-canvas);
+  color: var(--color-muted);
+  font-size: 0.6875rem;
+  pointer-events: all;
+}
+
+.stalled {
+  border-left: 3px solid var(--color-warn);
+}

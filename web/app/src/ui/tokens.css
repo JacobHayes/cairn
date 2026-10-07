@@ -227,34 +227,9 @@ code,
   font-weight: 600;
 }
 
-/* Node detail (5.1): a side panel beside the journey's nodes on a wide screen, above them on
-   a narrow one. */
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(20rem, 30rem);
-  gap: var(--space-4);
-  align-items: start;
-}
-
-.split > .detail-panel {
-  order: 2;
-  position: sticky;
-  top: var(--space-4);
-  max-height: calc(100vh - 2 * var(--space-4));
-  overflow-y: auto;
-}
-
+/* Node detail (5.1) sits beside the canvas on a wide screen and above it on a narrow one
+   (canvas/canvas.css, `.canvas-split`). */
 @media (max-width: 52rem) {
-  .split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .split > .detail-panel {
-    order: 0;
-    position: static;
-    max-height: none;
-  }
-
   .field {
     min-width: 0;
     width: 100%;
@@ -309,11 +284,6 @@ code,
   border-left: 2px solid var(--color-border);
   padding-left: var(--space-3);
   margin: var(--space-2) 0;
-}
-
-.row-selected {
-  background: var(--color-canvas);
-  outline: 2px solid var(--color-accent);
 }
 
 .markdown > :first-child {

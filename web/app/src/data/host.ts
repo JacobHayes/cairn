@@ -10,6 +10,7 @@ import type {
   ProjectionAnswer,
   ProjectionRequest,
   RenderedDraft,
+  RouteLevelRequest,
 } from "@cairn/wasm";
 
 export type Capabilities = Schema<"Capabilities">;
@@ -18,6 +19,9 @@ export type DomainDocument = Schema<"DomainDocument">;
 export type JourneyPage = Schema<"JourneyPage">;
 export type Patch = Schema<"Patch">;
 export type Markdown = Schema<"Markdown">;
+export type Route = Schema<"Route">;
+export type RouteVersion = Schema<"RouteVersion">;
+export type Level = Schema<"Level">;
 
 export type HostKind = "server" | "browser";
 
@@ -54,6 +58,10 @@ export interface Host {
   documentText(journey: string): Promise<string>;
   /** The deployment context (E6). */
   deployment(): Promise<Deployment>;
+  /** A route with its draft (A11); `Missing` when there is none. */
+  route(route: string): Promise<Route>;
+  /** One published version of a route (A11); `Missing` when there is none. */
+  routeVersion(route: string, version: number): Promise<RouteVersion>;
   /** J4: a page of a journey's history, or of `node`'s, after the log position `after`. */
   history(journey: string, node?: string, after?: number): Promise<HistoryPage>;
   /** Sends one patch, its events carrying `note` (J1). */
@@ -69,5 +77,7 @@ export interface Deriver {
   project<R extends ProjectionRequest>(journey: string, request: R): Promise<ProjectionAnswer<R>>;
   /** A10, G3: a message draft rendered with the held journey's context. */
   renderDraft(journey: string, request: DraftRequest): Promise<RenderedDraft>;
+  /** C2: a route graph's canvas level (a route has no state to hold). */
+  routeLevel(request: RouteLevelRequest): Promise<Level>;
   release(journey: string): Promise<void>;
 }

@@ -64,6 +64,23 @@ export class BrowserRoot {
      */
     patch(request: string, now: string): string;
     /**
+     * One published version of a route (A11), as `GET /routes/{id}/versions/{version}`
+     * answers it; `version` is its number as text.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: no such route or version, or an unreadable input.
+     */
+    routeVersion(route: string, version: string): string;
+    /**
+     * A route with its draft (A11), as `GET /routes/{id}` answers it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: no such route, or an unreadable input.
+     */
+    route(route: string): string;
+    /**
      * H6: a subscriber to what `watching` (the JSON of a list of watch names) names, holding
      * the current revisions for its first take.
      *
@@ -186,6 +203,17 @@ export function importRoute(request: string): string;
 export function preview(document: string, request: string): string;
 
 /**
+ * C2: a route's canvas level: `request` is the JSON of a [`RouteLevelRequest`]; the answer is
+ * the JSON of a `Level`, as a journey's level projection answers it.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`]: an unreadable request, an invalid graph, or a container the
+ * graph lacks.
+ */
+export function routeLevel(request: string): string;
+
+/**
  * Runs when the module is instantiated: a panic's message goes to the console, since the
  * abort that follows says only that the module trapped.
  */
@@ -225,6 +253,8 @@ export interface InitOutput {
     readonly browserroot_journeys: (a: number, b: number) => void;
     readonly browserroot_new: (a: number) => void;
     readonly browserroot_patch: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly browserroot_route: (a: number, b: number, c: number, d: number) => void;
+    readonly browserroot_routeVersion: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
     readonly derivation_derived: (a: number, b: number) => void;
     readonly derivation_key: (a: number, b: number) => void;
@@ -236,6 +266,7 @@ export interface InitOutput {
     readonly importRoute: (a: number, b: number, c: number) => void;
     readonly preview: (a: number, b: number, c: number, d: number, e: number) => void;
     readonly rootsubscription_take: (a: number, b: number, c: number) => void;
+    readonly routeLevel: (a: number, b: number, c: number) => void;
     readonly start: () => void;
     readonly touched: (a: number, b: number, c: number) => void;
     readonly touchedOverlaps: (a: number, b: number, c: number, d: number, e: number) => void;

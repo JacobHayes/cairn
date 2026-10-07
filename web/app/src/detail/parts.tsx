@@ -2,7 +2,7 @@
 // everything, so most of it starts folded: progressive disclosure), a link to another node's
 // detail, and a list of contributing nodes.
 import type { ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 
 import { titleOf, type Ready } from "./model.ts";
 
@@ -11,10 +11,11 @@ export function nodePath(journey: string, key: string): string {
   return `/journeys/${journey}/nodes/${key}`;
 }
 
-/** A link to another node's detail, by its title. */
+/** A link to another node's detail, by its title, keeping what the canvas shows (5.2). */
 export function NodeLink({ view, node }: { view: Ready; node: string }) {
+  const { search } = useLocation();
   return (
-    <Link to={nodePath(view.journey.header.id, node)} data-node={node}>
+    <Link to={{ pathname: nodePath(view.journey.header.id, node), search }} data-node={node}>
       {titleOf(view, node)}
     </Link>
   );

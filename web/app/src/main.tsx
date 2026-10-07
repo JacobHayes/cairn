@@ -6,25 +6,31 @@ import { createRoot } from "react-dom/client";
 import { HashRouter, Route, Routes } from "react-router";
 
 import { boot } from "./boot.ts";
+import { LayoutsContext } from "./canvas/hooks.ts";
+import { Layouts, LayoutWorker } from "./canvas/layouts.ts";
 import { SessionContext } from "./data/react.ts";
 import type { Session } from "./data/session.ts";
 import { JourneyIndex } from "./screens/JourneyIndex.tsx";
 import { JourneyPage } from "./screens/JourneyPage.tsx";
+import { RouteCanvasPage } from "./screens/RouteCanvasPage.tsx";
 import { Shell } from "./shell/Shell.tsx";
 import "./ui/tokens.css";
 
-function App({ session }: { session: Session }) {
+function App({ session, layouts }: { session: Session; layouts: Layouts }) {
   return (
     <SessionContext value={session}>
-      <HashRouter>
-        <Routes>
-          <Route element={<Shell />}>
-            <Route index element={<JourneyIndex />} />
-            <Route path="journeys/:id" element={<JourneyPage />} />
-            <Route path="journeys/:id/nodes/:key" element={<JourneyPage />} />
-          </Route>
-        </Routes>
-      </HashRouter>
+      <LayoutsContext value={layouts}>
+        <HashRouter>
+          <Routes>
+            <Route element={<Shell />}>
+              <Route index element={<JourneyIndex />} />
+              <Route path="journeys/:id" element={<JourneyPage />} />
+              <Route path="journeys/:id/nodes/:key" element={<JourneyPage />} />
+              <Route path="routes/:id" element={<RouteCanvasPage />} />
+            </Route>
+          </Routes>
+        </HashRouter>
+      </LayoutsContext>
     </SessionContext>
   );
 }
@@ -38,7 +44,7 @@ boot().then(
   (session) => {
     root.render(
       <StrictMode>
-        <App session={session} />
+        <App session={session} layouts={new Layouts(new LayoutWorker())} />
       </StrictMode>,
     );
   },

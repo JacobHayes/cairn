@@ -54,6 +54,14 @@ export class FakeHost implements Host {
     return Promise.resolve({ patches: [] });
   }
 
+  route(route: string): Promise<never> {
+    return Promise.reject(new Missing(route));
+  }
+
+  routeVersion(route: string): Promise<never> {
+    return Promise.reject(new Missing(route));
+  }
+
   documentText(journey: string): Promise<string> {
     this.fetches.set(journey, (this.fetches.get(journey) ?? 0) + 1);
     const held = this.journeysHeld.get(journey);
@@ -131,6 +139,10 @@ export class FakeDeriver implements Deriver {
 
   renderDraft(): Promise<never> {
     return Promise.reject(new Error("no drafts in the fake"));
+  }
+
+  routeLevel(): Promise<never> {
+    return Promise.reject(new Error("no route levels in the fake"));
   }
 
   release(journey: string): Promise<void> {

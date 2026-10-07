@@ -51,6 +51,11 @@ export function serverHost(origin: string, engine: Engine): Host {
       answered(journey, () =>
         client.GET("/journeys/{id}/document", { params: { path: { id: journey } }, parseAs: "text" }),
       ),
+    route: (route) => answered(route, () => client.GET("/routes/{id}", { params: { path: { id: route } } })),
+    routeVersion: (route, version) =>
+      answered(`${route} version ${String(version)}`, () =>
+        client.GET("/routes/{id}/versions/{version}", { params: { path: { id: route, version } } }),
+      ),
     history: (journey, node, after) =>
       answered(journey, () =>
         client.GET("/journeys/{id}/history", {

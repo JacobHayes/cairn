@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-import { nodeRow, open, openJourney, rename, save, startRename } from "../e2e/shell.ts";
+import { nodeCard, open, openJourney, rename, renameOf, save, startRename } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${name}.png`) });
@@ -31,8 +31,7 @@ test("a live update after a patch in another tab, on the server host", async ({ 
   await rename(editor, "n_findings", renamed);
   await expect(editor.getByTestId("notice")).toHaveAttribute("data-tone", "saved");
   await shot(editor, "3a-patch-saved-with-consequences");
-  await expect(nodeRow(other, "n_findings").getByTestId("title")).toHaveText(renamed);
-  await nodeRow(other, "n_findings").scrollIntoViewIfNeeded();
+  await expect(nodeCard(other, "n_findings").getByTestId("title")).toHaveText(renamed);
   await shot(other, "3b-other-tab-updated-live");
 });
 
@@ -44,7 +43,6 @@ test("a conflict on one field, surfaced with what intervened", async ({ context 
   await rename(one, "n_plan", "Test plan, theirs");
   await save(two, "n_plan");
   await expect(two.getByTestId("conflict")).toBeVisible();
-  await nodeRow(two, "n_plan").scrollIntoViewIfNeeded();
   await shot(two, "4-conflict-surfaced");
 });
 
@@ -64,7 +62,7 @@ test("version skew stops the tab and asks for a reload; the draft survives it", 
   await shot(two, "5-version-skew-banner");
   await two.unroute("**/journeys/j_bakeoff/document");
   await two.getByRole("button", { name: "Reload" }).click();
-  await expect(nodeRow(two, "n_summary").getByRole("textbox")).toHaveValue(unsent);
+  await expect(renameOf(two, "n_summary").getByRole("textbox")).toHaveValue(unsent);
   await shot(two, "6-draft-survives-reload");
 });
 
@@ -90,7 +88,7 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   await openJourney(other, "server", "j_hiring");
   const theirs = "Close out with the candidate, by phone";
   await rename(other, "n_close_out", theirs);
-  await expect(nodeRow(page, "n_close_out").getByTestId("title")).toHaveText(theirs);
+  await expect(nodeCard(page, "n_close_out").getByTestId("title")).toHaveText(theirs);
   await beat(page);
   await beat(page);
   await other.close();

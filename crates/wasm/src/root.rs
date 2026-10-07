@@ -15,8 +15,8 @@ use std::time::Duration;
 
 use cairn_schema::{
     Actor, Consequences, Domain, JourneyId, JourneyStatus, Lineage, Markdown, NodeKey, Patch,
-    PatchEvents, PatchReceipt, ProposalId, RankConstants, Revision, RevisionOf, Timestamp, Title,
-    VersionNumber,
+    PatchEvents, PatchReceipt, ProposalId, RankConstants, Revision, RevisionOf, RouteId, Timestamp,
+    Title, VersionNumber,
 };
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, WriteError, Written,
@@ -407,6 +407,45 @@ impl BrowserRoot {
         };
         let after = position(after)?;
         Ok(json(&self.history_page(&id, node.as_ref(), after)?))
+    }
+
+    /// A route with its draft (A11), as `GET /routes/{id}` answers it.
+    ///
+    /// # Errors
+    ///
+    /// The JSON of a [`HostError`]: no such route, or an unreadable input.
+    pub fn route(&self, route: &str) -> Result<String, String> {
+        let id: RouteId = route
+            .parse()
+            .map_err(|error| HostError::unreadable("route", format!("{error:?}")))?;
+        match now_or_never(self.service.route(&id)).map_err(failed)? {
+            Some(found) => Ok(json(&found)),
+            None => Err(HostError::Missing {
+                message: format!("no route {id}"),
+            }
+            .into()),
+        }
+    }
+
+    /// One published version of a route (A11), as `GET /routes/{id}/versions/{version}`
+    /// answers it; `version` is its number as text.
+    ///
+    /// # Errors
+    ///
+    /// The JSON of a [`HostError`]: no such route or version, or an unreadable input.
+    #[wasm_bindgen(js_name = routeVersion)]
+    pub fn route_version(&self, route: &str, version: &str) -> Result<String, String> {
+        let id: RouteId = route
+            .parse()
+            .map_err(|error| HostError::unreadable("route", format!("{error:?}")))?;
+        let number: VersionNumber = read("version", version)?;
+        match now_or_never(self.service.route_version(&id, number)).map_err(failed)? {
+            Some(found) => Ok(json(&found)),
+            None => Err(HostError::Missing {
+                message: format!("no version {number} of route {id}"),
+            }
+            .into()),
+        }
     }
 
     /// The deployment: its entities, aliases, and revision (E6).

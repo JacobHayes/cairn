@@ -9,15 +9,16 @@ import {
   countDocumentFetches,
   derivedRevision,
   fresh,
-  nodeRow,
+  nodeCard,
   open,
   openJourney,
   rename,
+  renameOf,
   save,
   startRename,
 } from "./shell.ts";
 
-const title = (page: Page, node: string) => nodeRow(page, node).getByTestId("title");
+const title = (page: Page, node: string) => nodeCard(page, node).getByTestId("title");
 
 test("an edit in one page appears in another", async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
@@ -57,7 +58,7 @@ test("edits to one field surface a conflict", async ({ context }) => {
   await rename(one, "n_onsite", theirs);
   await save(two, "n_onsite");
   await expect(two.getByTestId("conflict")).toContainText("n_onsite");
-  await expect(nodeRow(two, "n_onsite").getByRole("textbox")).toHaveValue(mine);
+  await expect(renameOf(two, "n_onsite").getByRole("textbox")).toHaveValue(mine);
   await expect(title(one, "n_onsite")).toHaveText(theirs);
   await two.getByRole("button", { name: "Keep my edit on the current version" }).click();
   await save(two, "n_onsite");
@@ -131,13 +132,13 @@ test("version skew stops the tab and asks for a reload, keeping unsent edits", a
   });
   await rename(one, "n_plan", fresh("Plan"));
   await expect(two.getByTestId("skew")).toBeVisible();
-  await expect(nodeRow(two, "n_criteria").getByRole("button", { name: "Save" })).toBeDisabled();
+  await expect(renameOf(two, "n_criteria").getByRole("button", { name: "Save" })).toBeDisabled();
   expect(await derivedRevision(two)).toBe(held);
   await two.unroute("**/journeys/j_vendor_eval/document");
   await two.getByRole("button", { name: "Reload" }).click();
   await expect(two.getByTestId("derivation")).toBeVisible();
   await expect(two.getByTestId("skew")).toHaveCount(0);
-  await expect(nodeRow(two, "n_criteria").getByRole("textbox")).toHaveValue(unsent);
+  await expect(renameOf(two, "n_criteria").getByRole("textbox")).toHaveValue(unsent);
   expect(await derivedRevision(two)).toBe(await derivedRevision(one));
 });
 
@@ -174,7 +175,7 @@ test("typing is held while a save is in flight, so nothing typed is lost", async
   const renamed = fresh("Beta feedback");
   await startRename(page, "n_beta_feedback", renamed);
   await save(page, "n_beta_feedback");
-  await expect(nodeRow(page, "n_beta_feedback").getByRole("textbox")).toBeDisabled();
+  await expect(renameOf(page, "n_beta_feedback").getByRole("textbox")).toBeDisabled();
   release();
   await expect(title(page, "n_beta_feedback")).toHaveText(renamed);
 });
@@ -197,21 +198,23 @@ async function journeyFromHiringRoute(request: APIRequestContext): Promise<strin
 test("a draft follows its journey and its host, not the screen it was typed on", async ({ page }) => {
   const copy = await journeyFromHiringRoute(page.request);
   await openJourney(page, "server", copy);
-  await expect(nodeRow(page, "n_offer")).toBeVisible();
+  await expect(nodeCard(page, "n_offer")).toBeVisible();
   await page.goto(`/?host=server#/journeys/j_hiring`);
   await expect(page.getByTestId("derivation")).toBeVisible();
   const draft = fresh("Offer, j_hiring's draft");
   await startRename(page, "n_offer", draft);
   await page.evaluate((to) => {
     location.hash = to;
-  }, `#/journeys/${copy}`);
+  }, `#/journeys/${copy}/nodes/n_offer`);
   await expect(page.getByTestId("journey-name")).toContainText("Hiring copy");
-  await expect(nodeRow(page, "n_offer").getByRole("textbox")).toHaveCount(0);
+  await expect(renameOf(page, "n_offer").getByRole("button", { name: /^Rename/ })).toBeVisible();
+  await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveCount(0);
   await page.evaluate(() => {
-    location.hash = "#/journeys/j_hiring";
+    location.hash = "#/journeys/j_hiring/nodes/n_offer";
   });
-  await expect(nodeRow(page, "n_offer").getByRole("textbox")).toHaveValue(draft);
-  await page.goto(`/?host=browser#/journeys/j_hiring`);
+  await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveValue(draft);
+  await page.goto(`/?host=browser#/journeys/j_hiring/nodes/n_offer`);
   await expect(page.getByTestId("derivation")).toBeVisible();
-  await expect(nodeRow(page, "n_offer").getByRole("textbox")).toHaveCount(0);
+  await expect(renameOf(page, "n_offer").getByRole("button", { name: /^Rename/ })).toBeVisible();
+  await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveCount(0);
 });

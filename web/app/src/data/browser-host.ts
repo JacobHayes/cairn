@@ -65,6 +65,8 @@ export function browserHost(root: InBrowserHost): Host {
     journeys: () => read("the journey index", () => root.journeys()),
     deployment: () => read("the deployment", () => root.deployment()),
     documentText: (journey) => read(journey, () => root.documentText(journey)),
+    route: (route) => read(route, () => root.route(route)),
+    routeVersion: (route, version) => read(`${route} version ${String(version)}`, () => root.routeVersion(route, version)),
     history: (journey, node, after) => read(journey, () => root.history(journey, node, after)),
     send: (patch, note) => send(root, patch, note),
     openTicks: ticksOf(root),

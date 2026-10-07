@@ -13,6 +13,8 @@ export const browserroot_history: (a: number, b: number, c: number, d: number, e
 export const browserroot_journeys: (a: number, b: number) => void;
 export const browserroot_new: (a: number) => void;
 export const browserroot_patch: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+export const browserroot_route: (a: number, b: number, c: number, d: number) => void;
+export const browserroot_routeVersion: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
 export const browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
 export const derivation_derived: (a: number, b: number) => void;
 export const derivation_key: (a: number, b: number) => void;
@@ -24,6 +26,7 @@ export const exportRoute: (a: number, b: number, c: number) => void;
 export const importRoute: (a: number, b: number, c: number) => void;
 export const preview: (a: number, b: number, c: number, d: number, e: number) => void;
 export const rootsubscription_take: (a: number, b: number, c: number) => void;
+export const routeLevel: (a: number, b: number, c: number) => void;
 export const start: () => void;
 export const touched: (a: number, b: number, c: number) => void;
 export const touchedOverlaps: (a: number, b: number, c: number, d: number, e: number) => void;

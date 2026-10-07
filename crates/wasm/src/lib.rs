@@ -4,8 +4,9 @@
 //! For every host, the engine over JSON: a domain document read with its engine version
 //! checked first ([`read_document`]: version skew), derived once ([`Derivation`]) and
 //! projected ([`Projection`]), a draft patch applied locally ([`apply`]), a proposal
-//! previewed ([`preview`]), a patch's touched set for the H5 safe retry ([`touched`]), and
-//! route files exported and imported ([`export_route`], [`import_route`]). Every input and
+//! previewed ([`preview`]), a patch's touched set for the H5 safe retry ([`touched`]), route
+//! files exported and imported ([`export_route`], [`import_route`]), and a route graph's
+//! canvas level ([`route_level`]). Every input and
 //! output is the schema's JSON, so each value is the server's byte for byte.
 //!
 //! For the in-browser host, its composition root ([`BrowserRoot`]): the service over the
@@ -20,6 +21,7 @@ mod files;
 pub mod fixtures;
 mod local;
 mod root;
+mod route;
 
 #[cfg(feature = "server")]
 pub mod cases;
@@ -35,6 +37,7 @@ pub use root::{
     BrowserRoot, HistoryAnswer, JourneyPage, JourneySummary, PatchAnswer, PatchRequest,
     RootSubscription, Taken, Tick,
 };
+pub use route::{RouteLevelRequest, route_level, route_level_of};
 
 use std::future::Future;
 use std::pin::pin;
