@@ -6,7 +6,8 @@
 //! Stateless: every request is a POST answered with one JSON response, no session is kept
 //! between requests, and no stream stays open, so each call is held to the API's request
 //! limits like any other request: its duration, its body (the same `request_bytes_max`), and
-//! the requests in flight (DECISIONS.md, 4.3).
+//! the requests in flight
+//! (decisions/2026-10-06-the-mcp-endpoint-is-stateless-json-inside-the-apis-router.md).
 
 use std::sync::Arc;
 use std::time::Instant;
@@ -38,7 +39,8 @@ pub const MCP_PATH: &str = "/mcp";
 pub fn router<S: Store + 'static>(tools: ToolSet<S>) -> Router {
     // Host and Origin checks guard a server nothing else authenticates; this one sits
     // behind the auth layer, and its public host is the deployment's, which the listener
-    // owns (DECISIONS.md, 4.3).
+    // owns
+    // (decisions/2026-10-06-the-mcp-endpoint-is-stateless-json-inside-the-apis-router.md).
     let config = StreamableHttpServerConfig::default()
         .with_legacy_session_mode(false)
         .with_json_response(true)
@@ -91,7 +93,8 @@ impl<S: Store + 'static> ServerHandler for Server<S> {
             // A write resubmitted under its patch id is answered from its receipt (H5).
             annotations.idempotent_hint = Some(definition.writes);
             // Output schemas stay out of the list: an agent reads the output it gets, and they
-            // would multiply the list's size (DECISIONS.md, 4.3).
+            // would multiply the list's size, per
+            // decisions/2026-10-06-the-tool-list-carries-the-mutation-vocabulary-once-and-no.md.
             Tool::new(
                 definition.name,
                 definition.description,

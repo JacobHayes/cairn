@@ -1,0 +1,6 @@
+# History pages events it is given, and finds a node's by the records they name
+
+- Question: J4 wants history per node and per journey, grouped by patch; the store already keeps an `event_nodes` index (3.1), and the engine never reads the store (the ruling: `history(events)` takes schema `Event`s).
+- Call: `history(events, node, cursor)` takes the journey's events in log order, keeps those naming the node (when one is given), and returns at most 200 events, grouped by patch, with the total and a cursor; a large patch spans pages. Which events name a node is `Event::nodes` in the schema: the subject, both ends of an edge, and the node every written record hangs off, the same rule as the store's `backend::event_nodes`, which could now call it. The store additionally names the nodes whose requirement a whole-node removal takes, which needs the graph before the commit; a host that wants that exactness passes the store's node-filtered events and no node.
+- Alternatives: the engine reading store rows (forbidden); per-node history only in the store (the browser host, which has events and no store index, could not show it).
+- What would change it: a node's history needing the removal's requiring nodes in the browser host too.

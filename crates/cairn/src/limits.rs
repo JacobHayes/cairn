@@ -1,7 +1,7 @@
 //! The binary's limits (PRACTICES, Explicit limits). It names none of its own: each bound
 //! it enforces is one the table already names, borrowed where the table does not name the
-//! value (DECISIONS.md, 1.2: values the limits table does not name take the nearest named
-//! limit).
+//! value
+//! (decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
 
 use std::time::Duration;
 
@@ -10,8 +10,8 @@ pub use cairn_store::limits::SSE_COALESCING_INTERVAL;
 
 /// How long data sent on a connection may go unacknowledged before the kernel closes it
 /// (`TCP_USER_TIMEOUT`): the SSE write stall, so a subscriber that stops taking writes is
-/// disconnected at the socket, not only once its buffers fill (DECISIONS.md, 4.2: where the
-/// SSE write stall is enforced).
+/// disconnected at the socket, not only once its buffers fill
+/// (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md).
 pub const UNACKNOWLEDGED_DURATION_MAX: Duration = SSE_WRITE_STALL;
 
 /// How long a connection stays idle before TCP keepalive probes it: the write stall, so an

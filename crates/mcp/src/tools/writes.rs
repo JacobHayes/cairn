@@ -658,7 +658,8 @@ pub(crate) struct ResolveDateConflict {
 
 impl ResolveDateConflict {
     fn patch(self) -> Result<DomainPatch, ToolError> {
-        // F5: the moves a chain lists (DECISIONS.md, 2.3).
+        // F5: the moves a chain lists
+        // (decisions/2026-10-06-chains-gain-answer-and-today-fixers-resolution-moves.md).
         let move_kind = matches!(
             self.resolution,
             Mutation::ShiftPin { .. }

@@ -9,7 +9,8 @@
 --
 -- Uniqueness a patch may pass through on its way to a valid graph (sibling ids, emails) is
 -- checked at the end of the commit rather than by a unique index: SQLite has no deferred
--- unique constraint (DECISIONS.md).
+-- unique constraint
+-- (decisions/2026-10-06-uniqueness-a-patch-may-pass-through-is-checked-at-the-end.md).
 
 -- Domains and their revisions (H5). The first write of every commit is its domain's row.
 

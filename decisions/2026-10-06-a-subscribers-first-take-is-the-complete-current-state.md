@@ -1,0 +1,6 @@
+# A subscriber's first take is the complete current state
+
+- Question: review round 1 found that a journey hard-deleted while a subscriber was away is never shown as gone: the store lists only existing domains, so a reconnecting index view hears nothing about it, and a view watching it by name hears revision 0, older than what it holds, which "refetch only when newer" (H6) ignores.
+- Call: the first take after seeding is `Take::Current`, the complete current revisions of everything watched (a domain watched by name and absent at 0), even when empty; later takes are `Take::Ticks`, changes only. A subscriber treats a domain it holds as deleted when the current set lists it at 0 or, under a kind watch, leaves it out. A deletion seen live is still a tick at the deleting commit's revision, after which the refetch finds nothing. ARCHITECTURE (Concurrency and notification) says so.
+- Alternatives: keeping each deleted journey's last revision in the store and listing it in `Revisions` (a store schema change for one bit, and the deletion record carries no revision); ticks that name a deletion (a second tick shape every client handles, and it can still be missed while away).
+- What would change it: views of other things that can disappear (proposals, with 4.8), which follow the same rule.

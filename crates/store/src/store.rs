@@ -26,7 +26,8 @@ use crate::target::{Document, LoadTarget};
 /// Nothing is answered from a write that may not have reached the store's storage: not a
 /// read, not a receipt, not a commit. A backend that cannot tell whether a failed commit
 /// reached it settles that before it answers anything, or errs on every call until it is
-/// reopened (DECISIONS.md, the log sync fix).
+/// reopened
+/// (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 pub trait Store: AuthStore + ConversationStore + Send + Sync {
     /// One read of one graph by typed target: a journey, a route with its draft, a published
     /// version, or the deployment. `None` when it does not exist; the deployment always

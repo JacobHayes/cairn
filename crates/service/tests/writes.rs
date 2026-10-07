@@ -728,8 +728,8 @@ fn a_patch_to_a_proposal_is_not_a_domain_patch() {
     assert!(DomainPatch::new(proposal, None).is_err());
 }
 
-/// The futures a multi-threaded host awaits are `Send` over either store (DECISIONS.md: the
-/// service is generic over its store).
+/// The futures a multi-threaded host awaits are `Send` over either store
+/// (decisions/2026-10-06-the-service-is-generic-over-its-store-and-holds-its-notifier.md).
 #[test]
 fn every_operation_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}

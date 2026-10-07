@@ -168,7 +168,7 @@ wasm=$(grep -o 'assets/[^"]*\.js' "$work/body" | head -1)
 module=$(cd "$repo/web/app/dist/build" && ls assets/*.wasm | head -1)
 request "The browser host's wasm module, cached for good" 200 0 -I "$base/$module"
 
-printf '\n## A foreign Host is refused before auth\n\nA page rebound by DNS to this address names its own host; it is refused on every surface (DECISIONS.md, 4.3 review round 1, 4.7):\n' >>"$out"
+printf '\n## A foreign Host is refused before auth\n\nA page rebound by DNS to this address names its own host; it is refused on every surface ([`decisions/2026-10-06-dns-rebinding-protection-is-a-host-allowlist-in-front.md`](../../../decisions/2026-10-06-dns-rebinding-protection-is-a-host-allowlist-in-front.md), [`decisions/2026-10-07-the-host-allowlist-matches-names-not-ports-and-refuses.md`](../../../decisions/2026-10-07-the-host-allowlist-matches-names-not-ports-and-refuses.md)):\n' >>"$out"
 request "The API, from another host" 421 200 -H "Host: attacker.example:$port" "$base/capabilities"
 request "MCP, from another host" 421 200 -X POST -H "Host: attacker.example" "$base/mcp"
 request "The UI, from another host" 421 200 -H "Host: attacker.example" "$base/"
@@ -208,7 +208,7 @@ mise exec -- cargo test --quiet --locked -p cairn --test server -- --exact \
   >"$work/stall.log" 2>&1 || status=$?
 [ "$status" = 0 ] || miss "the write stall test"
 {
-  printf 'The acceptance test (`crates/cairn/tests/server.rs`) opens the revision stream with the smallest receive buffer the kernel allows, stops reading while the stream keeps ticking, and times the slot from the moment its receive window closed. `TCP_USER_TIMEOUT` at the 15 s stall closes the connection in the kernel, long before the server'"'"'s send buffer could fill (DECISIONS.md, 4.2, 4.7). Its measurement, exit status %s:\n\n```text\n' "$status"
+  printf 'The acceptance test (`crates/cairn/tests/server.rs`) opens the revision stream with the smallest receive buffer the kernel allows, stops reading while the stream keeps ticking, and times the slot from the moment its receive window closed. `TCP_USER_TIMEOUT` at the 15 s stall closes the connection in the kernel, long before the server'"'"'s send buffer could fill ([`decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md`](../../../decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md), [`decisions/2026-10-07-the-socket-level-write-stall-is-measured.md`](../../../decisions/2026-10-07-the-socket-level-write-stall-is-measured.md)). Its measurement, exit status %s:\n\n```text\n' "$status"
   grep '^freed' "$work/stall.log"
   printf '```\n'
 } >>"$out"

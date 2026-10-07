@@ -4,7 +4,8 @@
 // input, so a revision that changes nothing the layout reads (most state changes) is not laid
 // out again; one that does is laid out with the view's latest positions as hints, so a small
 // edit moves few nodes. A reload starts with no hints: the layout of a view is then a
-// function of its graph alone (DECISIONS.md, 5.2).
+// function of its graph alone
+// (decisions/2026-10-07-the-layout-is-hinted-by-the-views-last-positions-a-fresh.md).
 import ELK from "elkjs/lib/elk-api.js";
 
 import { hintsOf, layOut, signature, type Elk, type LayoutRequest, type Placement } from "./layout.ts";

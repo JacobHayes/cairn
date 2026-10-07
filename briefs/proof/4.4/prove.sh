@@ -80,7 +80,7 @@ status=0
 protocols=$(mise exec -- cargo test --locked -p cairn-assistant --test protocols 2>&1) || status=$?
 [ "$status" -eq 0 ] || miss "the protocol round trips failed"
 {
-  printf 'Each protocol sends a conversation and its tools to a loopback server standing in for the provider, which holds the request to the fixture'"'"'s body and headers and answers the fixture'"'"'s response: a tool call, then, once the tool'"'"'s result is sent back in the protocol'"'"'s own shape, the final text (`crates/assistant/tests/protocols.rs`, exit status %s). The fixtures were written from each provider'"'"'s public API reference, not captured live, since that needs a credential (DECISIONS.md, 4.4):\n\n| Protocol | Fixture | Source |\n|---|---|---|\n' "$status"
+  printf 'Each protocol sends a conversation and its tools to a loopback server standing in for the provider, which holds the request to the fixture'"'"'s body and headers and answers the fixture'"'"'s response: a tool call, then, once the tool'"'"'s result is sent back in the protocol'"'"'s own shape, the final text (`crates/assistant/tests/protocols.rs`, exit status %s). The fixtures were written from each provider'"'"'s public API reference, not captured live, since that needs a credential ([`decisions/2026-10-06-the-openai-protocol-is-the-responses-api-and-the-wire.md`](../../../decisions/2026-10-06-the-openai-protocol-is-the-responses-api-and-the-wire.md)):\n\n| Protocol | Fixture | Source |\n|---|---|---|\n' "$status"
   for fixture in anthropic-messages openai-responses chat-completions; do
     file=crates/assistant/tests/fixtures/$fixture.json
     source=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).source)' "$file")

@@ -1,0 +1,6 @@
+# What a stalled journey waits on
+
+- Question: D5's diagnostic names "a gating node, a snooze and its target, or an `auto_reach` date" and shows "blocked" only when every in-scope non-terminal node is blocked; the brief asks how the nearest gating nodes are picked.
+- Call: following open dependencies (acyclic) from any blocked node ends at a node that is not blocked, which is on the frontier unless closed, so whenever open in-scope work remains the frontier is non-empty, and an empty acting frontier means every frontier node is held. `waiting_on` lists each frontier node in key order with its hold (a snooze with its target, or an `auto_reach` milestone with its date), then, as `Gate`, each unfinished target of those node snoozes that is not itself held: the snooze lifts when it finishes, and a surface follows it to its own blockers. `all_blocked` is computed as D5 states it and is never true in a valid journey; a property test holds both facts.
+- Alternatives: a walk from every blocked node to its nearest blockers (it always ends at the held frontier nodes, so it names nothing more); naming the targets only inside the snooze cause (a surface could not tell that a blocked target is what holds the journey).
+- What would change it: a hold off the acting frontier other than snoozes and auto-reach dates, which would need its own cause.

@@ -3,7 +3,8 @@
 //! route's draft picks up where they left off and no one else sees it. A conversation keeps
 //! the user's words, the assistant's replies, and Cairn's report of each write the assistant
 //! made; tool traffic is not kept, since every turn starts from a fresh read of its target.
-//! It keeps its newest [`CONVERSATION_MESSAGE_COUNT_MAX`] messages (DECISIONS.md, 4.4).
+//! It keeps its newest [`CONVERSATION_MESSAGE_COUNT_MAX`] messages
+//! (decisions/2026-10-06-conversations-are-one-per-target-per-user-keep-their-newest.md).
 
 use std::fmt;
 

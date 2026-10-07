@@ -47,9 +47,11 @@ mod in_process {
             .status
     }
 
-    /// DNS-rebinding protection (DECISIONS.md, 4.3 review round 1): a request naming another
-    /// host is refused on every surface before the auth layer, with or without a credential;
-    /// the public host and, on this loopback listener, a loopback name are served.
+    /// DNS-rebinding protection
+    /// (decisions/2026-10-06-dns-rebinding-protection-is-a-host-allowlist-in-front.md):
+    /// a request naming another host is refused on every surface before the auth layer,
+    /// with or without a credential; the public host and, on this loopback listener, a
+    /// loopback name are served.
     #[tokio::test]
     async fn only_the_configured_hosts_are_served_on_every_surface() {
         let config = support::config(&support::dev_provider(Some("dev-token")));
@@ -236,13 +238,14 @@ mod in_process {
         }
     }
 
-    /// DECISIONS.md, 4.2: an SSE client that stops reading, with the stream still ticking,
-    /// loses its subscriber slot within the write stall plus one coalescing interval of its
-    /// receive window closing. The kernel closes the connection at `TCP_USER_TIMEOUT`, long
-    /// before the server's send buffer could fill and stall the API's own channel. The
-    /// kernel starts that clock at its first zero-window probe, one retransmission timeout
-    /// (at least Linux's 200 ms minimum) after the window closes, which the bound allows for
-    /// (DECISIONS.md, 4.7: what the stall bound is measured from).
+    /// decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md: an SSE client that
+    /// stops reading, with the stream still ticking, loses its subscriber slot within the
+    /// write stall plus one coalescing interval of its receive window closing. The kernel
+    /// closes the connection at `TCP_USER_TIMEOUT`, long before the server's send buffer
+    /// could fill and stall the API's own channel. The kernel starts that clock at its first
+    /// zero-window probe, one retransmission timeout (at least Linux's 200 ms minimum) after
+    /// the window closes, which the bound allows for
+    /// (decisions/2026-10-07-the-socket-level-write-stall-is-measured.md).
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn a_subscriber_that_stops_reading_loses_its_slot_at_the_write_stall() {

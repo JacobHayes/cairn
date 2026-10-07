@@ -36,7 +36,8 @@ pub struct ImportRequest {
     /// against; none for a new route.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub base: Option<RouteVersion>,
-    /// The import's patch id, which new keys are minted from (DECISIONS.md, 4.8).
+    /// The import's patch id, which new keys are minted from
+    /// (decisions/2026-10-06-an-imported-route-file-mints-its-new-keys-from-the-patch-id.md).
     pub patch_id: PatchId,
 }
 

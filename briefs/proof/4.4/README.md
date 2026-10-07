@@ -479,13 +479,13 @@ x-request-id: rq_…
 
 ## The wire protocols
 
-Each protocol sends a conversation and its tools to a loopback server standing in for the provider, which holds the request to the fixture's body and headers and answers the fixture's response: a tool call, then, once the tool's result is sent back in the protocol's own shape, the final text (`crates/assistant/tests/protocols.rs`, exit status 0). The fixtures were written from each provider's public API reference, not captured live, since that needs a credential (DECISIONS.md, 4.4):
+Each protocol sends a conversation and its tools to a loopback server standing in for the provider, which holds the request to the fixture's body and headers and answers the fixture's response: a tool call, then, once the tool's result is sent back in the protocol's own shape, the final text (`crates/assistant/tests/protocols.rs`, exit status 0). The fixtures were written from each provider's public API reference, not captured live, since that needs a credential ([`decisions/2026-10-06-the-openai-protocol-is-the-responses-api-and-the-wire.md`](../../../decisions/2026-10-06-the-openai-protocol-is-the-responses-api-and-the-wire.md)):
 
 | Protocol | Fixture | Source |
 |---|---|---|
-| `anthropic-messages` | `crates/assistant/tests/fixtures/anthropic-messages.json` | Written from the Anthropic Messages API reference (POST /v1/messages, tool use), not captured live: a live capture needs a credential (DECISIONS.md, 4.4). |
-| `openai-responses` | `crates/assistant/tests/fixtures/openai-responses.json` | Written from the OpenAI Responses API reference (POST /v1/responses, function calling, stateless reasoning), not captured live: a live capture needs a credential (DECISIONS.md, 4.4). |
-| `chat-completions` | `crates/assistant/tests/fixtures/chat-completions.json` | Written from the OpenAI chat completions reference (POST /v1/chat/completions, tool calls), the shape OpenAI-compatible servers accept, not captured live: a live capture needs a credential (DECISIONS.md, 4.4). |
+| `anthropic-messages` | `crates/assistant/tests/fixtures/anthropic-messages.json` | Written from the Anthropic Messages API reference (POST /v1/messages, tool use), not captured live: a live capture needs a credential (decisions/2026-10-06-the-openai-protocol-is-the-responses-api-and-the-wire.md). |
+| `openai-responses` | `crates/assistant/tests/fixtures/openai-responses.json` | Written from the OpenAI Responses API reference (POST /v1/responses, function calling, stateless reasoning), not captured live: a live capture needs a credential (decisions/2026-10-06-the-openai-protocol-is-the-responses-api-and-the-wire.md). |
+| `chat-completions` | `crates/assistant/tests/fixtures/chat-completions.json` | Written from the OpenAI chat completions reference (POST /v1/chat/completions, tool calls), the shape OpenAI-compatible servers accept, not captured live: a live capture needs a credential (decisions/2026-10-06-the-openai-protocol-is-the-responses-api-and-the-wire.md). |
 
 ```
 test a_provider_error_is_reported_without_the_credential ... ok

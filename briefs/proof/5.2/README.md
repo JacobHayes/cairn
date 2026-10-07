@@ -101,7 +101,7 @@ Two pages laying out the vendor evaluation: identical positions for all 27 nodes
 
 One action added under Reporting, requiring the findings (on the server host, the view's
 previous positions as hints): 5 of 27 nodes moved within their containers
-(`n_reporting`, `n_final_review`, `n_findings`, `n_findings_reviewer`, `n_review_opens`), under the stated bound of a quarter (DECISIONS.md, 5.2).
+(`n_reporting`, `n_final_review`, `n_findings`, `n_findings_reviewer`, `n_review_opens`), under the stated bound of a quarter ([`decisions/2026-10-07-the-layout-is-hinted-by-the-views-last-positions-a-fresh.md`](../../../decisions/2026-10-07-the-layout-is-hinted-by-the-views-last-positions-a-fresh.md)).
 
 ## The tests
 

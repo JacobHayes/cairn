@@ -2,7 +2,8 @@
 //! the wasm module, built by `mise run build:web` before `cargo build` into
 //! `web/app/dist/build/` (never checked in) and embedded with `rust-embed`. Each file is
 //! served at its own path and `index.html` also at `/`; the UI routes by the URL's hash, so
-//! no other path needs a fallback (DECISIONS.md, 4.6).
+//! no other path needs a fallback
+//! (decisions/2026-10-06-the-ui-routes-by-the-urls-hash-beside-the-apis-paths-on-one.md).
 //!
 //! A binary built without the web build embeds nothing, and `cairn serve` refuses to start
 //! rather than serve an API with no UI ([`router`]).

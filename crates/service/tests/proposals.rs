@@ -576,8 +576,8 @@ async fn an_upgrade_or_relink_submitted_directly_is_refused<S: Store>(store: Arc
     }
 }
 
-/// The proposal operations' futures are `Send` over either store (DECISIONS.md: the service
-/// is generic over its store).
+/// The proposal operations' futures are `Send` over either store
+/// (decisions/2026-10-06-the-service-is-generic-over-its-store-and-holds-its-notifier.md).
 #[test]
 fn every_proposal_operation_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}

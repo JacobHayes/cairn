@@ -8,8 +8,9 @@
 //! refuses the headers from any peer but this machine.
 //!
 //! A Tailscale login name was authenticated by the tailnet's identity provider, so it is
-//! listed as a verified email when it has the shape of one (H3; DECISIONS.md). A tagged
-//! node is a machine, not a person: it signs no one in.
+//! listed as a verified email when it has the shape of one (H3;
+//! decisions/2026-10-06-a-tailscale-login-name-is-a-verified-email.md). A tagged node is
+//! a machine, not a person: it signs no one in.
 
 use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;

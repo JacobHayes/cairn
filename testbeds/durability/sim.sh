@@ -19,8 +19,8 @@
 #      store that does not open on a failing disk is an honest outcome);
 #   7. known Turso and patina gaps (README, Findings): each must still reproduce exactly as
 #      recorded. One that stops reproducing fails this leg, so a Turso or patina bump that
-#      fixes it gets its README section and DECISIONS.md entry updated instead of going
-#      stale.
+#      fixes it gets its README section and its file in decisions/ updated instead of
+#      going stale.
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -215,8 +215,9 @@ reached "$settled_label" "${error_logs[@]}" ||
   fail "crash under errors: no commit was settled after its log sync failed"
 reached durability-failed-write-retried "${error_logs[@]}" ||
   fail "crash under errors: no failed write was retried"
-# The finding the testbed found (DECISIONS.md, 6.2), pinned as a regression at the store's
-# current order of operations: seed 12's first commit fails its log fsync, and the crash
+# The finding the testbed found
+# (decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md), pinned
+# as a regression at the store's current order of operations: seed 12's first commit fails its log fsync, and the crash
 # lands before any later log sync. With the store answering that commit applied before a
 # barrier synced it (the fix removed), this run loses the acknowledged commit. Its run
 # without the crash shows the failed log sync was settled.
@@ -250,7 +251,7 @@ gap() {
   shift 2
   run "$@" >"$out/gap-$name.log" 2>&1 || true
   grep -Eq "$pattern" "$out/gap-$name.log" ||
-    fail "Turso gap '$name' no longer reproduces: update testbeds/durability/README.md and DECISIONS.md"
+    fail "Turso gap '$name' no longer reproduces: update testbeds/durability/README.md and its file in decisions/"
   say "gap $name still reproduces: $(grep -Eo "$pattern" "$out/gap-$name.log" | head -1)"
 }
 gap open-size-panic 'turso panicked: failed to get file size' --seed 23 --fs-error-permille 50
@@ -258,6 +259,6 @@ gap open-short-read 'Logical log short read: expected [0-9]+, got [0-9]+' --seed
 gap reopen-page-cache-panic 'Attempted to insert different page with same key' \
   --seed 6 --fs-error-permille 20 -- --open-attempts 64
 torn=$(grep -l '^DURABILITY_RESTART .*torn_tail=true' "${crash_logs[@]}" || true)
-[ -z "$torn" ] || fail "patina gap 'no-partial-log-frame' no longer reproduces ($torn): require durability-torn-log-tail-discarded in leg 5 and update README.md and DECISIONS.md"
+[ -z "$torn" ] || fail "patina gap 'no-partial-log-frame' no longer reproduces ($torn): require durability-torn-log-tail-discarded in leg 5 and update README.md and its file in decisions/"
 say "gap no-partial-log-frame still reproduces: no crash left part of a Turso log frame"
 say "leg 7 passed: known Turso and patina gaps reproduce as recorded"

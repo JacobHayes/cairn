@@ -1,5 +1,5 @@
 {
-  "source": "Written from the Anthropic Messages API reference (POST /v1/messages, tool use), not captured live: a live capture needs a credential (DECISIONS.md, 4.4).",
+  "source": "Written from the Anthropic Messages API reference (POST /v1/messages, tool use), not captured live: a live capture needs a credential (decisions/2026-10-06-the-openai-protocol-is-the-responses-api-and-the-wire.md).",
   "path": "/v1/messages",
   "headers": {
     "x-api-key": "test-key",

@@ -1,0 +1,6 @@
+# An empty draft carries its route's retired keys, and publishing retires what it left out
+
+- Question: a draft opened by an import or a saved journey starts empty, so it held none of the route's retired keys, and nothing retired the keys of the extended version that its content left out. A key could come back, and later versions lost the retirement history (Invariants: no key is ever reused).
+- Call: import rejects a supplied key the base retired (`retired_key_reused`). `open_draft { import | save_as_route }` on a route with versions writes the latest version's retired keys into the new draft, so `add_node` refuses them. `publish_draft` retires every node, role, and kind key of the version the draft extends that the draft leaves out. Both read that version, so the host loads it for those two mutations; a missing one is `target_missing`. A save-as-route of a journey behind its route that would bring back a retired key lists one violation per key, naming the version that retired it and the remedy (upgrade the journey to that version first, save it as a new route, or, for a node, exclude it).
+- Alternatives: retiring at open time (the import's matched keys would then be refused); retiring at publish only when the version happens to be loaded (a silent gap).
+- What would change it: a store that keeps a route's retired keys outside its version graphs.

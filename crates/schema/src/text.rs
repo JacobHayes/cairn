@@ -1,7 +1,7 @@
 //! Bounded text (PRACTICES, Explicit limits): every string a document carries has a byte
 //! limit, checked when it is parsed. Strings the limits table does not name take the
 //! nearest named limit: single-line labels the title limit, free text the body limit
-//! (DECISIONS.md).
+//! (decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
 
 use std::fmt;
 use std::str::FromStr;

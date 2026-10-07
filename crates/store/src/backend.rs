@@ -431,7 +431,8 @@ pub fn deployment_violations(deployment: &Deployment) -> Vec<Violation> {
 /// The checks on one graph a commit wrote: within `graph_bytes_max` serialized with its
 /// state, and sibling ids unique (PRD Identity and references). Sibling uniqueness is
 /// checked here, at the end of the commit, rather than by a unique index, since a patch may
-/// swap two siblings' ids and pass through a duplicate on the way (DECISIONS.md).
+/// swap two siblings' ids and pass through a duplicate on the way
+/// (decisions/2026-10-06-uniqueness-a-patch-may-pass-through-is-checked-at-the-end.md).
 #[must_use]
 pub fn graph_violations(graph_id: &GraphId, graph: &Graph) -> Vec<Violation> {
     let mut violations = Vec::new();

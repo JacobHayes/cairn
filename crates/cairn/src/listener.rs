@@ -1,9 +1,9 @@
 //! The listener (ARCHITECTURE, Build, run, deploy: one port for API, MCP, assistant, SSE,
 //! and UI). Every accepted connection gets `TCP_USER_TIMEOUT` at the SSE write stall and
-//! TCP keepalive (DECISIONS.md, 4.2: where the SSE write stall is enforced): data the peer
-//! leaves unacknowledged for the stall, or a closed receive window that long, closes the
-//! connection in the kernel, hyper drops the response body, and the SSE pump, which watches
-//! its channel close, drops the subscription at once.
+//! TCP keepalive (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md): data the
+//! peer leaves unacknowledged for the stall, or a closed receive window that long, closes
+//! the connection in the kernel, hyper drops the response body, and the SSE pump, which
+//! watches its channel close, drops the subscription at once.
 
 use std::future::Future;
 use std::io;
@@ -41,8 +41,8 @@ fn set_user_timeout(socket: &SockRef<'_>) -> io::Result<()> {
 
 /// Other kernels have no `TCP_USER_TIMEOUT`: there, a peer that stops reading is caught
 /// once its buffers fill (the API's own stall), and a proxy's idle timeout must stand in
-/// for the rest (DECISIONS.md, 4.2: what would change it). [`warn_unsupported`] says so at
-/// startup.
+/// for the rest (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md, what
+/// would change it). [`warn_unsupported`] says so at startup.
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
 fn set_user_timeout(_socket: &SockRef<'_>) -> io::Result<()> {
     Ok(())
@@ -104,8 +104,10 @@ pub async fn serve(
 mod tests {
     use super::*;
 
-    /// DECISIONS.md, 4.2: an accepted connection carries the write stall as its user
-    /// timeout, and keepalive at the write stall, probing at the heartbeat interval.
+    /// An accepted connection carries the write stall as its user timeout, and
+    /// keepalive at the write stall, probing at the heartbeat interval
+    /// (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md,
+    /// decisions/2026-10-07-the-socket-level-write-stall-is-measured.md).
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[tokio::test]
     async fn an_accepted_connection_carries_the_stall_and_keepalive() {

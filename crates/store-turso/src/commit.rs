@@ -346,10 +346,12 @@ async fn lock(
 
 /// Writes (without changing) the revision row of every other domain or proposal the
 /// commit depends on, so a concurrent commit there conflicts with this one: Turso checks no
-/// read against a concurrent write, only writes (DECISIONS.md). Those are every revision a
-/// precondition names, a proposal's destination (so a proposal cannot be created while its
-/// journey is hard-deleted), and the deployment when the commit writes an entity reference
-/// (so a merge cannot miss a journey that starts referencing its entities, E6).
+/// read against a concurrent write, only writes
+/// (decisions/2026-10-06-a-turso-commit-writes-the-revision-row-of-every-domain.md). Those
+/// are every revision a precondition names, a proposal's destination (so a proposal cannot
+/// be created while its journey is hard-deleted), and the deployment when the commit writes
+/// an entity reference (so a merge cannot miss a journey that starts referencing its
+/// entities, E6).
 async fn lock_dependencies(
     connection: &Connection,
     commit: &Commit,
@@ -633,7 +635,8 @@ async fn store_receipt(connection: &Connection, stored: &StoredReceipt) -> Resul
 /// connection outside this process's turns can cause: stale with every revision the commit
 /// names that has moved and what intervened, read now. When none has, the commit it lost to
 /// is still in flight and nothing it did can be seen, so the commit fails rather than name a
-/// revision that may never exist with nothing intervening (H5; DECISIONS.md, the H5 fix).
+/// revision that may never exist with nothing intervening (H5;
+/// decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md).
 async fn conflicted(connection: &Connection, commit: &Commit, shape: &Shape) -> CommitError {
     let mut conflicts = Vec::new();
     for (of, expected) in backend::expected_revisions(commit, shape) {

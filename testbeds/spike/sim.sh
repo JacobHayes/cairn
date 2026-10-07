@@ -12,7 +12,7 @@
 #      run passes, every run retried, and no fault knob was inert;
 #   6. known patina gaps (README, Patina gap report): each must still reproduce exactly as
 #      recorded. One that stops reproducing fails this leg, so a patina bump that fixes a gap
-#      gets its README section and DECISIONS.md entry updated instead of going stale.
+#      gets its README section and its file in decisions/ updated instead of going stale.
 #
 # The current-thread runtime with `--tick-ms 1` is the configuration that works under the
 # shim; the gap legs run the ones that do not.
@@ -94,7 +94,7 @@ gap() {
   shift 2
   "$@" >"$out/gap-$name.log" 2>&1 || status=$?
   if [ "$status" -eq 0 ] || ! grep -Eq "$pattern" "$out/gap-$name.log"; then
-    fail "patina gap '$name' no longer reproduces (exit $status): update testbeds/spike/README.md and DECISIONS.md"
+    fail "patina gap '$name' no longer reproduces (exit $status): update testbeds/spike/README.md and its file in decisions/"
   fi
   say "gap $name still reproduces: $(grep -Eo "$pattern" "$out/gap-$name.log" | head -1)"
 }

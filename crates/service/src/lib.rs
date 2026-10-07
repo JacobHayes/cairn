@@ -44,8 +44,9 @@ use std::sync::Arc;
 use cairn_store::{Notifier, Store};
 
 /// The service over one store (ARCHITECTURE, Service layer and composition). Generic over the
-/// store, whose trait is not object-safe (DECISIONS.md, 3.1); the notifier is a trait
-/// object. Cloning shares the store and notifier.
+/// store, whose trait is not object-safe
+/// (decisions/2026-10-06-the-store-trait-is-generic-with-send-futures-not-object-safe.md);
+/// the notifier is a trait object. Cloning shares the store and notifier.
 pub struct Service<S> {
     store: Arc<S>,
     notifier: Arc<dyn Notifier>,

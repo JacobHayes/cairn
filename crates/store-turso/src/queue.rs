@@ -1,13 +1,14 @@
 //! Commits queue in process on what they write (ARCHITECTURE, Concurrency and notification;
-//! DECISIONS.md, the H5 fix): before it begins, a commit takes its turn at every revision
-//! row it writes and at its patch id, and holds them until its transaction ends. A commit
-//! beside one in flight on the same rows therefore waits for it and then sees what it did:
-//! a resubmission meets its original's receipt, and a stale commit is answered with what
-//! really intervened, never with a revision still in flight (H5). Commits to different
-//! domains wait on each other only at a row both write: every commit that writes an entity
-//! reference or creates an entity claims the deployment's revision row, so those queue
-//! across journeys and routes. Turns are taken in one order (the claims' order), so no
-//! commit waits on one that waits on it.
+//! decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md):
+//! before it begins, a commit takes its turn at every revision row it writes and at its
+//! patch id, and holds them until its transaction ends. A commit beside one in flight on
+//! the same rows therefore waits for it and then sees what it did: a resubmission meets its
+//! original's receipt, and a stale commit is answered with what really intervened, never
+//! with a revision still in flight (H5). Commits to different domains wait on each other
+//! only at a row both write: every commit that writes an entity reference or creates an
+//! entity claims the deployment's revision row, so those queue across journeys and routes.
+//! Turns are taken in one order (the claims' order), so no commit waits on one that waits
+//! on it.
 
 use std::collections::{BTreeMap, BTreeSet};
 use std::future::Future;

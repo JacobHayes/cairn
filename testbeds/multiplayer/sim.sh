@@ -14,7 +14,7 @@
 #      run passes, every run resent a request, some patch was answered from its receipt,
 #      and no fault knob was inert;
 #   6. known patina gaps: each must still reproduce exactly as recorded, so a patina bump
-#      that fixes one gets its README section and DECISIONS.md entry updated.
+#      that fixes one gets its README section and its file in decisions/ updated.
 #
 # One current-thread runtime with the 1 ms ticker (the testbed's default) is the
 # configuration the spike (1.3) found the shim carries.
@@ -28,14 +28,15 @@ fail() {
 }
 command -v cargo-patina >/dev/null || fail "cargo-patina is missing: run mise install"
 
-# Product bugs this testbed found and DECISIONS.md records, by the label of the invariant a
+# Product bugs this testbed found and decisions/ records, by the label of the invariant a
 # run breaks first. Until each is fixed, a campaign generation failing on one of these is
 # reported, not fatal; any other failure is. When a fix lands, its label comes out of
 # this list and its ignored test in crates/service/tests/in_flight.rs is un-ignored.
 known_findings=()
 
-# Coverage oracles in the binary that this testbed cannot reach, by label (DECISIONS.md,
-# 6.1 integration). The campaign's own gate is waived for these alone: any other oracle that
+# Coverage oracles in the binary that this testbed cannot reach, by label
+# (decisions/2026-10-06-oracles-the-multiplayer-testbed-cannot-reach-are-listed.md). The
+# campaign's own gate is waived for these alone: any other oracle that
 # never fires fails leg 4, and one of these firing is reported so it can leave the list.
 out_of_reach=(
   # 4.1's announce fallback: needs a journey patch with an entity create riding in it and
@@ -89,7 +90,7 @@ found=$(grep -oE '^    (instruction@[^ ]+ \(undecodable-instruction\) \[symbol=[
 expected=$(sort -u unsupported-symbols.txt)
 [ "$found" = "$expected" ] || {
   diff <(printf '%s\n' "$expected") <(printf '%s\n' "$found") >&2 || true
-  fail "the audit's unsupported symbols changed: update unsupported-symbols.txt, README.md gap 4, and DECISIONS.md"
+  fail "the audit's unsupported symbols changed: update unsupported-symbols.txt, README.md gap 4, and decisions/2026-10-06-patina-turso-links-symbols-the-shim-refuses-to-run-beside.md"
 }
 grep -q 'unsupported native imports' "$out/audit.log" || fail "the audit reports no unsupported symbols: gap 4 is fixed"
 allow=$(paste -sd, unsupported-symbols.txt)
@@ -171,7 +172,7 @@ gap() {
   shift 2
   "$@" >"$out/gap-$name.log" 2>&1 || status=$?
   if [ "$status" -eq 0 ] || ! grep -Eq "$pattern" "$out/gap-$name.log"; then
-    fail "patina gap '$name' no longer reproduces (exit $status): update testbeds/multiplayer/README.md and DECISIONS.md"
+    fail "patina gap '$name' no longer reproduces (exit $status): update testbeds/multiplayer/README.md and its file in decisions/"
   fi
   say "gap $name still reproduces: $(grep -Eo "$pattern" "$out/gap-$name.log" | head -1)"
 }

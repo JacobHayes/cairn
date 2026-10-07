@@ -1,0 +1,6 @@
+# Values the limits table does not name take the nearest named limit
+
+- Question: PRACTICES (Explicit limits) puts a limit on everything, but its table names no limit for keys, client-generated ids, names (entity, route, journey, role and kind titles), emails, choice labels, condition values, reasons, URLs, or for collections such as emails per entity, attachments per node, or entities per deployment. Adding a limit needs the user's sign-off.
+- Call: no new limits. Keys and prefixed ids take the id slug limit (64 bytes, prefix included); single-line labels (names, emails, choice titles, condition values) the title limit (256 bytes); free text (reasons, prompts, help) and URLs the body limit (64 KiB). A collection the table does not name is bounded by the serialized graph cap (16 MiB, checked on the graph a patch produces) and, in any document, by the request-body cap (24 MiB), which every parse checks first.
+- Alternatives: new named limits (URL 2 KiB, emails per entity, attachments per node), which need sign-off; leaving those values unbounded, which PRACTICES forbids.
+- What would change it: a value that is legitimately longer than its borrowed limit (a long URL is the likeliest), or a collection that grows large inside the 16 MiB cap; either becomes a named limit after sign-off.

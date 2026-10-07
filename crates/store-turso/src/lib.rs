@@ -145,7 +145,8 @@ impl TursoStore {
     }
 
     /// Opens the store over the I/O implementation `io` instead of the platform's: a test
-    /// seam, so a test can fail one fsync (DECISIONS.md, 6.2).
+    /// seam, so a test can fail one fsync
+    /// (decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md).
     ///
     /// # Errors
     ///

@@ -11,7 +11,8 @@
 //! way, so a retry that would now break an invariant is rejected, never widened. It only
 //! ever moves forward: a conflict whose current revision is not past the one the patch
 //! named is surfaced, never rebased onto, so no answer can send it back and forth between
-//! two revisions (DECISIONS.md, the H5 fix).
+//! two revisions
+//! (decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md).
 
 use std::future::Future;
 
@@ -21,7 +22,8 @@ use crate::wire::PatchAnswer;
 
 /// Automatic resubmissions of one patch, at most: a runaway stop, not a budget. Each one
 /// needs another commit to have landed on the patch's domain in between; the bound is
-/// PRACTICES' tool-loop iteration limit, borrowed (DECISIONS.md, 4.2).
+/// PRACTICES' tool-loop iteration limit, borrowed
+/// (decisions/2026-10-06-what-the-clients-safe-retry-resubmits-and-how-often.md).
 pub const RESUBMISSION_COUNT_MAX: u32 = 32;
 
 /// H5: the patch to resubmit after it was answered stale with `conflicts` and

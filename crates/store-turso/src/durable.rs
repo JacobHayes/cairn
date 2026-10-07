@@ -1,12 +1,13 @@
-//! Nothing is answered from a write that may not be on disk (DECISIONS.md, the log sync
-//! fix). Turso keeps a transaction whose record it appended to the logical log even when
-//! the log's fsync then fails and its `COMMIT` errs (`turso_core` 0.8.2, a dropped commit
-//! whose log was appended is marked committed): the write is visible, and reaches the disk
-//! only with a later successful sync of the log. So a `COMMIT` that fails other than by a
-//! conflict or a constraint leaves the store unsettled, and no call is answered until a
-//! barrier, a write of its own, has synced the log past it. When the barrier fails too, the
-//! store fails closed: every call errs until it is opened again, and every open settles what
-//! the log holds with a barrier before it answers anything.
+//! Nothing is answered from a write that may not be on disk
+//! (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md). Turso
+//! keeps a transaction whose record it appended to the logical log even when the log's fsync
+//! then fails and its `COMMIT` errs (`turso_core` 0.8.2, a dropped commit whose log was
+//! appended is marked committed): the write is visible, and reaches the disk only with a
+//! later successful sync of the log. So a `COMMIT` that fails other than by a conflict or a
+//! constraint leaves the store unsettled, and no call is answered until a barrier, a write
+//! of its own, has synced the log past it. When the barrier fails too, the store fails
+//! closed: every call errs until it is opened again, and every open settles what the log
+//! holds with a barrier before it answers anything.
 
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};

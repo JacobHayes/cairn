@@ -97,9 +97,10 @@ mod commands {
         );
     }
 
-    /// DECISIONS.md, 4.7 (after 6.2's Turso open gaps): a database that does not open stops
-    /// `serve` and `migrate` with a nonzero exit naming it; the process never retries the
-    /// open, which Turso cannot survive in one process.
+    /// A database that does not open stops `serve` and `migrate` with a nonzero exit
+    /// naming it; the process never retries the open, which Turso cannot survive in one
+    /// process
+    /// (decisions/2026-10-07-a-database-that-does-not-open-stops-the-binary-it-never.md).
     #[test]
     fn a_database_that_does_not_open_stops_the_process() {
         let directory = directory("unopenable");

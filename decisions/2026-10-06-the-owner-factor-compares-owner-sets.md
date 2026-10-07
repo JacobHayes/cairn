@@ -1,0 +1,6 @@
+# The owner factor compares owner sets
+
+- Question: an owner resolves to a set of entities (a role may have several members), and the PRD's `owner_factor` (2 "when d's owner differs from n's owner, or d is owned by no one and n is owned") does not say what "differs" means for sets, or the case of an owned target and an unowned node; "prioritize for me" recomputes it "relative to the current user", who may hold several entities (H3).
+- Call: the factor is 1 when the target's owners and the acting entities share an entity, or both are empty, and 2 otherwise: a target no one owns differs from an owned node, and an owned target from an unowned node. Globally the acting entities are the node's own owners; for a viewer (`Derived::rank_for`), the viewer's entities. The viewer's ranking recomputes leverage, its normalization, ranks, and the order, and leaves the shared ranking unchanged.
+- Alternatives: set equality (a role-owned node and a work item owned by one of its members would count as others' work); factor 1 for an owned target behind an unowned node (finishing unowned work would never count as freeing anyone).
+- What would change it: role-level ownership becoming a distinct notion from its members.

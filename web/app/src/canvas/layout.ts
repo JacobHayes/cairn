@@ -3,9 +3,10 @@
 // a request carries its nodes in tree order and its edges sorted, so the same level always
 // makes the same request. Small edits move few nodes: a request may carry the previous
 // revision's positions as hints, which ELK's semi-interactive crossing minimization keeps the
-// order of nodes within each layer by (DECISIONS.md, 5.2). ELK runs in a worker
-// (layout-worker.ts); this module is the pure part both sides share, and what the unit tests
-// run in-thread.
+// order of nodes within each layer by
+// (decisions/2026-10-07-the-layout-is-hinted-by-the-views-last-positions-a-fresh.md). ELK
+// runs in a worker (layout-worker.ts); this module is the pure part both sides share, and
+// what the unit tests run in-thread.
 //
 // Cost at `node_count_max` (2,000 nodes, at most 64 explicit edges each): building the ELK
 // graph and reading its positions are O(nodes + edges); ELK's layered algorithm is roughly
@@ -50,7 +51,8 @@ export type Placement = Record<string, Placed>;
 /**
  * C15's stated bound: adding one node (or one requirement) to the vendor evaluation's canvas,
  * laid out with the previous positions as hints, moves fewer than this fraction of its nodes
- * within their containers (DECISIONS.md, 5.2).
+ * within their containers
+ * (decisions/2026-10-07-the-layout-is-hinted-by-the-views-last-positions-a-fresh.md).
  */
 export const LAYOUT_MOVED_FRACTION_MAX = 0.25;
 

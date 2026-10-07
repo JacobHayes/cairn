@@ -1,0 +1,6 @@
+# [patina] a delayed TCP segment does not wake epoll_wait
+
+- Question: do patina's network delay knobs (`--net-latency-nanos`, `--net-jitter-nanos`, a drop's retransmit backoff) work for a tokio guest?
+- Call: only with a timer keeping the reactor awake. A segment whose delivery time passes while the reader blocks in `epoll_wait` is delivered at the reactor's next wake instead: 1 ns of latency makes a ping-pong under a 1 s timeout take the full 1 s of virtual time, and with no timer armed the shim aborts (`a shim lock was re-entered by the thread that holds it (a signal handler ran over shim code)`). Blocking `std::net` reads are delivered on time. The spike's `--tick-ms 1` task bounds the lag to 1 ms; with it every delayed run passes. Patina's `pubsub` testbed passes its latency leg because its heartbeat timers do the same. Reproducer: `testbeds/spike/README.md`, gap 2.
+- Alternatives: no delay faults for tokio guests (loses the timeout and retry paths 6.1 exists to test); a larger attempt timeout (delays then always cost a full timeout, which is a different fault than the one configured).
+- What would change it: a patina fix; then the ticker is dropped and the `delayed-delivery` gap leg starts failing.

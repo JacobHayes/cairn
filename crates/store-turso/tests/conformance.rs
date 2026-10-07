@@ -94,7 +94,8 @@ mod conformance {
         a_resubmission_beside_a_commit_in_flight_is_answered_from_its_receipt,
     );
 
-    // DECISIONS.md, the log sync fix: what a commit whose log fsync fails leaves.
+    // What a commit whose log fsync fails leaves
+    // (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
     turso_cases!(
         log_sync:
         a_commit_whose_log_sync_fails_is_answered_once_the_log_is_synced,

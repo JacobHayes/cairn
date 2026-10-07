@@ -1,0 +1,6 @@
+# The membership-loss flag is derived from the breakdown's shape, not stored
+
+- Question: B10 flags "a child whose seeding entity later leaves the role" after the assisted one-child-per-member breakdown, which writes explicit per-member participations. Nothing stored records which role seeded a child, and no brief adds such a record.
+- Call: derive it. A node is flagged for a kind when it declares exactly one explicit entity for that kind, the value it would otherwise inherit for that kind (its nearest declaring ancestor's, or the default owner) is a role, and that entity is not one of the role's current members (resolved through aliases, the role filled through its decision only while the answer is in effect). A hand-written single-entity override naming someone outside the inherited role is flagged too; the flag is informational (D3) and the override is still honored.
+- Alternatives: a stored "seeded from role" marker on breakdown children (a schema and mutation change the PRD does not describe, and a record every upgrade must carry); flagging any explicit participation outside the inherited role, whatever its size (would flag deliberate multi-entity overrides).
+- What would change it: users finding deliberate single-entity overrides flagged too often, which would argue for the stored marker.

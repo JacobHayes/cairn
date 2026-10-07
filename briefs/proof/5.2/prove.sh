@@ -198,7 +198,7 @@ EOF
   echo
   echo "One action added under Reporting, requiring the findings (on the server host, the view's"
   echo "previous positions as hints): $moved_count of $node_count nodes moved within their containers"
-  echo "($moved_list), under the stated bound of a quarter (DECISIONS.md, 5.2)."
+  echo "($moved_list), under the stated bound of a quarter ([\`decisions/2026-10-07-the-layout-is-hinted-by-the-views-last-positions-a-fresh.md\`](../../../decisions/2026-10-07-the-layout-is-hinted-by-the-views-last-positions-a-fresh.md))."
   cat <<'EOF'
 
 ## The tests

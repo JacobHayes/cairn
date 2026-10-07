@@ -4,8 +4,9 @@
 # smoke campaign's generations and oracle coverage, and the planted bug (Turso's revision
 # check skipping the target domain) found by the campaign, minimized to the knobs that
 # matter, and shown by its deterministic service test. The product finding 6.1 made is
-# fixed (DECISIONS.md); its service tests are shown passing. Exits non-zero if any outcome
-# differs from the one it expects.
+# fixed (decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md);
+# its service tests are shown passing. Exits non-zero if any outcome differs from the one
+# it expects.
 #
 # usage: briefs/proof/6.1/prove.sh
 #
@@ -184,7 +185,8 @@ pinned revision. Before this brief nothing drove Cairn's HTTP server with more t
 at a time; now `mise run sim` runs four HTTP clients and one in-process agent patching one
 journey through Cairn's real server, store (Turso), and Rust client (H5's safe retry, H6's
 subscription tracking), under seeded network faults and fault sites, checks nine invariants
-at the end of every run, and found a product bug, since fixed (DECISIONS.md, brief 6.1).
+at the end of every run, and found a product bug, since fixed
+([`decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md`](../../../decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md)).
 
 The `--allow-unsupported-symbols` list names exactly the symbols Turso links that the shim
 refuses (testbeds/multiplayer/README.md, gap 4).
@@ -218,7 +220,8 @@ $head_rows
 
 Every coverage oracle declared in the binary fired, the service's and client's own
 \`reachable!\` sites included, except those \`sim.sh\` lists as out of this testbed's reach
-($(paste -sd' ' <<<"$out_of_reach" | sed -E 's/([a-z-]+)/`\1`/g'); DECISIONS.md, 6.1 integration).
+($(paste -sd' ' <<<"$out_of_reach" | sed -E 's/([a-z-]+)/`\1`/g');
+[\`decisions/2026-10-06-oracles-the-multiplayer-testbed-cannot-reach-are-listed.md\`](../../../decisions/2026-10-06-oracles-the-multiplayer-testbed-cannot-reach-are-listed.md)).
 The fault sites are listed by the runs they fired in:
 
 | Site | Kind | Generations |
@@ -265,8 +268,9 @@ $(grep -E '^test result' <<<"$unplanted_log" | cut -c1-240)
 
 ## The product finding (fixed)
 
-The first campaigns found an H5 bug (DECISIONS.md, "a resubmission beside its own original in
-flight is answered stale"): a patch resubmitted while its original was still committing was
+The first campaigns found an H5 bug
+([\`decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md\`](../../../decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md)):
+a patch resubmitted while its original was still committing was
 answered stale, naming the revision in flight with nothing intervening, and its caller was
 told it conflicted although it landed. It is fixed: a Turso commit takes its turn at the rows
 it writes and at its patch id, and the client never rebases backward. Its two cases run in

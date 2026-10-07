@@ -97,8 +97,8 @@ fn database(
 }
 
 /// The public base URL: http or https, a host, no credentials, query, or fragment, and the
-/// root path, since the API and the UI are served at the root of their origin (DECISIONS.md,
-/// 4.6: the UI routes by the URL's hash beside the API's paths).
+/// root path, since the API and the UI are served at the root of their origin
+/// (decisions/2026-10-06-the-ui-routes-by-the-urls-hash-beside-the-apis-paths-on-one.md).
 fn public_url(text: &str, problems: &mut Vec<Problem>) -> Option<Url> {
     let url = match Url::parse(text) {
         Ok(url) => url,

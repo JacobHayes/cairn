@@ -1,0 +1,6 @@
+# [patina] Turso links symbols the shim refuses to run beside
+
+- Question: can a testbed linking the Turso store run under the native shim with no allowance, as the spike did?
+- Call: no, at the pinned revisions. `turso_core` 0.8.2 links `libloading` unconditionally (`dlopen`, `dlclose`) and, through its default `simd` feature that `turso` and `turso_sdk_kit` enable with no way to disable downstream, simsimd's AVX-512 FP16 kernels: 17 functions whose instructions patina's decoder cannot read (`undecodable-instruction`). `cargo patina run` refuses the binary (`19 symbol(s) ... neither interposed by the deterministic runtime nor known-safe`). None is called on Cairn's paths. Every run passes `--allow-unsupported-symbols` naming exactly those 19 (`testbeds/multiplayer/unsupported-symbols.txt`), never `all`; `sim.sh` fails if the audit finds any other, or none. Reproducer and output: `testbeds/multiplayer/README.md`, gap 4.
+- Alternatives: `--allow-unsupported-symbols all` (would hide a new unmodeled effect); patching Turso's features (not ours to pin differently from the store crate).
+- What would change it: patina deny-trapping `dlopen` as it does process spawning and decoding the AVX-512 FP16 instructions, or a Turso release that gates both.

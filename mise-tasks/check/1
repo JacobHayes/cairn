@@ -2,7 +2,8 @@
 #MISE description="Rung 1: format, lint, typecheck (rustfmt, clippy, workspace lints, patina site labels, the wasm32 build of the runtime-free crates, the TypeScript typecheck, eslint)"
 # PRACTICES, The validation ladder, rung 1; Code conventions. Rung 1 runs tools, not tests:
 # it fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
-# eslint joined with the first TypeScript package, web/client (DECISIONS.md, 1.1).
+# eslint joined with the first TypeScript package, web/client
+# (decisions/2026-10-06-rung-1s-typescript-checks-join-with-the-first-typescript.md).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_RUNG=1
@@ -88,10 +89,11 @@ ladder_suite clippy "$checked" crates
 
 # PRACTICES, Simulation with patina: every `sometimes!`, `reachable!`, `always!`, and
 # `buggify!` site carries a literal kebab-case label. A campaign reads the labels declared
-# anywhere in a binary, and one holding a space breaks every campaign over it (DECISIONS.md,
-# 6.1, patina gap 5). The exceptions: the one reproducer of that gap, and the durability
-# testbed's crash oracles, whose kebab-case labels are constants so a campaign, which draws
-# no crash, does not declare them (DECISIONS.md, 6.2, patina).
+# anywhere in a binary, and one holding a space breaks every campaign over it (patina gap 5,
+# decisions/2026-10-06-patina-a-site-label-holding-a-space-breaks-every-campaign.md). The
+# exceptions: the one reproducer of that gap, and the durability testbed's crash oracles,
+# whose kebab-case labels are constants so a campaign, which draws no crash, does not
+# declare them (decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md).
 label_exceptions=(
   testbeds/multiplayer/gaps/src/bin/spaced_label.rs
   testbeds/durability/src/restart.rs

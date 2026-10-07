@@ -4,9 +4,10 @@
 //! (ARCHITECTURE, Observability).
 //!
 //! [`router`] is the whole API as an `axum::Router`, so the binary and a testbed serve it on
-//! whatever runtime they build (DECISIONS.md, 1.3). A TCP server records peers, as the auth
-//! layer needs: `axum::serve(listener, router.into_make_service_with_connect_info::<
-//! SocketAddr>())`.
+//! whatever runtime they build
+//! (decisions/2026-10-06-6-1-drives-the-real-http-server-on-one-current-thread.md). A TCP
+//! server records peers, as the auth layer needs: `axum::serve(listener,
+//! router.into_make_service_with_connect_info::<SocketAddr>())`.
 
 #![forbid(unsafe_code)]
 

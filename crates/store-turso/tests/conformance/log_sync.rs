@@ -1,9 +1,10 @@
-//! A commit whose logical-log fsync fails (DECISIONS.md, the log sync fix). The durability
-//! testbed found it under patina: the log sync of a commit failed, the commit answered
-//! `Failed`, yet Turso kept it visible; the resubmission was answered `AlreadyApplied` from
-//! a receipt that had never reached the disk, and a crash before the next log sync lost the
-//! acknowledged commit. These are that run minimized to the faults that matter, with the
-//! platform I/O wrapped to fail log fsyncs.
+//! A commit whose logical-log fsync fails
+//! (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md). The
+//! durability testbed found it under patina: the log sync of a commit failed, the commit
+//! answered `Failed`, yet Turso kept it visible; the resubmission was answered
+//! `AlreadyApplied` from a receipt that had never reached the disk, and a crash before the
+//! next log sync lost the acknowledged commit. These are that run minimized to the faults
+//! that matter, with the platform I/O wrapped to fail log fsyncs.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicU32, Ordering};

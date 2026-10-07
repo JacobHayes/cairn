@@ -1,0 +1,6 @@
+# The Host allowlist matches names, not ports, and refuses with 421
+
+- Question: the allowlist (4.3 review round 1) is "built from the public URL's authority, plus loopback names when the listener is loopback-bound". An authority has a port, and proxies differ in whether the `Host` they forward carries one; Vite's development proxy forwards its own `127.0.0.1:<port>`.
+- Call: a request is served when the host name in its target's authority, or else its `Host`, equals the public URL's host or, on a loopback-bound listener, `localhost`, `127.0.0.1`, or `[::1]`, compared case-insensitively with a trailing dot ignored; any port is accepted, a malformed one or credentials are refused. A rebinding page can choose its port but never a name other than its own, so the name is what protects the peer-trusting providers. A refused request is answered 421 Misdirected Request in plain text and logged with the host it named, before the request id, the auth layer, the limits, or any handler; the layer wraps the API, `/mcp`, auth's routes, `/metrics`, and the UI alike.
+- Alternatives: matching name and port (breaks proxies that forward or drop the port, and the Vite dev loop); 403 or 400 (421 says the server does not answer for that name, which is what happened).
+- What would change it: a deployment reached under several names (public URL aliases, as the 4.3 entry says).

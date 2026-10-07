@@ -16,8 +16,8 @@ use url::Url;
 use crate::limits::IDENTITY_CALL_DURATION_MAX;
 
 /// The bytes of one identity-provider response: discovery documents, key sets, and token
-/// responses are a few kilobytes, and the body limit is the nearest named limit (DECISIONS,
-/// brief 1.2).
+/// responses are a few kilobytes, and the body limit is the nearest named limit
+/// (decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
 fn response_bytes_max() -> usize {
     usize::try_from(Limit::BodyBytes.max()).unwrap_or(usize::MAX)
 }

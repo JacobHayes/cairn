@@ -1,8 +1,11 @@
 //! Turso-specific cases (readiness ruling for 3.1): commits in flight together, a long
 //! commit beside reads and another domain's commit, a crash in the middle of a commit, and
-//! the foreign-key gap the domain revision row closes (DECISIONS.md). A commit on rows one
-//! in flight writes waits its turn and then sees what that one did (the H5 fix,
-//! DECISIONS.md); a commit on other rows does not wait.
+//! the foreign-key gap the domain revision row closes
+//! (decisions/2026-10-06-turso-checks-no-foreign-key-against-a-concurrent-transaction.md).
+//! A commit on rows one in flight writes waits its turn and then sees what that one did
+//! (the H5 fix,
+//! decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md);
+//! a commit on other rows does not wait.
 
 use std::future::Future;
 use std::pin::pin;
@@ -257,9 +260,11 @@ fn delete_journey(patch: &str, journey: &str, base: u32) -> Commit {
         .commit()
 }
 
-/// A19 and the foreign-key gap (DECISIONS.md): a journey's hard delete (removing parent
-/// rows) racing a commit that adds a node to it (a child row) cannot leave an orphan,
-/// because both write the journey's revision row: the add waits its turn and is stale.
+/// A19 and the foreign-key gap
+/// (decisions/2026-10-06-turso-checks-no-foreign-key-against-a-concurrent-transaction.md):
+/// a journey's hard delete (removing parent rows) racing a commit that adds a node to
+/// it (a child row) cannot leave an orphan, because both write the journey's revision
+/// row: the add waits its turn and is stale.
 pub async fn a_delete_racing_a_child_insert_leaves_no_orphan(backend: &Turso) {
     let faults = Faults::default();
     let store = backend.open(faults.clone()).await;
@@ -301,7 +306,8 @@ async fn raw_count(path: &std::path::Path, sql: &str) -> i64 {
 
 /// The gap itself, at the SQL level, at the pinned Turso: a child insert and its parent's
 /// delete in two concurrent MVCC transactions both commit, leaving an orphan. When this
-/// starts failing, Turso checks foreign keys across transactions and the DECISIONS.md entry
+/// starts failing, Turso checks foreign keys across transactions and
+/// decisions/2026-10-06-turso-checks-no-foreign-key-against-a-concurrent-transaction.md
 /// can be revisited.
 pub async fn turso_lets_a_child_insert_race_its_parents_delete(backend: &Turso) {
     let path = backend.path(0);

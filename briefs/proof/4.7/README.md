@@ -132,7 +132,7 @@ cache-control: public, max-age=31536000, immutable
 
 ## A foreign Host is refused before auth
 
-A page rebound by DNS to this address names its own host; it is refused on every surface (DECISIONS.md, 4.3 review round 1, 4.7):
+A page rebound by DNS to this address names its own host; it is refused on every surface ([`decisions/2026-10-06-dns-rebinding-protection-is-a-host-allowlist-in-front.md`](../../../decisions/2026-10-06-dns-rebinding-protection-is-a-host-allowlist-in-front.md), [`decisions/2026-10-07-the-host-allowlist-matches-names-not-ports-and-refuses.md`](../../../decisions/2026-10-07-the-host-allowlist-matches-names-not-ports-and-refuses.md)):
 
 ### The API, from another host
 
@@ -228,7 +228,7 @@ The server's log (standard error), JSON lines; the last after SIGTERM, which it 
 
 ## A subscriber that stops reading loses its slot at the write stall
 
-The acceptance test (`crates/cairn/tests/server.rs`) opens the revision stream with the smallest receive buffer the kernel allows, stops reading while the stream keeps ticking, and times the slot from the moment its receive window closed. `TCP_USER_TIMEOUT` at the 15 s stall closes the connection in the kernel, long before the server's send buffer could fill (DECISIONS.md, 4.2, 4.7). Its measurement, exit status 0:
+The acceptance test (`crates/cairn/tests/server.rs`) opens the revision stream with the smallest receive buffer the kernel allows, stops reading while the stream keeps ticking, and times the slot from the moment its receive window closed. `TCP_USER_TIMEOUT` at the 15 s stall closes the connection in the kernel, long before the server's send buffer could fill ([`decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md`](../../../decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md), [`decisions/2026-10-07-the-socket-level-write-stall-is-measured.md`](../../../decisions/2026-10-07-the-socket-level-write-stall-is-measured.md)). Its measurement, exit status 0:
 
 ```text
 freed 15.243205412s after the window closed, 15.714427051s after reading stopped

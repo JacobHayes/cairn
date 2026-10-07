@@ -29,7 +29,8 @@ pub struct ToolDefinition {
     /// The JSON Schema of its arguments: an object.
     pub input_schema: Map<String, Value>,
     /// The JSON Schema of what it answers when it succeeds: an object. Not listed over MCP
-    /// (DECISIONS.md, 4.3); the endpoint's tests hold every output to it.
+    /// (decisions/2026-10-06-the-tool-list-carries-the-mutation-vocabulary-once-and-no.md);
+    /// the endpoint's tests hold every output to it.
     pub output_schema: Map<String, Value>,
 }
 
@@ -59,7 +60,8 @@ pub(crate) fn schema<T: JsonSchema>() -> Map<String, Value> {
 
 /// The schema of `T`, a tool's arguments that carry mutations, with each mutation described
 /// as an object whose `op` names it rather than spelled out: `apply_patch` spells the
-/// vocabulary out once, so the tool list an agent loads carries it once (DECISIONS.md, 4.3).
+/// vocabulary out once, so the tool list an agent loads carries it once
+/// (decisions/2026-10-06-the-tool-list-carries-the-mutation-vocabulary-once-and-no.md).
 /// Parsing is as strict either way.
 pub(crate) fn schema_citing_mutations<T: JsonSchema>() -> Map<String, Value> {
     citing::<T>(&[MUTATION, REVIEW_ITEM])

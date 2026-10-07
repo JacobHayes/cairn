@@ -261,11 +261,11 @@ impl Records {
         }
     }
 
-    /// Advances the revisions one patch's events move (A17, H5; DECISIONS.md, entity creates
-    /// in another domain's patch): the patch's domain advances by one, unless the patch only
-    /// edits a proposal, whose record carries its own revision; a patch to another domain
-    /// that writes deployment records (an entity create, a deleted journey id) also advances
-    /// the deployment by one.
+    /// Advances the revisions one patch's events move (A17, H5;
+    /// decisions/2026-10-06-entity-creates-in-another-domains-patch-advance.md): the patch's
+    /// domain advances by one, unless the patch only edits a proposal, whose record carries
+    /// its own revision; a patch to another domain that writes deployment records (an entity
+    /// create, a deleted journey id) also advances the deployment by one.
     pub fn advance(&mut self, events: &[cairn_schema::Event]) {
         let Some(first) = events.first() else {
             return;

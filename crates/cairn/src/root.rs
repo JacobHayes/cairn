@@ -205,8 +205,9 @@ pub async fn serve(
 ) -> Result<(), StartupError> {
     // Opened once: a failed open stops the process, never a retry here, since Turso cannot
     // open again in a process a failed open ran in, and some open failures are not
-    // recoverable at all (DECISIONS.md, 6.2: [turso] an open under injected I/O faults).
-    // A supervisor restarts the process.
+    // recoverable at all
+    // (decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md). A
+    // supervisor restarts the process.
     let store = Arc::new(
         TursoStore::open(&config.database)
             .await

@@ -52,7 +52,7 @@ ladder=$(mise run check:4 2>&1) || status=$?
   printf '`mise run check:4` exit status %s. Each backend is its own suite, so neither can vanish behind the other:\n\n' "$status"
   printf '| Suite | Tests |\n|---|---|\n'
   grep -E 'ladder: rung 4: suite' <<<"$ladder" | sed -E 's/.*suite store conformance: ([a-z]+): ([0-9]+) tests/| \1 | \2 |/'
-  printf '\nThe Turso suite adds its own cases: two creates of one journey in flight, two creates of one entity key riding in two journeys at once, a hard delete racing a node insert into the journey, a long commit beside a read of its journey and a commit to another, a crash in the middle of a commit, a new entity reference racing a merge of the entity, a proposal racing its journey'"'"'s deletion, history paged while an earlier-numbered commit is in flight, and the foreign-key gap (DECISIONS.md).\n'
+  printf '\nThe Turso suite adds its own cases: two creates of one journey in flight, two creates of one entity key riding in two journeys at once, a hard delete racing a node insert into the journey, a long commit beside a read of its journey and a commit to another, a crash in the middle of a commit, a new entity reference racing a merge of the entity, a proposal racing its journey'"'"'s deletion, history paged while an earlier-numbered commit is in flight, and the foreign-key gap ([`decisions/2026-10-06-turso-checks-no-foreign-key-against-a-concurrent-transaction.md`](../../../decisions/2026-10-06-turso-checks-no-foreign-key-against-a-concurrent-transaction.md)).\n'
 } >>"$out"
 
 printf '\n## Planted bug: events appended outside the all-or-nothing step\n\n' >>"$out"

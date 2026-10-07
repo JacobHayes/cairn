@@ -8,7 +8,8 @@
 // so this package does not depend on the browser host). The resubmission names the revisions
 // the rejection reports, never a newer one read since, and keeps its patch id. It only ever
 // moves forward: a conflict whose current revision is not past the one the patch named is
-// surfaced, never rebased onto (DECISIONS.md, 6.1 and the H5 fix).
+// surfaced, never rebased onto
+// (decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md).
 import type { components } from "../generated/api.ts";
 
 type Schemas = components["schemas"];
@@ -21,8 +22,9 @@ export type Domain = Schemas["Domain"];
 
 /**
  * Automatic resubmissions of one patch, at most: a runaway stop, not a budget. The bound
- * is the Rust client's (`RESUBMISSION_COUNT_MAX`, DECISIONS.md 4.2), so both clients give up
- * at the same point.
+ * is the Rust client's (`RESUBMISSION_COUNT_MAX`,
+ * decisions/2026-10-06-what-the-clients-safe-retry-resubmits-and-how-often.md), so both
+ * clients give up at the same point.
  */
 export const RESUBMISSION_COUNT_MAX = 32;
 

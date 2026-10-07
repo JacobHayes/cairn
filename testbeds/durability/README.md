@@ -72,26 +72,33 @@ mise run sim     # every leg of sim.sh, from the repository root
 
 ## Findings
 
-All in `DECISIONS.md` (brief 6.2, and the log sync fix).
+Each finding is recorded in `decisions/`, linked at the end of its item.
 
 - **Store: an acknowledged commit is lost after a failed log fsync (fixed).** Turso keeps a
   commit visible after its log `fsync` fails and its `COMMIT` errors; the resubmission was
   answered from that receipt and acknowledged; a crash before the next log sync lost it.
   Found at seed 31, `--fs-error-permille 5 --fs-crash-at write:40`. The store now answers
-  nothing after such a failure until a barrier commit has synced the log past it, and
-  fails closed until reopened when it cannot. Its deterministic tests are
+  nothing after such a failure until a barrier commit has synced the log past it, and fails
+  closed until reopened when it cannot. Its deterministic tests are
   `crates/store-turso/tests/conformance/log_sync.rs`; leg 6 pins seed 12 at `sync:28`.
+  Recorded in
+  [`decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md`](../../decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md)
+  and
+  [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 - **Patina: a removed directory stops crash points.** Once the guest removes a directory
   (Turso's temporary directory, when a connection that wrote is dropped), no later
   `--fs-crash-at` point fires and the run ends uncrashed. So the store's open runs its
-  barrier on a pooled connection, which keeps its temporary directory. An in-process
-  reopen still drops the pool, so a run that reopens is not crashed after it.
+  barrier on a pooled connection, which keeps its temporary directory. An in-process reopen
+  still drops the pool, so a run that reopens is not crashed after it. Recorded in
+  [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 - **Turso: opens under injected faults.** A log size error at open panics; a short read of
-  the log header fails the open; an open retried in-process after a failed one panics in
-  the page cache; `EINTR` is reported, not retried.
-- **Patina: no crash in campaigns, no partial Turso frame.** A campaign never draws a
-  crash, so the crash oracles carry constant labels (out of the link-time table) and the
-  sweep gates them. Byte tearing tears the ledger's appends but never leaves part of a
-  Turso log frame, so the torn-tail oracle has not fired.
+  the log header fails the open; an open retried in-process after a failed one panics in the
+  page cache; `EINTR` is reported, not retried. Recorded in
+  [`decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md`](../../decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md).
+- **Patina: no crash in campaigns, no partial Turso frame.** A campaign never draws a crash,
+  so the crash oracles carry constant labels (out of the link-time table) and the sweep
+  gates them. Byte tearing tears the ledger's appends but never leaves part of a Turso log
+  frame, so the torn-tail oracle has not fired. Recorded in
+  [`decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md`](../../decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md).
 - Reused from 6.1: whitespace-free site labels, verdicts rather than `always!`, the
   symbol allowance.

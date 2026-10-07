@@ -1,8 +1,9 @@
-//! The records a patch reads (ARCHITECTURE, Write path; DECISIONS.md 2.1: apply works over
-//! loaded records): the engine's `Records` assembled from store loads, and the revisions the
-//! commit must recheck. The engine never sees the store, and the store never sees the engine.
-//! A patch to a proposal (I6) loads the proposal; a patch that applies one loads it too, and
-//! everything its mutations read, as if the patch held them.
+//! The records a patch reads (ARCHITECTURE, Write path;
+//! decisions/2026-10-06-apply-works-over-loaded-records-and-replay-shares-its-write.md): the
+//! engine's `Records` assembled from store loads, and the revisions the commit must recheck.
+//! The engine never sees the store, and the store never sees the engine. A patch to a
+//! proposal (I6) loads the proposal; a patch that applies one loads it too, and everything
+//! its mutations read, as if the patch held them.
 //!
 //! Cost: one load for the deployment, one for the target, one per proposal the patch edits or
 //! applies, one per route version the patch reads, and for each entity merge one index query

@@ -1,0 +1,6 @@
+# Uniqueness a patch may pass through is checked at the end of the commit
+
+- Question: ARCHITECTURE's Schema outline makes (graph_id, parent_key, id) unique on nodes, and H3 makes emails unique across entities, but a valid patch can pass through a duplicate on the way (swapping two siblings' ids; moving an email from one entity to another, in either order), and neither SQLite nor Turso has a deferred unique constraint.
+- Call: both are checked inside the commit transaction, after its writes, on the graphs and deployment it produced, in both backends, and a duplicate rejects the patch (`duplicate_sibling_id`, `email_taken`); the tables keep plain indexes for the lookup. Primary keys stay unique constraints, since no patch passes through a duplicate key. Conformance cases: `sibling_ids_may_swap_within_a_commit_but_not_end_duplicated`, `emails_may_move_between_entities_within_a_commit_but_stay_unique`.
+- Alternatives: immediate unique indexes (they reject valid patches); ordering a change set's writes so no duplicate appears (the store would need the engine's knowledge of what each write means).
+- What would change it: deferred unique constraints in Turso, or a Postgres backend (which has them).

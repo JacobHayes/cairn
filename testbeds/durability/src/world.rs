@@ -252,13 +252,16 @@ pub fn report_violation(label: &str, detail: &str) {
 }
 
 /// Turso panics, rather than answering an error, when an injected I/O error reaches these
-/// points of an open (DECISIONS.md, 6.2, turso). An open that panics with one of them is a
-/// store that did not open; any other panic is a finding and goes on unwinding.
+/// points of an open
+/// (decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md). An open
+/// that panics with one of them is a store that did not open; any other panic is a finding
+/// and goes on unwinding.
 const TURSO_OPEN_PANICS: [&str; 1] = ["failed to get file size"];
 
 /// Opens the store once. The world does not retry a failed open unless told to: a server
 /// whose store does not open exits and is restarted by its supervisor, and Turso can panic
-/// when an open is retried in the process a failed one ran in (DECISIONS.md, 6.2, turso).
+/// when an open is retried in the process a failed one ran in
+/// (decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md).
 async fn open_store(directory: &Path, faults: &Faults) -> Result<TursoStore, Stop> {
     let path = database(directory);
     let faults = faults.clone();

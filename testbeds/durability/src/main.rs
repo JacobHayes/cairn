@@ -9,8 +9,9 @@
 //! checks the invariants (`audit`) before doing anything else, resubmits the step that was
 //! in flight, and finishes the plan; every run checks them again at the end. Each broken
 //! invariant is a `violation` verdict and the run exits 1 (not an `always!`, whose abort
-//! loses a crash-restart run's trace: DECISIONS.md, 6.2, patina); a clean run reports a
-//! `pass` verdict whose detail is echoed as a `DURABILITY_RESULT` line.
+//! loses a crash-restart run's trace:
+//! decisions/2026-10-07-how-the-durability-testbed-judges-durability.md); a clean run reports
+//! a `pass` verdict whose detail is echoed as a `DURABILITY_RESULT` line.
 //!
 //! Arguments: `--dir PATH` (the data directory; default `/cairn-durability`, which exists
 //! only in patina's in-memory filesystem, so a native run passes one), `--steps N` (the

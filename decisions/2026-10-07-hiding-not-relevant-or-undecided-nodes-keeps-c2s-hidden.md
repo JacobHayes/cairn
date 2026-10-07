@@ -1,0 +1,6 @@
+# Hiding not-relevant or undecided nodes keeps C2's hidden-prerequisites promise in the tab
+
+- Question: C1 gives not-relevant and undecided nodes each a toggle that hides them, and C2 says hiding a kind never makes blocked work look free. The engine's `level` (2.6) takes the shown kinds and the container and nothing about relevance, so the relevance toggles hide nodes the engine still drew.
+- Call: the canvas filters the engine's level in the tab: a hidden card and what rolls up into it leave the canvas with their lines, a card under a hidden one is drawn under its nearest shown ancestor, and a card gains a blocker in its hidden-prerequisites marker when the card, or a node rolled up into it, is blocked by it (its own `blocked_by`, containment aside, or an ancestor's it inherits through `blocked_through`) and either the blocker or the node holding the requirement is hidden this way. Not-relevant nodes block nothing, so hiding them never marks anything; undecided ones do.
+- Alternatives: a relevance filter in the engine's `level` (a projection change for a display toggle, and the API's level would grow a parameter no agent needs); hiding without the marker (undecided work would look free, which C2 forbids for kinds).
+- What would change it: another client needing relevance-filtered levels, which would move this rule into the engine.

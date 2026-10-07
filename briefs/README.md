@@ -2,7 +2,7 @@
 
 A brief is an implementation milestone: what to build next, in what order, and how to show it works. It points into `PRD.md`, `ARCHITECTURE.md`, and `PRACTICES.md` by requirement id and section heading and does not restate them; where a brief and a document disagree, the document wins (`AGENTS.md`).
 
-Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase, steps run in order unless the table says otherwise. 4.8 and 4.9 finish what 4.1 and 4.2 start once the engine is complete, so they run before 4.3 and 4.5, which depend on them (DECISIONS.md).
+Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase, steps run in order unless the table says otherwise. 4.8 and 4.9 finish what 4.1 and 4.2 start once the engine is complete, so they run before 4.3 and 4.5, which depend on them ([`decisions/2026-10-06-the-service-and-api-split-at-the-engines-2-4-boundary.md`](../decisions/2026-10-06-the-service-and-api-split-at-the-engines-2-4-boundary.md)).
 
 ## Template
 
@@ -12,7 +12,7 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 4. **Scope**: in, and out where a neighbor could build the same thing.
 5. **Acceptance**: behavior by PRD id and scenario; the planted bug; the rungs this brief adds to the ladder, if any (PRACTICES, Growing the ladder); fixtures used. Every brief also leaves `briefs/proof/<id>/` (AGENTS, Leave proof).
 6. **Decisions left to the implementer**.
-7. **Decision log**: appended by the implementer, for small calls; calls that matter go in `DECISIONS.md` (AGENTS).
+7. **Decision log**: appended by the implementer, for small calls; calls that matter go in `decisions/`, one new file per decision (AGENTS).
 
 ## The cut
 

@@ -1,14 +1,15 @@
-//! The `Host` allowlist in front of the whole router (DECISIONS.md, 4.3 review round 1:
-//! DNS-rebinding protection belongs to the listener). A page whose name an attacker rebinds
-//! to the server's address makes the browser send that name as the request's `Host`, so the
-//! dev provider without a token and Tailscale in direct mode, which trust the peer, would
-//! otherwise answer it as their user. Every request whose host is not the public URL's, or,
-//! when the listener is bound to loopback, a loopback name, is refused before the auth layer,
-//! on the API, `/mcp`, auth's own routes, the UI, and `/metrics` alike.
+//! The `Host` allowlist in front of the whole router: DNS-rebinding protection belongs to the
+//! listener (decisions/2026-10-06-dns-rebinding-protection-is-a-host-allowlist-in-front.md).
+//! A page whose name an attacker rebinds to the server's address makes the browser send that
+//! name as the request's `Host`, so the dev provider without a token and Tailscale in direct
+//! mode, which trust the peer, would otherwise answer it as their user. Every request whose
+//! host is not the public URL's, or, when the listener is bound to loopback, a loopback name,
+//! is refused before the auth layer, on the API, `/mcp`, auth's own routes, the UI, and
+//! `/metrics` alike.
 //!
 //! The name decides, not the port: a rebinding page can choose any port but never a name
 //! other than its own, while proxies in front of Cairn differ in whether they forward the
-//! port (DECISIONS.md, 4.7).
+//! port (decisions/2026-10-07-the-host-allowlist-matches-names-not-ports-and-refuses.md).
 
 use std::collections::BTreeSet;
 use std::net::SocketAddr;

@@ -1,0 +1,6 @@
+# The engine's `Derived` projects onto the schema's here
+
+- Question: 2.2 deferred projecting the engine's `Derived` onto the schema's `Derived` and `NodeDerived` until every field they carry is derived; with rank, every one is. The schema's lists (gravity and leverage contributors) would hold up to 2,000 entries per node if complete.
+- Call: `Derived::to_schema(graph)` builds the schema's `Derived` in 2.5: every D3 value per node with its explanation inputs, the frontiers in global rank order, and the stalled diagnostic; explanation lists are cut to `explanation_entry_count_max` with their totals (the server-response shape ARCHITECTURE describes), while the engine lists them completely on demand (`Priority::gravity_from`, `leverage_from`, `downstream`). `RelevanceExplanation.condition_on` names the node whose condition or force include decided the value when it is not the node itself. The schema types needed no new fields.
+- Alternatives: leaving the projection to 2.6 (2.6's projections would start by writing it); complete lists in the schema type (about 4 million contributor entries at the limits).
+- What would change it: a host that serializes the schema's `Derived` and needs complete lists, which would page them from the engine (the `explanations` projection, 2.6).

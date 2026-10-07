@@ -11,8 +11,8 @@
 //! and its body ends in an error, so it reconnects and starts again from current revisions.
 //! A peer that stops reading is caught here only once the socket's buffers fill; the
 //! listener's `TCP_USER_TIMEOUT` (4.7) closes it at the stall, and the pump then drops it
-//! as gone (DECISIONS.md, 4.2: where the SSE write stall is enforced).
-//! A client that goes away is noticed at once and dropped the same way.
+//! as gone (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md). A client that
+//! goes away is noticed at once and dropped the same way.
 
 use std::fmt;
 use std::pin::Pin;

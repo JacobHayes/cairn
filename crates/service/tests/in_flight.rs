@@ -187,12 +187,13 @@ fn split_applied(
     }
 }
 
-/// H5 (6.1 finding, fixed; DECISIONS.md): a patch resubmitted while its original is still
-/// committing (its answer was lost, or its caller stopped waiting) is the same patch: it
-/// lands once, and the other submission is answered from its receipt. On Turso the
-/// original is held inside its transaction and the resubmission waits its turn; on the
-/// memory store, which commits whole, the original is held before it begins and the
-/// resubmission lands first.
+/// H5 (6.1 finding, fixed;
+/// decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md):
+/// a patch resubmitted while its original is still committing (its answer was lost, or
+/// its caller stopped waiting) is the same patch: it lands once, and the other
+/// submission is answered from its receipt. On Turso the original is held inside its
+/// transaction and the resubmission waits its turn; on the memory store, which commits
+/// whole, the original is held before it begins and the resubmission lands first.
 async fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt<
     S: Store + 'static,
 >(
@@ -223,11 +224,13 @@ fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt_on_tur
     });
 }
 
-/// H5 (6.1 finding, fixed; DECISIONS.md): a stale answer is the client's only evidence for
-/// retrying on its own, so it names no revision without what that revision touched. Two
-/// renames of one node from revision 1, one held in flight: the other is answered stale
-/// carrying the held one's rename, never naming the revision in flight with nothing
-/// intervening, which the client would take as safe to rebase onto.
+/// H5 (6.1 finding, fixed;
+/// decisions/2026-10-06-a-resubmission-beside-its-own-original-in-flight-is-answered.md):
+/// a stale answer is the client's only evidence for retrying on its own, so it names no
+/// revision without what that revision touched. Two renames of one node from revision
+/// 1, one held in flight: the other is answered stale carrying the held one's rename,
+/// never naming the revision in flight with nothing intervening, which the client would
+/// take as safe to rebase onto.
 async fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches<S: Store + 'static>(
     service: Service<S>,
     gate: Arc<Gate>,

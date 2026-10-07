@@ -1,5 +1,5 @@
 {
-  "source": "Written from the OpenAI Responses API reference (POST /v1/responses, function calling, stateless reasoning), not captured live: a live capture needs a credential (DECISIONS.md, 4.4).",
+  "source": "Written from the OpenAI Responses API reference (POST /v1/responses, function calling, stateless reasoning), not captured live: a live capture needs a credential (decisions/2026-10-06-the-openai-protocol-is-the-responses-api-and-the-wire.md).",
   "path": "/v1/responses",
   "headers": {
     "authorization": "Bearer test-key"

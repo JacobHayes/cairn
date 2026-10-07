@@ -4,8 +4,9 @@
 //! discard (Turso's frame-level atomicity: a frame whose trailer is missing is not replayed).
 //!
 //! The coverage oracles here fire only in a restarted incarnation, which only a crash-restart
-//! makes, and `cargo patina campaign` draws no crash (DECISIONS.md, 6.2, patina). Their labels
-//! are constants rather than literals, so they stay out of the link-time site table a
+//! makes, and `cargo patina campaign` draws no crash
+//! (decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md). Their
+//! labels are constants rather than literals, so they stay out of the link-time site table a
 //! campaign gates on; the crash sweep in `sim.sh` gates on them instead.
 
 use std::collections::BTreeSet;

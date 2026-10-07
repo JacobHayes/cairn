@@ -1,0 +1,6 @@
+# Metrics are served at /metrics behind the auth layer, with derive and commit durations from the service and the Turso store
+
+- Question: ARCHITECTURE lists request counts and latencies, patch outcomes, engine panics, derive duration, and store commit duration; the API recorded the first three, nobody the last two, and whether `/metrics` is public was open.
+- Call: the binary installs a Prometheus recorder (`metrics-exporter-prometheus`, without its own listener) and serves `GET /metrics` behind the auth layer, so a scraper presents an agent token like any client; it is not part of the OpenAPI document. It and the UI are served beside the API through `cairn_api::router_beside`, under the API's body and in-flight limits and its observability, since the in-flight limit is one per process (review round 1). The service times each derive (`cairn_derive_duration_seconds`) on native targets only (the browser has no clock std can read, and nothing to export to); the Turso store times each commit by outcome (`cairn_store_commit_duration_seconds`).
+- Alternatives: an unauthenticated `/metrics` (discloses endpoint traffic to anyone who reaches the port); timing in the binary through a store wrapper (the Store trait has thirty methods to forward).
+- What would change it: a scraper that cannot send a bearer token.

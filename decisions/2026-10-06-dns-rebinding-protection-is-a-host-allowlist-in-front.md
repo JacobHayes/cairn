@@ -1,0 +1,6 @@
+# DNS-rebinding protection is a Host allowlist in front of the whole router, built by 4.7
+
+- Question: the review found that turning rmcp's `Host` allowlist off leaves a gap the API shares: the dev provider without a token and Tailscale in direct mode authenticate on the peer, so a page whose name an attacker rebinds to the server's loopback or tailnet address can drive `/mcp` and the API as that user. The session cookie (host-scoped, `SameSite=Lax`) and the JSON content type do not help once the browser believes the request is same-origin. No brief carried a `Host` check.
+- Call: one `Host` allowlist in front of the whole router, built by the binary from the public URL's authority (and loopback names when the listener is bound to loopback), refusing any other `Host` before the auth layer; MCP keeps rmcp's own check off, since the listener's covers it. Added to 4.7's scope and acceptance. Until 4.7 nothing is served outside tests.
+- Alternatives: rmcp's check on `/mcp` only (the API stays open to the same attack); a check inside the auth providers that trust the peer (each would need the public URL, and the UI's routes would stay exposed).
+- What would change it: a deployment reached under several names, which would make the allowlist a list in the configuration (public URL aliases).

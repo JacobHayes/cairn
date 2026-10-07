@@ -6,9 +6,10 @@ decides whether 6.1's multiplayer testbed drives the real HTTP server or calls t
 in-process. This directory is throwaway: brief 6.2 folds it in or deletes it.
 
 **Answer: yes, on one current-thread tokio runtime with a ticker task; no, on more than one
-thread doing tokio I/O.** 6.1 drives the real HTTP server (DECISIONS.md, 2026-10-06, brief
-1.3). Everything below is real output from patina at the pinned revision `6a2977e7` on
-Linux x86_64; three patina gaps are written up at the end.
+thread doing tokio I/O.** 6.1 drives the real HTTP server
+([`decisions/2026-10-06-6-1-drives-the-real-http-server-on-one-current-thread.md`](../../decisions/2026-10-06-6-1-drives-the-real-http-server-on-one-current-thread.md)).
+Everything below is real output from patina at the pinned revision `6a2977e7` on Linux
+x86_64; three patina gaps are written up at the end.
 
 ## The program
 
@@ -48,7 +49,8 @@ mise run sim          # every leg below, from the repository root (testbeds/spik
 
 `mise run sim` takes about 15 s here: code checks and unit tests, build, audit, determinism,
 the smoke campaign, the faulted sweep, and one leg per gap that fails if the gap stops
-reproducing (so a patina bump that fixes one gets this file and DECISIONS.md updated).
+reproducing (so a patina bump that fixes one gets this file and its file in `decisions/`
+updated).
 
 ## Results
 
@@ -153,7 +155,7 @@ SSE or other long-lived streaming responses, reqwest or other client crates, HTT
 ## Patina gap report
 
 Three gaps, each reproduced at the pinned revision and confirmed absent natively. Each has a
-`DECISIONS.md` entry tagged patina and a leg in `sim.sh` that fails once it stops
+file in `decisions/` tagged `[patina]` and a leg in `sim.sh` that fails once it stops
 reproducing. The reproducer is one file, a tokio TCP ping-pong (dependency: `tokio =1.53.1`
 with `macros`, `net`, `rt`, `rt-multi-thread`, `io-util`, `time`):
 

@@ -343,7 +343,7 @@ fn a_placeholder_completes_only_once_broken_down_or_atomic() {
 #[test]
 fn a_role_with_a_filling_decision_and_a_fed_milestone_change_only_through_the_decision() {
     let records = vendor_after(2);
-    // The client routes both through the decision (DECISIONS.md, E3 role fills).
+    // The client routes both through the decision (decisions/2026-10-07-a-direct-fill-of-a-decision-filled-role-is-routed.md).
     for direct in [
         "- op: fill_role\n  role: r_eval_owner\n  entities: [e_lead]\n",
         "- op: clear_role_fill\n  role: r_eval_owner\n",

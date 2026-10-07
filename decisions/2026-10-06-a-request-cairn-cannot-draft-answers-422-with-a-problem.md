@@ -1,0 +1,6 @@
+# A request Cairn cannot draft answers 422 with a problem, not a rejection
+
+- Question: an upgrade, save as route, re-link, or refresh can fail before any patch exists: the journey follows no route, the version is older than the one it follows, or the draft passes a proposal's limits (the engine's `DraftError`). PRACTICES keeps `Rejection` for a patch that was submitted and refused, and 4.2 answers everything else as a `Problem`; neither names a status for a well-formed request the engine cannot draft.
+- Call: a missing journey or route version answers 404 `not_found`; the other draft errors answer 422 with a `Problem` whose code is `cannot_draft`. The OpenAPI document lists 422 on the drafting operations as one of a `Rejection` (the proposal write was invalid) or a `Problem`; the two are told apart by their fields. A refusal is counted with the patch outcomes as `not_drafted`.
+- Alternatives: 409 (nothing conflicts: the request would fail the same way on any revision); a `Rejection::Invalid` with a made-up violation path (a draft error is not a violation of a candidate graph, and A15's list is the engine's); 400 (the request parses).
+- What would change it: a client that needs to tell draft errors apart programmatically, which would give `DraftError` its own wire enum.

@@ -217,8 +217,8 @@ impl<S: Store> Service<S> {
     /// merge that id committed. A merge names the journeys referencing either entity at
     /// their revisions when it was drafted, which a client reads from the index, so a
     /// resubmission after any of them moved carries other content for the same merge; it is
-    /// matched by what it merges (DECISIONS.md, 4.3): the committed patch's one event merged
-    /// the same entity into the same survivor.
+    /// matched by what it merges (briefs/4.3-mcp.md, Decision log): the committed patch's
+    /// one event merged the same entity into the same survivor.
     async fn merged_as(&self, patch: &Patch) -> Result<bool, WriteError> {
         let [
             Mutation::MergeEntities {

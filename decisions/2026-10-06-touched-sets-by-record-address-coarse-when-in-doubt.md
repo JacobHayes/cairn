@@ -1,0 +1,6 @@
+# Touched sets by record address, coarse when in doubt
+
+- Question: H5 retries a stale patch automatically when its touched set does not overlap the intervening events', "by key and field"; the scout left the granularity open, and some mutations' effects (create, publish, upgrade, apply a proposal) depend on content they do not name.
+- Call: a touched set is a set of record addresses. Node fields, edges, participations, resources, local-edit markers, and each kind of journey state are addressed separately, so an edit and a transition on one node, or edits to two fields, never overlap; a whole node overlaps everything on it (an edge belongs to both ends), so a removal overlaps any change to what it removes. A mutation whose effect depends on unnamed content, and any mutation the dispatch does not list, touches its whole domain: too coarse only costs an automatic retry, never correctness. A transition or answer also touches the node's snooze and answer; proposal edits touch only the proposal.
+- Alternatives: per-node granularity (simpler, fewer automatic retries); computing touched sets from the graph at apply (exact but not available to a client deciding whether to resubmit).
+- What would change it: retries in the multiplayer testbed (6.1) failing too often, which would refine the coarse cases.

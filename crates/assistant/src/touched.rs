@@ -1,9 +1,11 @@
 //! What one direct write touches (I5: "unless one change would touch more than ten nodes"),
-//! resolved against its journey as it stands (DECISIONS.md, 4.4): every node a record the
-//! patch writes hangs off, by its touched set (H5); a note or link it removes counts the
-//! node the stored journey has it on; and skipping or reopening a node counts its whole
-//! subtree, which D1a skips or reopens with it. A role fill writes one record and counts
-//! none: who holds a role is one answer, as a decision that fills the role is.
+//! resolved against its journey as it stands
+//! (decisions/2026-10-07-the-ten-node-limit-holds-across-a-turn-and-what-touched.md): every
+//! node a record the patch writes hangs off, by its touched set (H5); a note or link it
+//! removes counts the node the stored journey has it on; and skipping or reopening a node
+//! counts its whole subtree, which D1a skips or reopens with it. A role fill writes one
+//! record and counts none: who holds a role is one answer, as a decision that fills the
+//! role is.
 
 use std::collections::{BTreeMap, BTreeSet};
 

@@ -48,7 +48,8 @@ limit_markers! {
     EntityCountPerFill => EntityCountPerFill,
     /// A collection the limits table does not name, bounded by the serialized graph cap
     /// (`graph_bytes_max`) and, for any document, the request cap (`request_bytes_max`), which
-    /// every parse checks first (DECISIONS.md).
+    /// every parse checks first
+    /// (decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
     ByDocumentSize => GraphBytes,
     /// `chain_count_per_rejection_max`.
     ChainCountPerRejection => ChainCountPerRejection,

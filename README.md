@@ -15,7 +15,7 @@ deployment at http://127.0.0.1:8080/.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md): how it is built.
 - [`PRACTICES.md`](PRACTICES.md): how code is written and verified.
 - [`AGENTS.md`](AGENTS.md): the entry point for implementers, then [`briefs/`](briefs/README.md).
-- [`DECISIONS.md`](DECISIONS.md): judgment calls awaiting review.
+- [`decisions/`](decisions/README.md): judgment calls awaiting review, one file each.
 
 ## Develop
 

@@ -145,7 +145,8 @@ impl Client {
     }
 
     /// At least one redirect URI, each allowed, and the whole within the body limit (the
-    /// nearest named limit for a document of free text; DECISIONS.md, brief 1.2).
+    /// nearest named limit for a document of free text;
+    /// decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
     fn check(&self) -> Result<(), ClientError> {
         if self.redirect_uris.is_empty() {
             return Err(ClientError::RedirectUri(

@@ -101,7 +101,7 @@ impl From<GaveUp> for Stop {
 
 /// Wakes the runtime every `period` and does nothing else: under the shim a TCP segment
 /// delayed by a network fault is delivered only when some timer wakes the runtime
-/// (DECISIONS.md, 1.3: a delayed TCP segment does not wake `epoll_wait`).
+/// (decisions/2026-10-06-patina-a-delayed-tcp-segment-does-not-wake-epoll-wait.md).
 async fn tick(period: Duration) {
     let mut interval = tokio::time::interval(period);
     loop {

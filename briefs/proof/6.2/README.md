@@ -12,10 +12,12 @@ submitted, and that the state loaded equals the engine's replay of the log.
 
 Seed 12. Under fs errors its first commit's log fsync fails. Before the store was fixed,
 such a commit was answered from a receipt that never reached the disk, and a crash before
-the next log sync took the acknowledged commit away (DECISIONS.md, 6.2, found at seed 31
-through a retry). Now the store syncs the log with a barrier commit before it answers
+the next log sync took the acknowledged commit away
+([`decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md`](../../../decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md),
+found at seed 31 through a retry). Now the store syncs the log with a barrier commit before it answers
 ("Settled", reported by the run without a crash), so the crash after it loses nothing
-(DECISIONS.md, the log sync fix). With the fix removed, the run with both loses step 0.
+([`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md)).
+With the fix removed, the run with both loses step 0.
 
 | Run | Faults | Verdict | Retried write | Settled | Restart | Violation |
 |---|---|---|---|---|---|---|

@@ -2,10 +2,11 @@
 # Generates briefs/proof/6.2/README.md: the durability testbed (testbeds/durability) built
 # shim-linked and run under patina. One seed fault-free, under a failed log fsync, under a
 # crash-restart, and under both, which lost an acknowledged commit until the store was
-# fixed (DECISIONS.md, 6.2 and the log sync fix); a crash-restart sample; a smoke
-# campaign's generations and oracles; a crash sweep and the oracles it fired; the planted
-# client bug passing fault-free and caught by a crash; and the finding's deterministic
-# store tests passing. Exits non-zero if any outcome differs from the one it expects.
+# fixed (decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md and
+# decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md);
+# a crash-restart sample; a smoke campaign's generations and oracles; a crash sweep and
+# the oracles it fired; the planted client bug passing fault-free and caught by a crash;
+# and the finding's deterministic store tests passing. Exits non-zero if any outcome differs from the one it expects.
 #
 # usage: briefs/proof/6.2/prove.sh
 #
@@ -131,10 +132,12 @@ test_results=$(grep -E '^test conformance::' <<<"$test_log")
   echo
   echo 'Seed 12. Under fs errors its first commit'"'"'s log fsync fails. Before the store was fixed,'
   echo 'such a commit was answered from a receipt that never reached the disk, and a crash before'
-  echo 'the next log sync took the acknowledged commit away (DECISIONS.md, 6.2, found at seed 31'
-  echo 'through a retry). Now the store syncs the log with a barrier commit before it answers'
+  echo 'the next log sync took the acknowledged commit away'
+  echo '([`decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md`](../../../decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md),'
+  echo 'found at seed 31 through a retry). Now the store syncs the log with a barrier commit before it answers'
   echo '("Settled", reported by the run without a crash), so the crash after it loses nothing'
-  echo '(DECISIONS.md, the log sync fix). With the fix removed, the run with both loses step 0.'
+  echo '([`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md)).'
+  echo 'With the fix removed, the run with both loses step 0.'
   echo
   echo '| Run | Faults | Verdict | Retried write | Settled | Restart | Violation |'
   echo '|---|---|---|---|---|---|---|'
