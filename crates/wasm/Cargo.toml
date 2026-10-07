@@ -42,6 +42,12 @@ cairn-engine = { workspace = true, features = ["testing"] }
 axum.workspace = true
 cairn-auth.workspace = true
 tokio = { workspace = true, features = ["net", "rt"] }
+# 3.2's stub OIDC issuer, which the fixture server starts beside itself so a browser test
+# links an identity (brief 5.5): what that test code builds its tokens and keys with.
+chrono.workspace = true
+ed25519-dalek.workspace = true
+openidconnect.workspace = true
+url.workspace = true
 
 [lints]
 workspace = true

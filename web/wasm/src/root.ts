@@ -7,7 +7,7 @@ import type { Schema } from "@cairn/client";
 import { BrowserRoot, type RootSubscription } from "../generated/cairn_wasm.js";
 
 import { loadEngine, type Engine, type WasmSource } from "./engine.ts";
-import { hosted, parsed, stoppedBy, type HistoryPage, type PatchRequest, type Taken } from "./types.ts";
+import { hosted, parsed, stoppedBy, type HistoryPage, type JourneyIndexQuery, type PatchRequest, type Taken } from "./types.ts";
 
 /** Hears a subscription's ticks: the first time, the current revisions (`first`). */
 export type TickListener = (ticks: Schema<"Tick">[], first: boolean) => void;
@@ -48,6 +48,42 @@ export class InBrowserHost {
   /** The journey index (C16). */
   journeys(): Schema<"JourneyPage"> {
     return parsed<Schema<"JourneyPage">>(hosted(() => this.#root.journeys()));
+  }
+
+  /** C16: the journey index `query` asks for, as `GET /journeys` with those filters answers it. */
+  journeyIndex(query: JourneyIndexQuery): Schema<"JourneyPage"> {
+    return parsed<Schema<"JourneyPage">>(hosted(() => this.#root.journeyIndex(JSON.stringify(query))));
+  }
+
+  /** The route index from after `after`, as `GET /routes` answers it. */
+  routes(after?: string): Schema<"RoutePage"> {
+    return parsed<Schema<"RoutePage">>(hosted(() => this.#root.routes(after ?? "")));
+  }
+
+  /** C17: a route's versions with the journeys on each, as `GET /routes/{id}/versions` answers it. */
+  routeDetail(route: string): Schema<"RouteDetail"> {
+    return parsed<Schema<"RouteDetail">>(hosted(() => this.#root.routeDetail(route)));
+  }
+
+  /** A13: a route version as its file, or its draft with no version, as `GET /routes/{id}/export` answers it. */
+  exportFile(route: string, version?: number): Schema<"RouteFile"> {
+    return parsed<Schema<"RouteFile">>(hosted(() => this.#root.exportFile(route, version === undefined ? "" : String(version))));
+  }
+
+  /**
+   * A13: imports a route file as the local user, as `POST /routes/{id}/import` answers it:
+   * the patch answer, or a HostFailure whose reason is the rejection. Subscribers hear what
+   * it moved.
+   */
+  importFile(request: Schema<"RouteImport">): Schema<"PatchAnswer"> {
+    const answer = parsed<Schema<"PatchAnswer">>(hosted(() => this.#root.importFile(JSON.stringify(request), this.#clock())));
+    this.#deliverAll();
+    return answer;
+  }
+
+  /** The caller, as `GET /users/me` answers it (H3). */
+  viewer(): Schema<"Viewer"> {
+    return parsed<Schema<"Viewer">>(hosted(() => this.#root.viewer(this.#clock())));
   }
 
   /** A journey's domain document now, as the server answers it: the text to derive. */

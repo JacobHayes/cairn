@@ -1,7 +1,9 @@
 // G1, G2: the node's notes and links, attributed and timestamped, each editable and
 // deletable, and a link designated as the node's artifact or not (G2: a `requires_artifact`
 // deliverable's guard looks for one on the node itself; removing it after completion leaves
-// the node done and `stale`). Adding one is a form kept as a draft until it is sent.
+// the node done and `stale`). Adding one is a form kept as a draft until it is sent. The
+// journey's own notes and links (G1, on the journey's overview) are the same list with no
+// node, and no artifact.
 import type { Schema } from "@cairn/client";
 
 import { Badge, Button, Field } from "../ui/kit.tsx";
@@ -55,7 +57,7 @@ interface AnnotationDraft {
   text: string;
 }
 
-function Editor({ write, node, form }: { write: NodeWrite; node: string; form: ReturnType<typeof useFormDraft<AnnotationDraft>> }) {
+function Editor({ write, node, form, types }: { write: NodeWrite; node: string | null; form: ReturnType<typeof useFormDraft<AnnotationDraft>>; types: AnnotationType[] }) {
   const { draft } = form;
   if (draft === undefined) {
     return null;
@@ -72,7 +74,7 @@ function Editor({ write, node, form }: { write: NodeWrite; node: string; form: R
     <div className="stack" data-testid="annotation-editor">
       <span className="row">
         <select className="select" aria-label="Type" value={value.type} onChange={(event) => { form.change({ ...value, type: event.target.value as AnnotationType }); }}>
-          {ANNOTATION_TYPES.map((type) => (
+          {types.map((type) => (
             <option key={type} value={type}>
               {type === "note" ? "Note" : `${type[0]?.toUpperCase() ?? ""}${type.slice(1)} link`}
             </option>
@@ -99,6 +101,7 @@ function Item({ annotation, write, onEdit }: { annotation: Annotation; write: No
   const { body } = annotation;
   const { type, text } = contentOf(body);
   const link = type !== "note";
+  const designates = link && body.node != null;
   return (
     <li className="stack attachment" data-testid="annotation" data-key={body.key} data-type={type}>
       <span className="row">
@@ -113,7 +116,7 @@ function Item({ annotation, write, onEdit }: { annotation: Annotation; write: No
       </span>
       <span className="row">
         <Button disabled={write.disabled} onClick={onEdit}>Edit</Button>
-        {link ? (
+        {designates ? (
           <Button disabled={write.disabled} onClick={() => void write.run([{ op: "edit_annotation", annotation: designated(body, type !== "artifact") }])}>
             {type === "artifact" ? "Not the artifact" : "Make it the artifact"}
           </Button>
@@ -126,20 +129,20 @@ function Item({ annotation, write, onEdit }: { annotation: Annotation; write: No
   );
 }
 
-/** G1, G2: the node's notes and links, with the form that adds or edits one. */
-export function AttachmentList({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `annotations:${detail.node.key}`);
-  const key = detail.node.key;
-  const form = useFormDraft<AnnotationDraft>(write.journey, key, "annotation");
-  const { annotations } = detail;
-  const artifacts = annotations.filter((annotation) => annotation.body.artifact !== undefined).length;
-  const summary = [String(annotations.length), detail.node.requires_artifact === true ? `artifact required, ${String(artifacts)} designated` : undefined];
+/**
+ * G1: notes and links on `node`, or on the journey itself when `node` is null, with the form
+ * that adds or edits one; `summary` heads the section.
+ */
+export function AnnotationList({ view, node, annotations, summary }: { view: Ready; node: string | null; annotations: Annotation[]; summary: string }) {
+  const write = useNodeWrite(view, `annotations:${node ?? "journey"}`);
+  const form = useFormDraft<AnnotationDraft>(write.journey, node ?? "journey", "annotation");
+  const types = node === null ? ANNOTATION_TYPES.filter((type) => type !== "artifact") : ANNOTATION_TYPES;
   const edit = (annotation: Annotation) => {
     const { type, text } = contentOf(annotation.body);
     form.open({ key: annotation.body.key, adding: false, type, title: annotation.body.title ?? "", text }, write.seen);
   };
   return (
-    <Section title="Notes and links" summary={summary.filter((part) => part !== undefined).join(", ")} open testId="annotations">
+    <Section title="Notes and links" summary={summary} open testId="annotations">
       {annotations.length === 0 ? <span className="muted">None yet.</span> : null}
       <ul className="checklist stack">
         {annotations.map((annotation) => (
@@ -153,9 +156,17 @@ export function AttachmentList({ view, detail }: { view: Ready; detail: NodeDeta
           </Button>
         </span>
       ) : (
-        <Editor write={write} node={key} form={form} />
+        <Editor write={write} node={node} form={form} types={types} />
       )}
       <Rejected view={view} write={write} onResolved={form.close} />
     </Section>
   );
+}
+
+/** G1, G2: the node's notes and links, with the form that adds or edits one. */
+export function AttachmentList({ view, detail }: { view: Ready; detail: NodeDetail }) {
+  const { annotations } = detail;
+  const artifacts = annotations.filter((annotation) => annotation.body.artifact !== undefined).length;
+  const summary = [String(annotations.length), detail.node.requires_artifact === true ? `artifact required, ${String(artifacts)} designated` : undefined];
+  return <AnnotationList view={view} node={detail.node.key} annotations={annotations} summary={summary.filter((part) => part !== undefined).join(", ")} />;
 }

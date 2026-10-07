@@ -21,9 +21,7 @@ use cairn_schema::{
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, WriteError, Written,
 };
-use cairn_store::{
-    InProcessNotifier, JourneyQuery, MemoryStore, PageSize, Subscription, Take, Watch,
-};
+use cairn_store::{InProcessNotifier, MemoryStore, Subscription, Take, Watch};
 use jiff::tz::TimeZone;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -158,7 +156,7 @@ fn watch(name: &str) -> Result<Watch, HostError> {
 }
 
 /// A service failure, as the root reports it.
-fn failed(error: impl std::fmt::Display) -> HostError {
+pub(crate) fn failed(error: impl std::fmt::Display) -> HostError {
     HostError::Failed {
         message: error.to_string(),
     }
@@ -243,7 +241,7 @@ impl BrowserRoot {
     }
 
     /// The local identity's call at `now` (an RFC 3339 timestamp).
-    fn call(&self, now: &str) -> Result<Call, HostError> {
+    pub(crate) fn call(&self, now: &str) -> Result<Call, HostError> {
         Ok(Call {
             actor: self.local.clone(),
             now: now
@@ -300,43 +298,13 @@ impl BrowserRoot {
         }
     }
 
-    /// The journey index (C16): every journey, in id order.
+    /// The journey index (C16): every journey, in id order, up to the page limit.
     ///
     /// # Errors
     ///
     /// When the store fails.
     pub fn journey_page(&self) -> Result<JourneyPage, HostError> {
-        let query = JourneyQuery {
-            size: PageSize::MAX,
-            ..JourneyQuery::default()
-        };
-        let page = now_or_never(self.service.journeys(&query)).map_err(failed)?;
-        let items = page.items.into_iter().map(|summary| {
-            let upgrade_available = summary.upgrade_available();
-            let cairn_store::JourneySummary {
-                id,
-                name,
-                status,
-                lineage,
-                revision,
-                created_at,
-                latest_version,
-            } = summary;
-            JourneySummary {
-                id,
-                name,
-                status,
-                lineage,
-                revision,
-                created_at,
-                latest_version,
-                upgrade_available,
-            }
-        });
-        Ok(JourneyPage {
-            items: items.collect(),
-            next: page.next,
-        })
+        self.journey_index(&crate::reads::JourneyIndexQuery::default())
     }
 }
 

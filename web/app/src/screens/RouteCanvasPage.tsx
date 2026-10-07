@@ -2,7 +2,7 @@
 // open or one is asked for, drawn with no journey state: kinds, titles, a decision's prompt,
 // explicit edges solid and implicit gates dotted, semantic zoom (C2) and drill-in (C4) by the
 // same engine rules as a journey's canvas (the derive worker answers its level). It follows
-// the route live (H6). Authoring on it is 5.6's; route detail and versions are 5.5's.
+// the route live (H6). Authoring on it is 5.6's; route detail and versions (5.5) link here.
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
@@ -15,6 +15,7 @@ import { layoutViewOf, paramsOf, viewFrom, type CanvasView } from "../canvas/set
 import type { Level, Route } from "../data/host.ts";
 import { useDeployment, useSession } from "../data/react.ts";
 import type { Schema } from "@cairn/client";
+import { routeDetailPath } from "../routes/address.ts";
 
 /** The graph a route's canvas shows: its draft, or one published version. */
 interface Shown {
@@ -176,6 +177,7 @@ export function RouteCanvasPage() {
             {shown.of === "draft" ? "The draft" : `Version ${String(shown.of)}`}
             {shown.of !== "draft" && shown.route.draft == null ? " (no draft is open)" : ""}; a route has no journey state.
           </span>
+          <Link to={routeDetailPath(id)}>Versions and journeys</Link>
         </div>
         <KindToggles view={view} journey={false} onChange={(next) => void navigate(routeCanvasPath(id, version, next))} />
         <nav className="crumbs" aria-label="Drilled into" data-testid="crumbs">

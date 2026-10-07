@@ -98,7 +98,13 @@ export function Shell() {
         <Link to="/" className="shell-brand">
           Cairn
         </Link>
-        <Link to="/">Journeys</Link>
+        <nav className="row shell-nav" aria-label="Screens">
+          <Link to="/">Journeys</Link>
+          <Link to="/mine">Mine</Link>
+          <Link to="/routes">Routes</Link>
+          <Link to="/entities">Entities</Link>
+          <Link to="/me">You</Link>
+        </nav>
         <span className="shell-spacer" />
         <LiveStatus />
         <HostSwitch />

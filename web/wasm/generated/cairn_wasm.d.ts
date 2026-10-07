@@ -29,6 +29,15 @@ export class BrowserRoot {
      */
     document(journey: string, now: string): string;
     /**
+     * A13: version `version` of route `route` as a file, or its draft when `version` is
+     * empty, as `GET /routes/{id}/export` answers it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: no such route, version, or draft, or an unreadable input.
+     */
+    exportFile(route: string, version: string): string;
+    /**
      * J4: a page of a journey's history, or of `node`'s (empty for the whole journey), after
      * the log position `after` (negative for the first page), as `GET /journeys/{id}/history`
      * answers it.
@@ -38,6 +47,25 @@ export class BrowserRoot {
      * The JSON of a [`HostError`]: no such journey, or an unreadable input.
      */
     history(journey: string, node: string, after: number): string;
+    /**
+     * A13: imports a route file as the local user at `now`: `request` is the JSON of a
+     * [`RouteImport`]; the answer is the JSON of the patch answer, as
+     * `POST /routes/{id}/import` answers it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`], the rejection among them.
+     */
+    importFile(request: string, now: string): string;
+    /**
+     * C16: the journey index `query` (the JSON of a [`JourneyIndexQuery`]) asks for, as
+     * `GET /journeys` answers it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`].
+     */
+    journeyIndex(query: string): string;
     /**
      * The journey index (C16), as `GET /journeys` answers it.
      *
@@ -64,6 +92,15 @@ export class BrowserRoot {
      */
     patch(request: string, now: string): string;
     /**
+     * C17: route `route`'s versions with the journeys on each, as
+     * `GET /routes/{id}/versions` answers it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`]: no such route, or an unreadable input.
+     */
+    routeDetail(route: string): string;
+    /**
      * One published version of a route (A11), as `GET /routes/{id}/versions/{version}`
      * answers it; `version` is its number as text.
      *
@@ -81,6 +118,15 @@ export class BrowserRoot {
      */
     route(route: string): string;
     /**
+     * The route index from after `after` (empty for the first page), as `GET /routes`
+     * answers it.
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`].
+     */
+    routes(after: string): string;
+    /**
      * H6: a subscriber to what `watching` (the JSON of a list of watch names) names, holding
      * the current revisions for its first take.
      *
@@ -89,6 +135,14 @@ export class BrowserRoot {
      * The JSON of a [`HostError`].
      */
     subscribe(watching: string): RootSubscription;
+    /**
+     * The caller at `now`, as `GET /users/me` answers it (H3).
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`].
+     */
+    viewer(now: string): string;
 }
 
 /**
@@ -203,6 +257,27 @@ export function importRoute(request: string): string;
 export function preview(document: string, request: string): string;
 
 /**
+ * A13: a route file's text (YAML, or JSON, which is YAML) read as the file document, the
+ * JSON the API's import takes: `GET` and `POST` carry JSON, disks hold YAML (ARCHITECTURE,
+ * File format).
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError::Unreadable`] when the text is not a route file.
+ */
+export function readRouteFile(text: string): string;
+
+/**
+ * A13: the file document (the JSON of a `RouteFile`, as an export answers it) written as
+ * the canonical YAML a route file is kept in on disk: sorted, in a stable field order.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError::Unreadable`] when the JSON is not a route file.
+ */
+export function routeFileText(file: string): string;
+
+/**
  * C2: a route's canvas level: `request` is the JSON of a [`RouteLevelRequest`]; the answer is
  * the JSON of a `Level`, as a journey's level projection answers it.
  *
@@ -249,13 +324,19 @@ export interface InitOutput {
     readonly browserroot_capabilities: (a: number, b: number) => void;
     readonly browserroot_deployment: (a: number, b: number) => void;
     readonly browserroot_document: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly browserroot_exportFile: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly browserroot_history: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => void;
+    readonly browserroot_importFile: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly browserroot_journeyIndex: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_journeys: (a: number, b: number) => void;
     readonly browserroot_new: (a: number) => void;
     readonly browserroot_patch: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly browserroot_route: (a: number, b: number, c: number, d: number) => void;
+    readonly browserroot_routeDetail: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_routeVersion: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
+    readonly browserroot_routes: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
+    readonly browserroot_viewer: (a: number, b: number, c: number, d: number) => void;
     readonly derivation_derived: (a: number, b: number) => void;
     readonly derivation_key: (a: number, b: number) => void;
     readonly derivation_new: (a: number, b: number, c: number) => void;
@@ -265,7 +346,9 @@ export interface InitOutput {
     readonly exportRoute: (a: number, b: number, c: number) => void;
     readonly importRoute: (a: number, b: number, c: number) => void;
     readonly preview: (a: number, b: number, c: number, d: number, e: number) => void;
+    readonly readRouteFile: (a: number, b: number, c: number) => void;
     readonly rootsubscription_take: (a: number, b: number, c: number) => void;
+    readonly routeFileText: (a: number, b: number, c: number) => void;
     readonly routeLevel: (a: number, b: number, c: number) => void;
     readonly start: () => void;
     readonly touched: (a: number, b: number, c: number) => void;

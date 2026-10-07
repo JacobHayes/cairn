@@ -2143,6 +2143,23 @@ export interface components {
             /** @description The version. */
             version: components["schemas"]["VersionNumber"];
         };
+        /** @description One identity a user signs in with (ARCHITECTURE, Auth: users and identities). */
+        LinkedIdentity: {
+            /**
+             * Format: date-time
+             * @description When it was linked.
+             */
+            linked_at: string;
+            /** @description The provider, by its configured name. */
+            provider: components["schemas"]["Slug"];
+            /** @description The provider's subject for the account. */
+            subject: components["schemas"]["Title"];
+            /**
+             * @description H3: the emails the provider marked verified at the last sign-in; only these match an
+             *     entity.
+             */
+            verified_emails: components["schemas"]["Email"][];
+        };
         /** @description C9: a list filter that needs no argument. */
         ListFlag: "mine" | "unassigned" | "next_up" | "decisions_needed" | "needs_breakdown" | "active" | "blocked" | "overdue" | "stale" | "snoozed" | "snoozed_and_overdue" | "shortfall";
         /** @description C9: a page of the list. */
@@ -4352,6 +4369,8 @@ export interface components {
             agent?: components["schemas"]["AgentId"] | null;
             /** @description Their entities, which "mine" covers together. */
             entities: components["schemas"]["EntityKey"][];
+            /** @description The identities they sign in with, by provider and subject. */
+            identities: components["schemas"]["LinkedIdentity"][];
             /**
              * @description H3: present when their emails name more than one entity, which are then offered for
              *     merging.

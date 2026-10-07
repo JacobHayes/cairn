@@ -1,14 +1,14 @@
 // The tab's one data layer over either host (ARCHITECTURE, Web UI): the capabilities, the
-// deployment context, the journey index, the derived journeys, the tick stream that keeps
+// deployment context, the caller, the derived journeys, the tick stream that keeps
 // them current (H6), the version-skew latch, the notices, and the write path (H5, D7).
 import { Subscription, type Timers } from "@cairn/client";
 
 import { DeploymentStore } from "./deployment-store.ts";
 import type { Capabilities, Deriver, Host } from "./host.ts";
-import { IndexStore } from "./index-store.ts";
 import { JourneyStore } from "./journeys.ts";
 import { Notices } from "./notices.ts";
 import { SkewLatch } from "./skew.ts";
+import { ViewerStore } from "./viewer-store.ts";
 import { ROLLOVER_CHECK_MS } from "./today.ts";
 import { write, type WriteIntent, type WriteResult } from "./writes.ts";
 
@@ -36,7 +36,7 @@ export class Session {
   readonly skew = new SkewLatch();
   readonly notices = new Notices();
   readonly deployment: DeploymentStore;
-  readonly index: IndexStore;
+  readonly viewer: ViewerStore;
   readonly journeys: JourneyStore;
   readonly #timers: Timers;
   readonly #now: () => Date;
@@ -50,7 +50,7 @@ export class Session {
     this.#now = parts.now ?? (() => new Date());
     this.subscription = new Subscription(parts.host.openTicks, this.#timers);
     this.deployment = new DeploymentStore(parts.host, this.subscription);
-    this.index = new IndexStore(parts.host, this.subscription);
+    this.viewer = new ViewerStore(parts.host, this.deployment);
     this.journeys = new JourneyStore({
       host: parts.host,
       deriver: parts.deriver,
@@ -65,6 +65,7 @@ export class Session {
   static async start(parts: SessionParts): Promise<Session> {
     const session = new Session(parts, await parts.host.capabilities());
     await session.deployment.refetch();
+    session.viewer.refetch();
     return session;
   }
 

@@ -1,10 +1,10 @@
 // The data layer as React hooks: every screen reads through these, never the host directly.
 import type { StreamStatus } from "@cairn/client";
-import { createContext, useContext, useEffect, useSyncExternalStore } from "react";
+import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 
-import type { Capabilities, Deployment } from "./host.ts";
-import type { IndexView } from "./index-store.ts";
+import type { Capabilities, Deployment, Viewer } from "./host.ts";
 import type { JourneyView } from "./journeys.ts";
+import { LiveRead, type LiveSpec, type LiveView } from "./live.ts";
 import type { Notice } from "./notices.ts";
 import type { Session } from "./session.ts";
 import type { Skew } from "./skew.ts";
@@ -27,11 +27,12 @@ export function useJourney(id: string): JourneyView {
   return useSyncExternalStore(journeys.subscribe, () => journeys.view(id));
 }
 
-/** The journey index, kept current while shown (H6). */
-export function useJourneyIndex(): IndexView {
-  const { index } = useSession();
-  useEffect(() => index.mount(), [index]);
-  return useSyncExternalStore(index.subscribe, () => index.view);
+/** The caller (H3), once fetched; refetched whenever a newer deployment is held. */
+export function useViewer(): { viewer: Viewer | undefined; failed: string | undefined } {
+  const { viewer } = useSession();
+  const current = useSyncExternalStore(viewer.subscribe, () => viewer.current);
+  const failed = useSyncExternalStore(viewer.subscribe, () => viewer.failed);
+  return { viewer: current, failed };
 }
 
 /** The deployment context (E6), once fetched. */
@@ -64,4 +65,16 @@ export function useStreamStatus(): StreamStatus {
 /** Capabilities gating: what the host offers. */
 export function useCapabilities(): Capabilities {
   return useSession().capabilities;
+}
+
+/**
+ * A read kept current while shown (H6), made afresh whenever `key` changes: `key` names
+ * everything `spec` depends on, since the spec itself is rebuilt on every render.
+ */
+export function useLive<T>(key: string, spec: (session: Session) => LiveSpec<T>): { view: LiveView<T>; refetch: () => void } {
+  const session = useSession();
+  const read = useMemo(() => new LiveRead(session.subscription, spec(session)), [session, key]);
+  useEffect(() => read.mount(), [read]);
+  const view = useSyncExternalStore(read.subscribe, () => read.view);
+  return { view, refetch: () => { read.refetch(); } };
 }

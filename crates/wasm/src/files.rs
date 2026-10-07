@@ -8,7 +8,7 @@
 
 use cairn_engine::format::RouteHeading;
 use cairn_engine::{Graph, export, import};
-use cairn_schema::{Deployment, PatchId, Route, RouteFile, RouteVersion, from_yaml};
+use cairn_schema::{Deployment, PatchId, Route, RouteFile, RouteVersion, from_yaml, to_yaml};
 use cairn_service::PatchKeys;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -116,4 +116,29 @@ pub fn export_route(request: &str) -> Result<String, String> {
 #[wasm_bindgen(js_name = importRoute)]
 pub fn import_route(request: &str) -> Result<String, String> {
     Ok(json(&imported(&read("import request", request)?)?))
+}
+
+/// A13: a route file's text (YAML, or JSON, which is YAML) read as the file document, the
+/// JSON the API's import takes: `GET` and `POST` carry JSON, disks hold YAML (ARCHITECTURE,
+/// File format).
+///
+/// # Errors
+///
+/// The JSON of a [`HostError::Unreadable`] when the text is not a route file.
+#[wasm_bindgen(js_name = readRouteFile)]
+pub fn read_route_file(text: &str) -> Result<String, String> {
+    let file: RouteFile = from_yaml(text).map_err(|error| HostError::unreadable("file", error))?;
+    Ok(json(&file))
+}
+
+/// A13: the file document (the JSON of a `RouteFile`, as an export answers it) written as
+/// the canonical YAML a route file is kept in on disk: sorted, in a stable field order.
+///
+/// # Errors
+///
+/// The JSON of a [`HostError::Unreadable`] when the JSON is not a route file.
+#[wasm_bindgen(js_name = routeFileText)]
+pub fn route_file_text(file: &str) -> Result<String, String> {
+    let file: RouteFile = read("file", file)?;
+    Ok(to_yaml(&file).map_err(|error| HostError::unreadable("file", error))?)
 }

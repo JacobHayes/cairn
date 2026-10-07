@@ -103,6 +103,15 @@ mod in_process {
         let viewer: Viewer = get(&ann, "/users/me").await;
         assert_eq!(viewer.entities, ["e_lead".parse().unwrap()].into());
         assert_eq!((viewer.agent, viewer.merge_offer), (None, None));
+        let emails: Vec<_> = viewer
+            .identities
+            .iter()
+            .flat_map(|identity| &identity.verified_emails)
+            .collect();
+        assert!(
+            !viewer.identities.is_empty() && !emails.is_empty(),
+            "the identity that names the entity is listed with its verified email"
+        );
         let capabilities: Capabilities = get(&ann, "/capabilities").await;
         assert_eq!(capabilities, Capabilities::from(service.capabilities()));
         assert!(capabilities.sse && capabilities.mcp && !capabilities.assistant);

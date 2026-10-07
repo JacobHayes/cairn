@@ -225,3 +225,63 @@ fn a_message_draft_renders_with_the_journey_context_in_the_derivation() {
     let refused = derivation.render_draft(template).unwrap_err();
     assert!(matches!(thrown(&refused), HostError::Missing { .. }));
 }
+
+/// Brief 5.5: the reads the screens around a journey make are the API's JSON: the index with
+/// its filters (C16), the route index and detail (C17), the caller (H3), and a route file
+/// exported, imported as a new route, and exported again unchanged (A13).
+#[test]
+fn the_index_route_and_viewer_reads_are_the_apis_json() {
+    fn same<T: serde::Serialize + serde::de::DeserializeOwned>(text: &str) -> T {
+        let parsed: T = serde_json::from_str(text).unwrap();
+        assert_eq!(text, serde_json::to_string(&parsed).unwrap());
+        parsed
+    }
+    let root = BrowserRoot::seeded().unwrap();
+    let filtered: wire::JourneyPage = same(
+        &root
+            .journey_index_json(r#"{"route": "vendor-evaluation", "status": ["active"]}"#)
+            .unwrap(),
+    );
+    let ids: Vec<String> = filtered
+        .items
+        .iter()
+        .map(|item| item.id.to_string())
+        .collect();
+    assert_eq!(ids, ["j_vendor_eval"]);
+    let routes: wire::RoutePage = same(&root.routes("").unwrap());
+    assert!(
+        routes
+            .items
+            .iter()
+            .any(|route| route.header.id.as_str() == "hiring-loop")
+    );
+    let detail: wire::RouteDetail = same(&root.route_detail("vendor-evaluation").unwrap());
+    assert!(
+        detail.versions[0]
+            .journeys
+            .contains(&"j_vendor_eval".parse().unwrap())
+    );
+    let viewer: wire::Viewer = same(&root.viewer(NOW).unwrap());
+    assert_eq!(viewer.identities.len(), 1);
+    assert_eq!(
+        viewer.merge_offer.as_ref(),
+        Some(&viewer.entities),
+        "the local identity's emails name each fixture's lead"
+    );
+
+    let exported = root.export_file("hiring-loop", "1").unwrap();
+    let mut file: serde_json::Value = serde_json::from_str(&exported).unwrap();
+    file["route"] = "hiring-loop-copy".into();
+    file.as_object_mut().unwrap().remove("extends");
+    let import = serde_json::json!({ "patch_id": "p_copy", "file": file }).to_string();
+    let answered = root.import_file_json(&import, NOW).unwrap();
+    let _: wire::PatchAnswer = same(&answered);
+    let again = root.export_file("hiring-loop-copy", "").unwrap();
+    let parsed: serde_json::Value = serde_json::from_str(&again).unwrap();
+    assert_eq!(
+        parsed, file,
+        "a route file imported and exported comes back unchanged"
+    );
+    let text = cairn_wasm::route_file_text(&again).unwrap();
+    assert_eq!(cairn_wasm::read_route_file(&text).unwrap(), again);
+}

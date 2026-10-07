@@ -1,7 +1,7 @@
 // The shell on the server host, against the fixture server through Vite's proxy: views stay
 // current across pages (H6), writes from different pages meet through the safe retry (H5),
 // a deployment tick re-derives, and a document from a newer engine stops the tab (version
-// skew). The index and owner cases land with their screens (5.5). The `binary` project of
+// skew). The index and owner cases are around-server.spec.ts's (5.5). The `binary` project of
 // playwright.config.ts runs this suite again against the real binary (4.7).
 import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
 

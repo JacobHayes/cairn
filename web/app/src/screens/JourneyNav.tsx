@@ -1,18 +1,19 @@
-// A journey's screens, one link each: the canvas (5.2), the acting surfaces (C9 to C11), and
-// the read-mostly views (C12, C13, C18). A screen only links to screens that exist
-// (briefs/README.md); a later screen adds its own.
+// A journey's screens, one link each: its overview (C16), the canvas (5.2), the acting
+// surfaces (C9 to C11), and the read-mostly views (C12, C13, C18). A screen only links to
+// screens that exist (briefs/README.md); a later screen adds its own.
 //
 // The canvas and the read-mostly views each sit at the journey's address plus a segment and
 // open node detail at that address plus `/nodes/<key>`. Moving among them keeps an open node
 // open, and keeps the address's query: it is the canvas's settings (canvas/settings.ts), which
 // the read-mostly views do not read, so coming back to the canvas finds it as it was left. The
-// acting surfaces keep their own settings in their query, so they are always linked fresh.
+// overview and the acting surfaces keep their own addresses, so they are always linked fresh.
 import { Link, useLocation } from "react-router";
 
 import { listPath, nextPath, triagePath, walkthroughPath } from "../acting/address.ts";
 import { nodePath } from "../detail/parts.tsx";
+import { overviewPath } from "../journeys/address.ts";
 
-export type JourneyScreen = "canvas" | "next" | "list" | "triage" | "walkthrough" | "decisions" | "timeline" | "summary";
+export type JourneyScreen = "overview" | "canvas" | "next" | "list" | "triage" | "walkthrough" | "decisions" | "timeline" | "summary";
 
 /** A screen at the journey's address plus `segment`, carrying the canvas's query and an open node. */
 interface Segmented {
@@ -25,6 +26,7 @@ interface Addressed {
 }
 
 const SCREENS: ({ screen: JourneyScreen; label: string } & (Segmented | Addressed))[] = [
+  { screen: "overview", label: "Overview", path: overviewPath },
   { screen: "canvas", label: "Canvas", segment: "" },
   { screen: "next", label: "Next", path: (journey) => nextPath(journey) },
   { screen: "list", label: "List", path: (journey) => listPath(journey) },

@@ -16,6 +16,10 @@ pub struct Viewer {
     pub user: UserId,
     /// Their entities, which "mine" covers together.
     pub entities: BTreeSet<EntityKey>,
+    /// The identities they sign in with (ARCHITECTURE, Auth: users and identities), each
+    /// with the verified emails it carried at its last sign-in, in provider and subject
+    /// order.
+    pub identities: Vec<IdentityRecord>,
 }
 
 impl Viewer {
@@ -37,11 +41,13 @@ impl<S: Store> Service<S> {
     /// When the store fails.
     pub async fn viewer(&self, call: &Call) -> Result<Viewer, ServiceError> {
         let user = call.actor.user.clone();
-        let identities = self.store.identities_of(&user).await?;
+        let mut identities = self.store.identities_of(&user).await?;
+        identities.sort_by(|a, b| (&a.provider, &a.subject).cmp(&(&b.provider, &b.subject)));
         let deployment = self.deployment().await?;
         Ok(Viewer {
             entities: entities_of(&identities, &deployment),
             user,
+            identities,
         })
     }
 }

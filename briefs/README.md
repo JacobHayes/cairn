@@ -43,7 +43,7 @@ Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase,
 | 5.2 | Canvas, semantic zoom, trace, layout | `web/app` | 5.1 | landed |
 | 5.3 | List, next, triage, decision walkthrough | `web/app` | 5.2 | landed |
 | 5.4 | Decision view, timeline, status summary | `web/app` | 5.2 (beside 5.3) | landed |
-| 5.5 | Journey index and overview, route screens, entities, identity | `web/app` | 5.3 |  |
+| 5.5 | Journey index and overview, route screens, entities, identity | `web/app` | 5.3 | landed |
 | 5.6 | Authoring | `web/app` | 5.5 |  |
 | 5.7 | Proposal review and its flows | `web/app` | 5.6 |  |
 | 5.8 | Assistant panel | `web/app` | 5.7, 4.4 |  |

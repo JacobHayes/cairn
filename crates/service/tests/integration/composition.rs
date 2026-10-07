@@ -138,6 +138,17 @@ mod composition {
             let viewer = run(service.viewer(&call("u_lead", "2026-10-06T12:00:00Z"))).unwrap();
             let expected: BTreeSet<_> = expected.iter().map(|key| key.parse().unwrap()).collect();
             assert_eq!(viewer.entities, expected, "{case}");
+            let listed: Vec<_> = viewer
+                .identities
+                .iter()
+                .map(|identity| (identity.provider.to_string(), identity.subject.to_string()))
+                .collect();
+            let mut sorted = listed.clone();
+            sorted.sort();
+            assert_eq!(
+                listed, sorted,
+                "{case}: identities in provider and subject order"
+            );
             assert_eq!(
                 viewer.merge_offer().is_some(),
                 expected.len() > 1,

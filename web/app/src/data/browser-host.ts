@@ -5,7 +5,8 @@
 import type { Answered, HttpFailure, OpenTicks } from "@cairn/client";
 import { HostFailure, type InBrowserHost } from "@cairn/wasm";
 
-import { Missing, ReadFailed, type Host, type Markdown, type Patch } from "./host.ts";
+import { Missing, ReadFailed, type Host, type Markdown, type Patch, type RouteImport } from "./host.ts";
+import { filesOf } from "./server-host.ts";
 
 /** A failure of the root as the data layer reads one: what it says, with no HTTP status. */
 function failure(thrown: unknown): HttpFailure {
@@ -41,6 +42,18 @@ function send(root: InBrowserHost, patch: Patch, note?: Markdown): Promise<Answe
   }
 }
 
+/** A13: an import as the root answers it, in the shape a server's answer takes. */
+function importInto(root: InBrowserHost, request: RouteImport): Promise<Answered<HttpFailure>> {
+  try {
+    return Promise.resolve({ outcome: "answered", answer: root.importFile(request) });
+  } catch (thrown) {
+    if (thrown instanceof HostFailure && thrown.reason.error === "rejected") {
+      return Promise.resolve({ outcome: "rejected", rejection: thrown.reason.rejection });
+    }
+    return Promise.resolve({ outcome: "failed", error: failure(thrown) });
+  }
+}
+
 /** The root's subscriptions as a tick stream: its first take is the current revisions. */
 function ticksOf(root: InBrowserHost): OpenTicks {
   return (watching, handlers) =>
@@ -62,7 +75,14 @@ export function browserHost(root: InBrowserHost): Host {
     engineVersion: engine.version,
     overlaps: (patch, intervening) => engine.touchedOverlaps(patch, intervening),
     capabilities: () => read("the capabilities", () => root.capabilities()),
-    journeys: () => read("the journey index", () => root.journeys()),
+    journeys: (query) => read("the journey index", () => root.journeyIndex(query ?? {})),
+    routes: (after) => read("the route index", () => root.routes(after)),
+    routeDetail: (route) => read(route, () => root.routeDetail(route)),
+    exportRoute: (route, version) =>
+      read(version === undefined ? `${route}'s draft` : `${route} version ${String(version)}`, () => root.exportFile(route, version)),
+    importRoute: (request) => importInto(root, request),
+    viewer: () => read("the viewer", () => root.viewer()),
+    files: filesOf(engine),
     deployment: () => read("the deployment", () => root.deployment()),
     documentText: (journey) => read(journey, () => root.documentText(journey)),
     route: (route) => read(route, () => root.route(route)),

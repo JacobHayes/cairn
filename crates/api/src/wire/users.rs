@@ -2,7 +2,7 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{AgentId, EntityKey, Timestamp, Title, UserId};
+use cairn_schema::{AgentId, Email, EntityKey, Slug, Timestamp, Title, UserId};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -21,6 +21,34 @@ pub struct Viewer {
     /// merging.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub merge_offer: Option<BTreeSet<EntityKey>>,
+    /// The identities they sign in with, by provider and subject.
+    pub identities: Vec<LinkedIdentity>,
+}
+
+/// One identity a user signs in with (ARCHITECTURE, Auth: users and identities).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LinkedIdentity {
+    /// The provider, by its configured name.
+    pub provider: Slug,
+    /// The provider's subject for the account.
+    pub subject: Title,
+    /// H3: the emails the provider marked verified at the last sign-in; only these match an
+    /// entity.
+    pub verified_emails: BTreeSet<Email>,
+    /// When it was linked.
+    pub linked_at: Timestamp,
+}
+
+impl From<cairn_store::IdentityRecord> for LinkedIdentity {
+    fn from(record: cairn_store::IdentityRecord) -> Self {
+        Self {
+            provider: record.provider,
+            subject: record.subject,
+            verified_emails: record.verified_emails,
+            linked_at: record.linked_at,
+        }
+    }
 }
 
 /// `POST /users/me/tokens`: what to call the new agent token.

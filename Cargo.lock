@@ -698,11 +698,15 @@ dependencies = [
  "cairn-schema",
  "cairn-service",
  "cairn-store",
+ "chrono",
+ "ed25519-dalek",
  "jiff",
+ "openidconnect",
  "serde",
  "serde_json",
  "serde_path_to_error",
  "tokio",
+ "url",
  "wasm-bindgen",
 ]
 

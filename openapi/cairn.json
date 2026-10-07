@@ -4677,6 +4677,40 @@
         ],
         "type": "object"
       },
+      "LinkedIdentity": {
+        "additionalProperties": false,
+        "description": "One identity a user signs in with (ARCHITECTURE, Auth: users and identities).",
+        "properties": {
+          "linked_at": {
+            "description": "When it was linked.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "provider": {
+            "$ref": "#/components/schemas/Slug",
+            "description": "The provider, by its configured name."
+          },
+          "subject": {
+            "$ref": "#/components/schemas/Title",
+            "description": "The provider's subject for the account."
+          },
+          "verified_emails": {
+            "description": "H3: the emails the provider marked verified at the last sign-in; only these match an\nentity.",
+            "items": {
+              "$ref": "#/components/schemas/Email"
+            },
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "provider",
+          "subject",
+          "verified_emails",
+          "linked_at"
+        ],
+        "type": "object"
+      },
       "ListFlag": {
         "description": "C9: a list filter that needs no argument.",
         "oneOf": [
@@ -12800,6 +12834,13 @@
             "type": "array",
             "uniqueItems": true
           },
+          "identities": {
+            "description": "The identities they sign in with, by provider and subject.",
+            "items": {
+              "$ref": "#/components/schemas/LinkedIdentity"
+            },
+            "type": "array"
+          },
           "merge_offer": {
             "description": "H3: present when their emails name more than one entity, which are then offered for\nmerging.",
             "items": {
@@ -12818,7 +12859,8 @@
         },
         "required": [
           "user",
-          "entities"
+          "entities",
+          "identities"
         ],
         "type": "object"
       },

@@ -19,7 +19,7 @@ pub use reads::{
     EventPage, JourneyMatches, JourneyPage, JourneySummary, LoggedEvent, RouteDetail, RoutePage,
     RouteSummary, SearchHit, SearchPage, VersionJourneys,
 };
-pub use users::{AgentToken, MintedToken, TokenRequest, Viewer};
+pub use users::{AgentToken, LinkedIdentity, MintedToken, TokenRequest, Viewer};
 
 use std::collections::BTreeMap;
 

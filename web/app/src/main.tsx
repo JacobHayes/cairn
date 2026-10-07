@@ -13,7 +13,14 @@ import { LayoutsContext } from "./canvas/hooks.ts";
 import { Layouts, LayoutWorker } from "./canvas/layouts.ts";
 import { SessionContext } from "./data/react.ts";
 import type { Session } from "./data/session.ts";
-import { JourneyIndex } from "./screens/JourneyIndex.tsx";
+import { JourneyIndex } from "./journeys/JourneyIndex.tsx";
+import { MineScreen } from "./journeys/MineScreen.tsx";
+import { NewJourney } from "./journeys/NewJourney.tsx";
+import { Overview } from "./journeys/Overview.tsx";
+import { Entities } from "./people/Entities.tsx";
+import { Identity } from "./people/Identity.tsx";
+import { RouteDetailPage } from "./routes/RouteDetail.tsx";
+import { RouteIndex } from "./routes/RouteIndex.tsx";
 import { JourneyPage } from "./screens/JourneyPage.tsx";
 import { DecisionViewPage, SummaryPage, TimelinePage } from "./screens/JourneyViews.tsx";
 import { RouteCanvasPage } from "./screens/RouteCanvasPage.tsx";
@@ -28,6 +35,9 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
           <Routes>
             <Route element={<Shell />}>
               <Route index element={<JourneyIndex />} />
+              <Route path="mine" element={<MineScreen />} />
+              <Route path="new" element={<NewJourney />} />
+              <Route path="journeys/:id/overview" element={<Overview />} />
               <Route path="journeys/:id" element={<JourneyPage />} />
               <Route path="journeys/:id/nodes/:key" element={<JourneyPage />} />
               <Route path="journeys/:id/next" element={<NextScreen />} />
@@ -39,7 +49,11 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route path="journeys/:id/timeline/nodes/:key" element={<TimelinePage />} />
               <Route path="journeys/:id/summary" element={<SummaryPage />} />
               <Route path="journeys/:id/summary/nodes/:key" element={<SummaryPage />} />
+              <Route path="routes" element={<RouteIndex />} />
               <Route path="routes/:id" element={<RouteCanvasPage />} />
+              <Route path="routes/:id/versions" element={<RouteDetailPage />} />
+              <Route path="entities" element={<Entities />} />
+              <Route path="me" element={<Identity />} />
             </Route>
           </Routes>
         </HashRouter>

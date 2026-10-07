@@ -4,7 +4,7 @@
 import type { Answered, HttpFailure, Patch, Tick, TickHandlers, Timers } from "@cairn/client";
 import type { DerivationKey, Derived } from "@cairn/wasm";
 
-import { Missing, type Deriver, type Host } from "./host.ts";
+import { Missing, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type RouteFile, type Viewer } from "./host.ts";
 
 export const ENGINE = "1.0.0";
 
@@ -34,7 +34,12 @@ export class FakeHost implements Host {
     return Promise.resolve({ auth: [], assistant: false, mcp: false, sse: true });
   }
 
-  journeys() {
+  /** The index queries asked, in turn. */
+  readonly queries: (JourneyIndexQuery | undefined)[] = [];
+  viewerHeld: Viewer = { user: "u_fake", entities: [], identities: [] };
+
+  journeys(query?: JourneyIndexQuery): Promise<JourneyPage> {
+    this.queries.push(query);
     const items = [...this.journeysHeld].map(([id, held]) => ({
       id,
       name: id,
@@ -61,6 +66,31 @@ export class FakeHost implements Host {
   routeVersion(route: string): Promise<never> {
     return Promise.reject(new Missing(route));
   }
+
+  routes() {
+    return Promise.resolve({ items: [] });
+  }
+
+  routeDetail(route: string): Promise<never> {
+    return Promise.reject(new Missing(route));
+  }
+
+  exportRoute(route: string): Promise<never> {
+    return Promise.reject(new Missing(route));
+  }
+
+  importRoute(): Promise<Answered<HttpFailure>> {
+    return Promise.resolve({ outcome: "failed", error: { status: 0, message: "no imports in the fake" } });
+  }
+
+  viewer(): Promise<Viewer> {
+    return Promise.resolve(this.viewerHeld);
+  }
+
+  readonly files = {
+    read: (text: string): RouteFile => JSON.parse(text) as RouteFile,
+    text: (file: RouteFile): string => JSON.stringify(file),
+  };
 
   documentText(journey: string): Promise<string> {
     this.fetches.set(journey, (this.fetches.get(journey) ?? 0) + 1);

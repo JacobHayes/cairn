@@ -9,6 +9,8 @@ import init, {
   exportRoute,
   importRoute,
   preview,
+  readRouteFile,
+  routeFileText,
   routeLevel,
   touched,
   touchedOverlaps,
@@ -172,6 +174,16 @@ export class Engine {
   /** A13: the graph a route file's import would open as a draft. */
   importRoute(request: ImportRequest): Schema<"Graph"> {
     return parsed<Schema<"Graph">>(this.importRouteText(request));
+  }
+
+  /** A13: a route file's text (YAML or JSON) as the file document the API's import takes. */
+  readRouteFile(text: string): Schema<"RouteFile"> {
+    return parsed<Schema<"RouteFile">>(hosted(() => readRouteFile(text)));
+  }
+
+  /** A13: the file document as the canonical YAML a route file is kept in on disk. */
+  routeFileText(file: Schema<"RouteFile">): string {
+    return hosted(() => routeFileText(JSON.stringify(file)));
   }
 
   /** C2: a route graph's canvas level, as the module wrote it (a route has no state to derive). */

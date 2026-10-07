@@ -1,8 +1,13 @@
 // B2: answering or revising a decision, with an input for each answer type (A4). The draft
 // (the answer being chosen and the revision its author saw) survives a reload. A decision that
 // fills a role or pins a milestone is the only way to change that value (E3), and the editor
-// says which.
+// says which. An entity answer picks existing entities or names a new one, made in the same
+// patch as the answer (B3, E6: "answer this decision with a new person" is one patch).
 import type { Schema } from "@cairn/client";
+import { useDraft } from "../data/drafts.ts";
+
+import type { Mutation } from "../data/writes.ts";
+import { newEntityKey } from "../people/model.ts";
 
 import { Button, Field } from "../ui/kit.tsx";
 import { NodeLink } from "./parts.tsx";
@@ -101,14 +106,35 @@ function Input({ view, node, value, onChange }: { view: Ready; node: GraphNode; 
   return <Field aria-label="Answer" value={value.text} onChange={(event) => { onChange({ text: event.target.value }); }} />;
 }
 
+/**
+ * B3: the answer's mutations: the answer alone, or, when a new entity is named for an entity
+ * answer, the entity made first and the answer naming it (added to a list answer).
+ */
+export function answerMutations(decision: string, value: AnswerValue, named: string, key: (name: string) => string = newEntityKey): Mutation[] {
+  const name = named.trim();
+  if (name === "" || !("entity" in value || "entity_list" in value)) {
+    return [{ op: "answer", decision, value }];
+  }
+  const entity = key(name);
+  const answer: AnswerValue = "entity" in value ? { entity } : { entity_list: [...value.entity_list, entity] };
+  return [{ op: "create_entity", entity: { key: entity, name } }, { op: "answer", decision, value: answer }];
+}
+
 export function AnswerEditor({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `answer:${detail.node.key}`);
+  // The new entity's name is part of the answer's draft: kept across a reload, gone with it.
+  const [namedDraft, setNamed] = useDraft<string>(`answer-entity:${write.journey}:${detail.node.key}`);
+  const named = namedDraft ?? "";
   const { node, record, answer } = detail;
   const form = useFormDraft<AnswerValue>(write.journey, node.key, "answer");
   if (!answerable(node.kind, record.state)) {
     return <Rejected view={view} write={write} />;
   }
   const { draft } = form;
+  const close = () => {
+    setNamed(undefined);
+    form.close();
+  };
   const drives = node.fills_role !== undefined || node.feeds_milestone !== undefined;
   if (draft === undefined) {
     return (
@@ -129,20 +155,24 @@ export function AnswerEditor({ view, detail }: { view: Ready; detail: NodeDetail
     );
   }
   const save = async () => {
-    if (await write.run([{ op: "answer", decision: node.key, value: draft.value }], draft)) {
-      form.close();
+    if (await write.run(answerMutations(node.key, draft.value, named), draft)) {
+      close();
     }
   };
+  const entityAnswer = "entity" in draft.value || "entity_list" in draft.value;
   return (
     <div className="stack" data-testid="answer-editor">
       <span className="row">
         <Input view={view} node={node} value={draft.value} onChange={form.change} />
+        {entityAnswer ? (
+          <Field aria-label="Or a new entity" placeholder={"entity" in draft.value ? "Or a new entity's name" : "And a new entity's name"} value={named} onChange={(event) => { setNamed(event.target.value === "" ? undefined : event.target.value); }} />
+        ) : null}
         <Button primary disabled={write.disabled} onClick={() => void save()}>
           Save the answer
         </Button>
-        <Button onClick={() => { form.close(); write.dismiss(); }}>Cancel</Button>
+        <Button onClick={() => { close(); write.dismiss(); }}>Cancel</Button>
       </span>
-      <Rejected view={view} write={write} onResolved={form.close} />
+      <Rejected view={view} write={write} onResolved={close} />
     </div>
   );
 }

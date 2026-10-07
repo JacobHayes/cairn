@@ -20,6 +20,7 @@ mod error;
 mod files;
 pub mod fixtures;
 mod local;
+mod reads;
 mod root;
 mod route;
 
@@ -28,10 +29,17 @@ pub mod cases;
 
 pub use derivation::{Derivation, DraftRequest, Projection, engine_version_text, read_document};
 pub use error::HostError;
-pub use files::{ExportRequest, ImportRequest, export_route, exported, import_route, imported};
+pub use files::{
+    ExportRequest, ImportRequest, export_route, exported, import_route, imported, read_route_file,
+    route_file_text,
+};
 pub use local::{
     AppliedLocally, ApplyRequest, PreviewRequest, apply, apply_locally, preview, preview_locally,
     touched, touched_overlaps,
+};
+pub use reads::{
+    JourneyIndexQuery, LinkedIdentity, RouteDetail, RouteImport, RoutePage, RouteSummary,
+    VersionJourneys, Viewer,
 };
 pub use root::{
     BrowserRoot, HistoryAnswer, JourneyPage, JourneySummary, PatchAnswer, PatchRequest,

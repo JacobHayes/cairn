@@ -25,6 +25,7 @@ pub async fn viewer<S: Store + 'static>(
         agent,
         entities: viewer.entities,
         merge_offer,
+        identities: viewer.identities.into_iter().map(Into::into).collect(),
     }))
 }
 
