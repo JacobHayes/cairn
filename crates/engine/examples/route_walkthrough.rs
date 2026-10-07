@@ -428,7 +428,7 @@ fn saved_and_created(out: &mut String, records: &Records, journey: &JourneyId) -
     let published = accept(
         &saved,
         PatchTarget::Route(route.clone()),
-        vec![Mutation::PublishDraft],
+        vec![Mutation::PublishDraft {}],
     )?;
     let lineage = Lineage {
         route,

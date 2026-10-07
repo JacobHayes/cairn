@@ -309,7 +309,7 @@ fn event(session: &Session<'_>, mutation: &Mutation, delta: Vec<Write>) -> Event
     let deletes = |mutations: &[Mutation]| {
         mutations
             .iter()
-            .any(|mutation| matches!(mutation, Mutation::DeleteJourney))
+            .any(|mutation| matches!(mutation, Mutation::DeleteJourney {}))
     };
     let applies_a_deletion = match mutation {
         Mutation::ApplyProposal { proposal, .. } => session

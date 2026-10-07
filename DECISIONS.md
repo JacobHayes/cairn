@@ -2,6 +2,13 @@
 
 Judgment calls made while implementing the briefs, for the user to review (`AGENTS.md`, Decide, record, keep going). Newest first. Each entry: date, brief, the question, the call, the alternatives, and what would change it.
 
+## 2026-10-07, brief 2.1 (follow-up): a direct fill of a decision-filled role is routed by the client, as a fed milestone's pin is
+
+- Question: E3 says "fill directly" on a role with a filling decision "answers the decision", and brief 2.1 lists "role fills routed through their filling decision". The engine rejects `fill_role` and `clear_role_fill` on such a role with `filled_through_decision`, naming the decision, and no entry said who routes the fill. The same rule for a fed milestone's pin was settled as client routing (5.1, inline resolution: pinning answers the decision, unpinning reopens it; the engine rejects a direct pin edit as `pinned_through_decision`).
+- Call: the same split for roles. The engine keeps one authority per role and rejects a direct fill or clear of a decision-filled role, its message naming the decision. The client routes: filling such a role answers its filling decision with the entity (an entity decision) or the entities (an entity-list decision, A6), and clearing it reopens the decision (D1: reopen empties what the decision drove). An agent reads the decision from the rejection or the graph (`fills_role`) and does the same. The web app already finds the decision (`fillingDecision`, web/app/src/detail/model.ts); the brief that adds a role-fill action routes through it.
+- Alternatives: the engine rewriting `fill_role` into an answer (one mutation would then emit an event of another type, and the answer's own guards, dates, and the D1 row for a first answer or a revision would apply to a mutation that never asked for them); accepting the direct fill as an override of the decision (two authorities per role, which E3 rules out).
+- What would change it: a client that cannot read the graph to find the filling decision, or a need for the fill and the answer to be one event.
+
 ## 2026-10-07, the log sync fix: nothing is answered from a write until a log sync covers it, and a store that cannot sync fails closed
 
 - Question: 6.2's finding (below). Turso keeps a commit whose logical-log fsync failed: turso_core 0.8.2 marks a failed commit committed once its log record was appended, so memory matches what recovery would replay. The store answered `Failed` yet served the commit's receipt, a resubmission was acknowledged from it, and a crash lost it. What is the simplest design that never answers from a write that may not be on disk?

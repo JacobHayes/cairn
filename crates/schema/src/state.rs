@@ -346,28 +346,56 @@ pub enum OverrideKind {
 #[serde(deny_unknown_fields)]
 pub struct JourneyState {
     /// Each node's stored state.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map"
+    )]
     pub nodes: BTreeMap<NodeKey, NodeState>,
     /// Each route-copied node's local edits (B4), apart from its state so that an edit and
     /// a transition on one node touch different records (H5).
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map"
+    )]
     pub local_edits: BTreeMap<NodeKey, BTreeSet<LocalEdit>>,
     /// Answers by decision.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map"
+    )]
     pub answers: BTreeMap<NodeKey, AnswerValue>,
     /// Direct role fills, for roles without a filling decision (E3). A role with a filling
     /// decision is filled from that decision's answer, which is derived, not stored here.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map"
+    )]
     pub role_fills: BTreeMap<RoleKey, EntitySet>,
     /// Pins: explicit journey-level dates on nodes (PRD glossary, Pin). A pin from a
     /// `feeds_milestone` answer is derived from the answer, not stored here (E3).
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map"
+    )]
     pub pins: BTreeMap<NodeKey, Date>,
     /// Snoozes by node (B6).
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map"
+    )]
     pub snoozes: BTreeMap<NodeKey, SnoozeTarget>,
     /// Overrides by node.
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map"
+    )]
     pub overrides: BTreeMap<NodeKey, Overrides>,
     /// Route-copied nodes the journey removed, so an upgrade does not re-add them (B4).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]

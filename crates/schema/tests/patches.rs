@@ -293,3 +293,35 @@ fn a_proposal_cannot_hold_proposal_mutations() {
     let nested = "- op: create_proposal\n  proposal:\n    title: Outer\n    destination_revision: 1\n    mutations:\n    - {op: discard_proposal}\n";
     assert!(from_yaml::<Vec<Mutation>>(nested).is_err());
 }
+
+/// A17: a mutation without arguments takes none: an extra field is an error in YAML and
+/// JSON, never dropped, so `{op: delete_journey, journey: j_other}` cannot read as a delete
+/// of the target. The bare form still parses. The argument-free mutations are found from
+/// the every-mutation sample, so the test follows the type.
+#[test]
+fn an_argument_free_mutation_rejects_unknown_fields() {
+    let bare: Vec<Mutation> = sample()
+        .mutations
+        .as_slice()
+        .iter()
+        .filter(|mutation| {
+            serde_json::to_value(mutation)
+                .unwrap()
+                .as_object()
+                .unwrap()
+                .len()
+                == 1
+        })
+        .cloned()
+        .collect();
+    assert!(bare.contains(&Mutation::DeleteJourney {}));
+    for mutation in &bare {
+        let op = op_name(mutation);
+        let plain = format!("{{\"op\": \"{op}\"}}");
+        assert_eq!(&from_json::<Mutation>(&plain).unwrap(), mutation);
+        assert_eq!(&from_yaml::<Mutation>(&plain).unwrap(), mutation);
+        let extra = format!("{{\"op\": \"{op}\", \"journey\": \"j_other\"}}");
+        assert!(from_json::<Mutation>(&extra).is_err(), "{extra}");
+        assert!(from_yaml::<Mutation>(&extra).is_err(), "{extra}");
+    }
+}

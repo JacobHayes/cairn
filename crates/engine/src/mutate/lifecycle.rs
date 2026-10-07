@@ -31,7 +31,7 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
         (PatchTarget::Journey(_), Mutation::SetJourneyStatus { status }) => {
             set_status(session, *status)
         }
-        (PatchTarget::Journey(id), Mutation::DeleteJourney) => vec![
+        (PatchTarget::Journey(id), Mutation::DeleteJourney {}) => vec![
             Write::Remove(RecordKey::Domain(cairn_schema::Domain::Journey(id.clone()))),
             Write::Put(Record::DeletedJourney {
                 journey: id.clone(),
@@ -310,9 +310,12 @@ fn route(session: &mut Session<'_>, id: &RouteId, mutation: &Mutation) -> Vec<Wr
                 *retired,
             )]
         }
-        Mutation::OpenDraft { .. } | Mutation::DiscardDraft | Mutation::PublishDraft
+        Mutation::OpenDraft { .. } | Mutation::DiscardDraft {} | Mutation::PublishDraft {}
             if route.draft.is_some()
-                != matches!(mutation, Mutation::DiscardDraft | Mutation::PublishDraft) =>
+                != matches!(
+                    mutation,
+                    Mutation::DiscardDraft {} | Mutation::PublishDraft {}
+                ) =>
         {
             let (code, message) = if route.draft.is_some() {
                 (
@@ -326,8 +329,8 @@ fn route(session: &mut Session<'_>, id: &RouteId, mutation: &Mutation) -> Vec<Wr
             Vec::new()
         }
         Mutation::OpenDraft { source } => open_draft(session, id, latest, source),
-        Mutation::DiscardDraft => clear_draft.to_vec(),
-        Mutation::PublishDraft => publish(session, id, &route, latest, clear_draft),
+        Mutation::DiscardDraft {} => clear_draft.to_vec(),
+        Mutation::PublishDraft {} => publish(session, id, &route, latest, clear_draft),
         other => unreachable!("{other:?} is not a route lifecycle mutation"),
     }
 }

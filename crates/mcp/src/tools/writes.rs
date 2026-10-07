@@ -836,7 +836,7 @@ impl PublishDraft {
             target,
             write.base_revision,
             None,
-            vec![Mutation::PublishDraft],
+            vec![Mutation::PublishDraft {}],
             write.note,
         )
     }

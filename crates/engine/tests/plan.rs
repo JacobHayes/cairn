@@ -259,31 +259,42 @@ fn an_answer_at_both_ends_is_not_offered_as_a_move() {
     each_move_resolves(&records, mutations, short);
 }
 
-/// E6, F5: a merge whose aliases make contradictory work apply is rejected with the chains.
+/// E6, F5: a merge whose aliases make contradictory work apply is rejected with the chains,
+/// whether it is alone in its patch or shares it with an unrelated merge before or after it
+/// (each merge adds its journeys to the check; none replaces another's).
 #[test]
 fn a_merge_that_breaks_the_plan_carries_its_chains() {
     let records = support::vendor_after(2);
     let prepare = "\
 - op: create_entity\n  entity: {key: e_other, name: Other}\n\
+- op: create_entity\n  entity: {key: e_x, name: X}\n\
+- op: create_entity\n  entity: {key: e_y, name: Y}\n\
 - op: add_node\n  node: {key: n_start, id: start, kind: milestone, title: Start}\n\
 - op: set_pin\n  node: n_start\n  date: \"2026-11-10\"\n\
 - op: add_node\n  node: {key: n_long, id: long, kind: action, title: Long, estimate: 30, relevant_when: {equals: {decision: n_who_owns, value: e_other}}, not_before: {after: n_start}, due_by: {before: n_decision_meeting}}\n";
     let prepared = support::vendor_patch(&records, prepare).unwrap();
     let records = prepared.records();
     let revision = records.journeys.values().next().unwrap().revision.get();
-    let merge = format!(
+    let breaking = format!(
         "- op: merge_entities\n  survivor: e_other\n  merged: e_lead\n  journeys: {{j_vendor_eval: {revision}}}\n"
     );
-    let patch = support::patch_to(records, "deployment", &merge);
-    let Err(Rejection::Invalid { violations }) =
-        cairn_engine::apply(records, &patch, &support::fixed_inputs())
-    else {
-        panic!("the merge makes the long action apply");
-    };
-    let found = &violations.as_slice()[0];
-    assert_eq!(found.code, ViolationCode::MergeBreaksJourney);
-    let chains = found.chains.as_ref().expect("the chains ride along");
-    assert_eq!(chains.chains.as_slice()[0].shortfall_days, 20);
+    let unrelated = "- op: merge_entities\n  survivor: e_x\n  merged: e_y\n  journeys: {}\n";
+    for mutations in [
+        breaking.clone(),
+        format!("{breaking}{unrelated}"),
+        format!("{unrelated}{breaking}"),
+    ] {
+        let patch = support::patch_to(records, "deployment", &mutations);
+        let Err(Rejection::Invalid { violations }) =
+            cairn_engine::apply(records, &patch, &support::fixed_inputs())
+        else {
+            panic!("the merge makes the long action apply:\n{mutations}");
+        };
+        let found = &violations.as_slice()[0];
+        assert_eq!(found.code, ViolationCode::MergeBreaksJourney, "{mutations}");
+        let chains = found.chains.as_ref().expect("the chains ride along");
+        assert_eq!(chains.chains.as_slice()[0].shortfall_days, 20);
+    }
 }
 
 // Review round 3 regression.

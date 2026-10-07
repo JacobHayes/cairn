@@ -557,9 +557,11 @@ pub type EntitySet = BoundedSet<EntityKey, EntityCountPerFill>;
 
 /// Where a participation comes from (E2): a role reference, written as the role, or
 /// explicit entities, written as a list.
-#[derive(
-    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
-)]
+//
+// Read by hand rather than as an untagged enum, whose only error is "did not match any
+// variant": a list past `entity_count_per_fill_max` is rejected naming that limit, a repeated
+// entity naming it, and anything but a string or a list as such.
+#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, JsonSchema)]
 #[serde(untagged, bound = "")]
 #[schemars(bound = "R: References", rename = "ParticipationSource{R}")]
 pub enum ParticipationSource<R: References> {
@@ -569,6 +571,45 @@ pub enum ParticipationSource<R: References> {
     Entities(EntitySet),
 }
 
+impl<'de, R: References> Deserialize<'de> for ParticipationSource<R> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        struct Source<R>(std::marker::PhantomData<R>);
+
+        impl<'de, R: References> serde::de::Visitor<'de> for Source<R> {
+            type Value = ParticipationSource<R>;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str("a role, or a list of entities")
+            }
+
+            fn visit_str<E: serde::de::Error>(self, text: &str) -> Result<Self::Value, E> {
+                text.parse()
+                    .map(ParticipationSource::Role)
+                    .map_err(E::custom)
+            }
+
+            fn visit_seq<A: serde::de::SeqAccess<'de>>(
+                self,
+                mut access: A,
+            ) -> Result<Self::Value, A::Error> {
+                let mut entities = Vec::new();
+                while let Some(entity) = access.next_element::<EntityKey>()? {
+                    entities.push(entity);
+                    // Checked as entries arrive, so an oversized list fails before it is read.
+                    Limit::EntityCountPerFill
+                        .check(entities.len())
+                        .map_err(serde::de::Error::custom)?;
+                }
+                EntitySet::new(entities)
+                    .map(ParticipationSource::Entities)
+                    .map_err(serde::de::Error::custom)
+            }
+        }
+
+        deserializer.deserialize_any(Source(std::marker::PhantomData))
+    }
+}
+
 /// A node's participations (E2): at most one source per kind, at most `kind_count_max`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize)]
 #[serde(into = "BTreeMap<R::Kind, ParticipationSource<R>>", bound = "")]
@@ -576,41 +617,14 @@ pub struct Participations<R: References>(BTreeMap<R::Kind, ParticipationSource<R
 
 impl<'de, R: References> Deserialize<'de> for Participations<R> {
     /// Reads the map entry by entry, so a kind written twice is an error rather than the
-    /// last assignment silently winning (JSON maps allow repeated keys; YAML's reader
-    /// already rejects them), and the kind count is checked as entries arrive.
+    /// last assignment silently winning, and the kind count is checked as entries arrive.
     fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
-        struct Entries<R>(std::marker::PhantomData<R>);
-
-        impl<'de, R: References> serde::de::Visitor<'de> for Entries<R> {
-            type Value = Participations<R>;
-
-            fn expecting(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-                formatter.write_str("a map from participation kind to a role or a list of entities")
-            }
-
-            fn visit_map<A: serde::de::MapAccess<'de>>(
-                self,
-                mut access: A,
-            ) -> Result<Self::Value, A::Error> {
-                let mut map = BTreeMap::new();
-                while let Some((kind, source)) =
-                    access.next_entry::<R::Kind, ParticipationSource<R>>()?
-                {
-                    if map.contains_key(&kind) {
-                        return Err(serde::de::Error::custom(format!(
-                            "participation kind {kind} appears twice"
-                        )));
-                    }
-                    map.insert(kind, source);
-                    Limit::KindCount
-                        .check(map.len())
-                        .map_err(serde::de::Error::custom)?;
-                }
-                Ok(Participations(map))
-            }
-        }
-
-        deserializer.deserialize_map(Entries(std::marker::PhantomData))
+        crate::serde_util::unique_entries(
+            deserializer,
+            "a map from participation kind to a role or a list of entities",
+            Some(Limit::KindCount),
+        )
+        .map(Participations)
     }
 }
 

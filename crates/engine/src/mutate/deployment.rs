@@ -128,7 +128,8 @@ fn merge(
 }
 
 /// The journeys loaded for a merge that reference either entity must be the ones it names,
-/// at the revisions it names (E6, H5); each is then validated with the merge applied.
+/// at the revisions it names (E6, H5); each is then validated with every merge of the patch
+/// applied.
 fn check_journeys(
     session: &mut Session<'_>,
     entities: [&EntityKey; 2],
@@ -175,7 +176,10 @@ fn check_journeys(
             });
         }
     }
-    session.merge_checked = referencing.into_iter().map(|(id, _)| id).collect();
+    // A later merge in the patch adds its journeys; it never drops an earlier merge's (E6).
+    session
+        .merge_checked
+        .extend(referencing.into_iter().map(|(id, _)| id));
 }
 
 fn joined_holds_both(writes: &[Write], gone: &Entity) -> bool {

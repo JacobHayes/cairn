@@ -163,7 +163,7 @@ impl<S: Store> Service<S> {
             destination,
             id,
             base_revision,
-            Mutation::DiscardProposal,
+            Mutation::DiscardProposal {},
         );
         if let Some(answer) = self.saved_before(&patch).await? {
             return answer;

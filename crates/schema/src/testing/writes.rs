@@ -121,7 +121,7 @@ fn arb_lifecycle_mutation() -> BoxedStrategy<Mutation> {
         (arb_title(), prop::option::of(arb_markdown()))
             .prop_map(|(name, description)| Mutation::EditJourney { name, description }),
         arb_journey_status().prop_map(|status| Mutation::SetJourneyStatus { status }),
-        Just(Mutation::DeleteJourney),
+        Just(Mutation::DeleteJourney {}),
         (arb_title(), prop::option::of(arb_markdown()))
             .prop_map(|(name, description)| Mutation::CreateRoute { name, description }),
         (arb_title(), prop::option::of(arb_markdown()))
@@ -133,8 +133,8 @@ fn arb_lifecycle_mutation() -> BoxedStrategy<Mutation> {
             arb_journey_id().prop_map(|journey| DraftSource::SaveAsRoute { journey }),
         ]
         .prop_map(|source| Mutation::OpenDraft { source }),
-        Just(Mutation::DiscardDraft),
-        Just(Mutation::PublishDraft),
+        Just(Mutation::DiscardDraft {}),
+        Just(Mutation::PublishDraft {}),
     ]
     .boxed()
 }
@@ -527,7 +527,7 @@ pub fn arb_mutation() -> BoxedStrategy<Mutation> {
             arb_proposal_draft().prop_map(|proposal| Mutation::CreateProposal { proposal }),
             arb_proposal_draft().prop_map(|proposal| Mutation::EditProposal { proposal }),
             (arb_proposal_id(), arb_revision()).prop_map(|(proposal, reviewed_revision)| Mutation::ApplyProposal { proposal, reviewed_revision }),
-            Just(Mutation::DiscardProposal),
+            Just(Mutation::DiscardProposal {}),
         ],
     ]
     .boxed()

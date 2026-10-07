@@ -289,6 +289,11 @@ impl Removal {
 /// One change within a patch (PRD glossary, Mutation), each emitting one event (J2). The
 /// set covers every change the PRD defines; [`Mutation::change_class`] sorts each into
 /// structural or state (PRD glossary, Structural change).
+//
+// A mutation without arguments is an empty struct variant, not a unit one: serde lets a unit
+// variant of an internally tagged enum ignore unknown fields, so `{op: delete_journey,
+// journey: j_other}` would parse as a delete of the target. A struct variant rejects them;
+// the wire form `{op: delete_journey}` is the same either way.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "op", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Mutation {
@@ -318,7 +323,7 @@ pub enum Mutation {
         status: JourneyStatus,
     },
     /// Hard-delete the journey and its events (A19).
-    DeleteJourney,
+    DeleteJourney {},
 
     // Route lifecycle (A11, A13, A19).
     /// Create the target route, with no versions and no draft.
@@ -348,9 +353,9 @@ pub enum Mutation {
         source: DraftSource,
     },
     /// Discard the route's draft.
-    DiscardDraft,
+    DiscardDraft {},
     /// Publish the draft as the next version and clear it (A11).
-    PublishDraft,
+    PublishDraft {},
 
     // Graph structure (A1, B4, A18).
     /// Add a node.
@@ -615,6 +620,7 @@ pub enum Mutation {
         /// The entity merged into it, whose key becomes an alias.
         merged: EntityKey,
         /// Every journey referencing either, at the revision the merge was checked against.
+        #[serde(deserialize_with = "crate::serde_util::unique_map")]
         journeys: BTreeMap<JourneyId, Revision>,
     },
 
@@ -637,7 +643,7 @@ pub enum Mutation {
         reviewed_revision: Revision,
     },
     /// Discard the target proposal.
-    DiscardProposal,
+    DiscardProposal {},
 }
 
 /// Structural or state (PRD glossary, Structural change).
@@ -659,13 +665,13 @@ impl Mutation {
     pub fn change_class(&self) -> ChangeClass {
         match self {
             Mutation::CreateJourney { .. }
-            | Mutation::DeleteJourney
+            | Mutation::DeleteJourney {}
             | Mutation::CreateRoute { .. }
             | Mutation::EditRoute { .. }
             | Mutation::SetRouteRetired { .. }
             | Mutation::OpenDraft { .. }
-            | Mutation::DiscardDraft
-            | Mutation::PublishDraft
+            | Mutation::DiscardDraft {}
+            | Mutation::PublishDraft {}
             | Mutation::AddNode { .. }
             | Mutation::ReplaceNode { .. }
             | Mutation::RemoveNode { .. }
@@ -716,7 +722,7 @@ impl Mutation {
             | Mutation::EditEntity { .. }
             | Mutation::CreateProposal { .. }
             | Mutation::EditProposal { .. }
-            | Mutation::DiscardProposal => ChangeClass::State,
+            | Mutation::DiscardProposal {} => ChangeClass::State,
         }
     }
 
@@ -729,7 +735,7 @@ impl Mutation {
             Mutation::CreateProposal { .. }
                 | Mutation::EditProposal { .. }
                 | Mutation::ApplyProposal { .. }
-                | Mutation::DiscardProposal
+                | Mutation::DiscardProposal {}
         )
     }
 }

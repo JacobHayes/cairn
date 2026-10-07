@@ -211,6 +211,10 @@ pub struct Deployment {
     #[serde(default, skip_serializing_if = "Keyed::is_empty")]
     pub entities: Keyed<Entity, ByDocumentSize>,
     /// Merged entities' old keys, each resolving to the entity it was merged into (E6).
-    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map"
+    )]
     pub aliases: BTreeMap<EntityKey, EntityKey>,
 }

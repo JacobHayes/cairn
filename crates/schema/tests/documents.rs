@@ -237,3 +237,122 @@ fn a_document_with_many_yaml_nodes_parses() {
     let back: Vec<cairn_schema::EntityKey> = from_yaml(&yaml).unwrap();
     assert_eq!(back.len(), entities.len());
 }
+
+/// A parse of one text in both formats.
+type Parse = fn(&str) -> [bool; 2];
+
+/// Reads `text` as JSON and as YAML (a JSON document is YAML too): whether each parsed.
+fn parses<T: serde::de::DeserializeOwned>(text: &str) -> [bool; 2] {
+    [from_json::<T>(text).is_ok(), from_yaml::<T>(text).is_ok()]
+}
+
+/// A key written twice in a keyed map is an error in JSON as it is in YAML, never the last
+/// value winning: each case's map parses with its keys once and fails with one repeated.
+#[test]
+fn a_map_key_written_twice_is_rejected_in_both_formats() {
+    use cairn_schema::{Deployment, JourneyState, Mutation};
+    let state = |map: &str, entries: &str| format!(r#"{{"{map}":{{{entries}}}}}"#);
+    let pin = |key: &str, date: &str| format!(r#""{key}":"{date}""#);
+    let node =
+        |key: &str, state: &str| format!(r#""{key}":{{"state":"{state}","provenance":"local"}}"#);
+    let answer = |key: &str, yes: bool| format!(r#""{key}":{{"boolean":{yes}}}"#);
+    let journeys = |entries: &str| {
+        format!(
+            r#"{{"op":"merge_entities","survivor":"e_a","merged":"e_b","journeys":{{{entries}}}}}"#
+        )
+    };
+    let aliases = |entries: &str| format!(r#"{{"revision":1,"aliases":{{{entries}}}}}"#);
+    let cases: [(&str, Parse, String, String); 5] = [
+        (
+            "state.pins",
+            parses::<JourneyState>,
+            state(
+                "pins",
+                &[pin("n_a", "2026-10-01"), pin("n_b", "2026-10-02")].join(","),
+            ),
+            state(
+                "pins",
+                &[pin("n_a", "2026-10-01"), pin("n_a", "2026-10-02")].join(","),
+            ),
+        ),
+        (
+            "state.nodes",
+            parses::<JourneyState>,
+            state(
+                "nodes",
+                &[node("n_a", "todo"), node("n_b", "done")].join(","),
+            ),
+            state(
+                "nodes",
+                &[node("n_a", "todo"), node("n_a", "done")].join(","),
+            ),
+        ),
+        (
+            "state.answers",
+            parses::<JourneyState>,
+            state(
+                "answers",
+                &[answer("n_a", true), answer("n_b", false)].join(","),
+            ),
+            state(
+                "answers",
+                &[answer("n_a", true), answer("n_a", false)].join(","),
+            ),
+        ),
+        (
+            "merge_entities.journeys",
+            parses::<Mutation>,
+            journeys(r#""j_one":1,"j_two":5"#),
+            journeys(r#""j_one":1,"j_one":5"#),
+        ),
+        (
+            "deployment.aliases",
+            parses::<Deployment>,
+            aliases(r#""e_a":"e_c","e_b":"e_c""#),
+            aliases(r#""e_a":"e_c","e_a":"e_d""#),
+        ),
+    ];
+    for (name, parse, once, twice) in cases {
+        assert_eq!(parse(&once), [true, true], "{name}: {once}");
+        assert_eq!(parse(&twice), [false, false], "{name}: {twice}");
+    }
+}
+
+/// E2: a participation's entities past `entity_count_per_fill_max` are rejected naming that
+/// limit, in both formats; a repeated entity, and a value that is neither a role nor a list
+/// of entities, are rejected too.
+#[test]
+fn a_participation_source_says_what_is_wrong() {
+    let node = |source: &str| {
+        format!(r#"{{"id":"a","kind":"action","title":"A","participations":{{"owner":{source}}}}}"#)
+    };
+    let entities = |count: u32| {
+        let keys: Vec<String> = (0..count).map(|index| format!(r#""e_{index}""#)).collect();
+        format!("[{}]", keys.join(","))
+    };
+    let max = Limit::EntityCountPerFill.max();
+    for good in [r#""owner_role""#.to_owned(), "[]".to_owned(), entities(max)] {
+        assert_eq!(
+            parses::<Node<FileRefs>>(&node(&good)),
+            [true, true],
+            "{good}"
+        );
+    }
+    let past = node(&entities(max + 1));
+    for error in [
+        from_json::<Node<FileRefs>>(&past).unwrap_err(),
+        from_yaml::<Node<FileRefs>>(&past).unwrap_err(),
+    ] {
+        assert!(
+            error.message.contains(Limit::EntityCountPerFill.name()),
+            "{error}"
+        );
+    }
+    for bad in [r#"["e_a","e_a"]"#, r#"{"role":"owner_role"}"#, "1"] {
+        assert_eq!(
+            parses::<Node<FileRefs>>(&node(bad)),
+            [false, false],
+            "{bad}"
+        );
+    }
+}

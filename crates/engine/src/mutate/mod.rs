@@ -21,6 +21,7 @@ use cairn_schema::{
     RevisionConflict, Subject, Violation, ViolationCode, Write,
 };
 
+use crate::edit::RemovalIndex;
 use crate::graph::Document;
 use crate::pipeline::ApplyInputs;
 use crate::records::Records;
@@ -55,8 +56,14 @@ pub(crate) struct Session<'a> {
     pub created_entities: BTreeSet<EntityKey>,
     /// Route versions published in this patch.
     pub published: Vec<Lineage>,
-    /// Journeys an entity merge is checked against (E6).
-    pub merge_checked: Vec<JourneyId>,
+    /// Journeys the entity merges in this patch are checked against, every merge's (E6).
+    pub merge_checked: BTreeSet<JourneyId>,
+    /// What node removals reach in the patch's graph, built at the first removal and kept
+    /// up to date by every later write (A18; [`RemovalIndex`]).
+    pub removal_index: Option<RemovalIndex>,
+    /// The operations this patch's removals spent, the index's building included: rung 3's
+    /// cost test budgets it.
+    pub removal_operations: u64,
 }
 
 /// Which targets a mutation applies to, and which handler applies it.
@@ -85,7 +92,7 @@ fn scope(mutation: &Mutation) -> Scope {
         Mutation::CreateJourney { .. }
         | Mutation::EditJourney { .. }
         | Mutation::SetJourneyStatus { .. }
-        | Mutation::DeleteJourney
+        | Mutation::DeleteJourney {}
         | Mutation::Upgrade { .. }
         | Mutation::Relink { .. } => Scope::Journey,
         Mutation::Transition { .. }
@@ -110,8 +117,8 @@ fn scope(mutation: &Mutation) -> Scope {
         | Mutation::EditRoute { .. }
         | Mutation::SetRouteRetired { .. }
         | Mutation::OpenDraft { .. }
-        | Mutation::DiscardDraft
-        | Mutation::PublishDraft => Scope::Route,
+        | Mutation::DiscardDraft {}
+        | Mutation::PublishDraft {} => Scope::Route,
         Mutation::AddNode { .. }
         | Mutation::SetNodeField { .. }
         | Mutation::ReplaceNode { .. }
@@ -135,7 +142,7 @@ fn scope(mutation: &Mutation) -> Scope {
         Mutation::ApplyProposal { .. } => Scope::Apply,
         Mutation::CreateProposal { .. }
         | Mutation::EditProposal { .. }
-        | Mutation::DiscardProposal => Scope::Proposal,
+        | Mutation::DiscardProposal {} => Scope::Proposal,
     }
 }
 
@@ -172,6 +179,7 @@ pub(crate) fn apply(session: &mut Session<'_>, mutation: &Mutation, delta: &mut 
     }));
     for write in writes {
         session.candidate.write(&write);
+        session.index_write(&write);
         delta.push(write);
     }
 }
@@ -193,12 +201,33 @@ impl<'a> Session<'a> {
             snoozed: BTreeMap::new(),
             created_entities: BTreeSet::new(),
             published: Vec::new(),
-            merge_checked: Vec::new(),
+            merge_checked: BTreeSet::new(),
+            removal_index: None,
+            removal_operations: 0,
         }
     }
 }
 
 impl Session<'_> {
+    /// Folds a write the candidate has just taken into the removal index (A18), or drops
+    /// the index when the write replaced its graph wholesale.
+    fn index_write(&mut self, write: &Write) {
+        let Some(mut index) = self.removal_index.take() else {
+            return;
+        };
+        let Some(id) = self.graph_id() else {
+            return;
+        };
+        let kept = match self.candidate.graph(&id) {
+            Some(graph) => index.observe(&id, graph, write),
+            None => false,
+        };
+        self.removal_operations += index.take_operations();
+        if kept {
+            self.removal_index = Some(index);
+        }
+    }
+
     /// Whether the patch's target takes this mutation at this point: the right kind of
     /// target, existing (or not, for a create), and not archived (B11).
     fn admits(&self, mutation: &Mutation) -> Result<(), (ViolationCode, String)> {
@@ -275,7 +304,7 @@ impl Session<'_> {
             mutation,
             Mutation::SetJourneyStatus {
                 status: JourneyStatus::Completed
-            } | Mutation::DeleteJourney
+            } | Mutation::DeleteJourney {}
         );
         let archived = self
             .candidate

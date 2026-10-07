@@ -7,8 +7,11 @@
 //! is retired, and in a journey each route-copied node in the subtree gets a tombstone so an
 //! upgrade does not bring it back (B4).
 //!
-//! Cost at the limits: one walk of the subtree and one pass over every node's edges, O(n +
-//! edges), and one write per removed record.
+//! Cost at the limits: the patch's first removal indexes the graph once ([`RemovalIndex`],
+//! O(n log n) plus the edges and notes); each removal then walks its own subtree with that
+//! subtree's edges and notes, and makes one write per removed record, so a patch of
+//! `node_count_max` removals costs the index once plus what it removes, not a graph pass
+//! per removal. Every other write folds what it adds into the index (`mutate::apply`).
 
 use std::collections::BTreeSet;
 
@@ -19,7 +22,7 @@ use cairn_schema::{
 
 use super::Session;
 use super::structure::retire;
-use crate::graph::Tree;
+use crate::edit::RemovalIndex;
 
 /// What the subtree holds now.
 struct Reach {
@@ -31,14 +34,8 @@ struct Reach {
 }
 
 impl Reach {
-    fn of(session: &Session<'_>, node: &NodeKey) -> Self {
-        let Some(graph) = session.graph() else {
-            unreachable!("a graph patch targets an existing graph")
-        };
-        let tree = Tree::build(graph);
-        let mut nodes = vec![node.clone()];
-        nodes.extend(tree.descendants(node));
-        let inside: BTreeSet<&NodeKey> = nodes.iter().collect();
+    fn of(graph: &cairn_schema::Graph, index: &mut RemovalIndex, node: &NodeKey) -> Self {
+        let nodes = index.subtree(graph, node);
         let mut reach = Reach {
             edges: BTreeSet::new(),
             resources: BTreeSet::new(),
@@ -46,17 +43,9 @@ impl Reach {
             participations: BTreeSet::new(),
             nodes: Vec::new(),
         };
-        for dependent in graph.nodes.values() {
-            for requirement in dependent.requires.iter() {
-                if inside.contains(&dependent.key) || inside.contains(requirement) {
-                    reach.edges.insert(Edge {
-                        node: dependent.key.clone(),
-                        requires: requirement.clone(),
-                    });
-                }
-            }
-        }
         for key in &nodes {
+            reach.edges.extend(index.edges(graph, key));
+            reach.annotations.extend(index.annotations(graph, key));
             let Some(found) = graph.nodes.get(key) else {
                 continue;
             };
@@ -76,22 +65,11 @@ impl Reach {
                         }),
                 );
         }
-        let attached = graph.state.annotations.values().filter(|annotation| {
-            annotation
-                .body
-                .node
-                .as_ref()
-                .is_some_and(|on| inside.contains(on))
-        });
-        reach
-            .annotations
-            .extend(attached.map(|annotation| annotation.body.key.clone()));
         assert_eq!(
             nodes.first(),
             Some(node),
             "the removed node leads its subtree"
         );
-        assert_eq!(inside.len(), nodes.len(), "a subtree visits each node once");
         reach.nodes = nodes;
         reach
     }
@@ -138,7 +116,14 @@ pub(super) fn remove(session: &mut Session<'_>, removal: &Removal) -> Vec<Write>
     if !session.require(&removal.node) {
         return Vec::new();
     }
-    let reach = Reach::of(session, &removal.node);
+    let cached = session.removal_index.take();
+    let Some(graph) = session.graph() else {
+        unreachable!("a graph patch targets an existing graph")
+    };
+    let mut index = cached.unwrap_or_else(|| RemovalIndex::build(graph));
+    let reach = Reach::of(graph, &mut index, &removal.node);
+    session.removal_operations += index.take_operations();
+    session.removal_index = Some(index);
     let extra = reach.unnamed(removal);
     if !extra.is_empty() {
         session.reject(

@@ -86,3 +86,72 @@ pub(crate) fn exactly_one_of(schema: &mut schemars::Schema, fields: &[&str]) {
         .collect();
     schema.insert("oneOf".to_owned(), serde_json::Value::Array(options));
 }
+
+/// Reads a map entry by entry and rejects a key written twice. JSON allows repeated keys and
+/// serde's own map keeps the last, while YAML's reader rejects them, so without this the two
+/// formats would read one document differently. With `limit`, the entry count is checked as
+/// entries arrive, so an oversized map fails before it is all read.
+pub(crate) fn unique_entries<'de, D, K, V>(
+    deserializer: D,
+    expecting: &'static str,
+    limit: Option<crate::limits::Limit>,
+) -> Result<std::collections::BTreeMap<K, V>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    K: serde::Deserialize<'de> + Ord + std::fmt::Display,
+    V: serde::Deserialize<'de>,
+{
+    struct Entries<K, V> {
+        expecting: &'static str,
+        limit: Option<crate::limits::Limit>,
+        types: std::marker::PhantomData<(K, V)>,
+    }
+
+    impl<'de, K, V> serde::de::Visitor<'de> for Entries<K, V>
+    where
+        K: serde::Deserialize<'de> + Ord + std::fmt::Display,
+        V: serde::Deserialize<'de>,
+    {
+        type Value = std::collections::BTreeMap<K, V>;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str(self.expecting)
+        }
+
+        fn visit_map<A: serde::de::MapAccess<'de>>(
+            self,
+            mut access: A,
+        ) -> Result<Self::Value, A::Error> {
+            let mut map = std::collections::BTreeMap::new();
+            while let Some((key, value)) = access.next_entry::<K, V>()? {
+                if map.contains_key(&key) {
+                    return Err(serde::de::Error::custom(format!("{key} appears twice")));
+                }
+                map.insert(key, value);
+                if let Some(limit) = self.limit {
+                    limit.check(map.len()).map_err(serde::de::Error::custom)?;
+                }
+            }
+            Ok(map)
+        }
+    }
+
+    deserializer.deserialize_map(Entries {
+        expecting,
+        limit,
+        types: std::marker::PhantomData,
+    })
+}
+
+/// `deserialize_with` for a keyed map field: [`unique_entries`] without a limit, so a key
+/// written twice is an error in JSON as it is in YAML.
+pub(crate) fn unique_map<'de, D, K, V>(
+    deserializer: D,
+) -> Result<std::collections::BTreeMap<K, V>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    K: serde::Deserialize<'de> + Ord + std::fmt::Display,
+    V: serde::Deserialize<'de>,
+{
+    unique_entries(deserializer, "a map with each key once", None)
+}

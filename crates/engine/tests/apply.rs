@@ -343,11 +343,17 @@ fn a_placeholder_completes_only_once_broken_down_or_atomic() {
 #[test]
 fn a_role_with_a_filling_decision_and_a_fed_milestone_change_only_through_the_decision() {
     let records = vendor_after(2);
-    let fill = "- op: fill_role\n  role: r_eval_owner\n  entities: [e_lead]\n";
-    assert_eq!(
-        codes(vendor_patch(&records, fill)),
-        [ViolationCode::FilledThroughDecision]
-    );
+    // The client routes both through the decision (DECISIONS.md, E3 role fills).
+    for direct in [
+        "- op: fill_role\n  role: r_eval_owner\n  entities: [e_lead]\n",
+        "- op: clear_role_fill\n  role: r_eval_owner\n",
+    ] {
+        assert_eq!(
+            codes(vendor_patch(&records, direct)),
+            [ViolationCode::FilledThroughDecision],
+            "{direct}"
+        );
+    }
     let pin = "- op: set_pin\n  node: n_decision_meeting\n  date: \"2026-11-30\"\n";
     assert_eq!(
         codes(vendor_patch(&records, pin)),
@@ -680,4 +686,45 @@ fn a_proposal_may_unarchive_or_delete_an_archived_journey() {
             "{id}"
         );
     }
+}
+
+/// A18: a removal sees what earlier mutations in its patch changed, even after another
+/// removal in the patch has indexed the graph: a child added in between goes with its
+/// parent, an edge added in between widens the removal unless it is named, and a child
+/// moved out in between stays.
+#[test]
+fn a_removal_sees_what_its_patch_added_after_an_earlier_removal() {
+    let records = support::journey(&support::add_nodes(&[
+        "{key: n_parent, id: parent, kind: group, title: Parent}",
+        "{key: n_gone, id: gone, kind: action, title: Gone}",
+        "{key: n_other, id: other, kind: action, title: Other}",
+        "{key: n_home, id: home, kind: group, title: Home}",
+        "{key: n_mover, id: mover, kind: action, title: Mover, parent: n_parent}",
+    ]));
+    let first = "- op: remove_node\n  removal: {node: n_gone}\n";
+    let child = "- op: add_node\n  node: {key: n_child, id: child, kind: action, title: Child, parent: n_parent}\n";
+    let edge = "- op: add_edge\n  edge: {node: n_other, requires: n_parent}\n";
+    let moved = "- op: set_node_field\n  node: n_mover\n  value: {parent: n_home}\n";
+    let parent = |names: &str| {
+        format!("- op: remove_node\n  removal: {{node: n_parent, descendants: [n_mover{names}}}\n")
+    };
+    let holds = |records: &cairn_engine::Records, node: &str| {
+        support::graph(records).nodes.get(&key(node)).is_some()
+    };
+    let with_child =
+        support::accepted(&records, &format!("{first}{child}{}", parent(", n_child]")));
+    assert!(!holds(&with_child, "n_child"));
+    let without_mover = support::accepted(&records, &format!("{first}{moved}{}", parent("]")));
+    assert!(holds(&without_mover, "n_mover"));
+    assert!(!holds(&without_mover, "n_parent"));
+    assert_eq!(
+        codes(support::journey_patch(
+            &records,
+            &format!("{first}{edge}{}", parent("]"))
+        )),
+        [ViolationCode::RemovalWidened]
+    );
+    let named = parent("], edges: [{node: n_other, requires: n_parent}]");
+    let with_edge = support::accepted(&records, &format!("{first}{edge}{named}"));
+    assert!(!holds(&with_edge, "n_parent"));
 }

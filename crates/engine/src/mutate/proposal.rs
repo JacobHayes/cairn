@@ -32,11 +32,11 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
             reject(session, ViolationCode::TargetExists, "the proposal exists");
             return Vec::new();
         }
-        (Mutation::EditProposal { .. } | Mutation::DiscardProposal, None) => {
+        (Mutation::EditProposal { .. } | Mutation::DiscardProposal {}, None) => {
             reject(session, ViolationCode::TargetMissing, "no such proposal");
             return Vec::new();
         }
-        (Mutation::EditProposal { .. } | Mutation::DiscardProposal, Some(found))
+        (Mutation::EditProposal { .. } | Mutation::DiscardProposal {}, Some(found))
             if found.destination != *destination =>
         {
             reject(
@@ -46,7 +46,7 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
             );
             return Vec::new();
         }
-        (Mutation::EditProposal { .. } | Mutation::DiscardProposal, Some(found))
+        (Mutation::EditProposal { .. } | Mutation::DiscardProposal {}, Some(found))
             if found.status != ProposalStatus::Open =>
         {
             reject(
@@ -61,7 +61,7 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
             draft: proposal.clone(),
             ..found
         },
-        (Mutation::DiscardProposal, Some(found)) => Proposal {
+        (Mutation::DiscardProposal {}, Some(found)) => Proposal {
             revision,
             status: ProposalStatus::Discarded,
             ..found

@@ -271,7 +271,7 @@ fn versions_read(records: &Records, patch: &Patch, mutations: &[&Mutation]) -> B
                     follows = Some(target);
                 }
             }
-            (Mutation::OpenDraft { .. } | Mutation::PublishDraft, PatchTarget::Route(id)) => {
+            (Mutation::OpenDraft { .. } | Mutation::PublishDraft {}, PatchTarget::Route(id)) => {
                 let route = records.routes.get(id);
                 let latest = route.and_then(|route| route.versions.iter().next_back());
                 let extends = route

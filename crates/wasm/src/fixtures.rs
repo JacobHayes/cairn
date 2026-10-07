@@ -127,7 +127,7 @@ impl Fixture {
                 .values()
                 .map(|node| Mutation::AddNode { node: node.clone() }),
         );
-        mutations.push(Mutation::PublishDraft);
+        mutations.push(Mutation::PublishDraft {});
         let id = format!("p_seed_{}", self.name.replace('-', "_"));
         Ok(Some(Patch {
             id: id

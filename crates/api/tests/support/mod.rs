@@ -337,7 +337,7 @@ pub fn publish_fixture_route(name: &str) -> Patch {
     }
     let nodes = graph.nodes.values().cloned();
     mutations.extend(nodes.map(|node| Mutation::AddNode { node }));
-    mutations.push(Mutation::PublishDraft);
+    mutations.push(Mutation::PublishDraft {});
     Patch {
         id: format!("p_seed_{}", name.replace('-', "_"))
             .parse()

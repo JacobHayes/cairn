@@ -61,6 +61,25 @@ pub fn derive_inputs(deployment: cairn_schema::Deployment) -> cairn_schema::Deri
     }
 }
 
+/// Runs `patch`'s mutations over `records` as [`apply`] does, without the validation that
+/// follows, and returns the operations its node removals spent, the removal index's
+/// building included (A18): rung 3's removal cost test budgets it.
+///
+/// # Panics
+///
+/// When a mutation is rejected.
+#[must_use]
+pub fn removal_operation_count(records: &Records, patch: &Patch) -> u64 {
+    let inputs = fixed_inputs();
+    let mut session = crate::mutate::Session::new(patch, &inputs, records.clone());
+    for (ordinal, mutation) in patch.mutations.as_slice().iter().enumerate() {
+        session.ordinal = u32::try_from(ordinal).unwrap_or(u32::MAX);
+        crate::mutate::apply(&mut session, mutation, &mut Vec::new());
+    }
+    assert!(session.violations.is_empty(), "{:#?}", session.violations);
+    session.removal_operations
+}
+
 /// One generated operation.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Op {
@@ -111,6 +130,13 @@ pub enum Op {
     Artifact {
         /// The node, by index.
         node: u16,
+    },
+    /// Move node `node` under node `parent`.
+    Move {
+        /// The node, by index.
+        node: u16,
+        /// The new parent, by index.
+        parent: u16,
     },
     /// Remove node `node`, naming everything its removal reaches.
     Remove {
@@ -179,10 +205,81 @@ fn patch(records: &Records, mutations: Vec<Mutation>) -> Patch {
     }
 }
 
+/// The most operations one generated patch holds.
+pub const PATCH_OP_COUNT_MAX: usize = 6;
+
+/// The operations of one generated patch: 1 to [`PATCH_OP_COUNT_MAX`], applied together, so
+/// a later mutation meets what an earlier one in the same patch did (J2, A17).
+pub fn arb_patch() -> impl Strategy<Value = Vec<Op>> {
+    prop::collection::vec(arb_ops(), 1..=PATCH_OP_COUNT_MAX)
+}
+
+/// The operations of one generated structural patch: 2 to 12 node additions, edges, notes,
+/// moves, and removals, removal-heavy, so a removal often meets what earlier mutations in its patch
+/// added, moved under, or linked to the node it removes (A18).
+pub fn arb_structure_patch() -> impl Strategy<Value = Vec<Op>> {
+    let kind = prop_oneof![
+        Just(NodeKind::Action),
+        Just(NodeKind::Deliverable),
+        Just(NodeKind::Group),
+    ];
+    let op = prop_oneof![
+        3 => (any::<u16>(), kind).prop_map(|(parent, kind)| Op::AddChild { parent, kind }),
+        2 => (any::<u16>(), any::<u16>()).prop_map(|(node, requires)| Op::AddEdge { node, requires }),
+        1 => any::<u16>().prop_map(|node| Op::Artifact { node }),
+        1 => (any::<u16>(), any::<u16>()).prop_map(|(node, parent)| Op::Move { node, parent }),
+        3 => any::<u16>().prop_map(|node| Op::Remove { node }),
+    ];
+    prop::collection::vec(op, 2..=12)
+}
+
+/// The one patch `ops` make against the records as they are now. Each operation resolves
+/// against the records the ones before it leave, found by applying each alone to a scratch
+/// copy; one that copy rejects leaves it as it was, so the operations after it resolve as
+/// if it were not there (the patch holding it is then most likely rejected, as generated
+/// single operations often are).
+///
+/// # Panics
+///
+/// When `ops` is empty or longer than a patch may be.
+#[must_use]
+pub fn resolve_patch(ops: &[Op], records: &Records) -> Patch {
+    resolve_in_sequence(ops, records).0
+}
+
+/// [`resolve_patch`], with the records the operations leave when each, applied alone in
+/// turn, is accepted; none when one is rejected.
+///
+/// # Panics
+///
+/// When `ops` is empty or longer than a patch may be.
+#[must_use]
+pub fn resolve_in_sequence(ops: &[Op], records: &Records) -> (Patch, Option<Records>) {
+    assert!(!ops.is_empty(), "a patch holds at least one mutation");
+    let mut scratch = records.clone();
+    let mut every_accepted = true;
+    let mut mutations = Vec::with_capacity(ops.len());
+    for op in ops {
+        let mutation = op.mutation(&scratch);
+        let alone = patch(&scratch, vec![mutation.clone()]);
+        match apply(&scratch, &alone, &fixed_inputs()) {
+            Ok(applied) => scratch = applied.records().clone(),
+            Err(_) => every_accepted = false,
+        }
+        mutations.push(mutation);
+    }
+    (patch(records, mutations), every_accepted.then_some(scratch))
+}
+
 impl Op {
     /// The patch this operation makes against the records as they are now.
     #[must_use]
     pub fn resolve(&self, records: &Records) -> Patch {
+        patch(records, vec![self.mutation(records)])
+    }
+
+    /// The mutation this operation makes against the records as they are now.
+    fn mutation(&self, records: &Records) -> Mutation {
         let empty = cairn_schema::Graph::default();
         let graph = records
             .journeys
@@ -196,7 +293,7 @@ impl Op {
                 .flatten()
         };
         let fresh = graph.nodes.len() + graph.retired_keys.nodes.len() + 1;
-        let mutation = match (self, pick(0)) {
+        match (self, pick(0)) {
             (Op::AddChild { parent, kind }, _) => add_child(graph, pick(*parent), *kind, fresh),
             (
                 Op::AddEdge { .. }
@@ -205,6 +302,7 @@ impl Op {
                 | Op::Pin { .. }
                 | Op::Snooze { .. }
                 | Op::Artifact { .. }
+                | Op::Move { .. }
                 | Op::Remove { .. },
                 None,
             ) => add_child(graph, None, NodeKind::Action, fresh),
@@ -232,9 +330,13 @@ impl Op {
                 "op: add_annotation\nannotation: {{key: a_g{fresh}, node: {}, artifact: \"https://example.org/{fresh}\"}}\n",
                 key_text(pick(*node))
             )),
+            (Op::Move { node, parent }, Some(_)) => yaml(&format!(
+                "op: set_node_field\nnode: {}\nvalue: {{parent: {}}}\n",
+                key_text(pick(*node)),
+                key_text(pick(*parent))
+            )),
             (Op::Remove { node }, Some(key)) => removal(graph, pick(*node).unwrap_or(key)),
-        };
-        patch(records, vec![mutation])
+        }
     }
 }
 

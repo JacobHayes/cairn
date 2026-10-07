@@ -54,6 +54,7 @@ pub enum ConflictResolution {
     /// remains (B7: map old to new).
     MapChoices {
         /// Removed choice to remaining choice.
+        #[serde(deserialize_with = "crate::serde_util::unique_map")]
         map: BTreeMap<Slug, Slug>,
     },
     /// Take the route's value and clear the state it makes invalid.
@@ -220,7 +221,11 @@ pub enum Conflict {
         #[serde(skip_serializing_if = "Option::is_none")]
         route: Option<ParticipationKind<KeyRefs>>,
         /// The journey's participations of the kind, by node.
-        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        #[serde(
+            default,
+            skip_serializing_if = "BTreeMap::is_empty",
+            deserialize_with = "crate::serde_util::unique_map"
+        )]
         references: BTreeMap<NodeKey, ParticipationSource<KeyRefs>>,
     },
     /// The graph's `default_owner`, which both sides changed.

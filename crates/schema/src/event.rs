@@ -253,7 +253,7 @@ impl Mutation {
             Mutation::CreateJourney { .. } => EventType::JourneyCreated,
             Mutation::EditJourney { .. } => EventType::JourneyEdited,
             Mutation::SetJourneyStatus { .. } => EventType::JourneyStatusChanged,
-            Mutation::DeleteJourney => EventType::JourneyDeleted,
+            Mutation::DeleteJourney {} => EventType::JourneyDeleted,
             Mutation::CreateRoute { .. } => EventType::RouteCreated,
             Mutation::EditRoute { .. } => EventType::RouteEdited,
             Mutation::SetRouteRetired { retired: true } => EventType::RouteRetired,
@@ -267,8 +267,8 @@ impl Mutation {
             Mutation::OpenDraft {
                 source: DraftSource::SaveAsRoute { .. },
             } => EventType::SavedAsRoute,
-            Mutation::DiscardDraft => EventType::DraftDiscarded,
-            Mutation::PublishDraft => EventType::RoutePublished,
+            Mutation::DiscardDraft {} => EventType::DraftDiscarded,
+            Mutation::PublishDraft {} => EventType::RoutePublished,
             Mutation::Upgrade { .. } => EventType::JourneyUpgraded,
             Mutation::Relink { .. } => EventType::Relinked,
             Mutation::SetProvenance { .. } => EventType::ProvenanceChanged,
@@ -279,7 +279,7 @@ impl Mutation {
             Mutation::CreateProposal { .. } => EventType::ProposalCreated,
             Mutation::EditProposal { .. } => EventType::ProposalEdited,
             Mutation::ApplyProposal { .. } => EventType::ProposalApplied,
-            Mutation::DiscardProposal => EventType::ProposalDiscarded,
+            Mutation::DiscardProposal {} => EventType::ProposalDiscarded,
             graph_mutation => unreachable!("{graph_mutation:?} is typed by Mutation::event_type"),
         }
     }

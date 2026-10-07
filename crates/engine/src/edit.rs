@@ -165,52 +165,26 @@ pub(crate) fn full_removal(graph: &Graph, node: &NodeKey) -> Removal {
     }
 }
 
-/// A18: the full removal of each of `nodes`, from one tree and one index of edges and notes
-/// by node: O(n log n + edges) once, then each removal's subtree with its nodes' edges, so
-/// many removals (an upgrade's orphans) cost at most depth x (n + edges) together.
+/// A18: the full removal of each of `nodes`, from one [`RemovalIndex`]: O(n log n + edges)
+/// once, then each removal's subtree with its nodes' edges, so many removals (an upgrade's
+/// orphans) cost at most depth x (n + edges) together.
 pub(crate) fn full_removals(graph: &Graph, nodes: &[NodeKey]) -> Vec<Removal> {
-    let tree = crate::graph::Tree::build(graph);
-    let mut edges: BTreeMap<&NodeKey, Vec<Edge>> = BTreeMap::new();
-    for dependent in graph.nodes.values() {
-        for requirement in dependent.requires.iter() {
-            let edge = Edge {
-                node: dependent.key.clone(),
-                requires: requirement.clone(),
-            };
-            edges.entry(&dependent.key).or_default().push(edge.clone());
-            edges.entry(requirement).or_default().push(edge);
-        }
-    }
-    let mut annotations: BTreeMap<&NodeKey, Vec<&AttachmentKey>> = BTreeMap::new();
-    for note in graph.state.annotations.values() {
-        if let Some(node) = &note.body.node {
-            annotations.entry(node).or_default().push(&note.body.key);
-        }
-    }
+    let mut index = RemovalIndex::build(graph);
     nodes
         .iter()
         .map(|node| {
-            let descendants: BTreeSet<NodeKey> = tree.descendants(node).into_iter().collect();
+            let inside = index.subtree(graph, node);
             let mut removal = Removal {
                 node: node.clone(),
-                descendants,
+                descendants: inside.iter().skip(1).cloned().collect(),
                 edges: BTreeSet::new(),
                 resources: BTreeSet::new(),
                 annotations: BTreeSet::new(),
                 participations: BTreeSet::new(),
             };
-            let inside: Vec<NodeKey> = removal.nodes().cloned().collect();
             for key in &inside {
-                removal
-                    .edges
-                    .extend(edges.get(key).into_iter().flatten().cloned());
-                removal.annotations.extend(
-                    annotations
-                        .get(key)
-                        .into_iter()
-                        .flatten()
-                        .map(|note| (*note).clone()),
-                );
+                removal.edges.extend(index.edges(graph, key));
+                removal.annotations.extend(index.annotations(graph, key));
                 let Some(found) = graph.nodes.get(key) else {
                     continue;
                 };
@@ -233,4 +207,203 @@ pub(crate) fn full_removals(graph: &Graph, nodes: &[NodeKey]) -> Vec<Removal> {
             removal
         })
         .collect()
+}
+
+/// What a removal reaches, indexed once for a graph (A18): each node's children, the edges
+/// into and out of each node, and the notes on each. Built in O(n log n + edges + notes).
+///
+/// The index may hold more than the graph does, never less: every lookup is read through
+/// the graph as it now stands, so a node, edge, or note the graph no longer holds, or a
+/// child that has moved to another parent, is skipped, and a skipped child's subtree is not
+/// walked (a removed child went with it; a moved one is indexed under its new parent too).
+/// A removal only takes things away, so it leaves the index true; any other write to the
+/// graph is folded in by [`RemovalIndex::observe`], which indexes what it added. Each lookup
+/// then costs its own subtree and that subtree's edges and notes, never the whole graph, so
+/// a patch's removals cost the index once plus what they remove, whatever else the patch
+/// writes between them.
+pub(crate) struct RemovalIndex {
+    children: BTreeMap<NodeKey, BTreeSet<NodeKey>>,
+    edges: BTreeMap<NodeKey, BTreeSet<Edge>>,
+    annotations: BTreeMap<NodeKey, BTreeSet<AttachmentKey>>,
+    /// The nodes, edges, and notes visited since last taken, building included (rung 3
+    /// budgets it).
+    operations: u64,
+}
+
+impl RemovalIndex {
+    /// Indexes `graph`.
+    pub(crate) fn build(graph: &Graph) -> Self {
+        let mut index = RemovalIndex {
+            children: BTreeMap::new(),
+            edges: BTreeMap::new(),
+            annotations: BTreeMap::new(),
+            operations: 0,
+        };
+        for node in graph.nodes.values() {
+            index.index_node(node);
+        }
+        for note in graph.state.annotations.values() {
+            index.index_annotation(note);
+        }
+        index
+    }
+
+    /// Indexes a node as `graph` holds it: under its parent, and with its edges.
+    fn index_node(&mut self, node: &Node<KeyRefs>) {
+        self.operations += 1;
+        if let Some(parent) = &node.parent {
+            self.children
+                .entry(parent.clone())
+                .or_default()
+                .insert(node.key.clone());
+        }
+        for requirement in node.requires.iter() {
+            self.index_edge(&Edge {
+                node: node.key.clone(),
+                requires: requirement.clone(),
+            });
+        }
+    }
+
+    fn index_edge(&mut self, edge: &Edge) {
+        self.operations += 1;
+        for end in [&edge.node, &edge.requires] {
+            self.edges
+                .entry(end.clone())
+                .or_default()
+                .insert(edge.clone());
+        }
+    }
+
+    fn index_annotation(&mut self, note: &cairn_schema::Annotation) {
+        self.operations += 1;
+        if let Some(node) = &note.body.node {
+            self.annotations
+                .entry(node.clone())
+                .or_default()
+                .insert(note.body.key.clone());
+        }
+    }
+
+    /// Folds in a write `graph` (the indexed graph, `id`) has just taken: a node put whole or
+    /// a field of it, an edge, or a note is indexed as the graph now holds it. Anything else
+    /// a graph write puts (state, resources, participations, keys) is read from the graph at
+    /// lookup, and a removal only takes things away, so neither needs indexing. Returns
+    /// false when the write replaced the graph wholesale and the index must be built again.
+    #[must_use]
+    pub(crate) fn observe(
+        &mut self,
+        id: &cairn_schema::GraphId,
+        graph: &Graph,
+        write: &cairn_schema::Write,
+    ) -> bool {
+        use cairn_schema::{GraphRecord, Record, RecordKey, Write};
+        match write {
+            Write::Put(Record::Graph {
+                graph: written,
+                record,
+            }) if written == id => {
+                match record {
+                    GraphRecord::Node(cairn_schema::Node { key, .. })
+                    | GraphRecord::NodeField { node: key, .. } => {
+                        if let Some(node) = graph.nodes.get(key) {
+                            self.index_node(node);
+                        }
+                    }
+                    GraphRecord::Edge(edge) => self.index_edge(edge),
+                    GraphRecord::Annotation(note) => self.index_annotation(note),
+                    // Read from the graph at lookup, or not reach at all.
+                    GraphRecord::Role(_)
+                    | GraphRecord::Kind(_)
+                    | GraphRecord::DefaultOwner(_)
+                    | GraphRecord::Participation { .. }
+                    | GraphRecord::Resource { .. }
+                    | GraphRecord::RetiredKey(_)
+                    | GraphRecord::NodeState { .. }
+                    | GraphRecord::LocalEdit { .. }
+                    | GraphRecord::Answer { .. }
+                    | GraphRecord::RoleFill { .. }
+                    | GraphRecord::Pin { .. }
+                    | GraphRecord::Snooze { .. }
+                    | GraphRecord::Overrides { .. }
+                    | GraphRecord::Tombstone(_) => {}
+                }
+                true
+            }
+            Write::CopyGraph { to, .. } => to != id,
+            Write::Remove(RecordKey::Graph(removed)) => removed != id,
+            Write::Remove(RecordKey::Domain(_)) => false,
+            Write::Put(_) | Write::Remove(_) => true,
+        }
+    }
+
+    /// `node` and every descendant `graph` holds, the node first, then depth first in the
+    /// order [`crate::graph::Tree::descendants`] gives. A child the graph no longer holds
+    /// under this parent is skipped, with its subtree.
+    pub(crate) fn subtree(&mut self, graph: &Graph, node: &NodeKey) -> Vec<NodeKey> {
+        let children = |parent: &NodeKey| self.children.get(parent).into_iter().flatten();
+        let mut found = vec![node.clone()];
+        let mut seen = BTreeSet::from([node]);
+        let mut stack: Vec<(&NodeKey, &NodeKey)> =
+            children(node).map(|child| (node, child)).collect();
+        let mut visited: u64 = 0;
+        while let Some((parent, next)) = stack.pop() {
+            visited += 1;
+            let held = graph
+                .nodes
+                .get(next)
+                .is_some_and(|found| found.parent.as_ref() == Some(parent));
+            // A cycle in a broken candidate must not loop forever.
+            if !held || !seen.insert(next) {
+                continue;
+            }
+            found.push(next.clone());
+            stack.extend(children(next).map(|child| (next, child)));
+        }
+        self.operations += visited;
+        assert!(found.len() <= graph.nodes.len() + 1);
+        found
+    }
+
+    /// The edges into and out of `node` that `graph` holds.
+    pub(crate) fn edges(&mut self, graph: &Graph, node: &NodeKey) -> Vec<Edge> {
+        let indexed = self.edges.get(node);
+        self.operations +=
+            indexed.map_or(0, |edges| u64::try_from(edges.len()).unwrap_or(u64::MAX));
+        indexed
+            .into_iter()
+            .flatten()
+            .filter(|edge| {
+                graph
+                    .nodes
+                    .get(&edge.node)
+                    .is_some_and(|dependent| dependent.requires.as_set().contains(&edge.requires))
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// The notes on `node` that `graph` holds.
+    pub(crate) fn annotations(&mut self, graph: &Graph, node: &NodeKey) -> Vec<AttachmentKey> {
+        let indexed = self.annotations.get(node);
+        self.operations += indexed.map_or(0, |keys| u64::try_from(keys.len()).unwrap_or(u64::MAX));
+        indexed
+            .into_iter()
+            .flatten()
+            .filter(|key| {
+                graph
+                    .state
+                    .annotations
+                    .get(key)
+                    .is_some_and(|note| note.body.node.as_ref() == Some(node))
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// The nodes, edges, and notes visited since the last call, building included, and the
+    /// count reset.
+    pub(crate) fn take_operations(&mut self) -> u64 {
+        std::mem::take(&mut self.operations)
+    }
 }
