@@ -25,6 +25,29 @@ ladder_require_tool rustfmt cargo fmt --version
 ladder_require_tool clippy cargo clippy --version
 ladder_require_tool node node --version
 
+# PRACTICES, Code conventions (TypeScript): the strict typecheck over every web package's
+# sources and generated types, and eslint with the type-aware rules over the hand-written
+# sources (generated code is not linted). Both come from the npm workspace: `npm ci`. They
+# need nothing cargo builds, so they run in the background while the Rust checks below do,
+# each writing its output and status under dist/ladder/, and are read at the end.
+for tool in tsc eslint; do
+  [ -x "node_modules/.bin/$tool" ] || ladder_fail "tool missing: $tool (run npm ci)"
+done
+typescript=dist/ladder/rung-1
+rm -rf "$typescript"
+mkdir -p "$typescript"
+{
+  status=0
+  node_modules/.bin/tsc -p tsconfig.json --listFiles >"$typescript/tsc.out" 2>&1 || status=$?
+  echo "$status" >"$typescript/tsc.status"
+} &
+{
+  status=0
+  node_modules/.bin/eslint --max-warnings 0 --format json . >"$typescript/eslint.json" \
+    2>"$typescript/eslint.err" || status=$?
+  echo "$status" >"$typescript/eslint.status"
+} &
+
 # Workspace members as "name<TAB>manifest path" lines.
 # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
 members=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
@@ -150,21 +173,22 @@ cargo check --locked --target wasm32-unknown-unknown "${wasm_packages[@]}" \
   || ladder_fail "a runtime-free crate does not build for wasm32-unknown-unknown"
 ladder_suite "wasm32-unknown-unknown build" "${#wasm_crates[@]}" crates
 
-# PRACTICES, Code conventions (TypeScript): the strict typecheck over every web package's
-# sources and generated types, and eslint with the type-aware rules over the hand-written
-# sources (generated code is not linted). Both come from the npm workspace: `npm ci`.
-for tool in tsc eslint; do
-  [ -x "node_modules/.bin/$tool" ] || ladder_fail "tool missing: $tool (run npm ci)"
-done
-node_modules/.bin/tsc -p tsconfig.json || ladder_fail "the TypeScript typecheck reported errors"
-typed=$(node_modules/.bin/tsc -p tsconfig.json --listFilesOnly | grep -c "^$PWD/web/" || true)
+# The TypeScript checks started at the top. `--listFiles` names every file the typecheck read,
+# after any errors.
+wait
+[ "$(cat "$typescript/tsc.status")" -eq 0 ] || {
+  grep -v "^/" "$typescript/tsc.out" || true
+  ladder_fail "the TypeScript typecheck reported errors"
+}
+typed=$(grep -c "^$PWD/web/" "$typescript/tsc.out" || true)
 ladder_suite "TypeScript typecheck" "$typed" files
-linted_json=$(node_modules/.bin/eslint --max-warnings 0 --format json .) || {
+[ "$(cat "$typescript/eslint.status")" -eq 0 ] || {
+  cat "$typescript/eslint.err" >&2
   node_modules/.bin/eslint --max-warnings 0 . || true
   ladder_fail "eslint reported problems"
 }
 # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
-linted=$(node -e 'let text = ""; process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => console.log(JSON.parse(text).length));' <<<"$linted_json")
+linted=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).length);' "$typescript/eslint.json")
 ladder_suite eslint "$linted" files
 
 ladder_rung_end
