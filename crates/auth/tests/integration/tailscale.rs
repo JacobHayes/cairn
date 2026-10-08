@@ -1,6 +1,7 @@
 //! The Tailscale provider (H1), offline: direct mode against a fake tailscaled answering
-//! whois on a unix socket, proxy mode through `Tailscale-User-*` headers, and the refusals
-//! that keep each mode where it is safe (3.2, Security).
+//! whois on a unix socket, proxy mode through `Tailscale-User-*` headers from this machine or
+//! from the proxies it lists, and the refusals that keep each mode where it is safe (3.2,
+//! Security).
 
 #[cfg(test)]
 mod tailscale {
@@ -13,9 +14,12 @@ mod tailscale {
     use axum::body::Body;
     use axum::extract::Query;
     use axum::http::StatusCode;
+    use axum::http::request::Builder;
     use axum::response::{IntoResponse, Response};
     use axum::routing::get;
-    use cairn_auth::{AuthProvider, Listener, TailscaleConfig, TailscaleMode, TailscaleProvider};
+    use cairn_auth::{
+        AuthProvider, Listener, TailscaleConfig, TailscaleMode, TailscaleProvider, TrustedProxies,
+    };
     use cairn_store::AuthStore;
     use serde_json::json;
 
@@ -83,6 +87,37 @@ mod tailscale {
         Tailscaled { socket }
     }
 
+    /// Proxy mode trusting `tailscale serve` on this machine.
+    fn this_machine() -> TailscaleMode {
+        TailscaleMode::Proxy {
+            trusted: TrustedProxies::ThisMachine,
+        }
+    }
+
+    /// Proxy mode trusting a proxy on another machine at `sources`.
+    fn proxies(sources: &[&str]) -> TailscaleMode {
+        let sources = sources.iter().map(|source| source.parse().unwrap());
+        TailscaleMode::Proxy {
+            trusted: TrustedProxies::Sources(sources.collect()),
+        }
+    }
+
+    /// A listener on a private network address, which a proxy on another machine reaches.
+    fn private() -> Listener {
+        Listener::Tcp("10.10.10.6:8085".parse().unwrap())
+    }
+
+    /// Request headers, by name and value.
+    type Headers = [(&'static str, &'static str)];
+
+    /// `builder` carrying each of `headers`.
+    fn with_headers(mut builder: Builder, headers: &[(&str, &str)]) -> axum::http::Request<Body> {
+        for (name, value) in headers {
+            builder = builder.header(*name, *value);
+        }
+        builder.body(Body::empty()).unwrap()
+    }
+
     fn config(mode: TailscaleMode) -> TailscaleConfig {
         TailscaleConfig {
             name: "tailscale".parse().unwrap(),
@@ -97,7 +132,8 @@ mod tailscale {
 
     /// Direct mode: tailscaled's whois names the peer's user, whose login is a verified
     /// email; a tagged machine signs no one in, a peer tailscaled does not know is refused,
-    /// and so is every request when tailscaled cannot be asked.
+    /// and so is every request when tailscaled cannot be asked. `Tailscale-*` headers are
+    /// never read: a forged login changes nothing.
     #[tokio::test]
     async fn direct_mode_asks_tailscaled_who_the_peer_is() {
         let daemon = tailscaled();
@@ -121,6 +157,21 @@ mod tailscale {
             whoami(&router, get_from(STRANGER_PEER)).await,
             Err(StatusCode::FORBIDDEN)
         );
+        let forged = [("Tailscale-User-Login", "bob@example.org")];
+        let forged_by = |peer| with_headers(request("/whoami", peer), &forged);
+        let still_ann = whoami(&router, forged_by(ANN_PEER)).await.unwrap();
+        assert_eq!(still_ann.user, ann.user);
+        let cases = [
+            (TAGGED_PEER, StatusCode::UNAUTHORIZED),
+            (STRANGER_PEER, StatusCode::FORBIDDEN),
+        ];
+        for (peer, refused) in cases {
+            assert_eq!(
+                whoami(&router, forged_by(peer)).await,
+                Err(refused),
+                "{peer}"
+            );
+        }
 
         let gone = TailscaleMode::Direct {
             socket: socket_path(),
@@ -134,8 +185,9 @@ mod tailscale {
         );
     }
 
-    /// Direct mode serves only a listener bound to a tailnet address; proxy mode only one
-    /// the proxy alone reaches, loopback or a unix socket.
+    /// Direct mode serves only a listener bound to a tailnet address; proxy mode trusting
+    /// this machine only one the proxy alone reaches, loopback or a unix socket; proxy mode
+    /// trusting the proxies it lists any listener, since it checks every peer.
     #[test]
     fn each_mode_starts_only_on_a_listener_where_it_is_safe() {
         let direct = || TailscaleMode::Direct {
@@ -146,10 +198,15 @@ mod tailscale {
             (direct(), loopback(), false),
             (direct(), public(), false),
             (direct(), Listener::Unix, false),
-            (TailscaleMode::Proxy, loopback(), true),
-            (TailscaleMode::Proxy, Listener::Unix, true),
-            (TailscaleMode::Proxy, public(), false),
-            (TailscaleMode::Proxy, tailnet(), false),
+            (this_machine(), loopback(), true),
+            (this_machine(), Listener::Unix, true),
+            (this_machine(), public(), false),
+            (this_machine(), tailnet(), false),
+            (this_machine(), private(), false),
+            (proxies(&["10.10.10.2"]), private(), true),
+            (proxies(&["10.10.10.0/24"]), public(), true),
+            (proxies(&["10.10.10.2"]), loopback(), true),
+            (proxies(&[]), private(), false),
         ];
         for (mode, listener, starts) in cases {
             let started = TailscaleProvider::new(config(mode.clone()), listener);
@@ -163,7 +220,7 @@ mod tailscale {
     async fn proxy_mode_trusts_the_headers_only_from_this_machine() {
         let world = World::new();
         let provider: Arc<dyn AuthProvider> =
-            Arc::new(TailscaleProvider::new(config(TailscaleMode::Proxy), loopback()).unwrap());
+            Arc::new(TailscaleProvider::new(config(this_machine()), loopback()).unwrap());
         let router = app(&world.auth(loopback(), vec![provider]));
         let proxied = |peer: &str| {
             request("/whoami", peer)
@@ -183,5 +240,59 @@ mod tailscale {
             whoami(&router, get_from(LOCAL)).await,
             Err(StatusCode::UNAUTHORIZED)
         );
+    }
+
+    /// Proxy mode behind a proxy on another machine: the headers name the user only from a
+    /// listed source; from anywhere else, loopback included, a request carrying any
+    /// `Tailscale-*` header is refused, so forged headers name no one. From the proxy, no
+    /// user header is anonymous, and a tagged node signs no one in even beside a login.
+    #[tokio::test]
+    async fn proxy_mode_trusts_the_headers_only_from_the_proxies_it_lists() {
+        const PROXY: &str = "10.10.10.2:52000";
+        const NEIGHBOUR: &str = "10.10.10.7:52000";
+        let world = World::new();
+        let mode = proxies(&["10.10.10.2"]);
+        let provider: Arc<dyn AuthProvider> =
+            Arc::new(TailscaleProvider::new(config(mode), private()).unwrap());
+        let router = app(&world.auth(private(), vec![provider]));
+        let user = [
+            ("Tailscale-User-Login", "ann@example.org"),
+            ("Tailscale-User-Name", "Ann"),
+            ("Tailscale-Node-Name", "laptop.example.ts.net"),
+        ];
+        let tagged = [
+            ("Tailscale-Node-Tags", "tag:ci"),
+            ("Tailscale-Node-Name", "ci.example.ts.net"),
+        ];
+        let tagged_with_login = [
+            ("Tailscale-Node-Tags", "tag:ci"),
+            ("Tailscale-User-Login", "ann@example.org"),
+        ];
+        let node_only = [("Tailscale-Node-Name", "laptop.example.ts.net")];
+        let unauthorized = Err(StatusCode::UNAUTHORIZED);
+        let forbidden = Err(StatusCode::FORBIDDEN);
+        let cases: [(&str, &Headers, Result<(), StatusCode>); 10] = [
+            (PROXY, &user, Ok(())),
+            (PROXY, &[], unauthorized),
+            (PROXY, &tagged, unauthorized),
+            (PROXY, &tagged_with_login, unauthorized),
+            (PROXY, &node_only, unauthorized),
+            (NEIGHBOUR, &user, forbidden),
+            (NEIGHBOUR, &node_only, forbidden),
+            (NEIGHBOUR, &[], unauthorized),
+            (LOCAL, &user, forbidden),
+            (REMOTE, &tagged, forbidden),
+        ];
+        for (peer, headers, expected) in cases {
+            let answered = whoami(&router, with_headers(request("/whoami", peer), headers)).await;
+            let outcome = answered.as_ref().map(|_| ()).map_err(|status| *status);
+            assert_eq!(outcome, expected, "{peer} {headers:?}");
+            if let Ok(actor) = answered {
+                let identities = world.store.identities_of(&actor.user).await.unwrap();
+                assert_eq!(identities[0].subject.as_str(), "ann@example.org");
+                let user = world.store.user(&actor.user).await.unwrap().unwrap();
+                assert_eq!(user.name.as_str(), "Ann");
+            }
+        }
     }
 }

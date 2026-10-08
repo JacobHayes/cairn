@@ -31,5 +31,7 @@ pub use oauth::{OAuthConfig, OAuthServer};
 pub use oidc::{OidcConfig, OidcProvider};
 pub use provider::{AuthProvider, BoxFuture, Listener, Peer, Presented, Verdict};
 pub use secret::Secret;
-pub use tailscale::{TailscaleConfig, TailscaleMode, TailscaleProvider};
+pub use tailscale::{
+    ProxySource, TailscaleConfig, TailscaleMode, TailscaleProvider, TrustedProxies,
+};
 pub use tokens::{AgentToken, MintedToken};

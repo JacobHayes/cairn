@@ -79,8 +79,9 @@ model = "a-model-name"
 
 Each provider kind's settings: `dev` (`user`, `verified_emails`, `token`, `auto_link`,
 `allow_off_loopback`), `oidc` (`issuer`, `client_id`, `client_secret`, `auto_link`),
-`builtin_oauth` (`sign_in_with`), `tailscale` (`mode` direct with `socket`, or proxy;
-`auto_link`). The environment overrides `database`, `listen`, `public_url`, and `timezone`
+`builtin_oauth` (`sign_in_with`), `tailscale` (`mode` direct with `socket`, or proxy, with
+`trusted_proxies` listing the addresses or networks of a proxy on another machine, or left
+out for `tailscale serve` on this one; `auto_link`). The environment overrides `database`, `listen`, `public_url`, and `timezone`
 with `CAIRN_DATABASE`, `CAIRN_LISTEN`, `CAIRN_PUBLIC_URL`, and `CAIRN_TIMEZONE`, and supplies
 secrets: `CAIRN_ASSISTANT_API_KEY`, and `CAIRN_AUTH_<NAME>_TOKEN` (dev) or
 `CAIRN_AUTH_<NAME>_CLIENT_SECRET` (OIDC), `<NAME>` being the provider's name in capitals

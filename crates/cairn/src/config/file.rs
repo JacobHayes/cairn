@@ -127,6 +127,9 @@ pub(crate) struct TailscaleFile {
     pub name: String,
     pub mode: TailscaleModeFile,
     pub socket: Option<String>,
+    /// Proxy mode: the addresses or networks a proxy on another machine connects from;
+    /// absent, the proxy is this machine's.
+    pub trusted_proxies: Option<Vec<String>>,
     #[serde(default)]
     pub auto_link: bool,
 }
@@ -137,7 +140,7 @@ pub(crate) struct TailscaleFile {
 pub(crate) enum TailscaleModeFile {
     /// Ask tailscaled who the peer is.
     Direct,
-    /// Trust `tailscale serve`'s identity headers.
+    /// Trust an authenticating proxy's identity headers.
     Proxy,
 }
 

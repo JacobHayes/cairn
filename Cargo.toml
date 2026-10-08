@@ -28,7 +28,8 @@ cairn-wasm = { path = "crates/wasm" }
 # ed25519-dalek only to sign a test issuer's ID tokens; getrandom for secrets; subtle to
 # compare them in constant time; url for the public base URL; hyper, hyper-util, and
 # http-body-util for the one GET to tailscaled's whois over its unix socket (already in the
-# tree under axum and reqwest); tower only to drive a router in tests.
+# tree under axum and reqwest); ipnet for the networks Tailscale's proxy mode trusts (already
+# in the tree under reqwest); tower only to drive a router in tests.
 base64 = "0.22.1"
 axum = { version = "0.8.9", default-features = false, features = ["form", "http1", "json", "query", "tokio"] }
 chrono = { version = "0.4.45", default-features = false }
@@ -38,6 +39,7 @@ getrandom = "0.3.4"
 http-body-util = "0.1.3"
 hyper = { version = "1.11.1", default-features = false, features = ["client", "http1"] }
 hyper-util = { version = "0.1.21", default-features = false, features = ["tokio"] }
+ipnet = { version = "2.12.2", default-features = false, features = ["std"] }
 # The OIDC client (ARCHITECTURE, Auth; PRACTICES names it): discovery, the code exchange
 # with PKCE, and ID token verification. Its default features bring reqwest 0.12 on tokio
 # with rustls (ring, webpki roots): the HTTP client and TLS stack for issuer calls.

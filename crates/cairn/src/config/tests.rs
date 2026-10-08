@@ -4,6 +4,7 @@
 use std::path::Path;
 
 use cairn_assistant::Protocol;
+use cairn_auth::{TailscaleMode, TrustedProxies};
 use cairn_schema::RankConstants;
 
 use super::*;
@@ -208,6 +209,32 @@ api_key = \"key\"
     assert!(assistant.credential.is_some());
 }
 
+/// Tailscale's proxy mode trusts this machine unless it lists where its proxy connects
+/// from, as addresses or networks.
+#[test]
+fn proxy_mode_trusts_this_machine_or_the_proxies_it_lists() {
+    let cases = [
+        ("", TrustedProxies::ThisMachine),
+        (
+            "trusted_proxies = [\"10.10.10.2\", \"fd00::/8\"]",
+            TrustedProxies::Sources(vec![
+                "10.10.10.2".parse().unwrap(),
+                "fd00::/8".parse().unwrap(),
+            ]),
+        ),
+    ];
+    for (listed, trusted) in cases {
+        let text = format!(
+            "{MINIMAL}\n[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\n{listed}"
+        );
+        let config = parsed(&text).unwrap();
+        let Some(Provider::Tailscale(tailscale)) = config.auth.last() else {
+            panic!("no Tailscale provider: {listed}");
+        };
+        assert_eq!(tailscale.mode, TailscaleMode::Proxy { trusted }, "{listed}");
+    }
+}
+
 #[test]
 fn provider_mistakes_are_named_by_provider() {
     let cases = [
@@ -234,6 +261,18 @@ fn provider_mistakes_are_named_by_provider() {
         (
             "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\nsocket = \"/run/ts.sock\"",
             "auth.tailnet.socket",
+        ),
+        (
+            "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"direct\"\nsocket = \"/run/ts.sock\"\ntrusted_proxies = [\"10.0.0.1\"]",
+            "auth.tailnet.trusted_proxies",
+        ),
+        (
+            "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\ntrusted_proxies = []",
+            "auth.tailnet.trusted_proxies",
+        ),
+        (
+            "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\ntrusted_proxies = [\"10.0.0.1\", \"edge.example\"]",
+            "auth.tailnet.trusted_proxies",
         ),
         (
             "[[auth]]\nkind = \"oidc\"\nname = \"corp\"\nissuer = \"not a url\"\nclient_id = \"c\"",

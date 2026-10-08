@@ -4565,7 +4565,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4631,7 +4631,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4701,7 +4701,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4807,7 +4807,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -4912,7 +4912,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5006,7 +5006,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5075,7 +5075,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5194,7 +5194,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5263,7 +5263,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5341,7 +5341,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5424,7 +5424,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5521,7 +5521,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5599,7 +5599,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5677,7 +5677,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5760,7 +5760,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5843,7 +5843,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -5924,7 +5924,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6013,7 +6013,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6110,7 +6110,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6199,7 +6199,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6286,7 +6286,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6377,7 +6377,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6495,7 +6495,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6613,7 +6613,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6731,7 +6731,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6854,7 +6854,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -6941,7 +6941,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7019,7 +7019,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7099,7 +7099,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7181,7 +7181,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7295,7 +7295,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7377,7 +7377,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7495,7 +7495,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7613,7 +7613,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7727,7 +7727,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7809,7 +7809,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7925,7 +7925,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -7994,7 +7994,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8072,7 +8072,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8155,7 +8155,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8255,7 +8255,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8337,7 +8337,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8455,7 +8455,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8573,7 +8573,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8687,7 +8687,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8767,7 +8767,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8849,7 +8849,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8915,7 +8915,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -8981,7 +8981,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9052,7 +9052,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;
@@ -9138,7 +9138,7 @@ export interface operations {
                     "text/plain": string;
                 };
             };
-            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
             403: {
                 headers: {
                     [name: string]: unknown;

@@ -739,7 +739,7 @@ fn responses(
 
 /// The auth layer's own answers, which stand in front of every operation in plain text
 /// (3.2): 401 with its `WWW-Authenticate` challenge, 403 for a peer a local-only provider
-/// refuses, and 503 when an identity provider cannot be asked (no `Retry-After`). A status
+/// or a proxy-mode provider refuses, and 503 when an identity provider cannot be asked (no `Retry-After`). A status
 /// the API also answers as a problem gets the text body beside it.
 fn auth_refusals(answers: &mut Map<String, Value>) {
     let refusals = [
@@ -749,7 +749,8 @@ fn auth_refusals(answers: &mut Map<String, Value>) {
         ),
         (
             "403",
-            "The auth layer refused the peer: a local-only provider and a remote peer (in text).",
+            "The auth layer refused the peer: a local-only provider and a remote peer, or \
+             identity headers from a peer no proxy-mode provider trusts (in text).",
         ),
         (
             "503",

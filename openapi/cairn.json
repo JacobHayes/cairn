@@ -4093,7 +4093,7 @@
           },
           {
             "const": "store_failed_closed",
-            "description": "The store has failed closed: every call errs until the process reopens it.",
+            "description": "The store has failed closed: every call errs until the process is restarted.",
             "type": "string"
           }
         ]
@@ -13283,7 +13283,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -13356,7 +13356,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -13439,7 +13439,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "409": {
             "content": {
@@ -13562,7 +13562,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "409": {
             "content": {
@@ -13686,7 +13686,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -13879,7 +13879,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -13971,7 +13971,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -14177,7 +14177,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -14261,7 +14261,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -14360,7 +14360,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -14467,7 +14467,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -14581,7 +14581,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -14675,7 +14675,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -14769,7 +14769,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -14887,7 +14887,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15006,7 +15006,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15114,7 +15114,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15266,7 +15266,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15468,7 +15468,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15581,7 +15581,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15715,7 +15715,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15829,7 +15829,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -15973,7 +15973,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16117,7 +16117,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16268,7 +16268,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16455,7 +16455,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16559,7 +16559,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16653,7 +16653,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16756,7 +16756,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -16860,7 +16860,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17001,7 +17001,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17103,7 +17103,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17247,7 +17247,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17391,7 +17391,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17525,7 +17525,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17629,7 +17629,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17785,7 +17785,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -17869,7 +17869,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -17968,7 +17968,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18075,7 +18075,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18200,7 +18200,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18304,7 +18304,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18448,7 +18448,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18592,7 +18592,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18726,7 +18726,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18829,7 +18829,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {
@@ -18949,7 +18949,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -19022,7 +19022,7 @@
                 }
               }
             },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -19103,7 +19103,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "500": {
             "content": {
@@ -19189,7 +19189,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "413": {
             "content": {
@@ -19291,7 +19291,7 @@
                 }
               }
             },
-            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
           "404": {
             "content": {

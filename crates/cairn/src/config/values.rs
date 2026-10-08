@@ -5,7 +5,9 @@ use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
 use cairn_assistant::protocol::{Credential, ProviderConfig};
-use cairn_auth::{DevConfig, OAuthConfig, OidcConfig, TailscaleConfig, TailscaleMode};
+use cairn_auth::{
+    DevConfig, OAuthConfig, OidcConfig, ProxySource, TailscaleConfig, TailscaleMode, TrustedProxies,
+};
 use cairn_schema::{Email, Slug, TimeZoneName, Title};
 use jiff::tz::TimeZone;
 use url::Url;
@@ -252,10 +254,11 @@ fn provider(
         ProviderFile::Tailscale(TailscaleFile {
             mode,
             socket,
+            trusted_proxies,
             auto_link,
             ..
         }) => {
-            let mode = tailscale_mode(mode, socket, &mut at)?;
+            let mode = tailscale_mode(mode, socket, trusted_proxies, &mut at)?;
             Some(Provider::Tailscale(TailscaleConfig {
                 name: name?,
                 mode,
@@ -346,29 +349,69 @@ fn sign_in(
 }
 
 /// Tailscale's mode: direct names tailscaled's socket (no default: where it lives is the
-/// machine's), proxy names none.
+/// machine's) and trusts no proxy; proxy names no socket, and trusts this machine unless it
+/// lists where its proxy connects from.
 fn tailscale_mode(
     mode: TailscaleModeFile,
     socket: Option<String>,
+    trusted_proxies: Option<Vec<String>>,
     at: &mut At<'_>,
 ) -> Option<TailscaleMode> {
-    match (mode, socket) {
-        (TailscaleModeFile::Direct, Some(socket)) => Some(TailscaleMode::Direct {
-            socket: PathBuf::from(socket),
-        }),
-        (TailscaleModeFile::Direct, None) => {
-            at.push(
-                "socket",
-                "is required in direct mode: tailscaled's local API socket",
-            );
-            None
+    match mode {
+        TailscaleModeFile::Direct => {
+            if trusted_proxies.is_some() {
+                at.push(
+                    "trusted_proxies",
+                    "is for proxy mode; direct mode asks tailscaled and reads no header",
+                );
+            }
+            if socket.is_none() {
+                at.push(
+                    "socket",
+                    "is required in direct mode: tailscaled's local API socket",
+                );
+            }
+            let socket = socket.filter(|_| trusted_proxies.is_none())?;
+            Some(TailscaleMode::Direct {
+                socket: PathBuf::from(socket),
+            })
         }
-        (TailscaleModeFile::Proxy, None) => Some(TailscaleMode::Proxy),
-        (TailscaleModeFile::Proxy, Some(_)) => {
-            at.push("socket", "is for direct mode; proxy mode reads no socket");
-            None
+        TailscaleModeFile::Proxy => {
+            let trusted = match trusted_proxies {
+                None => Some(TrustedProxies::ThisMachine),
+                Some(written) => proxy_sources(&written, at).map(TrustedProxies::Sources),
+            };
+            if socket.is_some() {
+                at.push("socket", "is for direct mode; proxy mode reads no socket");
+                return None;
+            }
+            trusted.map(|trusted| TailscaleMode::Proxy { trusted })
         }
     }
+}
+
+/// The addresses and networks a proxy on another machine connects from: at least one, each
+/// valid.
+fn proxy_sources(written: &[String], at: &mut At<'_>) -> Option<Vec<ProxySource>> {
+    if written.is_empty() {
+        at.push(
+            "trusted_proxies",
+            "lists no address; leave it out to trust a proxy on this machine",
+        );
+        return None;
+    }
+    let mut sources = Vec::with_capacity(written.len());
+    let mut valid = true;
+    for text in written {
+        match text.parse::<ProxySource>() {
+            Ok(source) => sources.push(source),
+            Err(error) => {
+                at.push("trusted_proxies", error);
+                valid = false;
+            }
+        }
+    }
+    valid.then_some(sources)
 }
 
 /// The assistant's provider: protocol, endpoint, model, and the credential, if any.

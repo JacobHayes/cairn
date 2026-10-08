@@ -89,6 +89,52 @@ mod in_process {
         assert_eq!(health, 200);
     }
 
+    /// Behind an authenticating proxy on another machine (Tailscale proxy mode listing the
+    /// proxy's address): through the real listener, the proxy's headers sign its user in
+    /// at the public host, the same headers from any other peer are refused, the proxy's
+    /// anonymous health check is answered, and a request naming the listener's address
+    /// rather than the public host is refused before any of it.
+    #[tokio::test]
+    async fn behind_a_listed_proxy_only_its_identity_headers_sign_in() {
+        const PROXY: [u8; 4] = [127, 0, 0, 2];
+        const NEIGHBOUR: [u8; 4] = [127, 0, 0, 3];
+        let tailscale = "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\ntrusted_proxies = [\"127.0.0.2\"]\n";
+        let mut config = support::config(tailscale);
+        // A listener on every address, as one on a private network is: only the listed
+        // proxy's headers are trusted on it, not this machine's.
+        config.listen = "0.0.0.0:0".parse().unwrap();
+        let app = root::app(
+            &config,
+            support::assembly(Arc::new(InProcessNotifier::new())),
+        )
+        .unwrap();
+        let address = support::serve(app).await;
+        let login = [
+            ("tailscale-user-login", "ann@example.org"),
+            ("tailscale-user-name", "Ann"),
+        ];
+        let me = support::send_from(PROXY.into(), address, "/users/me", PUBLIC_HOST, &login).await;
+        assert_eq!(me.status, 200, "{}", me.text());
+        let identity = &me.json()["identities"][0];
+        assert_eq!(identity["provider"], json!("tailnet"));
+        assert_eq!(identity["subject"], json!("ann@example.org"));
+        for (source, headers, status) in [
+            (NEIGHBOUR, &login[..], 403),
+            ([127, 0, 0, 1], &login[..], 403),
+            (PROXY, &[][..], 401),
+        ] {
+            let reply =
+                support::send_from(source.into(), address, "/users/me", PUBLIC_HOST, headers).await;
+            assert_eq!(reply.status, status, "{source:?} {headers:?}");
+        }
+        let health = support::send_from(PROXY.into(), address, "/healthz", PUBLIC_HOST, &[]).await;
+        assert_eq!(health.status, 200);
+        let listener_address = format!("127.0.0.1:{}", address.port());
+        let misdirected =
+            support::send_from(PROXY.into(), address, "/healthz", &listener_address, &[]).await;
+        assert_eq!(misdirected.status, 421);
+    }
+
     /// I5: the assistant is in the capabilities exactly when it is configured; MCP and SSE
     /// always are, with the configured sign-in methods in order.
     #[tokio::test]

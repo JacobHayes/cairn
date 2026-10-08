@@ -580,6 +580,7 @@ dependencies = [
  "http-body-util",
  "hyper",
  "hyper-util",
+ "ipnet",
  "jiff",
  "openidconnect",
  "serde",
