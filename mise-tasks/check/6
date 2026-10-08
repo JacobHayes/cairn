@@ -47,8 +47,6 @@ for config in web/*/vitest.config.ts; do
   ladder_suite "web unit: $package" "$passed" tests
 done
 
-cargo run --quiet --locked --release -p cairn-wasm --features server --bin cairn-wasm-cases -- \
-  web/wasm/dist/cases || ladder_fail "the server's agreement cases were not written"
 # The web build the binary embeds, then the programs the browser tests start, built as the
 # tests are (scripts/built): the binary, the example that seeds its database, and the fixture
 # server the app's server-host tests (web/app, 4.6) run against. Built here so Playwright's
@@ -57,12 +55,23 @@ cargo run --quiet --locked --release -p cairn-wasm --features server --bin cairn
   || ladder_fail "the app's web build failed"
 [ -f web/app/dist/build/index.html ] || ladder_fail "the app's web build wrote no index.html"
 scripts/built || ladder_fail "the binary, the fixture server, or the seeding example did not build"
+# The server's answers the browser host's tests compare with: cairn-wasm-cases, just built in
+# the debug profile with the rest, walks the fixtures through the service. Unoptimized that
+# takes tens of seconds, so it runs beside the binary's and the app's tests, which do not read
+# its output, and only web/wasm's suite waits for it.
+scripts/built cairn-wasm-cases web/wasm/dist/cases &
+cases=$!
+trap 'kill "$cases" 2>/dev/null || true' EXIT
+
 ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
 ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
 
 for config in web/*/playwright.config.ts; do
   package=$(dirname "$config")
   report="$PWD/$package/dist/playwright.json"
+  if [ "$package" = web/wasm ]; then
+    wait "$cases" || ladder_fail "the server's agreement cases were not written"
+  fi
   status=0
   (cd "$package" && PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
     "$OLDPWD/node_modules/.bin/playwright" test --reporter=list,json) || status=$?
