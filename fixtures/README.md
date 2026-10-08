@@ -16,6 +16,11 @@ file is that version. Route files carry every key, so scenario patches can refer
 roles, and kinds by key. Every file is written in canonical form: parsing and writing it
 gives the same bytes, which `crates/schema/tests/integration/fixtures.rs` checks.
 
+The derived values below are read from this file by
+`crates/engine/tests/integration/fixture_readme.rs` and checked against the engine: its
+tables, and each fixture's projection lines. A change that moves one of them fails that test
+until this file is updated with it.
+
 ## `vendor-evaluation/`
 
 The PRD's illustrative example, with every mechanism it names. Four up-front decisions
@@ -129,7 +134,7 @@ the 14-day horizon, so urgency is 0. The scenario matrix checks the ranks
 Projected after kickoff (brief 2.6), read at 2026-10-06: the canvas level with actions hidden
 (each visible node, and the nearest visible ancestor it is drawn in; C2), the actions that roll
 up into a visible node as its checklist (C4), and the first three items of the next list (C10).
-`crates/engine/tests/integration/fixture_projections.rs` checks these values.
+`crates/engine/tests/integration/fixture_readme.rs` checks these lines.
 
 - `vendor-evaluation`, after step 3, visible with actions hidden: `n_decision_meeting`, `n_kickoff`, `n_meeting_date`, `n_partner_runs`, `n_purpose`, `n_reporting`, `n_final_review` (in `n_reporting`), `n_final_report` (in `n_final_review`), `n_findings` (in `n_reporting`), `n_findings_reviewer` (in `n_reporting`), `n_review_opens` (in `n_reporting`), `n_setup`, `n_access` (in `n_setup`), `n_plan` (in `n_setup`), `n_workload` (in `n_setup`), `n_testing`, `n_baseline` (in `n_testing`), `n_comparison_set` (in `n_testing`), `n_partner_led` (in `n_testing`), `n_who_informed`, `n_who_owns`.
 - `vendor-evaluation`, after step 3, actions rolled up: `n_plan` holds `n_plan_draft`, `n_plan_review`; `n_partner_led` holds `n_criteria`, `n_partner_results`.

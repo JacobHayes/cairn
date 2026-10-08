@@ -8,6 +8,7 @@
 // the path often repeats a name (`notifier::notifier::`).
 #![allow(clippy::module_inception)]
 
+mod document_command;
 mod documents;
 mod fixtures;
 mod json_schema;

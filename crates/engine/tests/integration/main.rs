@@ -24,7 +24,7 @@ mod dates;
 mod dependencies;
 mod document;
 mod domains;
-mod fixture_projections;
+mod fixture_readme;
 mod format;
 mod graph;
 mod guards;
