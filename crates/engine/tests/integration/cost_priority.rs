@@ -41,13 +41,17 @@ mod cost {
     #[test]
     fn priority_stays_linear_at_the_limits() {
         // Read after the pinned milestones' date too, when the gated `auto_reach` ones are due.
-        for (open, today) in [
-            (false, "2026-10-06"),
-            (true, "2026-10-06"),
-            (true, "2026-12-01"),
-        ] {
-            within_budget(&heaviest(open), today.parse().unwrap());
-        }
+        // Each reading is its own derive at the limits, so they run side by side: the test
+        // takes the longest of them, not their sum.
+        std::thread::scope(|scope| {
+            for (open, today) in [
+                (false, "2026-10-06"),
+                (true, "2026-10-06"),
+                (true, "2026-12-01"),
+            ] {
+                scope.spawn(move || within_budget(&heaviest(open), today.parse().unwrap()));
+            }
+        });
     }
 
     /// The ranked `auto_reach` milestones due by today whose dependencies are not satisfied:

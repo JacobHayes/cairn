@@ -121,18 +121,6 @@ mod cost {
         let records = records(retitled);
         let inputs = cairn_engine::testing::fixed_inputs();
         let id = cairn_engine::testing::journey_id();
-        let started = Instant::now();
-        let draft = upgrade(&records, &id, VersionNumber::FIRST.next(), &inputs).unwrap();
-        println!(
-            "upgrade at the limits: drafted in {} ms with {} items",
-            started.elapsed().as_millis(),
-            draft.items.len()
-        );
-        assert!(
-            draft.items.is_empty(),
-            "every retitle applies cleanly: {:#?}",
-            draft.items.as_slice().first()
-        );
         let patch = Patch {
             id: parse("p_upgrade"),
             target: PatchTarget::Journey(id.clone()),
@@ -143,13 +131,6 @@ mod cost {
             }])
             .unwrap(),
         };
-        let started = Instant::now();
-        let applied = apply(&records, &patch, &inputs).unwrap();
-        println!(
-            "upgrade at the limits: applied in {} ms with {} writes",
-            started.elapsed().as_millis(),
-            applied.events()[0].delta.len()
-        );
         // For scale: the same journey's apply of a rename, which validates and derives the
         // same candidate without merging.
         let rename = Patch {
@@ -159,20 +140,47 @@ mod cost {
             .unwrap(),
             ..patch.clone()
         };
-        let started = Instant::now();
-        apply(&records, &rename, &inputs).unwrap();
-        println!(
-            "upgrade at the limits: a rename of the same journey applied in {} ms",
-            started.elapsed().as_millis()
-        );
-        let graph = &applied.records().journeys[&id].graph;
-        assert_eq!(graph.nodes.len(), NODE_COUNT_MAX as usize);
-        assert!(
-            graph
-                .nodes
-                .values()
-                .all(|node| node.title.as_str().ends_with(" again"))
-        );
+        // The draft, the apply, and the rename each start from the same records, so they run
+        // side by side: the test takes the longest of them, not their sum.
+        std::thread::scope(|scope| {
+            scope.spawn(|| {
+                let started = Instant::now();
+                let draft = upgrade(&records, &id, VersionNumber::FIRST.next(), &inputs).unwrap();
+                println!(
+                    "upgrade at the limits: drafted in {} ms with {} items",
+                    started.elapsed().as_millis(),
+                    draft.items.len()
+                );
+                assert!(
+                    draft.items.is_empty(),
+                    "every retitle applies cleanly: {:#?}",
+                    draft.items.as_slice().first()
+                );
+            });
+            scope.spawn(|| {
+                let started = Instant::now();
+                apply(&records, &rename, &inputs).unwrap();
+                println!(
+                    "upgrade at the limits: a rename of the same journey applied in {} ms",
+                    started.elapsed().as_millis()
+                );
+            });
+            let started = Instant::now();
+            let applied = apply(&records, &patch, &inputs).unwrap();
+            println!(
+                "upgrade at the limits: applied in {} ms with {} writes",
+                started.elapsed().as_millis(),
+                applied.events()[0].delta.len()
+            );
+            let graph = &applied.records().journeys[&id].graph;
+            assert_eq!(graph.nodes.len(), NODE_COUNT_MAX as usize);
+            assert!(
+                graph
+                    .nodes
+                    .values()
+                    .all(|node| node.title.as_str().ends_with(" again"))
+            );
+        });
     }
 
     /// The target keeps only the roots: drafting computes every orphan's removal in one pass.
