@@ -124,9 +124,22 @@ debug = "line-tables-only"
 debug = false
 
 # The browser host's build (brief 4.5): the release profile, its symbols stripped and linked
-# as one unit, so the module the page downloads is small. Only the wasm build task uses it.
+# as one unit, so the module the page downloads is small. The wasm build task uses it for the
+# release build and in CI (CAIRN_WASM_PROFILE=wasm); the link takes most of a minute.
 [profile.wasm]
 inherits = "release"
 strip = true
 lto = true
 codegen-units = 1
+
+# The browser host's build in the development loop (`mise run check`, `gen`, `serve`): no LTO
+# and opt-level 1, so a change to the engine rebuilds the module in seconds, and stripped like
+# the wasm profile. Stripping is what decides the bindings: it drops the module's target
+# features section, without which wasm-bindgen binds through the stack instead of multiple
+# return values, so both profiles generate the same web/wasm/generated/
+# (decisions/2026-10-08-the-check-builds-the-wasm-module-without-lto.md).
+[profile.wasm-dev]
+inherits = "dev"
+opt-level = 1
+debug = false
+strip = true

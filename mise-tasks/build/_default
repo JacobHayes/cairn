@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-#MISE description="Build the release binary with the web build embedded: build:web, then cargo build --release -p cairn"
+#MISE description="Build the release binary with the web build embedded: build:web with the optimized module (the wasm profile), then cargo build --release -p cairn"
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-mise run build:web
+CAIRN_WASM_PROFILE=wasm mise run build:web
 cargo build --locked --release -p cairn
 target_dir=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
   let text = "";

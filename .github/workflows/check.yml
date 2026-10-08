@@ -33,6 +33,10 @@ jobs:
       # Rung 3's property tests at more cases than a local run's 64
       # (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
       PROPTEST_CASES: 256
+      # The browser host's module as it ships, optimized: its bindings are the ones rung 5
+      # checks, and rung 6 tests it (a local check builds the faster wasm-dev profile;
+      # decisions/2026-10-08-the-check-builds-the-wasm-module-without-lto.md).
+      CAIRN_WASM_PROFILE: wasm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
@@ -59,6 +63,7 @@ jobs:
     env:
       MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
       PROPTEST_CASES: 4096
+      CAIRN_WASM_PROFILE: wasm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
