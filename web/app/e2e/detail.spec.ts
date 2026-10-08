@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 
 import { annotate, dateChain, flag, openNode, pin, section, state } from "./detail.ts";
-import { fresh } from "./shell.ts";
+import { fresh, openFromCanvas } from "./shell.ts";
 
 test("the final report's detail reads its due chain and what to edit (C8, F7)", async ({ page }) => {
   const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
@@ -185,4 +185,17 @@ test("over the server, a note added in one page appears in another's panel (H6)"
   const text = fresh("Called the candidate");
   await annotate(mine, "note", text);
   await expect(theirs.getByTestId("annotations")).toContainText(text);
+});
+
+test("work whose relevance waits on an unanswered decision completes with a warning (D4, D7)", async ({ page }) => {
+  const offer = await openNode(page, "browser", "j_hiring", "n_make_offer");
+  await offer.getByTestId("actions").getByRole("button", { name: "Reopen" }).click();
+  await expect(state(offer)).toHaveAttribute("data-status", "open");
+  const panel = await openFromCanvas(page, "n_close_out");
+  const warning = panel.getByTestId("actions").getByTestId("may-not-apply");
+  await expect(warning).toHaveAttribute("data-unanswered", "n_make_offer");
+  await panel.getByTestId("actions").getByRole("button", { name: "Complete" }).click();
+  await expect(state(panel)).toHaveAttribute("data-status", "done");
+  await expect(page.getByTestId("notice").last().locator('[data-testid="consequence"][data-kind="undecided"]')).toBeVisible();
+  await expect((await section(panel, "relevance")).getByTestId("relevance-why")).toHaveAttribute("data-status", "undecided");
 });

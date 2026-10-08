@@ -101,6 +101,25 @@ async fn completing_a_placeholder_not_broken_down_is_refused_until_bypassed() {
     assert_eq!(applied["receipt"]["revision"], 5);
 }
 
+/// D4, D7: completing work whose relevance waits on an unanswered decision applies through
+/// the tool, answered with the warning naming that decision.
+#[tokio::test]
+async fn completing_undecided_work_applies_with_a_warning() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let complete = json!({
+        "journey": "j_vendor_eval", "node": "n_baseline", "transition": "complete",
+        "patch_id": "p_baseline_done", "base_revision": 1,
+    });
+    let applied = world.ok(&ann, "transition_node", complete).await;
+    assert_eq!(applied["status"], "applied");
+    assert_eq!(
+        applied["consequences"]["j_vendor_eval"]["undecided"],
+        json!([{ "node": "n_baseline", "unanswered": ["n_comparison_set"] }])
+    );
+}
+
 /// H5: a write against a revision that moved is refused as stale with what moved; the same
 /// patch id resubmitted after it landed is answered from its receipt.
 #[tokio::test]

@@ -31,7 +31,8 @@ and that user.
    make up (`p_` and a short slug, unique per write) and the `base_revision` you read.
    The answer's `receipt.revision` is the base of your next write on that journey.
 4. **Report consequences.** A write answers what it newly caused (nodes that went stale,
-   shortfalls, relevance changes). Tell the person what changed, not just that it worked.
+   shortfalls, relevance changes, and finished work that may not apply because the decision
+   its relevance reads is unanswered). Tell the person what changed, not just that it worked.
 
 ## Revisions, retries, and errors
 

@@ -147,7 +147,8 @@ pub(crate) struct WriteOutput {
     /// The receipt: the revision the patch produced is the base of the next write.
     receipt: PatchReceipt,
     /// What it caused in each journey it changed (D7): newly stale nodes, shortfalls,
-    /// relevance changes, and the frontier's movement.
+    /// finished work that may not apply while a decision is unanswered (D4), relevance
+    /// changes, and the frontier's movement.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     consequences: BTreeMap<JourneyId, Consequences>,
 }

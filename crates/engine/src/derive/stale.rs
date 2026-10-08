@@ -17,7 +17,9 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{GuardFailure, KeyRefs, Node, NodeKey, Payload, State};
+use cairn_schema::{
+    DependencyVia, GuardFailure, KeyRefs, Node, NodeKey, Payload, Relevance, State,
+};
 
 use super::blocking::Blocking;
 use super::dependencies::{Dependencies, EdgeClass, EdgeSet};
@@ -105,7 +107,7 @@ pub(crate) fn reasons(
     };
     if !blocking.deps_done(key) {
         failures.extend(
-            open_dependencies(dependencies, blocking, key)
+            guard_open_dependencies(dependencies, blocking, relevance, key)
                 .into_iter()
                 .map(GuardFailure::OpenDependency),
         );
@@ -143,6 +145,34 @@ pub(crate) fn open_dependencies(
         blocking.deps_done(key) || dependencies.node_index(key).is_none()
     );
     open
+}
+
+/// D4's `deps_done` as a guard reads it: [`open_dependencies`], less an undecided node's
+/// condition gates. Those hold work until the answer its relevance reads arrives, and
+/// finishing undecided work is accepted with a warning rather than refused (Gating, D4), so
+/// they hold neither its transition nor make it stale; every other dependency still does.
+#[must_use]
+pub(crate) fn guard_open_dependencies(
+    dependencies: &Dependencies,
+    blocking: &Blocking,
+    relevance: &Relevances,
+    key: &NodeKey,
+) -> BTreeSet<NodeKey> {
+    let open = open_dependencies(dependencies, blocking, key);
+    if open.is_empty() || relevance.get(key).map(|found| found.value) != Some(Relevance::Undecided)
+    {
+        return open;
+    }
+    let held: BTreeSet<NodeKey> = dependencies
+        .of(key, EdgeSet::Pruned)
+        .into_iter()
+        .filter(|dependency| dependency.class == EdgeClass::Gate)
+        .filter(|dependency| !matches!(dependency.via, DependencyVia::Condition { .. }))
+        .filter(|dependency| open.contains(&dependency.node))
+        .map(|dependency| dependency.node)
+        .collect();
+    assert!(held.is_subset(&open));
+    held
 }
 
 /// G2: the nodes with an artifact link, read once per pass so each completed node's guard is a

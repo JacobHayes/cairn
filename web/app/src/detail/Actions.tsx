@@ -1,10 +1,12 @@
 // Per-kind actions (D1): the transitions the node's state machine offers from where it is,
 // a skip with the reason D1 requires, and for a decision its answer (B2), each one patch
-// whose rejection shows here, with a bypass when a guard failed (D4). A decision that fills a
+// whose rejection shows here, with a bypass when a guard failed (D4). Finishing undecided
+// work is accepted, and says beside the action that it may not apply (D4). A decision that fills a
 // role or pins a milestone says so: those values are edited by answering it (E3).
 import { Button, Field } from "../ui/kit.tsx";
 import { AnswerEditor } from "./AnswerEditor.tsx";
-import { isBlocked, movesFrom, transition, type Move, type NodeDetail, type Ready } from "./model.ts";
+import { mayNotApply } from "../data/notices.ts";
+import { isBlocked, movesFrom, titleOf, transition, unansweredOf, type Move, type NodeDetail, type Ready } from "./model.ts";
 import { Rejected } from "./Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
 
@@ -16,6 +18,22 @@ const LABEL: Record<Move, string> = {
   skip: "Skip",
   reopen: "Reopen",
 };
+
+/**
+ * D4: beside a finishing action on undecided work, that finishing it is accepted but may not
+ * apply, naming the decisions it waits on; nothing when the node is not undecided.
+ */
+export function MayNotApply({ view, node }: { view: Ready; node: string }) {
+  const unanswered = unansweredOf(view, node);
+  if (unanswered.length === 0) {
+    return null;
+  }
+  return (
+    <span className="muted" data-testid="may-not-apply" data-unanswered={unanswered.join(" ")}>
+      {mayNotApply(unanswered, (key) => titleOf(view, key))}.
+    </span>
+  );
+}
 
 export function SkipForm({ write, node, form }: { write: NodeWrite; node: string; form: ReturnType<typeof useFormDraft<string>> }) {
   const reason = form.draft?.value ?? "";
@@ -47,6 +65,7 @@ export function Actions({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const skip = useFormDraft<string>(write.journey, node.key, "skip");
   const moves = movesFrom(node.kind, record.state);
   const startedEarly = record.state === "active" && isBlocked(detail.derived, record.state);
+  const finishes = moves.includes("complete") || moves.includes("reach") || (node.kind === "decision" && record.state === "open");
   return (
     <div className="stack" data-testid="actions">
       <div className="row">
@@ -68,6 +87,7 @@ export function Actions({ view, detail }: { view: Ready; detail: NodeDetail }) {
         )}
         {startedEarly ? <span className="muted">Started early: still blocked.</span> : null}
       </div>
+      {finishes ? <MayNotApply view={view} node={node.key} /> : null}
       {skip.draft === undefined ? null : <SkipForm write={write} node={node.key} form={skip} />}
       <Rejected view={view} write={write} />
       {node.kind === "decision" ? <AnswerEditor view={view} detail={detail} /> : null}

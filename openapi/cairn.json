@@ -1786,6 +1786,13 @@
               }
             ],
             "description": "The journey became stalled."
+          },
+          "undecided": {
+            "description": "Finished nodes newly undecided, which may not apply: a warning, never a rejection.",
+            "items": {
+              "$ref": "#/components/schemas/UndecidedConsequence"
+            },
+            "type": "array"
           }
         },
         "type": "object"
@@ -12718,6 +12725,29 @@
         "required": [
           "conversation",
           "ended"
+        ],
+        "type": "object"
+      },
+      "UndecidedConsequence": {
+        "additionalProperties": false,
+        "description": "Finished work newly undecided (D4, D7): a node completed, answered, or reached while\na decision its relevance reads is unanswered, so it may not apply. A warning, never a\nrejection: the node stays undecided and is not forced into scope.",
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The node."
+          },
+          "unanswered": {
+            "description": "The open decisions its relevance waits on that it newly waits on.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array",
+            "uniqueItems": true
+          }
+        },
+        "required": [
+          "node",
+          "unanswered"
         ],
         "type": "object"
       },

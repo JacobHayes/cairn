@@ -1,5 +1,6 @@
 // The shell's notices: what a write newly caused (D7, the consequences notice), shown at the
-// moment of the edit and never stored, and what went wrong with one.
+// moment of the edit and never stored, among it the warning that finished work may not apply
+// while a decision is unanswered (D4), and what went wrong with one.
 import type { Schema } from "@cairn/client";
 
 import { Emitter } from "./emitter.ts";
@@ -9,9 +10,11 @@ export type PatchAnswer = Schema<"PatchAnswer">;
 
 /** One line of a notice: what kind of consequence, and the nodes it names. */
 export interface ConsequenceLine {
-  kind: "stale" | "shortfall" | "overdue" | "stalled";
+  kind: "stale" | "shortfall" | "overdue" | "undecided" | "stalled";
   journey: string;
   nodes: string[];
+  /** For `undecided`: the open decisions the finished nodes' relevance waits on (D4). */
+  unanswered?: string[];
 }
 
 export interface Notice {
@@ -38,11 +41,25 @@ export function linesOf(consequences: Record<string, Consequences>): Consequence
     add("stale", (caused.stale ?? []).map((stale) => stale.node));
     add("shortfall", (caused.shortfalls ?? []).map((shortfall) => shortfall.node));
     add("overdue", caused.overdue ?? []);
+    const undecided = caused.undecided ?? [];
+    if (undecided.length > 0) {
+      const unanswered = [...new Set(undecided.flatMap((each) => each.unanswered))].sort();
+      lines.push({ kind: "undecided", journey, nodes: undecided.map((each) => each.node), unanswered });
+    }
     if (caused.stalled != null) {
       lines.push({ kind: "stalled", journey, nodes: [] });
     }
   }
   return lines;
+}
+
+/**
+ * D4: the warning for finished work whose relevance waits on `unanswered` decisions, named by
+ * `title`: it was accepted, and may not apply once they are answered.
+ */
+export function mayNotApply(unanswered: string[], title: (key: string) => string = (key) => key): string {
+  const names = unanswered.map(title).join(", ");
+  return `May not apply, since ${names} ${unanswered.length === 1 ? "is" : "are"} unanswered`;
 }
 
 /** The notices on screen, newest last; a few at most. */

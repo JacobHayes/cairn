@@ -53,7 +53,7 @@ pub use derived::{
     EffectiveDate, EffectiveParticipation, EngineVersion, Explained, NodeDates, NodeDerived,
     OwnerFactor, ParticipationOrigin, RankConstants, Real, Relevance, RelevanceExplanation, Score,
     ShortfallConsequence, StaleConsequence, StallCause, Stalled, Thousandths, TimeZoneName,
-    UndecidedDiscount,
+    UndecidedConsequence, UndecidedDiscount,
 };
 pub use document::{
     ParseError, WriteError, from_json, from_yaml, to_json, to_json_pretty, to_yaml,

@@ -530,6 +530,18 @@ pub struct StaleConsequence {
     pub reasons: BTreeSet<GuardFailure>,
 }
 
+/// Finished work newly undecided (D4, D7): a node completed, answered, or reached while
+/// a decision its relevance reads is unanswered, so it may not apply. A warning, never a
+/// rejection: the node stays undecided and is not forced into scope.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UndecidedConsequence {
+    /// The node.
+    pub node: NodeKey,
+    /// The open decisions its relevance waits on that it newly waits on.
+    pub unanswered: BTreeSet<NodeKey>,
+}
+
 /// A new or larger shortfall.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -554,6 +566,9 @@ pub struct Consequences {
     /// Newly overdue nodes.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub overdue: Vec<NodeKey>,
+    /// Finished nodes newly undecided, which may not apply: a warning, never a rejection.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub undecided: Vec<UndecidedConsequence>,
     /// The journey became stalled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stalled: Option<Stalled>,

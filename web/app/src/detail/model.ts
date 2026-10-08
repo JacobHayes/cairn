@@ -201,6 +201,39 @@ export function isBlocked(derived: NodeDerived, state: State): boolean {
   return inScope && !TERMINAL.includes(state) && held;
 }
 
+/**
+ * Gating, D4: the open decisions an undecided node's relevance waits on: those still to be
+ * answered (open, relevant, and not under a skip) that each condition leaving it undecided
+ * reads, its own and its ancestors', up to a force include; empty when the node is not
+ * undecided. Finishing it is accepted, with the warning that it may not apply.
+ */
+export function unansweredOf(view: Ready, key: string): string[] {
+  const open = (decision: string) => {
+    const node = nodeOf(view, decision);
+    const found = view.derived.nodes[decision];
+    return (
+      node !== undefined &&
+      found !== undefined &&
+      found.relevance.value === "relevant" &&
+      found.effectively_skipped !== true &&
+      recordOf(view, node).state === "open"
+    );
+  };
+  const waiting = new Set<string>();
+  // Up the tree while undecided: a relevant node has nothing undecided above it.
+  let current: string | undefined = key;
+  let relevance = view.derived.nodes[key]?.relevance;
+  while (current !== undefined && relevance?.value === "undecided") {
+    // The node's own condition is undecided exactly when it produced the value.
+    if (relevance.condition_on === undefined) {
+      (relevance.decisions ?? []).filter(open).forEach((decision) => waiting.add(decision));
+    }
+    current = nodeOf(view, current)?.parent ?? undefined;
+    relevance = current === undefined ? undefined : view.derived.nodes[current]?.relevance;
+  }
+  return [...waiting].sort();
+}
+
 export type FlagTone = "good" | "warn" | "bad" | "plain";
 
 /** D3: the derived flags a node carries (C8), those that are set. */

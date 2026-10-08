@@ -1,7 +1,7 @@
 // C8's node detail composed in the tab from the document and its derive, and D1's moves.
 import { describe, expect, it } from "vitest";
 
-import { flagsOf, isBlocked, movesFrom, nodeDetail, transition, type Move, type NodeKind, type State } from "./model.ts";
+import { flagsOf, isBlocked, movesFrom, nodeDetail, transition, unansweredOf, type Move, type NodeDerived, type NodeKind, type State } from "./model.ts";
 import { testView } from "./view.test-support.ts";
 
 describe("nodeDetail", () => {
@@ -71,5 +71,40 @@ describe("flags (D3)", () => {
     const derived = testView().derived.nodes["n_report"];
     expect(derived && isBlocked(derived, "done")).toBe(false);
     expect(derived && isBlocked({ ...derived, relevance: { value: "not_relevant" } }, "todo")).toBe(false);
+  });
+});
+
+describe("unansweredOf (Gating, D4)", () => {
+  /** The test view with `relevance` on some nodes and `states` stored. */
+  const viewWith = (relevance: Record<string, NodeDerived["relevance"]>, states: Record<string, State> = {}) => {
+    const view = testView();
+    for (const [key, value] of Object.entries(relevance)) {
+      const found = view.derived.nodes[key];
+      if (found !== undefined) {
+        view.derived.nodes[key] = { ...found, relevance: value };
+      }
+    }
+    const stored = Object.fromEntries(Object.entries(states).map(([key, state]) => [key, { state, provenance: "local" as const }]));
+    view.journey.graph.state = { ...view.journey.graph.state, nodes: stored };
+    return view;
+  };
+
+  it("names the open, relevant decisions an undecided node waits on", () => {
+    const view = viewWith({ n_findings: { value: "undecided", decisions: ["n_when"] } });
+    expect(unansweredOf(view, "n_findings")).toEqual(["n_when"]);
+  });
+
+  it("names an undecided ancestor's decisions too", () => {
+    const view = viewWith({
+      n_stage: { value: "undecided", decisions: ["n_when"] },
+      n_findings: { value: "undecided", condition_on: "n_stage", decisions: ["n_when"] },
+    });
+    expect(unansweredOf(view, "n_findings")).toEqual(["n_when"]);
+  });
+
+  it("names nothing for a decided decision or a node that is not undecided", () => {
+    const decided = viewWith({ n_findings: { value: "undecided", decisions: ["n_when"] } }, { n_when: "decided" });
+    expect(unansweredOf(decided, "n_findings")).toEqual([]);
+    expect(unansweredOf(testView(), "n_findings")).toEqual([]);
   });
 });

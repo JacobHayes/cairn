@@ -77,4 +77,20 @@ describe("consequenceLines (D7)", () => {
     ]);
     expect(consequenceLines({ outcome: "already_applied", receipt })).toEqual([]);
   });
+
+  it("lists finished work that may not apply with every decision it waits on, each once (D4)", () => {
+    const answer = {
+      outcome: "applied" as const,
+      receipt,
+      consequences: {
+        j_one: {
+          undecided: [
+            { node: "n_a", unanswered: ["n_flag"] },
+            { node: "n_b", unanswered: ["n_other", "n_flag"] },
+          ],
+        },
+      },
+    };
+    expect(consequenceLines(answer)).toEqual([{ kind: "undecided", journey: "j_one", nodes: ["n_a", "n_b"], unanswered: ["n_flag", "n_other"] }]);
+  });
 });

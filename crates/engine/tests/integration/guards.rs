@@ -9,7 +9,7 @@ use crate::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::Records;
-use cairn_schema::{Guard, GuardFailure, Rejection, Violation, ViolationCode};
+use cairn_schema::{Guard, GuardFailure, Rejection, Relevance, Violation, ViolationCode};
 use support::{add_nodes as add, key};
 
 fn complete(node: &str) -> String {
@@ -101,9 +101,9 @@ const FLAG: &str =
     "{key: n_flag, id: flag, kind: decision, title: Flag, prompt: Flag?, answer_type: boolean}";
 const BRANCH: &str = "{key: n_branch, id: branch, kind: action, title: Branch, relevant_when: {equals: {decision: n_flag, value: true}}}";
 
-/// D4: a completing transition needs its node relevant on the graph the patch produces: an
-/// answer in the same patch that makes it not relevant is named with it; an undecided node
-/// does not complete; force include is the escape hatch.
+/// D4: a completing transition is refused on a node the graph the patch produces leaves not
+/// relevant, naming the answer in the same patch that did it; force include is the escape
+/// hatch.
 #[test]
 fn relevance_guards_completion() {
     let records = support::journey(&add(&[FLAG, BRANCH]));
@@ -117,18 +117,76 @@ fn relevance_guards_completion() {
     assert_eq!(found.code, ViolationCode::NotRelevant);
     assert_eq!(found.bypassable, None, "relevance has no bypass");
     assert_eq!(found.caused_by, BTreeSet::from([1]), "the answer");
-    let undecided = violations(&records, &complete("n_branch"));
-    assert!(
-        undecided
-            .iter()
-            .any(|found| found.code == ViolationCode::NotRelevant),
-        "an undecided node is not relevant yet"
-    );
     let forced = format!(
-        "- op: apply_override\n  node: n_branch\n  override: {{force_include: {{reason: Needed anyway.}}}}\n{}",
-        complete("n_branch")
+        "- op: apply_override\n  node: n_branch\n  override: {{force_include: {{reason: Needed anyway.}}}}\n{answered_away}"
     );
     assert!(support::journey_patch(&records, &forced).is_ok());
+}
+
+/// Gating, D4: completing, answering, or reaching a node whose relevance waits on an
+/// unanswered decision is accepted, its condition gate holding nothing; the node stays
+/// undecided, gains no override, and is not stale.
+#[test]
+fn undecided_work_finishes_and_stays_undecided() {
+    let cases = [
+        (BRANCH, complete("n_branch")),
+        (
+            "{key: n_branch, id: branch, kind: decision, title: Branch, prompt: Go?, answer_type: boolean, relevant_when: {equals: {decision: n_flag, value: true}}}",
+            "- op: answer\n  decision: n_branch\n  value: {boolean: true}\n".to_owned(),
+        ),
+        (
+            "{key: n_branch, id: branch, kind: milestone, title: Branch, relevant_when: {equals: {decision: n_flag, value: true}}}",
+            "- op: transition\n  node: n_branch\n  transition: reach\n".to_owned(),
+        ),
+    ];
+    for (node, finish) in cases {
+        let records = support::journey(&add(&[FLAG, node]));
+        let finished = support::accepted(&records, &finish);
+        let derived = support::derived(&finished, support::JOURNEY);
+        let graph = support::journey_graph(&finished, support::JOURNEY);
+        assert_eq!(
+            derived.relevance().value(&key("n_branch")),
+            Relevance::Undecided,
+            "{finish}"
+        );
+        assert_eq!(
+            derived.unanswered(&graph, &key("n_branch")),
+            BTreeSet::from([key("n_flag")])
+        );
+        assert!(!derived.is_stale(&key("n_branch")), "{finish}");
+        assert!(
+            !support::graph(&finished)
+                .state
+                .overrides
+                .contains_key(&key("n_branch")),
+            "not forced into scope: {finish}"
+        );
+    }
+}
+
+/// D4: an undecided node's other open dependencies still hold its completion: the violation
+/// names them, not the decision its relevance waits on, and a bypass accepts only them.
+#[test]
+fn undecided_work_still_waits_on_its_other_dependencies() {
+    let gated = "{key: n_branch, id: branch, kind: action, title: Branch, requires: [n_first], relevant_when: {equals: {decision: n_flag, value: true}}}";
+    let records = support::journey(&add(&[FLAG, FIRST, gated]));
+    let [found] = &violations(&records, &complete("n_branch"))[..] else {
+        panic!("one violation")
+    };
+    assert_eq!(found.code, ViolationCode::GuardFailed);
+    assert_eq!(
+        found.failures,
+        BTreeSet::from([GuardFailure::OpenDependency(key("n_first"))])
+    );
+    let bypassed = support::accepted(
+        &records,
+        &format!(
+            "{}{}",
+            complete("n_branch"),
+            bypass("n_branch", "deps_done")
+        ),
+    );
+    assert!(!support::derived(&bypassed, support::JOURNEY).is_stale(&key("n_branch")));
 }
 
 /// Gating 2, D4: a gated decision answered before what it requires is done is rejected; in

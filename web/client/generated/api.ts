@@ -1295,6 +1295,8 @@ export interface components {
             stale?: components["schemas"]["StaleConsequence"][];
             /** @description The journey became stalled. */
             stalled?: components["schemas"]["Stalled"] | null;
+            /** @description Finished nodes newly undecided, which may not apply: a warning, never a rejection. */
+            undecided?: components["schemas"]["UndecidedConsequence"][];
         };
         /**
          * @description One constraint: `after` is at least `offset_days` after `before` (offsets may be zero or
@@ -4338,6 +4340,17 @@ export interface components {
             ended: components["schemas"]["Ended"];
             /** @description What the assistant said last, if anything. */
             reply?: components["schemas"]["Markdown"] | null;
+        };
+        /**
+         * @description Finished work newly undecided (D4, D7): a node completed, answered, or reached while
+         *     a decision its relevance reads is unanswered, so it may not apply. A warning, never a
+         *     rejection: the node stays undecided and is not forced into scope.
+         */
+        UndecidedConsequence: {
+            /** @description The node. */
+            node: components["schemas"]["NodeKey"];
+            /** @description The open decisions its relevance waits on that it newly waits on. */
+            unanswered: components["schemas"]["NodeKey"][];
         };
         /** @description One edge of the graph a canvas edge stands for: `dependent` waits on `requirement`. */
         UnderlyingEdge: {

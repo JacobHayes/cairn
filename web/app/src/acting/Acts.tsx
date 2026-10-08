@@ -3,13 +3,14 @@
 // its bypass). Answering and snoozing are node detail's own editors (5.1), so a draft started
 // here is the one the panel shows. A placeholder breaks down into pieces that open a proposal
 // (B10). An unassigned node offers to assign its owner (D2); a card offers pass, which writes
-// nothing (C11).
+// nothing (C11). Undecided work may be finished, and says beside its acts that it may not
+// apply (D4).
 import { useState } from "react";
 import { Link } from "react-router";
 
 import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
 import { newAttachmentKey } from "../detail/Attachments.tsx";
-import { SkipForm } from "../detail/Actions.tsx";
+import { MayNotApply, SkipForm } from "../detail/Actions.tsx";
 import { AnswerEditor } from "../detail/AnswerEditor.tsx";
 import { SnoozeEditor } from "../detail/editors.tsx";
 import { nodeDetail, transition, type Ready } from "../detail/model.ts";
@@ -19,6 +20,9 @@ import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { BreakDown } from "../proposals/Entries.tsx";
 import { actsFor, assignOwner, doneMutations, hasArtifact, type Act, type Facts } from "./acts.ts";
+
+/** D4: the acts that finish a node, beside which undecided work says it may not apply. */
+const FINISHING: Act[] = ["done", "reach", "answer"];
 
 /** G2, C11: done for a deliverable that requires an artifact and has none: its link and the completion, one patch. */
 function DoneWithArtifact({ write, node }: { write: NodeWrite; node: string }) {
@@ -118,6 +122,7 @@ export function Acts({ view, facts, onPass }: { view: Ready; facts: Facts; onPas
           </Button>
         )}
       </div>
+      {acts.some((act) => FINISHING.includes(act)) ? <MayNotApply view={view} node={facts.node.key} /> : null}
       {skip.draft === undefined ? null : <SkipForm write={write} node={facts.node.key} form={skip} />}
       {acts.includes("answer") ? <AnswerEditor view={view} detail={detail} /> : null}
       {facts.derived.unassigned === true ? <AssignOwner view={view} write={write} node={facts.node.key} /> : null}

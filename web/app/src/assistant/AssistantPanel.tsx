@@ -12,7 +12,7 @@ import { Link } from "react-router";
 
 import { targetKey, type AssistantAction, type AssistantHost, type AssistantTarget } from "../data/assistant.ts";
 import { useDraft } from "../data/drafts.ts";
-import { linesOf } from "../data/notices.ts";
+import { linesOf, mayNotApply } from "../data/notices.ts";
 import { useSession } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { Markdown } from "../ui/markdown.tsx";
@@ -74,7 +74,7 @@ function Applied({ action, titleOf }: { action: Extract<AssistantAction, { outco
               `The journey is now stalled`
             ) : (
               <>
-                Newly {line.kind}:{" "}
+                {line.kind === "undecided" ? mayNotApply(line.unanswered ?? [], (key) => titleOf?.(key) ?? key) : `Newly ${line.kind}`}:{" "}
                 {line.nodes.map((node, index) => (
                   <span key={node}>
                     {index === 0 ? null : ", "}

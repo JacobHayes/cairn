@@ -44,7 +44,7 @@ use std::collections::BTreeSet;
 
 use cairn_schema::{
     Blocker, Date, DependencyVia, Deployment, DeriveInputs, EntityKey, GuardFailure, KeyRefs, Node,
-    NodeKey, RankConstants, State,
+    NodeKey, RankConstants, Relevance, State,
 };
 
 use crate::graph::{Document, Graph};
@@ -189,6 +189,65 @@ impl Derived {
     #[must_use]
     pub fn open_dependencies(&self, key: &NodeKey) -> BTreeSet<NodeKey> {
         stale::open_dependencies(&self.dependencies, &self.blocking, key)
+    }
+
+    /// D4's `deps_done` failures as a guarded transition and `stale` read them: those of
+    /// [`Derived::open_dependencies`], less an undecided node's condition gates, which its
+    /// relevance answers for (finishing undecided work is accepted with a warning).
+    #[must_use]
+    pub fn guard_open_dependencies(&self, key: &NodeKey) -> BTreeSet<NodeKey> {
+        stale::guard_open_dependencies(&self.dependencies, &self.blocking, &self.relevance, key)
+    }
+
+    /// Gating, D4: the decisions an undecided node's relevance waits on: those still to be
+    /// answered (open, relevant, and not under a skip, so they contribute `undecided`) that
+    /// are read by each condition leaving it undecided, its own and its ancestors', up to a
+    /// force include. Empty when the node is not undecided. `graph` is the one derived.
+    ///
+    /// # Panics
+    ///
+    /// When `graph` is not the one derived, or an undecided node waits on no decision.
+    #[must_use]
+    pub fn unanswered(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<NodeKey> {
+        let document = graph.document();
+        let open = |decision: &&NodeKey| {
+            self.relevance.get(decision).map(|found| found.value) == Some(Relevance::Relevant)
+                && document
+                    .nodes
+                    .get(*decision)
+                    .is_some_and(|node| stored_state(document, node) == State::Open)
+                && self.skips.skipped_by(decision).is_none()
+        };
+        let mut waiting = BTreeSet::new();
+        // Up the tree while undecided: a relevant node (a force include among them) has
+        // nothing undecided above it, and the depth limit bounds the walk.
+        let mut current = Some(key);
+        while let Some(node) = current {
+            let Some(found) = self.relevance.get(node) else {
+                break;
+            };
+            if found.value != Relevance::Undecided {
+                break;
+            }
+            // The node's own condition is undecided exactly when it produced the value.
+            if let Producer::Condition { on, decisions } = &found.producer
+                && on == node
+            {
+                waiting.extend(decisions.iter().filter(open).cloned());
+            }
+            current = document
+                .nodes
+                .get(node)
+                .and_then(|found| found.parent.as_ref());
+        }
+        let undecided =
+            self.relevance.get(key).map(|found| found.value) == Some(Relevance::Undecided);
+        assert_eq!(
+            waiting.is_empty(),
+            !undecided,
+            "{key} is undecided exactly when it waits on an open decision"
+        );
+        waiting
     }
 
     /// Gating, Blocked: what blocks the node itself: its own explicit requirements,

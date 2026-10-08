@@ -8,7 +8,9 @@ mod in_process {
     use axum::http::{HeaderValue, Method, StatusCode};
     use cairn_api::error::status_of;
     use cairn_api::wire::{Capabilities, PatchAnswer, Problem, ProblemCode};
-    use cairn_schema::{Rejection, ViolationCode};
+    use std::collections::BTreeSet;
+
+    use cairn_schema::{Rejection, UndecidedConsequence, ViolationCode};
 
     use crate::support::{self, World, get, ok, post, request};
 
@@ -68,6 +70,34 @@ mod in_process {
             revision,
             receipt.revision.get(),
             "nothing was applied twice"
+        );
+    }
+
+    /// D4, D7: completing work whose relevance waits on an unanswered decision is applied
+    /// and answered with the warning naming that decision.
+    #[tokio::test]
+    async fn finishing_undecided_work_is_applied_with_a_warning() {
+        let world = World::start().await;
+        let ann = world.vendor_after(1).await;
+        let complete = support::patch(
+            "p_baseline",
+            "{journey: j_vendor_eval}",
+            1,
+            "- op: transition\n  node: n_baseline\n  transition: complete\n",
+        );
+        let landed = ok::<PatchAnswer>(
+            &post(&ann, &format!("{JOURNEY}/patches"), &request(&complete)).await,
+        );
+        let PatchAnswer::Applied { consequences, .. } = &landed else {
+            panic!("applied, not {landed:#?}")
+        };
+        let caused = &consequences[&"j_vendor_eval".parse().unwrap()];
+        assert_eq!(
+            caused.undecided,
+            [UndecidedConsequence {
+                node: "n_baseline".parse().unwrap(),
+                unanswered: BTreeSet::from(["n_comparison_set".parse().unwrap()]),
+            }]
         );
     }
 

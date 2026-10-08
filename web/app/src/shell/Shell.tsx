@@ -3,6 +3,7 @@
 import { Link, Outlet } from "react-router";
 
 import { switchedTo } from "../data/choose.ts";
+import { mayNotApply } from "../data/notices.ts";
 import { useNotices, useSession, useSkew, useStreamStatus } from "../data/react.ts";
 import { Badge, Button, Gate } from "../ui/kit.tsx";
 
@@ -81,8 +82,12 @@ function Notices() {
             <span className="muted">Nothing became stale, short, overdue, or stalled.</span>
           ) : null}
           {notice.lines.map((line) => (
-            <span key={`${line.journey}:${line.kind}`} className="muted" data-testid="consequence">
-              {line.kind === "stalled" ? `${line.journey} is now stalled` : `Newly ${line.kind}: ${line.nodes.join(", ")}`}
+            <span key={`${line.journey}:${line.kind}`} className="muted" data-testid="consequence" data-kind={line.kind}>
+              {line.kind === "stalled"
+                ? `${line.journey} is now stalled`
+                : line.kind === "undecided"
+                  ? `${mayNotApply(line.unanswered ?? [])}: ${line.nodes.join(", ")}`
+                  : `Newly ${line.kind}: ${line.nodes.join(", ")}`}
             </span>
           ))}
         </div>

@@ -2,9 +2,11 @@
 //! candidate is derived once, with the patch's today, and every guarded transition the patch
 //! attempted (complete, a first answer, reach) is held to relevance and `deps_done` on it, so
 //! a guard is never satisfied only for a moment and a bulk completion is accepted in any
-//! order (A17). A `deps_done` bypass applied in the same patch accepts the open dependencies
-//! present, and they are recorded on it; relevance has no bypass (force include is the escape
-//! hatch). A snooze the patch made must sit on a node in scope that is not closed: not
+//! order (A17). Relevance refuses a node that is not relevant and has no bypass (force include
+//! is the escape hatch); an undecided node passes, and neither do its condition gates hold it
+//! (`deps_done` as a guard reads it), so finishing undecided work is accepted and reported as
+//! a consequence (D7) that it may not apply. A `deps_done` bypass applied in the same patch
+//! accepts the open dependencies present, and they are recorded on it. A snooze the patch made must sit on a node in scope that is not closed: not
 //! effectively skipped and not a milestone that reads as reached (B6; a blocked node may be
 //! snoozed, Gating).
 //!
@@ -81,12 +83,13 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
     snoozes(check, &tree, &derived);
 }
 
-/// D4: a guarded transition needs its node relevant on the graph the patch produces.
+/// D4: a guarded transition needs its node in scope on the graph the patch produces: an
+/// undecided node takes it, and the consequences report that it may not apply (D7).
 fn relevance(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &NodeKey, at: u32) {
     let Some(found) = derived.relevance().get(key) else {
         return;
     };
-    if found.value == Relevance::Relevant {
+    if found.value != Relevance::NotRelevant {
         return;
     }
     let mut involved = Involved::default();
@@ -100,11 +103,8 @@ fn relevance(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &
         graph.tree(),
         key,
         ViolationCode::NotRelevant,
-        format!(
-            "the node is {} on the graph this patch produces, and only a relevant node takes \
-             this transition (D4); force include it to go ahead",
-            found.value
-        ),
+        "the node is not relevant on the graph this patch produces, and a node out of scope \
+         does not take this transition (D4); force include it to go ahead",
     );
     violation.at.mutation = Some(at);
     violation.caused_by = causes(check.events, at, &involved);
@@ -112,9 +112,10 @@ fn relevance(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &
 }
 
 /// D4: a guarded transition needs every hard dependency of its node satisfied on the graph
-/// the patch produces, or a bypass in the patch that accepts the open ones.
+/// the patch produces (an undecided node's condition gates aside), or a bypass in the patch
+/// that accepts the open ones.
 fn deps_done(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &NodeKey, at: u32) {
-    let open = derived.open_dependencies(key);
+    let open = derived.guard_open_dependencies(key);
     if open.is_empty() {
         return;
     }

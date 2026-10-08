@@ -1,6 +1,8 @@
 //! D7: what a patch, or a proposal preview, newly caused in derived state: nodes that became
-//! `stale` or gained a stale reason, new or larger shortfalls, newly `overdue` nodes, and the
-//! journey becoming `stalled`, each with its explanation. A pure function of the two sides'
+//! `stale` or gained a stale reason, new or larger shortfalls, newly `overdue` nodes, finished
+//! nodes newly undecided (completed, answered, or reached while a decision their relevance
+//! reads is unanswered, so they may not apply; D4), and the journey becoming `stalled`, each
+//! with its explanation. A pure function of the two sides'
 //! graphs and derivations, which the caller derives with the same inputs (ARCHITECTURE, Write
 //! path), so the passing of midnight is never blamed on a patch. Computed for the response,
 //! never stored.
@@ -9,9 +11,13 @@
 //! stale reasons of each stale node (at most about 1,300 edges walked each) and the chain of
 //! each new or larger shortfall (at most one step per instant slot).
 
-use cairn_schema::{Consequences, NodeKey, ShortfallConsequence, StaleConsequence};
+use std::collections::BTreeSet;
 
-use super::Derived;
+use cairn_schema::{
+    Consequences, NodeKey, ShortfallConsequence, StaleConsequence, State, UndecidedConsequence,
+};
+
+use super::{Derived, stored_state};
 use crate::graph::Graph;
 
 /// D7: what the `after` side newly shows against the `before` side. A node the before side
@@ -64,9 +70,38 @@ pub fn consequences(
         if after.dates().overdue(key) && !(existed(key) && before.dates().overdue(key)) {
             found.overdue.push(key.clone());
         }
+        let mut unanswered = finished_undecided(after_graph, after, key);
+        if !unanswered.is_empty() && existed(key) {
+            let earlier = finished_undecided(before_graph, before, key);
+            unanswered.retain(|decision| !earlier.contains(decision));
+        }
+        if !unanswered.is_empty() {
+            found.undecided.push(UndecidedConsequence {
+                node: key.clone(),
+                unanswered,
+            });
+        }
     }
     if before.blocking().stalled().is_none() {
         found.stalled = after.blocking().stalled().cloned();
     }
     found
+}
+
+/// D4: the open decisions a finished node's relevance waits on: empty unless the node was
+/// completed, answered, or reached (a skip finishes nothing that could apply) and is
+/// undecided.
+fn finished_undecided(graph: &Graph, derived: &Derived, key: &NodeKey) -> BTreeSet<NodeKey> {
+    let document = graph.document();
+    let finished = document.nodes.get(key).is_some_and(|node| {
+        matches!(
+            stored_state(document, node),
+            State::Done | State::Decided | State::Reached
+        )
+    });
+    if finished {
+        derived.unanswered(graph, key)
+    } else {
+        BTreeSet::new()
+    }
 }

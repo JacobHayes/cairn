@@ -8,7 +8,7 @@ use crate::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::{Records, consequences};
-use cairn_schema::{Consequences, GuardFailure, StaleConsequence};
+use cairn_schema::{Consequences, GuardFailure, StaleConsequence, UndecidedConsequence};
 use support::{add_nodes as add, key};
 
 /// D7 over the test journey: `before` against `before` with `patch` applied, both sides
@@ -160,4 +160,74 @@ fn a_patch_that_makes_work_overdue_reports_it() {
         "2026-10-06",
     );
     assert_eq!(found.overdue, [key("n_meeting"), key("n_prep")]);
+}
+
+const FLAG: &str =
+    "{key: n_flag, id: flag, kind: decision, title: Flag, prompt: Flag?, answer_type: boolean}";
+const BRANCH: &str = "{key: n_branch, id: branch, kind: action, title: Branch, relevant_when: {equals: {decision: n_flag, value: true}}}";
+
+/// D4, D7: finishing undecided work reports that it may not apply, naming the decision its
+/// relevance waits on, and nothing stale; the answer that settles it reports nothing more;
+/// reopening that decision under the finished work reports the same warning, not `stale`.
+#[test]
+fn finished_undecided_work_is_reported_as_it_may_not_apply() {
+    let records = support::journey(&add(&[FLAG, BRANCH]));
+    let complete = "- op: transition\n  node: n_branch\n  transition: complete\n";
+    let warned = [UndecidedConsequence {
+        node: key("n_branch"),
+        unanswered: BTreeSet::from([key("n_flag")]),
+    }];
+    let finished = caused(&records, complete, "2026-10-06");
+    assert_eq!(
+        (&finished.undecided[..], &finished.stale[..]),
+        (&warned[..], &[][..])
+    );
+    let done = support::accepted(&records, complete);
+    let answer = "- op: answer\n  decision: n_flag\n  value: {boolean: true}\n";
+    let settled = caused(&done, answer, "2026-10-06");
+    assert_eq!(
+        (&settled.undecided[..], &settled.stale[..]),
+        (&[][..], &[][..])
+    );
+    let answered = support::accepted(&done, answer);
+    let reopen = "- op: transition\n  node: n_flag\n  transition: reopen\n";
+    let reopened = caused(&answered, reopen, "2026-10-06");
+    assert_eq!(
+        (&reopened.undecided[..], &reopened.stale[..]),
+        (&warned[..], &[][..])
+    );
+}
+
+/// D4, D7: the warning names every decision leaving the work undecided, its ancestors' too,
+/// so reopening an ancestor's decision under finished work warns again.
+#[test]
+fn the_warning_names_the_decisions_of_undecided_ancestors() {
+    let records = support::journey(&add(&[
+        FLAG,
+        "{key: n_other, id: other, kind: decision, title: Other, prompt: Other?, answer_type: boolean}",
+        "{key: n_group, id: group, kind: group, title: Group, relevant_when: {equals: {decision: n_other, value: true}}}",
+        "{key: n_inner, id: inner, kind: action, title: Inner, parent: n_group, relevant_when: {equals: {decision: n_flag, value: true}}}",
+    ]));
+    let complete = "- op: transition\n  node: n_inner\n  transition: complete\n";
+    let finished = caused(&records, complete, "2026-10-06");
+    assert_eq!(
+        finished.undecided,
+        [UndecidedConsequence {
+            node: key("n_inner"),
+            unanswered: BTreeSet::from([key("n_flag"), key("n_other")]),
+        }]
+    );
+    let answered = support::accepted(
+        &support::accepted(&records, complete),
+        "- op: answer\n  decision: n_other\n  value: {boolean: true}\n",
+    );
+    let reopen = "- op: transition\n  node: n_other\n  transition: reopen\n";
+    let reopened = caused(&answered, reopen, "2026-10-06");
+    assert_eq!(
+        reopened.undecided,
+        [UndecidedConsequence {
+            node: key("n_inner"),
+            unanswered: BTreeSet::from([key("n_other")]),
+        }]
+    );
 }

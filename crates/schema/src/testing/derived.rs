@@ -432,18 +432,27 @@ pub fn arb_consequences() -> BoxedStrategy<Consequences> {
         .prop_map(|(node, reasons)| StaleConsequence { node, reasons });
     let shortfall = (arb_node_key(), arb_short_chain())
         .prop_map(|(node, shortfall)| crate::derived::ShortfallConsequence { node, shortfall });
+    let undecided = (
+        arb_node_key(),
+        prop::collection::btree_set(arb_node_key(), 1..3),
+    )
+        .prop_map(|(node, unanswered)| crate::derived::UndecidedConsequence { node, unanswered });
     (
         prop::collection::vec(stale, 0..2),
         prop::collection::vec(shortfall, 0..2),
         prop::collection::vec(arb_node_key(), 0..2),
+        prop::collection::vec(undecided, 0..2),
         prop::option::of(arb_stalled()),
     )
-        .prop_map(|(stale, shortfalls, overdue, stalled)| Consequences {
-            stale,
-            shortfalls,
-            overdue,
-            stalled,
-        })
+        .prop_map(
+            |(stale, shortfalls, overdue, undecided, stalled)| Consequences {
+                stale,
+                shortfalls,
+                overdue,
+                undecided,
+                stalled,
+            },
+        )
         .boxed()
 }
 
