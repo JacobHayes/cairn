@@ -1,11 +1,12 @@
 // The decision view (C12) over the vendor evaluation and the hiring loop: each decision with
 // its answer and what that answer affected, the partner decision gating the partner-led
-// subset (and re-gating it live when the answer is revised), the server's projection shown
-// row for row, and a decision opening its detail beside the view.
+// subset (and re-gating it live when the answer is revised), and a decision opening its
+// detail beside the view. The server host draws the view from the page's own derivation of
+// the server's document, which web/wasm's agreement cases hold to the server's projection.
 import { expect, test, type Page } from "@playwright/test";
 
 import { nodePanel } from "./shell.ts";
-import { openScreen, served } from "./views.ts";
+import { openScreen } from "./views.ts";
 
 function decisionRow(page: Page, node: string) {
   return page.locator(`[data-testid="decision-row"][data-node="${node}"]`);
@@ -33,25 +34,6 @@ test("C12: the partner decision gates the partner-led subset, and revising it re
   await expect.poll(() => affected(page, "n_partner_runs")).toEqual(Object.fromEntries(PARTNER_LED.map((key) => [key, "relevant"])));
 });
 
-test("C12: every decision with its answer, pins, fills, and markers, as the server projects them", { tag: "@server" }, async ({ page }) => {
-  await openScreen(page, "server", "j_vendor_eval", "decisions");
-  const view = await served<{ decisions: { node: string; state: string; affects?: string[]; pins?: string; fills?: string }[]; edges: unknown[] }>(
-    page,
-    "j_vendor_eval",
-    "decisions",
-  );
-  const rows = page.getByTestId("decision-row");
-  await expect(rows).toHaveCount(view.decisions.length);
-  for (const entry of view.decisions) {
-    const row = decisionRow(page, entry.node);
-    await expect(row).toHaveAttribute("data-state", entry.state);
-    expect(Object.keys(await affected(page, entry.node))).toEqual(entry.affects ?? []);
-    await expect(row.getByTestId("pins")).toHaveCount(entry.pins === undefined ? 0 : 1);
-    await expect(row.getByTestId("fills")).toHaveCount(entry.fills === undefined ? 0 : 1);
-  }
-  await expect(page.locator("[data-testid=canvas] [data-testid=node-card]")).toHaveCount(view.decisions.length);
-  await expect(page.locator("[data-testid=canvas] [data-testid=edge-line]")).toHaveCount(view.edges.length);
-});
 
 test("C12: a decision's card opens its detail beside the view, and closing it stays on the view", async ({ page }) => {
   await openScreen(page, "browser", "j_hiring", "decisions");

@@ -1,7 +1,6 @@
 // What the browser tests of the decision view, the timeline, and the status summary share:
 // opening one of a journey's screens on a host, on the browser host at a fixed day so what is
-// overdue or due soon does not move with the calendar, and reading a projection the server
-// answers for the same journey.
+// overdue or due soon does not move with the calendar.
 import { expect, type Page } from "@playwright/test";
 
 import { open, type HostKind } from "./shell.ts";
@@ -31,11 +30,4 @@ export async function openScreen(page: Page, host: HostKind, journey: string, se
   if (host === "browser") {
     await expect(page.getByTestId("derivation")).toHaveAttribute("data-today", FIXED_TODAY);
   }
-}
-
-/** The server's answer to projection `path` (`decisions`, `timeline`, `summary`) of `journey`. */
-export async function served<T>(page: Page, journey: string, path: string): Promise<T> {
-  const response = await page.request.get(`/journeys/${journey}/${path}`);
-  expect(response.ok()).toBe(true);
-  return ((await response.json()) as { value: T }).value;
 }

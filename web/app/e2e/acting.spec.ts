@@ -1,8 +1,8 @@
 // The acting surfaces in Chromium (rung 6): the list's filters, grouping, search, and bulk
 // actions as one patch (C9); the next list's ranking, re-sort, and stalled panel (C10, D5);
 // triage's pass and per-kind cards (C11, B10); snoozes leaving and returning (B6); and the
-// decision walkthrough over a fresh journey on the server host (C11, D2). The other tests
-// read the fixtures on the in-browser host, fresh on every load.
+// decision walkthrough over a fresh journey started from the vendor evaluation's route (C11,
+// D2). Every test runs on the in-browser host, whose fixtures are fresh on every load.
 import { expect, test, type Page } from "@playwright/test";
 
 import {
@@ -16,11 +16,14 @@ import {
   passOrder,
   revisionAfter,
   select,
-  startVendorJourney,
   turnOn,
 } from "./acting.ts";
+import { journeyName, startJourney } from "./around.ts";
 import { derivedRevision } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
+
+/** Starts a fresh journey from version 1 of the vendor evaluation's route (B1); its id. */
+const startVendorJourney = (page: Page) => startJourney(page, "browser", journeyName("Walkthrough"), { route: "vendor-evaluation", version: 1 });
 
 const UP_FRONT = ["n_meeting_date", "n_partner_runs", "n_purpose", "n_who_informed", "n_who_owns"];
 
@@ -151,9 +154,9 @@ test("C11: pass writes nothing and sends the card to the back of the pass", asyn
   expect(await derivedRevision(page)).toBe(revision);
 });
 
-test("C11: the walkthrough opens on the decisions at the start; answering the partner decision surfaces its work in the same pass", { tag: "@server" }, async ({ page }) => {
+test("C11: the walkthrough opens on the decisions at the start; answering the partner decision surfaces its work in the same pass", async ({ page }) => {
   const journey = await startVendorJourney(page);
-  await openActing(page, "server", journey, "triage?mode=decisions");
+  await openActing(page, "browser", journey, "triage?mode=decisions");
   expect((await passOrder(page)).sort()).toEqual(UP_FRONT);
   await expect(card(page)).toHaveAttribute("data-node", "n_partner_runs");
   await card(page).getByLabel("Assign owner").selectOption("e_lead");
@@ -174,12 +177,12 @@ test("C11: the walkthrough opens on the decisions at the start; answering the pa
   expect(await nextKeys(page)).toEqual(pass);
 });
 
-test("C11, B10: a placeholder's card offers break down and mark atomic, and no done until it is atomic", { tag: "@server" }, async ({ page }) => {
+test("C11, B10: a placeholder's card offers break down and mark atomic, and no done until it is atomic", async ({ page }) => {
   const journey = await startVendorJourney(page);
-  await openActing(page, "server", journey, "triage");
+  await openActing(page, "browser", journey, "triage");
   await expect(card(page)).toHaveAttribute("data-node", "n_kickoff");
   await card(page).getByRole("button", { name: "Mark reached" }).click();
-  await openActing(page, "server", journey, "triage?kind=deliverable");
+  await openActing(page, "browser", journey, "triage?kind=deliverable");
   await expect.poll(() => passOrder(page)).toContain("n_workload");
   while ((await card(page).getAttribute("data-node")) !== "n_workload") {
     await card(page).getByTestId("pass").click();
@@ -190,9 +193,9 @@ test("C11, B10: a placeholder's card offers break down and mark atomic, and no d
   await expect(acts).toHaveAttribute("data-acts", /\bdone\b/);
 });
 
-test("C11, C9: with every decision skipped in bulk, the walkthrough shows what would unblock the next ones", { tag: "@server" }, async ({ page }) => {
+test("C11, C9: with every decision skipped in bulk, the walkthrough shows what would unblock the next ones", async ({ page }) => {
   const journey = await startVendorJourney(page);
-  await openActing(page, "server", journey, "list?flag=decisions_needed");
+  await openActing(page, "browser", journey, "list?flag=decisions_needed");
   await expect.poll(() => listKeys(page)).toHaveLength(UP_FRONT.length);
   await page.getByRole("button", { name: "Select all shown" }).click();
   await page.getByRole("button", { name: "Skip..." }).click();
@@ -204,9 +207,9 @@ test("C11, C9: with every decision skipped in bulk, the walkthrough shows what w
   await expect(comparison.locator('[data-testid="unblocker"][data-node="n_plan"]')).toBeVisible();
 });
 
-test("C11: a walkthrough filtered to only mine says the open decisions are others', not that none can be made", { tag: "@server" }, async ({ page }) => {
+test("C11: a walkthrough filtered to only mine says the open decisions are others', not that none can be made", async ({ page }) => {
   const journey = await startVendorJourney(page);
-  await openActing(page, "server", journey, "triage?mode=decisions&mine=1");
+  await openActing(page, "browser", journey, "triage?mode=decisions&mine=1");
   await expect(page.getByTestId("triage-empty")).toHaveAttribute("data-status", "filtered");
   await expect(page.getByTestId("waiting-decisions")).toHaveCount(0);
 });

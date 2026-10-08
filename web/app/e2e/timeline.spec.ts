@@ -1,12 +1,13 @@
 // The timeline (C13, with F6 and F7's presentation): the vendor evaluation anchored on its
 // final milestone, the decision meeting; the product launch's late code freeze marked short,
-// with the chain that explains it; a journey with no final milestone drawn with no anchor once
-// it has a date; and the server's projection shown row for row.
+// with the chain that explains it; and a journey with no final milestone drawn with no anchor
+// once it has a date. The server host draws it from the page's own derivation of the server's
+// document, which web/wasm's agreement cases hold to the server's projection.
 import { expect, test, type Page } from "@playwright/test";
 
 import { pin } from "./detail.ts";
 import { nodePanel } from "./shell.ts";
-import { openScreen, served } from "./views.ts";
+import { openScreen } from "./views.ts";
 
 function entry(page: Page, node: string) {
   return page.locator(`[data-testid="timeline-entry"][data-node="${node}"]`);
@@ -59,10 +60,3 @@ test("C13: with no final milestone there is no end anchor; a pin puts a node on 
   await expect(page.locator('[data-testid="timeline-entry"][data-end="true"]')).toHaveCount(0);
 });
 
-test("C13: the timeline shows the server's projection row for row", { tag: "@server" }, async ({ page }) => {
-  await openScreen(page, "server", "j_launch", "timeline");
-  const timeline = await served<{ entries: { node: string; date: string; origin: string }[]; end?: string }>(page, "j_launch", "timeline");
-  await expect(page.getByTestId("timeline-entry")).toHaveCount(timeline.entries.length);
-  expect(await rows(page)).toEqual(timeline.entries.map((each) => [each.node, each.date, each.origin]));
-  await expect(page.getByTestId("timeline")).toHaveAttribute("data-end", timeline.end ?? "");
-});

@@ -1,13 +1,14 @@
 // The status summary (C18): each fixture's counts and lists as fixtures/README.md states them
-// (read on the browser host at the scenario matrix's day), the server's projection shown as
-// it answers it, the tabs leading to it from the canvas, and a print of it leaving out the
-// navigation and the detail panel.
+// (read on the browser host at the scenario matrix's day), the tabs leading to it from the
+// canvas, and a print of it leaving out the navigation and the detail panel. The server host
+// draws it from the page's own derivation of the server's document, which web/wasm's
+// agreement cases hold to the server's projection.
 import { readFileSync } from "node:fs";
 
 import { expect, test, type Page } from "@playwright/test";
 
 import { nodePanel, openJourney } from "./shell.ts";
-import { FIXTURE_JOURNEYS, openScreen, served } from "./views.ts";
+import { FIXTURE_JOURNEYS, openScreen } from "./views.ts";
 
 const README = readFileSync(new URL("../../../fixtures/README.md", import.meta.url), "utf8").split("\n");
 
@@ -48,25 +49,6 @@ for (const [fixture, journey] of Object.entries(FIXTURE_JOURNEYS)) {
   });
 }
 
-test("C18: the summary shows the server's projection", { tag: "@server" }, async ({ page }) => {
-  await openScreen(page, "server", "j_launch", "summary");
-  const summary = await served<{
-    by_state: Record<string, number>;
-    remaining: number;
-    shortfalls?: string[];
-    overdue?: string[];
-    upcoming_milestones?: { node: string }[];
-    open_decisions?: { node: string }[];
-  }>(page, "j_launch", "summary");
-  await expect(page.getByTestId("summary-remaining")).toHaveAttribute("data-count", String(summary.remaining));
-  for (const [state, count] of Object.entries(summary.by_state)) {
-    await expect(page.locator(`[data-testid="summary-state"][data-state="${state}"]`)).toHaveAttribute("data-count", String(count));
-  }
-  expect(await listed(page, "summary-shortfalls")).toEqual(summary.shortfalls ?? []);
-  expect(await listed(page, "summary-overdue")).toEqual(summary.overdue ?? []);
-  expect(await listed(page, "summary-upcoming")).toEqual((summary.upcoming_milestones ?? []).map((each) => each.node));
-  expect(await listed(page, "summary-open")).toEqual((summary.open_decisions ?? []).map((each) => each.node));
-});
 
 test("C18: the tabs lead from the canvas to the summary and keep an open node and the canvas settings, and a print leaves out navigation and the panel", async ({ page }) => {
   await openJourney(page, "browser", "j_bakeoff", "?hide=action&heat=on");

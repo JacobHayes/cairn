@@ -4,7 +4,9 @@
 // (I5's two paths, I7: applying is the user's click); the conversation is the user's per
 // target, read back on the overview's panel and after a reload, on a route's draft too, with
 // a message being typed kept to its target and a turn that outlives the panel closing; and
-// the in-browser host never shows the panel (capabilities gating).
+// the in-browser host never shows the panel (capabilities gating). The tests on the server
+// host are tagged @server: the fixture server's scripted model is one for the whole server, so
+// they run one at a time with the other tests that write to it.
 import { expect, test } from "@playwright/test";
 
 import { startVendorJourney } from "./acting.ts";
@@ -14,7 +16,7 @@ import { state } from "./detail.ts";
 import { confirmAndApply, reviewOpen } from "./proposals.ts";
 import { nodePanel, open, openJourney } from "./shell.ts";
 
-test("I5, I7: a direct change reported with its node, and a breakdown proposed, reviewed, and applied", async ({ page }) => {
+test("I5, I7: a direct change reported with its node, and a breakdown proposed, reviewed, and applied", { tag: "@server" }, async ({ page }) => {
   const journey = await startVendorJourney(page);
   await openJourney(page, "server", journey);
   const panel = await openPanel(page);
@@ -57,7 +59,7 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
   await expect(page.getByTestId("assistant-panel").getByTestId("review-proposal")).toHaveCount(1);
 });
 
-test("I5: the conversation is kept per target, read back on the overview and after a reload, a route's draft its own", async ({ page }) => {
+test("I5: the conversation is kept per target, read back on the overview and after a reload, a route's draft its own", { tag: "@server" }, async ({ page }) => {
   const journey = await startVendorJourney(page);
   await openOverview(page, "server", journey);
   const panel = await openPanel(page);
@@ -85,7 +87,7 @@ test("capabilities gating: the in-browser host never shows the panel", async ({ 
   await expect(page.getByTestId("assistant-toggle")).toHaveCount(1);
 });
 
-test("I5: a message typed about one journey stays with it, and a turn outlives the panel closing", async ({ page }) => {
+test("I5: a message typed about one journey stays with it, and a turn outlives the panel closing", { tag: "@server" }, async ({ page }) => {
   const first = await startVendorJourney(page);
   const second = await startVendorJourney(page);
   await openJourney(page, "server", second);

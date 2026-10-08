@@ -1,21 +1,21 @@
 // The journey canvas over the vendor evaluation and the hiring loop (C1 to C7, C15): each
-// toggle combination 2.6's proof documents renders the level's node set (checked against the
-// server's level too), drilling in and out, the trace of the test plan, the hidden-prerequisites
-// marker when decisions are hidden and the trace it opens, the stalled surface, and the
-// layout: the same graph twice, and one node added on the fixture.
+// toggle combination 2.6's proof documents renders the level's node set, drilling in and out,
+// the trace of the test plan, the hidden-prerequisites marker when decisions are hidden and
+// the trace it opens, the stalled surface, and the layout: the same graph twice, and one node
+// added on the fixture in edit mode.
 import { expect, test, type Page } from "@playwright/test";
 
 import { LAYOUT_MOVED_FRACTION_MAX } from "../src/canvas/layout.ts";
+import { addNode, openEditing } from "./authoring.ts";
 import { cardKeys, containers, lineBetween, marks, places, showKind, toggle } from "./canvas.ts";
 import { section } from "./detail.ts";
 import { derivedRevision, fresh, nodeCard, nodePanel, openFromCanvas, openJourney, rename, renameOf, startRename } from "./shell.ts";
 
 /** The vendor evaluation at the end of its scenario, as 2.6's proof walks it at its own steps. */
-const COMBINATIONS: { name: string; query: string; level: string; nodes: Record<string, string> }[] = [
+const COMBINATIONS: { name: string; query: string; nodes: Record<string, string> }[] = [
   {
     name: "actions hidden",
     query: "?hide=action",
-    level: "kind=group&kind=decision&kind=deliverable&kind=milestone",
     nodes: {
       n_decision_meeting: "top", n_kickoff: "top", n_meeting_date: "top", n_partner_runs: "top", n_purpose: "top",
       n_reporting: "top", n_final_review: "n_reporting", n_final_report: "n_final_review", n_findings: "n_reporting",
@@ -28,13 +28,11 @@ const COMBINATIONS: { name: string; query: string; level: string; nodes: Record<
   {
     name: "groups only",
     query: "?hide=decision,deliverable,action,milestone",
-    level: "kind=group",
     nodes: { n_reporting: "top", n_final_review: "n_reporting", n_setup: "top", n_testing: "top", n_partner_led: "n_testing" },
   },
   {
     name: "drilled into Setup, every kind",
     query: "?in=n_setup",
-    level: "container=n_setup",
     nodes: {
       n_access: "top", n_plan: "top", n_plan_draft: "n_plan", n_plan_review: "n_plan", n_workload: "top",
       n_workload_ingest: "n_workload", n_workload_query: "n_workload",
@@ -43,7 +41,6 @@ const COMBINATIONS: { name: string; query: string; level: string; nodes: Record<
   {
     name: "groups and milestones hidden",
     query: "?hide=group,milestone",
-    level: "kind=decision&kind=deliverable&kind=action",
     nodes: {
       n_meeting_date: "top", n_partner_runs: "top", n_purpose: "top", n_final_report: "top", n_findings: "top",
       n_findings_reviewer: "top", n_access: "top", n_plan: "top", n_plan_draft: "n_plan", n_plan_review: "n_plan",
@@ -54,13 +51,10 @@ const COMBINATIONS: { name: string; query: string; level: string; nodes: Record<
 ];
 
 for (const combination of COMBINATIONS) {
-  test(`C2: ${combination.name} renders the level's node set`, { tag: "@server" }, async ({ page }) => {
+  test(`C2: ${combination.name} renders the level's node set`, async ({ page }) => {
     await openJourney(page, "browser", "j_vendor_eval", combination.query);
     await expect.poll(() => containers(page)).toEqual(combination.nodes);
-    const served = (await (await page.request.get(`/journeys/j_vendor_eval/level?${combination.level}`)).json()) as {
-      value: { nodes: { key: string }[] };
-    };
-    expect(served.value.nodes.map((node) => node.key).sort()).toEqual(await cardKeys(page));
+    expect(await cardKeys(page)).toEqual(Object.keys(combination.nodes).sort());
   });
 }
 
@@ -231,21 +225,10 @@ test("a rename started on one node does not follow the panel to another", async 
   await expect(renameOf(page, "n_access").getByRole("textbox")).toHaveValue("Not the plan");
 });
 
-test("C15: adding one node to the fixture moves fewer than the stated fraction of its nodes", { tag: "@server" }, async ({ page }) => {
-  await openJourney(page, "server", "j_vendor_eval");
+test("C15: adding one node to the fixture moves fewer than the stated fraction of its nodes", async ({ page }) => {
+  await openEditing(page, "browser", "j_vendor_eval");
   const before = await places(page);
-  const revision = await derivedRevision(page);
-  const suffix = Math.random().toString(36).slice(2, 8);
-  const key = `n_share_${suffix}`;
-  const patch = {
-    id: `p_share_${suffix}`,
-    target: { journey: "j_vendor_eval" },
-    base_revision: revision,
-    mutations: [
-      { op: "add_node", node: { key, id: `share-${suffix}`, parent: "n_reporting", kind: "action", title: "Share the findings", requires: ["n_findings"] } },
-    ],
-  };
-  expect((await page.request.post("/journeys/j_vendor_eval/patches", { data: { patch } })).status()).toBe(200);
+  const key = await addNode(page, "action", "Share the findings", "Reporting");
   await expect(nodeCard(page, key)).toBeVisible();
   const after = await places(page);
   const moved = Object.keys(before).filter((node) => {

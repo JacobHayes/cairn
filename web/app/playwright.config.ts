@@ -47,14 +47,15 @@ export default defineConfig({
   forbidOnly: true,
   reporter: [["list"]],
   use: { baseURL: `http://127.0.0.1:${appPort}` },
-  // The projects run side by side. The tests tagged @server use the one fixture server (they
-  // write to it, or compare with what it serves), and the `binary` project the one binary, so
-  // each of those runs its tests one at a time, in file order, as they ran before the projects
-  // were split; they come first so they start first, being the longest chains. A test on the
-  // in-browser host seeds its own store in its page, so those run in parallel in the workers
-  // left over.
+  // The projects run side by side. The tests tagged @server are the ones only the server host
+  // can run: pages meeting through the server (live updates, conflicts), sign-in, and the
+  // assistant. They use the one fixture server, and the `binary` project the one binary, so
+  // each of those runs its tests one at a time, in file order; they come first so they start
+  // first. server.spec.ts runs only against the binary: it is the server host's shell suite,
+  // and the binary serves the same API the fixture server does. A test on the in-browser host
+  // seeds its own store in its page, so those run in parallel in the workers left over.
   projects: [
-    { name: "server", grep: /@server/, workers: 1, use: { ...devices["Desktop Chrome"] } },
+    { name: "server", grep: /@server/, testIgnore: "server.spec.ts", workers: 1, use: { ...devices["Desktop Chrome"] } },
     {
       name: "binary",
       testMatch: "server.spec.ts",
