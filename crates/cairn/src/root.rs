@@ -16,7 +16,8 @@ use axum::Router;
 use cairn_assistant::Assistant;
 use cairn_assistant::protocol::HttpProvider;
 use cairn_auth::{
-    Accounts, Auth, AuthProvider, Clock, DevProvider, OAuthServer, OidcProvider, TailscaleProvider,
+    Accounts, Auth, AuthProvider, Clock, DevProvider, GcpIapProvider, OAuthServer, OidcProvider,
+    TailscaleProvider,
 };
 use cairn_service::{AuthKind, AuthMethod, Capabilities, Parts, Service};
 use cairn_store::{AuthStore, InProcessNotifier, Notifier, Store, StoreError};
@@ -102,6 +103,7 @@ pub fn capabilities(config: &Config) -> Capabilities {
                 Provider::Oidc(oidc) => (&oidc.name, AuthKind::Oidc),
                 Provider::BuiltinOauth(oauth) => (&oauth.name, AuthKind::BuiltinOauth),
                 Provider::Tailscale(tailscale) => (&tailscale.name, AuthKind::Tailscale),
+                Provider::GcpIap(iap) => (&iap.name, AuthKind::GcpIap),
             };
             AuthMethod {
                 name: name.clone(),
@@ -119,7 +121,7 @@ pub fn capabilities(config: &Config) -> Capabilities {
 ///
 /// Every provider that refuses its configuration (the dev provider off loopback without its
 /// override, Tailscale's proxy mode on a listener others reach, an OIDC issuer over plain
-/// http).
+/// http, an IAP audience that is not an IAP resource).
 pub fn providers<S: AuthStore + 'static>(
     config: &Config,
     accounts: &Accounts<S>,
@@ -141,6 +143,8 @@ pub fn providers<S: AuthStore + 'static>(
             Provider::Tailscale(tailscale) => {
                 TailscaleProvider::new(tailscale.clone(), listener).map(|made| Arc::new(made) as _)
             }
+            Provider::GcpIap(iap) => GcpIapProvider::new(iap.clone(), accounts.clock().clone())
+                .map(|made| Arc::new(made) as _),
         };
         match made {
             Ok(made) => built.push(made),

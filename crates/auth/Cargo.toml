@@ -1,6 +1,6 @@
 [package]
 name = "cairn-auth"
-description = "Auth providers (dev, OIDC, the built-in OAuth server, Tailscale), users, identities, and agent tokens, with the axum layer the API and MCP endpoints sit behind."
+description = "Auth providers (dev, OIDC, the built-in OAuth server, Tailscale, Google Cloud IAP), users, identities, and agent tokens, with the axum layer the API and MCP endpoints sit behind."
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -31,6 +31,7 @@ url.workspace = true
 
 [dev-dependencies]
 ed25519-dalek.workspace = true
+p256.workspace = true
 tokio = { workspace = true, features = ["macros", "net", "rt"] }
 tower.workspace = true
 

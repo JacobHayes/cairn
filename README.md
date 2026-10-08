@@ -64,7 +64,7 @@ undecided_discount = 0.5
 other_owner_factor = 2.0
 
 [[auth]]                                 # one or more, asked in this order
-kind = "oidc"                            # or dev, builtin_oauth, tailscale
+kind = "oidc"                            # or dev, builtin_oauth, tailscale, gcp_iap
 name = "corp"
 issuer = "https://login.example.com"
 client_id = "cairn"
@@ -85,7 +85,11 @@ Each provider kind's settings: `dev` (`user`, `verified_emails`, `token`, `auto_
 `allow_off_loopback`), `oidc` (`issuer`, `client_id`, `client_secret`, `auto_link`),
 `builtin_oauth` (`sign_in_with`), `tailscale` (`mode` direct with `socket`, or proxy, with
 `trusted_proxies` listing the addresses or networks of a proxy on another machine, or left
-out for `tailscale serve` on this one; `auto_link`). The environment overrides `database`, `listen`, `public_url`, and `timezone`
+out for `tailscale serve` on this one; `auto_link`), `gcp_iap` (`audience`, the IAP-protected backend service as
+`/projects/<number>/global/backendServices/<id>`; `auto_link`). Behind Google Cloud
+Identity-Aware Proxy, `gcp_iap` verifies the signed assertion IAP adds to every request
+(`x-goog-iap-jwt-assertion`) against Google's keys, so each person is signed in as their
+Google account with no sign-in step of Cairn's own. The environment overrides `database`, `listen`, `public_url`, and `timezone`
 with `CAIRN_DATABASE`, `CAIRN_LISTEN`, `CAIRN_PUBLIC_URL`, and `CAIRN_TIMEZONE`, and supplies
 secrets: `CAIRN_ASSISTANT_API_KEY`, and `CAIRN_AUTH_<NAME>_TOKEN` (dev) or
 `CAIRN_AUTH_<NAME>_CLIENT_SECRET` (OIDC), `<NAME>` being the provider's name in capitals

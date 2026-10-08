@@ -338,7 +338,8 @@ type OidcClient = openidconnect::core::CoreClient<
     openidconnect::EndpointMaybeSet,
 >;
 
-fn chrono_time(now: cairn_schema::Timestamp) -> chrono::DateTime<chrono::Utc> {
+/// `now` as the time `openidconnect` reads.
+pub(crate) fn chrono_time(now: cairn_schema::Timestamp) -> chrono::DateTime<chrono::Utc> {
     let time =
         chrono::DateTime::from_timestamp(now.as_second(), now.subsec_nanosecond().unsigned_abs());
     time.unwrap_or_default()

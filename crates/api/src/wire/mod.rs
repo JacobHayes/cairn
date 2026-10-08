@@ -147,6 +147,8 @@ pub enum AuthKind {
     BuiltinOauth,
     /// Tailscale identity.
     Tailscale,
+    /// Google Cloud Identity-Aware Proxy's signed assertion.
+    GcpIap,
     /// The browser host's single local identity.
     Local,
 }
@@ -166,6 +168,7 @@ impl From<&cairn_service::Capabilities> for Capabilities {
                 cairn_service::AuthKind::Oidc => AuthKind::Oidc,
                 cairn_service::AuthKind::BuiltinOauth => AuthKind::BuiltinOauth,
                 cairn_service::AuthKind::Tailscale => AuthKind::Tailscale,
+                cairn_service::AuthKind::GcpIap => AuthKind::GcpIap,
                 cairn_service::AuthKind::Local => AuthKind::Local,
             },
         });

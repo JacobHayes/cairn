@@ -18,7 +18,7 @@ use std::fmt;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
 
-use cairn_auth::{DevConfig, Listener, OAuthConfig, OidcConfig, TailscaleConfig};
+use cairn_auth::{DevConfig, GcpIapConfig, Listener, OAuthConfig, OidcConfig, TailscaleConfig};
 use cairn_schema::{RankConstants, TimeZoneName};
 use cairn_service::DeploymentSettings;
 use jiff::tz::TimeZone;
@@ -73,6 +73,8 @@ pub enum Provider {
     BuiltinOauth(OAuthConfig),
     /// Tailscale.
     Tailscale(TailscaleConfig),
+    /// Google Cloud IAP.
+    GcpIap(GcpIapConfig),
 }
 
 /// One thing wrong with a configuration: the key or variable it is about, and what.

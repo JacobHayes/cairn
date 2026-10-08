@@ -165,6 +165,8 @@ pub enum AuthKind {
     BuiltinOauth,
     /// Tailscale identity.
     Tailscale,
+    /// Google Cloud Identity-Aware Proxy's signed assertion.
+    GcpIap,
     /// The browser host's single local identity.
     Local,
 }

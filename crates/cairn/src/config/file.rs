@@ -71,6 +71,8 @@ pub(crate) enum ProviderFile {
     BuiltinOauth(OAuthFile),
     /// Tailscale identity, direct or behind `tailscale serve`.
     Tailscale(TailscaleFile),
+    /// Google Cloud Identity-Aware Proxy's signed assertion on each request.
+    GcpIap(GcpIapFile),
 }
 
 impl ProviderFile {
@@ -80,7 +82,8 @@ impl ProviderFile {
             ProviderFile::Dev(DevFile { name, .. })
             | ProviderFile::Oidc(OidcFile { name, .. })
             | ProviderFile::BuiltinOauth(OAuthFile { name, .. })
-            | ProviderFile::Tailscale(TailscaleFile { name, .. }) => name,
+            | ProviderFile::Tailscale(TailscaleFile { name, .. })
+            | ProviderFile::GcpIap(GcpIapFile { name, .. }) => name,
         }
     }
 }
@@ -130,6 +133,16 @@ pub(crate) struct TailscaleFile {
     /// Proxy mode: the addresses or networks a proxy on another machine connects from;
     /// absent, the proxy is this machine's.
     pub trusted_proxies: Option<Vec<String>>,
+    #[serde(default)]
+    pub auto_link: bool,
+}
+
+/// The Google Cloud IAP provider as written.
+#[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct GcpIapFile {
+    pub name: String,
+    pub audience: String,
     #[serde(default)]
     pub auto_link: bool,
 }

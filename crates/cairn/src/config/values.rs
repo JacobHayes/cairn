@@ -6,7 +6,8 @@ use std::path::{Path, PathBuf};
 
 use cairn_assistant::protocol::{Credential, ProviderConfig};
 use cairn_auth::{
-    DevConfig, OAuthConfig, OidcConfig, ProxySource, TailscaleConfig, TailscaleMode, TrustedProxies,
+    DevConfig, GcpIapConfig, OAuthConfig, OidcConfig, ProxySource, TailscaleConfig, TailscaleMode,
+    TrustedProxies,
 };
 use cairn_schema::{Email, Slug, TimeZoneName, Title};
 use jiff::tz::TimeZone;
@@ -14,8 +15,8 @@ use url::Url;
 
 use super::env::{Origin, VALUE_OVERRIDES, variable_name};
 use super::file::{
-    AssistantFile, DevFile, FileConfig, OAuthFile, OidcFile, ProviderFile, TailscaleFile,
-    TailscaleModeFile,
+    AssistantFile, DevFile, FileConfig, GcpIapFile, OAuthFile, OidcFile, ProviderFile,
+    TailscaleFile, TailscaleModeFile,
 };
 use super::{Config, Problem, Provider, rank};
 
@@ -265,6 +266,15 @@ fn provider(
                 auto_link,
             }))
         }
+        ProviderFile::GcpIap(GcpIapFile {
+            audience,
+            auto_link,
+            ..
+        }) => Some(Provider::GcpIap(GcpIapConfig {
+            name: name?,
+            audience,
+            auto_link,
+        })),
     }
 }
 

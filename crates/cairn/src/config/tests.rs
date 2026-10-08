@@ -176,6 +176,11 @@ sign_in_with = \"corp\"
 kind = \"tailscale\"
 name = \"tailnet\"
 mode = \"proxy\"
+[[auth]]
+kind = \"gcp_iap\"
+name = \"iap\"
+audience = \"/projects/1/global/backendServices/2\"
+auto_link = true
 [assistant]
 protocol = \"anthropic_messages\"
 endpoint = \"https://api.anthropic.com/v1\"
@@ -201,9 +206,14 @@ api_key = \"key\"
                 oauth.name.to_string()
             }
             Provider::Tailscale(tailscale) => tailscale.name.to_string(),
+            Provider::GcpIap(iap) => {
+                assert!(iap.auto_link);
+                assert_eq!(iap.audience, "/projects/1/global/backendServices/2");
+                iap.name.to_string()
+            }
         })
         .collect();
-    assert_eq!(names, ["dev", "corp", "agents", "tailnet"]);
+    assert_eq!(names, ["dev", "corp", "agents", "tailnet", "iap"]);
     let assistant = config.assistant.unwrap();
     assert_eq!(assistant.protocol, Protocol::AnthropicMessages);
     assert!(assistant.credential.is_some());

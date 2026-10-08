@@ -25,7 +25,8 @@ cairn-wasm = { path = "crates/wasm" }
 # (HTTP/1 on tokio, as the spike proved, plus forms, queries, and JSON for the OAuth
 # endpoints); base64 for the built-in server's client ids; chrono only for the clock
 # openidconnect checks expiry against; cookie for the session and sign-in cookies;
-# ed25519-dalek only to sign a test issuer's ID tokens; getrandom for secrets; subtle to
+# ed25519-dalek only to sign a test issuer's ID tokens; p256 only to sign test IAP
+# assertions (already in the tree under openidconnect); getrandom for secrets; subtle to
 # compare them in constant time; url for the public base URL; hyper, hyper-util, and
 # http-body-util for the one GET to tailscaled's whois over its unix socket (already in the
 # tree under axum and reqwest); ipnet for the networks Tailscale's proxy mode trusts (already
@@ -44,6 +45,7 @@ ipnet = { version = "2.12.2", default-features = false, features = ["std"] }
 # with PKCE, and ID token verification. Its default features bring reqwest 0.12 on tokio
 # with rustls (ring, webpki roots): the HTTP client and TLS stack for issuer calls.
 openidconnect = "4.0.1"
+p256 = { version = "0.13.2", default-features = false, features = ["ecdsa"] }
 subtle = "2.6.1"
 tower = { version = "0.5.2", default-features = false, features = ["util"] }
 url = "2.5.8"
