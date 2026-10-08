@@ -13,6 +13,8 @@ on:
 permissions:
   contents: read
 
+# Every action is pinned by full commit SHA, its release in a comment: a tag can be moved.
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
   cancel-in-progress: true
@@ -32,11 +34,14 @@ jobs:
       # (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
       PROPTEST_CASES: 256
     steps:
-      - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
       # The compiled dependencies and the cargo registry, from the last push to main: without
-      # them every run compiled the whole dependency tree from nothing, most of the job.
-      - uses: Swatinem/rust-cache@v2
+      # them every run compiled the whole dependency tree from nothing, most of the job. It
+      # restores Cargo's own target directory, so Cargo still decides what is fresh, and saves
+      # it without the workspace's crates or stale dependencies: a 0.6 GB entry, where the whole
+      # directory after a check is 5.8 GB, half of it the workspace's own test binaries.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: check
           save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -55,11 +60,14 @@ jobs:
       MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
       PROPTEST_CASES: 4096
     steps:
-      - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
       # The compiled dependencies and the cargo registry, from the last push to main: without
-      # them every run compiled the whole dependency tree from nothing, most of the job.
-      - uses: Swatinem/rust-cache@v2
+      # them every run compiled the whole dependency tree from nothing, most of the job. It
+      # restores Cargo's own target directory, so Cargo still decides what is fresh, and saves
+      # it without the workspace's crates or stale dependencies: a 0.6 GB entry, where the whole
+      # directory after a check is 5.8 GB, half of it the workspace's own test binaries.
+      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
           shared-key: check
           save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
@@ -79,6 +87,6 @@ jobs:
       # runner's default toolchain builds it and fails the pinned crate's rust-version.
       RUSTUP_TOOLCHAIN: "1.99.0"
     steps:
-      - uses: actions/checkout@v7
-      - uses: jdx/mise-action@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
       - run: mise run sim
