@@ -10,5 +10,5 @@ generator=node_modules/.bin/openapi-typescript
 [ -x "$generator" ] || { echo "gen: $generator is missing: run npm ci" >&2; exit 1; }
 rm -rf openapi web/client/generated
 mkdir -p openapi web/client/generated
-cargo run --quiet --locked -p cairn-api --bin cairn-openapi -- openapi/cairn.json
+scripts/built cairn-openapi openapi/cairn.json
 "$generator" openapi/cairn.json -o web/client/generated/api.ts --silent

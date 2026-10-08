@@ -3,7 +3,7 @@
 # PRACTICES, The validation ladder, rung 4; Testing > Shell: conformance and integration.
 # Each backend runs the suite from its crate's tests/integration/conformance.rs, inside `mod
 # conformance` (rung 2 skips the module by name; every crate's integration tests are one
-# binary, `--test integration`, and are picked by module path). The backends are listed here and each is
+# binary and are picked by module path). The backends are listed here and each is
 # its own suite, so a backend whose suite stops building or running fails the rung rather
 # than hiding behind another's count. The API's tests run against a server on loopback
 # over the memory store, inside `mod in_process` (rung 2 skips the module by name). The MCP
@@ -22,36 +22,23 @@ ladder_require_tool cargo cargo --version
 # CARGO_TERM_COLOR=always).
 export CARGO_TERM_COLOR=never
 
-# backend<TAB>crate
-backends=$'memory\tcairn-store\nturso\tcairn-store-turso'
-while IFS=$'\t' read -r backend crate; do
-  status=0
-  output=$(cargo test --locked -p "$crate" --all-features --test integration -- conformance:: 2>&1) || status=$?
-  printf '%s\n' "$output"
-  [ "$status" -eq 0 ] || ladder_fail "store conformance failed on the $backend backend"
-  count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
-  ladder_suite "store conformance: $backend" "$count" tests
-done <<<"$backends"
-
-status=0
-output=$(cargo test --locked -p cairn-api --all-features --tests -- in_process:: --skip mcp_in_process:: 2>&1) || status=$?
-printf '%s\n' "$output"
-[ "$status" -eq 0 ] || ladder_fail "the API's in-process tests failed"
-count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
-ladder_suite "API in process" "$count" tests
-
-status=0
-output=$(cargo test --locked -p cairn-api --all-features --test integration -- mcp_in_process:: 2>&1) || status=$?
-printf '%s\n' "$output"
-[ "$status" -eq 0 ] || ladder_fail "the MCP endpoint's in-process tests failed"
-count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
-ladder_suite "MCP in process" "$count" tests
-
-status=0
-output=$(cargo test --locked -p cairn --all-features --test integration -- server::in_process:: 2>&1) || status=$?
-printf '%s\n' "$output"
-[ "$status" -eq 0 ] || ladder_fail "the binary's in-process tests failed"
-count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
-ladder_suite "binary in process" "$count" tests
+# The tests rung 2 built, run by name (ladder_cargo_test): every module this rung owns, then
+# one suite each. A test the run picked that no suite counts fails the rung, so the filter
+# never runs more than the suites report.
+ladder_cargo_test --tests -- conformance:: in_process:: || ladder_fail "cargo test reported failures"
+# suite<TAB>crate<TAB>the test path it holds, as an awk regular expression
+suites=$'store conformance: memory\tcairn-store\t(^|::)conformance::
+store conformance: turso\tcairn-store-turso\t(^|::)conformance::
+API in process\tcairn-api\t(^|::)in_process::
+MCP in process\tcairn-api\t(^|::)mcp_in_process::
+binary in process\tcairn\t^server::in_process::'
+counted=0
+while IFS=$'\t' read -r suite crate pattern; do
+  count=$(ladder_tests_matching "$crate" "$pattern")
+  ladder_suite "$suite" "$count" tests
+  counted=$((counted + count))
+done <<<"$suites"
+ran=$(grep -c . <<<"$ladder_tests" || true)
+[ "$ran" -eq "$counted" ] || ladder_fail "ran $ran tests; the suites hold $counted"
 
 ladder_rung_end

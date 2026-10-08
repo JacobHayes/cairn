@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+# Runs one of the workspace's programs, built the way the validation ladder builds its tests:
+# every member, every feature, dev-dependencies included. Cargo resolves features per
+# invocation, so `cargo run -p <crate>` would resolve them for that crate alone and compile a
+# second copy of each dependency whose features differ (Turso, tokio, axum, and everything
+# above them); built this way, a program is linked from the units the tests already compiled.
+# The examples named below are what make the build include dev-dependencies, as the tests do.
+#
+# usage: scripts/built [PROGRAM [ARGUMENT...]]
+#   PROGRAM: a binary target's name (cairn, cairn-openapi), or examples/<name> for an
+#   example; with none, only builds them all.
+set -euo pipefail
+root="$(cd "$(dirname "$0")/.." && pwd)"
+cargo build --quiet --locked --manifest-path "$root/Cargo.toml" --workspace --all-features \
+  --bins --example seed_fixtures --example fixture_server
+[ $# -gt 0 ] || exit 0
+program=$1
+shift
+target_dir=$(cargo metadata --no-deps --format-version 1 --locked --manifest-path "$root/Cargo.toml" | node -e '
+  let text = "";
+  process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => console.log(JSON.parse(text).target_directory));')
+exec "$target_dir/debug/$program" "$@"

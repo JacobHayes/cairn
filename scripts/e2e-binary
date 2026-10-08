@@ -22,10 +22,10 @@ kind = "dev"
 name = "dev"
 user = "dev"
 TOML
-cargo run --quiet --locked -p cairn --example seed_fixtures -- "$directory/cairn.db"
+scripts/built examples/seed_fixtures "$directory/cairn.db"
 # Only the file configures it: none of the caller's CAIRN_ variables (overrides or secrets)
 # reaches the binary.
 while IFS= read -r variable; do
   unset "$variable"
 done < <(compgen -e | grep '^CAIRN_' || true)
-exec cargo run --quiet --locked -p cairn -- serve --config "$directory/cairn.toml"
+exec scripts/built cairn serve --config "$directory/cairn.toml"

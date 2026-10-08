@@ -5,4 +5,4 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 rm -rf schema
 mkdir -p schema
-cargo run --quiet --locked -p cairn-schema --bin cairn-schema-gen -- schema
+scripts/built cairn-schema-gen schema

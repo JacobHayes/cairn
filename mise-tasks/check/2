@@ -20,33 +20,24 @@ ladder_require_tool cargo cargo --version
 export CARGO_TERM_COLOR=never
 ladder_require_tool node node --version
 
-# Workspace members as "name<TAB>whether it has a library" lines.
-# shellcheck disable=SC2016 # the backticks are a JavaScript template literal
 crates=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
   let text = "";
   process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
-    for (const item of JSON.parse(text).packages) {
-      const library = item.targets.some((target) => target.kind.some((kind) => kind === "lib" || kind === "rlib"));
-      console.log(`${item.name}\t${library}`);
-    }
+    for (const item of JSON.parse(text).packages) console.log(item.name);
   });')
 skips=(--skip property:: --skip conformance:: --skip cost:: --skip in_process:: --skip binary::binary::)
 # Every workspace crate is a suite, whatever test binaries it builds: unit, integration, and
-# doc tests together, run one crate at a time so each count belongs to its crate. `--tests`
-# builds only the targets that hold tests: a plain `cargo test` also links every example,
-# which rung 1's clippy already compiles. Doc tests are a second run.
-while IFS=$'\t' read -r crate library; do
+# doc tests together, each test counted for the crate whose binary ran it. `--tests` builds
+# only the targets that hold tests: a plain `cargo test` also links every example, which
+# rung 1's clippy already compiles. Doc tests are a second run.
+ladder_cargo_test --tests -- "${skips[@]}" || ladder_fail "cargo test reported failures"
+tests=$ladder_tests
+ladder_cargo_test --doc -- "${skips[@]}" || ladder_fail "the doc tests reported failures"
+tests+=$'\n'"$ladder_tests"
+ladder_tests=$tests
+while IFS= read -r crate; do
   [ -n "$crate" ] || continue
-  status=0
-  output=$(cargo test --locked -p "$crate" --all-features --tests -- "${skips[@]}" 2>&1) || status=$?
-  if [ "$status" -eq 0 ] && [ "$library" = true ]; then
-    doc=$(cargo test --locked -p "$crate" --all-features --doc -- "${skips[@]}" 2>&1) || status=$?
-    output+=$'\n'"$doc"
-  fi
-  printf '%s\n' "$output"
-  [ "$status" -eq 0 ] || ladder_fail "cargo test reported failures in $crate"
-  count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
-  ladder_suite "$crate tests" "$count" tests
+  ladder_suite "$crate tests" "$(ladder_tests_matching "$crate" "")" tests
 done <<<"$crates"
 
 ladder_rung_end

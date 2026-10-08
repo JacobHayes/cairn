@@ -34,25 +34,20 @@ members=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
       console.log(`${item.name}\t${path.relative(process.cwd(), path.dirname(item.manifest_path))}`);
   });')
 
-# One crate at a time, as rung 2 runs them, so the test binary rung 2 built is the one run
-# here: a workspace-wide build would resolve features differently and link it again.
+# The tests rung 2 built, run by name (ladder_cargo_test). One suite per file, the crate's
+# directory and the file named by the test's path.
+ladder_cargo_test --test integration -- property:: cost:: || ladder_fail "cargo test reported failures"
 suites=0
 while IFS=$'\t' read -r crate directory; do
   [ -n "$crate" ] || continue
-  tests="$directory/tests/integration"
-  compgen -G "$tests/property_*.rs" >/dev/null || compgen -G "$tests/cost_*.rs" >/dev/null || continue
-  status=0
-  output=$(cargo test --locked -p "$crate" --all-features --test integration -- property:: cost:: 2>&1) || status=$?
-  printf '%s\n' "$output"
-  [ "$status" -eq 0 ] || ladder_fail "cargo test reported failures in $crate"
   while IFS=$'\t' read -r file count; do
     [ -n "$file" ] || continue
-    ladder_suite "$tests/$file.rs" "$count" tests
+    ladder_suite "$directory/tests/integration/$file.rs" "$count" tests
     suites=$((suites + 1))
-  done < <(awk '
-    match($0, /^test [a-z0-9_]+::(property|cost)::[^ ]+ \.\.\. /) {
-      split(substr($0, 6), path, "::"); count[path[1]]++ }
-    END { for (file in count) print file "\t" count[file] }' <<<"$output" | sort)
+  done < <(awk -F'\t' -v crate="$crate" '
+    $1 == crate && match($2, /^[a-z0-9_]+::(property|cost)::/) {
+      split($2, path, "::"); count[path[1]]++ }
+    END { for (file in count) print file "\t" count[file] }' <<<"$ladder_tests" | sort)
 done <<<"$members"
 
 # The property and cost test files in the tree, so a file that stops building or running,

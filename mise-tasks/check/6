@@ -49,24 +49,16 @@ done
 
 cargo run --quiet --locked --release -p cairn-wasm --features server --bin cairn-wasm-cases -- \
   web/wasm/dist/cases || ladder_fail "the server's agreement cases were not written"
-# The app's server-host tests (web/app, 4.6) run against the fixture server; built here so
-# Playwright's start of it is a run, not a build.
-cargo build --quiet --locked -p cairn-wasm --example fixture_server \
-  || ladder_fail "the fixture server did not build"
-
-# The web build the binary embeds, then the binary over it and the example that seeds its
-# database for the browser tests.
+# The web build the binary embeds, then the programs the browser tests start, built as the
+# tests are (scripts/built): the binary, the example that seeds its database, and the fixture
+# server the app's server-host tests (web/app, 4.6) run against. Built here so Playwright's
+# start of them is a run, not a build.
 (cd web/app && "$OLDPWD/node_modules/.bin/vite" build --config vite.config.ts) \
   || ladder_fail "the app's web build failed"
 [ -f web/app/dist/build/index.html ] || ladder_fail "the app's web build wrote no index.html"
-cargo build --quiet --locked -p cairn --bin cairn --example seed_fixtures \
-  || ladder_fail "the binary did not build"
-status=0
-output=$(cargo test --locked -p cairn --all-features --test integration -- binary::binary:: 2>&1) || status=$?
-printf '%s\n' "$output"
-[ "$status" -eq 0 ] || ladder_fail "the binary's tests failed"
-count=$(awk '/^running [0-9]+ tests?$/ { total += $2 } END { print total + 0 }' <<<"$output")
-ladder_suite "binary" "$count" tests
+scripts/built || ladder_fail "the binary, the fixture server, or the seeding example did not build"
+ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
+ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
 
 for config in web/*/playwright.config.ts; do
   package=$(dirname "$config")

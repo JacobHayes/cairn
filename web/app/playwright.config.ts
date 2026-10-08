@@ -59,7 +59,7 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: `cargo run --quiet --locked -p cairn-wasm --example fixture_server -- ${serverPort} http://127.0.0.1:${appPort}`,
+      command: `scripts/built examples/fixture_server ${serverPort} http://127.0.0.1:${appPort}`,
       cwd: repo,
       url: `${server}/capabilities`,
       timeout: 600_000,
