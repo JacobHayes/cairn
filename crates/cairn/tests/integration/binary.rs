@@ -1,8 +1,8 @@
 //! The binary itself, as a deployment runs it (brief 4.7, Acceptance): a config file and a
 //! database file, one port for the UI and the API, startup failures that name what is
-//! missing, and a clean stop. `mod commands` needs only the binary (rung 2); `mod binary`
-//! needs it built with the web build embedded, so rung 6 runs it after `mise run
-//! build:web`.
+//! missing, a clean stop, and a patch it acknowledged still in the file after it. `mod
+//! commands` needs only the binary (rung 2); `mod binary` needs it built with the web build
+//! embedded, so rung 6 runs it after `mise run build:web`.
 #![cfg(test)]
 
 use std::io::{BufRead, BufReader};
@@ -163,7 +163,10 @@ mod commands {
 
 mod binary {
     use super::*;
-    use crate::support::{self, get};
+    use crate::support::{self, get, send};
+    use cairn_store::{Document, LoadTarget, Store};
+    use cairn_store_turso::TursoStore;
+    use serde_json::json;
 
     /// A started `cairn serve`, stopped (killed) when dropped.
     struct Served {
@@ -260,6 +263,59 @@ mod binary {
         assert!(stopped.success());
         let status = served.child.wait().unwrap();
         assert!(status.success(), "{status}");
+    }
+
+    /// A17, J2: a patch the running binary acknowledges is in its database file. Over HTTP a
+    /// journey is created and given a node, the binary is stopped, and the file, opened
+    /// again by the store, holds the journey at the revision the binary answered, the node,
+    /// and both patches' receipts.
+    #[tokio::test]
+    async fn an_acknowledged_patch_is_in_the_database_file_after_a_stop() {
+        let directory = directory("persisted");
+        let path = config_file(&directory, CONFIG);
+        let mut served = serve(&path);
+        let patches = [
+            json!({ "id": "p_create", "target": { "journey": "j_persisted" }, "base_revision": 0,
+                "mutations": [{ "op": "create_journey", "name": "Persisted" }] }),
+            json!({ "id": "p_node", "target": { "journey": "j_persisted" }, "base_revision": 1,
+                "mutations": [{ "op": "add_node", "node": { "key": "n_kept", "id": "kept",
+                    "kind": "action", "title": "Kept" } }] }),
+        ];
+        let mut revision = 0;
+        for patch in &patches {
+            let body = json!({ "patch": patch }).to_string();
+            let reply = send(
+                served.address,
+                "POST",
+                "localhost",
+                "/journeys/j_persisted/patches",
+                &[("content-type", "application/json")],
+                Some(&body),
+            )
+            .await;
+            assert_eq!(reply.status, 200, "{}", reply.text());
+            revision = reply.json()["receipt"]["revision"].as_u64().unwrap();
+        }
+
+        let stopped = Command::new("kill")
+            .args(["-TERM", &served.child.id().to_string()])
+            .status()
+            .unwrap();
+        assert!(stopped.success());
+        assert!(served.child.wait().unwrap().success());
+
+        let store = TursoStore::open(&directory.join("cairn.db")).await.unwrap();
+        let target = LoadTarget::Journey("j_persisted".parse().unwrap());
+        let Some(Document::Journey(journey)) = store.load(&target).await.unwrap() else {
+            panic!("the journey is not in the database file");
+        };
+        assert_eq!(u64::from(journey.revision.get()), revision);
+        let node = "n_kept".parse().unwrap();
+        assert!(journey.graph.nodes.as_map().contains_key(&node));
+        for patch in ["p_create", "p_node"] {
+            let receipt = store.receipt(&patch.parse().unwrap()).await.unwrap();
+            assert!(receipt.is_some(), "{patch} has no receipt");
+        }
     }
 
     /// PRACTICES, Errors, panics, and rejections: a log line that cannot be written (its

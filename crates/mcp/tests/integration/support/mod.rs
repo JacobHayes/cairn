@@ -94,13 +94,21 @@ impl World {
     /// Publishes the vendor evaluation and starts `j_vendor_eval` from its version 1 with
     /// its people (the scenario's first step): the journey at revision 1.
     pub async fn vendor_journey(&self, actor: &Actor) {
+        self.vendor_after(actor, 1).await;
+    }
+
+    /// Publishes the vendor evaluation and applies its scenario's first `steps` steps as
+    /// `actor`, each at its own time: the journey at revision `steps`.
+    pub async fn vendor_after(&self, actor: &Actor, steps: usize) {
         self.publish(actor, "vendor-evaluation").await;
         let path = fixtures_root()
             .join("vendor-evaluation")
             .join("journey.yaml");
         let scenario: Scenario = from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap();
-        let first = scenario.steps.as_slice()[0].patch.clone();
-        self.patch(actor, first).await;
+        for step in scenario.steps.as_slice().iter().take(steps) {
+            self.now.store(step.at.as_second(), Ordering::SeqCst);
+            self.patch(actor, step.patch.clone()).await;
+        }
     }
 }
 

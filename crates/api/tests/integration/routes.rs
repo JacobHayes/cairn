@@ -12,8 +12,8 @@ mod in_process {
     use cairn_api::client::{Reply, Transport};
     use cairn_api::wire::{PatchAnswer, Problem, ProblemCode, ProposalAnswer, ProposalReview};
     use cairn_schema::{
-        ConflictResolution, Domain, Journey, Proposal, Rejection, ReviewItem, Route, RouteFile,
-        ViolationCode, from_yaml,
+        Conflict, ConflictResolution, Domain, Journey, Kept, Proposal, Rejection, ReviewItem,
+        Route, RouteFile, Subject, ViolationCode, from_yaml,
     };
     use serde_json::json;
 
@@ -111,15 +111,31 @@ mod in_process {
         let drafted = saved(ok(
             &post(&ann, &format!("{JOURNEY}/upgrade"), &upgrade).await
         ));
-        let kinds: BTreeSet<String> = drafted
+        // The title both sides changed conflicts, the estimate only the journey changed is
+        // kept, and the workload version 2 removes is an orphan.
+        let about: BTreeSet<(&str, &str)> = drafted
             .draft
             .items
             .as_slice()
             .iter()
-            .map(|item| serde_json::to_value(item).unwrap()["item"].to_string())
+            .map(|item| match item {
+                ReviewItem::Conflict {
+                    conflict: Conflict::Field { node, .. },
+                    ..
+                } => ("conflict", node.as_str()),
+                ReviewItem::KeptLocalEdit {
+                    kept: Kept::Node { node, .. },
+                } => ("kept", node.as_str()),
+                ReviewItem::Orphan { node, .. } => ("orphan", node.as_str()),
+                other => panic!("{other:?}"),
+            })
             .collect();
-        let expected = ["\"conflict\"", "\"kept_local_edit\"", "\"orphan\""];
-        assert_eq!(kinds, expected.into_iter().map(str::to_owned).collect());
+        let expected = [
+            ("conflict", "n_access"),
+            ("kept", "n_findings"),
+            ("orphan", "n_workload"),
+        ];
+        assert_eq!(about, expected.into());
         let journey: Journey = get(&ann, JOURNEY).await;
         assert_eq!(journey.header.lineage.unwrap().version.get(), 1, "not yet");
 
@@ -132,11 +148,14 @@ mod in_process {
         let Rejection::Invalid { violations } = blocked.json().unwrap() else {
             panic!("an unresolved conflict blocks the apply")
         };
-        let codes: Vec<ViolationCode> = violations.as_slice().iter().map(|v| v.code).collect();
-        assert!(
-            codes.contains(&ViolationCode::UnresolvedReviewItem),
-            "{codes:?}"
-        );
+        let unresolved: Vec<&Option<Subject>> = violations
+            .as_slice()
+            .iter()
+            .filter(|violation| violation.code == ViolationCode::UnresolvedReviewItem)
+            .map(|violation| &violation.at.subject)
+            .collect();
+        let access = Subject::Node("n_access".parse().unwrap());
+        assert_eq!(unresolved, [&Some(access)], "{violations:#?}");
 
         let mut resolved = drafted.draft.clone();
         for item in resolved.items.as_mut_slice() {

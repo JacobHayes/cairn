@@ -5,6 +5,7 @@
 
 use crate::support;
 
+use std::collections::BTreeSet;
 use std::time::Duration;
 
 use cairn_assistant::limits::{
@@ -13,6 +14,8 @@ use cairn_assistant::limits::{
 };
 use cairn_assistant::scripted::Step;
 use cairn_assistant::{Action, Because, Ended, Message, Reply, Target, TurnError};
+use cairn_schema::{JourneyId, NodeKey, StatusSummary};
+use cairn_service::Call;
 use cairn_store::{ConversationStore, MessageAuthor};
 use serde_json::{Value, json};
 
@@ -105,6 +108,17 @@ async fn an_empty_journey_is_structured_through_a_proposal_the_user_applies() {
     assert_eq!(held["proposal"]["created_by"], "u_owner");
 }
 
+/// The vendor evaluation's status summary, as the service derives it now.
+async fn summary(world: &World, actor: &cairn_schema::Actor) -> StatusSummary {
+    let call = Call {
+        actor: actor.clone(),
+        now: world.now(),
+    };
+    let journey = "j_vendor_eval".parse().unwrap();
+    let summary = world.service.status_summary(&call, &journey).await;
+    summary.unwrap().value
+}
+
 /// I5, D7, H2: a state change the user asks for applies directly and is reported with what
 /// it caused; its events record the assistant and the user it acts for.
 #[tokio::test]
@@ -120,6 +134,9 @@ async fn a_direct_state_change_is_reported_with_its_consequences() {
             answer["value"] = json!({ "date": "2026-10-06" });
         }
     }
+    let vendor: JourneyId = "j_vendor_eval".parse().unwrap();
+    let before = summary(&world, &lead).await;
+    assert_eq!((before.overdue.len(), before.shortfalls.len()), (0, 0));
     let patch = json!({ "patch": { "id": "p_answers", "target": { "journey": "j_vendor_eval" },
         "base_revision": 1, "deployment_revision": 1, "mutations": answers } });
     world.script([
@@ -144,11 +161,29 @@ async fn a_direct_state_change_is_reported_with_its_consequences() {
         panic!("{:?}", turn.actions);
     };
     assert_eq!(receipt.revision.get(), 2);
-    let caused = consequences.get(&"j_vendor_eval".parse().unwrap());
-    assert!(
-        caused.is_some_and(|caused| !caused.shortfalls.is_empty()),
-        "{consequences:?}"
-    );
+    let caused = &consequences[&vendor];
+    // What it reports caused is what the journey now derives: nothing was overdue or short
+    // before, so every node overdue or short after is new.
+    let after = summary(&world, &lead).await;
+    let overdue: BTreeSet<&NodeKey> = caused.overdue.iter().collect();
+    assert_eq!(overdue, after.overdue.iter().collect(), "{consequences:?}");
+    let short: BTreeSet<&NodeKey> = caused.shortfalls.iter().map(|short| &short.node).collect();
+    assert_eq!(short, after.shortfalls.iter().collect(), "{consequences:?}");
+    // Read on the 1st, every unfinished node due before it: the work up to the end of
+    // testing and the review's opening, which the meeting on the 6th leaves no time for.
+    let expected = [
+        "n_access",
+        "n_baseline",
+        "n_comparison_set",
+        "n_kickoff",
+        "n_plan",
+        "n_plan_draft",
+        "n_plan_review",
+        "n_review_opens",
+        "n_testing",
+    ];
+    let overdue: Vec<&str> = overdue.into_iter().map(NodeKey::as_str).collect();
+    assert_eq!(overdue, expected);
     let events = last_events(&world, "j_vendor_eval").await;
     for event in events {
         assert_eq!(

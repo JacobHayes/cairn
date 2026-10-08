@@ -8,7 +8,7 @@ use crate::support;
 use std::collections::BTreeSet;
 
 use cairn_mcp::ToolError;
-use cairn_schema::{Rejection, ViolationCode};
+use cairn_schema::{Guard, GuardFailure, Rejection, Subject, ViolationCode};
 use serde_json::json;
 
 use support::{World, agent, user};
@@ -48,6 +48,57 @@ async fn a_refused_write_carries_every_violation() {
         .ok(&ann, "get_snapshot", json!({ "journey": "j_vendor_eval" }))
         .await;
     assert_eq!(snapshot["revision"], 1, "nothing was written");
+}
+
+/// B10, A16, D4: completing a placeholder that is not broken down is refused through the
+/// tool with the one guard that failed, named on the node and bypassable, and nothing is
+/// written; the same completion bypassing that guard with a reason applies.
+#[tokio::test]
+async fn completing_a_placeholder_not_broken_down_is_refused_until_bypassed() {
+    let world = World::new();
+    let ann = user("u_ann");
+    // Kickoff reached and access started: the workload is open and its stage has opened.
+    world.vendor_after(&ann, 4).await;
+    let complete = json!({
+        "journey": "j_vendor_eval", "node": "n_workload", "transition": "complete",
+        "patch_id": "p_workload_done", "base_revision": 4,
+    });
+    let refused = world.call(&ann, "transition_node", complete).await;
+    let Err(ToolError::Rejected {
+        rejection: Rejection::Invalid { violations },
+    }) = refused
+    else {
+        panic!("{refused:?}");
+    };
+    let [violation] = violations.as_slice() else {
+        panic!("{violations:#?}");
+    };
+    let workload = "n_workload".parse().unwrap();
+    assert_eq!(violation.code, ViolationCode::GuardFailed);
+    assert_eq!(violation.at.subject, Some(Subject::Node(workload)));
+    assert_eq!(
+        violation.failures,
+        BTreeSet::from([GuardFailure::NotBrokenDown])
+    );
+    assert_eq!(violation.bypassable, Some(Guard::BrokenDown));
+    let snapshot = json!({ "journey": "j_vendor_eval" });
+    let snapshot = world.ok(&ann, "get_snapshot", snapshot).await;
+    assert_eq!(snapshot["revision"], 4, "nothing was written");
+
+    let bypassed = json!({
+        "id": "p_workload_bypassed",
+        "target": { "journey": "j_vendor_eval" },
+        "base_revision": 4,
+        "mutations": [
+            { "op": "transition", "node": "n_workload", "transition": "complete" },
+            { "op": "apply_override", "node": "n_workload", "override": { "guard_bypass": {
+                "guards": ["broken_down"], "reason": "Run as one piece." } } },
+        ],
+    });
+    let applied = world
+        .ok(&ann, "apply_patch", json!({ "patch": bypassed }))
+        .await;
+    assert_eq!(applied["receipt"]["revision"], 5);
 }
 
 /// H5: a write against a revision that moved is refused as stale with what moved; the same

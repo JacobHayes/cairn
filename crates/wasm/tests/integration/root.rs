@@ -4,9 +4,12 @@
 //! host. The browser tests run the same through the wasm build.
 #![cfg(test)]
 
+use std::time::Duration;
+
 use cairn_api::wire;
 use cairn_schema::{DomainDocument, Rejection, RevisionOf};
-use cairn_wasm::{BrowserRoot, HostError, PatchAnswer, Taken, read_document};
+use cairn_store::limits::SSE_COALESCING_INTERVAL;
+use cairn_wasm::{BrowserRoot, HostError, PatchAnswer, Taken, Tick, read_document};
 
 /// The clock reads and writes are made at: after every fixture scenario's last step.
 const NOW: &str = "2026-10-12T12:00:00Z";
@@ -124,6 +127,55 @@ fn a_patch_applies_and_notifies_and_a_stale_one_is_rejected_with_what_intervened
         watching.taken(std::time::Duration::from_secs(2)).unwrap(),
         Taken::Empty
     );
+}
+
+/// H6: two commits between a subscriber's takes reach it as one tick naming the latest
+/// revision; a take within the coalescing interval of the last one waits for its end.
+#[test]
+fn two_quick_commits_reach_a_subscriber_as_one_tick() {
+    let root = BrowserRoot::seeded().unwrap();
+    let base = document(&root).journey.revision.get();
+    let watching = root.subscribe(r#"["journey:j_vendor_eval"]"#).unwrap();
+    let first = watching.taken(Duration::ZERO).unwrap();
+    assert!(matches!(first, Taken::Current { .. }), "{first:?}");
+    root.patch(&note("p_one", base, "a_one"), NOW).unwrap();
+    root.patch(&note("p_two", base + 1, "a_two"), NOW).unwrap();
+
+    let interval = SSE_COALESCING_INTERVAL;
+    let early = watching.taken(interval / 2).unwrap();
+    let until_ms = interval.as_secs_f64() * 1000.0;
+    assert_eq!(early, Taken::Wait { until_ms });
+    let vendor = RevisionOf::Domain(cairn_schema::Domain::Journey(
+        "j_vendor_eval".parse().unwrap(),
+    ));
+    let latest = Tick {
+        of: vendor,
+        revision: document(&root).journey.revision,
+    };
+    assert_eq!(latest.revision.get(), base + 2);
+    assert_eq!(
+        watching.taken(interval).unwrap(),
+        Taken::Ticks {
+            ticks: vec![latest]
+        }
+    );
+    assert_eq!(watching.taken(interval * 3).unwrap(), Taken::Empty);
+}
+
+/// The in-browser root's capabilities: one local sign-in, and no assistant, MCP, or SSE (its
+/// views subscribe to the notifier directly).
+#[test]
+fn the_root_offers_one_local_sign_in_and_nothing_else() {
+    let root = BrowserRoot::seeded().unwrap();
+    let capabilities: wire::Capabilities = serde_json::from_str(&root.capabilities()).unwrap();
+    let offered = (capabilities.assistant, capabilities.mcp, capabilities.sse);
+    assert_eq!(offered, (false, false, false));
+    let auth: Vec<(&str, wire::AuthKind)> = capabilities
+        .auth
+        .iter()
+        .map(|method| (method.name.as_str(), method.kind))
+        .collect();
+    assert_eq!(auth, [("local", wire::AuthKind::Local)]);
 }
 
 #[test]
