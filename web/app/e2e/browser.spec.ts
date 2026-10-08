@@ -54,6 +54,6 @@ test("every fixture's journey is derived in the worker", async ({ page }) => {
   expect(listed.map((journey) => journey.id)).toContain("j_vendor_eval");
   for (const journey of listed) {
     await openJourney(page, "browser", journey.id);
-    expect(await derivedRevision(page)).toBe(journey.revision);
+    await expect.poll(() => derivedRevision(page)).toBe(journey.revision);
   }
 });

@@ -96,9 +96,9 @@ test("C17, A19: three versions with journeys on each; retired, the route still o
   await openRouteDetail(page, "browser", "vendor-evaluation");
   await routeAction(page, "Retire");
   await expect(page.getByTestId("route-detail").getByTestId("retired")).toBeVisible();
-  expect(await versionJourneys(page, 1)).toEqual({ j_vendor_eval: "available" });
-  expect(await versionJourneys(page, 2)).toEqual({ [second]: "available" });
-  expect(await versionJourneys(page, 3)).toEqual({ [third]: "none" });
+  await expect.poll(() => versionJourneys(page, 1)).toEqual({ j_vendor_eval: "available" });
+  await expect.poll(() => versionJourneys(page, 2)).toEqual({ [second]: "available" });
+  await expect.poll(() => versionJourneys(page, 3)).toEqual({ [third]: "none" });
   await expect(page.getByTestId("start-from-version")).toHaveCount(0);
   await open(page, "browser", "/?route=vendor-evaluation&upgrade=1");
   await expect(page.locator('[data-testid="journey-row"]')).toHaveCount(2);

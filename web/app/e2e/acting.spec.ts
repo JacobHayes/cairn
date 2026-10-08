@@ -70,8 +70,8 @@ test("C9: filters hold at once, search reads notes, and rows group by container"
   await page.getByRole("button", { name: "Search", exact: true }).click();
   await expect.poll(() => listKeys(page)).toEqual(["n_access"]);
   await openActing(page, "browser", "j_vendor_eval", "list?kind=action&group=container");
-  const groups = await page.getByTestId("list-group").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-node")));
-  expect([...groups].sort()).toEqual(["n_partner_led", "n_plan"]);
+  const groups = page.getByTestId("list-group");
+  await expect.poll(async () => (await groups.evaluateAll((rows) => rows.map((row) => row.getAttribute("data-node")))).sort()).toEqual(["n_partner_led", "n_plan"]);
 });
 
 test("C9: a bulk completion with one node failing its guard is rejected whole, naming it", async ({ page }) => {

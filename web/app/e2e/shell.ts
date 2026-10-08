@@ -19,12 +19,27 @@ export async function open(page: Page, host: HostKind, path = "/"): Promise<void
   await expect(shell).toBeVisible();
 }
 
-/** Moves the tab to the screen at `path` without loading the page again, as the app's links do. */
+/**
+ * Moves the tab to the screen at `path` without loading the page again, as the app's links do,
+ * and returns once the router has rendered it: the shell's host switch links to the screen
+ * the router shows, so its address follows only when the new screen is on the page. Data the
+ * screen derives may still be on its way; read it with a web-first assertion.
+ */
 export async function goWithin(page: Page, path: string): Promise<void> {
   await page.evaluate((to) => {
     history.pushState(null, "", to);
     dispatchEvent(new PopStateEvent("popstate"));
   }, path);
+  const shown = page.getByRole("link", { name: /^Switch to / });
+  await expect.poll(async () => screenOf((await shown.getAttribute("href")) ?? "")).toBe(screenOf(path));
+}
+
+/** The screen an address names: its path and query, without the host switch's parameter. */
+function screenOf(address: string): string {
+  const url = new URL(address, "http://screen.invalid");
+  url.searchParams.delete("host");
+  url.searchParams.sort();
+  return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
 /** A journey's page, once derived and its canvas drawn. */
