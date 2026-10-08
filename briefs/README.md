@@ -1,10 +1,12 @@
 # Cairn: feature briefs
 
-A brief is an implementation milestone: what to build next, in what order, and how to show it works. It points into `PRD.md`, `ARCHITECTURE.md`, and `PRACTICES.md` by requirement id and section heading and does not restate them; where a brief and a document disagree, the document wins (`AGENTS.md`).
+Every brief here has landed. Together they are the record of the milestones that built Cairn: what each built, in what order, and how it was shown to work, with its decision log and its proof under `briefs/proof/<id>/`. Read the ones that built what your work touches; new work does not start from a brief (`AGENTS.md`), and the proofs of later changes sit beside theirs, under `briefs/proof/YYYY-MM-DD-<short-slug>/`. A brief points into `PRD.md`, `ARCHITECTURE.md`, and `PRACTICES.md` by requirement id and section heading and does not restate them; where a brief and a document disagree, the document wins (`AGENTS.md`).
 
 Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase, steps run in order unless the table says otherwise. 4.8 and 4.9 finish what 4.1 and 4.2 start once the engine is complete, so they run before 4.3 and 4.5, which depend on them ([`decisions/2026-10-06-the-service-and-api-split-at-the-engines-2-4-boundary.md`](../decisions/2026-10-06-the-service-and-api-split-at-the-engines-2-4-boundary.md)).
 
 ## Template
+
+The shape every brief followed.
 
 1. **Header**: id, title, crates or packages, depends on.
 2. **Goal**: one paragraph.

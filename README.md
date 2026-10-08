@@ -6,7 +6,7 @@ a live graph with answers, progress, people, and dates. Every change is a valida
 patch, and Cairn ranks the frontier to answer "what should I do next?". People use it through
 a web UI; agents use the same capabilities through an HTTP API and an MCP server.
 
-Cairn is being built in feature briefs. The binary runs: `mise run serve` starts a local
+Cairn was built in feature briefs, all landed. The binary runs: `mise run serve` starts a local
 deployment at http://127.0.0.1:8080/.
 
 ## Documents
@@ -14,7 +14,8 @@ deployment at http://127.0.0.1:8080/.
 - [`PRD.md`](PRD.md): what Cairn does, and its glossary.
 - [`ARCHITECTURE.md`](ARCHITECTURE.md): how it is built.
 - [`PRACTICES.md`](PRACTICES.md): how code is written and verified.
-- [`AGENTS.md`](AGENTS.md): the entry point for implementers, then [`briefs/`](briefs/README.md).
+- [`AGENTS.md`](AGENTS.md): the entry point for agents changing Cairn.
+- [`briefs/`](briefs/README.md): the milestones that built Cairn, with their proofs.
 - [`decisions/`](decisions/README.md): judgment calls awaiting review, one file each.
 
 ## Develop
