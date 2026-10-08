@@ -1,7 +1,7 @@
 //! The HTTP API (ARCHITECTURE, HTTP API): axum endpoints over the service, behind the auth
-//! layer, for every operation the service offers (I1). A rejected patch answers its
-//! rejection unchanged (A15); every request is held to the request limits and observed
-//! (ARCHITECTURE, Observability).
+//! layer, for every operation the service offers (I1), and `GET /healthz` outside it. A
+//! rejected patch answers its rejection unchanged (A15); every request is held to the
+//! request limits and observed (ARCHITECTURE, Observability).
 //!
 //! [`router`] is the whole API as an `axum::Router`, so the binary and a testbed serve it on
 //! whatever runtime they build
@@ -66,10 +66,10 @@ impl<S: Store + 'static> Api<S> {
 /// Endpoints and the handlers that serve them.
 type Served<S> = Vec<(&'static Endpoint, MethodRouter<Api<S>>)>;
 
-/// The API: every endpoint behind `auth`'s layer, with the MCP endpoint at `/mcp` when the
-/// service's capabilities offer it (I2), auth's own routes beside them, the request limits,
-/// and observability, over `service`. `auth` must share the service's store. No assistant:
-/// see [`router_with_assistant`].
+/// The API: every endpoint but the health check behind `auth`'s layer, with the MCP
+/// endpoint at `/mcp` when the service's capabilities offer it (I2), auth's own routes
+/// beside them, the request limits, and observability, over `service`. `auth` must share
+/// the service's store. No assistant: see [`router_with_assistant`].
 pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router {
     router_with_assistant(service, auth, None)
 }
@@ -169,6 +169,12 @@ pub fn router_beside<S: Store + 'static>(
         let tools = cairn_mcp::ToolSet::new(api.service.clone(), auth.accounts().clock().clone());
         cairn_mcp::router(tools)
     });
+    // The health check sits outside the auth layer, so a proxy's anonymous probe reaches
+    // it, but inside the request limits and observation like everything else.
+    let health = Router::new()
+        .route(endpoints::HEALTH.path, get(handle::health::<S>))
+        .method_not_allowed_fallback(handle::method_not_allowed)
+        .with_state(api.clone());
     let routes = routes
         .method_not_allowed_fallback(handle::method_not_allowed)
         .with_state(api);
@@ -188,6 +194,7 @@ pub fn router_beside<S: Store + 'static>(
     };
     let app = auth
         .protect(routes)
+        .merge(health)
         .merge(auth.router())
         .merge(beside)
         .fallback(handle::no_such_endpoint);

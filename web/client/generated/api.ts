@@ -123,6 +123,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the server is serving: 200 while its store answers, 503 once the store has failed closed. Needs no credential. */
+        get: operations["getHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/journeys": {
         parameters: {
             query?: never;
@@ -1932,6 +1949,16 @@ export interface components {
         GuardFailure: {
             open_dependency: components["schemas"]["NodeKey"];
         } | "missing_artifact" | "not_broken_down";
+        /**
+         * @description `GET /healthz`: whether the server is serving. Answered 200 when it is, and 503 when its
+         *     store has failed closed and answers nothing until the process is restarted.
+         */
+        Health: {
+            /** @description Serving, or why not. */
+            status: components["schemas"]["HealthStatus"];
+        };
+        /** @description Whether the server is serving. */
+        HealthStatus: "ok" | "store_failed_closed";
         /** @description J4: a page of a journey's history, or of one node's, grouped by patch. */
         History: {
             /**
@@ -5074,6 +5101,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Problem"];
                     "text/plain": string;
+                };
+            };
+        };
+    };
+    getHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The store has failed closed (a Health), or a limit was reached (a problem). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"] | components["schemas"]["Problem"];
                 };
             };
         };

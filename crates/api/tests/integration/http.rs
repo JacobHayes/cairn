@@ -269,8 +269,9 @@ mod in_process {
         }
     }
 
-    /// The auth layer stands in front of every endpoint, and the request body limit before
-    /// any parse. The root assembles the assistant, so its endpoints are served too.
+    /// The auth layer stands in front of every endpoint but the public health check, and the
+    /// request body limit before any parse. The root assembles the assistant, so its
+    /// endpoints are served too.
     #[tokio::test]
     async fn requests_without_credentials_or_over_the_body_limit_are_refused() {
         let provider = std::sync::Arc::new(cairn_assistant::scripted::ScriptedProvider::default());
@@ -283,7 +284,12 @@ mod in_process {
                 .send(endpoint.method.clone(), &target, None)
                 .await
                 .unwrap();
-            assert_eq!(reply.status, StatusCode::UNAUTHORIZED, "{target}");
+            let expected = if endpoint.public {
+                StatusCode::OK
+            } else {
+                StatusCode::UNAUTHORIZED
+            };
+            assert_eq!(reply.status, expected, "{target}");
         }
         let ann = world.signed_in("ann");
         let limit = usize::try_from(cairn_api::limits::REQUEST_BYTES_MAX).unwrap();

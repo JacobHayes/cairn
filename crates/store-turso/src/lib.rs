@@ -255,6 +255,10 @@ impl Store for TursoStore {
         read!(self, connection => load::proposal(connection, id))
     }
 
+    fn health(&self) -> Result<(), StoreError> {
+        self.durability.still_open()
+    }
+
     async fn receipt(&self, patch: &PatchId) -> Result<Option<PatchReceipt>, StoreError> {
         let stored = read!(self, connection => load::receipt(connection, patch))?;
         Ok(stored.map(|stored| stored.receipt))

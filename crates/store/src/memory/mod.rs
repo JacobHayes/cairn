@@ -332,6 +332,15 @@ impl Store for MemoryStore {
         ready(Ok(self.state().domains.proposals.get(id).cloned()))
     }
 
+    fn health(&self) -> Result<(), StoreError> {
+        if self.faults.failed_closed() {
+            return Err(StoreError::Backend(
+                "the store failed closed (an armed fault)".to_owned(),
+            ));
+        }
+        Ok(())
+    }
+
     fn receipt(
         &self,
         patch: &PatchId,

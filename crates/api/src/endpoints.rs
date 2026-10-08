@@ -13,6 +13,8 @@ pub struct Endpoint {
     pub path: &'static str,
     /// The OpenAPI operation id.
     pub operation: &'static str,
+    /// Served outside the auth layer, to anyone: the health check alone.
+    pub public: bool,
 }
 
 impl Endpoint {
@@ -68,9 +70,18 @@ const fn endpoint(method: Method, path: &'static str, operation: &'static str) -
         method,
         path,
         operation,
+        public: false,
     }
 }
 
+/// `GET /healthz`: whether the server is serving, answered without credentials so a proxy's
+/// health check can ask it.
+pub static HEALTH: Endpoint = Endpoint {
+    method: Method::GET,
+    path: "/healthz",
+    operation: "getHealth",
+    public: true,
+};
 /// `GET /capabilities`: what this host offers.
 pub static CAPABILITIES: Endpoint = endpoint(Method::GET, "/capabilities", "getCapabilities");
 /// `POST /journeys/{id}/patches`: a journey patch, creating it at base revision 0 (A17).
@@ -225,7 +236,8 @@ pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = endpoint(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 51] = [
+pub static ALL: [&Endpoint; 52] = [
+    &HEALTH,
     &CAPABILITIES,
     &PATCH_JOURNEY,
     &PATCH_ROUTE,

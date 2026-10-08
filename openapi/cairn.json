@@ -4069,6 +4069,35 @@
           }
         ]
       },
+      "Health": {
+        "additionalProperties": false,
+        "description": "`GET /healthz`: whether the server is serving. Answered 200 when it is, and 503 when its\nstore has failed closed and answers nothing until the process is restarted.",
+        "properties": {
+          "status": {
+            "$ref": "#/components/schemas/HealthStatus",
+            "description": "Serving, or why not."
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "type": "object"
+      },
+      "HealthStatus": {
+        "description": "Whether the server is serving.",
+        "oneOf": [
+          {
+            "const": "ok",
+            "description": "Serving.",
+            "type": "string"
+          },
+          {
+            "const": "store_failed_closed",
+            "description": "The store has failed closed: every call errs until the process reopens it.",
+            "type": "string"
+          }
+        ]
+      },
       "History": {
         "additionalProperties": false,
         "description": "J4: a page of a journey's history, or of one node's, grouped by patch.",
@@ -13206,7 +13235,7 @@
     }
   },
   "info": {
-    "description": "The Cairn HTTP API. Every request is authenticated (a session cookie or a bearer token). A rejected patch answers its rejection unchanged, every violation by path (A15); other errors answer a Problem with the request id.",
+    "description": "The Cairn HTTP API. Every request but the health check is authenticated (a session cookie or a bearer token). A rejected patch answers its rejection unchanged, every violation by path (A15); other errors answer a Problem with the request id.",
     "title": "Cairn",
     "version": "0.1.0"
   },
@@ -13971,6 +14000,52 @@
           }
         },
         "summary": "Revision ticks as server-sent `tick` events, current revisions first (H6)."
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Health"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Problem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "The store has failed closed (a Health), or a limit was reached (a problem)."
+          }
+        },
+        "security": [],
+        "summary": "Whether the server is serving: 200 while its store answers, 503 once the store has failed closed. Needs no credential."
       }
     },
     "/journeys": {

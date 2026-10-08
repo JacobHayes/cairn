@@ -92,6 +92,25 @@ impl From<cairn_service::Written> for PatchAnswer {
     }
 }
 
+/// `GET /healthz`: whether the server is serving. Answered 200 when it is, and 503 when its
+/// store has failed closed and answers nothing until the process is restarted.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Health {
+    /// Serving, or why not.
+    pub status: HealthStatus,
+}
+
+/// Whether the server is serving.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum HealthStatus {
+    /// Serving.
+    Ok,
+    /// The store has failed closed: every call errs until the process is restarted.
+    StoreFailedClosed,
+}
+
 /// The capabilities document (`GET /capabilities`): what this host offers.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

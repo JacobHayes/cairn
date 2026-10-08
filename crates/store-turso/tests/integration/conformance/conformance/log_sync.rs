@@ -264,18 +264,27 @@ pub async fn a_record_write_whose_log_sync_fails_is_settled_before_the_next_answ
         "the read answered before the log was synced: {read:?}"
     );
     assert!(read.unwrap().is_some(), "Turso kept the record");
+    assert!(
+        store.health().is_ok(),
+        "a store that settled is not healthy"
+    );
 }
 
 /// When the barrier after a record write's failed log fsync fails too, every call errs.
 pub async fn a_record_write_whose_log_sync_and_barrier_fail_closes_the_store(backend: &Turso) {
     let log = Arc::new(LogSyncs::default());
     let store = open(backend, &log, Faults::default()).await;
+    assert!(store.health().is_ok(), "a store just opened is not healthy");
 
     log.failing.store(2, Ordering::SeqCst);
     let failed = store.put_user(user("u_ann")).await;
     assert!(failed.is_err(), "the write was to fail: {failed:?}");
     let read = store.user(&id("u_ann")).await;
     assert!(read.is_err(), "a record was answered: {read:?}");
+    assert!(
+        store.health().is_err(),
+        "a store that failed closed is healthy"
+    );
     assert_eq!(
         log.failing.load(Ordering::SeqCst),
         0,

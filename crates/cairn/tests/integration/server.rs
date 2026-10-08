@@ -13,9 +13,11 @@ mod in_process {
 
     use crate::support::{self, PUBLIC_HOST, get, send};
 
-    /// A request for every surface: the API, MCP, auth's own routes, the UI, and metrics.
-    const SURFACES: [(&str, &str); 5] = [
+    /// A request for every surface: the API, its health check, MCP, auth's own routes, the
+    /// UI, and metrics.
+    const SURFACES: [(&str, &str); 6] = [
         ("GET", "/capabilities"),
+        ("GET", "/healthz"),
         ("POST", "/mcp"),
         ("POST", "/auth/sign-out"),
         ("GET", "/"),
@@ -79,9 +81,12 @@ mod in_process {
                 );
             }
         }
-        // Past the allowlist, the auth layer still asks for the credential.
+        // Past the allowlist, the auth layer still asks for the credential, except of the
+        // health check.
         let anonymous = request(address, PUBLIC_HOST, ("GET", "/capabilities"), None).await;
         assert_eq!(anonymous, 401);
+        let health = request(address, PUBLIC_HOST, ("GET", "/healthz"), None).await;
+        assert_eq!(health, 200);
     }
 
     /// I5: the assistant is in the capabilities exactly when it is configured; MCP and SSE

@@ -13,11 +13,11 @@ use serde_json::{Map, Value, json};
 use crate::endpoints::Endpoint;
 use crate::query::{self, ParamSpec, schema_of};
 use crate::wire::{
-    AgentToken, AssistantRequest, Capabilities, Conversation, EventPage, History, JourneyPage,
-    Mine, MintedToken, NodeDetail, PatchAnswer, PatchRequest, Problem, Projected, ProposalAnswer,
-    ProposalApply, ProposalCreate, ProposalEdit, ProposalReview, ProposalStep, RelinkRequest,
-    RouteDetail, RouteImport, RoutePage, SaveAsRouteRequest, SearchPage, Tick, TokenRequest,
-    TurnReply, UpgradeRequest, Viewer,
+    AgentToken, AssistantRequest, Capabilities, Conversation, EventPage, Health, History,
+    JourneyPage, Mine, MintedToken, NodeDetail, PatchAnswer, PatchRequest, Problem, Projected,
+    ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalReview, ProposalStep,
+    RelinkRequest, RouteDetail, RouteImport, RoutePage, SaveAsRouteRequest, SearchPage, Tick,
+    TokenRequest, TurnReply, UpgradeRequest, Viewer,
 };
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, Entity, EntityKey, ExplainedField,
@@ -97,7 +97,8 @@ fn read<T: JsonSchema>(endpoint: &'static Endpoint, summary: &'static str) -> Op
 
 /// Every endpoint's operation, in the endpoint table's order.
 fn operations() -> Vec<Operation> {
-    let mut all = writes();
+    let mut all = vec![health()];
+    all.extend(writes());
     all.extend(proposals());
     all.extend(bulk());
     let mut reads = reads();
@@ -211,6 +212,15 @@ fn node_reads() -> Vec<Operation> {
             )
         },
     ]
+}
+
+/// The health check: public, so a proxy's anonymous probe can ask it.
+fn health() -> Operation {
+    read::<Health>(
+        &crate::endpoints::HEALTH,
+        "Whether the server is serving: 200 while its store answers, 503 once the store has \
+         failed closed. Needs no credential.",
+    )
 }
 
 /// Capabilities and the domain patches.
@@ -554,7 +564,7 @@ pub fn document() -> Value {
         "info": {
             "title": "Cairn",
             "version": env!("CARGO_PKG_VERSION"),
-            "description": "The Cairn HTTP API. Every request is authenticated (a session cookie or a bearer token). A rejected patch answers its rejection unchanged, every violation by path (A15); other errors answer a Problem with the request id.",
+            "description": "The Cairn HTTP API. Every request but the health check is authenticated (a session cookie or a bearer token). A rejected patch answers its rejection unchanged, every violation by path (A15); other errors answer a Problem with the request id.",
         },
         "paths": paths,
         "components": {
@@ -594,6 +604,10 @@ fn render(
     if !parameters.is_empty() {
         rendered["parameters"] = Value::Array(parameters);
     }
+    if operation.endpoint.public {
+        // No credential: the document's default security does not apply.
+        rendered["security"] = json!([]);
+    }
     if let Some(body) = operation.body {
         rendered["requestBody"] = json!({
             "required": true,
@@ -623,8 +637,11 @@ fn query_parameter(spec: &ParamSpec, generator: &mut SchemaGenerator) -> Value {
 
 /// The problems an operation answers besides its success, by status.
 fn problems_of(operation: &Operation) -> Vec<(&'static str, &'static str)> {
-    let mut problems = vec![
-        ("400", "The request is malformed."),
+    let mut problems = Vec::new();
+    if !operation.endpoint.public {
+        problems.push(("400", "The request is malformed."));
+    }
+    problems.extend([
         (
             "500",
             "The server failed; the request id names it in the logs.",
@@ -633,7 +650,7 @@ fn problems_of(operation: &Operation) -> Vec<(&'static str, &'static str)> {
             "503",
             "A limit was reached or the request timed out; retry after `Retry-After`.",
         ),
-    ];
+    ]);
     if !operation.path.is_empty() {
         problems.push(("404", "No such resource."));
     }
@@ -695,7 +712,16 @@ fn responses(
     for (status, description) in problems_of(operation) {
         answers.insert(status.to_owned(), json_of(problem.as_value(), description));
     }
-    auth_refusals(&mut answers);
+    if operation.endpoint.public {
+        // The health check's own 503 carries its body; a limit's carries a problem.
+        let health = generator.subschema_for::<Health>();
+        let either = json!({"oneOf": [health, problem]});
+        let unavailable = "The store has failed closed (a Health), or a limit was reached \
+                           (a problem).";
+        answers.insert("503".to_owned(), json_of(&either, unavailable));
+    } else {
+        auth_refusals(&mut answers);
+    }
     if operation.patch {
         let stale = "Stale (with what intervened) or a reused patch id (H5).";
         answers.insert("409".to_owned(), json_of(rejection.as_value(), stale));

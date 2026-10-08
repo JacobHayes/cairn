@@ -8,6 +8,7 @@
 use std::collections::BTreeSet;
 use std::future::Future;
 use std::pin::Pin;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, PoisonError};
 
 /// A point inside a commit, in the order a commit passes them.
@@ -39,6 +40,7 @@ pub struct Faults {
 struct Armed {
     failures: Mutex<BTreeSet<CommitPoint>>,
     pause: Mutex<Option<PauseHook>>,
+    closed: AtomicBool,
 }
 
 impl Faults {
@@ -77,6 +79,20 @@ impl Faults {
             .pause
             .lock()
             .unwrap_or_else(PoisonError::into_inner) = None;
+    }
+
+    /// The store reports that it has failed closed from now on. A backend with storage
+    /// reaches that state only when its storage fails (its own tests fail it that way); the
+    /// memory store, which has none, reports it from its health check once this is armed,
+    /// so a host's tests can see how it answers a store that failed closed.
+    pub fn fail_closed(&self) {
+        self.inner.closed.store(true, Ordering::SeqCst);
+    }
+
+    /// Whether [`Faults::fail_closed`] was armed.
+    #[must_use]
+    pub fn failed_closed(&self) -> bool {
+        self.inner.closed.load(Ordering::SeqCst)
     }
 
     /// The wait a commit at `point` must await, if a pause is armed.

@@ -89,7 +89,9 @@ with `-` as `_`.
 Cairn serves plain HTTP. TLS termination, process supervision, and containers are left to
 what runs it: put it behind a proxy that terminates TLS and forwards the `Host` header, and
 set `public_url` to the address people use. Requests naming any other host are refused
-(421), as are loopback names unless the listener is bound to loopback. Logs are JSON lines
+(421), as are loopback names unless the listener is bound to loopback. `GET /healthz` needs
+no credential, for the proxy's health check: it answers 200 while the server is serving and
+503 once its database has failed closed (restart the process). Logs are JSON lines
 on standard error; metrics are at `/metrics` in Prometheus's format, behind the same auth as
 the API (a scraper uses an agent token).
 

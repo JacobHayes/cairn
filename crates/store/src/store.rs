@@ -65,6 +65,17 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
     fn commit(&self, commit: Commit)
     -> impl Future<Output = Result<Committed, CommitError>> + Send;
 
+    /// Whether the store still answers: an error once it has failed closed, when it answers
+    /// nothing until it is reopened
+    /// (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
+    /// It reads the store's own state and touches no storage, so a health check costs
+    /// nothing.
+    ///
+    /// # Errors
+    ///
+    /// Once the store has failed closed.
+    fn health(&self) -> Result<(), StoreError>;
+
     /// The current revisions of every domain and proposal, for a new subscriber (H6).
     fn revisions(&self) -> impl Future<Output = Result<Revisions, StoreError>> + Send;
 

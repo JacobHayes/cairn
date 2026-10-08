@@ -41,7 +41,7 @@ pub use write::{DomainPatch, NotADomainPatch, WriteError, Written};
 
 use std::sync::Arc;
 
-use cairn_store::{Notifier, Store};
+use cairn_store::{Notifier, Store, StoreError};
 
 /// The service over one store (ARCHITECTURE, Service layer and composition). Generic over the
 /// store, whose trait is not object-safe
@@ -101,5 +101,15 @@ impl<S: Store> Service<S> {
     #[must_use]
     pub fn settings(&self) -> &DeploymentSettings {
         &self.settings
+    }
+
+    /// Whether the service can answer (`GET /healthz`): its store has not failed closed.
+    /// It reads the store's own state, never its storage.
+    ///
+    /// # Errors
+    ///
+    /// The store's, once it has failed closed.
+    pub fn health(&self) -> Result<(), StoreError> {
+        self.store.health()
     }
 }

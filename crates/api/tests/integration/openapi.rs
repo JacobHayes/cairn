@@ -19,6 +19,7 @@ mod in_process {
     /// endpoint.
     fn offered_by() -> Vec<(&'static str, Vec<&'static Endpoint>)> {
         vec![
+            ("health", vec![&at::HEALTH]),
             ("capabilities", vec![&at::CAPABILITIES]),
             (
                 "patch",
@@ -108,7 +109,7 @@ mod in_process {
 
     /// I1: every service operation has an endpoint, every endpoint is in the OpenAPI
     /// document, and the router serves it with its method (behind the auth layer, which
-    /// answers 401 only on a path the router matched).
+    /// answers 401 only on a path the router matched, unless the endpoint is public).
     #[tokio::test]
     async fn every_service_operation_has_an_endpoint() {
         let listed: BTreeSet<String> = offered_by()
@@ -130,7 +131,8 @@ mod in_process {
                 let placeholders = endpoint.path.matches('{').count();
                 let target = endpoint.path_with(&vec!["x_1"; placeholders]);
                 let reply = anonymous.send(endpoint.method.clone(), &target, None).await;
-                assert_eq!(reply.unwrap().status.as_u16(), 401, "{operation}: {target}");
+                let refused = reply.unwrap().status.as_u16() == 401;
+                assert_eq!(refused, !endpoint.public, "{operation}: {target}");
                 // Signed in, the router answers the endpoint's own method with anything but
                 // 405 (the auth layer answers 401 before the router's method check).
                 let reply = signed_in.send(endpoint.method.clone(), &target, None).await;
@@ -179,6 +181,7 @@ mod in_process {
     /// Reads whose answers, accepted and refused, the conformance test checks.
     fn documented_reads() -> Vec<(&'static Endpoint, &'static str)> {
         vec![
+            (&at::HEALTH, "/healthz"),
             (&at::CAPABILITIES, "/capabilities"),
             (&at::JOURNEYS, "/journeys"),
             (&at::JOURNEY, "/journeys/j_vendor_eval"),
@@ -270,6 +273,29 @@ mod in_process {
             &at::MINT_TOKEN,
             &post(&ann, "/users/me/tokens", &named).await,
         );
+    }
+
+    /// The health check answers without a credential, serving and once the store has
+    /// failed closed, as the document says, and the document asks no credential of it.
+    #[tokio::test]
+    async fn the_health_check_is_public_and_answers_what_the_document_says() {
+        let document = cairn_api::openapi::document();
+        let operation = &document["paths"][at::HEALTH.path]["get"];
+        assert_eq!(operation["security"], json!([]));
+        let world = World::start().await;
+        let anonymous = world.anonymous();
+        let serving = anonymous.send(Method::GET, "/healthz", None).await.unwrap();
+        assert_eq!(serving.status.as_u16(), 200);
+        assert_eq!(serving.json::<Value>().unwrap()["status"], json!("ok"));
+        conforms(&document, &at::HEALTH, &serving);
+        world.faults.fail_closed();
+        let closed = anonymous.send(Method::GET, "/healthz", None).await.unwrap();
+        assert_eq!(closed.status.as_u16(), 503);
+        assert_eq!(
+            closed.json::<Value>().unwrap()["status"],
+            json!("store_failed_closed")
+        );
+        conforms(&document, &at::HEALTH, &closed);
     }
 
     /// Proposal answers, accepted and refused, are what the document says they are.

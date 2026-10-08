@@ -11,6 +11,8 @@ pub mod users;
 
 use axum::Json;
 use axum::extract::{Extension, State};
+use axum::http::StatusCode;
+use axum::response::{IntoResponse, Response};
 use cairn_schema::{Actor, Domain, JourneyId, PatchTarget, Rejection, RouteId};
 use cairn_service::{DomainPatch, WriteError, Written};
 use cairn_store::Store;
@@ -19,10 +21,34 @@ use crate::Api;
 use crate::error::ApiError;
 use crate::extract::{JsonBody, Path, segment};
 use crate::observe;
-use crate::wire::{Capabilities, PatchAnswer, PatchRequest, ProblemCode};
+use crate::wire::{Capabilities, Health, HealthStatus, PatchAnswer, PatchRequest, ProblemCode};
 
 /// A handler's answer: its JSON body, or what went wrong.
 pub type Answer<T> = Result<Json<T>, ApiError>;
+
+/// `GET /healthz`, outside the auth layer: 200 while the store answers, 503 once it has
+/// failed closed. Cheap: it reads the store's state, never its storage.
+pub async fn health<S: Store + 'static>(State(api): State<Api<S>>) -> Response {
+    match api.service.health() {
+        Ok(()) => (
+            StatusCode::OK,
+            Json(Health {
+                status: HealthStatus::Ok,
+            }),
+        )
+            .into_response(),
+        Err(error) => {
+            tracing::error!(%error, "health check: the store has failed closed");
+            (
+                StatusCode::SERVICE_UNAVAILABLE,
+                Json(Health {
+                    status: HealthStatus::StoreFailedClosed,
+                }),
+            )
+                .into_response()
+        }
+    }
+}
 
 /// `GET /capabilities`.
 pub async fn capabilities<S: Store + 'static>(State(api): State<Api<S>>) -> Json<Capabilities> {

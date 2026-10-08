@@ -24,7 +24,7 @@ use cairn_schema::{
     RouteFile, Scenario, SequentialKeys, Slug, Timestamp, from_yaml,
 };
 use cairn_service::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Parts, Service};
-use cairn_store::{InProcessNotifier, MemoryStore};
+use cairn_store::{Faults, InProcessNotifier, MemoryStore};
 use jiff::tz::{Offset, TimeZone};
 use serde::de::DeserializeOwned;
 
@@ -100,6 +100,8 @@ pub fn settings() -> DeploymentSettings {
 pub struct World {
     pub service: Service<MemoryStore>,
     pub store: Arc<MemoryStore>,
+    /// The store's faults, for a test that fails the store closed.
+    pub faults: Faults,
     pub notifier: Arc<InProcessNotifier>,
     pub clock: TestClock,
     pub address: SocketAddr,
@@ -127,7 +129,8 @@ impl World {
     }
 
     async fn begin(mcp: bool, assistant: Option<Arc<dyn cairn_assistant::Provider>>) -> Self {
-        let store = Arc::new(MemoryStore::new());
+        let faults = Faults::default();
+        let store = Arc::new(MemoryStore::with_faults(faults.clone()));
         let notifier = Arc::new(InProcessNotifier::new());
         let clock = TestClock::default();
         clock.set("2026-10-01T14:00:00Z");
@@ -172,6 +175,7 @@ impl World {
         Self {
             service,
             store,
+            faults,
             notifier,
             clock,
             address,
