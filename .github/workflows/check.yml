@@ -34,6 +34,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
+      # The compiled dependencies and the cargo registry, from the last push to main: without
+      # them every run compiled the whole dependency tree from nothing, most of the job.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: check
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       # The npm workspace's tools (TypeScript, eslint, openapi-typescript) for rungs 1 and 5.
       - run: npm ci
       # Rung 6's browser, at the version @playwright/test pins.
@@ -51,6 +57,12 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5
+      # The compiled dependencies and the cargo registry, from the last push to main: without
+      # them every run compiled the whole dependency tree from nothing, most of the job.
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: check
+          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
       # The npm workspace's tools (TypeScript, eslint, openapi-typescript) for rungs 1 and 5.
       - run: npm ci
       # Rung 6's browser, at the version @playwright/test pins.
