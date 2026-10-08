@@ -13,7 +13,7 @@ use cairn_auth::Clock;
 use cairn_mcp::{ToolError, ToolSet, instructions};
 use cairn_schema::{Actor, AgentId, ConversationId, Markdown};
 use cairn_service::Service;
-use cairn_store::{ConversationMessage, MessageAuthor, Store};
+use cairn_store::{ConversationMessage, ConversationRecord, MessageAuthor, Store};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
@@ -285,14 +285,7 @@ impl<S: Store + 'static> Assistant<S> {
         // A route that does not exist yet keeps no conversation until a turn drafts one:
         // naming routes that do not exist stores nothing.
         if exists || held || !actions.is_empty() {
-            let saved = tokio::time::timeout_at(end, self.store.put_conversation(record)).await;
-            match saved {
-                Ok(saved) => saved.map_err(failed)?,
-                // The writes stand and are answered; only the conversation is not kept.
-                Err(_) => {
-                    tracing::warn!(conversation = %id, "assistant conversation not saved in time");
-                }
-            }
+            self.save(record, end, !actions.is_empty()).await?;
         }
         metrics::counter!("cairn_assistant_turns_total", "ended" => ended_label(&ended))
             .increment(1);
@@ -303,6 +296,30 @@ impl<S: Store + 'static> Assistant<S> {
             actions,
             ended,
         })
+    }
+
+    /// Saves `record` before `end`. A failed save fails the turn only when it `wrote`
+    /// nothing; otherwise its writes stand and are answered (I5: every direct write is
+    /// reported), and only the conversation is not kept.
+    async fn save(
+        &self,
+        record: ConversationRecord,
+        end: Instant,
+        wrote: bool,
+    ) -> Result<(), TurnError> {
+        let id = record.id.clone();
+        match tokio::time::timeout_at(end, self.store.put_conversation(record)).await {
+            Ok(Ok(())) => Ok(()),
+            Ok(Err(error)) if !wrote => Err(TurnError::Failed(error.to_string())),
+            Ok(Err(error)) => {
+                tracing::warn!(conversation = %id, %error, "assistant conversation not saved");
+                Ok(())
+            }
+            Err(_) => {
+                tracing::warn!(conversation = %id, "assistant conversation not saved in time");
+                Ok(())
+            }
+        }
     }
 
     /// The tool loop: provider calls until one answers without a tool call, or a limit.
@@ -348,13 +365,23 @@ impl<S: Store + 'static> Assistant<S> {
                     let outcome = wrapper::run(&tools, store, &actor, called, &mut held).await;
                     (outcome, held)
                 });
-                let (outcome, held) = match tokio::time::timeout_at(deadline, running).await {
+                let mut running = running;
+                let (outcome, held) = match tokio::time::timeout_at(deadline, &mut running).await {
                     Ok(Ok(ran)) => ran,
                     Ok(Err(error)) if error.is_panic() => {
                         std::panic::resume_unwind(error.into_panic())
                     }
-                    Ok(Err(_)) | Err(_) => {
+                    Ok(Err(_)) => return (None, actions, Ended::TurnTimedOut),
+                    Err(_) => {
+                        // The deadline overtook the call, which still runs: a write it lands
+                        // within half the save reserve is reported with the turn (I5: every
+                        // direct write is reported); one later still is not, which the
+                        // turn's ending note says.
                         patina_dst::sometimes!(true, "assistant-tool-call-past-deadline");
+                        let late = deadline + TURN_SAVE_RESERVE / 2;
+                        if let Ok(Ok((outcome, _))) = tokio::time::timeout_at(late, running).await {
+                            record(&mut actions, outcome.action);
+                        }
                         return (None, actions, Ended::TurnTimedOut);
                     }
                 };
@@ -500,6 +527,7 @@ fn report(action: &Action) -> String {
         Action::Applied {
             tool,
             receipt,
+            nodes,
             consequences,
         } => {
             let caused: usize = consequences
@@ -511,8 +539,18 @@ fn report(action: &Action) -> String {
                         + usize::from(caused.stalled.is_some())
                 })
                 .sum();
+            let wrote = nodes
+                .iter()
+                .map(|node| format!("`{node}`"))
+                .collect::<Vec<_>>()
+                .join(", ");
+            let wrote = if wrote.is_empty() {
+                String::new()
+            } else {
+                format!(" (wrote {wrote})")
+            };
             format!(
-                "Applied `{tool}` as patch `{}`: {} is at revision {}, with {caused} new \
+                "Applied `{tool}` as patch `{}`{wrote}: {} is at revision {}, with {caused} new \
                  consequence(s).",
                 receipt.patch_id, receipt.domain, receipt.revision
             )
@@ -556,7 +594,11 @@ fn ending_note(ended: &Ended) -> Option<String> {
         Ended::IterationLimit => {
             Some("The turn ended: the assistant reached its tool-call limit.".to_owned())
         }
-        Ended::TurnTimedOut => Some("The turn ended: it ran past its time limit.".to_owned()),
+        Ended::TurnTimedOut => Some(
+            "The turn ended: it ran past its time limit. A change still being written then may \
+             land after this report; check the journey."
+                .to_owned(),
+        ),
     }
 }
 

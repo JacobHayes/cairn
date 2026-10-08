@@ -18,6 +18,7 @@ import type {
   PreviewRequest,
 } from "@cairn/wasm";
 
+import type { AssistantHost } from "./assistant.ts";
 import type { ProposalHost } from "./proposals.ts";
 
 export type Capabilities = Schema<"Capabilities">;
@@ -93,6 +94,8 @@ export interface Host {
   send(patch: Patch, note?: Markdown): Promise<Answered<HttpFailure>>;
   /** I6, C14: proposals, and the upgrade, save-as-route, and re-link drafts (B7, B8, B9). */
   readonly proposals: ProposalHost;
+  /** I5: the assistant, on a host that assembled one; the in-browser host never has one. */
+  readonly assistant: AssistantHost | undefined;
   /** H6: the host's revision ticks. */
   readonly openTicks: OpenTicks;
 }

@@ -17,6 +17,13 @@
                 },
                 "type": "object"
               },
+              "nodes": {
+                "description": "The nodes it wrote, in key order (I5: a direct change is reported with the nodes\nit affected, which the panel links to); none for a write to no journey's nodes.",
+                "items": {
+                  "$ref": "#/components/schemas/NodeKey"
+                },
+                "type": "array"
+              },
               "outcome": {
                 "const": "applied",
                 "type": "string"
@@ -2000,6 +2007,73 @@
         "required": [
           "node",
           "score"
+        ],
+        "type": "object"
+      },
+      "Conversation": {
+        "additionalProperties": false,
+        "description": "`GET /journeys/{id}/assistant` and `GET /routes/{id}/draft/assistant`: the caller's\nconversation about that journey or draft (I5: one per target per user), as kept: its\nnewest messages, oldest first. A conversation not started yet has none.",
+        "properties": {
+          "conversation": {
+            "$ref": "#/components/schemas/ConversationId",
+            "description": "The conversation's id, which every turn about this target answers too."
+          },
+          "messages": {
+            "default": [],
+            "description": "Its messages, oldest first.",
+            "items": {
+              "$ref": "#/components/schemas/ConversationEntry"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "conversation"
+        ],
+        "type": "object"
+      },
+      "ConversationAuthor": {
+        "description": "Who wrote a conversation message.",
+        "oneOf": [
+          {
+            "const": "user",
+            "description": "The user.",
+            "type": "string"
+          },
+          {
+            "const": "assistant",
+            "description": "The assistant.",
+            "type": "string"
+          },
+          {
+            "const": "cairn",
+            "description": "Cairn, reporting a write the assistant made or how a turn ended.",
+            "type": "string"
+          }
+        ]
+      },
+      "ConversationEntry": {
+        "additionalProperties": false,
+        "description": "One kept message of a conversation.",
+        "properties": {
+          "at": {
+            "description": "When it was kept.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "author": {
+            "$ref": "#/components/schemas/ConversationAuthor",
+            "description": "Who wrote it."
+          },
+          "content": {
+            "$ref": "#/components/schemas/Markdown",
+            "description": "What it says."
+          }
+        },
+        "required": [
+          "author",
+          "at",
+          "content"
         ],
         "type": "object"
       },
@@ -14113,6 +14187,103 @@
       }
     },
     "/journeys/{id}/assistant": {
+      "get": {
+        "operationId": "conversationAboutJourney",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "The caller's conversation with the assistant about a journey, as kept, when the capabilities offer the assistant (I5)."
+      },
       "post": {
         "operationId": "converseAboutJourney",
         "parameters": [
@@ -17624,6 +17795,103 @@
       }
     },
     "/routes/{id}/draft/assistant": {
+      "get": {
+        "operationId": "conversationAboutRouteDraft",
+        "parameters": [
+          {
+            "description": "The route.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RouteId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Conversation"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "The caller's conversation with the assistant about a route's draft, as kept, when the capabilities offer the assistant (I5)."
+      },
       "post": {
         "operationId": "converseAboutRouteDraft",
         "parameters": [

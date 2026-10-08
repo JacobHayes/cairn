@@ -23,11 +23,13 @@ export interface Notice {
 
 /** D7: what an accepted patch newly caused, journey by journey, each kind that has any. */
 export function consequenceLines(answer: PatchAnswer): ConsequenceLine[] {
-  if (answer.outcome !== "applied") {
-    return [];
-  }
+  return answer.outcome === "applied" ? linesOf(answer.consequences ?? {}) : [];
+}
+
+/** D7: what a write newly caused in each journey it changed, each kind that has any. */
+export function linesOf(consequences: Record<string, Consequences>): ConsequenceLine[] {
   const lines: ConsequenceLine[] = [];
-  for (const [journey, caused] of Object.entries(answer.consequences ?? {})) {
+  for (const [journey, caused] of Object.entries(consequences)) {
     const add = (kind: ConsequenceLine["kind"], nodes: string[]) => {
       if (nodes.length > 0) {
         lines.push({ kind, journey, nodes });

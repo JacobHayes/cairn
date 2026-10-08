@@ -1,0 +1,102 @@
+/* The assistant panel: docked at the window's right edge below the shell header, the screen
+   making room for it on a wide window and sliding under it on a narrow one; the notices move
+   left of it so neither hides the other. Drawn with the design tokens, light and dark. */
+:root {
+  --assistant-width: 26rem;
+}
+
+.assistant-panel {
+  position: fixed;
+  top: 4rem;
+  right: var(--space-4);
+  bottom: var(--space-4);
+  width: min(var(--assistant-width), calc(100vw - 2 * var(--space-4)));
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  z-index: 20;
+  box-shadow: 0 4px 24px rgb(0 0 0 / 0.18);
+}
+
+@media (min-width: 72rem) {
+  body:has(.assistant-panel) .shell-main {
+    margin-right: calc(var(--assistant-width) + 2 * var(--space-4));
+  }
+}
+
+body:has(.assistant-panel) .notices {
+  right: calc(var(--assistant-width) + 3 * var(--space-4));
+}
+
+.assistant-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.assistant-transcript {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.assistant-said {
+  align-self: flex-end;
+  max-width: 85%;
+  margin-left: auto;
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius);
+  background: var(--color-accent);
+  color: var(--color-accent-text);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.assistant-reply {
+  max-width: 95%;
+  overflow-wrap: anywhere;
+}
+
+.assistant-report {
+  font-size: var(--text-small);
+  overflow-wrap: anywhere;
+}
+
+.assistant-write {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius);
+  background: var(--color-canvas);
+}
+
+.assistant-nodes {
+  overflow-wrap: anywhere;
+}
+
+.assistant-panel .textarea {
+  min-height: 4rem;
+  resize: vertical;
+}
+
+.assistant-write a.button {
+  text-decoration: none;
+}
+
+.assistant-write a.button-primary {
+  color: var(--color-accent-text);
+}
+
+.assistant-toggle[aria-pressed="true"] {
+  border-color: var(--color-accent);
+  color: var(--color-accent);
+}

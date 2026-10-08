@@ -11,16 +11,20 @@ mod in_process {
 
     use axum::body::Body;
     use axum::extract::ConnectInfo;
+    use axum::http::Method;
     use axum::http::{Request, StatusCode};
     use cairn_api::client::Reply;
     use cairn_api::endpoints::{self as at, Endpoint};
-    use cairn_api::wire::{Capabilities, MintedToken, Problem, ProblemCode, TurnReply};
+    use cairn_api::wire::{
+        Capabilities, Conversation, ConversationAuthor, MintedToken, Problem, ProblemCode,
+        TurnReply,
+    };
     use cairn_assistant::scripted::{ScriptedProvider, Step};
     use cairn_assistant::{Action, Ended, Provider, Reply as ModelReply};
     use serde_json::{Value, json};
     use tower::ServiceExt;
 
-    use cairn_schema::Mutation;
+    use cairn_schema::{Mutation, NodeKey};
 
     use cairn_api::client::Transport;
 
@@ -78,6 +82,8 @@ mod in_process {
         ] {
             let reply = post(&ann, target, &said).await;
             assert_eq!(reply.status, StatusCode::NOT_FOUND, "{target}");
+            let read = ann.send(Method::GET, target, None).await.unwrap();
+            assert_eq!(read.status, StatusCode::NOT_FOUND, "{target}");
         }
 
         let provider = scripted(vec![Step::say("Hello."), Step::say("Hello again.")]);
@@ -94,6 +100,56 @@ mod in_process {
             assert_eq!(reply.status, StatusCode::OK, "{}", endpoint.operation);
             assert_eq!(violations(endpoint, &reply), Vec::<String>::new());
         }
+        let reads = [
+            (&at::ASSISTANT_JOURNEY_CONVERSATION, JOURNEY),
+            (&at::ASSISTANT_ROUTE_DRAFT_CONVERSATION, "vendor-evaluation"),
+        ];
+        for (endpoint, id) in reads {
+            let reply = ann
+                .send(Method::GET, &endpoint.path_with(&[id]), None)
+                .await
+                .unwrap();
+            assert_eq!(reply.status, StatusCode::OK, "{}", endpoint.operation);
+            assert_eq!(violations(endpoint, &reply), Vec::<String>::new());
+        }
+    }
+
+    /// I5: a conversation is the caller's, one per target: read back as kept, the user's
+    /// words, Cairn's report of each write, and the reply in order, with the same id the
+    /// turn answered; another user's conversation about the same journey is their own.
+    #[tokio::test]
+    async fn a_conversation_reads_back_as_kept_and_only_by_its_user() {
+        let reach = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "reach",
+            "patch_id": "p_kickoff", "base_revision": 2 });
+        let provider = scripted(vec![
+            Step::call("transition_node", reach),
+            Step::say("Kickoff is reached."),
+        ]);
+        let world = with_assistant(&provider).await;
+        let ann = world.vendor_after(2).await;
+        let target = at::ASSISTANT_JOURNEY_CONVERSATION.path_with(&[JOURNEY]);
+        let before: Conversation = get(&ann, &target).await;
+        assert_eq!(before.messages, Vec::new(), "nothing kept before a turn");
+
+        let said = json!({ "message": "Kickoff happened." });
+        let turn: TurnReply = ok(&post(&ann, &target, &said).await);
+        let kept: Conversation = get(&ann, &target).await;
+        assert_eq!(kept.conversation, turn.conversation);
+        assert_eq!(kept.conversation, before.conversation);
+        let authors: Vec<ConversationAuthor> =
+            kept.messages.iter().map(|message| message.author).collect();
+        assert_eq!(
+            authors,
+            [
+                ConversationAuthor::User,
+                ConversationAuthor::Cairn,
+                ConversationAuthor::Assistant
+            ]
+        );
+
+        let bob: Conversation = get(&world.signed_in("bob"), &target).await;
+        assert_ne!(bob.conversation, kept.conversation);
+        assert_eq!(bob.messages, Vec::new());
     }
 
     /// I5, D7: a turn's direct write and its proposal are answered as the document says, the
@@ -121,10 +177,16 @@ mod in_process {
         );
         let turn: TurnReply = ok(&reply);
         assert_eq!(turn.ended, Ended::Replied);
-        assert!(matches!(
-            turn.actions.as_slice(),
-            [Action::Applied { .. }, Action::Proposed { .. }]
-        ));
+        let [Action::Applied { nodes, .. }, Action::Proposed { .. }] = turn.actions.as_slice()
+        else {
+            panic!("{:?}", turn.actions);
+        };
+        let kickoff: NodeKey = "n_kickoff".parse().unwrap();
+        assert_eq!(
+            nodes,
+            &[kickoff],
+            "the direct write names the node it wrote"
+        );
         assert_eq!(
             world.revision(JOURNEY).await,
             3,
@@ -150,6 +212,9 @@ mod in_process {
             refused.json::<Problem>().unwrap().error,
             ProblemCode::UserOnly
         );
+        let read = helper.send(Method::GET, &target, None).await.unwrap();
+        assert_eq!(read.status, StatusCode::FORBIDDEN);
+        assert_eq!(read.json::<Problem>().unwrap().error, ProblemCode::UserOnly);
         let missing = post(
             &ann,
             &at::ASSISTANT_JOURNEY.path_with(&["j_nowhere"]),

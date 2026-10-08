@@ -91,6 +91,8 @@ export function browserHost(root: InBrowserHost): Host {
     history: (journey, node, after) => read(journey, () => root.history(journey, node, after)),
     send: (patch, note) => send(root, patch, note),
     proposals: browserProposals(root),
+    // Its root assembles no assistant (ARCHITECTURE, Service layer and composition).
+    assistant: undefined,
     openTicks: ticksOf(root),
   };
 }

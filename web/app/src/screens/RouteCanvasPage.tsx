@@ -4,10 +4,12 @@
 // same engine rules as a journey's canvas (the derive worker answers its level). It follows
 // the route live (H6). A draft is authored here by hand (5.6: the palette, a node's structure
 // beside the canvas, edges drawn between cards); a version is read only, with the offer to
-// open a draft. Route detail and versions (5.5) link here.
+// open a draft. Route detail and versions (5.5) link here. The assistant panel (5.8) talks
+// about the route's draft, which it can open, whichever graph is shown.
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
+import { AssistantDock } from "../assistant/AssistantPanel.tsx";
 import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { OpenDraftOffer, RouteAuthoringBar, RouteNodePanel } from "../authoring/RouteAuthoring.tsx";
 import { routeAuthored, type Authored } from "../authoring/target.ts";
@@ -214,6 +216,7 @@ export function RouteCanvasPage() {
               {shown.of !== "draft" && shown.route.draft == null ? " (no draft is open)" : ""}; a route has no journey state.
             </span>
             <Link to={routeDetailPath(id)}>Versions and journeys</Link>
+            <AssistantDock target={{ route: id }} titleOf={(key) => (shown.route.draft?.graph.nodes ?? []).find((node) => node.key === key)?.title} />
           </div>
           {shown.of !== "draft" && shown.route.draft == null ? <OpenDraftOffer route={shown.route} /> : null}
           {authored === undefined ? null : <RouteAuthoringBar authored={authored} container={view.container} drawing={drawing} onAdded={(key) => void navigate(routeNodePath(id, view, key))} />}

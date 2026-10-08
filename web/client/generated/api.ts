@@ -164,7 +164,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The caller's conversation with the assistant about a journey, as kept, when the capabilities offer the assistant (I5). */
+        get: operations["conversationAboutJourney"];
         put?: never;
         /** One assistant turn about a journey, when the capabilities offer the assistant (I5): its direct writes with their consequences, and its proposals for review. */
         post: operations["converseAboutJourney"];
@@ -624,7 +625,8 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The caller's conversation with the assistant about a route's draft, as kept, when the capabilities offer the assistant (I5). */
+        get: operations["conversationAboutRouteDraft"];
         put?: never;
         /** One assistant turn about a route's draft, when the capabilities offer the assistant (I5, A12): what it drafts arrives as proposals on the draft. */
         post: operations["converseAboutRouteDraft"];
@@ -818,6 +820,11 @@ export interface components {
             consequences?: {
                 [key: string]: components["schemas"]["Consequences"];
             };
+            /**
+             * @description The nodes it wrote, in key order (I5: a direct change is reported with the nodes
+             *     it affected, which the panel links to); none for a write to no journey's nodes.
+             */
+            nodes?: components["schemas"]["NodeKey"][];
             /** @constant */
             outcome: "applied";
             /** @description The patch's receipt. */
@@ -1356,6 +1363,34 @@ export interface components {
             other_owner?: boolean;
             /** @description What it adds. */
             score: components["schemas"]["Score"];
+        };
+        /**
+         * @description `GET /journeys/{id}/assistant` and `GET /routes/{id}/draft/assistant`: the caller's
+         *     conversation about that journey or draft (I5: one per target per user), as kept: its
+         *     newest messages, oldest first. A conversation not started yet has none.
+         */
+        Conversation: {
+            /** @description The conversation's id, which every turn about this target answers too. */
+            conversation: components["schemas"]["ConversationId"];
+            /**
+             * @description Its messages, oldest first.
+             * @default []
+             */
+            messages: components["schemas"]["ConversationEntry"][];
+        };
+        /** @description Who wrote a conversation message. */
+        ConversationAuthor: "user" | "assistant" | "cairn";
+        /** @description One kept message of a conversation. */
+        ConversationEntry: {
+            /**
+             * Format: date-time
+             * @description When it was kept.
+             */
+            at: string;
+            /** @description Who wrote it. */
+            author: components["schemas"]["ConversationAuthor"];
+            /** @description What it says. */
+            content: components["schemas"]["Markdown"];
         };
         /** @description Starts with "cv_"; at most id_bytes_max (64) bytes. */
         ConversationId: string;
@@ -5176,6 +5211,85 @@ export interface operations {
             };
         };
     };
+    conversationAboutJourney: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversation"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
     converseAboutJourney: {
         parameters: {
             query?: never;
@@ -7795,6 +7909,85 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    conversationAboutRouteDraft: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Conversation"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description Only a user may do this, not an agent acting for one. Or: The auth layer refused the peer: a local-only provider and a remote peer (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
                     "text/plain": string;
                 };
             };

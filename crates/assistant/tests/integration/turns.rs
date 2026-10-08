@@ -718,6 +718,34 @@ async fn a_missing_route_keeps_no_conversation_and_a_discard_is_reported_as_one(
     );
 }
 
+/// I5 (every direct write is reported): a commit the turn's deadline overtakes, but which
+/// lands within the save reserve, is reported with the turn that ended at its limit.
+#[tokio::test(start_paused = true)]
+async fn a_commit_landing_just_past_the_deadline_is_reported() {
+    let faults = cairn_store::Faults::default();
+    let world = World::with_faults(faults.clone());
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    // A second past the turn's deadline (its limit less the save reserve).
+    let lands = tokio::time::Instant::now() + TURN_DURATION_MAX - TURN_SAVE_RESERVE
+        + Duration::from_secs(1);
+    faults.pause_with(std::sync::Arc::new(move |_| {
+        Box::pin(tokio::time::sleep_until(lands))
+    }));
+    let reach = json!({ "journey": "j_vendor_eval", "node": "n_kickoff", "transition": "reach",
+        "patch_id": "p_late", "base_revision": 1 });
+    world.script([Step::call("transition_node", reach), Step::say("Hello.")]);
+    let turn = world
+        .turn(&lead, &vendor_target(), "Kickoff happened.")
+        .await;
+    assert_eq!(turn.ended, Ended::TurnTimedOut);
+    assert!(
+        matches!(turn.actions.as_slice(), [Action::Applied { .. }]),
+        "the late write is reported: {:?}",
+        turn.actions
+    );
+}
+
 /// PRACTICES, Explicit limits (review 4.4 r2): a tool call whose commit stalls is held to the
 /// turn's limit; the turn ends, releases its conversation and its slot, and is saved.
 #[tokio::test(start_paused = true)]

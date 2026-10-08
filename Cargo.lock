@@ -693,6 +693,7 @@ version = "0.1.0"
 dependencies = [
  "axum",
  "cairn-api",
+ "cairn-assistant",
  "cairn-auth",
  "cairn-engine",
  "cairn-schema",

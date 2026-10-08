@@ -2,12 +2,13 @@
 // with whether an upgrade is available (the host's field), its own notes and links (G1), and
 // its life: complete (suggested once nothing in scope is left, or the final milestone is
 // reached, B11), reopen, archive, un-archive, and hard delete behind its name typed back
-// (A19); and the proposals that upgrade it, save it as a route, and re-link it (B7, B8, B9).
-// Kept current (H6).
+// (A19); the proposals that upgrade it, save it as a route, and re-link it (B7, B8, B9); and
+// the assistant panel (I5, 5.8). Kept current (H6).
 import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router";
 
 import { ActingFrame } from "../acting/Frame.tsx";
+import { AssistantDock, journeyTitles } from "../assistant/AssistantPanel.tsx";
 import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
 import { useLive, useSession } from "../data/react.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
@@ -92,7 +93,7 @@ function OverviewBody({ ready }: { ready: Ready }) {
 export function Overview() {
   const { id = "" } = useParams();
   return (
-    <ActingFrame id={id} screen="overview">
+    <ActingFrame id={id} screen="overview" header={(ready) => <AssistantDock target={{ journey: id }} titleOf={journeyTitles(ready)} />}>
       {(ready) => <OverviewBody ready={ready} />}
     </ActingFrame>
   );

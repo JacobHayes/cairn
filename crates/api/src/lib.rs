@@ -74,6 +74,43 @@ pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router
     router_with_assistant(service, auth, None)
 }
 
+/// The endpoints held to the request duration, with their handlers: the assistant's
+/// conversation reads among them when `assistant` is mounted.
+fn served<S: Store + 'static>(assistant: bool) -> Served<S> {
+    use crate::endpoints as at;
+    use crate::handlers as handle;
+    let mut served: Served<S> = vec![
+        (&at::CAPABILITIES, get(handle::capabilities::<S>)),
+        (&at::PATCH_JOURNEY, post(handle::patch_journey::<S>)),
+        (&at::PATCH_ROUTE, post(handle::patch_route::<S>)),
+        (&at::PATCH_DEPLOYMENT, post(handle::patch_deployment::<S>)),
+        (&at::JOURNEYS, get(handle::reads::journeys::<S>)),
+        (&at::JOURNEY, get(handle::reads::journey::<S>)),
+        (&at::DOCUMENT, get(handle::reads::document::<S>)),
+        (&at::ROUTES, get(handle::reads::routes::<S>)),
+        (&at::ROUTE, get(handle::reads::route::<S>)),
+        (&at::ROUTE_VERSIONS, get(handle::reads::route_versions::<S>)),
+        (&at::ROUTE_VERSION, get(handle::reads::route_version::<S>)),
+        (&at::DEPLOYMENT, get(handle::reads::deployment::<S>)),
+        (&at::ENTITY, get(handle::reads::entity::<S>)),
+        (&at::SEARCH, get(handle::reads::search::<S>)),
+        (&at::EVENTS, get(handle::reads::events::<S>)),
+        (&at::STREAM, get(stream::stream::<S>)),
+        (&at::VIEWER, get(handle::users::viewer::<S>)),
+        (&at::TOKENS, get(handle::users::tokens::<S>)),
+        (&at::MINT_TOKEN, post(handle::users::mint_token::<S>)),
+        (&at::REVOKE_TOKEN, delete(handle::users::revoke_token::<S>)),
+    ];
+    served.extend(handle::projections::served::<S>());
+    served.extend(handle::proposals::served::<S>());
+    served.extend(handle::bulk::served::<S>());
+    if assistant {
+        // I5: reading a conversation back is an ordinary read, under the request duration.
+        served.extend(handle::assistant::reads::<S>());
+    }
+    served
+}
+
 /// [`router`], with the assistant's endpoints when the host's root assembled one (I5;
 /// ARCHITECTURE, Service layer and composition: absence is a `None` at the root). They sit
 /// behind the auth layer and the body and in-flight limits but outside the request
@@ -105,7 +142,6 @@ pub fn router_beside<S: Store + 'static>(
     assistant: Option<Assistant<S>>,
     beside: Router,
 ) -> Router {
-    use crate::endpoints as at;
     use crate::handlers as handle;
     assert_eq!(
         service.capabilities().assistant,
@@ -117,31 +153,7 @@ pub fn router_beside<S: Store + 'static>(
         auth: auth.clone(),
         assistant,
     };
-    let mut served: Served<S> = vec![
-        (&at::CAPABILITIES, get(handle::capabilities::<S>)),
-        (&at::PATCH_JOURNEY, post(handle::patch_journey::<S>)),
-        (&at::PATCH_ROUTE, post(handle::patch_route::<S>)),
-        (&at::PATCH_DEPLOYMENT, post(handle::patch_deployment::<S>)),
-        (&at::JOURNEYS, get(handle::reads::journeys::<S>)),
-        (&at::JOURNEY, get(handle::reads::journey::<S>)),
-        (&at::DOCUMENT, get(handle::reads::document::<S>)),
-        (&at::ROUTES, get(handle::reads::routes::<S>)),
-        (&at::ROUTE, get(handle::reads::route::<S>)),
-        (&at::ROUTE_VERSIONS, get(handle::reads::route_versions::<S>)),
-        (&at::ROUTE_VERSION, get(handle::reads::route_version::<S>)),
-        (&at::DEPLOYMENT, get(handle::reads::deployment::<S>)),
-        (&at::ENTITY, get(handle::reads::entity::<S>)),
-        (&at::SEARCH, get(handle::reads::search::<S>)),
-        (&at::EVENTS, get(handle::reads::events::<S>)),
-        (&at::STREAM, get(stream::stream::<S>)),
-        (&at::VIEWER, get(handle::users::viewer::<S>)),
-        (&at::TOKENS, get(handle::users::tokens::<S>)),
-        (&at::MINT_TOKEN, post(handle::users::mint_token::<S>)),
-        (&at::REVOKE_TOKEN, delete(handle::users::revoke_token::<S>)),
-    ];
-    served.extend(handle::projections::served::<S>());
-    served.extend(handle::proposals::served::<S>());
-    served.extend(handle::bulk::served::<S>());
+    let served = served::<S>(api.assistant.is_some());
     let mut routes = Router::new();
     for (endpoint, method_router) in served {
         routes = routes.route(endpoint.path, method_router);

@@ -2,9 +2,9 @@
 //! resolved against its journey as it stands
 //! (decisions/2026-10-07-the-ten-node-limit-holds-across-a-turn-and-what-touched.md): every
 //! node a record the patch writes hangs off, by its touched set (H5); a note or link it
-//! removes counts the node the stored journey has it on; and skipping or reopening a node
-//! counts its whole subtree, which D1a skips or reopens with it. A role fill writes one
-//! record and counts none: who holds a role is one answer, as a decision that fills the
+//! removes or moves counts the node the stored journey has it on; and skipping or reopening
+//! a node counts its whole subtree, which D1a skips or reopens with it. A role fill writes
+//! one record and counts none: who holds a role is one answer, as a decision that fills the
 //! role is.
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -22,7 +22,13 @@ pub fn touched_nodes(patch: &Patch, journey: Option<&Graph>) -> Option<BTreeSet<
     for key in patch.touched().as_set() {
         match key {
             RecordKey::Domain(_) | RecordKey::Graph(_) | RecordKey::RouteDraft(_) => return None,
-            RecordKey::InGraph { key, .. } => nodes.extend(node_of(key, journey)),
+            RecordKey::InGraph { key, .. } => {
+                nodes.extend(node_of(key, journey));
+                // A note or link moved to another node leaves the one it was on.
+                if let GraphKey::Annotation { annotation, .. } = key {
+                    nodes.extend(stored_annotation_node(journey, annotation));
+                }
+            }
             RecordKey::JourneyHeader(_)
             | RecordKey::RouteHeader(_)
             | RecordKey::RouteVersion { .. }

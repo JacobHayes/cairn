@@ -18,8 +18,11 @@ function Derivation({ ready }: { ready: Ready }) {
   );
 }
 
-/** Journey `id`'s screen `screen`, its body drawn by `children` once the journey is derived. */
-export function ActingFrame({ id, screen, children }: { id: string; screen: JourneyScreen; children: (ready: Ready) => ReactNode }) {
+/**
+ * Journey `id`'s screen `screen`, its body drawn by `children` once the journey is derived,
+ * and anything `header` adds to the heading's row.
+ */
+export function ActingFrame({ id, screen, children, header }: { id: string; screen: JourneyScreen; children: (ready: Ready) => ReactNode; header?: (ready: Ready) => ReactNode }) {
   const journey = useJourney(id);
   switch (journey.status) {
     case "loading":
@@ -39,6 +42,7 @@ export function ActingFrame({ id, screen, children }: { id: string; screen: Jour
         <div className="row">
           <h1 className="title" data-testid="journey-name">{journey.journey.header.name}</h1>
           <Derivation ready={journey} />
+          {header?.(journey)}
         </div>
         <JourneyNav journey={id} current={screen} />
       </section>

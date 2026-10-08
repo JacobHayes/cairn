@@ -14,6 +14,7 @@ import {
 } from "@cairn/client";
 import type { Engine } from "@cairn/wasm";
 
+import { serverAssistant } from "./assistant.ts";
 import { serverProposals } from "./proposals.ts";
 import { Missing, ReadFailed, type Host, type JourneyIndexQuery, type Markdown, type RouteFiles, type RouteImport } from "./host.ts";
 
@@ -118,6 +119,7 @@ export function serverHost(origin: string, engine: Engine): Host {
       ),
     send: (patch: Patch, note?: Markdown) => sendOver(client, note)(patch),
     proposals: serverProposals(client),
+    assistant: serverAssistant(client),
     openTicks: eventSourceTicks(origin),
   };
 }

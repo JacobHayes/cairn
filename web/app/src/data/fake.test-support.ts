@@ -4,6 +4,7 @@
 import type { Answered, HttpFailure, Patch, Tick, TickHandlers, Timers } from "@cairn/client";
 import type { DerivationKey, Derived } from "@cairn/wasm";
 
+import type { AssistantHost } from "./assistant.ts";
 import type { ProposalHost } from "./proposals.ts";
 import { Missing, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type RouteFile, type Viewer } from "./host.ts";
 
@@ -31,8 +32,12 @@ export class FakeHost implements Host {
 
   overlaps = (): boolean => false;
 
+  /** Whether the capabilities offer the assistant, and the assistant the host has. */
+  offersAssistant = false;
+  assistant: AssistantHost | undefined = undefined;
+
   capabilities() {
-    return Promise.resolve({ auth: [], assistant: false, mcp: false, sse: true });
+    return Promise.resolve({ auth: [], assistant: this.offersAssistant, mcp: false, sse: true });
   }
 
   /** The index queries asked, in turn. */

@@ -13,11 +13,11 @@ use serde_json::{Map, Value, json};
 use crate::endpoints::Endpoint;
 use crate::query::{self, ParamSpec, schema_of};
 use crate::wire::{
-    AgentToken, AssistantRequest, Capabilities, EventPage, History, JourneyPage, Mine, MintedToken,
-    NodeDetail, PatchAnswer, PatchRequest, Problem, Projected, ProposalAnswer, ProposalApply,
-    ProposalCreate, ProposalEdit, ProposalReview, ProposalStep, RelinkRequest, RouteDetail,
-    RouteImport, RoutePage, SaveAsRouteRequest, SearchPage, Tick, TokenRequest, TurnReply,
-    UpgradeRequest, Viewer,
+    AgentToken, AssistantRequest, Capabilities, Conversation, EventPage, History, JourneyPage,
+    Mine, MintedToken, NodeDetail, PatchAnswer, PatchRequest, Problem, Projected, ProposalAnswer,
+    ProposalApply, ProposalCreate, ProposalEdit, ProposalReview, ProposalStep, RelinkRequest,
+    RouteDetail, RouteImport, RoutePage, SaveAsRouteRequest, SearchPage, Tick, TokenRequest,
+    TurnReply, UpgradeRequest, Viewer,
 };
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, Entity, EntityKey, ExplainedField,
@@ -491,6 +491,24 @@ fn assistant() -> Vec<Operation> {
             "One assistant turn about a route's draft, when the capabilities offer the \
              assistant (I5, A12): what it drafts arrives as proposals on the draft.",
         ),
+        Operation {
+            path: &[JOURNEY_ID],
+            success: json::<Conversation>(),
+            ..operation(
+                &at::ASSISTANT_JOURNEY_CONVERSATION,
+                "The caller's conversation with the assistant about a journey, as kept, when \
+                 the capabilities offer the assistant (I5).",
+            )
+        },
+        Operation {
+            path: &[ROUTE_ID],
+            success: json::<Conversation>(),
+            ..operation(
+                &at::ASSISTANT_ROUTE_DRAFT_CONVERSATION,
+                "The caller's conversation with the assistant about a route's draft, as \
+                 kept, when the capabilities offer the assistant (I5).",
+            )
+        },
     ]
 }
 

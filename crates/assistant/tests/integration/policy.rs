@@ -474,3 +474,34 @@ async fn removals_and_skips_count_the_nodes_they_reach() {
     assert!(nodes.len() > 1, "the group and what it contains: {nodes:?}");
     assert!(nodes.contains(&"n_access".parse().unwrap()));
 }
+
+/// I5: moving notes onto one node counts the nodes they leave, read from the stored journey,
+/// as well as the one they land on.
+#[tokio::test]
+async fn moving_notes_counts_the_nodes_they_leave() {
+    let world = World::new();
+    let lead = user("u_lead");
+    world.vendor_journey(&lead).await;
+    let note = |index: usize, node: &str| json!({ "key": format!("a_note_{index}"), "node": node, "note": "Mine." });
+    let adds: Vec<Value> = ELEVEN
+        .iter()
+        .enumerate()
+        .map(|(index, node)| json!({ "op": "add_annotation", "annotation": note(index, node) }))
+        .collect();
+    let added = json!({ "patch": { "id": "p_notes", "target": { "journey": JOURNEY },
+        "base_revision": 1, "mutations": adds } });
+    world.ok(&lead, "apply_patch", added).await;
+    let moves: Vec<Value> = (0..ELEVEN.len())
+        .map(|index| json!({ "op": "edit_annotation", "annotation": note(index, "n_kickoff") }))
+        .collect();
+    let patch = json!({ "patch": { "id": "p_move", "target": { "journey": JOURNEY },
+        "base_revision": 2, "mutations": moves } });
+    let decided = wrapper::decide(&world.tools, world.store.as_ref(), "apply_patch", &patch).await;
+    let count = u32::try_from(ELEVEN.len() + 1).unwrap();
+    assert_eq!(
+        decided.map(|decision| decision.policy()),
+        Ok(Policy::Propose(Because::TooManyNodes {
+            count: Some(count)
+        }))
+    );
+}

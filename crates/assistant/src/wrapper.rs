@@ -107,6 +107,10 @@ pub enum Action {
         tool: String,
         /// The patch's receipt.
         receipt: PatchReceipt,
+        /// The nodes it wrote, in key order (I5: a direct change is reported with the nodes
+        /// it affected, which the panel links to); none for a write to no journey's nodes.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        nodes: Vec<NodeKey>,
         /// What it newly caused in each journey it changed (D7).
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         consequences: BTreeMap<JourneyId, Consequences>,
@@ -303,7 +307,7 @@ pub async fn run<S: Store + 'static>(
             let action = answer
                 .as_ref()
                 .ok()
-                .and_then(|output| applied(name, output));
+                .and_then(|output| applied(name, output, &nodes));
             if action.is_some() {
                 ledger.wrote(&domain, nodes);
             }
@@ -426,11 +430,12 @@ struct Written {
 }
 
 /// The applied action a direct write's output reports.
-fn applied(tool: &str, output: &Value) -> Option<Action> {
+fn applied(tool: &str, output: &Value, nodes: &BTreeSet<NodeKey>) -> Option<Action> {
     let written: Written = serde_json::from_value(output.clone()).ok()?;
     Some(Action::Applied {
         tool: tool.to_owned(),
         receipt: written.receipt,
+        nodes: nodes.iter().cloned().collect(),
         consequences: written.consequences,
     })
 }

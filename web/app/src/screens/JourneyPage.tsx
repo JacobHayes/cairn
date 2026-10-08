@@ -4,10 +4,12 @@
 // (5.1) beside the canvas at the journey's address with the node's key. What the canvas shows
 // is in the address's query (canvas/settings.ts), so every link keeps it. Edit mode (5.6)
 // adds the structure's editors: a palette above the canvas, the node's structure in its
-// detail, and drawing a requirement between two cards.
+// detail, and drawing a requirement between two cards. The assistant panel (5.8) opens from
+// the header when the host offers one.
 import { useMemo, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
+import { AssistantDock, journeyTitles } from "../assistant/AssistantPanel.tsx";
 import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
 import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { EditToggle, JourneyAuthoringBar } from "../authoring/JourneyAuthoring.tsx";
@@ -42,6 +44,7 @@ function Header({ ready, view, selected, bar }: { ready: Ready; view: CanvasView
           Derived in this tab at revision {key.revision}, deployment revision {key.deployment_revision}, for {key.today};{" "}
           {ready.derived.frontier.length} on the frontier.
         </span>
+        <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
       </div>
       <JourneyNav journey={header.id} current="canvas" node={selected} />
       <EditToggle journey={header.id} view={view} selected={selected} />

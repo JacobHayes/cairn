@@ -9,7 +9,9 @@ mod proposals;
 mod reads;
 mod users;
 
-pub use assistant::{AssistantRequest, TurnReply};
+pub use assistant::{
+    AssistantRequest, Conversation, ConversationAuthor, ConversationEntry, TurnReply,
+};
 pub use projections::{ChildEntry, History, Mine, NodeDetail, Projected};
 pub use proposals::{
     ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalReview, ProposalStep,

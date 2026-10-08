@@ -209,9 +209,23 @@ pub static ASSISTANT_ROUTE_DRAFT: Endpoint = endpoint(
     "/routes/{id}/draft/assistant",
     "converseAboutRouteDraft",
 );
+/// `GET /journeys/{id}/assistant`: the caller's conversation about a journey (I5), when the
+/// host offers the assistant.
+pub static ASSISTANT_JOURNEY_CONVERSATION: Endpoint = endpoint(
+    Method::GET,
+    "/journeys/{id}/assistant",
+    "conversationAboutJourney",
+);
+/// `GET /routes/{id}/draft/assistant`: the caller's conversation about a route's draft (I5),
+/// when the host offers the assistant.
+pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = endpoint(
+    Method::GET,
+    "/routes/{id}/draft/assistant",
+    "conversationAboutRouteDraft",
+);
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 49] = [
+pub static ALL: [&Endpoint; 51] = [
     &CAPABILITIES,
     &PATCH_JOURNEY,
     &PATCH_ROUTE,
@@ -261,6 +275,8 @@ pub static ALL: [&Endpoint; 49] = [
     &REVOKE_TOKEN,
     &ASSISTANT_JOURNEY,
     &ASSISTANT_ROUTE_DRAFT,
+    &ASSISTANT_JOURNEY_CONVERSATION,
+    &ASSISTANT_ROUTE_DRAFT_CONVERSATION,
 ];
 
 #[cfg(test)]
