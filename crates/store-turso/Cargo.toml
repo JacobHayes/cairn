@@ -11,7 +11,7 @@ publish.workspace = true
 [features]
 # A test seam: open the store over an I/O implementation the caller supplies
 # (`TursoStore::open_with_io`), so a test can fail one fsync
-# (decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md).
+# (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 io-seam = ["dep:turso_core"]
 
 [dependencies]

@@ -11,7 +11,7 @@ pub const DIRECT_WRITE_NODE_COUNT_MAX: u32 = 10;
 /// Tool calls run from one model reply: a reply asking for more is answered with a refusal
 /// for each call past this, so a reply cannot run past the turn's limits on tool calls
 /// alone. Borrowed from the iteration limit
-/// (decisions/2026-10-07-the-ten-node-limit-holds-across-a-turn-and-what-touched.md).
+/// (decisions/2026-10-06-the-write-wrapper-decides-on-the-patch-a-tool-would-submit.md).
 pub const TOOL_CALL_COUNT_PER_REPLY_MAX: u32 = TOOL_LOOP_ITERATION_COUNT_MAX;
 
 /// Provider calls in one turn: a runaway stop, not a budget. Structuring a journey is a few
@@ -44,13 +44,13 @@ pub const CONVERSATION_MESSAGE_COUNT_MAX: u32 = cairn_schema::limits::PAGE_ITEM_
 
 /// Bytes of a conversation replayed to the provider each turn, the newest kept: four
 /// message bodies, about 64 thousand tokens, well inside every current model's context
-/// (decisions/2026-10-07-the-ten-node-limit-holds-across-a-turn-and-what-touched.md:
+/// (decisions/2026-10-06-the-write-wrapper-decides-on-the-patch-a-tool-would-submit.md:
 /// pending the owner's sign-off as a named limit).
 pub const DIALOGUE_REPLAY_BYTES_MAX: u32 = 4 * cairn_schema::limits::BODY_BYTES_MAX;
 
 /// Bytes of one provider response read: the largest body Cairn takes in a request, since a
 /// reply's tool calls are bounded by what the tools accept
-/// (decisions/2026-10-07-the-ten-node-limit-holds-across-a-turn-and-what-touched.md).
+/// (decisions/2026-10-06-the-write-wrapper-decides-on-the-patch-a-tool-would-submit.md).
 pub const PROVIDER_RESPONSE_BYTES_MAX: u32 = cairn_schema::limits::REQUEST_BYTES_MAX;
 
 // A provider call fits in a turn, several times over.

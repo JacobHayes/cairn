@@ -1,6 +1,0 @@
-# The cycle check covers inherited requirements; condition gates and stages join with 2.2
-
-- Question: the acyclicity invariant covers explicit edges and every implicit gate (containment, inherited requirements, condition gates, stage openings). 2.1 owns "the cycle check over explicit and containment edges"; the readiness ruling gives the implicit-edge check to 2.2.
-- Call: 2.1 checks cycles over the instant network ARCHITECTURE describes (a container's entry, every node's start and finish, a child's entry or start waiting on its parent's entry, the parent's start on the child's finish, an explicit requirement on the dependent's entry or start), so a cycle through an inherited requirement (a group requiring a node that requires the group's own child) is caught now. Condition gates and stage openings need relevance and join the same network in 2.2. Edges to self, ancestors, and descendants are reported under their own codes and left out of the cycle check, so one cause gives one violation.
-- Alternatives: explicit and parent-child edges only (misses inherited cycles until 2.2).
-- What would change it: 2.2 building the effective graph as a separate structure, in which case this check moves into it.

@@ -1,6 +1,0 @@
-# The service is generic over its store and holds its notifier as a trait object
-
-- Question: brief 4.1 had the service over trait objects (PRACTICES, No dynamic dispatch: the store, notifier, and auth provider are trait objects by design), but the `Store` trait is not object-safe (DECISIONS.md 3.1), and a multi-threaded server needs every future the service returns to be `Send`, while the browser host runs on one thread.
-- Call: `Service<S: Store>` holds the store as `Arc<S>`, shared with the auth layer, whose `Accounts<S>` already takes an `Arc<S>`, and the notifier as `Arc<dyn Notifier>`: the notifier's methods are synchronous, so it stays a trait object as PRACTICES intends. Every operation's future is `Send` when the store's are, which a test asserts over both stores; `MemoryStore`'s futures are `Send` too (a `std` mutex), so the same service builds for `wasm32-unknown-unknown` (rung 1).
-- Alternatives: boxing every store future to make `Store` object-safe (an allocation per call, for a choice made once per process); a generic notifier (a type parameter for a seam with one implementation per host, and tests could not swap it).
-- What would change it: a host choosing among stores at run time.

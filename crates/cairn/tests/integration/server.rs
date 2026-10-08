@@ -242,8 +242,7 @@ mod in_process {
     /// closes the connection at `TCP_USER_TIMEOUT`, long before the server's send buffer
     /// could fill and stall the API's own channel. The kernel starts that clock at its first
     /// zero-window probe, one retransmission timeout (at least Linux's 200 ms minimum) after
-    /// the window closes, which the bound allows for
-    /// (decisions/2026-10-07-the-socket-level-write-stall-is-measured.md).
+    /// the window closes, which the bound allows for.
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
     async fn a_subscriber_that_stops_reading_loses_its_slot_at_the_write_stall() {

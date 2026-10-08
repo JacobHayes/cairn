@@ -106,8 +106,7 @@ mod tests {
 
     /// An accepted connection carries the write stall as its user timeout, and
     /// keepalive at the write stall, probing at the heartbeat interval
-    /// (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md,
-    /// decisions/2026-10-07-the-socket-level-write-stall-is-measured.md).
+    /// (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md).
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[tokio::test]
     async fn an_accepted_connection_carries_the_stall_and_keepalive() {

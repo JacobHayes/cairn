@@ -1,6 +1,6 @@
 //! The schema's `Derived` (ARCHITECTURE, Read path: `Derived`; D3): the engine's derived
 //! values projected onto the shape that crosses the API, now that every pass it carries exists
-//! (decisions/2026-10-06-the-engines-derived-projects-onto-the-schemas-here.md). Each node
+//! (decisions/2026-10-06-derive-returns-the-engines-own-derived-growing-a-field-per.md). Each node
 //! gets every D3 value with the inputs that explain it; the frontiers are in global rank
 //! order. Explanation lists are cut to the response limit with their totals
 //! (`explanation_entry_count_max`): inside the engine they are complete and listed on demand,

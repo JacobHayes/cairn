@@ -371,7 +371,7 @@ async fn history_pages_a_journeys_events_grouped_by_patch<S: Store>(store: Arc<S
 }
 
 /// The derived reads' futures are `Send` over either store, as the write path's are
-/// (decisions/2026-10-06-the-service-is-generic-over-its-store-and-holds-its-notifier.md).
+/// (decisions/2026-10-06-the-store-trait-is-generic-with-send-futures-not-object-safe.md).
 #[test]
 fn every_derived_read_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}

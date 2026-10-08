@@ -216,7 +216,7 @@ reached "$settled_label" "${error_logs[@]}" ||
 reached durability-failed-write-retried "${error_logs[@]}" ||
   fail "crash under errors: no failed write was retried"
 # The finding the testbed found
-# (decisions/2026-10-07-an-acknowledged-commit-is-lost-after-a-failed-log-fsync.md), pinned
+# (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md), pinned
 # as a regression at the store's current order of operations: seed 12's first commit fails its log fsync, and the crash
 # lands before any later log sync. With the store answering that commit applied before a
 # barrier synced it (the fix removed), this run loses the acknowledged commit. Its run

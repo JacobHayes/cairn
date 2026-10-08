@@ -25,7 +25,7 @@
 //! [`Derived`] holds the output of every pass. It is the engine's own type, with explanation
 //! lists complete and listed on demand; the schema's `Derived`, which crosses the API, is
 //! projected from it by [`Derived::to_schema`]
-//! (decisions/2026-10-06-the-engines-derived-projects-onto-the-schemas-here.md).
+//! (decisions/2026-10-06-derive-returns-the-engines-own-derived-growing-a-field-per.md).
 
 pub mod blocking;
 mod condition;

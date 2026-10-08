@@ -9,7 +9,7 @@
 //!
 //! The name decides, not the port: a rebinding page can choose any port but never a name
 //! other than its own, while proxies in front of Cairn differ in whether they forward the
-//! port (decisions/2026-10-07-the-host-allowlist-matches-names-not-ports-and-refuses.md).
+//! port (decisions/2026-10-06-dns-rebinding-protection-is-a-host-allowlist-in-front.md).
 
 use std::collections::BTreeSet;
 use std::net::SocketAddr;

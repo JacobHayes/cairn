@@ -1,5 +1,5 @@
 //! A turn's direct writes (I5;
-//! decisions/2026-10-07-the-ten-node-limit-holds-across-a-turn-and-what-touched.md): "mark
+//! decisions/2026-10-06-the-write-wrapper-decides-on-the-patch-a-tool-would-submit.md): "mark
 //! these fifteen done" is one change however many tool calls a model splits it into, so
 //! the ten-node limit holds across the turn. The ledger keeps the nodes the turn's direct
 //! writes touched; a write that would carry them past the limit is drafted instead, and

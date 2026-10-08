@@ -729,7 +729,7 @@ fn a_patch_to_a_proposal_is_not_a_domain_patch() {
 }
 
 /// The futures a multi-threaded host awaits are `Send` over either store
-/// (decisions/2026-10-06-the-service-is-generic-over-its-store-and-holds-its-notifier.md).
+/// (decisions/2026-10-06-the-store-trait-is-generic-with-send-futures-not-object-safe.md).
 #[test]
 fn every_operation_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}
