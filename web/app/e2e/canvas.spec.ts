@@ -54,7 +54,7 @@ const COMBINATIONS: { name: string; query: string; level: string; nodes: Record<
 ];
 
 for (const combination of COMBINATIONS) {
-  test(`C2: ${combination.name} renders the level's node set`, async ({ page }) => {
+  test(`C2: ${combination.name} renders the level's node set`, { tag: "@server" }, async ({ page }) => {
     await openJourney(page, "browser", "j_vendor_eval", combination.query);
     await expect.poll(() => containers(page)).toEqual(combination.nodes);
     const served = (await (await page.request.get(`/journeys/j_vendor_eval/level?${combination.level}`)).json()) as {
@@ -231,7 +231,7 @@ test("a rename started on one node does not follow the panel to another", async 
   await expect(renameOf(page, "n_access").getByRole("textbox")).toHaveValue("Not the plan");
 });
 
-test("C15: adding one node to the fixture moves fewer than the stated fraction of its nodes", async ({ page }) => {
+test("C15: adding one node to the fixture moves fewer than the stated fraction of its nodes", { tag: "@server" }, async ({ page }) => {
   await openJourney(page, "server", "j_vendor_eval");
   const before = await places(page);
   const revision = await derivedRevision(page);

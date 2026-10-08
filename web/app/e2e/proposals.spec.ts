@@ -125,7 +125,7 @@ test("B10: the placeholder broken down from its triage card through a proposal",
   }
 });
 
-test("B10, I6 on the server host: a placeholder broken down from its node detail through a proposal", async ({ page }) => {
+test("B10, I6 on the server host: a placeholder broken down from its node detail through a proposal", { tag: "@server" }, async ({ page }) => {
   const journey = await startVendorJourney(page);
   const document = (await (await page.request.get(`/journeys/${journey}/document`)).json()) as { journey: { revision: number } };
   const reached = await page.request.post(`/journeys/${journey}/patches`, {

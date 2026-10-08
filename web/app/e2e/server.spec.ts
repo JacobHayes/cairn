@@ -20,7 +20,7 @@ import {
 
 const title = (page: Page, node: string) => nodeCard(page, node).getByTestId("title");
 
-test("an edit in one page appears in another", async ({ context }) => {
+test("an edit in one page appears in another", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await openJourney(one, "server", "j_hiring");
   await openJourney(two, "server", "j_hiring");
@@ -32,7 +32,7 @@ test("an edit in one page appears in another", async ({ context }) => {
   expect(await derivedRevision(two)).toBe(await derivedRevision(one));
 });
 
-test("edits to different nodes both land", async ({ context }) => {
+test("edits to different nodes both land", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await openJourney(one, "server", "j_hiring");
   await openJourney(two, "server", "j_hiring");
@@ -49,7 +49,7 @@ test("edits to different nodes both land", async ({ context }) => {
   }
 });
 
-test("edits to one field surface a conflict", async ({ context }) => {
+test("edits to one field surface a conflict", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await openJourney(one, "server", "j_hiring");
   await openJourney(two, "server", "j_hiring");
@@ -66,7 +66,7 @@ test("edits to one field surface a conflict", async ({ context }) => {
   await expect(title(one, "n_onsite")).toHaveText(mine);
 });
 
-test("a later page shows the edit", async ({ context }) => {
+test("a later page shows the edit", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   const fetched = countDocumentFetches(two, "j_launch");
   await openJourney(one, "server", "j_launch");
@@ -101,7 +101,7 @@ async function createEntity(request: APIRequestContext): Promise<number> {
   return deployment.revision + 1;
 }
 
-test("a deployment tick refetches the deployment context and re-derives", async ({ page }) => {
+test("a deployment tick refetches the deployment context and re-derives", { tag: "@server" }, async ({ page }) => {
   const deploymentFetches: string[] = [];
   page.on("request", (request) => {
     if (new URL(request.url()).pathname === "/deployment") {
@@ -118,7 +118,7 @@ test("a deployment tick refetches the deployment context and re-derives", async 
   expect(deploymentFetches.length).toBe(fetchedBefore + 1);
 });
 
-test("version skew stops the tab and asks for a reload, keeping unsent edits", async ({ context }) => {
+test("version skew stops the tab and asks for a reload, keeping unsent edits", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await openJourney(one, "server", "j_vendor_eval");
   await openJourney(two, "server", "j_vendor_eval");
@@ -142,14 +142,14 @@ test("version skew stops the tab and asks for a reload, keeping unsent edits", a
   expect(await derivedRevision(two)).toBe(await derivedRevision(one));
 });
 
-test("the server host is chosen when a server answers", async ({ page }) => {
+test("the server host is chosen when a server answers", { tag: "@server" }, async ({ page }) => {
   await page.goto("/#/");
   await expect(page.getByTestId("host")).toHaveAttribute("data-status", "server");
   await open(page, "server");
   await expect(page.getByRole("link", { name: "Hire a platform engineer" })).toBeVisible();
 });
 
-test("an address that names no journey is shown missing, and the tab stays live", async ({ context }) => {
+test("an address that names no journey is shown missing, and the tab stays live", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await open(two, "server", "/journeys/not-a-journey");
   await expect(two.getByTestId("journey-missing")).toBeVisible();
@@ -162,7 +162,7 @@ test("an address that names no journey is shown missing, and the tab stays live"
   await expect(title(two, "n_announcement")).toHaveText(renamed);
 });
 
-test("typing is held while a save is in flight, so nothing typed is lost", async ({ page }) => {
+test("typing is held while a save is in flight, so nothing typed is lost", { tag: "@server" }, async ({ page }) => {
   await openJourney(page, "server", "j_launch");
   let release: () => void = () => undefined;
   const held = new Promise<void>((resolve) => {
@@ -195,7 +195,7 @@ async function journeyFromHiringRoute(request: APIRequestContext): Promise<strin
   return id;
 }
 
-test("a draft follows its journey and its host, not the screen it was typed on", async ({ page }) => {
+test("a draft follows its journey and its host, not the screen it was typed on", { tag: "@server" }, async ({ page }) => {
   const copy = await journeyFromHiringRoute(page.request);
   await openJourney(page, "server", copy);
   await expect(nodeCard(page, "n_offer")).toBeVisible();

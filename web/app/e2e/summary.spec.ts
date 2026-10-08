@@ -48,7 +48,7 @@ for (const [fixture, journey] of Object.entries(FIXTURE_JOURNEYS)) {
   });
 }
 
-test("C18: the summary shows the server's projection", async ({ page }) => {
+test("C18: the summary shows the server's projection", { tag: "@server" }, async ({ page }) => {
   await openScreen(page, "server", "j_launch", "summary");
   const summary = await served<{
     by_state: Record<string, number>;

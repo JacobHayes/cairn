@@ -44,18 +44,24 @@ export default defineConfig({
   outputDir: "dist/test-results",
   timeout: 120_000,
   expect: { timeout: 15_000 },
-  fullyParallel: false,
-  workers: 1,
   forbidOnly: true,
   reporter: [["list"]],
   use: { baseURL: `http://127.0.0.1:${appPort}` },
+  // The projects run side by side. The tests tagged @server use the one fixture server (they
+  // write to it, or compare with what it serves), and the `binary` project the one binary, so
+  // each of those runs its tests one at a time, in file order, as they ran before the projects
+  // were split; they come first so they start first, being the longest chains. A test on the
+  // in-browser host seeds its own store in its page, so those run in parallel in the workers
+  // left over.
   projects: [
-    { name: "chromium", use: { ...devices["Desktop Chrome"] } },
+    { name: "server", grep: /@server/, workers: 1, use: { ...devices["Desktop Chrome"] } },
     {
       name: "binary",
       testMatch: "server.spec.ts",
+      workers: 1,
       use: { ...devices["Desktop Chrome"], baseURL: `http://127.0.0.1:${binaryPort}` },
     },
+    { name: "chromium", grepInvert: /@server/, fullyParallel: true, use: { ...devices["Desktop Chrome"] } },
   ],
   webServer: [
     {

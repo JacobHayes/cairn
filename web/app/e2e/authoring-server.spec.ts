@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 import { dismissNotices, openEditing, section } from "./authoring.ts";
 import { fresh, openFromCanvas } from "./shell.ts";
 
-test("H5: a resource edited in another page meanwhile is reported, not overwritten, and kept on the current version when asked", async ({ context }) => {
+test("H5: a resource edited in another page meanwhile is reported, not overwritten, and kept on the current version when asked", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   for (const page of [one, two]) {
     await openEditing(page, "server", "j_launch");

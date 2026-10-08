@@ -59,7 +59,7 @@ test("C13: with no final milestone there is no end anchor; a pin puts a node on 
   await expect(page.locator('[data-testid="timeline-entry"][data-end="true"]')).toHaveCount(0);
 });
 
-test("C13: the timeline shows the server's projection row for row", async ({ page }) => {
+test("C13: the timeline shows the server's projection row for row", { tag: "@server" }, async ({ page }) => {
   await openScreen(page, "server", "j_launch", "timeline");
   const timeline = await served<{ entries: { node: string; date: string; origin: string }[]; end?: string }>(page, "j_launch", "timeline");
   await expect(page.getByTestId("timeline-entry")).toHaveCount(timeline.entries.length);

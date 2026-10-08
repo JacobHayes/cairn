@@ -29,8 +29,8 @@ export default defineConfig({
   testDir: "e2e",
   outputDir: "dist/test-results",
   timeout: 120_000,
-  fullyParallel: false,
-  workers: 1,
+  // Every test loads the module into a page of its own, so they run in parallel.
+  fullyParallel: true,
   forbidOnly: true,
   reporter: [["list"]],
   use: { baseURL: `http://127.0.0.1:${port}` },

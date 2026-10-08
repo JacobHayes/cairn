@@ -33,7 +33,7 @@ test("C12: the partner decision gates the partner-led subset, and revising it re
   await expect.poll(() => affected(page, "n_partner_runs")).toEqual(Object.fromEntries(PARTNER_LED.map((key) => [key, "relevant"])));
 });
 
-test("C12: every decision with its answer, pins, fills, and markers, as the server projects them", async ({ page }) => {
+test("C12: every decision with its answer, pins, fills, and markers, as the server projects them", { tag: "@server" }, async ({ page }) => {
   await openScreen(page, "server", "j_vendor_eval", "decisions");
   const view = await served<{ decisions: { node: string; state: string; affects?: string[]; pins?: string; fills?: string }[]; edges: unknown[] }>(
     page,

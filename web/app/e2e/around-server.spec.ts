@@ -33,7 +33,7 @@ async function journeyOwnedBy(request: APIRequestContext, owner: string): Promis
   return id;
 }
 
-test("H6: a journey started in one page appears in another page's index", async ({ context }) => {
+test("H6: a journey started in one page appears in another page's index", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await open(two, "server", "/");
   await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
@@ -43,7 +43,7 @@ test("H6: a journey started in one page appears in another page's index", async 
   await expect(two.locator(`[data-testid="journey-row"][data-journey="${id}"]`)).toContainText(name);
 });
 
-test("H6, E6: an entity merge in one page changes the owner another page shows", async ({ context }) => {
+test("H6, E6: an entity merge in one page changes the owner another page shows", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await open(one, "server", "/entities");
   const first = await addEntity(one, fresh("Owner"));
@@ -57,7 +57,7 @@ test("H6, E6: an entity merge in one page changes the owner another page shows",
   await expect(nodeCard(two, "n_task").getByTestId("card-owner")).toContainText(survivor);
 });
 
-test("H3: an identity signed in with the stub issuer links to the user, and its verified email names their entity", async ({ page }) => {
+test("H3: an identity signed in with the stub issuer links to the user, and its verified email names their entity", { tag: "@server" }, async ({ page }) => {
   const email = `${fresh("linked").replace(/\W/g, "-")}@example.org`;
   await open(page, "server", "/entities");
   const entity = await addEntity(page, fresh("Linked person"), email);
@@ -75,7 +75,7 @@ test("H3: an identity signed in with the stub issuer links to the user, and its 
   await expect(page.locator(`[data-testid="your-entity"][data-entity="${entity}"]`)).toBeVisible();
 });
 
-test("H5: an entity edited in another page meanwhile is not overwritten by an edit opened before it", async ({ context }) => {
+test("H5: an entity edited in another page meanwhile is not overwritten by an edit opened before it", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await open(one, "server", "/entities");
   const key = await addEntity(one, fresh("Edited"));

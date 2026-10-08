@@ -163,7 +163,7 @@ test("on a narrow screen the panel sits above the list with nothing off the side
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
-test("over the server, a resolution never overwrites a pin someone set meanwhile (F5, H5)", async ({ context }) => {
+test("over the server, a resolution never overwrites a pin someone set meanwhile (F5, H5)", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   const mine = await openNode(one, "server", "j_vendor_eval", "n_final_report");
   const theirs = await openNode(two, "server", "j_vendor_eval", "n_final_report");
@@ -177,7 +177,7 @@ test("over the server, a resolution never overwrites a pin someone set meanwhile
   await expect(theirs.getByTestId("pin-date")).toHaveText("2026-11-10");
 });
 
-test("over the server, a note added in one page appears in another's panel (H6)", async ({ context }) => {
+test("over the server, a note added in one page appears in another's panel (H6)", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   const mine = await openNode(one, "server", "j_hiring", "n_close_out");
   const theirs = await openNode(two, "server", "j_hiring", "n_close_out");
