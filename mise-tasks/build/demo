@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+#MISE description="Build the static demo site: the browser host's module (build:wasm), then the app's Vite build on the in-browser host into web/app/dist/demo/"
+# ARCHITECTURE, Web UI: in-browser host. The app with no server, seeded from the fixtures on
+# every load, for a static host that answers every path with index.html. A build output,
+# never checked in.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+mise run build:wasm
+(cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts --mode demo)
+[ -f web/app/dist/demo/index.html ] || { echo "build:demo: the build wrote no index.html" >&2; exit 1; }

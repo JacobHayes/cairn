@@ -123,17 +123,3 @@ export function serverHost(origin: string, engine: Engine): Host {
     openTicks: eventSourceTicks(origin),
   };
 }
-
-/**
- * Whether a server answers at `origin`: its capabilities document comes back as JSON. A
- * static site or a dev server with no server behind its proxy answers something else.
- */
-export async function serverAnswers(origin: string): Promise<boolean> {
-  try {
-    const response = await fetch(`${origin}/api/capabilities`, { headers: { Accept: "application/json" } });
-    const type = response.headers.get("content-type") ?? "";
-    return response.ok && type.includes("application/json");
-  } catch {
-    return false;
-  }
-}

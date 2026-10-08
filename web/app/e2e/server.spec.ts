@@ -143,13 +143,6 @@ test("version skew stops the tab and asks for a reload, keeping unsent edits", {
   expect(await derivedRevision(two)).toBe(await derivedRevision(one));
 });
 
-test("the server host is chosen when a server answers", { tag: "@server" }, async ({ page }) => {
-  await page.goto("/");
-  await expect(page.getByTestId("host")).toHaveAttribute("data-status", "server");
-  await open(page, "server");
-  await expect(page.getByRole("link", { name: "Hire a platform engineer" })).toBeVisible();
-});
-
 test("an address that names no journey is shown missing, and the tab stays live", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await open(two, "server", "/journeys/not-a-journey");
@@ -196,7 +189,7 @@ async function journeyFromHiringRoute(request: APIRequestContext): Promise<strin
   return id;
 }
 
-test("a draft follows its journey and its host, not the screen it was typed on", { tag: "@server" }, async ({ page }) => {
+test("a draft follows its journey, not the screen it was typed on", { tag: "@server" }, async ({ page }) => {
   const copy = await journeyFromHiringRoute(page.request);
   await openJourney(page, "server", copy);
   await expect(nodeCard(page, "n_offer")).toBeVisible();
@@ -210,8 +203,4 @@ test("a draft follows its journey and its host, not the screen it was typed on",
   await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveCount(0);
   await goWithin(page, "/journeys/j_hiring/nodes/n_offer");
   await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveValue(draft);
-  await open(page, "browser", "/journeys/j_hiring/nodes/n_offer");
-  await expect(page.getByTestId("derivation")).toBeVisible();
-  await expect(renameOf(page, "n_offer").getByRole("button", { name: /^Rename/ })).toBeVisible();
-  await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveCount(0);
 });

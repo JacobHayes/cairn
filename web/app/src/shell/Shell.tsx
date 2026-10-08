@@ -1,24 +1,18 @@
-// The app shell every screen renders inside: the header (the host and its switch, whether
-// the view is live), the version-skew banner, the screen, and the notices.
+// The app shell every screen renders inside: the header (the screens, whether the view is
+// live, and a badge on the demo), the version-skew banner, the screen, and the notices.
 import { Link, Outlet, useLocation } from "react-router";
 
-import { switchedTo } from "../data/choose.ts";
 import { mayNotApply } from "../data/notices.ts";
 import { useNotices, useSession, useSkew, useStreamStatus } from "../data/react.ts";
 import { Badge, Button, Gate } from "../ui/kit.tsx";
 
-function HostSwitch() {
+/** The demo is the in-browser host: say so, since nothing done there is saved. */
+function DemoBadge() {
   const { host } = useSession();
-  const other = host.kind === "server" ? "browser" : "server";
-  const at = useLocation();
-  return (
-    <span className="row">
-      <Badge data-testid="host" data-status={host.kind}>{host.kind === "server" ? "Server" : "In-browser host"}</Badge>
-      <a href={switchedTo(location.origin, at, other)} className="muted">
-        Switch to {other === "server" ? "the server" : "the in-browser host"}
-      </a>
-    </span>
-  );
+  if (host.kind !== "browser") {
+    return null;
+  }
+  return <Badge tone="warn">Demo: sample data, nothing is saved</Badge>;
 }
 
 /** H6: live over the server's SSE stream (gated on its capability) or the in-browser notifier. */
@@ -98,6 +92,8 @@ function Notices() {
 }
 
 export function Shell() {
+  // The screen the router shows, for the browser tests to wait on after an in-page navigation.
+  const { pathname, search } = useLocation();
   return (
     <>
       <header className="shell-header">
@@ -113,10 +109,10 @@ export function Shell() {
         </nav>
         <span className="shell-spacer" />
         <LiveStatus />
-        <HostSwitch />
+        <DemoBadge />
       </header>
       <SkewBanner />
-      <main className="shell-main">
+      <main className="shell-main" data-screen={`${pathname}${search}`}>
         <Outlet />
       </main>
       <Notices />

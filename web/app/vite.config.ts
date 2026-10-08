@@ -2,6 +2,11 @@
 // hot reload and proxies API calls to a running server, or runs the in-browser host with no
 // server). CAIRN_SERVER is the server's origin to proxy to; CAIRN_APP_PORT the port to serve
 // on (the browser tests pick free ones).
+//
+// The build fixes the host the app runs on (ARCHITECTURE, Web UI: in-browser host): the dev
+// server runs the server host when it proxies to one and the in-browser host when it does
+// not; `vite build` makes the build the binary embeds, on the server host, and `vite build
+// --mode demo` the static demo site, on the in-browser host.
 import { fileURLToPath } from "node:url";
 
 import react from "@vitejs/plugin-react";
@@ -21,13 +26,18 @@ if (server !== undefined) {
   }
 }
 
-export default defineConfig({
+export default defineConfig(({ command, mode }) => ({
+  define: {
+    __CAIRN_HOST__: JSON.stringify(command === "serve" ? (server === undefined ? "browser" : "server") : mode === "demo" ? "browser" : "server"),
+  },
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [react()],
   logLevel: "warn",
-  // `mise run build:web` writes here, and the binary embeds it (crates/cairn/src/assets.rs);
-  // beside it in dist/ sit the browser tests' reports, which are never embedded.
-  build: { outDir: "dist/build", emptyOutDir: true },
+  // `mise run build:web` writes dist/build/, which the binary embeds (crates/cairn/src/assets.rs),
+  // and `mise run build:demo` dist/demo/; beside them sit the browser tests' reports.
+  build: { outDir: mode === "demo" ? "dist/demo" : "dist/build", emptyOutDir: true },
+  // The browser tests run a dev server of each host side by side; each bundles into its own.
+  cacheDir: `../../node_modules/.vite/app-${server === undefined ? "demo" : "server"}`,
   // The dev server bundles dependencies it finds by crawling from index.html, which never
   // follows `new Worker(new URL(...))`. A dependency only a worker imports (ELK's worker
   // build, canvas/layout-worker.ts) was found when the first page started that worker: Vite
@@ -41,4 +51,4 @@ export default defineConfig({
     strictPort: true,
     proxy,
   },
-});
+}));

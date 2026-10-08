@@ -4,40 +4,45 @@ import { expect, type Page } from "@playwright/test";
 
 export type HostKind = "server" | "browser";
 
+/** The in-browser host's dev server (playwright.config.ts); the server host is the project's own. */
+const DEMO = `http://127.0.0.1:${process.env["CAIRN_DEMO_PORT"] ?? ""}`;
+
 /**
  * Opens the screen at `path` (`/`, `/journeys/<id>?view=...`) on `host`, once the shell is up:
  * within the page when it already runs on `host`, as a link would, so the in-browser host's
- * store (which lives only as long as the page) is kept; by loading the page otherwise.
+ * store (which lives only as long as the page) is kept; by loading the page otherwise. The
+ * shell shows a Demo badge on the in-browser host and none on the server.
  */
 export async function open(page: Page, host: HostKind, path = "/"): Promise<void> {
-  const shell = page.getByTestId("host");
-  if ((await shell.count()) === 1 && (await shell.getAttribute("data-status")) === host) {
+  const nav = page.getByRole("navigation", { name: "Screens", exact: true });
+  const demo = page.getByText("Demo: sample data", { exact: false });
+  const onDemo = page.url().startsWith(`${DEMO}/`);
+  if ((await nav.count()) === 1 && onDemo === (host === "browser")) {
     await goWithin(page, path);
   } else {
-    await page.goto(`${path}${path.includes("?") ? "&" : "?"}host=${host}`);
+    await page.goto(host === "browser" ? `${DEMO}${path}` : path);
   }
-  await expect(shell).toBeVisible();
+  await expect(nav).toBeVisible();
+  await expect(demo).toHaveCount(host === "browser" ? 1 : 0);
 }
 
 /**
  * Moves the tab to the screen at `path` without loading the page again, as the app's links do,
- * and returns once the router has rendered it: the shell's host switch links to the screen
- * the router shows, so its address follows only when the new screen is on the page. Data the
- * screen derives may still be on its way; read it with a web-first assertion.
+ * and returns once the router has rendered it (the shell's `data-screen`). Data the screen
+ * derives may still be on its way; read it with a web-first assertion.
  */
 export async function goWithin(page: Page, path: string): Promise<void> {
   await page.evaluate((to) => {
     history.pushState(null, "", to);
     dispatchEvent(new PopStateEvent("popstate"));
   }, path);
-  const shown = page.getByRole("link", { name: /^Switch to / });
-  await expect.poll(async () => screenOf((await shown.getAttribute("href")) ?? "")).toBe(screenOf(path));
+  const main = page.locator("main[data-screen]");
+  await expect.poll(async () => screenOf((await main.getAttribute("data-screen")) ?? "")).toBe(screenOf(path));
 }
 
-/** The screen an address names: its path and query, without the host switch's parameter. */
+/** The screen an address names: its path and its query, in a stable order. */
 function screenOf(address: string): string {
   const url = new URL(address, "http://screen.invalid");
-  url.searchParams.delete("host");
   url.searchParams.sort();
   return `${url.pathname}?${url.searchParams.toString()}`;
 }

@@ -7,7 +7,6 @@ import { derivedRevision, fresh, open, openJourney, rename, renameOf, startRenam
 
 test("the journey index lists every fixture's journey", async ({ page }) => {
   await open(page, "browser");
-  await expect(page.getByTestId("host")).toHaveAttribute("data-status", "browser");
   await expect(page.getByTestId("journey-row")).toHaveCount(4);
   for (const name of ["Two-week bake-off", "Hire a platform engineer", "Launch the reporting release"]) {
     await expect(page.getByRole("link", { name })).toBeVisible();

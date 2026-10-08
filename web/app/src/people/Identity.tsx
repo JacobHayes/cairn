@@ -86,7 +86,7 @@ export function Identity() {
       <span className="row">
         <h1 className="title">You</h1>
         <Badge data-testid="user">{viewer.user}</Badge>
-        {host.kind === "browser" ? <span className="muted">The in-browser host's one local identity.</span> : null}
+        {host.kind === "browser" ? <span className="muted">The demo's one local identity.</span> : null}
       </span>
       <Identities viewer={viewer} />
       <YourEntities viewer={viewer} />
