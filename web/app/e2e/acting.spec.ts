@@ -3,7 +3,7 @@
 // triage's pass and per-kind cards (C11, B10); snoozes leaving and returning (B6); and the
 // decision walkthrough over a fresh journey on the server host (C11, D2). The other tests
 // read the fixtures on the in-browser host, fresh on every load.
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import {
   answerCard,
@@ -20,21 +20,41 @@ import {
   turnOn,
 } from "./acting.ts";
 import { derivedRevision } from "./shell.ts";
+import { FIXED_TODAY } from "./views.ts";
 
 const UP_FRONT = ["n_meeting_date", "n_partner_runs", "n_purpose", "n_who_informed", "n_who_owns"];
 
+/** The product launch's acting frontier at the end of its scenario in rank order, read on `FIXED_TODAY`. */
+const LAUNCH_RANKED = ["n_launch", "n_docs", "n_announcement", "n_beta_end", "n_retro"];
+
+/** Holds the page's clock at noon UTC on `FIXED_TODAY`, so the in-browser host derives with that today. */
+async function atFixedToday(page: Page): Promise<void> {
+  await page.clock.setFixedTime(new Date(`${FIXED_TODAY}T12:00:00Z`));
+}
+
 test("C10: the next list ranks the frontier, and re-sorting by slack reorders it", async ({ page }) => {
+  await atFixedToday(page);
   await openActing(page, "browser", "j_launch", "next");
-  const ranked = await nextKeys(page);
+  // At the scenario matrix's day every slack is past the urgency window, so gravity and
+  // leverage rank: the launch leads, then the work feeding it; the retrospective, with no
+  // deadline, sorts last by slack.
+  expect(await nextKeys(page)).toEqual(LAUNCH_RANKED);
   await expect(page.getByTestId("breadcrumb").first()).toBeVisible();
-  await expect(page.getByTestId("why").first()).toHaveAttribute("data-rank", /\d/);
+  const ranks = await page.getByTestId("why").evaluateAll((whys) => whys.map((why) => Number(why.getAttribute("data-rank"))));
+  expect(ranks).toEqual([...ranks].sort((left, right) => right - left));
   await page.getByLabel("Sort by").selectOption("slack");
-  await expect.poll(() => nextKeys(page)).not.toEqual(ranked);
+  await expect.poll(() => nextKeys(page)).toEqual(["n_docs", "n_announcement", "n_beta_end", "n_launch", "n_retro"]);
   const slacks = await page.getByTestId("next-item").evaluateAll((items) => items.map((item) => item.getAttribute("data-slack") ?? ""));
   const known = slacks.filter((slack) => slack !== "").map(Number);
   expect(known).toEqual([...known].sort((left, right) => left - right));
   expect(slacks.slice(known.length).every((slack) => slack === "")).toBe(true);
-  expect((await nextKeys(page)).sort()).toEqual([...ranked].sort());
+});
+
+test("C11: triage holds the acting frontier, one card at a time in rank order", async ({ page }) => {
+  await atFixedToday(page);
+  await openActing(page, "browser", "j_launch", "triage");
+  expect(await passOrder(page)).toEqual(LAUNCH_RANKED);
+  await expect(card(page)).toHaveAttribute("data-node", LAUNCH_RANKED[0] ?? "");
 });
 
 test("C9: filters hold at once, search reads notes, and rows group by container", async ({ page }) => {
@@ -144,6 +164,14 @@ test("C11: the walkthrough opens on the decisions at the start; answering the pa
   expect((await passOrder(page)).sort()).toEqual(UP_FRONT.filter((key) => key !== "n_partner_runs"));
   await page.getByRole("link", { name: "Every kind" }).click();
   await expect.poll(() => passOrder(page)).toContain("n_criteria");
+  // Every kind holds the journey's acting frontier: kickoff, the decision meeting, the
+  // decisions still open, and the partner-led work the answer surfaced, in the next list's
+  // order.
+  const pass = await passOrder(page);
+  const everyKind = ["n_criteria", "n_decision_meeting", "n_kickoff", ...UP_FRONT.filter((key) => key !== "n_partner_runs")];
+  expect([...pass].sort()).toEqual(everyKind.sort());
+  await page.getByTestId("nav-next").click();
+  expect(await nextKeys(page)).toEqual(pass);
 });
 
 test("C11, B10: a placeholder's card offers break down and mark atomic, and no done until it is atomic", async ({ page }) => {
