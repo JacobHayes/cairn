@@ -78,7 +78,7 @@ Rule: production crates use `assert!` for invariants, plus `sometimes!` coverage
 
 ## Explicit limits
 
-Hard-coded named constants; validation rejects a patch that would exceed one, and loops use the same constant as their bound. Sized for human-authored processes, not for what the machine could hold.
+Hard-coded named constants; validation rejects a patch that would exceed one, and loops use the same constant as their bound. Sized for human-authored processes, not for what the machine could hold. Every list a person or agent writes has a count limit and every string a byte limit; the few values that take another row's limit, and why it fits them, are in [`decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md`](decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
 
 | Limit | Value | Why this value |
 |---|---|---|
@@ -86,12 +86,22 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | containment depth | 16 | Convention is group > deliverable > action, occasionally deeper; 16 is far past anything readable on a canvas. |
 | explicit edges per node, in plus out | 64 | A milestone that gates a whole stage does so through one implicit edge, not 64 explicit ones. Past this the canvas is unreadable and the author should restructure. |
 | mutations per patch | 8,000 | An import of a full graph is roughly four mutations per node (node, edges, participations, resources); 4 x the node limit, enforced by a `const` assertion. |
-| roles, participation kinds per graph | 32 each | A process with more than a couple dozen distinct roles is several processes. |
+| roles, participation kinds per graph | 32 each | A process with more than a couple dozen distinct roles is several processes. A node has at most one participation per kind, so this bounds a node's participations too. |
 | choices per decision | 32 | A single-choice question with more options is a text or entity answer in disguise. |
-| entities per role fill or entity-list answer | 100 | A stakeholder list; past 100 it is a team, which the PRD does not model. |
+| entities per role fill, entity-list answer, or explicit participation; values per `in` clause | 100 | A stakeholder list; past 100 it is a team, which the PRD does not model. An `in` clause compares against such a list. |
+| emails per entity | 16 | Work, personal, and a few former addresses, with room for a merge to join two people's lists. |
+| aliases per entity | 32 | Each merge of a duplicate adds one; a person imported from several sources gathers a handful. |
+| entities per deployment | 5,000 | Hundreds of journeys naming tens of people each, mostly shared; past this the deployment is a staff directory, which the PRD does not model. |
+| journeys named by one entity merge | 1,000 | A merge names every journey referencing either entity, and the PRD sizes a deployment at hundreds of journeys. |
+| resources per node | 16 | A tip, a template, an example or two; past 16 it is a reading list, which belongs in one linked document. |
+| notes per node, or on the journey | 100 | A running log of status notes over a long piece of work; past 100 the discussion belongs in a linked conversation. |
+| links per node, or on the journey | 32 | The artifacts, references, and conversations of one piece of work; past 32 they belong in a folder behind one link. |
 | condition tree depth, clauses | 8, 16 | Conditions are meant to be one or two clauses; this allows a complicated one and still fits in a form editor. |
-| id slug, title | 64, 256 bytes | Ids are paths; titles are card labels. |
-| description, note, resource body | 64 KiB | A long tip or template; larger content lives in a linked document. |
+| id slug or key, title or label | 64, 256 bytes | Ids and keys are paths and short references; titles, names, and choice labels are card labels. |
+| description, prompt, help, note, tip, message draft, text answer | 64 KiB | A long tip or template; larger content lives in a linked document. |
+| link (URL) | 4 KiB | Practical URLs stay under about 2 KiB; twice that admits long signed links and stays under the 8 KiB request line common servers accept. |
+| email address | 254 bytes | RFC 5321 caps an address path at 256 octets, angle brackets included. |
+| reason for a skip, override, or bypass | 4 KiB | A sentence or a short paragraph; a longer account belongs in a note. |
 | date offset, estimate | 365 days | A year. "Two weeks before the meeting" is the typical case; a multi-year offset is a modeling error. |
 | weight | 1,000 | The PRD's examples are 1, 5, and 10. Gravity sums weights over up to 2,000 nodes, so the sum fits comfortably in a `u32`. |
 | snapshot frontier top-N, history page | 200 per request | A bounded agent view; the remainder is counts and keys. Callers page. |

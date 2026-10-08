@@ -1,6 +1,6 @@
 //! The tree, ids, keys, and limits (PRD Invariants: graph, first, second, and last bullets;
-//! PRACTICES, Explicit limits). Cost at the limits: one pass over nodes and their edges, plus
-//! one serialization of the graph to measure it (at most 16 MiB).
+//! PRACTICES, Explicit limits). Cost at the limits: one pass over nodes, their edges, and
+//! their resources, plus one serialization of the graph to measure it (at most 16 MiB).
 
 use std::collections::BTreeMap;
 
@@ -17,6 +17,7 @@ pub(super) fn check(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     role_and_kind_ids(check, out);
     edge_counts(check, out);
     resource_keys(check, out);
+    resource_counts(check, out);
     graph_size(check, out);
 }
 
@@ -191,6 +192,27 @@ fn resource_keys(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                 found.related.push(Subject::Node(first.clone()));
                 out.push(found);
             }
+        }
+    }
+}
+
+/// PRACTICES, Explicit limits: at most `resource_count_per_node_max` resources per node,
+/// however they arrived (added one at a time, imported, or merged in by an upgrade).
+fn resource_counts(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
+    for node in check.document.nodes.values() {
+        if let Err(exceeded) = Limit::ResourceCountPerNode.check(node.resources.len()) {
+            let mut found = at_node(
+                check.tree,
+                &node.key,
+                ViolationCode::LimitExceeded,
+                format!(
+                    "{} resources, past {}",
+                    exceeded.count,
+                    exceeded.limit.name()
+                ),
+            );
+            found.limit = Some(exceeded.limit);
+            out.push(found);
         }
     }
 }

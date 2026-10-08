@@ -889,6 +889,7 @@
           "items": {
             "$ref": "#/$defs/Resource"
           },
+          "maxItems": 16,
           "type": "array"
         },
         "title": {
@@ -1157,8 +1158,8 @@
       "type": "string"
     },
     "Url": {
-      "description": "A URL: scheme:rest, no whitespace.",
-      "maxLength": 65536,
+      "description": "A URL: scheme:rest, no whitespace, at most link_bytes_max (4 KiB) bytes.",
+      "maxLength": 4096,
       "minLength": 1,
       "type": "string"
     },

@@ -1,6 +1,6 @@
 //! Bounded text (PRACTICES, Explicit limits): every string a document carries has a byte
-//! limit, checked when it is parsed. Strings the limits table does not name take the
-//! nearest named limit: single-line labels the title limit, free text the body limit
+//! limit, checked when it is parsed. Labels take the title limit and free text the body
+//! limit; links, emails, and reasons have their own
 //! (decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
 
 use std::fmt;
@@ -92,11 +92,11 @@ bounded_text!(
 );
 bounded_text!(
     /// The reason a skip, override, or bypass requires.
-    Reason, check_body, Limit::BodyBytes,
-    "A reason, at most body_bytes_max (64 KiB) bytes."
+    Reason, check_body, Limit::ReasonBytes,
+    "A reason, at most reason_bytes_max (4 KiB) bytes."
 );
 
-/// A link's target: `scheme:rest`, no whitespace, at most the body limit.
+/// A link's target: `scheme:rest`, no whitespace, at most `link_bytes_max`.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Url(String);
 
@@ -112,7 +112,7 @@ impl FromStr for Url {
     type Err = TextError;
 
     fn from_str(text: &str) -> Result<Self, TextError> {
-        check_line(text, Limit::BodyBytes)?;
+        check_line(text, Limit::LinkBytes)?;
         let scheme = text.split_once(':').map(|(scheme, _)| scheme);
         let scheme_ok = scheme.is_some_and(|scheme| {
             scheme.starts_with(|first: char| first.is_ascii_alphabetic())
@@ -130,9 +130,9 @@ impl FromStr for Url {
 string_serde!(
     Url,
     "Url",
-    "A URL: scheme:rest, no whitespace.",
+    "A URL: scheme:rest, no whitespace, at most link_bytes_max (4 KiB) bytes.",
     None::<&str>,
-    Some(Limit::BodyBytes)
+    Some(Limit::LinkBytes)
 );
 
 /// An email address, trimmed and lower-cased so that equal addresses compare equal (H3).
@@ -153,7 +153,7 @@ impl FromStr for Email {
     /// H3: emails compare case-insensitively after trimming, so they are stored that way.
     fn from_str(text: &str) -> Result<Self, TextError> {
         let normalized = text.trim().to_lowercase();
-        check_line(&normalized, Limit::TitleBytes)?;
+        check_line(&normalized, Limit::EmailBytes)?;
         let well_formed = normalized.split_once('@').is_some_and(|(local, domain)| {
             !local.is_empty() && !domain.is_empty() && !domain.contains('@')
         }) && !normalized.chars().any(char::is_whitespace);
@@ -167,9 +167,9 @@ impl FromStr for Email {
 string_serde!(
     Email,
     "Email",
-    "An email address; stored trimmed and lower-cased (H3).",
+    "An email address, at most email_bytes_max (254) bytes; stored trimmed and lower-cased (H3).",
     None::<&str>,
-    Some(Limit::TitleBytes)
+    Some(Limit::EmailBytes)
 );
 
 #[cfg(test)]
@@ -190,6 +190,33 @@ mod tests {
         assert!(at.parse::<Markdown>().is_ok());
         let past = format!("{at}b").parse::<Markdown>().unwrap_err();
         assert!(matches!(past, TextError::TooLong(e) if e.limit == Limit::BodyBytes));
+    }
+
+    /// Text of exactly `bytes` bytes that is otherwise well formed for `limit`'s type.
+    fn sized(limit: Limit, bytes: usize) -> Result<(), TextError> {
+        let pad = |prefix: &str, suffix: &str| {
+            let fill = bytes - prefix.len() - suffix.len();
+            format!("{prefix}{}{suffix}", "x".repeat(fill))
+        };
+        match limit {
+            Limit::LinkBytes => pad("https://example.org/", "").parse::<Url>().map(drop),
+            Limit::EmailBytes => pad("", "@example.org").parse::<Email>().map(drop),
+            Limit::ReasonBytes => pad("", "").parse::<Reason>().map(drop),
+            other => unreachable!("{other} is not a text limit here"),
+        }
+    }
+
+    #[test]
+    fn links_emails_and_reasons_at_and_past_their_own_limits() {
+        for limit in [Limit::LinkBytes, Limit::EmailBytes, Limit::ReasonBytes] {
+            let at = usize::try_from(limit.max()).unwrap();
+            assert_eq!(sized(limit, at), Ok(()), "{limit}");
+            let past = sized(limit, at + 1).unwrap_err();
+            assert!(
+                matches!(past, TextError::TooLong(e) if e.limit == limit),
+                "{limit}"
+            );
+        }
     }
 
     #[test]

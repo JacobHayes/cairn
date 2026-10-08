@@ -289,6 +289,20 @@ fn mutation_count_at_and_past_its_limit() {
 }
 
 #[test]
+fn merge_journeys_at_and_past_their_limit() {
+    let limit = Limit::JourneyCountPerMerge;
+    let merge = |count: u32| {
+        let journeys: serde_json::Map<_, _> = (0..count)
+            .map(|index| (format!("j_{index}"), Value::from(1)))
+            .collect();
+        serde_json::json!({"op": "merge_entities", "survivor": "e_a", "merged": "e_b", "journeys": journeys})
+    };
+    assert!(serde_json::from_value::<Mutation>(merge(limit.max())).is_ok());
+    let error = serde_json::from_value::<Mutation>(merge(limit.max() + 1)).unwrap_err();
+    assert!(error.to_string().contains(limit.name()), "{error}");
+}
+
+#[test]
 fn a_proposal_cannot_hold_proposal_mutations() {
     let nested = "- op: create_proposal\n  proposal:\n    title: Outer\n    destination_revision: 1\n    mutations:\n    - {op: discard_proposal}\n";
     assert!(from_yaml::<Vec<Mutation>>(nested).is_err());

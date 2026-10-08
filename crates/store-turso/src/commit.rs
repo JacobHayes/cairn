@@ -232,7 +232,7 @@ async fn within(
     }
     if !shape.created_entities.is_empty() {
         let before = load::deployment(connection).await?;
-        violations.extend(backend::taken_entity_keys(&shape.created_entities, &before));
+        violations.extend(backend::entity_create_violations(shape, &before)?);
     }
     let nodes = event_nodes(connection, commit).await?;
     let taken_proposals = proposals_of_deleted(connection, shape).await?;

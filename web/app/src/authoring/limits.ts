@@ -23,6 +23,10 @@ export const ID_BYTES_MAX = 64;
 export const TITLE_BYTES_MAX = 256;
 /** A description, note, prompt, help text, or resource body, in bytes. */
 export const BODY_BYTES_MAX = 64 * 1024;
+/** A link (a URL), in bytes. */
+export const LINK_BYTES_MAX = 4 * 1024;
+/** Resources per node. */
+export const RESOURCE_COUNT_PER_NODE_MAX = 16;
 /** A date offset or an estimate, in days. */
 export const OFFSET_DAYS_MAX = 365;
 /** A weight. */
@@ -46,5 +50,5 @@ export function outOfRange(value: number, max: number, what: string): string | u
 
 /** Why `text` is not a URL as the schema takes one (scheme:rest, no whitespace), or undefined. */
 export function urlProblem(text: string): string | undefined {
-  return /^[A-Za-z][A-Za-z0-9+.-]*:\S+$/.test(text) ? overBytes(text, BODY_BYTES_MAX, "The address") : "An address is a URL: a scheme, a colon, and no spaces (https://...).";
+  return /^[A-Za-z][A-Za-z0-9+.-]*:\S+$/.test(text) ? overBytes(text, LINK_BYTES_MAX, "The address") : "An address is a URL: a scheme, a colon, and no spaces (https://...).";
 }

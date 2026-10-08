@@ -338,11 +338,22 @@ pub fn reject_violations(mut violations: Vec<Violation>) -> Result<(), CommitErr
     if violations.is_empty() {
         return Ok(());
     }
+    Err(rejection(violations))
+}
+
+/// The rejection listing `violations`.
+///
+/// # Panics
+///
+/// When `violations` is empty: a rejection lists what it rejects.
+#[must_use]
+pub fn rejection(violations: Vec<Violation>) -> CommitError {
+    assert!(!violations.is_empty(), "a rejection lists what it rejects");
     match Violations::new(violations) {
-        Ok(violations) => Err(CommitError::Rejected(Rejection::Invalid { violations })),
-        Err(error) => Err(CommitError::Failed(StoreError::Backend(format!(
+        Ok(violations) => CommitError::Rejected(Rejection::Invalid { violations }),
+        Err(error) => CommitError::Failed(StoreError::Backend(format!(
             "violations could not be listed: {error}"
-        )))),
+        ))),
     }
 }
 
@@ -390,6 +401,62 @@ pub fn taken_entity_keys(created: &BTreeSet<EntityKey>, before: &Deployment) -> 
             )
         })
         .collect()
+}
+
+/// The checks on the entities a commit creates, made before its writes are applied: each
+/// key not already taken ([`taken_entity_keys`]), and, for creates riding in a journey's or
+/// route's patch, the deployment within its entity limit ([`entity_count_violation`]). A
+/// deployment patch is checked against the deployment revision it was validated at, and may
+/// remove entities (a merge) before it creates one, so the engine's count already holds for it.
+///
+/// # Errors
+///
+/// The rejection, at once, when riding creates would overfill the deployment: the commit's
+/// writes could not be applied to check anything else.
+pub fn entity_create_violations(
+    shape: &Shape,
+    before: &Deployment,
+) -> Result<Vec<Violation>, CommitError> {
+    let created = &shape.created_entities;
+    let mut violations = taken_entity_keys(created, before);
+    if shape.domain == Domain::Deployment {
+        return Ok(violations);
+    }
+    if let Some(full) = entity_count_violation(created, before) {
+        violations.push(full);
+        return Err(rejection(violations));
+    }
+    Ok(violations)
+}
+
+/// PRACTICES, Explicit limits: the entities a commit creates fit under
+/// `entity_count_per_deployment_max` on top of those the deployment already holds. A create
+/// riding in a journey patch takes no deployment revision (E6), so two patches validated
+/// against the same deployment can each fit and together not; the commit is where that shows.
+/// Checked before the commit's writes are applied, which could not hold the overflow.
+#[must_use]
+pub fn entity_count_violation(
+    created: &BTreeSet<EntityKey>,
+    before: &Deployment,
+) -> Option<Violation> {
+    let added = created
+        .iter()
+        .filter(|key| before.entities.get(key).is_none())
+        .count();
+    let exceeded = Limit::EntityCountPerDeployment
+        .check(before.entities.len() + added)
+        .err()?;
+    let mut found = violation(
+        ViolationCode::LimitExceeded,
+        Subject::Deployment,
+        format!(
+            "the deployment would hold {} entities, past {}",
+            exceeded.count,
+            exceeded.limit.name()
+        ),
+    );
+    found.limit = Some(exceeded.limit);
+    Some(found)
 }
 
 /// E6, H3: the deployment a commit produced keeps aliases off entity keys and pointing at an

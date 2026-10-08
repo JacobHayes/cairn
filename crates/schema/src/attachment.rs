@@ -393,6 +393,20 @@ pub enum AnnotationContent {
     Conversation(Url),
 }
 
+impl AnnotationContent {
+    /// The per-holder limit this annotation counts against: notes against
+    /// `note_count_per_node_max`, links of every type against `link_count_per_node_max`.
+    #[must_use]
+    pub fn count_limit(&self) -> Limit {
+        match self {
+            AnnotationContent::Note(_) => Limit::NoteCountPerNode,
+            AnnotationContent::Artifact(_)
+            | AnnotationContent::Reference(_)
+            | AnnotationContent::Conversation(_) => Limit::LinkCountPerNode,
+        }
+    }
+}
+
 /// A note or link as its author writes it (G1): the part an add or edit carries.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,

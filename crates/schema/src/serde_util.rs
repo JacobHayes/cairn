@@ -155,3 +155,37 @@ where
 {
     unique_entries(deserializer, "a map with each key once", None)
 }
+
+/// `deserialize_with` for a map with one entry per node: [`unique_entries`] held to
+/// `node_count_max`, since a graph has no more nodes to key it by.
+pub(crate) fn unique_map_per_node<'de, D, K, V>(
+    deserializer: D,
+) -> Result<std::collections::BTreeMap<K, V>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    K: serde::Deserialize<'de> + Ord + std::fmt::Display,
+    V: serde::Deserialize<'de>,
+{
+    unique_entries(
+        deserializer,
+        "a map from node to its entry, each node once",
+        Some(crate::limits::Limit::NodeCount),
+    )
+}
+
+/// `deserialize_with` for a map with one entry per role: [`unique_entries`] held to
+/// `role_count_max`, since a graph has no more roles to key it by.
+pub(crate) fn unique_map_per_role<'de, D, K, V>(
+    deserializer: D,
+) -> Result<std::collections::BTreeMap<K, V>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    K: serde::Deserialize<'de> + Ord + std::fmt::Display,
+    V: serde::Deserialize<'de>,
+{
+    unique_entries(
+        deserializer,
+        "a map from role to its entry, each role once",
+        Some(crate::limits::Limit::RoleCount),
+    )
+}

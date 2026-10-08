@@ -1,6 +1,8 @@
 //! The deployment holds (E6, H3): every alias names an entity and is not one itself, so an
-//! alias resolves in one step with no cycle, and each email belongs to one entity. Checked
-//! when the patch wrote deployment records. Cost: one pass over entities and aliases.
+//! alias resolves in one step with no cycle, and each email belongs to one entity; a merge
+//! joins two entities' emails and aliases, so each entity is held to its email and alias
+//! limits here too. Checked when the patch wrote deployment records. Cost: one pass over
+//! entities and aliases.
 
 use std::collections::BTreeMap;
 
@@ -43,6 +45,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
         found.limit = Some(Limit::GraphBytes);
         check.violations.push(found);
     }
+    entity_limits(check);
     let mut holders = BTreeMap::new();
     for entity in deployment.entities.values() {
         for email in &entity.emails {
@@ -56,5 +59,31 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
                 check.violations.push(found);
             }
         }
+    }
+}
+
+/// PRACTICES, Explicit limits: each entity holds at most `email_count_per_entity_max` emails
+/// and is the target of at most `alias_count_per_entity_max` aliases.
+fn entity_limits(check: &mut Check<'_, '_>) {
+    let deployment = &check.session.candidate.deployment;
+    let emails = deployment.entities.values().filter_map(|entity| {
+        Limit::EmailCountPerEntity
+            .check(entity.emails.len())
+            .err()
+            .map(|exceeded| (&entity.key, exceeded))
+    });
+    let aliases = deployment.alias_counts_exceeded();
+    for (key, exceeded) in emails.chain(aliases) {
+        let mut found = violation(
+            ViolationCode::LimitExceeded,
+            format!(
+                "the entity has {}, past {}",
+                exceeded.count,
+                exceeded.limit.name()
+            ),
+        );
+        found.at.subject = Some(Subject::Entity(key.clone()));
+        found.limit = Some(exceeded.limit);
+        check.violations.push(found);
     }
 }

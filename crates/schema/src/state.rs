@@ -11,6 +11,7 @@ use crate::attachment::Annotation;
 use crate::collections::{BoundedSet, ByDocumentSize, ChoiceCountPerDecision, Keyed};
 use crate::field::NodeField;
 use crate::id::{AttachmentKey, EntityKey, KindKey, NodeKey, RoleKey, Slug};
+use crate::limits::{Limit, LimitExceeded};
 use crate::node::{AnswerType, EntitySet, NodeKind};
 use crate::text::Reason;
 use jiff::civil::Date;
@@ -349,63 +350,115 @@ pub struct JourneyState {
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
-        deserialize_with = "crate::serde_util::unique_map"
+        deserialize_with = "crate::serde_util::unique_map_per_node"
     )]
+    #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub nodes: BTreeMap<NodeKey, NodeState>,
     /// Each route-copied node's local edits (B4), apart from its state so that an edit and
     /// a transition on one node touch different records (H5).
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
-        deserialize_with = "crate::serde_util::unique_map"
+        deserialize_with = "crate::serde_util::unique_map_per_node"
     )]
+    #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub local_edits: BTreeMap<NodeKey, BTreeSet<LocalEdit>>,
     /// Answers by decision.
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
-        deserialize_with = "crate::serde_util::unique_map"
+        deserialize_with = "crate::serde_util::unique_map_per_node"
     )]
+    #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub answers: BTreeMap<NodeKey, AnswerValue>,
     /// Direct role fills, for roles without a filling decision (E3). A role with a filling
     /// decision is filled from that decision's answer, which is derived, not stored here.
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
-        deserialize_with = "crate::serde_util::unique_map"
+        deserialize_with = "crate::serde_util::unique_map_per_role"
     )]
+    #[schemars(extend("maxProperties" = crate::limits::ROLE_COUNT_MAX))]
     pub role_fills: BTreeMap<RoleKey, EntitySet>,
     /// Pins: explicit journey-level dates on nodes (PRD glossary, Pin). A pin from a
     /// `feeds_milestone` answer is derived from the answer, not stored here (E3).
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
-        deserialize_with = "crate::serde_util::unique_map"
+        deserialize_with = "crate::serde_util::unique_map_per_node"
     )]
+    #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub pins: BTreeMap<NodeKey, Date>,
     /// Snoozes by node (B6).
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
-        deserialize_with = "crate::serde_util::unique_map"
+        deserialize_with = "crate::serde_util::unique_map_per_node"
     )]
+    #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub snoozes: BTreeMap<NodeKey, SnoozeTarget>,
     /// Overrides by node.
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
-        deserialize_with = "crate::serde_util::unique_map"
+        deserialize_with = "crate::serde_util::unique_map_per_node"
     )]
+    #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub overrides: BTreeMap<NodeKey, Overrides>,
     /// Route-copied nodes the journey removed, so an upgrade does not re-add them (B4).
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub tombstones: BTreeSet<NodeKey>,
-    /// Notes and links (G1).
-    #[serde(default, skip_serializing_if = "Keyed::is_empty")]
+    /// Notes and links (G1): on each node, and on the journey itself, at most
+    /// `note_count_per_node_max` notes and `link_count_per_node_max` links.
+    #[serde(
+        default,
+        skip_serializing_if = "Keyed::is_empty",
+        deserialize_with = "journey_annotations"
+    )]
     pub annotations: Keyed<Annotation, ByDocumentSize>,
 }
 
+/// A journey's notes and links as written: each holder within its note and link limits.
+fn journey_annotations<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<Keyed<Annotation, ByDocumentSize>, D::Error> {
+    let annotations = Keyed::deserialize(deserializer)?;
+    if let Some((holder, exceeded)) = annotation_counts_exceeded(&annotations).first() {
+        let holder = holder.map_or_else(|| "the journey".to_owned(), ToString::to_string);
+        return Err(serde::de::Error::custom(format!(
+            "annotations on {holder}: {exceeded}"
+        )));
+    }
+    Ok(annotations)
+}
+
+/// Each holder (a node, or the journey itself as none) past its note or link limit, with
+/// the limit and count, in holder order.
+fn annotation_counts_exceeded(
+    annotations: &Keyed<Annotation, ByDocumentSize>,
+) -> Vec<(Option<&NodeKey>, LimitExceeded)> {
+    let mut counts: BTreeMap<(Option<&NodeKey>, Limit), usize> = BTreeMap::new();
+    for annotation in annotations.values() {
+        let limit = annotation.body.content.count_limit();
+        *counts
+            .entry((annotation.body.node.as_ref(), limit))
+            .or_default() += 1;
+    }
+    counts
+        .into_iter()
+        .filter_map(|((holder, limit), count)| limit.check(count).err().map(|e| (holder, e)))
+        .collect()
+}
+
 impl JourneyState {
+    /// Each holder of notes and links (a node, or the journey itself as none) past its
+    /// note or link limit. Annotations are added one patch at a time, so the engine checks
+    /// this after each as the parse checks it on read.
+    #[must_use]
+    pub fn annotation_counts_exceeded(&self) -> Vec<(Option<&NodeKey>, LimitExceeded)> {
+        annotation_counts_exceeded(&self.annotations)
+    }
+
     /// True for a route version or draft: no state at all.
     #[must_use]
     pub fn is_empty(&self) -> bool {
@@ -418,5 +471,87 @@ impl JourneyState {
             && self.overrides.is_empty()
             && self.tombstones.is_empty()
             && self.annotations.is_empty()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A journey state holding `count` annotations of one kind on `node` (none: the journey).
+    fn state_with(node: Option<&str>, field: &str, value: &str, count: u32) -> serde_json::Value {
+        let annotations: Vec<_> = (0..count)
+            .map(|index| {
+                let mut body = serde_json::json!({"key": format!("a_{index}"), field: value});
+                if let Some(node) = node {
+                    body["node"] = node.into();
+                }
+                serde_json::json!({
+                    "body": body,
+                    "created_by": "u_author",
+                    "created_at": "2026-10-01T00:00:00Z",
+                })
+            })
+            .collect();
+        serde_json::json!({"annotations": annotations})
+    }
+
+    #[test]
+    fn notes_and_links_at_and_past_their_limits_on_a_node_and_the_journey() {
+        let cases = [
+            ("note", "Status.", Limit::NoteCountPerNode),
+            ("artifact", "https://example.org/a", Limit::LinkCountPerNode),
+            (
+                "conversation",
+                "https://example.org/c",
+                Limit::LinkCountPerNode,
+            ),
+        ];
+        for (field, value, limit) in cases {
+            for node in [Some("n_work"), None] {
+                let at = state_with(node, field, value, limit.max());
+                assert!(
+                    serde_json::from_value::<JourneyState>(at).is_ok(),
+                    "{field}"
+                );
+                let past = state_with(node, field, value, limit.max() + 1);
+                let error = serde_json::from_value::<JourneyState>(past).unwrap_err();
+                assert!(error.to_string().contains(limit.name()), "{field}: {error}");
+            }
+        }
+    }
+
+    #[test]
+    fn notes_and_links_count_separately_and_per_holder() {
+        let note_limit = Limit::NoteCountPerNode.max();
+        let mut notes = state_with(Some("n_work"), "note", "Status.", note_limit);
+        let links = state_with(Some("n_work"), "reference", "https://example.org", 1);
+        let elsewhere = state_with(Some("n_other"), "note", "Status.", 1);
+        let all = notes["annotations"].as_array_mut().unwrap();
+        for (index, mut extra) in [links, elsewhere]
+            .into_iter()
+            .flat_map(|state| state["annotations"].as_array().unwrap().clone())
+            .enumerate()
+        {
+            extra["body"]["key"] = format!("a_extra_{index}").into();
+            all.push(extra);
+        }
+        assert!(serde_json::from_value::<JourneyState>(notes).is_ok());
+    }
+
+    #[test]
+    fn a_node_keyed_map_holds_the_node_limit() {
+        let answers = |count: u32| -> serde_json::Value {
+            (0..count)
+                .map(|index| (format!("n_{index}"), serde_json::json!({"boolean": true})))
+                .collect::<serde_json::Map<_, _>>()
+                .into()
+        };
+        let limit = Limit::NodeCount;
+        let at = serde_json::json!({"answers": answers(limit.max())});
+        assert!(serde_json::from_value::<JourneyState>(at).is_ok());
+        let past = serde_json::json!({"answers": answers(limit.max() + 1)});
+        let error = serde_json::from_value::<JourneyState>(past).unwrap_err();
+        assert!(error.to_string().contains(limit.name()), "{error}");
     }
 }

@@ -1479,11 +1479,14 @@ export interface components {
         };
         /** @description The deployment domain (E6; ARCHITECTURE, Engine > Model: `Deployment`). */
         Deployment: {
-            /** @description Merged entities' old keys, each resolving to the entity it was merged into (E6). */
+            /**
+             * @description Merged entities' old keys, each resolving to the entity it was merged into (E6), at
+             *     most `alias_count_per_entity_max` resolving to one entity.
+             */
             aliases?: {
                 [key: string]: components["schemas"]["EntityKey"];
             };
-            /** @description The entities. */
+            /** @description The entities, at most `entity_count_per_deployment_max`. */
             entities?: components["schemas"]["Entity"][];
             /** @description The deployment revision (H5). */
             revision: components["schemas"]["Revision"];
@@ -1585,7 +1588,7 @@ export interface components {
             /** @description Where it comes from. */
             origin: components["schemas"]["ParticipationOrigin"];
         };
-        /** @description An email address; stored trimmed and lower-cased (H3). */
+        /** @description An email address, at most email_bytes_max (254) bytes; stored trimmed and lower-cased (H3). */
         Email: string;
         /** @description How a turn ended. The writes before any ending stand and are reported. */
         Ended: {
@@ -1610,7 +1613,11 @@ export interface components {
         EngineVersion: string;
         /** @description A person or team journeys refer to (PRD glossary, Entity), deployment-scoped. */
         Entity: {
-            /** @description Its emails, each held by at most one entity (H3). */
+            /**
+             * @description Its emails, each held by at most one entity (H3), at most
+             *     `email_count_per_entity_max`. A merge joins two entities' emails, so the engine checks
+             *     the joined set too.
+             */
             emails?: components["schemas"]["Email"][];
             /** @description The entity's key. */
             key: components["schemas"]["EntityKey"];
@@ -2014,7 +2021,10 @@ export interface components {
          *     serialization.
          */
         JourneyState: {
-            /** @description Notes and links (G1). */
+            /**
+             * @description Notes and links (G1): on each node, and on the journey itself, at most
+             *     `note_count_per_node_max` notes and `link_count_per_node_max` links.
+             */
             annotations?: components["schemas"]["Annotation"][];
             /** @description Answers by decision. */
             answers?: {
@@ -2596,7 +2606,10 @@ export interface components {
             /** @constant */
             op: "edit_entity";
         } | {
-            /** @description Every journey referencing either, at the revision the merge was checked against. */
+            /**
+             * @description Every journey referencing either, at the revision the merge was checked against;
+             *     at most `journey_count_per_merge_max`.
+             */
             journeys: {
                 [key: string]: components["schemas"]["Revision"];
             };
@@ -3485,7 +3498,7 @@ export interface components {
             urgency: components["schemas"]["Real"];
         };
         Real: number;
-        /** @description A reason, at most body_bytes_max (64 KiB) bytes. */
+        /** @description A reason, at most reason_bytes_max (4 KiB) bytes. */
         Reason: string;
         /** @description One stored record, as after-state. */
         Record: {
@@ -4394,7 +4407,7 @@ export interface components {
             /** @description The version to upgrade to. */
             to: components["schemas"]["VersionNumber"];
         };
-        /** @description A URL: scheme:rest, no whitespace. */
+        /** @description A URL: scheme:rest, no whitespace, at most link_bytes_max (4 KiB) bytes. */
         Url: string;
         /** @description Starts with "u_"; at most id_bytes_max (64) bytes. */
         UserId: string;

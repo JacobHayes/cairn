@@ -3,8 +3,8 @@
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    Domain, Entity, EntityKey, JourneyId, Mutation, Record, RecordKey, Revision, RevisionConflict,
-    RevisionOf, Subject, ViolationCode, Write,
+    Domain, Entity, EntityKey, JourneyId, Limit, Mutation, Record, RecordKey, Revision,
+    RevisionConflict, RevisionOf, Subject, ViolationCode, Write,
 };
 
 use super::Session;
@@ -49,7 +49,8 @@ fn reject_entity(session: &mut Session<'_>, code: ViolationCode, key: &EntityKey
 }
 
 /// E6: a create needs no deployment revision, so a journey patch can create a person and
-/// answer with them at once; a key already an entity or an alias is rejected.
+/// answer with them at once; a key already an entity or an alias is rejected, and so is an
+/// entity past `entity_count_per_deployment_max`.
 fn create(session: &mut Session<'_>, entity: &Entity) -> Vec<Write> {
     let deployment = &session.candidate.deployment;
     if deployment.entities.get(&entity.key).is_some()
@@ -61,6 +62,21 @@ fn create(session: &mut Session<'_>, entity: &Entity) -> Vec<Write> {
             &entity.key,
             "the key is already an entity or an alias (E6)",
         );
+        return Vec::new();
+    }
+    if Limit::EntityCountPerDeployment
+        .check(deployment.entities.len() + 1)
+        .is_err()
+    {
+        reject_entity(
+            session,
+            ViolationCode::LimitExceeded,
+            &entity.key,
+            "past entity_count_per_deployment_max",
+        );
+        if let Some(found) = session.violations.last_mut() {
+            found.limit = Some(Limit::EntityCountPerDeployment);
+        }
         return Vec::new();
     }
     session.created_entities.insert(entity.key.clone());
@@ -103,6 +119,25 @@ fn merge(
     assert_ne!(survivor, merged);
     let mut joined = kept.clone();
     joined.emails.extend(gone.emails.iter().cloned());
+    // Every record an event carries reads back, so a merge that would put an entity past its
+    // email limit, or name more journeys than a merge may, is refused here rather than only
+    // by the final check, which a later edit in the patch could pass (PRACTICES, Explicit
+    // limits).
+    let counts = [
+        (Limit::EmailCountPerEntity, joined.emails.len()),
+        (Limit::JourneyCountPerMerge, journeys.len()),
+    ];
+    if let Some(exceeded) = counts
+        .into_iter()
+        .find_map(|(limit, count)| limit.check(count).err())
+    {
+        let message = format!("{} past {}", exceeded.count, exceeded.limit.name());
+        reject_entity(session, ViolationCode::LimitExceeded, survivor, &message);
+        if let Some(found) = session.violations.last_mut() {
+            found.limit = Some(exceeded.limit);
+        }
+        return Vec::new();
+    }
     let mut writes = vec![
         Write::Remove(RecordKey::Entity(merged.clone())),
         Write::Put(Record::Entity(joined)),

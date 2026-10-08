@@ -10,7 +10,7 @@ import { useDraft } from "../data/drafts.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import type { Resource } from "./graph.ts";
 import { mintKey } from "./keys.ts";
-import { BODY_BYTES_MAX, TITLE_BYTES_MAX, overBytes, urlProblem } from "./limits.ts";
+import { BODY_BYTES_MAX, RESOURCE_COUNT_PER_NODE_MAX, TITLE_BYTES_MAX, overBytes, urlProblem } from "./limits.ts";
 import { Picker } from "./parts.tsx";
 import { placeholderOptions, toStored, toWritten } from "./placeholders.ts";
 import { Refusal, type NodeEditorProps } from "./StructureEditors.tsx";
@@ -151,6 +151,7 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
   const write = useAuthorWrite(authored);
   const [editing, setEditing] = useDraft<Editing>(`resource-form:${domainOf(authored)}:${node.key}`);
   const resources = node.resources ?? [];
+  const full = resources.length >= RESOURCE_COUNT_PER_NODE_MAX;
   return (
     <div className="stack" data-testid="resource-editor">
       {resources.length === 0 ? <span className="muted">No resources.</span> : null}
@@ -169,7 +170,8 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
       </ul>
       {editing === undefined ? (
         <span className="row">
-          <Button onClick={() => { setEditing({ form: { key: undefined, type: "tip", title: "", body: "" }, base: authored.revision }); }}>Add a resource</Button>
+          <Button disabled={full} onClick={() => { setEditing({ form: { key: undefined, type: "tip", title: "", body: "" }, base: authored.revision }); }}>Add a resource</Button>
+          {full ? <span className="muted">A node holds at most {String(RESOURCE_COUNT_PER_NODE_MAX)} resources.</span> : null}
         </span>
       ) : (
         <ResourceFormView authored={authored} node={node} editing={editing} setEditing={setEditing} />

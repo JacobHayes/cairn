@@ -8,9 +8,12 @@ use std::fmt;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::collections::{ByDocumentSize, HasKey, Keyed};
+use crate::collections::{
+    BoundedSet, EmailCountPerEntity, EntityCountPerDeployment, HasKey, Keyed,
+};
 use crate::graph::Graph;
 use crate::id::{EntityKey, JourneyId, RouteId};
+use crate::limits::{Limit, LimitExceeded};
 use crate::number::{Revision, VersionNumber};
 use crate::text::{Email, Markdown, Title};
 use jiff::Timestamp;
@@ -188,9 +191,23 @@ pub struct Entity {
     pub key: EntityKey,
     /// Its name.
     pub name: Title,
-    /// Its emails, each held by at most one entity (H3).
-    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    /// Its emails, each held by at most one entity (H3), at most
+    /// `email_count_per_entity_max`. A merge joins two entities' emails, so the engine checks
+    /// the joined set too.
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeSet::is_empty",
+        deserialize_with = "entity_emails"
+    )]
+    #[schemars(with = "BoundedSet<Email, EmailCountPerEntity>")]
     pub emails: BTreeSet<Email>,
+}
+
+/// An entity's emails as written: each once, at most `email_count_per_entity_max`.
+fn entity_emails<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<BTreeSet<Email>, D::Error> {
+    BoundedSet::<Email, EmailCountPerEntity>::deserialize(deserializer).map(BoundedSet::into_set)
 }
 
 impl HasKey for Entity {
@@ -207,14 +224,118 @@ impl HasKey for Entity {
 pub struct Deployment {
     /// The deployment revision (H5).
     pub revision: Revision,
-    /// The entities.
+    /// The entities, at most `entity_count_per_deployment_max`.
     #[serde(default, skip_serializing_if = "Keyed::is_empty")]
-    pub entities: Keyed<Entity, ByDocumentSize>,
-    /// Merged entities' old keys, each resolving to the entity it was merged into (E6).
+    pub entities: Keyed<Entity, EntityCountPerDeployment>,
+    /// Merged entities' old keys, each resolving to the entity it was merged into (E6), at
+    /// most `alias_count_per_entity_max` resolving to one entity.
     #[serde(
         default,
         skip_serializing_if = "BTreeMap::is_empty",
-        deserialize_with = "crate::serde_util::unique_map"
+        deserialize_with = "deployment_aliases"
     )]
     pub aliases: BTreeMap<EntityKey, EntityKey>,
+}
+
+impl Deployment {
+    /// Each entity, in key order, that more than `alias_count_per_entity_max` aliases resolve
+    /// to, with its alias count. A merge moves the merged entity's aliases to the survivor, so
+    /// the engine checks this after one as the parse checks it on read.
+    #[must_use]
+    pub fn alias_counts_exceeded(&self) -> Vec<(&EntityKey, LimitExceeded)> {
+        alias_counts_exceeded(&self.aliases)
+    }
+}
+
+fn alias_counts_exceeded(
+    aliases: &BTreeMap<EntityKey, EntityKey>,
+) -> Vec<(&EntityKey, LimitExceeded)> {
+    let mut counts: BTreeMap<&EntityKey, usize> = BTreeMap::new();
+    for target in aliases.values() {
+        *counts.entry(target).or_default() += 1;
+    }
+    counts
+        .into_iter()
+        .filter_map(|(target, count)| {
+            Limit::AliasCountPerEntity
+                .check(count)
+                .err()
+                .map(|exceeded| (target, exceeded))
+        })
+        .collect()
+}
+
+/// The deployment's aliases as written: each alias once, and at most
+/// `alias_count_per_entity_max` resolving to one entity.
+fn deployment_aliases<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<BTreeMap<EntityKey, EntityKey>, D::Error> {
+    let aliases = crate::serde_util::unique_map(deserializer)?;
+    if let Some((target, exceeded)) = alias_counts_exceeded(&aliases).first() {
+        return Err(serde::de::Error::custom(format!(
+            "aliases of {target}: {exceeded}"
+        )));
+    }
+    Ok(aliases)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at_and_past<T: serde::de::DeserializeOwned + fmt::Debug>(
+        limit: Limit,
+        document: impl Fn(u32) -> serde_json::Value,
+    ) {
+        assert!(
+            serde_json::from_value::<T>(document(limit.max())).is_ok(),
+            "{limit}"
+        );
+        let past = serde_json::from_value::<T>(document(limit.max() + 1)).unwrap_err();
+        assert!(past.to_string().contains(limit.name()), "{limit}: {past}");
+    }
+
+    #[test]
+    fn an_entity_holds_its_email_limit() {
+        at_and_past::<Entity>(Limit::EmailCountPerEntity, |count| {
+            let emails: Vec<String> = (0..count).map(|n| format!("p{n}@example.org")).collect();
+            serde_json::json!({"key": "e_person", "name": "Person", "emails": emails})
+        });
+    }
+
+    #[test]
+    fn a_deployment_holds_its_entity_limit() {
+        at_and_past::<Deployment>(Limit::EntityCountPerDeployment, |count| {
+            let entities: Vec<_> = (0..count)
+                .map(|n| serde_json::json!({"key": format!("e_{n}"), "name": "Someone"}))
+                .collect();
+            serde_json::json!({"revision": 1, "entities": entities})
+        });
+    }
+
+    #[test]
+    fn a_deployment_holds_its_alias_limit_per_entity() {
+        at_and_past::<Deployment>(Limit::AliasCountPerEntity, |count| {
+            let aliases: serde_json::Map<_, _> = (0..count)
+                .map(|n| (format!("e_old_{n}"), serde_json::json!("e_survivor")))
+                .collect();
+            serde_json::json!({"revision": 1, "aliases": aliases})
+        });
+    }
+
+    #[test]
+    fn aliases_spread_over_entities_are_each_within_the_limit() {
+        let aliases: serde_json::Map<_, _> = (0..2 * ALIAS_LIMIT)
+            .map(|n| {
+                (
+                    format!("e_old_{n}"),
+                    serde_json::json!(format!("e_{}", n % 2)),
+                )
+            })
+            .collect();
+        let document = serde_json::json!({"revision": 1, "aliases": aliases});
+        assert!(serde_json::from_value::<Deployment>(document).is_ok());
+    }
+
+    const ALIAS_LIMIT: u32 = crate::limits::ALIAS_COUNT_PER_ENTITY_MAX;
 }

@@ -2,8 +2,9 @@
 //! kind's machine has, answers match their decisions, direct role fills and pins never stand
 //! in for a filling or feeding decision, and every record of state hangs off something that
 //! exists. A route version or draft has no state at all. Entity references are checked with
-//! the deployment by the apply pipeline. Cost at the limits: one pass over each state map,
-//! each entry one lookup by key.
+//! the deployment by the apply pipeline. Each node, and the journey itself, holds at most its
+//! limits of notes and links. Cost at the limits: one pass over each state map, each entry
+//! one lookup by key.
 
 use std::collections::BTreeMap;
 
@@ -31,6 +32,7 @@ pub(super) fn check(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     role_fills(check, out);
     pins_and_snoozes(check, out);
     attached_records(check, out);
+    annotation_counts(check, out);
 }
 
 /// D1: every node has a state its kind's machine has; B10: `atomic` only on placeholders.
@@ -281,5 +283,34 @@ fn attached_records(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
                 "a tombstoned node cannot come back (B4)",
             ));
         }
+    }
+}
+
+/// PRACTICES, Explicit limits: each node, and the journey itself, holds at most
+/// `note_count_per_node_max` notes and `link_count_per_node_max` links (G1).
+fn annotation_counts(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
+    for (holder, exceeded) in check.document.state.annotation_counts_exceeded() {
+        let mut found = match holder {
+            Some(node) => at_node(
+                check.tree,
+                node,
+                ViolationCode::LimitExceeded,
+                format!(
+                    "{} on the node, past {}",
+                    exceeded.count,
+                    exceeded.limit.name()
+                ),
+            ),
+            None => violation(
+                ViolationCode::LimitExceeded,
+                format!(
+                    "{} on the journey, past {}",
+                    exceeded.count,
+                    exceeded.limit.name()
+                ),
+            ),
+        };
+        found.limit = Some(exceeded.limit);
+        out.push(found);
     }
 }

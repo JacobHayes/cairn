@@ -105,10 +105,10 @@ impl MemoryStore {
         {
             violations.push(backend::deleted_journey(journey));
         }
-        violations.extend(backend::taken_entity_keys(
-            &shape.created_entities,
+        violations.extend(backend::entity_create_violations(
+            &shape,
             &state.domains.deployment,
-        ));
+        )?);
         let nodes: Vec<_> = commit
             .change_set
             .events

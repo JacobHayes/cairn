@@ -449,36 +449,52 @@ fn a_completion_reopened_in_the_same_patch_still_meets_its_guards() {
     );
 }
 
+/// Entities within their own limits can still fill the deployment record past its cap: the
+/// cap is the backstop behind the per-entity limits.
 #[test]
 fn a_deployment_past_its_size_cap_is_rejected() {
+    use cairn_schema::limits::{EMAIL_BYTES_MAX, EMAIL_COUNT_PER_ENTITY_MAX};
     let records = vendor_after(1);
-    let padding = "a".repeat(220);
-    let emails =
-        (0..72_000).map(|index| format!("{index:06}{padding}@example.org").parse().unwrap());
-    let entity = cairn_schema::Entity {
-        key: "e_large".parse().unwrap(),
+    let domain = "@example.org";
+    let padding = "a".repeat(usize::try_from(EMAIL_BYTES_MAX).unwrap() - domain.len() - 8);
+    let entity = |index: u32| cairn_schema::Entity {
+        key: format!("e_large_{index}").parse().unwrap(),
         name: "Large".parse().unwrap(),
-        emails: emails.collect(),
+        emails: (0..EMAIL_COUNT_PER_ENTITY_MAX)
+            .map(|email| {
+                format!("{index:06}{email:02}{padding}{domain}")
+                    .parse()
+                    .unwrap()
+            })
+            .collect(),
     };
+    // Enough entities at their email limit to pass 16 MiB of emails alone.
+    let per_entity = EMAIL_COUNT_PER_ENTITY_MAX * EMAIL_BYTES_MAX;
+    let count = cairn_schema::limits::GRAPH_BYTES_MAX / per_entity + 1;
     let mut patch = support::patch_to(
         &records,
         "{journey: j_vendor_eval}",
         "- op: create_entity\n  entity: {key: e_placeholder, name: Placeholder}\n",
     );
-    patch.mutations =
-        cairn_schema::Mutations::new(vec![cairn_schema::Mutation::CreateEntity { entity }])
-            .unwrap();
+    let creates = (0..count).map(|index| cairn_schema::Mutation::CreateEntity {
+        entity: entity(index),
+    });
+    patch.mutations = cairn_schema::Mutations::new(creates.collect()).unwrap();
     let Err(Rejection::Invalid { violations }) = apply(&records, &patch, &support::fixed_inputs())
     else {
         panic!("a deployment past graph_bytes_max is rejected")
     };
-    let found = &violations.as_slice()[0];
+    let found: Vec<_> = violations
+        .as_slice()
+        .iter()
+        .map(|found| (found.code, found.limit))
+        .collect();
     assert_eq!(
-        (found.code, found.limit),
-        (
+        found,
+        [(
             ViolationCode::LimitExceeded,
             Some(cairn_schema::Limit::GraphBytes)
-        )
+        )]
     );
 }
 

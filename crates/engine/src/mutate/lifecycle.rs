@@ -4,9 +4,9 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    DraftSource, GraphId, GraphKey, GraphRecord, JourneyHeader, JourneyId, JourneyStatus, Lineage,
-    LocalEdit, Markdown, Mutation, NodeState, PatchTarget, Provenance, Record, RecordKey,
-    RetiredKey, RouteHeader, RouteId, Title, VersionNumber, ViolationCode, Write,
+    DraftSource, GraphId, GraphKey, GraphRecord, JourneyHeader, JourneyId, JourneyStatus, Limit,
+    Lineage, LocalEdit, Markdown, Mutation, NodeKey, NodeState, PatchTarget, Provenance, Record,
+    RecordKey, RetiredKey, RouteHeader, RouteId, Title, VersionNumber, ViolationCode, Write,
 };
 
 use super::Session;
@@ -190,12 +190,43 @@ fn upgrade(session: &mut Session<'_>, to: VersionNumber) -> Vec<Write> {
     };
     let merged = crate::upgrade::merge::merge(&base.graph, &targeted.graph, &journey.graph);
     let changes = crate::upgrade::changes(&journey.graph, &merged.merged);
+    let overfilled = past_resource_limit(&changes);
+    if !overfilled.is_empty() {
+        for node in &overfilled {
+            super::structure::limit(session, node, Limit::ResourceCountPerNode);
+        }
+        return Vec::new();
+    }
     let mut writes = edit_journey(session, |header| header.lineage = Some(target));
     writes.extend(changes.into_iter().map(|change| match change {
         crate::upgrade::Change::Put(record) => session.put(*record),
         crate::upgrade::Change::Remove(key) => session.remove(key),
     }));
     writes
+}
+
+/// Each node the upgrade would write with more than `resource_count_per_node_max` resources
+/// (the route's and the journey's own together). Refused here, not only by the final check,
+/// so that every node record an event carries reads back even if a later mutation in the
+/// patch removes a resource; every such node is reported, since the refused upgrade writes
+/// nothing the final check could see.
+fn past_resource_limit(changes: &[crate::upgrade::Change]) -> Vec<NodeKey> {
+    changes
+        .iter()
+        .filter_map(|change| match change {
+            crate::upgrade::Change::Put(record) => match record.as_ref() {
+                GraphRecord::Node(node)
+                    if Limit::ResourceCountPerNode
+                        .check(node.resources.len())
+                        .is_err() =>
+                {
+                    Some(node.key.clone())
+                }
+                _ => None,
+            },
+            crate::upgrade::Change::Remove(_) => None,
+        })
+        .collect()
 }
 
 /// B9: the journey links to the version its saved route published, in one event: the new

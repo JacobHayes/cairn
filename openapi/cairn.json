@@ -2444,7 +2444,7 @@
         "properties": {
           "aliases": {
             "additionalProperties": false,
-            "description": "Merged entities' old keys, each resolving to the entity it was merged into (E6).",
+            "description": "Merged entities' old keys, each resolving to the entity it was merged into (E6), at\nmost `alias_count_per_entity_max` resolving to one entity.",
             "patternProperties": {
               "^e_[a-z0-9][a-z0-9_-]*$": {
                 "$ref": "#/components/schemas/EntityKey"
@@ -2453,11 +2453,11 @@
             "type": "object"
           },
           "entities": {
-            "description": "The entities.",
+            "description": "The entities, at most `entity_count_per_deployment_max`.",
             "items": {
               "$ref": "#/components/schemas/Entity"
             },
-            "maxItems": 16777216,
+            "maxItems": 5000,
             "type": "array"
           },
           "revision": {
@@ -2747,8 +2747,8 @@
         "type": "object"
       },
       "Email": {
-        "description": "An email address; stored trimmed and lower-cased (H3).",
-        "maxLength": 256,
+        "description": "An email address, at most email_bytes_max (254) bytes; stored trimmed and lower-cased (H3).",
+        "maxLength": 254,
         "minLength": 1,
         "type": "string"
       },
@@ -2836,10 +2836,11 @@
         "description": "A person or team journeys refer to (PRD glossary, Entity), deployment-scoped.",
         "properties": {
           "emails": {
-            "description": "Its emails, each held by at most one entity (H3).",
+            "description": "Its emails, each held by at most one entity (H3), at most\n`email_count_per_entity_max`. A merge joins two entities' emails, so the engine checks\nthe joined set too.",
             "items": {
               "$ref": "#/components/schemas/Email"
             },
+            "maxItems": 16,
             "type": "array",
             "uniqueItems": true
           },
@@ -4319,7 +4320,7 @@
         "description": "A journey's state, on its graph document. Maps are keyed and sorted, so a state has one\nserialization.",
         "properties": {
           "annotations": {
-            "description": "Notes and links (G1).",
+            "description": "Notes and links (G1): on each node, and on the journey itself, at most\n`note_count_per_node_max` notes and `link_count_per_node_max` links.",
             "items": {
               "$ref": "#/components/schemas/Annotation"
             },
@@ -4329,6 +4330,7 @@
           "answers": {
             "additionalProperties": false,
             "description": "Answers by decision.",
+            "maxProperties": 2000,
             "patternProperties": {
               "^n_[a-z0-9][a-z0-9_-]*$": {
                 "$ref": "#/components/schemas/AnswerValue"
@@ -4339,6 +4341,7 @@
           "local_edits": {
             "additionalProperties": false,
             "description": "Each route-copied node's local edits (B4), apart from its state so that an edit and\na transition on one node touch different records (H5).",
+            "maxProperties": 2000,
             "patternProperties": {
               "^n_[a-z0-9][a-z0-9_-]*$": {
                 "items": {
@@ -4353,6 +4356,7 @@
           "nodes": {
             "additionalProperties": false,
             "description": "Each node's stored state.",
+            "maxProperties": 2000,
             "patternProperties": {
               "^n_[a-z0-9][a-z0-9_-]*$": {
                 "$ref": "#/components/schemas/NodeState"
@@ -4363,6 +4367,7 @@
           "overrides": {
             "additionalProperties": false,
             "description": "Overrides by node.",
+            "maxProperties": 2000,
             "patternProperties": {
               "^n_[a-z0-9][a-z0-9_-]*$": {
                 "$ref": "#/components/schemas/Overrides"
@@ -4373,6 +4378,7 @@
           "pins": {
             "additionalProperties": false,
             "description": "Pins: explicit journey-level dates on nodes (PRD glossary, Pin). A pin from a\n`feeds_milestone` answer is derived from the answer, not stored here (E3).",
+            "maxProperties": 2000,
             "patternProperties": {
               "^n_[a-z0-9][a-z0-9_-]*$": {
                 "format": "date",
@@ -4384,6 +4390,7 @@
           "role_fills": {
             "additionalProperties": false,
             "description": "Direct role fills, for roles without a filling decision (E3). A role with a filling\ndecision is filled from that decision's answer, which is derived, not stored here.",
+            "maxProperties": 32,
             "patternProperties": {
               "^r_[a-z0-9][a-z0-9_-]*$": {
                 "items": {
@@ -4399,6 +4406,7 @@
           "snoozes": {
             "additionalProperties": false,
             "description": "Snoozes by node (B6).",
+            "maxProperties": 2000,
             "patternProperties": {
               "^n_[a-z0-9][a-z0-9_-]*$": {
                 "$ref": "#/components/schemas/SnoozeTarget"
@@ -6258,7 +6266,8 @@
             "properties": {
               "journeys": {
                 "additionalProperties": false,
-                "description": "Every journey referencing either, at the revision the merge was checked against.",
+                "description": "Every journey referencing either, at the revision the merge was checked against;\nat most `journey_count_per_merge_max`.",
+                "maxProperties": 1000,
                 "patternProperties": {
                   "^j_[a-z0-9][a-z0-9_-]*$": {
                     "$ref": "#/components/schemas/Revision"
@@ -6798,6 +6807,7 @@
             "items": {
               "$ref": "#/components/schemas/Resource"
             },
+            "maxItems": 16,
             "type": "array"
           },
           "title": {
@@ -7226,6 +7236,7 @@
             "items": {
               "$ref": "#/components/schemas/Resource2"
             },
+            "maxItems": 16,
             "type": "array"
           },
           "title": {
@@ -9851,8 +9862,8 @@
         "type": "number"
       },
       "Reason": {
-        "description": "A reason, at most body_bytes_max (64 KiB) bytes.",
-        "maxLength": 65536,
+        "description": "A reason, at most reason_bytes_max (4 KiB) bytes.",
+        "maxLength": 4096,
         "minLength": 1,
         "type": "string"
       },
@@ -12870,8 +12881,8 @@
         "type": "object"
       },
       "Url": {
-        "description": "A URL: scheme:rest, no whitespace.",
-        "maxLength": 65536,
+        "description": "A URL: scheme:rest, no whitespace, at most link_bytes_max (4 KiB) bytes.",
+        "maxLength": 4096,
         "minLength": 1,
         "type": "string"
       },

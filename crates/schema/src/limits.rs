@@ -1,7 +1,9 @@
 //! Value-level limits (PRACTICES, Explicit limits): hard-coded, enforced when a value is
-//! deserialized or constructed, and named in the error when one is exceeded. Graph-level
-//! limits that need the whole graph (explicit edges in plus out, containment depth over the
-//! tree) are checked by validation in the engine, against the same constants.
+//! deserialized or constructed, and named in the error when one is exceeded. Limits that a
+//! patch can reach one write at a time (explicit edges in plus out, containment depth over
+//! the tree, resources, notes, and links per node, a merged entity's emails and aliases,
+//! entities per deployment) are also checked by validation in the engine, against the same
+//! constants.
 
 use std::fmt;
 
@@ -28,10 +30,33 @@ pub const CONDITION_DEPTH_MAX: u32 = 8;
 pub const CONDITION_CLAUSE_COUNT_MAX: u32 = 16;
 /// Bytes in an id slug, and in a key (keys share the id limit: both are short references).
 pub const ID_BYTES_MAX: u32 = 64;
-/// Bytes in a title, and in the other single-line labels (names, emails, condition values).
+/// Bytes in a title, and in the other single-line labels (names, choice labels).
 pub const TITLE_BYTES_MAX: u32 = 256;
-/// Bytes in a description, note, resource body, reason, or link.
+/// Bytes in free text: a description, prompt, help, note, tip, message draft, or text answer.
 pub const BODY_BYTES_MAX: u32 = 64 * 1024;
+/// Bytes in a link (a URL). Practical URLs stay under about 2 KiB; twice that admits long
+/// signed links and stays under the 8 KiB request line common servers accept.
+pub const LINK_BYTES_MAX: u32 = 4 * 1024;
+/// Bytes in an email address: RFC 5321 caps a path at 256 octets, angle brackets included.
+pub const EMAIL_BYTES_MAX: u32 = 254;
+/// Bytes in the reason a skip, override, or bypass requires: a sentence or a short
+/// paragraph; a longer account is a note.
+pub const REASON_BYTES_MAX: u32 = 4 * 1024;
+/// Emails per entity: work, personal, and a few former addresses, with room for a merge to
+/// join two people's lists.
+pub const EMAIL_COUNT_PER_ENTITY_MAX: u32 = 16;
+/// Merged keys (aliases) resolving to one entity: each merge of a duplicate adds one.
+pub const ALIAS_COUNT_PER_ENTITY_MAX: u32 = 32;
+/// Entities per deployment: hundreds of journeys naming tens of people each, mostly shared.
+pub const ENTITY_COUNT_PER_DEPLOYMENT_MAX: u32 = 5_000;
+/// Journeys one entity merge names: every journey referencing either entity.
+pub const JOURNEY_COUNT_PER_MERGE_MAX: u32 = 1_000;
+/// Resources per node: a tip, a template, an example or two.
+pub const RESOURCE_COUNT_PER_NODE_MAX: u32 = 16;
+/// Notes on one node, or on the journey itself: a running log of a long piece of work.
+pub const NOTE_COUNT_PER_NODE_MAX: u32 = 100;
+/// Links (artifacts, references, conversations) on one node, or on the journey itself.
+pub const LINK_COUNT_PER_NODE_MAX: u32 = 32;
 /// Days in a date offset or an estimate.
 pub const OFFSET_DAYS_MAX: u32 = 365;
 /// A node's weight.
@@ -57,6 +82,10 @@ const _: () = assert!(MUTATION_COUNT_PER_PATCH_MAX == 4 * NODE_COUNT_MAX);
 // A request can carry a whole graph at its cap.
 const _: () = assert!(REQUEST_BYTES_MAX > GRAPH_BYTES_MAX);
 const _: () = assert!(CONTAINMENT_DEPTH_MAX * (ID_BYTES_MAX + 1) < BODY_BYTES_MAX);
+// The named text limits sit between a label and free text.
+const _: () = assert!(EMAIL_BYTES_MAX <= TITLE_BYTES_MAX);
+const _: () = assert!(TITLE_BYTES_MAX < LINK_BYTES_MAX && LINK_BYTES_MAX < BODY_BYTES_MAX);
+const _: () = assert!(TITLE_BYTES_MAX < REASON_BYTES_MAX && REASON_BYTES_MAX < BODY_BYTES_MAX);
 
 /// A value-level limit, named in the error when it is exceeded.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -87,6 +116,26 @@ pub enum Limit {
     TitleBytes,
     /// [`BODY_BYTES_MAX`].
     BodyBytes,
+    /// [`LINK_BYTES_MAX`].
+    LinkBytes,
+    /// [`EMAIL_BYTES_MAX`].
+    EmailBytes,
+    /// [`REASON_BYTES_MAX`].
+    ReasonBytes,
+    /// [`EMAIL_COUNT_PER_ENTITY_MAX`].
+    EmailCountPerEntity,
+    /// [`ALIAS_COUNT_PER_ENTITY_MAX`].
+    AliasCountPerEntity,
+    /// [`ENTITY_COUNT_PER_DEPLOYMENT_MAX`].
+    EntityCountPerDeployment,
+    /// [`JOURNEY_COUNT_PER_MERGE_MAX`].
+    JourneyCountPerMerge,
+    /// [`RESOURCE_COUNT_PER_NODE_MAX`].
+    ResourceCountPerNode,
+    /// [`NOTE_COUNT_PER_NODE_MAX`].
+    NoteCountPerNode,
+    /// [`LINK_COUNT_PER_NODE_MAX`].
+    LinkCountPerNode,
     /// [`OFFSET_DAYS_MAX`].
     OffsetDays,
     /// [`WEIGHT_MAX`].
@@ -103,7 +152,7 @@ pub enum Limit {
 
 impl Limit {
     /// Every limit, for tests that walk them all.
-    pub const ALL: [Limit; 19] = [
+    pub const ALL: [Limit; 29] = [
         Limit::NodeCount,
         Limit::ContainmentDepth,
         Limit::EdgeCountPerNode,
@@ -117,6 +166,16 @@ impl Limit {
         Limit::IdBytes,
         Limit::TitleBytes,
         Limit::BodyBytes,
+        Limit::LinkBytes,
+        Limit::EmailBytes,
+        Limit::ReasonBytes,
+        Limit::EmailCountPerEntity,
+        Limit::AliasCountPerEntity,
+        Limit::EntityCountPerDeployment,
+        Limit::JourneyCountPerMerge,
+        Limit::ResourceCountPerNode,
+        Limit::NoteCountPerNode,
+        Limit::LinkCountPerNode,
         Limit::OffsetDays,
         Limit::Weight,
         Limit::GraphBytes,
@@ -142,6 +201,16 @@ impl Limit {
             Limit::IdBytes => ID_BYTES_MAX,
             Limit::TitleBytes => TITLE_BYTES_MAX,
             Limit::BodyBytes => BODY_BYTES_MAX,
+            Limit::LinkBytes => LINK_BYTES_MAX,
+            Limit::EmailBytes => EMAIL_BYTES_MAX,
+            Limit::ReasonBytes => REASON_BYTES_MAX,
+            Limit::EmailCountPerEntity => EMAIL_COUNT_PER_ENTITY_MAX,
+            Limit::AliasCountPerEntity => ALIAS_COUNT_PER_ENTITY_MAX,
+            Limit::EntityCountPerDeployment => ENTITY_COUNT_PER_DEPLOYMENT_MAX,
+            Limit::JourneyCountPerMerge => JOURNEY_COUNT_PER_MERGE_MAX,
+            Limit::ResourceCountPerNode => RESOURCE_COUNT_PER_NODE_MAX,
+            Limit::NoteCountPerNode => NOTE_COUNT_PER_NODE_MAX,
+            Limit::LinkCountPerNode => LINK_COUNT_PER_NODE_MAX,
             Limit::OffsetDays => OFFSET_DAYS_MAX,
             Limit::Weight => WEIGHT_MAX,
             Limit::GraphBytes => GRAPH_BYTES_MAX,
@@ -168,6 +237,16 @@ impl Limit {
             Limit::IdBytes => "id_bytes_max",
             Limit::TitleBytes => "title_bytes_max",
             Limit::BodyBytes => "body_bytes_max",
+            Limit::LinkBytes => "link_bytes_max",
+            Limit::EmailBytes => "email_bytes_max",
+            Limit::ReasonBytes => "reason_bytes_max",
+            Limit::EmailCountPerEntity => "email_count_per_entity_max",
+            Limit::AliasCountPerEntity => "alias_count_per_entity_max",
+            Limit::EntityCountPerDeployment => "entity_count_per_deployment_max",
+            Limit::JourneyCountPerMerge => "journey_count_per_merge_max",
+            Limit::ResourceCountPerNode => "resource_count_per_node_max",
+            Limit::NoteCountPerNode => "note_count_per_node_max",
+            Limit::LinkCountPerNode => "link_count_per_node_max",
             Limit::OffsetDays => "offset_days_max",
             Limit::Weight => "weight_max",
             Limit::GraphBytes => "graph_bytes_max",

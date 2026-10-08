@@ -46,9 +46,19 @@ limit_markers! {
     ChoiceCountPerDecision => ChoiceCountPerDecision,
     /// `entity_count_per_fill_max`.
     EntityCountPerFill => EntityCountPerFill,
-    /// A collection the limits table does not name, bounded by the serialized graph cap
-    /// (`graph_bytes_max`) and, for any document, the request cap (`request_bytes_max`), which
-    /// every parse checks first
+    /// `email_count_per_entity_max`.
+    EmailCountPerEntity => EmailCountPerEntity,
+    /// `entity_count_per_deployment_max`.
+    EntityCountPerDeployment => EntityCountPerDeployment,
+    /// `journey_count_per_merge_max`.
+    JourneyCountPerMerge => JourneyCountPerMerge,
+    /// `resource_count_per_node_max`.
+    ResourceCountPerNode => ResourceCountPerNode,
+    /// A collection with no count limit of its own: one bounded by its items' own limits
+    /// (a journey's notes and links, by holder), one the engine builds from other bounded
+    /// values (an explanation, a rejection, a proposal's review items), or a fixture's steps.
+    /// The serialized graph cap (`graph_bytes_max`) and, for any document, the request cap
+    /// (`request_bytes_max`), which every parse checks first, are the backstop
     /// (decisions/2026-10-06-values-the-limits-table-does-not-name-take-the-nearest-named.md).
     ByDocumentSize => GraphBytes,
     /// `chain_count_per_rejection_max`.
@@ -193,6 +203,12 @@ impl<T: Ord + fmt::Debug, L: LimitOf> BoundedSet<T, L> {
     #[must_use]
     pub fn as_set(&self) -> &BTreeSet<T> {
         &self.0
+    }
+
+    /// The items, by value.
+    #[must_use]
+    pub fn into_set(self) -> BTreeSet<T> {
+        self.0
     }
 
     /// The number of items.

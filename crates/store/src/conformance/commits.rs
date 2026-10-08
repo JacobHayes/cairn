@@ -1002,6 +1002,67 @@ pub async fn an_entity_create_whose_key_is_an_entity_or_alias_is_rejected<B: Bac
     assert_eq!(snapshot(&store).await, before);
 }
 
+/// PRACTICES, Explicit limits: entity creates riding in two journeys' patches take no
+/// deployment revision (E6), so each can be validated against a deployment one short of
+/// `entity_count_per_deployment_max`; the first commit fills it and the second is rejected
+/// naming the limit, leaving the store as it was. A deployment patch at the limit may still
+/// remove an entity and create another.
+pub async fn riding_entity_creates_stop_at_the_entity_limit<B: Backend>(backend: &B) {
+    let store = open(backend).await;
+    let limit = cairn_schema::Limit::EntityCountPerDeployment;
+    let setup: Vec<Write> = (1..limit.max())
+        .map(|index| {
+            let key = format!("e_{index}");
+            Write::Put(Record::Entity(entity(&key, "Someone", &[])))
+        })
+        .collect();
+    let fill = deployment_patch("p_fill", 0).event(
+        EventType::EntityCreated,
+        Subject::Entity(id("e_1")),
+        setup,
+    );
+    applied(&store, fill.commit()).await;
+    for (patch, journey) in [("p_one", "j_one"), ("p_two", "j_two")] {
+        applied(&store, create_journey(patch, journey, Vec::new()).commit()).await;
+    }
+    let riding = |patch: &str, journey: &str, key: &str| {
+        create_entity(journey_patch(patch, journey, 1), entity(key, "New", &[])).commit()
+    };
+    applied(&store, riding("p_at", "j_one", "e_at")).await;
+    let loaded = deployment(&store).await;
+    assert_eq!(loaded.entities.len(), usize::try_from(limit.max()).unwrap());
+    let before = snapshot(&store).await;
+    let error = failed(&store, riding("p_past", "j_two", "e_past")).await;
+    let CommitError::Rejected(Rejection::Invalid { violations }) = &error else {
+        panic!("expected a rejection, got {error:?}")
+    };
+    let named: Vec<_> = violations
+        .as_slice()
+        .iter()
+        .map(|found| (found.code, found.limit))
+        .collect();
+    assert_eq!(named, vec![(ViolationCode::LimitExceeded, Some(limit))]);
+    assert_eq!(snapshot(&store).await, before);
+
+    // A deployment patch, checked at its revision, may remove an entity and then create one.
+    let swap = deployment_patch("p_swap", 2).event(
+        EventType::EntityCreated,
+        Subject::Entity(id("e_swapped")),
+        vec![
+            Write::Remove(RecordKey::Entity(id("e_1"))),
+            Write::Put(Record::Entity(entity("e_swapped", "New", &[]))),
+        ],
+    );
+    applied(&store, swap.commit()).await;
+    assert!(
+        deployment(&store)
+            .await
+            .entities
+            .get(&id("e_swapped"))
+            .is_some()
+    );
+}
+
 fn delete_journey(patch: &str, journey: &str, base: u32) -> crate::commit::Commit {
     journey_patch(patch, journey, base)
         .event_in(

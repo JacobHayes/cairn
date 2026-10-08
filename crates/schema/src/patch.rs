@@ -619,8 +619,10 @@ pub enum Mutation {
         survivor: EntityKey,
         /// The entity merged into it, whose key becomes an alias.
         merged: EntityKey,
-        /// Every journey referencing either, at the revision the merge was checked against.
-        #[serde(deserialize_with = "crate::serde_util::unique_map")]
+        /// Every journey referencing either, at the revision the merge was checked against;
+        /// at most `journey_count_per_merge_max`.
+        #[serde(deserialize_with = "merge_journeys")]
+        #[schemars(extend("maxProperties" = crate::limits::JOURNEY_COUNT_PER_MERGE_MAX))]
         journeys: BTreeMap<JourneyId, Revision>,
     },
 
@@ -644,6 +646,17 @@ pub enum Mutation {
     },
     /// Discard the target proposal.
     DiscardProposal {},
+}
+
+/// A merge's journeys as written: each once, at most `journey_count_per_merge_max`.
+fn merge_journeys<'de, D: serde::Deserializer<'de>>(
+    deserializer: D,
+) -> Result<BTreeMap<JourneyId, Revision>, D::Error> {
+    crate::serde_util::unique_entries(
+        deserializer,
+        "a map from journey to its revision, each journey once",
+        Some(crate::limits::Limit::JourneyCountPerMerge),
+    )
 }
 
 /// Structural or state (PRD glossary, Structural change).

@@ -22,7 +22,7 @@ use serde::{Deserialize, Serialize};
 use crate::attachment::Resource;
 use crate::collections::{
     BoundedSet, BoundedVec, ChoiceCountPerDecision, CollectionError, EdgeCountPerNode,
-    EntityCountPerFill, OneOrMany,
+    EntityCountPerFill, OneOrMany, ResourceCountPerNode,
 };
 use crate::condition::Condition;
 use crate::id::{EntityKey, Slug};
@@ -710,7 +710,9 @@ pub struct Node<R: References> {
     pub not_before: Option<DateRule<R>>,
     /// Default participations (E2).
     pub participations: Participations<R>,
-    /// Route-authored guidance (A10).
+    /// Route-authored guidance (A10), at most `resource_count_per_node_max`. Held as a list
+    /// the engine edits in place, so validation checks the count after every patch as the
+    /// parse checks it on read.
     pub resources: Vec<Resource<R>>,
     /// The kind and its own fields.
     pub payload: Payload<R>,
@@ -1049,8 +1051,21 @@ pub struct NodeWire<R: References> {
     not_before: Option<DateRule<R>>,
     #[serde(default, skip_serializing_if = "Participations::is_empty")]
     participations: Participations<R>,
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[serde(
+        default,
+        skip_serializing_if = "Vec::is_empty",
+        deserialize_with = "node_resources"
+    )]
+    #[schemars(with = "BoundedVec<Resource<R>, ResourceCountPerNode>")]
     resources: Vec<Resource<R>>,
+}
+
+/// A node's resources as written: at most `resource_count_per_node_max`.
+fn node_resources<'de, D: serde::Deserializer<'de>, R: References>(
+    deserializer: D,
+) -> Result<Vec<Resource<R>>, D::Error> {
+    BoundedVec::<Resource<R>, ResourceCountPerNode>::deserialize(deserializer)
+        .map(BoundedVec::into_vec)
 }
 
 impl<R: References> NodeWire<R> {
@@ -1407,6 +1422,28 @@ mod tests {
         assert_eq!(sources, [false, true, false]);
         let bad = json!({"id": "a", "kind": "action", "title": "A", "participations": {"owner": ["not-an-entity"]}});
         assert!(!parses(bad));
+    }
+
+    #[test]
+    fn resources_at_and_past_their_limit() {
+        let resources = |count: u32| -> Vec<serde_json::Value> {
+            (0..count)
+                .map(|index| json!({"tip": format!("Tip {index}.")}))
+                .collect()
+        };
+        let limit = crate::Limit::ResourceCountPerNode.max();
+        assert!(parses(
+            json!({"id": "a", "kind": "action", "title": "A", "resources": resources(limit)})
+        ));
+        let past =
+            json!({"id": "a", "kind": "action", "title": "A", "resources": resources(limit + 1)});
+        let error = serde_json::from_value::<Node<FileRefs>>(past).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains(crate::Limit::ResourceCountPerNode.name()),
+            "{error}"
+        );
     }
 
     #[test]

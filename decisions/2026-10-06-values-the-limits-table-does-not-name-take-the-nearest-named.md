@@ -1,6 +1,27 @@
-# Values the limits table does not name take the nearest named limit
+# Every user-written list and string has its own limit; a few share one that fits
 
-- Question: PRACTICES (Explicit limits) puts a limit on everything, but its table names no limit for keys, client-generated ids, names (entity, route, journey, role and kind titles), emails, choice labels, condition values, reasons, URLs, or for collections such as emails per entity, attachments per node, or entities per deployment. Adding a limit needs the user's sign-off.
-- Call: no new limits. Keys and prefixed ids take the id slug limit (64 bytes, prefix included); single-line labels (names, emails, choice titles, condition values) the title limit (256 bytes); free text (reasons, prompts, help) and URLs the body limit (64 KiB). A collection the table does not name is bounded by the serialized graph cap (16 MiB, checked on the graph a patch produces) and, in any document, by the request-body cap (24 MiB), which every parse checks first.
-- Alternatives: new named limits (URL 2 KiB, emails per entity, attachments per node), which need sign-off; leaving those values unbounded, which PRACTICES forbids.
-- What would change it: a value that is legitimately longer than its borrowed limit (a long URL is the likeliest), or a collection that grows large inside the 16 MiB cap; either becomes a named limit after sign-off.
+- Question: PRACTICES (Explicit limits) puts a limit on everything. The schema brief found values and lists the table did not name (keys, names, emails, choice labels, condition values, reasons, URLs; emails per entity, attachments per node, entities per deployment) and bounded them by borrowing the nearest named limit, which left lists bounded only by the 16 MiB graph cap. The owner then decided that every list gets its own count limit and that links get a limit much lower than 64 KiB, with borrowing kept only where it truly fits.
+- Call: named limits, each enforced when a document is parsed and, where a patch can reach it one write at a time, by validation in the engine, both naming the limit:
+  - Links 4 KiB; email addresses 254 bytes; reasons 4 KiB.
+  - Emails per entity 16; aliases per entity 32; entities per deployment 5,000; journeys named by one merge 1,000.
+  - Resources per node 16; notes per node 100 and links per node 32, where the journey itself counts as one more holder.
+  - The values and reasons are in the PRACTICES table.
+- Shared limits that fit, kept:
+  - Keys and prefixed ids take the id limit (64 bytes): both are short references.
+  - Names, choice labels, and resource, note, and proposal titles take the title limit (256 bytes): all are labels.
+  - Prompts, help, tips, message drafts, text answers, and condition text take the body limit (64 KiB). They are free text, and a condition value is compared with a text answer, so it can be as long.
+  - A node's participations take the kind limit (one per kind).
+  - Explicit participation entities and the values of an `in` clause take the entity-list limit.
+  - Journey state keyed by node (states, local edits, answers, pins, snoozes, overrides) takes the node limit, and role fills the role limit, at parse time: one entry each.
+- Left to the graph and request caps:
+  - Lists the engine builds or keeps rather than a person writes: explanations, rejections, review items, retired keys and tombstones, a bypass's recorded failures, local-edit markers.
+  - A removal's lists, which name what a subtree holds: the engine rejects a removal that misses anything the subtree holds, and ignores a name the graph no longer holds.
+  - A fixture's scenario steps.
+  - A journey's annotations as a whole, which the per-holder limits bound.
+  - Outside the schema, the auth crate's identity-provider responses and OAuth client documents keep the body limit as a document size.
+- Alternatives:
+  - URLs at 2 KiB (the long-standing browser and sitemap ceiling), rejected because signed and query-heavy links pass it.
+  - A total count for annotations or aliases per deployment, rejected because per-holder limits bound them and say which node or entity is full.
+  - Count limits on engine-built lists, rejected because an upgrade proposal over a large graph would become unreviewable rather than bounded.
+- What would change it: a real value past its limit (a link past 4 KiB, a merge naming more than 1,000 journeys, a node needing more than 100 notes) is a design signal for the owner, and an engine-built list that grows large inside the caps becomes a named limit.
+- History: first recorded with no new limits, borrowing the nearest named limit; rewritten when the owner asked for proportionate limits per list and value.
