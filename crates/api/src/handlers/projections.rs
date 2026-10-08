@@ -49,7 +49,7 @@ fn node(key: &str) -> Result<NodeKey, crate::error::ApiError> {
     segment(key, "node")
 }
 
-/// `GET /journeys/{id}/snapshot` (I3).
+/// `GET /api/journeys/{id}/snapshot` (I3).
 pub async fn snapshot<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -64,7 +64,7 @@ pub async fn snapshot<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/level` (C2).
+/// `GET /api/journeys/{id}/level` (C2).
 pub async fn level<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -82,7 +82,7 @@ pub async fn level<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/trace/{key}` (C7).
+/// `GET /api/journeys/{id}/trace/{key}` (C7).
 pub async fn trace<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -93,7 +93,7 @@ pub async fn trace<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/derived` (D3): the whole derive, which the browser computes itself from
+/// `GET /api/journeys/{id}/derived` (D3): the whole derive, which the browser computes itself from
 /// the domain document; for a client without the wasm engine.
 pub async fn derived<S: Store + 'static>(
     State(api): State<Api<S>>,
@@ -105,7 +105,7 @@ pub async fn derived<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/decisions` (C12).
+/// `GET /api/journeys/{id}/decisions` (C12).
 pub async fn decisions<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -116,7 +116,7 @@ pub async fn decisions<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/timeline` (C13).
+/// `GET /api/journeys/{id}/timeline` (C13).
 pub async fn timeline<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -127,7 +127,7 @@ pub async fn timeline<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/summary` (C18).
+/// `GET /api/journeys/{id}/summary` (C18).
 pub async fn summary<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -138,7 +138,7 @@ pub async fn summary<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/next` (C10).
+/// `GET /api/journeys/{id}/next` (C10).
 pub async fn next<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -152,7 +152,7 @@ pub async fn next<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/nodes` (C9).
+/// `GET /api/journeys/{id}/nodes` (C9).
 pub async fn nodes<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -167,7 +167,7 @@ pub async fn nodes<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/mine` (E4).
+/// `GET /api/journeys/{id}/mine` (E4).
 pub async fn mine<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -181,7 +181,7 @@ pub async fn mine<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/nodes/{key}` (C8): explanation lists capped with their totals.
+/// `GET /api/journeys/{id}/nodes/{key}` (C8): explanation lists capped with their totals.
 pub async fn node_detail<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -192,7 +192,7 @@ pub async fn node_detail<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/nodes/{key}/explanations/{field}`: a page of one explanation list,
+/// `GET /api/journeys/{id}/nodes/{key}/explanations/{field}`: a page of one explanation list,
 /// largest first; the first page is what node detail carries.
 pub async fn explanations<S: Store + 'static>(
     State(api): State<Api<S>>,
@@ -213,7 +213,7 @@ pub async fn explanations<S: Store + 'static>(
     Ok(Json(Projected::from_service(projected)))
 }
 
-/// `GET /journeys/{id}/history` (J4).
+/// `GET /api/journeys/{id}/history` (J4).
 pub async fn history<S: Store + 'static>(
     State(api): State<Api<S>>,
     Path(id): Path<String>,

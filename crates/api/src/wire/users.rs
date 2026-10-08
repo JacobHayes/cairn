@@ -51,7 +51,7 @@ impl From<cairn_store::IdentityRecord> for LinkedIdentity {
     }
 }
 
-/// `POST /users/me/tokens`: what to call the new agent token.
+/// `POST /api/users/me/tokens`: what to call the new agent token.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct TokenRequest {

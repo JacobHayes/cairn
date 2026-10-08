@@ -1,6 +1,6 @@
 //! Proposals (I6, C14; ARCHITECTURE, HTTP API: Resources): created against a domain with a
-//! client-generated id at `POST /{domain}/proposals`, then addressed by that id alone under
-//! `/proposals/{id}`, whose destination the stored proposal names. Every write runs on its own
+//! client-generated id at `POST /api/{domain}/proposals`, then addressed by that id alone under
+//! `/api/proposals/{id}`, whose destination the stored proposal names. Every write runs on its own
 //! task, is logged with its patch id and outcome, and counts toward the patch outcomes.
 
 use axum::Json;
@@ -36,7 +36,7 @@ pub fn served<S: Store + 'static>() -> crate::Served<S> {
     ]
 }
 
-/// `POST /journeys/{id}/proposals`.
+/// `POST /api/journeys/{id}/proposals`.
 pub async fn propose_journey<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -47,7 +47,7 @@ pub async fn propose_journey<S: Store + 'static>(
     create(&api, actor, Domain::Journey(id), request).await
 }
 
-/// `POST /routes/{id}/proposals`.
+/// `POST /api/routes/{id}/proposals`.
 pub async fn propose_route<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -58,7 +58,7 @@ pub async fn propose_route<S: Store + 'static>(
     create(&api, actor, Domain::Route(id), request).await
 }
 
-/// `POST /deployment/proposals`.
+/// `POST /api/deployment/proposals`.
 pub async fn propose_deployment<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -90,7 +90,7 @@ async fn create<S: Store + 'static>(
     proposal_written(&logged_patch, &logged_id, "create", written)
 }
 
-/// `GET /proposals/{id}` (I6).
+/// `GET /api/proposals/{id}` (I6).
 pub async fn proposal<S: Store + 'static>(
     State(api): State<Api<S>>,
     Path(id): Path<String>,
@@ -99,7 +99,7 @@ pub async fn proposal<S: Store + 'static>(
     Ok(Json(held(&api, &id).await?))
 }
 
-/// `PATCH /proposals/{id}` (I6, H5).
+/// `PATCH /api/proposals/{id}` (I6, H5).
 pub async fn edit<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -124,7 +124,7 @@ pub async fn edit<S: Store + 'static>(
     proposal_written(&logged_patch, &logged_id, "edit", written)
 }
 
-/// `POST /proposals/{id}/discard` (I6).
+/// `POST /api/proposals/{id}/discard` (I6).
 pub async fn discard<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -148,7 +148,7 @@ pub async fn discard<S: Store + 'static>(
     proposal_written(&logged_patch, &logged_id, "discard", written)
 }
 
-/// `POST /proposals/{id}/refresh` (I6): drafted again on its destination as it stands, the
+/// `POST /api/proposals/{id}/refresh` (I6): drafted again on its destination as it stands, the
 /// reviewer's choices carried over; it must be reviewed again before it applies.
 pub async fn refresh<S: Store + 'static>(
     State(api): State<Api<S>>,
@@ -172,7 +172,7 @@ pub async fn refresh<S: Store + 'static>(
     drafted_written(&logged_patch, &logged_id, "refresh", drafted)
 }
 
-/// `POST /proposals/{id}/preview` (C14, D7, I6).
+/// `POST /api/proposals/{id}/preview` (C14, D7, I6).
 pub async fn preview<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -183,7 +183,7 @@ pub async fn preview<S: Store + 'static>(
     Ok(Json(review.into()))
 }
 
-/// `POST /proposals/{id}/apply` (I6, H2): the caller confirms it.
+/// `POST /api/proposals/{id}/apply` (I6, H2): the caller confirms it.
 pub async fn apply<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,

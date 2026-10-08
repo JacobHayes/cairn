@@ -133,7 +133,7 @@ impl<S: AuthStore + 'static> Auth<S> {
     pub fn router(&self) -> Router {
         let authenticator: Arc<dyn Authenticate> = Arc::new(self.clone());
         let sign_out = Router::new()
-            .route("/auth/sign-out", post(sign_out::<S>))
+            .route("/api/auth/sign-out", post(sign_out::<S>))
             .with_state(self.clone());
         let routers = self.inner.providers.iter();
         routers

@@ -19,8 +19,9 @@ mod in_process {
 
     use crate::support::{self, World, get, ok, post};
 
-    const ROUTE: &str = "/routes/vendor-evaluation";
-    const JOURNEY: &str = "/journeys/j_vendor_eval";
+    const ROUTE: &str = "/api/routes/vendor-evaluation";
+    const JOURNEY: &str = "/api/journeys/j_vendor_eval";
+    const UPGRADE_APPLY: &str = "/api/proposals/pr_upgrade/apply";
 
     fn route_v2() -> RouteFile {
         let path = support::fixtures_root().join("vendor-evaluation/route-v2.yaml");
@@ -140,10 +141,10 @@ mod in_process {
         assert_eq!(journey.header.lineage.unwrap().version.get(), 1, "not yet");
 
         let review: ProposalReview =
-            ok(&post(&ann, "/proposals/pr_upgrade/preview", &json!({})).await);
+            ok(&post(&ann, "/api/proposals/pr_upgrade/preview", &json!({})).await);
         assert_ne!(review.preview.unresolved.len(), 0);
         let apply = |patch_id: &str, reviewed: u32| json!({"patch_id": patch_id, "reviewed_revision": reviewed});
-        let blocked = post(&ann, "/proposals/pr_upgrade/apply", &apply("p_blocked", 1)).await;
+        let blocked = post(&ann, UPGRADE_APPLY, &apply("p_blocked", 1)).await;
         assert_eq!(blocked.status, StatusCode::UNPROCESSABLE_ENTITY);
         let Rejection::Invalid { violations } = blocked.json().unwrap() else {
             panic!("an unresolved conflict blocks the apply")
@@ -165,17 +166,17 @@ mod in_process {
         }
         let edit = json!({"patch_id": "p_resolve", "base_revision": 1, "draft": resolved});
         let edited = ann
-            .send(Method::PATCH, "/proposals/pr_upgrade", Some(&edit))
+            .send(Method::PATCH, "/api/proposals/pr_upgrade", Some(&edit))
             .await;
         ok::<ProposalAnswer>(&edited.unwrap());
         let review: ProposalReview =
-            ok(&post(&ann, "/proposals/pr_upgrade/preview", &json!({})).await);
+            ok(&post(&ann, "/api/proposals/pr_upgrade/preview", &json!({})).await);
         let left = (
             review.preview.unresolved.len(),
             review.preview.violations.len(),
         );
         assert_eq!(left, (0, 0));
-        ok::<PatchAnswer>(&post(&ann, "/proposals/pr_upgrade/apply", &apply("p_apply", 2)).await);
+        ok::<PatchAnswer>(&post(&ann, UPGRADE_APPLY, &apply("p_apply", 2)).await);
         let journey: Journey = get(&ann, JOURNEY).await;
         assert_eq!(journey.header.lineage.unwrap().version.get(), 2);
     }
@@ -223,7 +224,7 @@ mod in_process {
             0,
             "- op: create_journey\n  name: Free\n",
         );
-        let target = "/journeys/j_free/patches";
+        let target = "/api/journeys/j_free/patches";
         ok::<PatchAnswer>(&post(&ann, target, &support::request(&free)).await);
         let upgrade =
             |to: u32| json!({"patch_id": format!("p_up_{to}"), "proposal": "pr_up", "to": to});
@@ -237,12 +238,12 @@ mod in_process {
         let import = json!({"patch_id": "p_import", "file": other});
         let cases = [
             (
-                "/journeys/j_free/upgrade".to_owned(),
+                "/api/journeys/j_free/upgrade".to_owned(),
                 upgrade(2),
                 ProblemCode::CannotDraft,
             ),
             (
-                "/journeys/j_missing/upgrade".to_owned(),
+                "/api/journeys/j_missing/upgrade".to_owned(),
                 upgrade(2),
                 ProblemCode::NotFound,
             ),

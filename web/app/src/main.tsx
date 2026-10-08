@@ -1,9 +1,10 @@
 // The app's entry: starts the tab's session (boot.ts), then renders the shell and its
-// screens under a hash router, so the UI's addresses never collide with the API's paths the
-// binary serves on the same origin and a static demo site needs no server rewrites.
+// screens under a path router: a screen's address is a real path, and the server answers
+// every path it does not keep for itself (`/api/`, `/.well-known/`, `/healthz`) with this
+// page, so a deep link or a reload opens its screen.
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { HashRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Route, Routes } from "react-router";
 
 import { ListScreen } from "./acting/ListScreen.tsx";
 import { NextScreen } from "./acting/NextScreen.tsx";
@@ -32,7 +33,7 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
   return (
     <SessionContext value={session}>
       <LayoutsContext value={layouts}>
-        <HashRouter>
+        <BrowserRouter>
           <Routes>
             <Route element={<Shell />}>
               <Route index element={<JourneyIndex />} />
@@ -59,7 +60,7 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route path="proposals/:id" element={<ProposalScreen />} />
             </Route>
           </Routes>
-        </HashRouter>
+        </BrowserRouter>
       </LayoutsContext>
     </SessionContext>
   );

@@ -68,7 +68,7 @@ export default defineConfig({
     {
       command: `scripts/built examples/fixture_server ${serverPort} http://127.0.0.1:${appPort}`,
       cwd: repo,
-      url: `${server}/capabilities`,
+      url: `${server}/api/capabilities`,
       timeout: 600_000,
       reuseExistingServer: false,
       stdout: "ignore",
@@ -76,7 +76,7 @@ export default defineConfig({
     {
       command: `scripts/e2e-binary ${binaryPort}`,
       cwd: repo,
-      url: `http://127.0.0.1:${binaryPort}/capabilities`,
+      url: `http://127.0.0.1:${binaryPort}/api/capabilities`,
       timeout: 600_000,
       reuseExistingServer: false,
       stdout: "ignore",

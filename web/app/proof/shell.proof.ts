@@ -52,7 +52,7 @@ test("version skew stops the tab and asks for a reload; the draft survives it", 
   await openJourney(two, "server", "j_bakeoff");
   const unsent = "Recommendation summary, unsent";
   await startRename(two, "n_summary", unsent);
-  await two.route("**/journeys/j_bakeoff/document", async (route) => {
+  await two.route("**/api/journeys/j_bakeoff/document", async (route) => {
     const response = await route.fetch();
     const document = (await response.json()) as { engine_version: string };
     await route.fulfill({ response, json: { ...document, engine_version: "99.0.0" } });
@@ -60,7 +60,7 @@ test("version skew stops the tab and asks for a reload; the draft survives it", 
   await rename(one, "n_comparison", "Side-by-side comparison, final");
   await expect(two.getByTestId("skew")).toBeVisible();
   await shot(two, "5-version-skew-banner");
-  await two.unroute("**/journeys/j_bakeoff/document");
+  await two.unroute("**/api/journeys/j_bakeoff/document");
   await two.getByRole("button", { name: "Reload" }).click();
   await expect(renameOf(two, "n_summary").getByRole("textbox")).toHaveValue(unsent);
   await shot(two, "6-draft-survives-reload");

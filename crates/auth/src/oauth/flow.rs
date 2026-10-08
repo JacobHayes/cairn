@@ -248,7 +248,9 @@ impl<S: AuthStore> Flow<S> {
                 let path = uri.path_and_query().map_or("/", |path| path.as_str());
                 let return_to: String =
                     url::form_urlencoded::byte_serialize(path.as_bytes()).collect();
-                redirect(&format!("/auth/{provider}/sign-in?return_to={return_to}"))
+                redirect(&format!(
+                    "/api/auth/{provider}/sign-in?return_to={return_to}"
+                ))
             }
             None => page(StatusCode::UNAUTHORIZED, "Sign in to Cairn first."),
         };
@@ -473,7 +475,7 @@ fn consent_page(client: &str, redirect_uri: &str, step: &str) -> Response {
          <h1>Allow {client} to act for you in Cairn?</h1>\
          <p>It will be able to read and change everything you can, until you revoke it. \
          Its answer goes to <code>{redirect_uri}</code>.</p>\
-         <form method=\"post\" action=\"/oauth/authorize\">\
+         <form method=\"post\" action=\"/api/oauth/authorize\">\
          <input type=\"hidden\" name=\"step\" value=\"{step}\">\
          <button name=\"decision\" value=\"allow\">Allow</button> \
          <button name=\"decision\" value=\"deny\">Deny</button></form>",

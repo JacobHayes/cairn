@@ -42,7 +42,7 @@ pub fn served<S: Store + 'static>() -> crate::Served<S> {
     ]
 }
 
-/// `POST /journeys/{id}/assistant`.
+/// `POST /api/journeys/{id}/assistant`.
 pub async fn journey<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -53,7 +53,7 @@ pub async fn journey<S: Store + 'static>(
     converse(&api, &actor, Target::Journey(id), request).await
 }
 
-/// `POST /routes/{id}/draft/assistant`.
+/// `POST /api/routes/{id}/draft/assistant`.
 pub async fn route_draft<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -64,7 +64,7 @@ pub async fn route_draft<S: Store + 'static>(
     converse(&api, &actor, Target::RouteDraft(id), request).await
 }
 
-/// `GET /journeys/{id}/assistant`.
+/// `GET /api/journeys/{id}/assistant`.
 pub async fn journey_conversation<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -74,7 +74,7 @@ pub async fn journey_conversation<S: Store + 'static>(
     kept(&api, &actor, &Target::Journey(id)).await
 }
 
-/// `GET /routes/{id}/draft/assistant`.
+/// `GET /api/routes/{id}/draft/assistant`.
 pub async fn route_draft_conversation<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,

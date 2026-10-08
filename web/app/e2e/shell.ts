@@ -4,10 +4,27 @@ import { expect, type Page } from "@playwright/test";
 
 export type HostKind = "server" | "browser";
 
-/** Opens the screen at `hash` (`/`, `/journeys/<id>`) on `host`, once the shell is up. */
-export async function open(page: Page, host: HostKind, hash = "/"): Promise<void> {
-  await page.goto(`/?host=${host}#${hash}`);
-  await expect(page.getByTestId("host")).toBeVisible();
+/**
+ * Opens the screen at `path` (`/`, `/journeys/<id>?view=...`) on `host`, once the shell is up:
+ * within the page when it already runs on `host`, as a link would, so the in-browser host's
+ * store (which lives only as long as the page) is kept; by loading the page otherwise.
+ */
+export async function open(page: Page, host: HostKind, path = "/"): Promise<void> {
+  const shell = page.getByTestId("host");
+  if ((await shell.count()) === 1 && (await shell.getAttribute("data-status")) === host) {
+    await goWithin(page, path);
+  } else {
+    await page.goto(`${path}${path.includes("?") ? "&" : "?"}host=${host}`);
+  }
+  await expect(shell).toBeVisible();
+}
+
+/** Moves the tab to the screen at `path` without loading the page again, as the app's links do. */
+export async function goWithin(page: Page, path: string): Promise<void> {
+  await page.evaluate((to) => {
+    history.pushState(null, "", to);
+    dispatchEvent(new PopStateEvent("popstate"));
+  }, path);
 }
 
 /** A journey's page, once derived and its canvas drawn. */
@@ -75,7 +92,7 @@ export function fresh(stem: string): string {
 export function countDocumentFetches(page: Page, journey: string): () => number {
   let count = 0;
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname === `/journeys/${journey}/document`) {
+    if (new URL(request.url()).pathname === `/api/journeys/${journey}/document`) {
       count += 1;
     }
   });

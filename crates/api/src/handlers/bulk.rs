@@ -33,7 +33,7 @@ pub fn served<S: Store + 'static>() -> crate::Served<S> {
     ]
 }
 
-/// `POST /journeys/{id}/upgrade` (B7).
+/// `POST /api/journeys/{id}/upgrade` (B7).
 pub async fn upgrade<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -57,7 +57,7 @@ pub async fn upgrade<S: Store + 'static>(
     drafted_written(&logged_patch, &logged_id, "upgrade", drafted)
 }
 
-/// `POST /journeys/{id}/save-as-route` (B8).
+/// `POST /api/journeys/{id}/save-as-route` (B8).
 pub async fn save_as_route<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -82,7 +82,7 @@ pub async fn save_as_route<S: Store + 'static>(
     drafted_written(&logged_patch, &logged_id, "save_as_route", drafted)
 }
 
-/// `POST /journeys/{id}/relink` (B9).
+/// `POST /api/journeys/{id}/relink` (B9).
 pub async fn relink<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -106,7 +106,7 @@ pub async fn relink<S: Store + 'static>(
     drafted_written(&logged_patch, &logged_id, "relink", drafted)
 }
 
-/// `POST /routes/{id}/import` (A13): one route patch opening a new route or a new draft.
+/// `POST /api/routes/{id}/import` (A13): one route patch opening a new route or a new draft.
 pub async fn import<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -133,7 +133,7 @@ pub async fn import<S: Store + 'static>(
     Ok(Json(answer?.into()))
 }
 
-/// `GET /routes/{id}/export` (A13): a version, or the draft when none is asked for.
+/// `GET /api/routes/{id}/export` (A13): a version, or the draft when none is asked for.
 pub async fn export<S: Store + 'static>(
     State(api): State<Api<S>>,
     Path(id): Path<String>,

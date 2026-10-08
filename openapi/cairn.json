@@ -415,7 +415,7 @@
       },
       "AssistantRequest": {
         "additionalProperties": false,
-        "description": "`POST /journeys/{id}/assistant` and `POST /routes/{id}/draft/assistant`: one message of\nthe caller's conversation about that journey or draft.",
+        "description": "`POST /api/journeys/{id}/assistant` and `POST /api/routes/{id}/draft/assistant`: one message of\nthe caller's conversation about that journey or draft.",
         "properties": {
           "message": {
             "$ref": "#/components/schemas/Markdown",
@@ -628,7 +628,7 @@
       },
       "Capabilities": {
         "additionalProperties": false,
-        "description": "The capabilities document (`GET /capabilities`): what this host offers.",
+        "description": "The capabilities document (`GET /api/capabilities`): what this host offers.",
         "properties": {
           "assistant": {
             "description": "Whether the in-app assistant is available (I5).",
@@ -642,7 +642,7 @@
             "type": "array"
           },
           "mcp": {
-            "description": "Whether the host serves MCP at `/mcp` (I2).",
+            "description": "Whether the host serves MCP at `/api/mcp` (I2).",
             "type": "boolean"
           },
           "sse": {
@@ -2019,7 +2019,7 @@
       },
       "Conversation": {
         "additionalProperties": false,
-        "description": "`GET /journeys/{id}/assistant` and `GET /routes/{id}/draft/assistant`: the caller's\nconversation about that journey or draft (I5: one per target per user), as kept: its\nnewest messages, oldest first. A conversation not started yet has none.",
+        "description": "`GET /api/journeys/{id}/assistant` and `GET /api/routes/{id}/draft/assistant`: the caller's\nconversation about that journey or draft (I5: one per target per user), as kept: its\nnewest messages, oldest first. A conversation not started yet has none.",
         "properties": {
           "conversation": {
             "$ref": "#/components/schemas/ConversationId",
@@ -8851,7 +8851,7 @@
       },
       "PatchRequest": {
         "additionalProperties": false,
-        "description": "`POST /{domain}/patches`: a patch to the domain the path names, and the note each of its\nevents carries (J1).",
+        "description": "`POST /api/{domain}/patches`: a patch to the domain the path names, and the note each of its\nevents carries (J1).",
         "properties": {
           "note": {
             "anyOf": [
@@ -9540,7 +9540,7 @@
       },
       "ProposalApply": {
         "additionalProperties": false,
-        "description": "`POST /proposals/{id}/apply`: applies the proposal as the caller, its confirming user\n(H2), at the editing revision they reviewed.",
+        "description": "`POST /api/proposals/{id}/apply`: applies the proposal as the caller, its confirming user\n(H2), at the editing revision they reviewed.",
         "properties": {
           "note": {
             "anyOf": [
@@ -9570,7 +9570,7 @@
       },
       "ProposalCreate": {
         "additionalProperties": false,
-        "description": "`POST /{domain}/proposals`: a new proposal for the path's domain (which may not exist yet:\na proposal can create a journey or route at revision 0).",
+        "description": "`POST /api/{domain}/proposals`: a new proposal for the path's domain (which may not exist yet:\na proposal can create a journey or route at revision 0).",
         "properties": {
           "draft": {
             "$ref": "#/components/schemas/ProposalDraft",
@@ -9635,7 +9635,7 @@
       },
       "ProposalEdit": {
         "additionalProperties": false,
-        "description": "`PATCH /proposals/{id}`: the proposal's new content, against the editing revision the\neditor saw (H5). Its destination's revision does not move.",
+        "description": "`PATCH /api/proposals/{id}`: the proposal's new content, against the editing revision the\neditor saw (H5). Its destination's revision does not move.",
         "properties": {
           "base_revision": {
             "$ref": "#/components/schemas/Revision",
@@ -9716,7 +9716,7 @@
       },
       "ProposalReview": {
         "additionalProperties": false,
-        "description": "`POST /proposals/{id}/preview` (C14, D7, I6): what applying the proposal now would do, and,\nwhen its destination moved since it was drafted, what moved.",
+        "description": "`POST /api/proposals/{id}/preview` (C14, D7, I6): what applying the proposal now would do, and,\nwhen its destination moved since it was drafted, what moved.",
         "properties": {
           "consequences": {
             "additionalProperties": false,
@@ -9776,7 +9776,7 @@
       },
       "ProposalStep": {
         "additionalProperties": false,
-        "description": "`POST /proposals/{id}/discard` and `POST /proposals/{id}/refresh`: against the editing\nrevision the caller saw.",
+        "description": "`POST /api/proposals/{id}/discard` and `POST /api/proposals/{id}/refresh`: against the editing\nrevision the caller saw.",
         "properties": {
           "base_revision": {
             "$ref": "#/components/schemas/Revision",
@@ -10443,7 +10443,7 @@
       },
       "RelinkRequest": {
         "additionalProperties": false,
-        "description": "`POST /journeys/{id}/relink` (B9): proposes re-linking the journey to a published version.",
+        "description": "`POST /api/journeys/{id}/relink` (B9): proposes re-linking the journey to a published version.",
         "properties": {
           "lineage": {
             "$ref": "#/components/schemas/Lineage",
@@ -11438,7 +11438,7 @@
       },
       "RouteImport": {
         "additionalProperties": false,
-        "description": "`POST /routes/{id}/import` (A13): a route file, imported as a new route or a new draft of\nthe path's route, matched against the version it extends.",
+        "description": "`POST /api/routes/{id}/import` (A13): a route file, imported as a new route or a new draft of\nthe path's route, matched against the version it extends.",
         "properties": {
           "file": {
             "$ref": "#/components/schemas/RouteFile",
@@ -11561,7 +11561,7 @@
       },
       "SaveAsRouteRequest": {
         "additionalProperties": false,
-        "description": "`POST /journeys/{id}/save-as-route` (B8): proposes saving the journey's structure as a\ndraft of a route, created when it does not exist.",
+        "description": "`POST /api/journeys/{id}/save-as-route` (B8): proposes saving the journey's structure as a\ndraft of a route, created when it does not exist.",
         "properties": {
           "name": {
             "$ref": "#/components/schemas/Title",
@@ -12620,7 +12620,7 @@
       },
       "TokenRequest": {
         "additionalProperties": false,
-        "description": "`POST /users/me/tokens`: what to call the new agent token.",
+        "description": "`POST /api/users/me/tokens`: what to call the new agent token.",
         "properties": {
           "name": {
             "$ref": "#/components/schemas/Title",
@@ -12887,7 +12887,7 @@
       },
       "UpgradeRequest": {
         "additionalProperties": false,
-        "description": "`POST /journeys/{id}/upgrade` (B7): proposes upgrading the journey to a newer version of\nthe route it follows.",
+        "description": "`POST /api/journeys/{id}/upgrade` (B7): proposes upgrading the journey to a newer version of\nthe route it follows.",
         "properties": {
           "patch_id": {
             "$ref": "#/components/schemas/PatchId",
@@ -13241,7 +13241,7 @@
   },
   "openapi": "3.1.0",
   "paths": {
-    "/capabilities": {
+    "/api/capabilities": {
       "get": {
         "operationId": "getCapabilities",
         "responses": {
@@ -13314,7 +13314,7 @@
         "summary": "What this host offers."
       }
     },
-    "/deployment": {
+    "/api/deployment": {
       "get": {
         "operationId": "getDeployment",
         "responses": {
@@ -13387,7 +13387,7 @@
         "summary": "The deployment: entities and aliases (E6)."
       }
     },
-    "/deployment/patches": {
+    "/api/deployment/patches": {
       "post": {
         "operationId": "patchDeployment",
         "requestBody": {
@@ -13510,7 +13510,7 @@
         "summary": "Applies a deployment patch: entities and merges (E6)."
       }
     },
-    "/deployment/proposals": {
+    "/api/deployment/proposals": {
       "post": {
         "operationId": "proposeToDeployment",
         "requestBody": {
@@ -13633,7 +13633,7 @@
         "summary": "Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6)."
       }
     },
-    "/entities/{key}": {
+    "/api/entities/{key}": {
       "get": {
         "operationId": "getEntity",
         "parameters": [
@@ -13727,7 +13727,7 @@
         "summary": "An entity, resolved through its aliases (E6)."
       }
     },
-    "/events": {
+    "/api/events": {
       "get": {
         "operationId": "listEvents",
         "parameters": [
@@ -13910,7 +13910,7 @@
         "summary": "Events, filtered and paged in commit order (J5)."
       }
     },
-    "/events/stream": {
+    "/api/events/stream": {
       "get": {
         "operationId": "streamRevisions",
         "parameters": [
@@ -14002,53 +14002,7 @@
         "summary": "Revision ticks as server-sent `tick` events, current revisions first (H6)."
       }
     },
-    "/healthz": {
-      "get": {
-        "operationId": "getHealth",
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Health"
-                }
-              }
-            },
-            "description": "Answered."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The server failed; the request id names it in the logs."
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Health"
-                    },
-                    {
-                      "$ref": "#/components/schemas/Problem"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "The store has failed closed (a Health), or a limit was reached (a problem)."
-          }
-        },
-        "security": [],
-        "summary": "Whether the server is serving: 200 while its store answers, 503 once the store has failed closed. Needs no credential."
-      }
-    },
-    "/journeys": {
+    "/api/journeys": {
       "get": {
         "operationId": "listJourneys",
         "parameters": [
@@ -14208,7 +14162,7 @@
         "summary": "The journey index, filtered and paged (C16)."
       }
     },
-    "/journeys/{id}": {
+    "/api/journeys/{id}": {
       "get": {
         "operationId": "getJourney",
         "parameters": [
@@ -14302,7 +14256,7 @@
         "summary": "A journey with its graph and state."
       }
     },
-    "/journeys/{id}/assistant": {
+    "/api/journeys/{id}/assistant": {
       "get": {
         "operationId": "conversationAboutJourney",
         "parameters": [
@@ -14528,7 +14482,7 @@
         "summary": "One assistant turn about a journey, when the capabilities offer the assistant (I5): its direct writes with their consequences, and its proposals for review."
       }
     },
-    "/journeys/{id}/decisions": {
+    "/api/journeys/{id}/decisions": {
       "get": {
         "operationId": "getDecisionView",
         "parameters": [
@@ -14622,7 +14576,7 @@
         "summary": "The decision view (C12)."
       }
     },
-    "/journeys/{id}/derived": {
+    "/api/journeys/{id}/derived": {
       "get": {
         "operationId": "getJourneyDerived",
         "parameters": [
@@ -14716,7 +14670,7 @@
         "summary": "Every derived value with its explanation inputs, as the browser derives the document (D3)."
       }
     },
-    "/journeys/{id}/document": {
+    "/api/journeys/{id}/document": {
       "get": {
         "operationId": "getJourneyDocument",
         "parameters": [
@@ -14810,7 +14764,7 @@
         "summary": "The domain document: the journey, the caller's derive inputs, and the engine version; nothing derived."
       }
     },
-    "/journeys/{id}/history": {
+    "/api/journeys/{id}/history": {
       "get": {
         "operationId": "getHistory",
         "parameters": [
@@ -14928,7 +14882,7 @@
         "summary": "The journey's events, or a node's, grouped by patch and paged (J4)."
       }
     },
-    "/journeys/{id}/level": {
+    "/api/journeys/{id}/level": {
       "get": {
         "operationId": "getJourneyLevel",
         "parameters": [
@@ -15047,7 +15001,7 @@
         "summary": "One canvas level: the kinds shown, at the top or within a container (C2)."
       }
     },
-    "/journeys/{id}/mine": {
+    "/api/journeys/{id}/mine": {
       "get": {
         "operationId": "getMine",
         "parameters": [
@@ -15155,7 +15109,7 @@
         "summary": "The nodes the caller participates in, by participation kind (E4)."
       }
     },
-    "/journeys/{id}/next": {
+    "/api/journeys/{id}/next": {
       "get": {
         "operationId": "getNext",
         "parameters": [
@@ -15307,7 +15261,7 @@
         "summary": "The acting frontier ranked, globally or for the caller, filtered (C10)."
       }
     },
-    "/journeys/{id}/nodes": {
+    "/api/journeys/{id}/nodes": {
       "get": {
         "operationId": "listNodes",
         "parameters": [
@@ -15519,7 +15473,7 @@
         "summary": "The nodes a list query matches, sorted and paged (C9)."
       }
     },
-    "/journeys/{id}/nodes/{key}": {
+    "/api/journeys/{id}/nodes/{key}": {
       "get": {
         "operationId": "getNode",
         "parameters": [
@@ -15622,7 +15576,7 @@
         "summary": "One node in full; each explanation list carries its largest entries up to the response limit and its total (C8)."
       }
     },
-    "/journeys/{id}/nodes/{key}/explanations/{field}": {
+    "/api/journeys/{id}/nodes/{key}/explanations/{field}": {
       "get": {
         "operationId": "listExplanations",
         "parameters": [
@@ -15766,7 +15720,7 @@
         "summary": "A page of a node's explanation list, largest first (C8)."
       }
     },
-    "/journeys/{id}/patches": {
+    "/api/journeys/{id}/patches": {
       "post": {
         "operationId": "patchJourney",
         "parameters": [
@@ -15910,7 +15864,7 @@
         "summary": "Applies a journey patch; base revision 0 creates it (A17)."
       }
     },
-    "/journeys/{id}/proposals": {
+    "/api/journeys/{id}/proposals": {
       "post": {
         "operationId": "proposeToJourney",
         "parameters": [
@@ -16054,7 +16008,7 @@
         "summary": "Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6)."
       }
     },
-    "/journeys/{id}/relink": {
+    "/api/journeys/{id}/relink": {
       "post": {
         "operationId": "proposeRelink",
         "parameters": [
@@ -16205,7 +16159,7 @@
         "summary": "Proposes re-linking the journey to a published version, differences kept as local edits unless the reviewer takes the route's (B9)."
       }
     },
-    "/journeys/{id}/save-as-route": {
+    "/api/journeys/{id}/save-as-route": {
       "post": {
         "operationId": "proposeSaveAsRoute",
         "parameters": [
@@ -16356,7 +16310,7 @@
         "summary": "Proposes saving the journey's structure as a route draft, with a participation mapping per explicit entity and an exclusion per node (B8)."
       }
     },
-    "/journeys/{id}/snapshot": {
+    "/api/journeys/{id}/snapshot": {
       "get": {
         "operationId": "getJourneySnapshot",
         "parameters": [
@@ -16506,7 +16460,7 @@
         "summary": "The bounded agent snapshot, scoped to a subtree and depth, its nodes paged (I3)."
       }
     },
-    "/journeys/{id}/summary": {
+    "/api/journeys/{id}/summary": {
       "get": {
         "operationId": "getStatusSummary",
         "parameters": [
@@ -16600,7 +16554,7 @@
         "summary": "The status summary (C18)."
       }
     },
-    "/journeys/{id}/timeline": {
+    "/api/journeys/{id}/timeline": {
       "get": {
         "operationId": "getTimeline",
         "parameters": [
@@ -16694,7 +16648,7 @@
         "summary": "The timeline (C13)."
       }
     },
-    "/journeys/{id}/trace/{key}": {
+    "/api/journeys/{id}/trace/{key}": {
       "get": {
         "operationId": "traceNode",
         "parameters": [
@@ -16797,7 +16751,7 @@
         "summary": "What is upstream and downstream of a node, gravity contributors marked (C7)."
       }
     },
-    "/journeys/{id}/upgrade": {
+    "/api/journeys/{id}/upgrade": {
       "post": {
         "operationId": "proposeUpgrade",
         "parameters": [
@@ -16948,7 +16902,7 @@
         "summary": "Proposes upgrading the journey to a newer version of its route: the merge's conflicts, kept edits, and orphans are its review items (B7)."
       }
     },
-    "/proposals/{id}": {
+    "/api/proposals/{id}": {
       "get": {
         "operationId": "getProposal",
         "parameters": [
@@ -17184,7 +17138,7 @@
         "summary": "Replaces its content against its editing revision; its destination does not move (H5)."
       }
     },
-    "/proposals/{id}/apply": {
+    "/api/proposals/{id}/apply": {
       "post": {
         "operationId": "applyProposal",
         "parameters": [
@@ -17328,7 +17282,7 @@
         "summary": "Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6)."
       }
     },
-    "/proposals/{id}/discard": {
+    "/api/proposals/{id}/discard": {
       "post": {
         "operationId": "discardProposal",
         "parameters": [
@@ -17472,7 +17426,7 @@
         "summary": "Discards it (I6)."
       }
     },
-    "/proposals/{id}/preview": {
+    "/api/proposals/{id}/preview": {
       "post": {
         "operationId": "previewProposal",
         "parameters": [
@@ -17566,7 +17520,7 @@
         "summary": "What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6)."
       }
     },
-    "/proposals/{id}/refresh": {
+    "/api/proposals/{id}/refresh": {
       "post": {
         "operationId": "refreshProposal",
         "parameters": [
@@ -17717,7 +17671,7 @@
         "summary": "Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6)."
       }
     },
-    "/routes": {
+    "/api/routes": {
       "get": {
         "operationId": "listRoutes",
         "parameters": [
@@ -17816,7 +17770,7 @@
         "summary": "The route index, paged (I2)."
       }
     },
-    "/routes/{id}": {
+    "/api/routes/{id}": {
       "get": {
         "operationId": "getRoute",
         "parameters": [
@@ -17910,7 +17864,7 @@
         "summary": "A route with its draft."
       }
     },
-    "/routes/{id}/draft/assistant": {
+    "/api/routes/{id}/draft/assistant": {
       "get": {
         "operationId": "conversationAboutRouteDraft",
         "parameters": [
@@ -18136,7 +18090,7 @@
         "summary": "One assistant turn about a route's draft, when the capabilities offer the assistant (I5, A12): what it drafts arrives as proposals on the draft."
       }
     },
-    "/routes/{id}/export": {
+    "/api/routes/{id}/export": {
       "get": {
         "operationId": "exportRoute",
         "parameters": [
@@ -18241,7 +18195,7 @@
         "summary": "A published version, or the draft, as a route file: every key kept, in one sorted order, naming the version it extends (A13)."
       }
     },
-    "/routes/{id}/import": {
+    "/api/routes/{id}/import": {
       "post": {
         "operationId": "importRoute",
         "parameters": [
@@ -18385,7 +18339,7 @@
         "summary": "Imports a route file as a new route or a new draft extending a published version, matched by key or path; one route patch (A13)."
       }
     },
-    "/routes/{id}/patches": {
+    "/api/routes/{id}/patches": {
       "post": {
         "operationId": "patchRoute",
         "parameters": [
@@ -18529,7 +18483,7 @@
         "summary": "Applies a route patch, its draft included (A17)."
       }
     },
-    "/routes/{id}/proposals": {
+    "/api/routes/{id}/proposals": {
       "post": {
         "operationId": "proposeToRoute",
         "parameters": [
@@ -18673,7 +18627,7 @@
         "summary": "Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6)."
       }
     },
-    "/routes/{id}/versions": {
+    "/api/routes/{id}/versions": {
       "get": {
         "operationId": "getRouteDetail",
         "parameters": [
@@ -18767,7 +18721,7 @@
         "summary": "A route's versions and their journeys (C17)."
       }
     },
-    "/routes/{id}/versions/{version}": {
+    "/api/routes/{id}/versions/{version}": {
       "get": {
         "operationId": "getRouteVersion",
         "parameters": [
@@ -18870,7 +18824,7 @@
         "summary": "One published route version."
       }
     },
-    "/search": {
+    "/api/search": {
       "get": {
         "operationId": "searchJourneys",
         "parameters": [
@@ -18980,7 +18934,7 @@
         "summary": "Text search across journeys, paged."
       }
     },
-    "/users/me": {
+    "/api/users/me": {
       "get": {
         "operationId": "getViewer",
         "responses": {
@@ -19053,7 +19007,7 @@
         "summary": "The caller and their entities (H2, H3)."
       }
     },
-    "/users/me/tokens": {
+    "/api/users/me/tokens": {
       "get": {
         "operationId": "listAgentTokens",
         "responses": {
@@ -19240,7 +19194,7 @@
         "summary": "Mints an agent token, shown this once (H2)."
       }
     },
-    "/users/me/tokens/{agent}": {
+    "/api/users/me/tokens/{agent}": {
       "delete": {
         "operationId": "revokeAgentToken",
         "parameters": [
@@ -19330,6 +19284,52 @@
           }
         },
         "summary": "Revokes one of the caller's agent tokens."
+      }
+    },
+    "/healthz": {
+      "get": {
+        "operationId": "getHealth",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Health"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Health"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Problem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "The store has failed closed (a Health), or a limit was reached (a problem)."
+          }
+        },
+        "security": [],
+        "summary": "Whether the server is serving: 200 while its store answers, 503 once the store has failed closed. Needs no credential."
       }
     }
   },

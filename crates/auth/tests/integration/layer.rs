@@ -170,7 +170,7 @@ mod layer {
 
         let renewed = world.accounts.start_session(&ann).await.unwrap();
         let cookie = format!("cairn_session={}", renewed.expose());
-        let out = with_cookie(request("/auth/sign-out", LOCAL), &cookie).method("POST");
+        let out = with_cookie(request("/api/auth/sign-out", LOCAL), &cookie).method("POST");
         let response = send(&router, out.body(Body::empty()).unwrap()).await;
         assert_eq!(response.status(), StatusCode::NO_CONTENT);
         let after = with_cookie(request("/whoami", LOCAL), &cookie).body(Body::empty());

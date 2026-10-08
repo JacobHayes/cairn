@@ -73,12 +73,12 @@ mod in_process {
     async fn the_capabilities_say_whether_the_assistant_is_served() {
         let without = World::start().await;
         let ann = without.vendor_after(1).await;
-        let capabilities: Capabilities = get(&ann, "/capabilities").await;
+        let capabilities: Capabilities = get(&ann, "/api/capabilities").await;
         assert!(!capabilities.assistant);
         let said = json!({ "message": "Hello." });
         for target in [
-            "/journeys/j_vendor_eval/assistant",
-            "/routes/vendor-evaluation/draft/assistant",
+            "/api/journeys/j_vendor_eval/assistant",
+            "/api/routes/vendor-evaluation/draft/assistant",
         ] {
             let reply = post(&ann, target, &said).await;
             assert_eq!(reply.status, StatusCode::NOT_FOUND, "{target}");
@@ -89,7 +89,7 @@ mod in_process {
         let provider = scripted(vec![Step::say("Hello."), Step::say("Hello again.")]);
         let with = with_assistant(&provider).await;
         let ann = with.vendor_after(1).await;
-        let capabilities: Capabilities = get(&ann, "/capabilities").await;
+        let capabilities: Capabilities = get(&ann, "/api/capabilities").await;
         assert!(capabilities.assistant);
         let endpoints = [
             (&at::ASSISTANT_JOURNEY, JOURNEY),
@@ -201,7 +201,7 @@ mod in_process {
         let provider = scripted(Vec::new());
         let world = with_assistant(&provider).await;
         let ann = world.vendor_after(1).await;
-        let minted = post(&ann, "/users/me/tokens", &json!({ "name": "Helper" })).await;
+        let minted = post(&ann, "/api/users/me/tokens", &json!({ "name": "Helper" })).await;
         let minted: MintedToken = ok(&minted);
         let helper = world.bearer(&minted.token);
         let said = json!({ "message": "Hello." });
@@ -285,7 +285,7 @@ mod in_process {
         let ann = world.vendor_after(1).await;
         let bakeoff = scenario("bake-off");
         let empty = json!({ "patch": bakeoff.steps.as_slice()[0].patch });
-        ok::<Value>(&post(&ann, "/journeys/j_bakeoff/patches", &empty).await);
+        ok::<Value>(&post(&ann, "/api/journeys/j_bakeoff/patches", &empty).await);
 
         structure_an_ad_hoc_journey(&world, &provider, &ann).await;
         answer_directly(&world, &provider, &ann).await;
@@ -311,7 +311,7 @@ mod in_process {
         ]);
         let said = json!({ "message": "A two-week bake-off between two options: three \
             decisions, four deliverables, and a decision milestone. Set it up." });
-        let reply = post(ann, "/journeys/j_bakeoff/assistant", &said).await;
+        let reply = post(ann, "/api/journeys/j_bakeoff/assistant", &said).await;
         let turn: TurnReply = ok(&reply);
         let [Action::Proposed { proposal, .. }] = turn.actions.as_slice() else {
             panic!("{:?}", turn.actions);
@@ -322,10 +322,10 @@ mod in_process {
             "drafting moves nothing"
         );
         let apply = json!({ "patch_id": "p_apply_bakeoff", "reviewed_revision": 1 });
-        let applied = post(ann, &format!("/proposals/{proposal}/apply"), &apply).await;
+        let applied = post(ann, &format!("/api/proposals/{proposal}/apply"), &apply).await;
         ok::<Value>(&applied);
         assert_eq!(world.revision("j_bakeoff").await, 2);
-        let events: Value = get(ann, "/events?patch=p_apply_bakeoff&size=1").await;
+        let events: Value = get(ann, "/api/events?patch=p_apply_bakeoff&size=1").await;
         let event = &events["items"][0]["event"];
         assert_eq!(event["actor"]["agent"], "ag_assistant");
         assert_eq!(event["confirming_user"], event["actor"]["user"]);
@@ -348,7 +348,7 @@ mod in_process {
         ]);
         let said = json!({ "message": "Answer the up-front decisions: purchase, I own it, \
             both stakeholders informed, no partner, and the meeting is on the 6th." });
-        let reply = post(ann, "/journeys/j_vendor_eval/assistant", &said).await;
+        let reply = post(ann, "/api/journeys/j_vendor_eval/assistant", &said).await;
         let turn: TurnReply = ok(&reply);
         assert!(
             matches!(turn.actions.as_slice(), [Action::Applied { consequences, .. }]
@@ -383,7 +383,7 @@ mod in_process {
             Step::say("That touches eleven nodes, so it is a proposal for you to review."),
         ]);
         let said = json!({ "message": "Lower the weight of every work item to 2." });
-        let reply = post(ann, "/journeys/j_vendor_eval/assistant", &said).await;
+        let reply = post(ann, "/api/journeys/j_vendor_eval/assistant", &said).await;
         let turn: TurnReply = ok(&reply);
         assert!(matches!(turn.actions.as_slice(), [Action::Proposed { .. }]));
         assert_eq!(world.revision(JOURNEY).await, 2, "nothing landed");
@@ -396,7 +396,7 @@ mod in_process {
         provider.push([Step::call("snooze", snooze), Step::Hang]);
         let said = json!({ "message": "Snooze the access request until Monday, then tell me \
             what is next." });
-        let reply = post(ann, "/journeys/j_vendor_eval/assistant", &said).await;
+        let reply = post(ann, "/api/journeys/j_vendor_eval/assistant", &said).await;
         let turn: TurnReply = ok(&reply);
         assert_eq!(turn.ended, Ended::ProviderTimedOut);
         assert!(matches!(turn.actions.as_slice(), [Action::Applied { .. }]));

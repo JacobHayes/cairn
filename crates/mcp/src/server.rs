@@ -32,7 +32,7 @@ use serde_json::{Map, Value};
 use crate::{ToolError, ToolSet, instructions, tools};
 
 /// Where the endpoint is served (I2).
-pub const MCP_PATH: &str = "/mcp";
+pub const MCP_PATH: &str = "/api/mcp";
 
 /// The MCP endpoint over `tools` at [`MCP_PATH`], for a router whose auth layer puts an
 /// [`Actor`] in every request's extensions.

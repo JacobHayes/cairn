@@ -16,7 +16,7 @@ use crate::extract::{Path, segment};
 use crate::query::{self, Params};
 use crate::wire::{EventPage, JourneyPage, RouteDetail, RoutePage, SearchPage};
 
-/// `GET /journeys` (C16).
+/// `GET /api/journeys` (C16).
 pub async fn journeys<S: Store + 'static>(
     State(api): State<Api<S>>,
     RawQuery(raw): RawQuery,
@@ -29,7 +29,7 @@ pub async fn journeys<S: Store + 'static>(
     }))
 }
 
-/// `GET /journeys/{id}`.
+/// `GET /api/journeys/{id}`.
 pub async fn journey<S: Store + 'static>(
     State(api): State<Api<S>>,
     Path(id): Path<String>,
@@ -41,7 +41,7 @@ pub async fn journey<S: Store + 'static>(
         .ok_or_else(|| ApiError::not_found(format_args!("journey {id}")))
 }
 
-/// `GET /journeys/{id}/document`: at the caller's today, with their entities as the viewer.
+/// `GET /api/journeys/{id}/document`: at the caller's today, with their entities as the viewer.
 pub async fn document<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -54,7 +54,7 @@ pub async fn document<S: Store + 'static>(
         .ok_or_else(|| ApiError::not_found(format_args!("journey {id}")))
 }
 
-/// `GET /routes` (I2).
+/// `GET /api/routes` (I2).
 pub async fn routes<S: Store + 'static>(
     State(api): State<Api<S>>,
     RawQuery(raw): RawQuery,
@@ -68,7 +68,7 @@ pub async fn routes<S: Store + 'static>(
     }))
 }
 
-/// `GET /routes/{id}`.
+/// `GET /api/routes/{id}`.
 pub async fn route<S: Store + 'static>(
     State(api): State<Api<S>>,
     Path(id): Path<String>,
@@ -80,7 +80,7 @@ pub async fn route<S: Store + 'static>(
         .ok_or_else(|| ApiError::not_found(format_args!("route {id}")))
 }
 
-/// `GET /routes/{id}/versions` (C17).
+/// `GET /api/routes/{id}/versions` (C17).
 pub async fn route_versions<S: Store + 'static>(
     State(api): State<Api<S>>,
     Path(id): Path<String>,
@@ -92,7 +92,7 @@ pub async fn route_versions<S: Store + 'static>(
         .ok_or_else(|| ApiError::not_found(format_args!("route {id}")))
 }
 
-/// `GET /routes/{id}/versions/{version}`.
+/// `GET /api/routes/{id}/versions/{version}`.
 pub async fn route_version<S: Store + 'static>(
     State(api): State<Api<S>>,
     Path((id, version)): Path<(String, String)>,
@@ -105,12 +105,12 @@ pub async fn route_version<S: Store + 'static>(
         .ok_or_else(|| ApiError::not_found(format_args!("version {version} of route {id}")))
 }
 
-/// `GET /deployment`.
+/// `GET /api/deployment`.
 pub async fn deployment<S: Store + 'static>(State(api): State<Api<S>>) -> Answer<Deployment> {
     Ok(Json(api.service.deployment().await?))
 }
 
-/// `GET /entities/{key}` (E6).
+/// `GET /api/entities/{key}` (E6).
 pub async fn entity<S: Store + 'static>(
     State(api): State<Api<S>>,
     Path(key): Path<String>,
@@ -122,7 +122,7 @@ pub async fn entity<S: Store + 'static>(
         .ok_or_else(|| ApiError::not_found(format_args!("entity {key}")))
 }
 
-/// `GET /search`.
+/// `GET /api/search`.
 pub async fn search<S: Store + 'static>(
     State(api): State<Api<S>>,
     RawQuery(raw): RawQuery,
@@ -132,7 +132,7 @@ pub async fn search<S: Store + 'static>(
     Ok(Json(page.into()))
 }
 
-/// `GET /events` (J5).
+/// `GET /api/events` (J5).
 pub async fn events<S: Store + 'static>(
     State(api): State<Api<S>>,
     RawQuery(raw): RawQuery,

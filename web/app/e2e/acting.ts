@@ -89,7 +89,7 @@ export function daysAfter(today: string, days: number): string {
 export async function startVendorJourney(page: Page): Promise<string> {
   const id = `j_${fresh("walk").replace(/\W/g, "_").toLowerCase()}`;
   const patchId = `p_${crypto.randomUUID().replaceAll("-", "")}`;
-  const response = await page.request.post(`/journeys/${id}/patches`, {
+  const response = await page.request.post(`/api/journeys/${id}/patches`, {
     data: {
       patch: {
         id: patchId,

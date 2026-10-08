@@ -3,7 +3,7 @@
 //! notifier is the in-process one, whose ticks the API's stream coalesces on tokio's timer;
 //! the auth providers are the configured ones, in order; the assistant is present exactly
 //! when configured, a `None` here and absent from the capabilities otherwise (I5). The API
-//! (with MCP at `/mcp`), auth's routes, `/metrics`, and the embedded UI share one router
+//! (with MCP at `/api/mcp`), auth's routes, `/api/metrics`, and the embedded UI share one router
 //! behind the `Host` allowlist, served on one port.
 
 use std::fmt;
@@ -38,7 +38,7 @@ pub struct Assembly<S> {
     pub notifier: Arc<dyn Notifier>,
     /// The web build.
     pub assets: Vec<Asset>,
-    /// The metrics `/metrics` serves.
+    /// The metrics `/api/metrics` serves.
     pub metrics: PrometheusHandle,
     /// The deployment clock.
     pub clock: Clock,
@@ -158,7 +158,7 @@ pub fn providers<S: AuthStore + 'static>(
 }
 
 /// The whole server's router: the API with MCP, the assistant when configured, auth's
-/// routes, `/metrics` behind the auth layer, and the UI, all behind the `Host` allowlist.
+/// routes, `/api/metrics` behind the auth layer, and the UI, all behind the `Host` allowlist.
 ///
 /// # Errors
 ///
@@ -184,11 +184,11 @@ pub fn app<S: Store + 'static>(
             Arc::new(HttpProvider::new(provider)),
         )
     });
-    let ui = assets::router(parts.assets).map_err(StartupError::WebBuild)?;
+    let ui = assets::router(&parts.assets).map_err(StartupError::WebBuild)?;
     let metrics = auth.protect(telemetry::metrics_router(parts.metrics));
-    // The UI and metrics sit beside the API under its request limits: the in-flight limit
-    // is per process, whatever the path.
-    let app = cairn_api::router_beside(service, &auth, assistant, metrics.merge(ui));
+    // Metrics and the UI sit beside the API under its request limits: the in-flight limit
+    // is per process, whatever the path. The UI answers every path the API does not keep.
+    let app = cairn_api::router_beside(service, &auth, assistant, metrics, Some(ui));
     Ok(AllowedHosts::new(&config.public_url, config.listen).guard(app))
 }
 

@@ -203,7 +203,12 @@ impl World {
     pub async fn vendor_after(&self, steps: usize) -> Transport {
         let ann = self.signed_in("ann");
         let seed = publish_fixture_route("vendor-evaluation");
-        let reply = post(&ann, "/routes/vendor-evaluation/patches", &request(&seed)).await;
+        let reply = post(
+            &ann,
+            "/api/routes/vendor-evaluation/patches",
+            &request(&seed),
+        )
+        .await;
         ok::<serde_json::Value>(&reply);
         for step in scenario("vendor-evaluation")
             .steps
@@ -213,7 +218,9 @@ impl World {
         {
             self.clock.set_to(step.at);
             let body = serde_json::json!({ "patch": step.patch, "note": step.note });
-            ok::<serde_json::Value>(&post(&ann, "/journeys/j_vendor_eval/patches", &body).await);
+            ok::<serde_json::Value>(
+                &post(&ann, "/api/journeys/j_vendor_eval/patches", &body).await,
+            );
         }
         ann
     }
@@ -325,7 +332,7 @@ pub fn patch(id: &str, target: &str, base: u32, mutations: &str) -> Patch {
     from_yaml(&yaml).unwrap_or_else(|error| panic!("{error}\n{yaml}"))
 }
 
-/// The body of `POST /{domain}/patches` for `patch`, with no note.
+/// The body of `POST /api/{domain}/patches` for `patch`, with no note.
 pub fn request(patch: &Patch) -> serde_json::Value {
     serde_json::json!({ "patch": patch })
 }
@@ -343,8 +350,8 @@ pub async fn proposals_of_every_domain(
     serde_json::Value,
 )> {
     use cairn_api::endpoints as at;
-    let journey: cairn_schema::Journey = get(transport, "/journeys/j_vendor_eval").await;
-    let deployment: cairn_schema::Deployment = get(transport, "/deployment").await;
+    let journey: cairn_schema::Journey = get(transport, "/api/journeys/j_vendor_eval").await;
+    let deployment: cairn_schema::Deployment = get(transport, "/api/deployment").await;
     let charter = serde_json::json!({
         "title": "Charter first",
         "destination_revision": journey.revision,
@@ -366,19 +373,19 @@ pub async fn proposals_of_every_domain(
     vec![
         (
             &at::PROPOSE_JOURNEY,
-            "/journeys/j_vendor_eval/proposals".to_owned(),
+            "/api/journeys/j_vendor_eval/proposals".to_owned(),
             "pr_charter",
             charter,
         ),
         (
             &at::PROPOSE_ROUTE,
-            "/routes/new-route/proposals".to_owned(),
+            "/api/routes/new-route/proposals".to_owned(),
             "pr_route",
             route,
         ),
         (
             &at::PROPOSE_DEPLOYMENT,
-            "/deployment/proposals".to_owned(),
+            "/api/deployment/proposals".to_owned(),
             "pr_entity",
             entity,
         ),

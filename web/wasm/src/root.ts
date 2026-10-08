@@ -50,28 +50,28 @@ export class InBrowserHost {
     return parsed<Schema<"JourneyPage">>(hosted(() => this.#root.journeys()));
   }
 
-  /** C16: the journey index `query` asks for, as `GET /journeys` with those filters answers it. */
+  /** C16: the journey index `query` asks for, as `GET /api/journeys` with those filters answers it. */
   journeyIndex(query: JourneyIndexQuery): Schema<"JourneyPage"> {
     return parsed<Schema<"JourneyPage">>(hosted(() => this.#root.journeyIndex(JSON.stringify(query))));
   }
 
-  /** The route index from after `after`, as `GET /routes` answers it. */
+  /** The route index from after `after`, as `GET /api/routes` answers it. */
   routes(after?: string): Schema<"RoutePage"> {
     return parsed<Schema<"RoutePage">>(hosted(() => this.#root.routes(after ?? "")));
   }
 
-  /** C17: a route's versions with the journeys on each, as `GET /routes/{id}/versions` answers it. */
+  /** C17: a route's versions with the journeys on each, as `GET /api/routes/{id}/versions` answers it. */
   routeDetail(route: string): Schema<"RouteDetail"> {
     return parsed<Schema<"RouteDetail">>(hosted(() => this.#root.routeDetail(route)));
   }
 
-  /** A13: a route version as its file, or its draft with no version, as `GET /routes/{id}/export` answers it. */
+  /** A13: a route version as its file, or its draft with no version, as `GET /api/routes/{id}/export` answers it. */
   exportFile(route: string, version?: number): Schema<"RouteFile"> {
     return parsed<Schema<"RouteFile">>(hosted(() => this.#root.exportFile(route, version === undefined ? "" : String(version))));
   }
 
   /**
-   * A13: imports a route file as the local user, as `POST /routes/{id}/import` answers it:
+   * A13: imports a route file as the local user, as `POST /api/routes/{id}/import` answers it:
    * the patch answer, or a HostFailure whose reason is the rejection. Subscribers hear what
    * it moved.
    */
@@ -81,7 +81,7 @@ export class InBrowserHost {
     return answer;
   }
 
-  /** The caller, as `GET /users/me` answers it (H3). */
+  /** The caller, as `GET /api/users/me` answers it (H3). */
   viewer(): Schema<"Viewer"> {
     return parsed<Schema<"Viewer">>(hosted(() => this.#root.viewer(this.#clock())));
   }
@@ -93,18 +93,18 @@ export class InBrowserHost {
 
   /**
    * J4: a page of a journey's history, or of `node`'s, after the log position `after`, as
-   * `GET /journeys/{id}/history` answers it.
+   * `GET /api/journeys/{id}/history` answers it.
    */
   history(journey: string, node?: string, after?: number): HistoryPage {
     return parsed<HistoryPage>(hosted(() => this.#root.history(journey, node ?? "", after ?? -1)));
   }
 
-  /** A route with its draft (A11), as `GET /routes/{id}` answers it. */
+  /** A route with its draft (A11), as `GET /api/routes/{id}` answers it. */
   route(route: string): Schema<"Route"> {
     return parsed<Schema<"Route">>(hosted(() => this.#root.route(route)));
   }
 
-  /** One published version of a route (A11), as `GET /routes/{id}/versions/{version}` answers it. */
+  /** One published version of a route (A11), as `GET /api/routes/{id}/versions/{version}` answers it. */
   routeVersion(route: string, version: number): Schema<"RouteVersion"> {
     return parsed<Schema<"RouteVersion">>(hosted(() => this.#root.routeVersion(route, String(version))));
   }
@@ -127,54 +127,54 @@ export class InBrowserHost {
     return answer;
   }
 
-  /** I6: a proposal by id, as `GET /proposals/{id}` answers it. */
+  /** I6: a proposal by id, as `GET /api/proposals/{id}` answers it. */
   proposal(id: string): Schema<"Proposal"> {
     return parsed<Schema<"Proposal">>(hosted(() => this.#root.proposal(id)));
   }
 
-  /** I6: creates a proposal for `destination`, as `POST /{domain}/proposals` answers it. */
+  /** I6: creates a proposal for `destination`, as `POST /api/{domain}/proposals` answers it. */
   propose(destination: Schema<"Domain">, request: Schema<"ProposalCreate">): Schema<"ProposalAnswer"> {
     return this.#proposalWrite(() => this.#root.propose(JSON.stringify(destination), JSON.stringify(request), this.#clock()));
   }
 
-  /** I6: edits a proposal against the editing revision its editor saw, as `PATCH /proposals/{id}` answers it. */
+  /** I6: edits a proposal against the editing revision its editor saw, as `PATCH /api/proposals/{id}` answers it. */
   editProposal(id: string, request: Schema<"ProposalEdit">): Schema<"ProposalAnswer"> {
     return this.#proposalWrite(() => this.#root.editProposal(id, JSON.stringify(request), this.#clock()));
   }
 
-  /** I6: discards a proposal, as `POST /proposals/{id}/discard` answers it. */
+  /** I6: discards a proposal, as `POST /api/proposals/{id}/discard` answers it. */
   discardProposal(id: string, request: Schema<"ProposalStep">): Schema<"ProposalAnswer"> {
     return this.#proposalWrite(() => this.#root.discardProposal(id, JSON.stringify(request), this.#clock()));
   }
 
-  /** I6: drafts a proposal again on its destination as it stands, as `POST /proposals/{id}/refresh` answers it. */
+  /** I6: drafts a proposal again on its destination as it stands, as `POST /api/proposals/{id}/refresh` answers it. */
   refreshProposal(id: string, request: Schema<"ProposalStep">): Schema<"ProposalAnswer"> {
     return this.#proposalWrite(() => this.#root.refreshProposal(id, JSON.stringify(request), this.#clock()));
   }
 
-  /** C14, I6: what applying a proposal now would do, as `POST /proposals/{id}/preview` answers it. */
+  /** C14, I6: what applying a proposal now would do, as `POST /api/proposals/{id}/preview` answers it. */
   previewProposal(id: string): Schema<"ProposalReview"> {
     return parsed<Schema<"ProposalReview">>(hosted(() => this.#root.previewProposal(id, this.#clock())));
   }
 
-  /** I6, H2: applies a proposal as the local user, as `POST /proposals/{id}/apply` answers it. */
+  /** I6, H2: applies a proposal as the local user, as `POST /api/proposals/{id}/apply` answers it. */
   applyProposal(id: string, request: Schema<"ProposalApply">): Schema<"PatchAnswer"> {
     const answer = parsed<Schema<"PatchAnswer">>(hosted(() => this.#root.applyProposal(id, JSON.stringify(request), this.#clock())));
     this.#deliverAll();
     return answer;
   }
 
-  /** B7: proposes upgrading a journey, as `POST /journeys/{id}/upgrade` answers it. */
+  /** B7: proposes upgrading a journey, as `POST /api/journeys/{id}/upgrade` answers it. */
   proposeUpgrade(journey: string, request: Schema<"UpgradeRequest">): Schema<"ProposalAnswer"> {
     return this.#proposalWrite(() => this.#root.proposeUpgrade(journey, JSON.stringify(request), this.#clock()));
   }
 
-  /** B8: proposes saving a journey as a route, as `POST /journeys/{id}/save-as-route` answers it. */
+  /** B8: proposes saving a journey as a route, as `POST /api/journeys/{id}/save-as-route` answers it. */
   proposeSaveAsRoute(journey: string, request: Schema<"SaveAsRouteRequest">): Schema<"ProposalAnswer"> {
     return this.#proposalWrite(() => this.#root.proposeSaveAsRoute(journey, JSON.stringify(request), this.#clock()));
   }
 
-  /** B9: proposes re-linking a journey, as `POST /journeys/{id}/relink` answers it. */
+  /** B9: proposes re-linking a journey, as `POST /api/journeys/{id}/relink` answers it. */
   proposeRelink(journey: string, request: Schema<"RelinkRequest">): Schema<"ProposalAnswer"> {
     return this.#proposalWrite(() => this.#root.proposeRelink(journey, JSON.stringify(request), this.#clock()));
   }

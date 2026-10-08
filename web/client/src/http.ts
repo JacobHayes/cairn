@@ -1,4 +1,4 @@
-// The API's side of the safe retry: one patch sent over HTTP (`POST /{domain}/patches`),
+// The API's side of the safe retry: one patch sent over HTTP (`POST /api/{domain}/patches`),
 // answered as `retry.ts` reads it. A 409 or 422 carries the rejection unchanged (A15); any
 // other refusal is a failure with the server's problem or text.
 import type { Client } from "openapi-fetch";
@@ -35,13 +35,13 @@ async function post(client: Client<paths>, patch: Patch, note: Markdown | undefi
   const body = note === undefined ? { patch } : { patch, note };
   const target = patch.target;
   if (target === "deployment") {
-    return client.POST("/deployment/patches", { body });
+    return client.POST("/api/deployment/patches", { body });
   }
   if ("journey" in target) {
-    return client.POST("/journeys/{id}/patches", { params: { path: { id: target.journey } }, body });
+    return client.POST("/api/journeys/{id}/patches", { params: { path: { id: target.journey } }, body });
   }
   if ("route" in target) {
-    return client.POST("/routes/{id}/patches", { params: { path: { id: target.route } }, body });
+    return client.POST("/api/routes/{id}/patches", { params: { path: { id: target.route } }, body });
   }
   return undefined;
 }

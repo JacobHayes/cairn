@@ -11,10 +11,9 @@ import "../journeys/journeys.css";
 import { Badge, Panel } from "../ui/kit.tsx";
 import { byName, offeredMerge } from "./model.ts";
 
-/** Where a sign-in with provider `name` starts, coming back to this screen on this host. */
-export function signInHref(name: string, location: Pick<Location, "search">): string {
-  const back = `/${location.search}#/me`;
-  return `/auth/${name}/sign-in?return_to=${encodeURIComponent(back)}`;
+/** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
+export function signInHref(name: string): string {
+  return `/api/auth/${name}/sign-in?return_to=${encodeURIComponent("/me")}`;
 }
 
 /** The providers a browser signs in with by being sent to them: OIDC on the server. */
@@ -95,7 +94,7 @@ export function Identity() {
         <span className="row" data-testid="link-identity">
           <span>Link another identity:</span>
           {providers.map((name) => (
-            <a key={name} className="button" href={signInHref(name, location)}>
+            <a key={name} className="button" href={signInHref(name)}>
               Sign in with {name}
             </a>
           ))}

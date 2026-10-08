@@ -49,7 +49,7 @@ export function filesOf(engine: Engine): RouteFiles {
   };
 }
 
-/** The journey index's query parameters (C16), as `GET /journeys` reads them. */
+/** The journey index's query parameters (C16), as `GET /api/journeys` reads them. */
 export function indexParams(query: JourneyIndexQuery = {}) {
   return {
     ...(query.status === undefined || query.status.length === 0 ? {} : { status: query.status }),
@@ -62,11 +62,11 @@ export function indexParams(query: JourneyIndexQuery = {}) {
   };
 }
 
-/** A13: `POST /routes/{id}/import`, answered as a patch is: answered, rejected, or failed. */
+/** A13: `POST /api/routes/{id}/import`, answered as a patch is: answered, rejected, or failed. */
 async function importOver(client: CairnClient, request: RouteImport): Promise<Answered<HttpFailure>> {
   let reply;
   try {
-    reply = await client.POST("/routes/{id}/import", { params: { path: { id: request.file.route } }, body: request });
+    reply = await client.POST("/api/routes/{id}/import", { params: { path: { id: request.file.route } }, body: request });
   } catch (thrown) {
     return { outcome: "failed", error: networkFailure(thrown) };
   }
@@ -87,30 +87,30 @@ export function serverHost(origin: string, engine: Engine): Host {
     kind: "server",
     engineVersion: engine.version,
     overlaps: (patch, intervening) => engine.touchedOverlaps(patch, intervening),
-    capabilities: () => answered("the capabilities", () => client.GET("/capabilities")),
-    journeys: (query) => answered("the journey index", () => client.GET("/journeys", { params: { query: indexParams(query) } })),
-    routes: (after) => answered("the route index", () => client.GET("/routes", { params: { query: after === undefined ? {} : { after } } })),
-    routeDetail: (route) => answered(route, () => client.GET("/routes/{id}/versions", { params: { path: { id: route } } })),
+    capabilities: () => answered("the capabilities", () => client.GET("/api/capabilities")),
+    journeys: (query) => answered("the journey index", () => client.GET("/api/journeys", { params: { query: indexParams(query) } })),
+    routes: (after) => answered("the route index", () => client.GET("/api/routes", { params: { query: after === undefined ? {} : { after } } })),
+    routeDetail: (route) => answered(route, () => client.GET("/api/routes/{id}/versions", { params: { path: { id: route } } })),
     exportRoute: (route, version) =>
       answered(version === undefined ? `${route}'s draft` : `${route} version ${String(version)}`, () =>
-        client.GET("/routes/{id}/export", { params: { path: { id: route }, query: version === undefined ? {} : { version } } }),
+        client.GET("/api/routes/{id}/export", { params: { path: { id: route }, query: version === undefined ? {} : { version } } }),
       ),
     importRoute: (request) => importOver(client, request),
-    viewer: () => answered("the viewer", () => client.GET("/users/me")),
+    viewer: () => answered("the viewer", () => client.GET("/api/users/me")),
     files: filesOf(engine),
-    deployment: () => answered("the deployment", () => client.GET("/deployment")),
+    deployment: () => answered("the deployment", () => client.GET("/api/deployment")),
     documentText: (journey) =>
       answered(journey, () =>
-        client.GET("/journeys/{id}/document", { params: { path: { id: journey } }, parseAs: "text" }),
+        client.GET("/api/journeys/{id}/document", { params: { path: { id: journey } }, parseAs: "text" }),
       ),
-    route: (route) => answered(route, () => client.GET("/routes/{id}", { params: { path: { id: route } } })),
+    route: (route) => answered(route, () => client.GET("/api/routes/{id}", { params: { path: { id: route } } })),
     routeVersion: (route, version) =>
       answered(`${route} version ${String(version)}`, () =>
-        client.GET("/routes/{id}/versions/{version}", { params: { path: { id: route, version } } }),
+        client.GET("/api/routes/{id}/versions/{version}", { params: { path: { id: route, version } } }),
       ),
     history: (journey, node, after) =>
       answered(journey, () =>
-        client.GET("/journeys/{id}/history", {
+        client.GET("/api/journeys/{id}/history", {
           params: {
             path: { id: journey },
             query: { ...(node === undefined ? {} : { node }), ...(after === undefined ? {} : { after }) },
@@ -130,7 +130,7 @@ export function serverHost(origin: string, engine: Engine): Host {
  */
 export async function serverAnswers(origin: string): Promise<boolean> {
   try {
-    const response = await fetch(`${origin}/capabilities`, { headers: { Accept: "application/json" } });
+    const response = await fetch(`${origin}/api/capabilities`, { headers: { Accept: "application/json" } });
     const type = response.headers.get("content-type") ?? "";
     return response.ok && type.includes("application/json");
   } catch {

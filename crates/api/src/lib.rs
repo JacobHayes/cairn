@@ -1,7 +1,8 @@
-//! The HTTP API (ARCHITECTURE, HTTP API): axum endpoints over the service, behind the auth
-//! layer, for every operation the service offers (I1), and `GET /healthz` outside it. A
-//! rejected patch answers its rejection unchanged (A15); every request is held to the
-//! request limits and observed (ARCHITECTURE, Observability).
+//! The HTTP API (ARCHITECTURE, HTTP API): axum endpoints over the service under `/api`,
+//! behind the auth layer, for every operation the service offers (I1), and `GET /healthz`
+//! outside it. A rejected patch answers its rejection unchanged (A15); every request is held
+//! to the request limits and observed (ARCHITECTURE, Observability). Every other path on the
+//! origin is the host's web app ([`router_beside`]).
 //!
 //! [`router`] is the whole API as an `axum::Router`, so the binary and a testbed serve it on
 //! whatever runtime they build
@@ -26,7 +27,7 @@ pub mod wire;
 
 use axum::Router;
 use axum::middleware;
-use axum::routing::{MethodRouter, delete, get, post};
+use axum::routing::{MethodRouter, any, delete, get, post};
 use cairn_assistant::Assistant;
 use cairn_auth::Auth;
 use cairn_schema::Actor;
@@ -67,7 +68,7 @@ impl<S: Store + 'static> Api<S> {
 type Served<S> = Vec<(&'static Endpoint, MethodRouter<Api<S>>)>;
 
 /// The API: every endpoint but the health check behind `auth`'s layer, with the MCP
-/// endpoint at `/mcp` when the service's capabilities offer it (I2), auth's own routes
+/// endpoint at `/api/mcp` when the service's capabilities offer it (I2), auth's own routes
 /// beside them, the request limits, and observability, over `service`. `auth` must share
 /// the service's store. No assistant: see [`router_with_assistant`].
 pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router {
@@ -125,22 +126,26 @@ pub fn router_with_assistant<S: Store + 'static>(
     auth: &Auth<S>,
     assistant: Option<Assistant<S>>,
 ) -> Router {
-    router_beside(service, auth, assistant, Router::new())
+    router_beside(service, auth, assistant, Router::new(), None)
 }
 
-/// [`router_with_assistant`], with a host's own routes `beside` it (the binary's UI and
-/// metrics) held to the same request limits and observed alike: the in-flight limit is one
-/// per process, so everything served on the port shares it. `beside` brings its own auth,
-/// if any, and must claim no path the API does.
+/// [`router_with_assistant`], with a host's own routes `beside` it (the binary's metrics)
+/// and its web `app`, held to the same request limits and observed alike: the in-flight
+/// limit is one per process, so everything served on the port shares it. `beside` brings its
+/// own auth, if any, and must claim no path the API does. The server keeps
+/// [`endpoints::RESERVED`] and the health check: a path there that no endpoint serves is
+/// answered as no endpoint. Every other request is the `app`'s, which answers what it does
+/// not serve itself, or, with no app, no endpoint as well.
 ///
 /// # Panics
 ///
-/// As [`router_with_assistant`], or when `beside` claims an API path.
+/// As [`router_with_assistant`], or when `beside` or `app` claims a path the API does.
 pub fn router_beside<S: Store + 'static>(
     service: Service<S>,
     auth: &Auth<S>,
     assistant: Option<Assistant<S>>,
     beside: Router,
+    app: Option<Router>,
 ) -> Router {
     use crate::handlers as handle;
     assert_eq!(
@@ -192,11 +197,27 @@ pub fn router_beside<S: Store + 'static>(
         Some(conversing) => routes.merge(conversing),
         None => routes,
     };
-    let app = auth
+    // The server's prefixes, whole: what no endpoint there serves is no endpoint, never the
+    // app's page.
+    let mut reserved = Router::new();
+    for prefix in endpoints::RESERVED {
+        for path in [
+            prefix.to_owned(),
+            format!("{prefix}/"),
+            format!("{prefix}/{{*rest}}"),
+        ] {
+            reserved = reserved.route(&path, any(handle::no_such_endpoint));
+        }
+    }
+    let whole = auth
         .protect(routes)
         .merge(health)
         .merge(auth.router())
-        .merge(beside)
-        .fallback(handle::no_such_endpoint);
-    admission::limited(app).layer(middleware::from_fn(observe::request))
+        .merge(reserved)
+        .merge(beside);
+    let whole = match app {
+        Some(app) => whole.merge(app),
+        None => whole.fallback(handle::no_such_endpoint),
+    };
+    admission::limited(whole).layer(middleware::from_fn(observe::request))
 }

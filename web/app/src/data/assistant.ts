@@ -1,6 +1,6 @@
 // The assistant over the server host (I5; ARCHITECTURE, Assistant): one turn of the caller's
-// conversation about a journey or a route's draft (`POST /journeys/{id}/assistant`,
-// `POST /routes/{id}/draft/assistant`), and that conversation read back as kept (`GET` on the
+// conversation about a journey or a route's draft (`POST /api/journeys/{id}/assistant`,
+// `POST /api/routes/{id}/draft/assistant`), and that conversation read back as kept (`GET` on the
 // same paths). The in-browser host has no assistant (ARCHITECTURE, Service layer and
 // composition: its root assembles none), so it has no `AssistantHost` at all.
 import { answerFailure, networkFailure, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
@@ -53,8 +53,8 @@ export function serverAssistant(client: CairnClient): AssistantHost {
     conversation: async (target) => {
       const read = await answered(() =>
         "journey" in target
-          ? client.GET("/journeys/{id}/assistant", { params: { path: { id: target.journey } } })
-          : client.GET("/routes/{id}/draft/assistant", { params: { path: { id: target.route } } }),
+          ? client.GET("/api/journeys/{id}/assistant", { params: { path: { id: target.journey } } })
+          : client.GET("/api/routes/{id}/draft/assistant", { params: { path: { id: target.route } } }),
       );
       if ("error" in read) {
         throw new Error(read.error.message);
@@ -65,8 +65,8 @@ export function serverAssistant(client: CairnClient): AssistantHost {
       const body = { message };
       const sent = await answered(() =>
         "journey" in target
-          ? client.POST("/journeys/{id}/assistant", { params: { path: { id: target.journey } }, body })
-          : client.POST("/routes/{id}/draft/assistant", { params: { path: { id: target.route } }, body }),
+          ? client.POST("/api/journeys/{id}/assistant", { params: { path: { id: target.journey } }, body })
+          : client.POST("/api/routes/{id}/draft/assistant", { params: { path: { id: target.route } }, body }),
       );
       return "error" in sent ? { outcome: "failed", error: sent.error } : { outcome: "answered", reply: sent.data };
     },

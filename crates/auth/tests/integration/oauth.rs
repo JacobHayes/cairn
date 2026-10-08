@@ -119,7 +119,7 @@ mod oauth {
 
     async fn register(setup: &Setup, redirect: &str) -> Response<Body> {
         let registration = json!({"redirect_uris": [redirect], "client_name": "Test client"});
-        let request = request("/oauth/register", LOCAL)
+        let request = request("/api/oauth/register", LOCAL)
             .method("POST")
             .header(CONTENT_TYPE, "application/json")
             .body(Body::from(registration.to_string()));
@@ -147,7 +147,7 @@ mod oauth {
         let query = url::form_urlencoded::Serializer::new(String::new())
             .extend_pairs(pairs)
             .finish();
-        format!("/oauth/authorize?{query}")
+        format!("/api/oauth/authorize?{query}")
     }
 
     /// The step secret on a consent page.
@@ -186,7 +186,7 @@ mod oauth {
         assert_eq!(shown.status(), StatusCode::OK);
         let step = step_of(shown).await;
         let form = [("step", step.as_str()), ("decision", "allow")];
-        let answered = post_form(setup, "/oauth/authorize", cookies, &form).await;
+        let answered = post_form(setup, "/api/oauth/authorize", cookies, &form).await;
         let back = query(&location(&answered));
         (client, verifier.secret().clone(), back["code"].clone())
     }
@@ -199,7 +199,7 @@ mod oauth {
             ("client_id", client),
             ("code_verifier", verifier),
         ];
-        post_form(setup, "/oauth/token", "", &form).await
+        post_form(setup, "/api/oauth/token", "", &form).await
     }
 
     /// I2 end to end: from a 401 an MCP client finds the resource and server metadata,
@@ -220,7 +220,7 @@ mod oauth {
         assert_eq!(server["issuer"], issuer);
         assert_eq!(server["code_challenge_methods_supported"], json!(["S256"]));
         let register_path = local(server["registration_endpoint"].as_str().unwrap());
-        assert_eq!(register_path, "/oauth/register");
+        assert_eq!(register_path, "/api/oauth/register");
         let client = client_id(&setup).await;
 
         let (pkce, verifier) = PkceCodeChallenge::new_random_sha256();
@@ -240,7 +240,7 @@ mod oauth {
         );
         let step = step_of(shown).await;
         let form = [("step", step.as_str()), ("decision", "allow")];
-        let answered = post_form(&setup, "/oauth/authorize", &cookies, &form).await;
+        let answered = post_form(&setup, "/api/oauth/authorize", &cookies, &form).await;
         let back = location(&answered);
         assert!(back.starts_with(REDIRECT), "{back}");
         let back = query(&back);
@@ -283,7 +283,7 @@ mod oauth {
         };
         let code = issuer.approve(&at_issuer, &person, Spoil::Nothing);
         let state = query(&at_issuer)["state"].clone();
-        let callback = format!("/auth/oidc/callback?code={code}&state={state}");
+        let callback = format!("/api/auth/oidc/callback?code={code}&state={state}");
         let finished = get(setup, &callback, &cookie_header(&cookies_set(&started))).await;
         assert_eq!(location(&finished), authorize);
         let set = cookies_set(&finished);
@@ -385,7 +385,7 @@ mod oauth {
         let step = step_of(get(&setup, &authorize, &ann).await).await;
         let as_bob = post_form(
             &setup,
-            "/oauth/authorize",
+            "/api/oauth/authorize",
             &bob,
             &[("step", &step), ("decision", "allow")],
         )
@@ -393,7 +393,7 @@ mod oauth {
         assert_eq!(as_bob.status(), StatusCode::FORBIDDEN);
         let again = post_form(
             &setup,
-            "/oauth/authorize",
+            "/api/oauth/authorize",
             &ann,
             &[("step", &step), ("decision", "allow")],
         )
@@ -403,7 +403,7 @@ mod oauth {
         let step = step_of(get(&setup, &authorize, &ann).await).await;
         let denied = post_form(
             &setup,
-            "/oauth/authorize",
+            "/api/oauth/authorize",
             &ann,
             &[("step", &step), ("decision", "deny")],
         )
@@ -446,7 +446,7 @@ mod oauth {
         )
         .await;
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
-        assert!(location(&response).starts_with("/auth/oidc/sign-in?"));
+        assert!(location(&response).starts_with("/api/auth/oidc/sign-in?"));
         assert_eq!(
             cookies_set(&response),
             [("cairn_session".to_owned(), String::new())]
@@ -463,7 +463,7 @@ mod oauth {
         let server = OAuthServer::new(config, setup.world.accounts.clone(), &base());
         for (path, resource) in [
             ("/", "http://127.0.0.1:8080"),
-            ("/mcp", "http://127.0.0.1:8080/mcp"),
+            ("/api/mcp", "http://127.0.0.1:8080/api/mcp"),
         ] {
             let challenge = server.challenge(path).unwrap();
             let metadata = local(challenge.split('"').nth(1).unwrap());

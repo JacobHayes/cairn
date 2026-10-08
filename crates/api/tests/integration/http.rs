@@ -14,7 +14,7 @@ mod in_process {
 
     use crate::support::{self, World, get, ok, post, request};
 
-    const JOURNEY: &str = "/journeys/j_vendor_eval";
+    const JOURNEY: &str = "/api/journeys/j_vendor_eval";
 
     fn violation_codes(rejection: &Rejection) -> Vec<ViolationCode> {
         let Rejection::Invalid { violations } = rejection else {
@@ -200,7 +200,7 @@ mod in_process {
             problem,
         };
         let (get, post) = (Method::GET, Method::POST);
-        let patches = "/journeys/j_vendor_eval/patches";
+        let patches = "/api/journeys/j_vendor_eval/patches";
         vec![
             case(
                 post.clone(),
@@ -222,14 +222,14 @@ mod in_process {
             ),
             case(
                 post,
-                "/journeys/%FF/patches",
+                "/api/journeys/%FF/patches",
                 Sent::Json("{}"),
                 P::BadRequest,
             ),
             case(get.clone(), "/nowhere", Sent::Nothing, P::NoSuchEndpoint),
             case(
                 get,
-                "/deployment/patches",
+                "/api/deployment/patches",
                 Sent::Nothing,
                 P::MethodNotAllowed,
             ),
@@ -298,7 +298,7 @@ mod in_process {
         let reply = ann
             .send_raw(
                 Method::POST,
-                "/deployment/patches",
+                "/api/deployment/patches",
                 Some(HeaderValue::from_static("application/json")),
                 Bytes::from(body),
             )
@@ -320,7 +320,7 @@ mod in_process {
         let _installed = metrics::set_default_local_recorder(&recorder);
         let world = World::start().await;
         let ann = world.vendor_after(1).await;
-        get::<Capabilities>(&ann, "/capabilities").await;
+        get::<Capabilities>(&ann, "/api/capabilities").await;
         let counted: Vec<(String, Vec<(String, String)>)> = snapshotter
             .snapshot()
             .into_vec()
@@ -343,11 +343,11 @@ mod in_process {
         };
         assert!(has(
             cairn_api::observe::REQUESTS,
-            ("endpoint", "/capabilities")
+            ("endpoint", "/api/capabilities")
         ));
         assert!(has(
             cairn_api::observe::REQUEST_DURATION,
-            ("endpoint", "/journeys/{id}/patches")
+            ("endpoint", "/api/journeys/{id}/patches")
         ));
         assert!(has(cairn_api::observe::PATCHES, ("outcome", "applied")));
     }

@@ -40,10 +40,8 @@ describe("message drafts (G3)", () => {
     expect(text).toBe("Hi [missing: roles.owner.name].");
   });
 
-  it("links to the journey on this page's host", () => {
-    expect(journeyUrl("j_one", { origin: "https://cairn.example", pathname: "/", search: "?host=browser" })).toBe(
-      "https://cairn.example/?host=browser#/journeys/j_one",
-    );
+  it("links to the journey's address on this origin", () => {
+    expect(journeyUrl("j_one", "https://cairn.example")).toBe("https://cairn.example/journeys/j_one");
   });
 });
 

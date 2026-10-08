@@ -41,9 +41,9 @@ test("C12: a decision's card opens its detail beside the view, and closing it st
   await page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").click();
   const panel = nodePanel(page, "n_make_offer");
   await expect(panel).toBeVisible();
-  await expect(page).toHaveURL(/#\/journeys\/j_hiring\/decisions\/nodes\/n_make_offer$/);
+  await expect(page).toHaveURL(/\/journeys\/j_hiring\/decisions\/nodes\/n_make_offer$/);
   await expect(decisionRow(page, "n_make_offer")).toHaveAttribute("data-selected", "true");
   await panel.getByRole("link", { name: "Close the node detail" }).click();
-  await expect(page).toHaveURL(/#\/journeys\/j_hiring\/decisions$/);
+  await expect(page).toHaveURL(/\/journeys\/j_hiring\/decisions$/);
   await expect(page.getByTestId("decision-table")).toBeVisible();
 });

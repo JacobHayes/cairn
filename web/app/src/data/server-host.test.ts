@@ -1,4 +1,4 @@
-// C16: the journey index's query as `GET /journeys` reads it: repeated statuses and entities,
+// C16: the journey index's query as `GET /api/journeys` reads it: repeated statuses and entities,
 // and nothing for a filter left empty.
 import { describe, expect, it } from "vitest";
 

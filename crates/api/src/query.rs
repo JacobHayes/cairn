@@ -73,7 +73,7 @@ const SIZE: ParamSpec = ParamSpec::one::<u32>(
     "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
 );
 
-/// `GET /journeys` (C16).
+/// `GET /api/journeys` (C16).
 pub const JOURNEY_PARAMS: &[ParamSpec] = &[
     ParamSpec::many::<JourneyStatus>("status", "Journeys in any of these statuses."),
     ParamSpec::one::<RouteId>("route", "Journeys following this route."),
@@ -90,13 +90,13 @@ pub const JOURNEY_PARAMS: &[ParamSpec] = &[
     SIZE,
 ];
 
-/// `GET /routes`.
+/// `GET /api/routes`.
 pub const ROUTE_PARAMS: &[ParamSpec] = &[
     ParamSpec::one::<RouteId>("after", "The page starts after this route."),
     SIZE,
 ];
 
-/// `GET /search`.
+/// `GET /api/search`.
 pub const SEARCH_PARAMS: &[ParamSpec] = &[
     ParamSpec::needed::<Title>(
         "text",
@@ -107,7 +107,7 @@ pub const SEARCH_PARAMS: &[ParamSpec] = &[
     SIZE,
 ];
 
-/// `GET /events` (J5).
+/// `GET /api/events` (J5).
 pub const EVENT_PARAMS: &[ParamSpec] = &[
     ParamSpec::one::<DomainName>("log", "Events in this domain's log."),
     ParamSpec::one::<NodeKey>("node", "Events that wrote anything on this node."),
@@ -120,7 +120,7 @@ pub const EVENT_PARAMS: &[ParamSpec] = &[
     SIZE,
 ];
 
-/// `GET /events/stream` (H6).
+/// `GET /api/events/stream` (H6).
 pub const STREAM_PARAMS: &[ParamSpec] = &[ParamSpec {
     required: true,
     ..ParamSpec::many::<WatchName>(
@@ -148,7 +148,7 @@ const KINDS: ParamSpec =
 
 const SORT: ParamSpec = ParamSpec::one::<SortBy>("sort", "The signal to sort by; rank when none.");
 
-/// `GET /journeys/{id}/snapshot` (I3).
+/// `GET /api/journeys/{id}/snapshot` (I3).
 pub const SNAPSHOT_PARAMS: &[ParamSpec] = &[
     ParamSpec::one::<NodeKey>(
         "subtree",
@@ -163,7 +163,7 @@ pub const SNAPSHOT_PARAMS: &[ParamSpec] = &[
     REVISION,
 ];
 
-/// `GET /journeys/{id}/level` (C2).
+/// `GET /api/journeys/{id}/level` (C2).
 pub const LEVEL_PARAMS: &[ParamSpec] = &[
     ParamSpec::many::<NodeKind>("kind", "The kinds shown; every kind when none."),
     ParamSpec::one::<NodeKey>(
@@ -172,7 +172,7 @@ pub const LEVEL_PARAMS: &[ParamSpec] = &[
     ),
 ];
 
-/// `GET /journeys/{id}/next` (C10).
+/// `GET /api/journeys/{id}/next` (C10).
 pub const NEXT_PARAMS: &[ParamSpec] = &[
     SORT,
     ParamSpec::one::<bool>("mine", "Only nodes the caller participates in (E4)."),
@@ -184,7 +184,7 @@ pub const NEXT_PARAMS: &[ParamSpec] = &[
     ),
 ];
 
-/// `GET /journeys/{id}/nodes` (C9).
+/// `GET /api/journeys/{id}/nodes` (C9).
 pub const LIST_PARAMS: &[ParamSpec] = &[
     ParamSpec::many::<ListFlag>(
         "flag",
@@ -203,22 +203,22 @@ pub const LIST_PARAMS: &[ParamSpec] = &[
     REVISION,
 ];
 
-/// `GET /journeys/{id}/mine` (E4).
+/// `GET /api/journeys/{id}/mine` (E4).
 pub const MINE_PARAMS: &[ParamSpec] = &[ParamSpec::many::<KindKey>(
     "kind",
     "Only these participation kinds; every kind when none.",
 )];
 
-/// `GET /journeys/{id}/nodes/{key}/explanations/{field}`.
+/// `GET /api/journeys/{id}/nodes/{key}/explanations/{field}`.
 pub const EXPLANATION_PARAMS: &[ParamSpec] = &[CURSOR, REVISION];
 
-/// `GET /journeys/{id}/history` (J4).
+/// `GET /api/journeys/{id}/history` (J4).
 pub const HISTORY_PARAMS: &[ParamSpec] = &[
     ParamSpec::one::<NodeKey>("node", "Only the events that wrote anything on this node."),
     ParamSpec::one::<u64>("after", "The page starts after this position in the log."),
 ];
 
-/// `GET /routes/{id}/export` (A13).
+/// `GET /api/routes/{id}/export` (A13).
 pub const EXPORT_PARAMS: &[ParamSpec] = &[ParamSpec::one::<VersionNumber>(
     "version",
     "The published version to export; the draft when none.",

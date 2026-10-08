@@ -1,6 +1,6 @@
 // The app shell every screen renders inside: the header (the host and its switch, whether
 // the view is live), the version-skew banner, the screen, and the notices.
-import { Link, Outlet } from "react-router";
+import { Link, Outlet, useLocation } from "react-router";
 
 import { switchedTo } from "../data/choose.ts";
 import { mayNotApply } from "../data/notices.ts";
@@ -10,10 +10,11 @@ import { Badge, Button, Gate } from "../ui/kit.tsx";
 function HostSwitch() {
   const { host } = useSession();
   const other = host.kind === "server" ? "browser" : "server";
+  const at = useLocation();
   return (
     <span className="row">
       <Badge data-testid="host" data-status={host.kind}>{host.kind === "server" ? "Server" : "In-browser host"}</Badge>
-      <a href={switchedTo(location, other)} className="muted">
+      <a href={switchedTo(location.origin, at, other)} className="muted">
         Switch to {other === "server" ? "the server" : "the in-browser host"}
       </a>
     </span>

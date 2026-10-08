@@ -60,7 +60,7 @@ test("B11, A19: completing leaves the active index and mine; archiving, then del
   const name = (await page.getByTestId("journey-name").textContent()) ?? "";
   await remove.getByRole("textbox").fill(name);
   await confirm.click();
-  await expect(page).toHaveURL(/#\/\?status=any$/);
+  await expect(page).toHaveURL(/\/\?status=any$/);
   await expect(page.getByTestId("journey-row").first()).toBeVisible();
   await expect(page.locator('[data-testid="journey-row"][data-journey="j_bakeoff"]')).toHaveCount(0);
 });

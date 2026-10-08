@@ -182,45 +182,57 @@ mod in_process {
     fn documented_reads() -> Vec<(&'static Endpoint, &'static str)> {
         vec![
             (&at::HEALTH, "/healthz"),
-            (&at::CAPABILITIES, "/capabilities"),
-            (&at::JOURNEYS, "/journeys"),
-            (&at::JOURNEY, "/journeys/j_vendor_eval"),
-            (&at::DOCUMENT, "/journeys/j_vendor_eval/document"),
-            (&at::ROUTES, "/routes?size=1"),
-            (&at::ROUTE, "/routes/vendor-evaluation"),
-            (&at::ROUTE_VERSIONS, "/routes/vendor-evaluation/versions"),
-            (&at::ROUTE_VERSION, "/routes/vendor-evaluation/versions/1"),
-            (&at::DEPLOYMENT, "/deployment"),
-            (&at::ENTITY, "/entities/e_lead"),
-            (&at::SEARCH, "/search?text=vendor"),
-            (&at::EVENTS, "/events?size=3"),
-            (&at::VIEWER, "/users/me"),
-            (&at::TOKENS, "/users/me/tokens"),
-            (&at::SNAPSHOT, "/journeys/j_vendor_eval/snapshot?depth=1"),
+            (&at::CAPABILITIES, "/api/capabilities"),
+            (&at::JOURNEYS, "/api/journeys"),
+            (&at::JOURNEY, "/api/journeys/j_vendor_eval"),
+            (&at::DOCUMENT, "/api/journeys/j_vendor_eval/document"),
+            (&at::ROUTES, "/api/routes?size=1"),
+            (&at::ROUTE, "/api/routes/vendor-evaluation"),
+            (
+                &at::ROUTE_VERSIONS,
+                "/api/routes/vendor-evaluation/versions",
+            ),
+            (
+                &at::ROUTE_VERSION,
+                "/api/routes/vendor-evaluation/versions/1",
+            ),
+            (&at::DEPLOYMENT, "/api/deployment"),
+            (&at::ENTITY, "/api/entities/e_lead"),
+            (&at::SEARCH, "/api/search?text=vendor"),
+            (&at::EVENTS, "/api/events?size=3"),
+            (&at::VIEWER, "/api/users/me"),
+            (&at::TOKENS, "/api/users/me/tokens"),
+            (
+                &at::SNAPSHOT,
+                "/api/journeys/j_vendor_eval/snapshot?depth=1",
+            ),
             (
                 &at::LEVEL,
-                "/journeys/j_vendor_eval/level?kind=group&kind=milestone",
+                "/api/journeys/j_vendor_eval/level?kind=group&kind=milestone",
             ),
-            (&at::TRACE, "/journeys/j_vendor_eval/trace/n_access"),
-            (&at::DECISIONS, "/journeys/j_vendor_eval/decisions"),
-            (&at::TIMELINE, "/journeys/j_vendor_eval/timeline"),
-            (&at::SUMMARY, "/journeys/j_vendor_eval/summary"),
-            (&at::NEXT, "/journeys/j_vendor_eval/next?for_viewer=true"),
-            (&at::NODES, "/journeys/j_vendor_eval/nodes?flag=blocked"),
-            (&at::MINE, "/journeys/j_vendor_eval/mine"),
-            (&at::NODE, "/journeys/j_vendor_eval/nodes/n_kickoff"),
+            (&at::TRACE, "/api/journeys/j_vendor_eval/trace/n_access"),
+            (&at::DECISIONS, "/api/journeys/j_vendor_eval/decisions"),
+            (&at::TIMELINE, "/api/journeys/j_vendor_eval/timeline"),
+            (&at::SUMMARY, "/api/journeys/j_vendor_eval/summary"),
+            (
+                &at::NEXT,
+                "/api/journeys/j_vendor_eval/next?for_viewer=true",
+            ),
+            (&at::NODES, "/api/journeys/j_vendor_eval/nodes?flag=blocked"),
+            (&at::MINE, "/api/journeys/j_vendor_eval/mine"),
+            (&at::NODE, "/api/journeys/j_vendor_eval/nodes/n_kickoff"),
             (
                 &at::EXPLANATIONS,
-                "/journeys/j_vendor_eval/nodes/n_kickoff/explanations/gravity",
+                "/api/journeys/j_vendor_eval/nodes/n_kickoff/explanations/gravity",
             ),
             (
                 &at::HISTORY,
-                "/journeys/j_vendor_eval/history?node=n_kickoff",
+                "/api/journeys/j_vendor_eval/history?node=n_kickoff",
             ),
-            (&at::NODE, "/journeys/j_vendor_eval/nodes/n_nowhere"),
-            (&at::NEXT, "/journeys/j_vendor_eval/next?sort=sideways"),
-            (&at::JOURNEY, "/journeys/j_missing"),
-            (&at::JOURNEYS, "/journeys?colour=blue"),
+            (&at::NODE, "/api/journeys/j_vendor_eval/nodes/n_nowhere"),
+            (&at::NEXT, "/api/journeys/j_vendor_eval/next?sort=sideways"),
+            (&at::JOURNEY, "/api/journeys/j_missing"),
+            (&at::JOURNEYS, "/api/journeys?colour=blue"),
         ]
     }
 
@@ -235,7 +247,7 @@ mod in_process {
         for (endpoint, target) in reads {
             conforms(&document, endpoint, &get(target).await.unwrap());
         }
-        let patches = "/journeys/j_vendor_eval/patches";
+        let patches = "/api/journeys/j_vendor_eval/patches";
         let note = support::patch(
             "p_note",
             "{journey: j_vendor_eval}",
@@ -271,7 +283,7 @@ mod in_process {
         conforms(
             &document,
             &at::MINT_TOKEN,
-            &post(&ann, "/users/me/tokens", &named).await,
+            &post(&ann, "/api/users/me/tokens", &named).await,
         );
     }
 
@@ -310,7 +322,7 @@ mod in_process {
             "mutations": [{"op": "add_annotation", "annotation": {"key": "a_note", "note": "Seen."}}],
         });
         let create = json!({"patch_id": "p_pr", "id": "pr_note", "draft": draft});
-        let proposals = "/journeys/j_vendor_eval/proposals";
+        let proposals = "/api/journeys/j_vendor_eval/proposals";
         let mut lost = create.clone();
         lost["patch_id"] = json!("p_pr_lost");
         let mut reused = create.clone();
@@ -324,26 +336,28 @@ mod in_process {
         }
         let edit = json!({"patch_id": "p_edit", "base_revision": 7, "draft": draft});
         let edited = ann
-            .send(Method::PATCH, "/proposals/pr_note", Some(&edit))
+            .send(Method::PATCH, "/api/proposals/pr_note", Some(&edit))
             .await;
         conforms(&document, &at::EDIT_PROPOSAL, &edited.unwrap());
-        let get = ann.send(Method::GET, "/proposals/pr_note", None).await;
+        let get = ann.send(Method::GET, "/api/proposals/pr_note", None).await;
         conforms(&document, &at::PROPOSAL, &get.unwrap());
-        let missing = ann.send(Method::GET, "/proposals/pr_missing", None).await;
+        let missing = ann
+            .send(Method::GET, "/api/proposals/pr_missing", None)
+            .await;
         conforms(&document, &at::PROPOSAL, &missing.unwrap());
-        let preview = post(&ann, "/proposals/pr_note/preview", &json!({})).await;
+        let preview = post(&ann, "/api/proposals/pr_note/preview", &json!({})).await;
         conforms(&document, &at::PREVIEW_PROPOSAL, &preview);
         let refresh = json!({"patch_id": "p_refresh", "base_revision": 1});
-        let refreshed = post(&ann, "/proposals/pr_note/refresh", &refresh).await;
+        let refreshed = post(&ann, "/api/proposals/pr_note/refresh", &refresh).await;
         conforms(&document, &at::REFRESH_PROPOSAL, &refreshed);
         for reviewed in [1, 2, 2] {
             let apply =
                 json!({"patch_id": format!("p_apply_{reviewed}"), "reviewed_revision": reviewed});
-            let applied = post(&ann, "/proposals/pr_note/apply", &apply).await;
+            let applied = post(&ann, "/api/proposals/pr_note/apply", &apply).await;
             conforms(&document, &at::APPLY_PROPOSAL, &applied);
         }
         let discard = json!({"patch_id": "p_discard", "base_revision": 2});
-        let discarded = post(&ann, "/proposals/pr_note/discard", &discard).await;
+        let discarded = post(&ann, "/api/proposals/pr_note/discard", &discard).await;
         conforms(&document, &at::DISCARD_PROPOSAL, &discarded);
     }
 
@@ -353,7 +367,7 @@ mod in_process {
         let document = cairn_api::openapi::document();
         let world = World::start().await;
         let ann = world.vendor_after(2).await;
-        let route = "/routes/vendor-evaluation";
+        let route = "/api/routes/vendor-evaluation";
         for target in ["/export?version=1", "/export", "/export?version=9"] {
             let reply = ann
                 .send(Method::GET, &format!("{route}{target}"), None)
@@ -380,19 +394,19 @@ mod in_process {
             0,
             "- op: create_journey\n  name: Free\n",
         );
-        post(&ann, "/journeys/j_free/patches", &request(&free)).await;
+        post(&ann, "/api/journeys/j_free/patches", &request(&free)).await;
         let upgrade = json!({"patch_id": "p_upgrade", "proposal": "pr_upgrade", "to": 1});
         for journey in ["j_vendor_eval", "j_free", "j_missing"] {
-            let reply = post(&ann, &format!("/journeys/{journey}/upgrade"), &upgrade).await;
+            let reply = post(&ann, &format!("/api/journeys/{journey}/upgrade"), &upgrade).await;
             conforms(&document, &at::UPGRADE, &reply);
         }
         let save =
             json!({"patch_id": "p_save", "proposal": "pr_save", "route": "saved", "name": "Saved"});
-        let saved = post(&ann, "/journeys/j_vendor_eval/save-as-route", &save).await;
+        let saved = post(&ann, "/api/journeys/j_vendor_eval/save-as-route", &save).await;
         conforms(&document, &at::SAVE_AS_ROUTE, &saved);
         let lineage = json!({"route": "vendor-evaluation", "version": 1});
         let relink = json!({"patch_id": "p_relink", "proposal": "pr_relink", "lineage": lineage});
-        let relinked = post(&ann, "/journeys/j_vendor_eval/relink", &relink).await;
+        let relinked = post(&ann, "/api/journeys/j_vendor_eval/relink", &relink).await;
         conforms(&document, &at::RELINK, &relinked);
     }
 
@@ -406,7 +420,7 @@ mod in_process {
         for (endpoint, target, id, draft) in crate::support::proposals_of_every_domain(&ann).await {
             let create = json!({"patch_id": format!("p_{id}"), "id": id, "draft": draft});
             conforms(&document, endpoint, &post(&ann, &target, &create).await);
-            let preview = post(&ann, &format!("/proposals/{id}/preview"), &json!({})).await;
+            let preview = post(&ann, &format!("/api/proposals/{id}/preview"), &json!({})).await;
             conforms(&document, &at::PREVIEW_PROPOSAL, &preview);
         }
     }

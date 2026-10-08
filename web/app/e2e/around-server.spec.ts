@@ -17,9 +17,9 @@ async function post(request: APIRequestContext, path: string, patch: object): Pr
 
 /** An empty journey with one action owned by `owner`, made through the API; its id. */
 async function journeyOwnedBy(request: APIRequestContext, owner: string): Promise<string> {
-  const deployment = (await (await request.get("/deployment")).json()) as { revision: number };
+  const deployment = (await (await request.get("/api/deployment")).json()) as { revision: number };
   const id = `j_${fresh("owned").replace(/\W/g, "_").toLowerCase()}`;
-  await post(request, `/journeys/${id}/patches`, {
+  await post(request, `/api/journeys/${id}/patches`, {
     id: patchId(),
     target: { journey: id },
     base_revision: 0,

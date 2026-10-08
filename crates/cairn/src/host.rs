@@ -4,8 +4,8 @@
 //! name as the request's `Host`, so the dev provider without a token and Tailscale in direct
 //! mode, which trust the peer, would otherwise answer it as their user. Every request whose
 //! host is not the public URL's, or, when the listener is bound to loopback, a loopback name,
-//! is refused before the auth layer, on the API, `/mcp`, auth's own routes, the UI, and
-//! `/metrics` alike.
+//! is refused before the auth layer, on the API, `/api/mcp`, auth's own routes, the UI, and
+//! `/api/metrics` alike.
 //!
 //! The name decides, not the port: a rebinding page can choose any port but never a name
 //! other than its own, while proxies in front of Cairn differ in whether they forward the

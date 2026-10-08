@@ -96,7 +96,7 @@ impl<S: AuthStore + 'static> OidcProvider<S> {
                 "the issuer must be https, or http on loopback".to_owned(),
             ));
         }
-        let callback = format!("auth/{}/callback", config.name);
+        let callback = format!("api/auth/{}/callback", config.name);
         let redirect = base
             .join(&callback)
             .map_err(|error| refuse(error.to_string()))
@@ -172,7 +172,7 @@ impl<S: AuthStore + 'static> Inner<S> {
             .put_oauth_state(record)
             .await
             .map_err(AuthError::from)?;
-        let path = format!("/auth/{}", self.config.name);
+        let path = format!("/api/auth/{}", self.config.name);
         let cookie = cookies::set(
             &self.login_cookie,
             verifier.secret(),
@@ -299,7 +299,7 @@ impl<S: AuthStore + 'static> Inner<S> {
             self.accounts.end_session(token).await?;
         }
         let session = self.accounts.start_session(&user).await?;
-        let path = format!("/auth/{}", self.config.name);
+        let path = format!("/api/auth/{}", self.config.name);
         let set = [
             cookies::set(
                 SESSION_COOKIE,
@@ -498,7 +498,7 @@ impl<S: AuthStore + 'static> AuthProvider for OidcProvider<S> {
         self.inner.config.auto_link
     }
 
-    /// `GET /auth/<name>/sign-in?return_to=<path>` and the issuer's callback.
+    /// `GET /api/auth/<name>/sign-in?return_to=<path>` and the issuer's callback.
     fn router(&self, authenticator: Arc<dyn Authenticate>) -> Option<Router> {
         let state = Routes {
             inner: Arc::clone(&self.inner),
@@ -506,8 +506,8 @@ impl<S: AuthStore + 'static> AuthProvider for OidcProvider<S> {
         };
         let name = &self.inner.config.name;
         let router = Router::new()
-            .route(&format!("/auth/{name}/sign-in"), get(start::<S>))
-            .route(&format!("/auth/{name}/callback"), get(finish::<S>))
+            .route(&format!("/api/auth/{name}/sign-in"), get(start::<S>))
+            .route(&format!("/api/auth/{name}/callback"), get(finish::<S>))
             .with_state(Arc::new(state));
         Some(router)
     }

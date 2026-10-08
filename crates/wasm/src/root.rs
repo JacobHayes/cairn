@@ -30,7 +30,7 @@ use crate::error::{HostError, json, read};
 use crate::fixtures::{seed, sign_in_local};
 use crate::now_or_never;
 
-/// `POST /{domain}/patches`'s body: a patch and the note its events carry (J1).
+/// `POST /api/{domain}/patches`'s body: a patch and the note its events carry (J1).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PatchRequest {
@@ -162,7 +162,7 @@ pub(crate) fn failed(error: impl std::fmt::Display) -> HostError {
     }
 }
 
-/// J4: `GET /journeys/{id}/history`'s answer, the API's `History`: a page of events grouped
+/// J4: `GET /api/journeys/{id}/history`'s answer, the API's `History`: a page of events grouped
 /// by patch, and where the next page starts.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -275,7 +275,7 @@ impl BrowserRoot {
     }
 
     /// J4: a page of the journey's history, or of the events naming `node`, from the log
-    /// position `after`, as `GET /journeys/{id}/history` answers it.
+    /// position `after`, as `GET /api/journeys/{id}/history` answers it.
     ///
     /// # Errors
     ///
@@ -326,7 +326,7 @@ impl BrowserRoot {
         json(self.service.capabilities())
     }
 
-    /// The journey index (C16), as `GET /journeys` answers it.
+    /// The journey index (C16), as `GET /api/journeys` answers it.
     ///
     /// # Errors
     ///
@@ -335,7 +335,7 @@ impl BrowserRoot {
         Ok(json(&self.journey_page()?))
     }
 
-    /// A journey's domain document at `now`, as `GET /journeys/{id}/document` answers it.
+    /// A journey's domain document at `now`, as `GET /api/journeys/{id}/document` answers it.
     ///
     /// # Errors
     ///
@@ -355,7 +355,7 @@ impl BrowserRoot {
     }
 
     /// J4: a page of a journey's history, or of `node`'s (empty for the whole journey), after
-    /// the log position `after` (negative for the first page), as `GET /journeys/{id}/history`
+    /// the log position `after` (negative for the first page), as `GET /api/journeys/{id}/history`
     /// answers it.
     ///
     /// # Errors
@@ -377,7 +377,7 @@ impl BrowserRoot {
         Ok(json(&self.history_page(&id, node.as_ref(), after)?))
     }
 
-    /// A route with its draft (A11), as `GET /routes/{id}` answers it.
+    /// A route with its draft (A11), as `GET /api/routes/{id}` answers it.
     ///
     /// # Errors
     ///
@@ -395,7 +395,7 @@ impl BrowserRoot {
         }
     }
 
-    /// One published version of a route (A11), as `GET /routes/{id}/versions/{version}`
+    /// One published version of a route (A11), as `GET /api/routes/{id}/versions/{version}`
     /// answers it; `version` is its number as text.
     ///
     /// # Errors

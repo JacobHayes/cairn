@@ -1,5 +1,5 @@
 //! The MCP endpoint in process (PRACTICES, Shell: API and MCP tests; I2, I3, I4, I6, I7,
-//! A12): an MCP client (rmcp's own) drives `/mcp` through the API as served, auth layer and
+//! A12): an MCP client (rmcp's own) drives `/api/mcp` through the API as served, auth layer and
 //! limits included, over the memory store. Every tool is called at least once and every
 //! output checked against its listed schema; the instructions are served; the endpoint
 //! shares the API's auth; and a host that does not offer MCP serves no endpoint.
@@ -394,7 +394,7 @@ mod mcp_in_process {
             "clientInfo": { "name": "test", "version": "1" } } });
         let anonymous = world
             .anonymous()
-            .send(Method::POST, "/mcp", Some(&initialize))
+            .send(Method::POST, "/api/mcp", Some(&initialize))
             .await
             .unwrap();
         assert_eq!(anonymous.status, StatusCode::UNAUTHORIZED);
@@ -407,14 +407,14 @@ mod mcp_in_process {
         assert!(challenge.contains("resource_metadata="), "{challenge}");
         let wrong = world
             .bearer("not-a-token")
-            .send(Method::POST, "/mcp", Some(&initialize))
+            .send(Method::POST, "/api/mcp", Some(&initialize))
             .await
             .unwrap();
         assert_eq!(wrong.status, StatusCode::UNAUTHORIZED);
         assert!(Agent::try_connect(&world, None).await.is_err());
 
         let ann = world.signed_in("ann");
-        let reply = post(&ann, "/users/me/tokens", &json!({ "name": "helper" })).await;
+        let reply = post(&ann, "/api/users/me/tokens", &json!({ "name": "helper" })).await;
         let minted: MintedToken = reply.json().unwrap();
         let agent = Agent::connect(&world, &minted.token).await;
         let reach = json!({ "journey": JOURNEY, "node": "n_kickoff", "transition": "reach",
@@ -424,7 +424,7 @@ mod mcp_in_process {
         let history = agent.ok("get_history", history).await;
         let actor = &history["patches"].as_array().unwrap().last().unwrap()["events"][0]["actor"];
         assert_eq!(actor["agent"], json!(minted.agent));
-        let user: Value = support::get(&ann, "/users/me").await;
+        let user: Value = support::get(&ann, "/api/users/me").await;
         assert_eq!(actor["user"], user["user"]);
     }
 
@@ -518,7 +518,7 @@ mod mcp_in_process {
         let world = World::start_without_mcp().await;
         let ann = world.signed_in("ann");
         let reply = ann
-            .send(Method::POST, "/mcp", Some(&json!({})))
+            .send(Method::POST, "/api/mcp", Some(&json!({})))
             .await
             .unwrap();
         assert_eq!(reply.status, StatusCode::NOT_FOUND);

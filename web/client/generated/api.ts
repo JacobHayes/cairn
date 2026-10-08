@@ -4,7 +4,7 @@
  */
 
 export interface paths {
-    "/capabilities": {
+    "/api/capabilities": {
         parameters: {
             query?: never;
             header?: never;
@@ -21,7 +21,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/deployment": {
+    "/api/deployment": {
         parameters: {
             query?: never;
             header?: never;
@@ -38,7 +38,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/deployment/patches": {
+    "/api/deployment/patches": {
         parameters: {
             query?: never;
             header?: never;
@@ -55,7 +55,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/deployment/proposals": {
+    "/api/deployment/proposals": {
         parameters: {
             query?: never;
             header?: never;
@@ -72,7 +72,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/entities/{key}": {
+    "/api/entities/{key}": {
         parameters: {
             query?: never;
             header?: never;
@@ -89,7 +89,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/events": {
+    "/api/events": {
         parameters: {
             query?: never;
             header?: never;
@@ -106,7 +106,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/events/stream": {
+    "/api/events/stream": {
         parameters: {
             query?: never;
             header?: never;
@@ -123,24 +123,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/healthz": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Whether the server is serving: 200 while its store answers, 503 once the store has failed closed. Needs no credential. */
-        get: operations["getHealth"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/journeys": {
+    "/api/journeys": {
         parameters: {
             query?: never;
             header?: never;
@@ -157,7 +140,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}": {
+    "/api/journeys/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -174,7 +157,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/assistant": {
+    "/api/journeys/{id}/assistant": {
         parameters: {
             query?: never;
             header?: never;
@@ -192,7 +175,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/decisions": {
+    "/api/journeys/{id}/decisions": {
         parameters: {
             query?: never;
             header?: never;
@@ -209,7 +192,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/derived": {
+    "/api/journeys/{id}/derived": {
         parameters: {
             query?: never;
             header?: never;
@@ -226,7 +209,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/document": {
+    "/api/journeys/{id}/document": {
         parameters: {
             query?: never;
             header?: never;
@@ -243,7 +226,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/history": {
+    "/api/journeys/{id}/history": {
         parameters: {
             query?: never;
             header?: never;
@@ -260,7 +243,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/level": {
+    "/api/journeys/{id}/level": {
         parameters: {
             query?: never;
             header?: never;
@@ -277,7 +260,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/mine": {
+    "/api/journeys/{id}/mine": {
         parameters: {
             query?: never;
             header?: never;
@@ -294,7 +277,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/next": {
+    "/api/journeys/{id}/next": {
         parameters: {
             query?: never;
             header?: never;
@@ -311,7 +294,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/nodes": {
+    "/api/journeys/{id}/nodes": {
         parameters: {
             query?: never;
             header?: never;
@@ -328,7 +311,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/nodes/{key}": {
+    "/api/journeys/{id}/nodes/{key}": {
         parameters: {
             query?: never;
             header?: never;
@@ -345,7 +328,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/nodes/{key}/explanations/{field}": {
+    "/api/journeys/{id}/nodes/{key}/explanations/{field}": {
         parameters: {
             query?: never;
             header?: never;
@@ -362,7 +345,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/patches": {
+    "/api/journeys/{id}/patches": {
         parameters: {
             query?: never;
             header?: never;
@@ -379,7 +362,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/proposals": {
+    "/api/journeys/{id}/proposals": {
         parameters: {
             query?: never;
             header?: never;
@@ -396,7 +379,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/relink": {
+    "/api/journeys/{id}/relink": {
         parameters: {
             query?: never;
             header?: never;
@@ -413,7 +396,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/save-as-route": {
+    "/api/journeys/{id}/save-as-route": {
         parameters: {
             query?: never;
             header?: never;
@@ -430,7 +413,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/snapshot": {
+    "/api/journeys/{id}/snapshot": {
         parameters: {
             query?: never;
             header?: never;
@@ -447,7 +430,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/summary": {
+    "/api/journeys/{id}/summary": {
         parameters: {
             query?: never;
             header?: never;
@@ -464,7 +447,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/timeline": {
+    "/api/journeys/{id}/timeline": {
         parameters: {
             query?: never;
             header?: never;
@@ -481,7 +464,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/trace/{key}": {
+    "/api/journeys/{id}/trace/{key}": {
         parameters: {
             query?: never;
             header?: never;
@@ -498,7 +481,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/journeys/{id}/upgrade": {
+    "/api/journeys/{id}/upgrade": {
         parameters: {
             query?: never;
             header?: never;
@@ -515,7 +498,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/proposals/{id}": {
+    "/api/proposals/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -533,7 +516,7 @@ export interface paths {
         patch: operations["editProposal"];
         trace?: never;
     };
-    "/proposals/{id}/apply": {
+    "/api/proposals/{id}/apply": {
         parameters: {
             query?: never;
             header?: never;
@@ -550,7 +533,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/proposals/{id}/discard": {
+    "/api/proposals/{id}/discard": {
         parameters: {
             query?: never;
             header?: never;
@@ -567,7 +550,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/proposals/{id}/preview": {
+    "/api/proposals/{id}/preview": {
         parameters: {
             query?: never;
             header?: never;
@@ -584,7 +567,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/proposals/{id}/refresh": {
+    "/api/proposals/{id}/refresh": {
         parameters: {
             query?: never;
             header?: never;
@@ -601,7 +584,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/routes": {
+    "/api/routes": {
         parameters: {
             query?: never;
             header?: never;
@@ -618,7 +601,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/routes/{id}": {
+    "/api/routes/{id}": {
         parameters: {
             query?: never;
             header?: never;
@@ -635,7 +618,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/routes/{id}/draft/assistant": {
+    "/api/routes/{id}/draft/assistant": {
         parameters: {
             query?: never;
             header?: never;
@@ -653,7 +636,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/routes/{id}/export": {
+    "/api/routes/{id}/export": {
         parameters: {
             query?: never;
             header?: never;
@@ -670,7 +653,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/routes/{id}/import": {
+    "/api/routes/{id}/import": {
         parameters: {
             query?: never;
             header?: never;
@@ -687,7 +670,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/routes/{id}/patches": {
+    "/api/routes/{id}/patches": {
         parameters: {
             query?: never;
             header?: never;
@@ -704,7 +687,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/routes/{id}/proposals": {
+    "/api/routes/{id}/proposals": {
         parameters: {
             query?: never;
             header?: never;
@@ -721,7 +704,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/routes/{id}/versions": {
+    "/api/routes/{id}/versions": {
         parameters: {
             query?: never;
             header?: never;
@@ -738,7 +721,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/routes/{id}/versions/{version}": {
+    "/api/routes/{id}/versions/{version}": {
         parameters: {
             query?: never;
             header?: never;
@@ -755,7 +738,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/search": {
+    "/api/search": {
         parameters: {
             query?: never;
             header?: never;
@@ -772,7 +755,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/users/me": {
+    "/api/users/me": {
         parameters: {
             query?: never;
             header?: never;
@@ -789,7 +772,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/users/me/tokens": {
+    "/api/users/me/tokens": {
         parameters: {
             query?: never;
             header?: never;
@@ -807,7 +790,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/users/me/tokens/{agent}": {
+    "/api/users/me/tokens/{agent}": {
         parameters: {
             query?: never;
             header?: never;
@@ -819,6 +802,23 @@ export interface paths {
         post?: never;
         /** Revokes one of the caller's agent tokens. */
         delete: operations["revokeAgentToken"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/healthz": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Whether the server is serving: 200 while its store answers, 503 once the store has failed closed. Needs no credential. */
+        get: operations["getHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
         options?: never;
         head?: never;
         patch?: never;
@@ -949,7 +949,7 @@ export interface components {
             entity_list: components["schemas"]["EntityKey"][];
         };
         /**
-         * @description `POST /journeys/{id}/assistant` and `POST /routes/{id}/draft/assistant`: one message of
+         * @description `POST /api/journeys/{id}/assistant` and `POST /api/routes/{id}/draft/assistant`: one message of
          *     the caller's conversation about that journey or draft.
          */
         AssistantRequest: {
@@ -1020,13 +1020,13 @@ export interface components {
             /** @description Why. */
             reason: components["schemas"]["Reason"];
         };
-        /** @description The capabilities document (`GET /capabilities`): what this host offers. */
+        /** @description The capabilities document (`GET /api/capabilities`): what this host offers. */
         Capabilities: {
             /** @description Whether the in-app assistant is available (I5). */
             assistant: boolean;
             /** @description How people sign in, in the order the host asks. */
             auth: components["schemas"]["AuthMethod"][];
-            /** @description Whether the host serves MCP at `/mcp` (I2). */
+            /** @description Whether the host serves MCP at `/api/mcp` (I2). */
             mcp: boolean;
             /** @description Whether the host streams revision ticks over SSE (H6). */
             sse: boolean;
@@ -1384,7 +1384,7 @@ export interface components {
             score: components["schemas"]["Score"];
         };
         /**
-         * @description `GET /journeys/{id}/assistant` and `GET /routes/{id}/draft/assistant`: the caller's
+         * @description `GET /api/journeys/{id}/assistant` and `GET /api/routes/{id}/draft/assistant`: the caller's
          *     conversation about that journey or draft (I5: one per target per user), as kept: its
          *     newest messages, oldest first. A conversation not started yet has none.
          */
@@ -3139,7 +3139,7 @@ export interface components {
             revision: components["schemas"]["Revision"];
         };
         /**
-         * @description `POST /{domain}/patches`: a patch to the domain the path names, and the note each of its
+         * @description `POST /api/{domain}/patches`: a patch to the domain the path names, and the note each of its
          *     events carries (J1).
          */
         PatchRequest: {
@@ -3390,7 +3390,7 @@ export interface components {
             proposal: components["schemas"]["Proposal"];
         };
         /**
-         * @description `POST /proposals/{id}/apply`: applies the proposal as the caller, its confirming user
+         * @description `POST /api/proposals/{id}/apply`: applies the proposal as the caller, its confirming user
          *     (H2), at the editing revision they reviewed.
          */
         ProposalApply: {
@@ -3402,7 +3402,7 @@ export interface components {
             reviewed_revision: components["schemas"]["Revision"];
         };
         /**
-         * @description `POST /{domain}/proposals`: a new proposal for the path's domain (which may not exist yet:
+         * @description `POST /api/{domain}/proposals`: a new proposal for the path's domain (which may not exist yet:
          *     a proposal can create a journey or route at revision 0).
          */
         ProposalCreate: {
@@ -3425,7 +3425,7 @@ export interface components {
             title: components["schemas"]["Title"];
         };
         /**
-         * @description `PATCH /proposals/{id}`: the proposal's new content, against the editing revision the
+         * @description `PATCH /api/proposals/{id}`: the proposal's new content, against the editing revision the
          *     editor saw (H5). Its destination's revision does not move.
          */
         ProposalEdit: {
@@ -3459,7 +3459,7 @@ export interface components {
             violations?: components["schemas"]["Violation"][];
         };
         /**
-         * @description `POST /proposals/{id}/preview` (C14, D7, I6): what applying the proposal now would do, and,
+         * @description `POST /api/proposals/{id}/preview` (C14, D7, I6): what applying the proposal now would do, and,
          *     when its destination moved since it was drafted, what moved.
          */
         ProposalReview: {
@@ -3486,7 +3486,7 @@ export interface components {
         /** @description A proposal's status. */
         ProposalStatus: "open" | "applied" | "discarded";
         /**
-         * @description `POST /proposals/{id}/discard` and `POST /proposals/{id}/refresh`: against the editing
+         * @description `POST /api/proposals/{id}/discard` and `POST /api/proposals/{id}/refresh`: against the editing
          *     revision the caller saw.
          */
         ProposalStep: {
@@ -3656,7 +3656,7 @@ export interface components {
             /** @description The value. */
             value: components["schemas"]["Relevance"];
         };
-        /** @description `POST /journeys/{id}/relink` (B9): proposes re-linking the journey to a published version. */
+        /** @description `POST /api/journeys/{id}/relink` (B9): proposes re-linking the journey to a published version. */
         RelinkRequest: {
             /** @description The route version to follow once it is applied. */
             lineage: components["schemas"]["Lineage"];
@@ -3940,7 +3940,7 @@ export interface components {
         /** @description A route id: a slug, unique in the deployment. */
         RouteId: string;
         /**
-         * @description `POST /routes/{id}/import` (A13): a route file, imported as a new route or a new draft of
+         * @description `POST /api/routes/{id}/import` (A13): a route file, imported as a new route or a new draft of
          *     the path's route, matched against the version it extends.
          */
         RouteImport: {
@@ -3984,7 +3984,7 @@ export interface components {
             version: components["schemas"]["VersionNumber"];
         };
         /**
-         * @description `POST /journeys/{id}/save-as-route` (B8): proposes saving the journey's structure as a
+         * @description `POST /api/journeys/{id}/save-as-route` (B8): proposes saving the journey's structure as a
          *     draft of a route, created when it does not exist.
          */
         SaveAsRouteRequest: {
@@ -4329,7 +4329,7 @@ export interface components {
         };
         /** @description Single-line text, at most title_bytes_max (256) bytes. */
         Title: string;
-        /** @description `POST /users/me/tokens`: what to call the new agent token. */
+        /** @description `POST /api/users/me/tokens`: what to call the new agent token. */
         TokenRequest: {
             /** @description Its name, as the user's list shows it. */
             name: components["schemas"]["Title"];
@@ -4423,7 +4423,7 @@ export interface components {
             node: components["schemas"]["NodeKey"];
         };
         /**
-         * @description `POST /journeys/{id}/upgrade` (B7): proposes upgrading the journey to a newer version of
+         * @description `POST /api/journeys/{id}/upgrade` (B7): proposes upgrading the journey to a newer version of
          *     the route it follows.
          */
         UpgradeRequest: {
@@ -5101,44 +5101,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Problem"];
                     "text/plain": string;
-                };
-            };
-        };
-    };
-    getHealth: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Health"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The store has failed closed (a Health), or a limit was reached (a problem). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Health"] | components["schemas"]["Problem"];
                 };
             };
         };
@@ -9174,6 +9136,44 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["Problem"];
                     "text/plain": string;
+                };
+            };
+        };
+    };
+    getHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The store has failed closed (a Health), or a limit was reached (a problem). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Health"] | components["schemas"]["Problem"];
                 };
             };
         };

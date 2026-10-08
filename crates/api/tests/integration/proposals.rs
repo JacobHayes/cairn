@@ -18,7 +18,7 @@ mod in_process {
 
     use crate::support::{World, get, ok, post};
 
-    const JOURNEY: &str = "/journeys/j_vendor_eval";
+    const JOURNEY: &str = "/api/journeys/j_vendor_eval";
 
     /// A draft adding note `key` to the journey, drafted at `revision`.
     fn note_draft(title: &str, key: &str, revision: u32) -> Value {
@@ -52,7 +52,7 @@ mod in_process {
     async fn agent_of(world: &World, member: &str) -> Transport {
         let named = json!({"name": "helper"});
         let minted: MintedToken =
-            ok(&post(&world.signed_in(member), "/users/me/tokens", &named).await);
+            ok(&post(&world.signed_in(member), "/api/users/me/tokens", &named).await);
         world.bearer(&minted.token)
     }
 
@@ -75,7 +75,7 @@ mod in_process {
         let agent = agent_of(world, "ann").await;
         let proposals = format!("{JOURNEY}/proposals");
         ok::<ProposalAnswer>(&post(&agent, &proposals, &create_body("p_pr")).await);
-        let edited = patch(&agent, "/proposals/pr_note", &edit_body("p_edit", 1)).await;
+        let edited = patch(&agent, "/api/proposals/pr_note", &edit_body("p_edit", 1)).await;
         ok::<ProposalAnswer>(&edited);
         agent
     }
@@ -87,7 +87,7 @@ mod in_process {
     async fn a_proposal_resubmitted_by_id_is_fetched_not_duplicated() {
         let world = World::start().await;
         let agent = drafted_by_agent(&world).await;
-        let held: Proposal = get(&agent, "/proposals/pr_note").await;
+        let held: Proposal = get(&agent, "/api/proposals/pr_note").await;
         assert_eq!(
             (held.revision.get(), held.status),
             (2, ProposalStatus::Open)
@@ -102,7 +102,12 @@ mod in_process {
             matches!(repeated, ProposalAnswer::AlreadySaved { .. }),
             "{repeated:?}"
         );
-        let old = patch(&agent, "/proposals/pr_note", &edit_body("p_edit_old", 1)).await;
+        let old = patch(
+            &agent,
+            "/api/proposals/pr_note",
+            &edit_body("p_edit_old", 1),
+        )
+        .await;
         let Rejection::Stale { conflicts, .. } = rejection(&old) else {
             panic!("an edit at an old revision is stale")
         };
@@ -122,7 +127,7 @@ mod in_process {
         drafted_by_agent(&world).await;
         let bob = world.signed_in("bob");
         let review: ProposalReview =
-            ok(&post(&bob, "/proposals/pr_note/preview", &json!({})).await);
+            ok(&post(&bob, "/api/proposals/pr_note/preview", &json!({})).await);
         assert_eq!(review.stale, None);
         assert_eq!(
             (
@@ -133,7 +138,7 @@ mod in_process {
         );
         let old = post(
             &bob,
-            "/proposals/pr_note/apply",
+            "/api/proposals/pr_note/apply",
             &apply_body("p_apply_old", 1),
         )
         .await;
@@ -144,17 +149,26 @@ mod in_process {
             conflicts[0].of,
             RevisionOf::Proposal("pr_note".parse().unwrap())
         );
-        let applied: PatchAnswer =
-            ok(&post(&bob, "/proposals/pr_note/apply", &apply_body("p_apply", 2)).await);
+        let applied: PatchAnswer = ok(&post(
+            &bob,
+            "/api/proposals/pr_note/apply",
+            &apply_body("p_apply", 2),
+        )
+        .await);
         assert_eq!(applied.receipt().revision.get(), 4);
-        let resubmitted = post(&bob, "/proposals/pr_note/apply", &apply_body("p_apply", 2)).await;
+        let resubmitted = post(
+            &bob,
+            "/api/proposals/pr_note/apply",
+            &apply_body("p_apply", 2),
+        )
+        .await;
         let resubmitted: PatchAnswer = ok(&resubmitted);
         let receipt = applied.receipt().clone();
         assert_eq!(resubmitted, PatchAnswer::AlreadyApplied { receipt }, "H5");
-        let held: Proposal = get(&bob, "/proposals/pr_note").await;
+        let held: Proposal = get(&bob, "/api/proposals/pr_note").await;
         assert_eq!(held.status, ProposalStatus::Applied);
-        let reviewer: Viewer = get(&bob, "/users/me").await;
-        let events: EventPage = get(&bob, "/events?patch=p_apply").await;
+        let reviewer: Viewer = get(&bob, "/api/users/me").await;
+        let events: EventPage = get(&bob, "/api/events?patch=p_apply").await;
         assert_ne!(events.items.len(), 0);
         for logged in events.items {
             assert_eq!(
@@ -176,7 +190,7 @@ mod in_process {
             let create = json!({"patch_id": format!("p_{id}"), "id": id, "draft": draft});
             let created = saved(ok(&post(&ann, &target, &create).await));
             let review: ProposalReview =
-                ok(&post(&ann, &format!("/proposals/{id}/preview"), &json!({})).await);
+                ok(&post(&ann, &format!("/api/proposals/{id}/preview"), &json!({})).await);
             assert_eq!(review.proposal, created, "{id}");
             let left = (
                 review.preview.unresolved.len(),
@@ -210,7 +224,7 @@ mod in_process {
         ok::<ProposalAnswer>(&post(&ann, &format!("{JOURNEY}/proposals"), &create).await);
         let discard = json!({"patch_id": "p_discard", "base_revision": 1});
         let discarded: ProposalAnswer =
-            ok(&post(&ann, "/proposals/pr_note/discard", &discard).await);
+            ok(&post(&ann, "/api/proposals/pr_note/discard", &discard).await);
         let ProposalAnswer::Saved { proposal, .. } = discarded else {
             panic!("saved: {discarded:?}")
         };
@@ -242,7 +256,7 @@ mod in_process {
         );
 
         let review: ProposalReview =
-            ok(&post(&ann, "/proposals/pr_note/preview", &json!({})).await);
+            ok(&post(&ann, "/api/proposals/pr_note/preview", &json!({})).await);
         let stale = review.stale.expect("the journey moved");
         assert_eq!(
             (stale.conflict.expected.get(), stale.conflict.current.get()),
@@ -255,7 +269,7 @@ mod in_process {
         } = rejection(
             &post(
                 &ann,
-                "/proposals/pr_note/apply",
+                "/api/proposals/pr_note/apply",
                 &apply_body("p_apply_stale", 1),
             )
             .await,
@@ -271,7 +285,7 @@ mod in_process {
 
         let refresh = json!({"patch_id": "p_refresh", "base_revision": 1});
         let refreshed: ProposalAnswer =
-            ok(&post(&ann, "/proposals/pr_note/refresh", &refresh).await);
+            ok(&post(&ann, "/api/proposals/pr_note/refresh", &refresh).await);
         let ProposalAnswer::Saved { proposal, .. } = refreshed else {
             panic!("saved: {refreshed:?}")
         };
@@ -283,10 +297,14 @@ mod in_process {
             (2, 4)
         );
         let review: ProposalReview =
-            ok(&post(&ann, "/proposals/pr_note/preview", &json!({})).await);
+            ok(&post(&ann, "/api/proposals/pr_note/preview", &json!({})).await);
         assert_eq!(review.stale, None);
-        let applied: PatchAnswer =
-            ok(&post(&ann, "/proposals/pr_note/apply", &apply_body("p_apply", 2)).await);
+        let applied: PatchAnswer = ok(&post(
+            &ann,
+            "/api/proposals/pr_note/apply",
+            &apply_body("p_apply", 2),
+        )
+        .await);
         assert_eq!(applied.receipt().revision.get(), 5);
     }
 
@@ -304,37 +322,37 @@ mod in_process {
         let cases = [
             (
                 Method::GET,
-                "/proposals/pr_missing",
+                "/api/proposals/pr_missing",
                 None,
                 ProblemCode::NotFound,
             ),
             (
                 Method::POST,
-                "/proposals/pr_missing/discard",
+                "/api/proposals/pr_missing/discard",
                 Some(&step),
                 ProblemCode::NotFound,
             ),
             (
                 Method::POST,
-                "/proposals/pr_missing/refresh",
+                "/api/proposals/pr_missing/refresh",
                 Some(&step),
                 ProblemCode::NotFound,
             ),
             (
                 Method::POST,
-                "/proposals/pr_missing/preview",
+                "/api/proposals/pr_missing/preview",
                 None,
                 ProblemCode::NotFound,
             ),
             (
                 Method::PATCH,
-                "/proposals/pr_missing",
+                "/api/proposals/pr_missing",
                 Some(&step),
                 ProblemCode::BadRequest,
             ),
             (
                 Method::POST,
-                "/journeys/j_vendor_eval/proposals",
+                "/api/journeys/j_vendor_eval/proposals",
                 Some(&nested),
                 ProblemCode::BadRequest,
             ),

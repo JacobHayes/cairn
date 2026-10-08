@@ -34,12 +34,15 @@ mise run serve        # a local deployment from cairn.dev.toml, signed in as the
 
 ## Run
 
-`cairn` is one binary: `cairn serve` runs the HTTP API, the MCP endpoint at `/mcp`, the
-revision stream, the assistant when one is configured, and the web UI on one port, over one
-database file. Build it with `mise run build` (the web build is embedded; a binary built
-without it refuses to serve). The other commands: `cairn migrate` creates the database or
-brings its schema up to date, `cairn config check` validates a configuration (providers
-included) without opening anything, and `cairn version`.
+`cairn` is one binary: `cairn serve` runs the HTTP API, the MCP endpoint at `/api/mcp`,
+the revision stream, the assistant when one is configured, and the web UI on one port, over
+one database file. The API, MCP, metrics, and sign-in live under `/api/`; OAuth metadata
+under `/.well-known/` and the health check at `/healthz` sit beside it; every other path is
+the web UI, so a screen's address (`/journeys/<id>`) loads directly. Build it with
+`mise run build` (the web build is embedded; a binary built without it refuses to serve).
+The other commands: `cairn migrate` creates the database or brings its schema up to date,
+`cairn config check` validates a configuration (providers included) without opening
+anything, and `cairn version`.
 
 The configuration is a TOML file, passed as `--config FILE` or named by `CAIRN_CONFIG`.
 Nothing a deployment must choose has a default; `cairn.dev.toml` is a complete example:
@@ -92,9 +95,10 @@ what runs it: put it behind a proxy that terminates TLS and forwards the `Host` 
 set `public_url` to the address people use. Requests naming any other host are refused
 (421), as are loopback names unless the listener is bound to loopback. `GET /healthz` needs
 no credential, for the proxy's health check: it answers 200 while the server is serving and
-503 once its database has failed closed (restart the process). Logs are JSON lines
-on standard error; metrics are at `/metrics` in Prometheus's format, behind the same auth as
-the API (a scraper uses an agent token).
+503 once its database has failed closed (restart the process). Logs are JSON lines on
+standard error; metrics are at `/api/metrics` in Prometheus's format, behind the same auth
+as the API (a scraper uses an agent token). An OIDC provider's redirect URI is
+`<public_url>api/auth/<name>/callback`.
 
 CI (`.github/workflows/check.yml`) runs `mise run check` on every push and nightly, and
 `mise run sim` nightly outside the gate.

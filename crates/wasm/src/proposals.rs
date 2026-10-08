@@ -1,8 +1,8 @@
 //! The in-browser root's proposals (I6, C14; brief 5.7): created against a domain with a
 //! client-generated id, fetched, edited, previewed, applied, discarded, and refreshed by id
 //! alone, and the upgrade, save-as-route, and re-link drafts (B7, B8, B9), each through the
-//! same service calls as the server's `/{domain}/proposals`, `/proposals/{id}...`, and
-//! `/journeys/{id}/{upgrade,save-as-route,relink}`, answering the API's JSON for them, so the
+//! same service calls as the server's `/api/{domain}/proposals`, `/api/proposals/{id}...`, and
+//! `/api/journeys/{id}/{upgrade,save-as-route,relink}`, answering the API's JSON for them, so the
 //! app's one data layer reviews a proposal on either host.
 
 use std::collections::BTreeMap;
@@ -21,7 +21,7 @@ use crate::error::{HostError, json, read};
 use crate::now_or_never;
 use crate::root::{BrowserRoot, PatchAnswer, failed};
 
-/// `POST /{domain}/proposals`'s body, as the API's `ProposalCreate`.
+/// `POST /api/{domain}/proposals`'s body, as the API's `ProposalCreate`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalCreate {
@@ -33,7 +33,7 @@ pub struct ProposalCreate {
     pub draft: ProposalDraft,
 }
 
-/// `PATCH /proposals/{id}`'s body, as the API's `ProposalEdit`.
+/// `PATCH /api/proposals/{id}`'s body, as the API's `ProposalEdit`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalEdit {
@@ -45,7 +45,7 @@ pub struct ProposalEdit {
     pub draft: ProposalDraft,
 }
 
-/// The body of `POST /proposals/{id}/discard` and `.../refresh`, as the API's `ProposalStep`.
+/// The body of `POST /api/proposals/{id}/discard` and `.../refresh`, as the API's `ProposalStep`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalStep {
@@ -55,7 +55,7 @@ pub struct ProposalStep {
     pub base_revision: Revision,
 }
 
-/// `POST /proposals/{id}/apply`'s body, as the API's `ProposalApply`.
+/// `POST /api/proposals/{id}/apply`'s body, as the API's `ProposalApply`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalApply {
@@ -68,7 +68,7 @@ pub struct ProposalApply {
     pub note: Option<Markdown>,
 }
 
-/// `POST /journeys/{id}/upgrade`'s body (B7), as the API's `UpgradeRequest`.
+/// `POST /api/journeys/{id}/upgrade`'s body (B7), as the API's `UpgradeRequest`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct UpgradeRequest {
@@ -80,7 +80,7 @@ pub struct UpgradeRequest {
     pub to: VersionNumber,
 }
 
-/// `POST /journeys/{id}/save-as-route`'s body (B8), as the API's `SaveAsRouteRequest`.
+/// `POST /api/journeys/{id}/save-as-route`'s body (B8), as the API's `SaveAsRouteRequest`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SaveAsRouteRequest {
@@ -94,7 +94,7 @@ pub struct SaveAsRouteRequest {
     pub name: Title,
 }
 
-/// `POST /journeys/{id}/relink`'s body (B9), as the API's `RelinkRequest`.
+/// `POST /api/journeys/{id}/relink`'s body (B9), as the API's `RelinkRequest`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RelinkRequest {
@@ -152,7 +152,7 @@ pub struct StaleBase {
     pub intervening: TouchedSet,
 }
 
-/// `POST /proposals/{id}/preview`'s answer (C14, D7, I6), as the API's `ProposalReview`.
+/// `POST /api/proposals/{id}/preview`'s answer (C14, D7, I6), as the API's `ProposalReview`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalReview {
@@ -206,7 +206,7 @@ fn journey_id(id: &str) -> Result<JourneyId, HostError> {
 }
 
 impl BrowserRoot {
-    /// I6: the proposal with this id, as `GET /proposals/{id}` answers it.
+    /// I6: the proposal with this id, as `GET /api/proposals/{id}` answers it.
     ///
     /// # Errors
     ///
@@ -220,7 +220,7 @@ impl BrowserRoot {
     }
 
     /// I6: creates a proposal for `destination` as the local user at `now`, as
-    /// `POST /{domain}/proposals` answers it.
+    /// `POST /api/{domain}/proposals` answers it.
     ///
     /// # Errors
     ///
@@ -245,7 +245,7 @@ impl BrowserRoot {
     }
 
     /// I6, H5: replaces the proposal's content against the editing revision its editor saw,
-    /// as `PATCH /proposals/{id}` answers it.
+    /// as `PATCH /api/proposals/{id}` answers it.
     ///
     /// # Errors
     ///
@@ -271,7 +271,7 @@ impl BrowserRoot {
         .map_err(write_failed)
     }
 
-    /// I6: discards the proposal, as `POST /proposals/{id}/discard` answers it.
+    /// I6: discards the proposal, as `POST /api/proposals/{id}/discard` answers it.
     ///
     /// # Errors
     ///
@@ -296,7 +296,7 @@ impl BrowserRoot {
     }
 
     /// I6: drafts the proposal again on its destination as it stands, the reviewer's choices
-    /// carried over, as `POST /proposals/{id}/refresh` answers it. Its revision moves, so it
+    /// carried over, as `POST /api/proposals/{id}/refresh` answers it. Its revision moves, so it
     /// must be reviewed again.
     ///
     /// # Errors
@@ -320,7 +320,7 @@ impl BrowserRoot {
     }
 
     /// C14, D7, I6: what applying the proposal now would do, and what moved since it was
-    /// drafted, as `POST /proposals/{id}/preview` answers it.
+    /// drafted, as `POST /api/proposals/{id}/preview` answers it.
     ///
     /// # Errors
     ///
@@ -352,7 +352,7 @@ impl BrowserRoot {
     }
 
     /// I6, H2: applies the proposal as the local user, its confirming user, at the editing
-    /// revision they reviewed, as `POST /proposals/{id}/apply` answers it.
+    /// revision they reviewed, as `POST /api/proposals/{id}/apply` answers it.
     ///
     /// # Errors
     ///
@@ -387,7 +387,7 @@ impl BrowserRoot {
     }
 
     /// B7: proposes upgrading `journey` to a newer version of its route, as
-    /// `POST /journeys/{id}/upgrade` answers it.
+    /// `POST /api/journeys/{id}/upgrade` answers it.
     ///
     /// # Errors
     ///
@@ -412,7 +412,7 @@ impl BrowserRoot {
     }
 
     /// B8: proposes saving `journey`'s structure as a draft of a route, as
-    /// `POST /journeys/{id}/save-as-route` answers it.
+    /// `POST /api/journeys/{id}/save-as-route` answers it.
     ///
     /// # Errors
     ///
@@ -437,7 +437,7 @@ impl BrowserRoot {
     }
 
     /// B9: proposes re-linking `journey` to a published version, as
-    /// `POST /journeys/{id}/relink` answers it.
+    /// `POST /api/journeys/{id}/relink` answers it.
     ///
     /// # Errors
     ///
@@ -463,7 +463,7 @@ impl BrowserRoot {
 
 #[wasm_bindgen]
 impl BrowserRoot {
-    /// I6: proposal `id`, as `GET /proposals/{id}` answers it.
+    /// I6: proposal `id`, as `GET /api/proposals/{id}` answers it.
     ///
     /// # Errors
     ///

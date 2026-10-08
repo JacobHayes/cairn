@@ -53,10 +53,10 @@ pub struct AppliedLocally {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PreviewRequest {
-    /// The proposal, as `GET /proposals/{id}` answers it; its destination is the journey.
+    /// The proposal, as `GET /api/proposals/{id}` answers it; its destination is the journey.
     pub proposal: Proposal,
     /// The route versions its mutations read (an upgrade's target and the journey's own),
-    /// as `GET /routes/{id}/versions/{version}` answers them.
+    /// as `GET /api/routes/{id}/versions/{version}` answers them.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub versions: Vec<RouteVersion>,
     /// When the preview is asked for.
@@ -70,7 +70,7 @@ pub struct PreviewRequest {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RouteApplyRequest {
-    /// The route as `GET /routes/{id}` answers it, with its draft; none for a patch that
+    /// The route as `GET /api/routes/{id}` answers it, with its draft; none for a patch that
     /// creates the route (base revision 0).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub route: Option<Route>,

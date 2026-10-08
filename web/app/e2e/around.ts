@@ -13,18 +13,18 @@ export function fixtureRoute(fixture: string): string {
   return fileURLToPath(new URL(`../../../fixtures/${fixture}/route.yaml`, import.meta.url));
 }
 
-/** Starts a journey from the new-journey form at `hash`; its id, once it opens on its walkthrough. */
+/** Starts a journey from the new-journey form at `path`; its id, once it opens on its walkthrough. */
 export async function startJourney(page: Page, host: HostKind, name: string, from?: { route: string; version?: number }): Promise<string> {
-  const hash = from === undefined ? "/new" : `/new?route=${from.route}${from.version === undefined ? "" : `&version=${String(from.version)}`}`;
-  await open(page, host, hash);
+  const path = from === undefined ? "/new" : `/new?route=${from.route}${from.version === undefined ? "" : `&version=${String(from.version)}`}`;
+  await open(page, host, path);
   const form = page.getByTestId("new-journey-form");
   await form.getByLabel("Name").fill(name);
   if (from === undefined) {
     await form.getByLabel("Start from").selectOption("");
   }
   await form.getByRole("button", { name: "Start the journey" }).click();
-  await expect(page).toHaveURL(/#\/journeys\/j_[a-z0-9_-]+\/triage\?mode=decisions$/);
-  return /#\/journeys\/(j_[a-z0-9_-]+)\//.exec(page.url())?.[1] ?? "";
+  await expect(page).toHaveURL(/\/journeys\/j_[a-z0-9_-]+\/triage\?mode=decisions$/);
+  return /\/journeys\/(j_[a-z0-9_-]+)\//.exec(page.url())?.[1] ?? "";
 }
 
 /** A fresh name for a journey this run starts. */

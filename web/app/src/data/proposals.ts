@@ -1,7 +1,7 @@
 // Proposals over either host (I6, C14; brief 5.7): fetched, created, edited, previewed,
 // applied, discarded, and refreshed by id, and the upgrade, save-as-route, and re-link drafts
-// (B7, B8, B9). The server answers over HTTP (`/{domain}/proposals`, `/proposals/{id}...`,
-// `/journeys/{id}/{upgrade,save-as-route,relink}`); the in-browser host answers the same JSON
+// (B7, B8, B9). The server answers over HTTP (`/api/{domain}/proposals`, `/api/proposals/{id}...`,
+// `/api/journeys/{id}/{upgrade,save-as-route,relink}`); the in-browser host answers the same JSON
 // from its root. Each write names a client patch id (H5) and a client proposal id (I6), so a
 // lost answer is resubmitted rather than guessed at; nothing retries on its own.
 import { answerFailure, networkFailure, type CairnClient, type HttpFailure, type Schema } from "@cairn/client";
@@ -107,25 +107,25 @@ async function readOver<T>(what: string, call: () => Promise<Reply<T>>): Promise
 export function serverProposals(client: CairnClient): ProposalHost {
   const at = (id: string) => ({ params: { path: { id } } });
   return {
-    get: (id) => readOver(id, () => client.GET("/proposals/{id}", at(id))),
+    get: (id) => readOver(id, () => client.GET("/api/proposals/{id}", at(id))),
     create: (destination, body) =>
       written(() => {
         if (destination === "deployment") {
-          return client.POST("/deployment/proposals", { body });
+          return client.POST("/api/deployment/proposals", { body });
         }
         if ("journey" in destination) {
-          return client.POST("/journeys/{id}/proposals", { ...at(destination.journey), body });
+          return client.POST("/api/journeys/{id}/proposals", { ...at(destination.journey), body });
         }
-        return client.POST("/routes/{id}/proposals", { ...at(destination.route), body });
+        return client.POST("/api/routes/{id}/proposals", { ...at(destination.route), body });
       }),
-    edit: (id, body) => written(() => client.PATCH("/proposals/{id}", { ...at(id), body })),
-    discard: (id, body) => written(() => client.POST("/proposals/{id}/discard", { ...at(id), body })),
-    refresh: (id, body) => written(() => client.POST("/proposals/{id}/refresh", { ...at(id), body })),
-    preview: (id) => readOver(id, () => client.POST("/proposals/{id}/preview", at(id))),
-    apply: (id, body) => written(() => client.POST("/proposals/{id}/apply", { ...at(id), body })),
-    upgrade: (journey, body) => written(() => client.POST("/journeys/{id}/upgrade", { ...at(journey), body })),
-    saveAsRoute: (journey, body) => written(() => client.POST("/journeys/{id}/save-as-route", { ...at(journey), body })),
-    relink: (journey, body) => written(() => client.POST("/journeys/{id}/relink", { ...at(journey), body })),
+    edit: (id, body) => written(() => client.PATCH("/api/proposals/{id}", { ...at(id), body })),
+    discard: (id, body) => written(() => client.POST("/api/proposals/{id}/discard", { ...at(id), body })),
+    refresh: (id, body) => written(() => client.POST("/api/proposals/{id}/refresh", { ...at(id), body })),
+    preview: (id) => readOver(id, () => client.POST("/api/proposals/{id}/preview", at(id))),
+    apply: (id, body) => written(() => client.POST("/api/proposals/{id}/apply", { ...at(id), body })),
+    upgrade: (journey, body) => written(() => client.POST("/api/journeys/{id}/upgrade", { ...at(journey), body })),
+    saveAsRoute: (journey, body) => written(() => client.POST("/api/journeys/{id}/save-as-route", { ...at(journey), body })),
+    relink: (journey, body) => written(() => client.POST("/api/journeys/{id}/relink", { ...at(journey), body })),
   };
 }
 

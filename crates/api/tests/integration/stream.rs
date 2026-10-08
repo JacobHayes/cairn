@@ -37,8 +37,7 @@ mod in_process {
         let world = World::start().await;
         let ann = world.vendor_after(2).await;
         let journey = Domain::Journey("j_vendor_eval".parse().unwrap());
-        let target =
-            "/events/stream?domain=journey:j_vendor_eval&domain=deployment&domain=journey:j_none";
+        let target = "/api/events/stream?domain=journey:j_vendor_eval&domain=deployment&domain=journey:j_none";
         let mut stream = open(&ann, target).await;
         let mut first = vec![
             next_tick(&mut stream).await,
@@ -68,7 +67,7 @@ mod in_process {
         );
         let bob = world.signed_in("bob");
         support::ok::<serde_json::Value>(
-            &post(&bob, "/journeys/j_vendor_eval/patches", &request(&note)).await,
+            &post(&bob, "/api/journeys/j_vendor_eval/patches", &request(&note)).await,
         );
         assert_eq!(next_tick(&mut stream).await, current(journey, revision(3)));
     }
@@ -79,7 +78,7 @@ mod in_process {
     async fn past_the_subscriber_limit_a_stream_is_refused_until_one_goes_away() {
         let world = World::start().await;
         let ann = world.signed_in("ann");
-        let target = "/events/stream?domain=deployment";
+        let target = "/api/events/stream?domain=deployment";
         let mut held = Vec::new();
         for _ in 0..SSE_SUBSCRIBER_COUNT_MAX {
             held.push(open(&ann, target).await);
@@ -108,9 +107,9 @@ mod in_process {
         let world = World::start().await;
         let ann = world.signed_in("ann");
         for target in [
-            "/events/stream",
-            "/events/stream?domain=node:n_a",
-            "/events/stream?watch=journeys",
+            "/api/events/stream",
+            "/api/events/stream?domain=node:n_a",
+            "/api/events/stream?watch=journeys",
         ] {
             let reply = ann.send(Method::GET, target, None).await.unwrap();
             assert_eq!(reply.status, StatusCode::BAD_REQUEST, "{target}");

@@ -230,16 +230,16 @@ mod binary {
             .unwrap();
         let mut served = serve(&path);
         let address = served.address;
-        let capabilities = get(address, "localhost", "/capabilities").await.json();
+        let capabilities = get(address, "localhost", "/api/capabilities").await.json();
         assert_eq!(capabilities["assistant"], false);
         assert_eq!(capabilities["mcp"], true);
-        let document = get(address, "localhost", "/journeys/j_hiring/document").await;
+        let document = get(address, "localhost", "/api/journeys/j_hiring/document").await;
         assert_eq!(document.status, 200, "{}", document.text());
         assert_eq!(
             document.json()["engine_version"],
             cairn_engine::engine_version().as_str()
         );
-        let snapshot = get(address, "localhost", "/journeys/j_hiring/snapshot").await;
+        let snapshot = get(address, "localhost", "/api/journeys/j_hiring/snapshot").await;
         assert_eq!(snapshot.status, 200, "{}", snapshot.text());
         assert!(
             snapshot.json()["value"]["counts"].is_object(),
@@ -250,7 +250,7 @@ mod binary {
         assert_eq!(page.status, 200);
         assert!(page.text().contains("<script"), "{}", page.text());
         assert_eq!(
-            get(address, "attacker.example", "/capabilities")
+            get(address, "attacker.example", "/api/capabilities")
                 .await
                 .status,
             421
@@ -288,7 +288,7 @@ mod binary {
                 served.address,
                 "POST",
                 "localhost",
-                "/journeys/j_persisted/patches",
+                "/api/journeys/j_persisted/patches",
                 &[("content-type", "application/json")],
                 Some(&body),
             )
@@ -342,7 +342,10 @@ mod binary {
         drop(stderr);
         let address = format!("127.0.0.1:{port}").parse().unwrap();
         for _ in 0..3 {
-            assert_eq!(get(address, "localhost", "/capabilities").await.status, 200);
+            assert_eq!(
+                get(address, "localhost", "/api/capabilities").await.status,
+                200
+            );
         }
         assert!(child.try_wait().unwrap().is_none(), "the server stopped");
         child.kill().unwrap();

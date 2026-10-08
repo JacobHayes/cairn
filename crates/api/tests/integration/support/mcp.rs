@@ -1,6 +1,6 @@
 //! An MCP client in process: rmcp's own client, its Streamable HTTP transport carried by a
 //! client that hands each request to the API's router as served (auth layer, limits, and
-//! all) instead of a socket, so a test drives `/mcp` exactly as a remote agent would.
+//! all) instead of a socket, so a test drives `/api/mcp` exactly as a remote agent would.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 use std::net::SocketAddr;
@@ -32,7 +32,7 @@ use tower::ServiceExt as _;
 use super::World;
 
 /// The URL the client is configured with; requests go to the router, not to this host.
-const URL: &str = "http://cairn.test/mcp";
+const URL: &str = "http://cairn.test/api/mcp";
 
 /// A failure inside the in-process client.
 #[derive(Debug)]
@@ -65,7 +65,7 @@ impl InProcess {
         let body = serde_json::to_vec(&message).unwrap();
         let mut request = Request::builder()
             .method(Method::POST)
-            .uri("/mcp")
+            .uri("/api/mcp")
             .header(HOST, "cairn.test")
             .header(CONTENT_TYPE, "application/json")
             .header(ACCEPT, "application/json, text/event-stream");
@@ -156,7 +156,7 @@ pub struct Agent {
 }
 
 impl Agent {
-    /// Connects to `world`'s `/mcp` presenting `Bearer token`.
+    /// Connects to `world`'s `/api/mcp` presenting `Bearer token`.
     pub async fn connect(world: &World, token: &str) -> Self {
         Self::try_connect(world, Some(token)).await.unwrap()
     }

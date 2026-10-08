@@ -19,9 +19,9 @@ export function draftText(draft: RenderedDraft): string {
   return draft.segments.map((segment) => ("text" in segment ? segment.text : `[missing: ${segment.missing}]`)).join("");
 }
 
-/** The page's link to the journey (`{{journey.url}}`), on this tab's host. */
-export function journeyUrl(journey: string, location: Pick<Location, "origin" | "pathname" | "search">): string {
-  return `${location.origin}${location.pathname}${location.search}#/journeys/${journey}`;
+/** The page's link to the journey (`{{journey.url}}`): its address on this origin. */
+export function journeyUrl(journey: string, origin: string): string {
+  return `${origin}/journeys/${journey}`;
 }
 
 function MessageDraft({ view, node, resource }: { view: Ready; node: string; resource: string }) {
@@ -32,7 +32,7 @@ function MessageDraft({ view, node, resource }: { view: Ready; node: string; res
   const derivation = `${String(view.key.revision)}:${String(view.key.deployment_revision)}:${view.key.today}`;
   useEffect(() => {
     let live = true;
-    deriver.renderDraft(journey, { key: node, resource, url: journeyUrl(journey, location) }).then(
+    deriver.renderDraft(journey, { key: node, resource, url: journeyUrl(journey, location.origin) }).then(
       (draft) => { if (live) setRendered(draft); },
       (thrown: unknown) => { if (live) setRendered({ failed: thrown instanceof Error ? thrown.message : String(thrown) }); },
     );

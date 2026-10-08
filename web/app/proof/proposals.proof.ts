@@ -14,7 +14,7 @@ import { dismissNotices } from "../e2e/authoring.ts";
 import { openOverview, openRouteDetail, routeAction, startJourney } from "../e2e/around.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits } from "../e2e/proposals.ts";
 import { state } from "../e2e/detail.ts";
-import { openFromCanvas, openJourney, rename } from "../e2e/shell.ts";
+import { goWithin, openFromCanvas, openJourney, rename } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 /** A picture of the page, without the saved notices that sit over it. */
@@ -66,7 +66,7 @@ test("I6: a stale proposal, refreshed and reviewed again", async ({ page }) => {
   await page.getByTestId("reviewed").check();
   await openJourney(page, "browser", "j_vendor_eval");
   await rename(page, "n_findings", "Findings, drafted");
-  await page.goto(address);
+  await goWithin(page, address);
   await expect(page.getByTestId("stale").getByTestId("intervening-patch")).toHaveCount(1);
   await shot(page, "5-stale");
   await page.getByTestId("refresh").click();

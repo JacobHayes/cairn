@@ -221,7 +221,7 @@ export interface EventSourceLike {
 const EVENT_SOURCE_CLOSED = 2;
 
 /**
- * The API's revision stream (`GET /events/stream?domain=...`, H6) over Server-Sent Events,
+ * The API's revision stream (`GET /api/events/stream?domain=...`, H6) over Server-Sent Events,
  * at `base` (the server's origin, or "" for the page's). The browser reconnects a dropped
  * stream by itself, firing `open` again; one it gave up on is reported closed.
  */
@@ -231,7 +231,7 @@ export function eventSourceTicks(
 ): OpenTicks {
   return (watching, handlers) => {
     const query = watching.map((name) => `domain=${encodeURIComponent(name)}`).join("&");
-    const source = create(`${base}/events/stream?${query}`);
+    const source = create(`${base}/api/events/stream?${query}`);
     source.onopen = () => {
       handlers.opened();
     };

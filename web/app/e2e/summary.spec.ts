@@ -56,12 +56,12 @@ test("C18: the tabs lead from the canvas to the summary and keep an open node an
   await expect(page.getByTestId("screen-summary")).toBeVisible();
   await page.locator('[data-testid="summary-open"] [data-node="n_winner"] a').click();
   await expect(nodePanel(page, "n_winner")).toBeVisible();
-  await expect(page).toHaveURL(/#\/journeys\/j_bakeoff\/summary\/nodes\/n_winner\?hide=action&heat=on$/);
+  await expect(page).toHaveURL(/\/journeys\/j_bakeoff\/summary\/nodes\/n_winner\?hide=action&heat=on$/);
   const timelineTab = page.getByTestId("nav-timeline");
-  await expect(timelineTab).toHaveAttribute("href", "#/journeys/j_bakeoff/timeline/nodes/n_winner?hide=action&heat=on");
+  await expect(timelineTab).toHaveAttribute("href", "/journeys/j_bakeoff/timeline/nodes/n_winner?hide=action&heat=on");
   // The canvas's settings ride along every tab, so going back finds the canvas as it was left.
   const canvasTab = page.getByTestId("nav-canvas");
-  await expect(canvasTab).toHaveAttribute("href", "#/journeys/j_bakeoff/nodes/n_winner?hide=action&heat=on");
+  await expect(canvasTab).toHaveAttribute("href", "/journeys/j_bakeoff/nodes/n_winner?hide=action&heat=on");
   await page.emulateMedia({ media: "print", colorScheme: "dark" });
   await expect(page.getByTestId("summary")).toBeVisible();
   // Paper has no dark theme: a dark screen prints its panels in black on white.

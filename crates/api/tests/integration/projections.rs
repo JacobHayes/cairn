@@ -21,12 +21,12 @@ mod in_process {
 
     use crate::support::{self, World, get, post};
 
-    const JOURNEY: &str = "/journeys/j_vendor_eval";
+    const JOURNEY: &str = "/api/journeys/j_vendor_eval";
     const NOW: &str = "2026-10-06T15:00:00Z";
 
     /// The service's call for the member `transport` signs in as, at [`NOW`].
     async fn call_of(transport: &Transport) -> Call {
-        let viewer: Viewer = get(transport, "/users/me").await;
+        let viewer: Viewer = get(transport, "/api/users/me").await;
         Call {
             actor: Actor {
                 user: viewer.user,
@@ -55,7 +55,7 @@ mod in_process {
         let created = support::patch("p_wide", "{journey: j_wide}", 0, &mutations);
         let reply = post(
             transport,
-            "/journeys/j_wide/patches",
+            "/api/journeys/j_wide/patches",
             &support::request(&created),
         )
         .await;
@@ -155,14 +155,14 @@ mod in_process {
         let page_max = usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap();
 
         let mut seen = Vec::new();
-        let mut target = "/journeys/j_wide/snapshot".to_owned();
+        let mut target = "/api/journeys/j_wide/snapshot".to_owned();
         loop {
             let page: Projected<Snapshot> = get(&ann, &target).await;
             assert!(page.value.nodes.len() <= page_max);
             seen.extend(page.value.nodes.into_iter().map(|node| node.row.key));
             let Some(next) = page.value.next else { break };
             target = format!(
-                "/journeys/j_wide/snapshot?cursor={}&revision={}",
+                "/api/journeys/j_wide/snapshot?cursor={}&revision={}",
                 next.position(),
                 page.revision
             );
@@ -171,7 +171,7 @@ mod in_process {
         assert_eq!((seen.len(), distinct.len()), (count + 1, count + 1));
 
         let mut listed = Vec::new();
-        let mut target = "/journeys/j_wide/nodes".to_owned();
+        let mut target = "/api/journeys/j_wide/nodes".to_owned();
         loop {
             let page: Projected<ListPage> = get(&ann, &target).await;
             assert!(page.value.rows.len() <= page_max);
@@ -179,7 +179,7 @@ mod in_process {
             listed.extend(page.value.rows.into_iter().map(|row| row.key));
             let Some(next) = page.value.next else { break };
             target = format!(
-                "/journeys/j_wide/nodes?cursor={}&revision={}",
+                "/api/journeys/j_wide/nodes?cursor={}&revision={}",
                 next.position(),
                 page.revision
             );
@@ -199,7 +199,7 @@ mod in_process {
         wide(&world, count).await;
         let cap = usize::try_from(EXPLANATION_ENTRY_COUNT_MAX).unwrap();
 
-        let detail: Projected<NodeDetail> = get(&ann, "/journeys/j_wide/nodes/n_root").await;
+        let detail: Projected<NodeDetail> = get(&ann, "/api/journeys/j_wide/nodes/n_root").await;
         let gravity = &detail.value.derived.gravity_from;
         assert_eq!(gravity.entries.len(), cap, "cut to the response limit");
         assert_eq!(
@@ -211,7 +211,7 @@ mod in_process {
         assert!(leverage.entries.len() <= cap);
 
         let mut entries = Vec::new();
-        let mut target = "/journeys/j_wide/nodes/n_root/explanations/gravity".to_owned();
+        let mut target = "/api/journeys/j_wide/nodes/n_root/explanations/gravity".to_owned();
         loop {
             let page: Projected<ExplanationPage> = get(&ann, &target).await;
             assert_eq!(
@@ -229,7 +229,7 @@ mod in_process {
             entries.extend(page.value.entries.into_iter().map(|entry| entry.node));
             let Some(next) = page.value.next else { break };
             target = format!(
-                "/journeys/j_wide/nodes/n_root/explanations/gravity?cursor={}&revision={}",
+                "/api/journeys/j_wide/nodes/n_root/explanations/gravity?cursor={}&revision={}",
                 next.position(),
                 page.revision
             );
@@ -246,9 +246,9 @@ mod in_process {
         let world = World::start().await;
         let ann = world.signed_in("ann");
         wide(&world, usize::try_from(PAGE_ITEM_COUNT_MAX).unwrap()).await;
-        let first: Projected<ListPage> = get(&ann, "/journeys/j_wide/nodes").await;
+        let first: Projected<ListPage> = get(&ann, "/api/journeys/j_wide/nodes").await;
         let next = first.value.next.expect("two pages").position();
-        let bare = format!("/journeys/j_wide/nodes?cursor={next}");
+        let bare = format!("/api/journeys/j_wide/nodes?cursor={next}");
         let reply = ann.send(Method::GET, &bare, None).await.unwrap();
         let problem: Problem = reply.json().unwrap();
         assert_eq!(
@@ -263,19 +263,19 @@ mod in_process {
             first.revision.get(),
             "- op: add_annotation\n  annotation: {key: a_note, note: Moved.}\n",
         );
-        let patches = "/journeys/j_wide/patches";
+        let patches = "/api/journeys/j_wide/patches";
         support::ok::<serde_json::Value>(&post(&ann, patches, &support::request(&note)).await);
         let targets = [
             format!(
-                "/journeys/j_wide/nodes?cursor={next}&revision={}",
+                "/api/journeys/j_wide/nodes?cursor={next}&revision={}",
                 first.revision
             ),
             format!(
-                "/journeys/j_wide/snapshot?cursor={next}&revision={}",
+                "/api/journeys/j_wide/snapshot?cursor={next}&revision={}",
                 first.revision
             ),
             format!(
-                "/journeys/j_wide/nodes/n_root/explanations/gravity?cursor=50&revision={}",
+                "/api/journeys/j_wide/nodes/n_root/explanations/gravity?cursor=50&revision={}",
                 first.revision
             ),
         ];
@@ -297,42 +297,42 @@ mod in_process {
         let world = World::start().await;
         let ann = world.vendor_after(2).await;
         let cases = [
-            ("/journeys/j_missing/next", ProblemCode::NotFound),
-            ("/journeys/j_missing/history", ProblemCode::NotFound),
+            ("/api/journeys/j_missing/next", ProblemCode::NotFound),
+            ("/api/journeys/j_missing/history", ProblemCode::NotFound),
             (
-                "/journeys/j_vendor_eval/nodes/n_nowhere",
+                "/api/journeys/j_vendor_eval/nodes/n_nowhere",
                 ProblemCode::NotFound,
             ),
             (
-                "/journeys/j_vendor_eval/trace/n_nowhere",
+                "/api/journeys/j_vendor_eval/trace/n_nowhere",
                 ProblemCode::NotFound,
             ),
             (
-                "/journeys/j_vendor_eval/snapshot?subtree=n_nowhere",
+                "/api/journeys/j_vendor_eval/snapshot?subtree=n_nowhere",
                 ProblemCode::NotFound,
             ),
             (
-                "/journeys/j_vendor_eval/nodes/n_kickoff/explanations/urgency",
+                "/api/journeys/j_vendor_eval/nodes/n_kickoff/explanations/urgency",
                 ProblemCode::BadRequest,
             ),
             (
-                "/journeys/j_vendor_eval/next?sort=sideways",
+                "/api/journeys/j_vendor_eval/next?sort=sideways",
                 ProblemCode::BadRequest,
             ),
             (
-                "/journeys/j_vendor_eval/nodes?flag=shiny",
+                "/api/journeys/j_vendor_eval/nodes?flag=shiny",
                 ProblemCode::BadRequest,
             ),
             (
-                "/journeys/j_vendor_eval/snapshot?depth=deep",
+                "/api/journeys/j_vendor_eval/snapshot?depth=deep",
                 ProblemCode::BadRequest,
             ),
             (
-                "/journeys/j_vendor_eval/level?colour=blue",
+                "/api/journeys/j_vendor_eval/level?colour=blue",
                 ProblemCode::BadRequest,
             ),
             (
-                "/journeys/j_vendor_eval/history?after=soon",
+                "/api/journeys/j_vendor_eval/history?after=soon",
                 ProblemCode::BadRequest,
             ),
         ];

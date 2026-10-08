@@ -10,7 +10,7 @@ use schemars::generate::SchemaSettings;
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde_json::{Map, Value, json};
 
-use crate::endpoints::Endpoint;
+use crate::endpoints::{self, Endpoint};
 use crate::query::{self, ParamSpec, schema_of};
 use crate::wire::{
     AgentToken, AssistantRequest, Capabilities, Conversation, EventPage, Health, History,
@@ -665,13 +665,16 @@ fn problems_of(operation: &Operation) -> Vec<(&'static str, &'static str)> {
         problems.push(("413", "The body is over the request size limit."));
         problems.push(("415", "The body is not application/json."));
     }
-    if matches!(
-        operation.endpoint.path,
-        "/users/me/tokens"
-            | "/users/me/tokens/{agent}"
-            | "/journeys/{id}/assistant"
-            | "/routes/{id}/draft/assistant"
-    ) {
+    let user_only = [
+        &endpoints::TOKENS,
+        &endpoints::REVOKE_TOKEN,
+        &endpoints::ASSISTANT_JOURNEY,
+        &endpoints::ASSISTANT_ROUTE_DRAFT,
+    ];
+    if user_only
+        .iter()
+        .any(|endpoint| endpoint.path == operation.endpoint.path)
+    {
         problems.push((
             "403",
             "Only a user may do this, not an agent acting for one.",

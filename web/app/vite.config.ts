@@ -7,25 +7,16 @@ import { fileURLToPath } from "node:url";
 import react from "@vitejs/plugin-react";
 import { defineConfig, type ProxyOptions } from "vite";
 
-/** The API's top-level paths (openapi/), which the UI never uses: it routes by hash. */
-const API_PATHS = [
-  "/auth",
-  "/capabilities",
-  "/deployment",
-  "/entities",
-  "/events",
-  "/journeys",
-  "/mcp",
-  "/proposals",
-  "/routes",
-  "/search",
-  "/users",
-];
+/**
+ * The paths the server keeps (crates/api/src/endpoints.rs, `PREFIX` and `RESERVED`, and the
+ * health check); every other path is the app's, which Vite answers with the page.
+ */
+const SERVER_PATHS = ["/api/", "/.well-known/", "/healthz"];
 
 const server = process.env["CAIRN_SERVER"];
 const proxy: Record<string, ProxyOptions> = {};
 if (server !== undefined) {
-  for (const path of API_PATHS) {
+  for (const path of SERVER_PATHS) {
     proxy[path] = { target: server, changeOrigin: false };
   }
 }

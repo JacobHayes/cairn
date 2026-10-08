@@ -38,7 +38,7 @@ export class BrowserRoot {
      */
     discardProposal(id: string, request: string, now: string): string;
     /**
-     * A journey's domain document at `now`, as `GET /journeys/{id}/document` answers it.
+     * A journey's domain document at `now`, as `GET /api/journeys/{id}/document` answers it.
      *
      * # Errors
      *
@@ -55,7 +55,7 @@ export class BrowserRoot {
     editProposal(id: string, request: string, now: string): string;
     /**
      * A13: version `version` of route `route` as a file, or its draft when `version` is
-     * empty, as `GET /routes/{id}/export` answers it.
+     * empty, as `GET /api/routes/{id}/export` answers it.
      *
      * # Errors
      *
@@ -64,7 +64,7 @@ export class BrowserRoot {
     exportFile(route: string, version: string): string;
     /**
      * J4: a page of a journey's history, or of `node`'s (empty for the whole journey), after
-     * the log position `after` (negative for the first page), as `GET /journeys/{id}/history`
+     * the log position `after` (negative for the first page), as `GET /api/journeys/{id}/history`
      * answers it.
      *
      * # Errors
@@ -75,7 +75,7 @@ export class BrowserRoot {
     /**
      * A13: imports a route file as the local user at `now`: `request` is the JSON of a
      * [`RouteImport`]; the answer is the JSON of the patch answer, as
-     * `POST /routes/{id}/import` answers it.
+     * `POST /api/routes/{id}/import` answers it.
      *
      * # Errors
      *
@@ -84,7 +84,7 @@ export class BrowserRoot {
     importFile(request: string, now: string): string;
     /**
      * C16: the journey index `query` (the JSON of a [`JourneyIndexQuery`]) asks for, as
-     * `GET /journeys` answers it.
+     * `GET /api/journeys` answers it.
      *
      * # Errors
      *
@@ -92,7 +92,7 @@ export class BrowserRoot {
      */
     journeyIndex(query: string): string;
     /**
-     * The journey index (C16), as `GET /journeys` answers it.
+     * The journey index (C16), as `GET /api/journeys` answers it.
      *
      * # Errors
      *
@@ -126,7 +126,7 @@ export class BrowserRoot {
      */
     previewProposal(id: string, now: string): string;
     /**
-     * I6: proposal `id`, as `GET /proposals/{id}` answers it.
+     * I6: proposal `id`, as `GET /api/proposals/{id}` answers it.
      *
      * # Errors
      *
@@ -178,7 +178,7 @@ export class BrowserRoot {
     refreshProposal(id: string, request: string, now: string): string;
     /**
      * C17: route `route`'s versions with the journeys on each, as
-     * `GET /routes/{id}/versions` answers it.
+     * `GET /api/routes/{id}/versions` answers it.
      *
      * # Errors
      *
@@ -186,7 +186,7 @@ export class BrowserRoot {
      */
     routeDetail(route: string): string;
     /**
-     * One published version of a route (A11), as `GET /routes/{id}/versions/{version}`
+     * One published version of a route (A11), as `GET /api/routes/{id}/versions/{version}`
      * answers it; `version` is its number as text.
      *
      * # Errors
@@ -195,7 +195,7 @@ export class BrowserRoot {
      */
     routeVersion(route: string, version: string): string;
     /**
-     * A route with its draft (A11), as `GET /routes/{id}` answers it.
+     * A route with its draft (A11), as `GET /api/routes/{id}` answers it.
      *
      * # Errors
      *
@@ -203,7 +203,7 @@ export class BrowserRoot {
      */
     route(route: string): string;
     /**
-     * The route index from after `after` (empty for the first page), as `GET /routes`
+     * The route index from after `after` (empty for the first page), as `GET /api/routes`
      * answers it.
      *
      * # Errors
@@ -221,7 +221,7 @@ export class BrowserRoot {
      */
     subscribe(watching: string): RootSubscription;
     /**
-     * The caller at `now`, as `GET /users/me` answers it (H3).
+     * The caller at `now`, as `GET /api/users/me` answers it (H3).
      *
      * # Errors
      *
@@ -322,7 +322,7 @@ export function engineVersion(): string;
 
 /**
  * Exports a route version or draft: `request` is the JSON of an [`ExportRequest`]; the
- * answer is the JSON of the `RouteFile`, as `GET /routes/{id}/export` answers it.
+ * answer is the JSON of the `RouteFile`, as `GET /api/routes/{id}/export` answers it.
  *
  * # Errors
  *

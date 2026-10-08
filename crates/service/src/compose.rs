@@ -94,7 +94,7 @@ impl DeploymentSettings {
     }
 }
 
-/// The capabilities document (`GET /capabilities`): what this host offers, so the UI shows
+/// The capabilities document (`GET /api/capabilities`): what this host offers, so the UI shows
 /// and hides features from it. Absence is the host's choice at its root, never a flag
 /// checked inside an operation.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -104,7 +104,7 @@ pub struct Capabilities {
     pub auth: Vec<AuthMethod>,
     /// Whether the in-app assistant is available (I5: the UI is fully usable without it).
     pub assistant: bool,
-    /// Whether the host serves MCP at `/mcp` (I2).
+    /// Whether the host serves MCP at `/api/mcp` (I2).
     pub mcp: bool,
     /// Whether the host streams revision ticks over SSE (H6).
     pub sse: bool,

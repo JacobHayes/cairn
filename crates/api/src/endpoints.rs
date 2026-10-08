@@ -1,6 +1,8 @@
 //! Every endpoint the API serves, by method and path (ARCHITECTURE, HTTP API). The router,
 //! the OpenAPI document, and the Rust client all read these, so a path is spelled once.
-//! Paths use axum's and OpenAPI's `{name}` placeholders.
+//! Paths use axum's and OpenAPI's `{name}` placeholders. Every endpoint but the health check
+//! sits under [`PREFIX`], so the rest of the origin is the web app's
+//! (decisions/2026-10-08-the-api-is-served-under-api-and-the-app-owns-the-rest.md).
 
 use axum::http::Method;
 
@@ -50,6 +52,17 @@ impl Endpoint {
     }
 }
 
+/// The path every endpoint but [`HEALTH`] sits under, MCP's and auth's routes too: the
+/// server's part of the origin. The web app owns every other path but `/.well-known/` and
+/// [`HEALTH`]'s, which standards and the deployment's probes fix.
+pub const PREFIX: &str = "/api";
+
+/// The path prefixes the server keeps whole: [`PREFIX`], and `/.well-known`, whose paths
+/// RFC 8615 fixes (OAuth's metadata). A path under one that no endpoint serves is answered
+/// as no endpoint, never with the app's page; with [`HEALTH`]'s path they are everything on
+/// the origin that is not the app's.
+pub const RESERVED: [&str; 2] = [PREFIX, "/.well-known"];
+
 const HEX: &[u8; 16] = b"0123456789ABCDEF";
 
 /// Percent-encodes everything in `segment` but RFC 3986's unreserved characters.
@@ -82,156 +95,190 @@ pub static HEALTH: Endpoint = Endpoint {
     operation: "getHealth",
     public: true,
 };
-/// `GET /capabilities`: what this host offers.
-pub static CAPABILITIES: Endpoint = endpoint(Method::GET, "/capabilities", "getCapabilities");
-/// `POST /journeys/{id}/patches`: a journey patch, creating it at base revision 0 (A17).
+/// `GET /api/capabilities`: what this host offers.
+pub static CAPABILITIES: Endpoint = endpoint(Method::GET, "/api/capabilities", "getCapabilities");
+/// `POST /api/journeys/{id}/patches`: a journey patch, creating it at base revision 0 (A17).
 pub static PATCH_JOURNEY: Endpoint =
-    endpoint(Method::POST, "/journeys/{id}/patches", "patchJourney");
-/// `POST /routes/{id}/patches`: a route patch, its draft included.
-pub static PATCH_ROUTE: Endpoint = endpoint(Method::POST, "/routes/{id}/patches", "patchRoute");
-/// `POST /deployment/patches`: a deployment patch (entities, merges).
+    endpoint(Method::POST, "/api/journeys/{id}/patches", "patchJourney");
+/// `POST /api/routes/{id}/patches`: a route patch, its draft included.
+pub static PATCH_ROUTE: Endpoint = endpoint(Method::POST, "/api/routes/{id}/patches", "patchRoute");
+/// `POST /api/deployment/patches`: a deployment patch (entities, merges).
 pub static PATCH_DEPLOYMENT: Endpoint =
-    endpoint(Method::POST, "/deployment/patches", "patchDeployment");
-/// `POST /journeys/{id}/proposals`: a proposal for a journey, which may not exist yet (I6).
-pub static PROPOSE_JOURNEY: Endpoint =
-    endpoint(Method::POST, "/journeys/{id}/proposals", "proposeToJourney");
-/// `POST /routes/{id}/proposals`: a proposal for a route, which may not exist yet (I6).
+    endpoint(Method::POST, "/api/deployment/patches", "patchDeployment");
+/// `POST /api/journeys/{id}/proposals`: a proposal for a journey, which may not exist yet (I6).
+pub static PROPOSE_JOURNEY: Endpoint = endpoint(
+    Method::POST,
+    "/api/journeys/{id}/proposals",
+    "proposeToJourney",
+);
+/// `POST /api/routes/{id}/proposals`: a proposal for a route, which may not exist yet (I6).
 pub static PROPOSE_ROUTE: Endpoint =
-    endpoint(Method::POST, "/routes/{id}/proposals", "proposeToRoute");
-/// `POST /deployment/proposals`: a proposal for the deployment (I6).
-pub static PROPOSE_DEPLOYMENT: Endpoint =
-    endpoint(Method::POST, "/deployment/proposals", "proposeToDeployment");
-/// `GET /proposals/{id}`: a proposal by its client-generated id (I6).
-pub static PROPOSAL: Endpoint = endpoint(Method::GET, "/proposals/{id}", "getProposal");
-/// `PATCH /proposals/{id}`: replaces a proposal's content against its editing revision.
-pub static EDIT_PROPOSAL: Endpoint = endpoint(Method::PATCH, "/proposals/{id}", "editProposal");
-/// `POST /proposals/{id}/preview`: what applying it now would do (C14, D7).
-pub static PREVIEW_PROPOSAL: Endpoint =
-    endpoint(Method::POST, "/proposals/{id}/preview", "previewProposal");
-/// `POST /proposals/{id}/apply`: applies it, the caller confirming (H2, I6).
+    endpoint(Method::POST, "/api/routes/{id}/proposals", "proposeToRoute");
+/// `POST /api/deployment/proposals`: a proposal for the deployment (I6).
+pub static PROPOSE_DEPLOYMENT: Endpoint = endpoint(
+    Method::POST,
+    "/api/deployment/proposals",
+    "proposeToDeployment",
+);
+/// `GET /api/proposals/{id}`: a proposal by its client-generated id (I6).
+pub static PROPOSAL: Endpoint = endpoint(Method::GET, "/api/proposals/{id}", "getProposal");
+/// `PATCH /api/proposals/{id}`: replaces a proposal's content against its editing revision.
+pub static EDIT_PROPOSAL: Endpoint = endpoint(Method::PATCH, "/api/proposals/{id}", "editProposal");
+/// `POST /api/proposals/{id}/preview`: what applying it now would do (C14, D7).
+pub static PREVIEW_PROPOSAL: Endpoint = endpoint(
+    Method::POST,
+    "/api/proposals/{id}/preview",
+    "previewProposal",
+);
+/// `POST /api/proposals/{id}/apply`: applies it, the caller confirming (H2, I6).
 pub static APPLY_PROPOSAL: Endpoint =
-    endpoint(Method::POST, "/proposals/{id}/apply", "applyProposal");
-/// `POST /proposals/{id}/discard`: discards it.
-pub static DISCARD_PROPOSAL: Endpoint =
-    endpoint(Method::POST, "/proposals/{id}/discard", "discardProposal");
-/// `POST /proposals/{id}/refresh`: drafts it again against its destination as it stands (I6).
-pub static REFRESH_PROPOSAL: Endpoint =
-    endpoint(Method::POST, "/proposals/{id}/refresh", "refreshProposal");
-/// `POST /journeys/{id}/upgrade`: proposes upgrading it to a newer route version (B7).
-pub static UPGRADE: Endpoint = endpoint(Method::POST, "/journeys/{id}/upgrade", "proposeUpgrade");
-/// `POST /journeys/{id}/save-as-route`: proposes saving its structure as a route draft (B8).
+    endpoint(Method::POST, "/api/proposals/{id}/apply", "applyProposal");
+/// `POST /api/proposals/{id}/discard`: discards it.
+pub static DISCARD_PROPOSAL: Endpoint = endpoint(
+    Method::POST,
+    "/api/proposals/{id}/discard",
+    "discardProposal",
+);
+/// `POST /api/proposals/{id}/refresh`: drafts it again against its destination as it stands (I6).
+pub static REFRESH_PROPOSAL: Endpoint = endpoint(
+    Method::POST,
+    "/api/proposals/{id}/refresh",
+    "refreshProposal",
+);
+/// `POST /api/journeys/{id}/upgrade`: proposes upgrading it to a newer route version (B7).
+pub static UPGRADE: Endpoint =
+    endpoint(Method::POST, "/api/journeys/{id}/upgrade", "proposeUpgrade");
+/// `POST /api/journeys/{id}/save-as-route`: proposes saving its structure as a route draft (B8).
 pub static SAVE_AS_ROUTE: Endpoint = endpoint(
     Method::POST,
-    "/journeys/{id}/save-as-route",
+    "/api/journeys/{id}/save-as-route",
     "proposeSaveAsRoute",
 );
-/// `POST /journeys/{id}/relink`: proposes re-linking it to a published version (B9).
-pub static RELINK: Endpoint = endpoint(Method::POST, "/journeys/{id}/relink", "proposeRelink");
-/// `POST /routes/{id}/import`: imports a route file as a new route or draft (A13).
-pub static IMPORT_ROUTE: Endpoint = endpoint(Method::POST, "/routes/{id}/import", "importRoute");
-/// `GET /routes/{id}/export`: a version or the draft as a route file (A13).
-pub static EXPORT_ROUTE: Endpoint = endpoint(Method::GET, "/routes/{id}/export", "exportRoute");
-/// `GET /journeys`: the journey index (C16).
-pub static JOURNEYS: Endpoint = endpoint(Method::GET, "/journeys", "listJourneys");
-/// `GET /journeys/{id}`: a journey with its graph and state.
-pub static JOURNEY: Endpoint = endpoint(Method::GET, "/journeys/{id}", "getJourney");
-/// `GET /journeys/{id}/document`: the domain document the browser derives.
-pub static DOCUMENT: Endpoint =
-    endpoint(Method::GET, "/journeys/{id}/document", "getJourneyDocument");
-/// `GET /journeys/{id}/snapshot`: the bounded agent snapshot, scoped and paged (I3).
-pub static SNAPSHOT: Endpoint =
-    endpoint(Method::GET, "/journeys/{id}/snapshot", "getJourneySnapshot");
-/// `GET /journeys/{id}/level`: one canvas level (C2).
-pub static LEVEL: Endpoint = endpoint(Method::GET, "/journeys/{id}/level", "getJourneyLevel");
-/// `GET /journeys/{id}/trace/{key}`: what is upstream and downstream of a node (C7).
-pub static TRACE: Endpoint = endpoint(Method::GET, "/journeys/{id}/trace/{key}", "traceNode");
-/// `GET /journeys/{id}/derived`: every derived value (D3), as the browser derives it.
-pub static DERIVED: Endpoint = endpoint(Method::GET, "/journeys/{id}/derived", "getJourneyDerived");
-/// `GET /journeys/{id}/decisions`: the decision view (C12).
-pub static DECISIONS: Endpoint =
-    endpoint(Method::GET, "/journeys/{id}/decisions", "getDecisionView");
-/// `GET /journeys/{id}/timeline`: the timeline (C13).
-pub static TIMELINE: Endpoint = endpoint(Method::GET, "/journeys/{id}/timeline", "getTimeline");
-/// `GET /journeys/{id}/summary`: the status summary (C18).
-pub static SUMMARY: Endpoint = endpoint(Method::GET, "/journeys/{id}/summary", "getStatusSummary");
-/// `GET /journeys/{id}/next`: the ranked acting frontier (C10).
-pub static NEXT: Endpoint = endpoint(Method::GET, "/journeys/{id}/next", "getNext");
-/// `GET /journeys/{id}/nodes`: the nodes a list query matches, paged (C9).
-pub static NODES: Endpoint = endpoint(Method::GET, "/journeys/{id}/nodes", "listNodes");
-/// `GET /journeys/{id}/mine`: the nodes the caller participates in (E4).
-pub static MINE: Endpoint = endpoint(Method::GET, "/journeys/{id}/mine", "getMine");
-/// `GET /journeys/{id}/nodes/{key}`: one node in full, explanations capped (C8).
-pub static NODE: Endpoint = endpoint(Method::GET, "/journeys/{id}/nodes/{key}", "getNode");
-/// `GET /journeys/{id}/nodes/{key}/explanations/{field}`: a page of one explanation list.
+/// `POST /api/journeys/{id}/relink`: proposes re-linking it to a published version (B9).
+pub static RELINK: Endpoint = endpoint(Method::POST, "/api/journeys/{id}/relink", "proposeRelink");
+/// `POST /api/routes/{id}/import`: imports a route file as a new route or draft (A13).
+pub static IMPORT_ROUTE: Endpoint =
+    endpoint(Method::POST, "/api/routes/{id}/import", "importRoute");
+/// `GET /api/routes/{id}/export`: a version or the draft as a route file (A13).
+pub static EXPORT_ROUTE: Endpoint = endpoint(Method::GET, "/api/routes/{id}/export", "exportRoute");
+/// `GET /api/journeys`: the journey index (C16).
+pub static JOURNEYS: Endpoint = endpoint(Method::GET, "/api/journeys", "listJourneys");
+/// `GET /api/journeys/{id}`: a journey with its graph and state.
+pub static JOURNEY: Endpoint = endpoint(Method::GET, "/api/journeys/{id}", "getJourney");
+/// `GET /api/journeys/{id}/document`: the domain document the browser derives.
+pub static DOCUMENT: Endpoint = endpoint(
+    Method::GET,
+    "/api/journeys/{id}/document",
+    "getJourneyDocument",
+);
+/// `GET /api/journeys/{id}/snapshot`: the bounded agent snapshot, scoped and paged (I3).
+pub static SNAPSHOT: Endpoint = endpoint(
+    Method::GET,
+    "/api/journeys/{id}/snapshot",
+    "getJourneySnapshot",
+);
+/// `GET /api/journeys/{id}/level`: one canvas level (C2).
+pub static LEVEL: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/level", "getJourneyLevel");
+/// `GET /api/journeys/{id}/trace/{key}`: what is upstream and downstream of a node (C7).
+pub static TRACE: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/trace/{key}", "traceNode");
+/// `GET /api/journeys/{id}/derived`: every derived value (D3), as the browser derives it.
+pub static DERIVED: Endpoint = endpoint(
+    Method::GET,
+    "/api/journeys/{id}/derived",
+    "getJourneyDerived",
+);
+/// `GET /api/journeys/{id}/decisions`: the decision view (C12).
+pub static DECISIONS: Endpoint = endpoint(
+    Method::GET,
+    "/api/journeys/{id}/decisions",
+    "getDecisionView",
+);
+/// `GET /api/journeys/{id}/timeline`: the timeline (C13).
+pub static TIMELINE: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/timeline", "getTimeline");
+/// `GET /api/journeys/{id}/summary`: the status summary (C18).
+pub static SUMMARY: Endpoint = endpoint(
+    Method::GET,
+    "/api/journeys/{id}/summary",
+    "getStatusSummary",
+);
+/// `GET /api/journeys/{id}/next`: the ranked acting frontier (C10).
+pub static NEXT: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/next", "getNext");
+/// `GET /api/journeys/{id}/nodes`: the nodes a list query matches, paged (C9).
+pub static NODES: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/nodes", "listNodes");
+/// `GET /api/journeys/{id}/mine`: the nodes the caller participates in (E4).
+pub static MINE: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/mine", "getMine");
+/// `GET /api/journeys/{id}/nodes/{key}`: one node in full, explanations capped (C8).
+pub static NODE: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/nodes/{key}", "getNode");
+/// `GET /api/journeys/{id}/nodes/{key}/explanations/{field}`: a page of one explanation list.
 pub static EXPLANATIONS: Endpoint = endpoint(
     Method::GET,
-    "/journeys/{id}/nodes/{key}/explanations/{field}",
+    "/api/journeys/{id}/nodes/{key}/explanations/{field}",
     "listExplanations",
 );
-/// `GET /journeys/{id}/history`: the journey's events, or a node's, grouped by patch (J4).
-pub static HISTORY: Endpoint = endpoint(Method::GET, "/journeys/{id}/history", "getHistory");
-/// `GET /routes`: the route index (I2).
-pub static ROUTES: Endpoint = endpoint(Method::GET, "/routes", "listRoutes");
-/// `GET /routes/{id}`: a route with its draft.
-pub static ROUTE: Endpoint = endpoint(Method::GET, "/routes/{id}", "getRoute");
-/// `GET /routes/{id}/versions`: route detail, its versions and the journeys on each (C17).
+/// `GET /api/journeys/{id}/history`: the journey's events, or a node's, grouped by patch (J4).
+pub static HISTORY: Endpoint = endpoint(Method::GET, "/api/journeys/{id}/history", "getHistory");
+/// `GET /api/routes`: the route index (I2).
+pub static ROUTES: Endpoint = endpoint(Method::GET, "/api/routes", "listRoutes");
+/// `GET /api/routes/{id}`: a route with its draft.
+pub static ROUTE: Endpoint = endpoint(Method::GET, "/api/routes/{id}", "getRoute");
+/// `GET /api/routes/{id}/versions`: route detail, its versions and the journeys on each (C17).
 pub static ROUTE_VERSIONS: Endpoint =
-    endpoint(Method::GET, "/routes/{id}/versions", "getRouteDetail");
-/// `GET /routes/{id}/versions/{version}`: one published version.
+    endpoint(Method::GET, "/api/routes/{id}/versions", "getRouteDetail");
+/// `GET /api/routes/{id}/versions/{version}`: one published version.
 pub static ROUTE_VERSION: Endpoint = endpoint(
     Method::GET,
-    "/routes/{id}/versions/{version}",
+    "/api/routes/{id}/versions/{version}",
     "getRouteVersion",
 );
-/// `GET /deployment`: entities and aliases at the deployment revision.
-pub static DEPLOYMENT: Endpoint = endpoint(Method::GET, "/deployment", "getDeployment");
-/// `GET /entities/{key}`: an entity, through its alias when merged away (E6).
-pub static ENTITY: Endpoint = endpoint(Method::GET, "/entities/{key}", "getEntity");
-/// `GET /search`: text search across journeys.
-pub static SEARCH: Endpoint = endpoint(Method::GET, "/search", "searchJourneys");
-/// `GET /events`: the event history, filtered and paged (J5).
-pub static EVENTS: Endpoint = endpoint(Method::GET, "/events", "listEvents");
-/// `GET /events/stream`: revision ticks over SSE, current revisions first (H6).
-pub static STREAM: Endpoint = endpoint(Method::GET, "/events/stream", "streamRevisions");
-/// `GET /users/me`: the caller and their entities (H3).
-pub static VIEWER: Endpoint = endpoint(Method::GET, "/users/me", "getViewer");
-/// `GET /users/me/tokens`: the caller's agent tokens.
-pub static TOKENS: Endpoint = endpoint(Method::GET, "/users/me/tokens", "listAgentTokens");
-/// `POST /users/me/tokens`: mints an agent token (H2).
-pub static MINT_TOKEN: Endpoint = endpoint(Method::POST, "/users/me/tokens", "mintAgentToken");
-/// `DELETE /users/me/tokens/{agent}`: revokes one.
+/// `GET /api/deployment`: entities and aliases at the deployment revision.
+pub static DEPLOYMENT: Endpoint = endpoint(Method::GET, "/api/deployment", "getDeployment");
+/// `GET /api/entities/{key}`: an entity, through its alias when merged away (E6).
+pub static ENTITY: Endpoint = endpoint(Method::GET, "/api/entities/{key}", "getEntity");
+/// `GET /api/search`: text search across journeys.
+pub static SEARCH: Endpoint = endpoint(Method::GET, "/api/search", "searchJourneys");
+/// `GET /api/events`: the event history, filtered and paged (J5).
+pub static EVENTS: Endpoint = endpoint(Method::GET, "/api/events", "listEvents");
+/// `GET /api/events/stream`: revision ticks over SSE, current revisions first (H6).
+pub static STREAM: Endpoint = endpoint(Method::GET, "/api/events/stream", "streamRevisions");
+/// `GET /api/users/me`: the caller and their entities (H3).
+pub static VIEWER: Endpoint = endpoint(Method::GET, "/api/users/me", "getViewer");
+/// `GET /api/users/me/tokens`: the caller's agent tokens.
+pub static TOKENS: Endpoint = endpoint(Method::GET, "/api/users/me/tokens", "listAgentTokens");
+/// `POST /api/users/me/tokens`: mints an agent token (H2).
+pub static MINT_TOKEN: Endpoint = endpoint(Method::POST, "/api/users/me/tokens", "mintAgentToken");
+/// `DELETE /api/users/me/tokens/{agent}`: revokes one.
 pub static REVOKE_TOKEN: Endpoint = endpoint(
     Method::DELETE,
-    "/users/me/tokens/{agent}",
+    "/api/users/me/tokens/{agent}",
     "revokeAgentToken",
 );
 
-/// `POST /journeys/{id}/assistant`: one assistant turn about a journey (I5), when the host
+/// `POST /api/journeys/{id}/assistant`: one assistant turn about a journey (I5), when the host
 /// offers the assistant.
 pub static ASSISTANT_JOURNEY: Endpoint = endpoint(
     Method::POST,
-    "/journeys/{id}/assistant",
+    "/api/journeys/{id}/assistant",
     "converseAboutJourney",
 );
-/// `POST /routes/{id}/draft/assistant`: one assistant turn about a route's draft (I5, A12),
+/// `POST /api/routes/{id}/draft/assistant`: one assistant turn about a route's draft (I5, A12),
 /// when the host offers the assistant.
 pub static ASSISTANT_ROUTE_DRAFT: Endpoint = endpoint(
     Method::POST,
-    "/routes/{id}/draft/assistant",
+    "/api/routes/{id}/draft/assistant",
     "converseAboutRouteDraft",
 );
-/// `GET /journeys/{id}/assistant`: the caller's conversation about a journey (I5), when the
+/// `GET /api/journeys/{id}/assistant`: the caller's conversation about a journey (I5), when the
 /// host offers the assistant.
 pub static ASSISTANT_JOURNEY_CONVERSATION: Endpoint = endpoint(
     Method::GET,
-    "/journeys/{id}/assistant",
+    "/api/journeys/{id}/assistant",
     "conversationAboutJourney",
 );
-/// `GET /routes/{id}/draft/assistant`: the caller's conversation about a route's draft (I5),
+/// `GET /api/routes/{id}/draft/assistant`: the caller's conversation about a route's draft (I5),
 /// when the host offers the assistant.
 pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = endpoint(
     Method::GET,
-    "/routes/{id}/draft/assistant",
+    "/api/routes/{id}/draft/assistant",
     "conversationAboutRouteDraft",
 );
 
@@ -299,13 +346,24 @@ mod tests {
     fn paths_fill_their_placeholders_in_order_and_encode_them() {
         assert_eq!(
             ROUTE_VERSION.path_with(&["r_a", "2"]),
-            "/routes/r_a/versions/2"
+            "/api/routes/r_a/versions/2"
         );
         assert_eq!(
             PATCH_JOURNEY.path_with(&["a b/c+"]),
-            "/journeys/a%20b%2Fc%2B/patches"
+            "/api/journeys/a%20b%2Fc%2B/patches"
         );
-        assert_eq!(CAPABILITIES.path_with(&[]), "/capabilities");
+        assert_eq!(CAPABILITIES.path_with(&[]), "/api/capabilities");
+    }
+
+    #[test]
+    fn every_endpoint_but_the_health_check_is_under_the_prefix() {
+        for endpoint in ALL {
+            let under = endpoint
+                .path
+                .strip_prefix(PREFIX)
+                .is_some_and(|rest| rest.starts_with('/'));
+            assert_eq!(under, !endpoint.public, "{}", endpoint.path);
+        }
     }
 
     #[test]

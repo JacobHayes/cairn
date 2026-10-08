@@ -12,7 +12,7 @@ use crate::error::ApiError;
 use crate::extract::{JsonBody, Path, segment};
 use crate::wire::{AgentToken, MintedToken, TokenRequest, Viewer};
 
-/// `GET /users/me` (H2, H3).
+/// `GET /api/users/me` (H2, H3).
 pub async fn viewer<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -29,7 +29,7 @@ pub async fn viewer<S: Store + 'static>(
     }))
 }
 
-/// `GET /users/me/tokens`.
+/// `GET /api/users/me/tokens`.
 pub async fn tokens<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -38,7 +38,7 @@ pub async fn tokens<S: Store + 'static>(
     Ok(Json(tokens.into_iter().map(Into::into).collect()))
 }
 
-/// `POST /users/me/tokens` (H2): only a user mints one.
+/// `POST /api/users/me/tokens` (H2): only a user mints one.
 pub async fn mint_token<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -52,7 +52,7 @@ pub async fn mint_token<S: Store + 'static>(
     Ok((StatusCode::CREATED, Json(token)))
 }
 
-/// `DELETE /users/me/tokens/{agent}`: only a user revokes one, and only their own.
+/// `DELETE /api/users/me/tokens/{agent}`: only a user revokes one, and only their own.
 pub async fn revoke_token<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,

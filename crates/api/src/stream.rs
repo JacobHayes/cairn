@@ -1,4 +1,4 @@
-//! The SSE revision stream (ARCHITECTURE, HTTP API: SSE; H6): `GET /events/stream?domain=...`
+//! The SSE revision stream (ARCHITECTURE, HTTP API: SSE; H6): `GET /api/events/stream?domain=...`
 //! sends a `tick` event for each revision the notifier announces, starting with the current
 //! revision of everything watched, so a commit between a client's fetch and its
 //! subscription is never missed; a domain deleted meanwhile starts at revision 0. Nothing else is streamed: a client refetches what moved.
@@ -58,7 +58,7 @@ impl Frame {
     }
 }
 
-/// `GET /events/stream` (H6).
+/// `GET /api/events/stream` (H6).
 ///
 /// # Errors
 ///

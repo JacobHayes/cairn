@@ -1,9 +1,9 @@
 //! The embedded web build (ARCHITECTURE, Build, run, deploy): the app's Vite build, with
 //! the wasm module, built by `mise run build:web` before `cargo build` into
 //! `web/app/dist/build/` (never checked in) and embedded with `rust-embed`. Each file is
-//! served at its own path and `index.html` also at `/`; the UI routes by the URL's hash, so
-//! no other path needs a fallback
-//! (decisions/2026-10-06-the-ui-routes-by-the-urls-hash-beside-the-apis-paths-on-one.md).
+//! served at its own path, and `index.html` at `/` and at every other path the server does
+//! not keep, since the UI routes by path: a screen's address loads the page, which shows
+//! that screen (decisions/2026-10-08-the-api-is-served-under-api-and-the-app-owns-the-rest.md).
 //!
 //! A binary built without the web build embeds nothing, and `cairn serve` refuses to start
 //! rather than serve an API with no UI ([`router`]).
@@ -12,10 +12,10 @@ use std::borrow::Cow;
 use std::fmt;
 
 use axum::Router;
-use axum::http::HeaderValue;
 use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE};
-use axum::response::IntoResponse;
-use axum::routing::get;
+use axum::http::{HeaderName, HeaderValue, Method, StatusCode, Uri};
+use axum::response::{IntoResponse, Response};
+use axum::routing::{MethodRouter, get};
 
 /// The app's page.
 pub const INDEX: &str = "index.html";
@@ -75,39 +75,76 @@ impl fmt::Display for WebBuildMissing {
 
 impl std::error::Error for WebBuildMissing {}
 
-/// The UI's routes: each asset at its path, and the page at `/` too. Hashed bundles under
-/// `assets/` never change at their path, so browsers keep them; the page is revalidated, so
-/// a new deployment's page is fetched at once (ARCHITECTURE, Web UI: version skew).
+/// The UI's routes: each asset at its path, and the page at `/` and, for `GET` and `HEAD`,
+/// at any other path, a screen's address (the API's router hands this router only the paths
+/// the server does not keep). Hashed bundles under `assets/` never change at their path, so
+/// browsers keep them, and one missing there is not found rather than answered with the
+/// page; the page is revalidated, so a new deployment's page is fetched at once
+/// (ARCHITECTURE, Web UI: version skew).
 ///
 /// # Errors
 ///
 /// When `assets` holds no page.
-pub fn router(assets: Vec<Asset>) -> Result<Router, WebBuildMissing> {
-    if !assets.iter().any(|asset| asset.path == INDEX) {
-        return Err(WebBuildMissing);
-    }
-    let mut router = Router::new();
+pub fn router(assets: &[Asset]) -> Result<Router, WebBuildMissing> {
+    let page = assets
+        .iter()
+        .find(|asset| asset.path == INDEX)
+        .map(Served::new)
+        .ok_or(WebBuildMissing)?;
+    let mut router = Router::new().route("/", page.clone().handler());
     for asset in assets {
-        let cache = if asset.path.starts_with("assets/") {
+        router = router.route(&format!("/{}", asset.path), Served::new(asset).handler());
+    }
+    let screen = move |method: Method, uri: Uri| {
+        let page = page.clone();
+        async move {
+            let bundle = uri.path().starts_with(&format!("/{BUNDLES}"));
+            if bundle || !(method == Method::GET || method == Method::HEAD) {
+                StatusCode::NOT_FOUND.into_response()
+            } else {
+                page.response()
+            }
+        }
+    };
+    Ok(router.fallback(screen))
+}
+
+/// Where the hashed bundles sit in the build.
+const BUNDLES: &str = "assets/";
+
+/// One asset as it is answered: its media type and caching, and its bytes.
+#[derive(Clone)]
+struct Served {
+    headers: [(HeaderName, HeaderValue); 2],
+    bytes: Cow<'static, [u8]>,
+}
+
+impl Served {
+    fn new(asset: &Asset) -> Self {
+        let cache = if asset.path.starts_with(BUNDLES) {
             "public, max-age=31536000, immutable"
         } else {
             "no-cache"
         };
         let media_type = HeaderValue::from_str(&asset.media_type)
             .unwrap_or(HeaderValue::from_static("application/octet-stream"));
-        let headers = [
-            (CONTENT_TYPE, media_type),
-            (CACHE_CONTROL, HeaderValue::from_static(cache)),
-        ];
-        let bytes = asset.bytes;
-        let serve = get(move || {
-            let (headers, bytes) = (headers.clone(), bytes.clone());
-            async move { (headers, bytes).into_response() }
-        });
-        if asset.path == INDEX {
-            router = router.route("/", serve.clone());
+        Self {
+            headers: [
+                (CONTENT_TYPE, media_type),
+                (CACHE_CONTROL, HeaderValue::from_static(cache)),
+            ],
+            bytes: asset.bytes.clone(),
         }
-        router = router.route(&format!("/{}", asset.path), serve);
     }
-    Ok(router)
+
+    fn response(&self) -> Response {
+        (self.headers.clone(), self.bytes.clone()).into_response()
+    }
+
+    fn handler(self) -> MethodRouter {
+        get(move || {
+            let served = self.clone();
+            async move { served.response() }
+        })
+    }
 }

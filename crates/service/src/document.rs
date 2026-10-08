@@ -1,4 +1,4 @@
-//! The domain document read (ARCHITECTURE, HTTP API: `GET /journeys/{id}/document`; Terms:
+//! The domain document read (ARCHITECTURE, HTTP API: `GET /api/journeys/{id}/document`; Terms:
 //! Domain document): what the browser derives locally, packaged by the engine.
 
 use cairn_engine::project;

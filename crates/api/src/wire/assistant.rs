@@ -9,7 +9,7 @@ use serde::{Deserialize, Serialize};
 
 pub use cairn_assistant::TurnReply;
 
-/// `POST /journeys/{id}/assistant` and `POST /routes/{id}/draft/assistant`: one message of
+/// `POST /api/journeys/{id}/assistant` and `POST /api/routes/{id}/draft/assistant`: one message of
 /// the caller's conversation about that journey or draft.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -18,7 +18,7 @@ pub struct AssistantRequest {
     pub message: Markdown,
 }
 
-/// `GET /journeys/{id}/assistant` and `GET /routes/{id}/draft/assistant`: the caller's
+/// `GET /api/journeys/{id}/assistant` and `GET /api/routes/{id}/draft/assistant`: the caller's
 /// conversation about that journey or draft (I5: one per target per user), as kept: its
 /// newest messages, oldest first. A conversation not started yet has none.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

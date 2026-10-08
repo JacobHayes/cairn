@@ -9,7 +9,7 @@ import { openRouteDetail, openOverview, routeAction, startJourney } from "./arou
 import { card, openActing, startVendorJourney } from "./acting.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits } from "./proposals.ts";
 import { section, state } from "./detail.ts";
-import { nodeCard, openFromCanvas, openJourney, rename } from "./shell.ts";
+import { goWithin, nodeCard, openFromCanvas, openJourney, rename } from "./shell.ts";
 
 test("B7, C14: the scenario journey upgraded to version 2, each conflict resolved, then applied", async ({ page }) => {
   await editWhereVersionTwoChanges(page, "browser");
@@ -54,7 +54,7 @@ test("I6: a stale proposal shows what moved, and applies only once refreshed and
 
   await openJourney(page, "browser", "j_vendor_eval");
   await rename(page, "n_findings", "Findings, drafted");
-  await page.goto(address);
+  await goWithin(page, address);
   const stale = page.getByTestId("stale");
   await expect(stale.getByTestId("intervening-patch")).toHaveCount(1);
   await expect.poll(() => blockers(page)).toContain("stale");
@@ -127,8 +127,8 @@ test("B10: the placeholder broken down from its triage card through a proposal",
 
 test("B10, I6 on the server host: a placeholder broken down from its node detail through a proposal", { tag: "@server" }, async ({ page }) => {
   const journey = await startVendorJourney(page);
-  const document = (await (await page.request.get(`/journeys/${journey}/document`)).json()) as { journey: { revision: number } };
-  const reached = await page.request.post(`/journeys/${journey}/patches`, {
+  const document = (await (await page.request.get(`/api/journeys/${journey}/document`)).json()) as { journey: { revision: number } };
+  const reached = await page.request.post(`/api/journeys/${journey}/patches`, {
     data: {
       patch: {
         id: `p_${crypto.randomUUID().replaceAll("-", "")}`,
@@ -205,7 +205,7 @@ test("I6: a stale route proposal lists each record that moved since it was draft
   const address = page.url();
   await openRouteDetail(page, "browser", "hiring-loop");
   await routeAction(page, "Open a draft");
-  await page.goto(address);
+  await goWithin(page, address);
   await expect(page.getByTestId("stale").getByTestId("intervening-record").first()).toBeVisible();
   await expect.poll(() => blockers(page)).toContain("stale");
 });

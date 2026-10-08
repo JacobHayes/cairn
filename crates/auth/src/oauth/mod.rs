@@ -129,12 +129,12 @@ impl<S: AuthStore + 'static> AuthProvider for OAuthServer<S> {
                 "/.well-known/oauth-authorization-server",
                 get(metadata::<S>),
             )
-            .route("/oauth/register", post(flow::register))
+            .route("/api/oauth/register", post(flow::register))
             .route(
-                "/oauth/authorize",
+                "/api/oauth/authorize",
                 get(flow::authorize::<S>).post(flow::consent::<S>),
             )
-            .route("/oauth/token", post(flow::token::<S>))
+            .route("/api/oauth/token", post(flow::token::<S>))
             .with_state(Arc::new(state));
         Some(router)
     }
@@ -166,9 +166,9 @@ async fn metadata<S: AuthStore>(State(flow): State<Arc<flow::Flow<S>>>) -> Json<
     let server = &flow.server;
     Json(json!({
         "issuer": server.issuer,
-        "authorization_endpoint": server.endpoint("/oauth/authorize"),
-        "token_endpoint": server.endpoint("/oauth/token"),
-        "registration_endpoint": server.endpoint("/oauth/register"),
+        "authorization_endpoint": server.endpoint("/api/oauth/authorize"),
+        "token_endpoint": server.endpoint("/api/oauth/token"),
+        "registration_endpoint": server.endpoint("/api/oauth/register"),
         "response_types_supported": ["code"],
         "grant_types_supported": ["authorization_code"],
         "code_challenge_methods_supported": ["S256"],

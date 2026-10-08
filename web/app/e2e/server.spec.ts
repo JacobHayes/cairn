@@ -9,6 +9,7 @@ import {
   countDocumentFetches,
   derivedRevision,
   fresh,
+  goWithin,
   nodeCard,
   open,
   openJourney,
@@ -88,7 +89,7 @@ test("a later page shows the edit", { tag: "@server" }, async ({ context }) => {
 
 /** Creates an entity through the API: a deployment patch, which moves the deployment revision. */
 async function createEntity(request: APIRequestContext): Promise<number> {
-  const deployment = (await (await request.get("/deployment")).json()) as { revision: number };
+  const deployment = (await (await request.get("/api/deployment")).json()) as { revision: number };
   const suffix = Math.random().toString(36).slice(2, 10);
   const patch = {
     id: `p_entity_${suffix}`,
@@ -96,7 +97,7 @@ async function createEntity(request: APIRequestContext): Promise<number> {
     base_revision: deployment.revision,
     mutations: [{ op: "create_entity", entity: { key: `e_probe_${suffix}`, name: `Probe ${suffix}` } }],
   };
-  const response = await request.post("/deployment/patches", { data: { patch } });
+  const response = await request.post("/api/deployment/patches", { data: { patch } });
   expect(response.status()).toBe(200);
   return deployment.revision + 1;
 }
@@ -104,7 +105,7 @@ async function createEntity(request: APIRequestContext): Promise<number> {
 test("a deployment tick refetches the deployment context and re-derives", { tag: "@server" }, async ({ page }) => {
   const deploymentFetches: string[] = [];
   page.on("request", (request) => {
-    if (new URL(request.url()).pathname === "/deployment") {
+    if (new URL(request.url()).pathname === "/api/deployment") {
       deploymentFetches.push(request.url());
     }
   });
@@ -125,7 +126,7 @@ test("version skew stops the tab and asks for a reload, keeping unsent edits", {
   const unsent = fresh("Unsent");
   await startRename(two, "n_criteria", unsent);
   const held = await derivedRevision(two);
-  await two.route("**/journeys/j_vendor_eval/document", async (route) => {
+  await two.route("**/api/journeys/j_vendor_eval/document", async (route) => {
     const response = await route.fetch();
     const document = (await response.json()) as { engine_version: string };
     await route.fulfill({ response, json: { ...document, engine_version: "99.0.0" } });
@@ -134,7 +135,7 @@ test("version skew stops the tab and asks for a reload, keeping unsent edits", {
   await expect(two.getByTestId("skew")).toBeVisible();
   await expect(renameOf(two, "n_criteria").getByRole("button", { name: "Save" })).toBeDisabled();
   expect(await derivedRevision(two)).toBe(held);
-  await two.unroute("**/journeys/j_vendor_eval/document");
+  await two.unroute("**/api/journeys/j_vendor_eval/document");
   await two.getByRole("button", { name: "Reload" }).click();
   await expect(two.getByTestId("derivation")).toBeVisible();
   await expect(two.getByTestId("skew")).toHaveCount(0);
@@ -143,7 +144,7 @@ test("version skew stops the tab and asks for a reload, keeping unsent edits", {
 });
 
 test("the server host is chosen when a server answers", { tag: "@server" }, async ({ page }) => {
-  await page.goto("/#/");
+  await page.goto("/");
   await expect(page.getByTestId("host")).toHaveAttribute("data-status", "server");
   await open(page, "server");
   await expect(page.getByRole("link", { name: "Hire a platform engineer" })).toBeVisible();
@@ -168,7 +169,7 @@ test("typing is held while a save is in flight, so nothing typed is lost", { tag
   const held = new Promise<void>((resolve) => {
     release = resolve;
   });
-  await page.route("**/journeys/j_launch/patches", async (route) => {
+  await page.route("**/api/journeys/j_launch/patches", async (route) => {
     await held;
     await route.continue();
   });
@@ -190,7 +191,7 @@ async function journeyFromHiringRoute(request: APIRequestContext): Promise<strin
     base_revision: 0,
     mutations: [{ op: "create_journey", name: `Hiring copy ${suffix}`, from: { route: "hiring-loop", version: 1 } }],
   };
-  const response = await request.post(`/journeys/${id}/patches`, { data: { patch } });
+  const response = await request.post(`/api/journeys/${id}/patches`, { data: { patch } });
   expect(response.status()).toBe(200);
   return id;
 }
@@ -199,21 +200,17 @@ test("a draft follows its journey and its host, not the screen it was typed on",
   const copy = await journeyFromHiringRoute(page.request);
   await openJourney(page, "server", copy);
   await expect(nodeCard(page, "n_offer")).toBeVisible();
-  await page.goto(`/?host=server#/journeys/j_hiring`);
+  await open(page, "server", "/journeys/j_hiring");
   await expect(page.getByTestId("derivation")).toBeVisible();
   const draft = fresh("Offer, j_hiring's draft");
   await startRename(page, "n_offer", draft);
-  await page.evaluate((to) => {
-    location.hash = to;
-  }, `#/journeys/${copy}/nodes/n_offer`);
+  await goWithin(page, `/journeys/${copy}/nodes/n_offer`);
   await expect(page.getByTestId("journey-name")).toContainText("Hiring copy");
   await expect(renameOf(page, "n_offer").getByRole("button", { name: /^Rename/ })).toBeVisible();
   await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveCount(0);
-  await page.evaluate(() => {
-    location.hash = "#/journeys/j_hiring/nodes/n_offer";
-  });
+  await goWithin(page, "/journeys/j_hiring/nodes/n_offer");
   await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveValue(draft);
-  await page.goto(`/?host=browser#/journeys/j_hiring/nodes/n_offer`);
+  await open(page, "browser", "/journeys/j_hiring/nodes/n_offer");
   await expect(page.getByTestId("derivation")).toBeVisible();
   await expect(renameOf(page, "n_offer").getByRole("button", { name: /^Rename/ })).toBeVisible();
   await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveCount(0);

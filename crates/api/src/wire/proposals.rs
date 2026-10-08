@@ -15,7 +15,7 @@ use cairn_schema::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// `POST /{domain}/proposals`: a new proposal for the path's domain (which may not exist yet:
+/// `POST /api/{domain}/proposals`: a new proposal for the path's domain (which may not exist yet:
 /// a proposal can create a journey or route at revision 0).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -29,7 +29,7 @@ pub struct ProposalCreate {
     pub draft: ProposalDraft,
 }
 
-/// `PATCH /proposals/{id}`: the proposal's new content, against the editing revision the
+/// `PATCH /api/proposals/{id}`: the proposal's new content, against the editing revision the
 /// editor saw (H5). Its destination's revision does not move.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -42,7 +42,7 @@ pub struct ProposalEdit {
     pub draft: ProposalDraft,
 }
 
-/// `POST /proposals/{id}/discard` and `POST /proposals/{id}/refresh`: against the editing
+/// `POST /api/proposals/{id}/discard` and `POST /api/proposals/{id}/refresh`: against the editing
 /// revision the caller saw.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -53,7 +53,7 @@ pub struct ProposalStep {
     pub base_revision: Revision,
 }
 
-/// `POST /proposals/{id}/apply`: applies the proposal as the caller, its confirming user
+/// `POST /api/proposals/{id}/apply`: applies the proposal as the caller, its confirming user
 /// (H2), at the editing revision they reviewed.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -121,7 +121,7 @@ impl ProposalAnswer {
     }
 }
 
-/// `POST /proposals/{id}/preview` (C14, D7, I6): what applying the proposal now would do, and,
+/// `POST /api/proposals/{id}/preview` (C14, D7, I6): what applying the proposal now would do, and,
 /// when its destination moved since it was drafted, what moved.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -171,7 +171,7 @@ impl From<cairn_service::ProposalReview> for ProposalReview {
     }
 }
 
-/// `POST /journeys/{id}/upgrade` (B7): proposes upgrading the journey to a newer version of
+/// `POST /api/journeys/{id}/upgrade` (B7): proposes upgrading the journey to a newer version of
 /// the route it follows.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -184,7 +184,7 @@ pub struct UpgradeRequest {
     pub to: VersionNumber,
 }
 
-/// `POST /journeys/{id}/save-as-route` (B8): proposes saving the journey's structure as a
+/// `POST /api/journeys/{id}/save-as-route` (B8): proposes saving the journey's structure as a
 /// draft of a route, created when it does not exist.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -199,7 +199,7 @@ pub struct SaveAsRouteRequest {
     pub name: Title,
 }
 
-/// `POST /journeys/{id}/relink` (B9): proposes re-linking the journey to a published version.
+/// `POST /api/journeys/{id}/relink` (B9): proposes re-linking the journey to a published version.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RelinkRequest {
@@ -211,7 +211,7 @@ pub struct RelinkRequest {
     pub lineage: Lineage,
 }
 
-/// `POST /routes/{id}/import` (A13): a route file, imported as a new route or a new draft of
+/// `POST /api/routes/{id}/import` (A13): a route file, imported as a new route or a new draft of
 /// the path's route, matched against the version it extends.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

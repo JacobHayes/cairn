@@ -16,13 +16,16 @@ mod in_process {
     /// A request for every surface: the API, its health check, MCP, auth's own routes, the
     /// UI, and metrics.
     const SURFACES: [(&str, &str); 6] = [
-        ("GET", "/capabilities"),
+        ("GET", "/api/capabilities"),
         ("GET", "/healthz"),
-        ("POST", "/mcp"),
-        ("POST", "/auth/sign-out"),
+        ("POST", "/api/mcp"),
+        ("POST", "/api/auth/sign-out"),
         ("GET", "/"),
-        ("GET", "/metrics"),
+        ("GET", "/api/metrics"),
     ];
+
+    /// The revision stream of every journey.
+    const JOURNEY_TICKS: &str = "/api/events/stream?domain=journeys";
 
     const INITIALIZE: &str = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}"#;
 
@@ -41,7 +44,7 @@ mod in_process {
             headers.push(("authorization", bearer.as_str()));
         }
         let (method, path) = surface;
-        let body = (path == "/mcp").then_some(INITIALIZE);
+        let body = (path == "/api/mcp").then_some(INITIALIZE);
         send(address, method, host, path, &headers, body)
             .await
             .status
@@ -83,10 +86,80 @@ mod in_process {
         }
         // Past the allowlist, the auth layer still asks for the credential, except of the
         // health check.
-        let anonymous = request(address, PUBLIC_HOST, ("GET", "/capabilities"), None).await;
+        let anonymous = request(address, PUBLIC_HOST, ("GET", "/api/capabilities"), None).await;
         assert_eq!(anonymous, 401);
         let health = request(address, PUBLIC_HOST, ("GET", "/healthz"), None).await;
         assert_eq!(health, 200);
+    }
+
+    /// What a request reached.
+    #[derive(Debug, PartialEq, Eq)]
+    enum Reached {
+        /// The app's page.
+        Page,
+        /// An endpoint's JSON answer, with this status.
+        Endpoint(u16),
+        /// The API's answer that nothing is served there.
+        NoEndpoint,
+        /// Nothing: not found, and not the page.
+        Missing,
+    }
+
+    /// The route map
+    /// (decisions/2026-10-08-the-api-is-served-under-api-and-the-app-owns-the-rest.md): the
+    /// server keeps `/api/`, `/.well-known/`, and `/healthz`, and answers every other path
+    /// with the app's page, so a screen's address loads; a path the server keeps that no
+    /// endpoint serves is no endpoint, never the page.
+    #[tokio::test]
+    async fn the_server_keeps_its_prefixes_and_every_other_path_is_the_apps_page() {
+        let config = support::config(&support::dev_provider(Some("dev-token")));
+        let app = root::app(
+            &config,
+            support::assembly(Arc::new(InProcessNotifier::new())),
+        )
+        .unwrap();
+        let address = support::serve(app).await;
+        let page = &support::assets()[0].bytes;
+        let headers = [("authorization", "Bearer dev-token")];
+        let cases = [
+            ("GET", "/", Reached::Page),
+            ("GET", "/journeys/j_vendor_eval", Reached::Page),
+            (
+                "GET",
+                "/journeys/j_vendor_eval/nodes/n_plan?hide=action",
+                Reached::Page,
+            ),
+            ("HEAD", "/routes/vendor-evaluation/versions", Reached::Page),
+            ("GET", "/capabilities", Reached::Page),
+            ("GET", "/healthz", Reached::Endpoint(200)),
+            ("GET", "/api/capabilities", Reached::Endpoint(200)),
+            ("GET", "/api", Reached::NoEndpoint),
+            ("GET", "/api/", Reached::NoEndpoint),
+            ("GET", "/api/no-such-endpoint", Reached::NoEndpoint),
+            (
+                "GET",
+                "/api/journeys/j_vendor_eval/no-such-view",
+                Reached::NoEndpoint,
+            ),
+            ("POST", "/api/no-such-endpoint", Reached::NoEndpoint),
+            ("GET", "/.well-known/no-such-document", Reached::NoEndpoint),
+            ("POST", "/journeys/j_vendor_eval/patches", Reached::Missing),
+            ("GET", "/assets/index-gone.js", Reached::Missing),
+        ];
+        for (method, path, expected) in cases {
+            let reply = send(address, method, PUBLIC_HOST, path, &headers, None).await;
+            let html = reply
+                .head
+                .to_ascii_lowercase()
+                .contains("content-type: text/html");
+            let reached = match reply.status {
+                200 if html && (method == "HEAD" || reply.body == page.as_ref()) => Reached::Page,
+                404 if reply.body.is_empty() => Reached::Missing,
+                404 if reply.json()["error"] == json!("no_such_endpoint") => Reached::NoEndpoint,
+                status => Reached::Endpoint(status),
+            };
+            assert_eq!(reached, expected, "{method} {path}: {}", reply.text());
+        }
     }
 
     /// Behind an authenticating proxy on another machine (Tailscale proxy mode listing the
@@ -113,7 +186,8 @@ mod in_process {
             ("tailscale-user-login", "ann@example.org"),
             ("tailscale-user-name", "Ann"),
         ];
-        let me = support::send_from(PROXY.into(), address, "/users/me", PUBLIC_HOST, &login).await;
+        let me =
+            support::send_from(PROXY.into(), address, "/api/users/me", PUBLIC_HOST, &login).await;
         assert_eq!(me.status, 200, "{}", me.text());
         let identity = &me.json()["identities"][0];
         assert_eq!(identity["provider"], json!("tailnet"));
@@ -123,8 +197,14 @@ mod in_process {
             ([127, 0, 0, 1], &login[..], 403),
             (PROXY, &[][..], 401),
         ] {
-            let reply =
-                support::send_from(source.into(), address, "/users/me", PUBLIC_HOST, headers).await;
+            let reply = support::send_from(
+                source.into(),
+                address,
+                "/api/users/me",
+                PUBLIC_HOST,
+                headers,
+            )
+            .await;
             assert_eq!(reply.status, status, "{source:?} {headers:?}");
         }
         let health = support::send_from(PROXY.into(), address, "/healthz", PUBLIC_HOST, &[]).await;
@@ -148,7 +228,7 @@ mod in_process {
             )
             .unwrap();
             let address = support::serve(app).await;
-            let capabilities = get(address, PUBLIC_HOST, "/capabilities").await.json();
+            let capabilities = get(address, PUBLIC_HOST, "/api/capabilities").await.json();
             assert_eq!(capabilities["assistant"], json!(offered));
             assert_eq!(capabilities["mcp"], json!(true));
             assert_eq!(capabilities["sse"], json!(true));
@@ -230,7 +310,7 @@ mod in_process {
     }
 
     /// Observability: the request counts and latencies the API records, the derive and
-    /// commit durations, all at `/metrics`, behind the auth layer.
+    /// commit durations, all at `/api/metrics`, behind the auth layer.
     #[tokio::test]
     async fn metrics_show_requests_derives_and_commits() {
         static RECORDER: std::sync::OnceLock<metrics_exporter_prometheus::PrometheusHandle> =
@@ -267,14 +347,14 @@ mod in_process {
             address,
             "GET",
             PUBLIC_HOST,
-            "/journeys/j_hiring/derived",
+            "/api/journeys/j_hiring/derived",
             &bearer,
             None,
         )
         .await;
         assert_eq!(derived.status, 200, "{}", derived.text());
-        assert_eq!(get(address, PUBLIC_HOST, "/metrics").await.status, 401);
-        let metrics = send(address, "GET", PUBLIC_HOST, "/metrics", &bearer, None)
+        assert_eq!(get(address, PUBLIC_HOST, "/api/metrics").await.status, 401);
+        let metrics = send(address, "GET", PUBLIC_HOST, "/api/metrics", &bearer, None)
             .await
             .text();
         for name in [
@@ -321,8 +401,7 @@ mod in_process {
         socket.set_recv_buffer_size(1).unwrap();
         socket.connect(&address.into()).unwrap();
         let mut client: std::net::TcpStream = socket.into();
-        let request =
-            format!("GET /events/stream?domain=journeys HTTP/1.1\r\nhost: {PUBLIC_HOST}\r\n\r\n");
+        let request = format!("GET {JOURNEY_TICKS} HTTP/1.1\r\nhost: {PUBLIC_HOST}\r\n\r\n");
         client.write_all(request.as_bytes()).unwrap();
         let mut head = [0_u8; 64];
         let read = client.read(&mut head).unwrap();
@@ -386,7 +465,7 @@ mod in_process {
     }
 
     /// PRACTICES, Explicit limits: requests in flight are bounded per process, so the UI and
-    /// `/metrics` share the API's limit. With the API full of requests whose bodies have not
+    /// `/api/metrics` share the API's limit. With the API full of requests whose bodies have not
     /// arrived, every surface answers 503 until they go.
     #[tokio::test]
     async fn every_surface_shares_the_in_flight_limit() {
@@ -406,25 +485,25 @@ mod in_process {
         for _ in 0..REQUEST_IN_FLIGHT_COUNT_MAX {
             let mut stream = tokio::net::TcpStream::connect(address).await.unwrap();
             let request = format!(
-                "POST /deployment/patches HTTP/1.1\r\nhost: {PUBLIC_HOST}\r\ncontent-type: application/json\r\ncontent-length: 64\r\n\r\n{{"
+                "POST /api/deployment/patches HTTP/1.1\r\nhost: {PUBLIC_HOST}\r\ncontent-type: application/json\r\ncontent-length: 64\r\n\r\n{{"
             );
             stream.write_all(request.as_bytes()).await.unwrap();
             held.push(stream);
         }
         let started = Instant::now();
-        while get(address, PUBLIC_HOST, "/capabilities").await.status != 503 {
+        while get(address, PUBLIC_HOST, "/api/capabilities").await.status != 503 {
             assert!(
                 started.elapsed() < Duration::from_secs(3),
                 "the API never filled"
             );
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
-        for path in ["/metrics", "/", "/assets/index-test.js"] {
+        for path in ["/api/metrics", "/", "/assets/index-test.js"] {
             assert_eq!(get(address, PUBLIC_HOST, path).await.status, 503, "{path}");
         }
         drop(held);
         let started = Instant::now();
-        while get(address, PUBLIC_HOST, "/metrics").await.status != 200 {
+        while get(address, PUBLIC_HOST, "/api/metrics").await.status != 200 {
             assert!(
                 started.elapsed() < Duration::from_secs(3),
                 "the slots were never freed"

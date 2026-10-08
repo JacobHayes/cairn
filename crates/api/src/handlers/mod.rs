@@ -50,12 +50,12 @@ pub async fn health<S: Store + 'static>(State(api): State<Api<S>>) -> Response {
     }
 }
 
-/// `GET /capabilities`.
+/// `GET /api/capabilities`.
 pub async fn capabilities<S: Store + 'static>(State(api): State<Api<S>>) -> Json<Capabilities> {
     Json(Capabilities::from(api.service.capabilities()))
 }
 
-/// `POST /journeys/{id}/patches`.
+/// `POST /api/journeys/{id}/patches`.
 pub async fn patch_journey<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -66,7 +66,7 @@ pub async fn patch_journey<S: Store + 'static>(
     submit(&api, actor, &Domain::Journey(id), request).await
 }
 
-/// `POST /routes/{id}/patches`.
+/// `POST /api/routes/{id}/patches`.
 pub async fn patch_route<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,
@@ -77,7 +77,7 @@ pub async fn patch_route<S: Store + 'static>(
     submit(&api, actor, &Domain::Route(id), request).await
 }
 
-/// `POST /deployment/patches`.
+/// `POST /api/deployment/patches`.
 pub async fn patch_deployment<S: Store + 'static>(
     State(api): State<Api<S>>,
     Extension(actor): Extension<Actor>,

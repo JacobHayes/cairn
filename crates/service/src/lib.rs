@@ -91,7 +91,7 @@ impl<S: Store> Service<S> {
         }
     }
 
-    /// The capabilities document (`GET /capabilities`): what this host offers.
+    /// The capabilities document (`GET /api/capabilities`): what this host offers.
     #[must_use]
     pub fn capabilities(&self) -> &Capabilities {
         &self.capabilities

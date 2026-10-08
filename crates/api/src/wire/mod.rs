@@ -31,7 +31,7 @@ use cairn_schema::{
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-/// `POST /{domain}/patches`: a patch to the domain the path names, and the note each of its
+/// `POST /api/{domain}/patches`: a patch to the domain the path names, and the note each of its
 /// events carries (J1).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -111,7 +111,7 @@ pub enum HealthStatus {
     StoreFailedClosed,
 }
 
-/// The capabilities document (`GET /capabilities`): what this host offers.
+/// The capabilities document (`GET /api/capabilities`): what this host offers.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Capabilities {
@@ -119,7 +119,7 @@ pub struct Capabilities {
     pub auth: Vec<AuthMethod>,
     /// Whether the in-app assistant is available (I5).
     pub assistant: bool,
-    /// Whether the host serves MCP at `/mcp` (I2).
+    /// Whether the host serves MCP at `/api/mcp` (I2).
     pub mcp: bool,
     /// Whether the host streams revision ticks over SSE (H6).
     pub sse: bool,

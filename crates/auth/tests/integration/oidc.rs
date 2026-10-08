@@ -65,7 +65,7 @@ mod oidc {
     }
 
     async fn start(setup: &Setup, browser_cookies: &str) -> Started {
-        let uri = "/auth/oidc/sign-in?return_to=/journeys";
+        let uri = "/api/auth/oidc/sign-in?return_to=/journeys";
         let request = with_cookie(request(uri, LOCAL), browser_cookies);
         let response = send(&setup.router, request.body(Body::empty()).unwrap()).await;
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
@@ -93,7 +93,7 @@ mod oidc {
         state: &str,
         cookies: &str,
     ) -> axum::http::Response<Body> {
-        let uri = format!("/auth/oidc/callback?code={code}&state={state}");
+        let uri = format!("/api/auth/oidc/callback?code={code}&state={state}");
         let request = with_cookie(request(&uri, LOCAL), cookies);
         send(&setup.router, request.body(Body::empty()).unwrap()).await
     }
@@ -296,7 +296,7 @@ mod oidc {
         };
         let provider = OidcProvider::new(config, world.accounts.clone(), &base()).unwrap();
         let router = app(&world.auth(loopback(), vec![Arc::new(provider)]));
-        let start = request("/auth/oidc/sign-in", LOCAL)
+        let start = request("/api/auth/oidc/sign-in", LOCAL)
             .body(Body::empty())
             .unwrap();
         let response = send(&router, start).await;
@@ -311,7 +311,7 @@ mod oidc {
         for advertise in [Advertise::PlainHttpKeys, Advertise::Oversized] {
             let setup = setup(false).await;
             setup.issuer.advertise(advertise);
-            let start = request("/auth/oidc/sign-in", LOCAL)
+            let start = request("/api/auth/oidc/sign-in", LOCAL)
                 .body(Body::empty())
                 .unwrap();
             let response = send(&setup.router, start).await;

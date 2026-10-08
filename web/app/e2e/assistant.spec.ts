@@ -14,7 +14,7 @@ import { ask, openPanel, patchId, script } from "./assistant.ts";
 import { openOverview } from "./around.ts";
 import { state } from "./detail.ts";
 import { confirmAndApply, reviewOpen } from "./proposals.ts";
-import { nodePanel, open, openJourney } from "./shell.ts";
+import { goWithin, nodePanel, open, openJourney } from "./shell.ts";
 
 test("I5, I7: a direct change reported with its node, and a breakdown proposed, reviewed, and applied", { tag: "@server" }, async ({ page }) => {
   const journey = await startVendorJourney(page);
@@ -91,16 +91,12 @@ test("I5: a message typed about one journey stays with it, and a turn outlives t
   const first = await startVendorJourney(page);
   const second = await startVendorJourney(page);
   await openJourney(page, "server", second);
-  await page.evaluate((hash) => {
-    location.hash = hash;
-  }, `#/journeys/${first}`);
+  await goWithin(page, `/journeys/${first}`);
   await expect(page.getByTestId("journey-name")).toBeVisible();
   const panel = await openPanel(page);
   await panel.getByTestId("assistant-message").fill("About the first journey.");
   // Back to a journey the tab already holds, so the page does not pass through loading.
-  await page.evaluate((hash) => {
-    location.hash = hash;
-  }, `#/journeys/${second}`);
+  await goWithin(page, `/journeys/${second}`);
   await expect(page.getByTestId("assistant-panel")).toHaveAttribute("data-target", `journey:${second}`);
   await expect(page.getByTestId("assistant-message")).toHaveValue("");
 

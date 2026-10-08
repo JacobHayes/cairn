@@ -3,7 +3,7 @@
 //!
 //! Logs are JSON lines on standard error, at info and above, each carrying the span it was
 //! written in (a request's id, method, and endpoint; a patch's id). Metrics go through the
-//! `metrics` facade to a Prometheus recorder, served at `/metrics` behind the auth layer: the
+//! `metrics` facade to a Prometheus recorder, served at `/api/metrics` behind the auth layer: the
 //! API's request counts and latencies by endpoint, MCP tool calls by tool, patch outcomes,
 //! caught engine panics, derive durations, and store commit durations.
 
@@ -54,10 +54,10 @@ pub fn install_metrics() -> Result<PrometheusHandle, BuildError> {
     Ok(handle)
 }
 
-/// `GET /metrics`: the recorder's metrics in Prometheus's text format.
+/// `GET /api/metrics`: the recorder's metrics in Prometheus's text format.
 pub fn metrics_router(handle: PrometheusHandle) -> Router {
     Router::new()
-        .route("/metrics", get(render))
+        .route("/api/metrics", get(render))
         .with_state(Arc::new(handle))
 }
 

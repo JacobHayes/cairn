@@ -19,7 +19,7 @@ use crate::error::{HostError, json, read};
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExportRequest {
-    /// The route, as `GET /routes/{id}` answers it.
+    /// The route, as `GET /api/routes/{id}` answers it.
     pub route: Route,
     /// The version to export; the route's draft when none.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -97,7 +97,7 @@ pub fn imported(request: &ImportRequest) -> Result<cairn_schema::Graph, HostErro
 }
 
 /// Exports a route version or draft: `request` is the JSON of an [`ExportRequest`]; the
-/// answer is the JSON of the `RouteFile`, as `GET /routes/{id}/export` answers it.
+/// answer is the JSON of the `RouteFile`, as `GET /api/routes/{id}/export` answers it.
 ///
 /// # Errors
 ///

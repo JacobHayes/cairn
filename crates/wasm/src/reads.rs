@@ -1,5 +1,5 @@
 //! The in-browser root's reads for the screens around a journey (brief 5.5): the journey
-//! index filtered as `GET /journeys` filters it (C16), the route index and route detail (C17),
+//! index filtered as `GET /api/journeys` filters it (C16), the route index and route detail (C17),
 //! route files exported and imported through the service (A13), and the caller with their
 //! identities and entities (H3). Each answers the API's JSON for the same request, so the
 //! app's one data layer reads either host.
@@ -19,7 +19,7 @@ use crate::error::{HostError, json, read};
 use crate::now_or_never;
 use crate::root::{BrowserRoot, JourneyPage, JourneySummary, PatchAnswer, failed};
 
-/// `GET /journeys`'s query (C16) as JSON: the statuses, the lineage route and version, the
+/// `GET /api/journeys`'s query (C16) as JSON: the statuses, the lineage route and version, the
 /// entities referred to (E6), whether an upgrade is available, and the page.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -112,7 +112,7 @@ pub struct RouteDetail {
     pub versions: Vec<VersionJourneys>,
 }
 
-/// `POST /routes/{id}/import`'s body (A13), as the API's `RouteImport`.
+/// `POST /api/routes/{id}/import`'s body (A13), as the API's `RouteImport`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct RouteImport {
@@ -158,7 +158,7 @@ pub struct Viewer {
 }
 
 impl BrowserRoot {
-    /// C16: the journey index `query` asks for, as `GET /journeys` answers it.
+    /// C16: the journey index `query` asks for, as `GET /api/journeys` answers it.
     ///
     /// # Errors
     ///
@@ -193,7 +193,7 @@ impl BrowserRoot {
         })
     }
 
-    /// The route index: every route, in id order, as `GET /routes` answers its first page
+    /// The route index: every route, in id order, as `GET /api/routes` answers its first page
     /// at the page limit.
     ///
     /// # Errors
@@ -299,7 +299,7 @@ fn route_id(route: &str) -> Result<RouteId, HostError> {
 #[wasm_bindgen]
 impl BrowserRoot {
     /// C16: the journey index `query` (the JSON of a [`JourneyIndexQuery`]) asks for, as
-    /// `GET /journeys` answers it.
+    /// `GET /api/journeys` answers it.
     ///
     /// # Errors
     ///
@@ -310,7 +310,7 @@ impl BrowserRoot {
         Ok(json(&self.journey_index(&query)?))
     }
 
-    /// The route index from after `after` (empty for the first page), as `GET /routes`
+    /// The route index from after `after` (empty for the first page), as `GET /api/routes`
     /// answers it.
     ///
     /// # Errors
@@ -326,7 +326,7 @@ impl BrowserRoot {
     }
 
     /// C17: route `route`'s versions with the journeys on each, as
-    /// `GET /routes/{id}/versions` answers it.
+    /// `GET /api/routes/{id}/versions` answers it.
     ///
     /// # Errors
     ///
@@ -337,7 +337,7 @@ impl BrowserRoot {
     }
 
     /// A13: version `version` of route `route` as a file, or its draft when `version` is
-    /// empty, as `GET /routes/{id}/export` answers it.
+    /// empty, as `GET /api/routes/{id}/export` answers it.
     ///
     /// # Errors
     ///
@@ -361,7 +361,7 @@ impl BrowserRoot {
 
     /// A13: imports a route file as the local user at `now`: `request` is the JSON of a
     /// [`RouteImport`]; the answer is the JSON of the patch answer, as
-    /// `POST /routes/{id}/import` answers it.
+    /// `POST /api/routes/{id}/import` answers it.
     ///
     /// # Errors
     ///
@@ -372,7 +372,7 @@ impl BrowserRoot {
         Ok(json(&self.import_file(&request, now)?))
     }
 
-    /// The caller at `now`, as `GET /users/me` answers it (H3).
+    /// The caller at `now`, as `GET /api/users/me` answers it (H3).
     ///
     /// # Errors
     ///

@@ -7,7 +7,7 @@
 //! An OIDC provider named `stub` signs in against 3.2's stub issuer, started beside it on
 //! loopback, so a browser test links an identity to the dev user (brief 5.5). The second
 //! argument, when given, is the origin the browser reaches the API at (the app's dev server,
-//! which proxies `/auth`), where the issuer sends the browser back.
+//! which proxies `/api/auth`), where the issuer sends the browser back.
 //!
 //! The assistant is mounted over 4.4's scripted provider (brief 5.8), so the capabilities
 //! offer it and a browser test drives the panel with no model and no credential: the test
