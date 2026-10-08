@@ -39,7 +39,7 @@ use cairn_store::{
 };
 
 #[cfg(feature = "io-seam")]
-pub use turso_core;
+pub use turso::core as turso_core;
 
 use pool::Pool;
 
