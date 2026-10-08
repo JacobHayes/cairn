@@ -101,6 +101,18 @@ standard error; metrics are at `/api/metrics` in Prometheus's format, behind the
 as the API (a scraper uses an agent token). An OIDC provider's redirect URI is
 `<public_url>api/auth/<name>/callback`.
 
+A process that opens the database holds it exclusively, so `cairn serve` and `cairn migrate`
+never share one: run against a live server, `migrate` fails with a locking error. The server
+applies any migrations the database lacks when it starts. To upgrade, stop the server, run
+`cairn migrate` with the new binary (a failed migration then shows before anything serves),
+and start it again. There is no online backup: stop the server, copy the database file
+together with the two files the store keeps beside it, its log and its write-ahead log, and
+start it again; restore all three together. For `cairn.db` those are `cairn.db-log` and
+`cairn.db-wal` (the log takes the database's name with its extension set to `.db-log`, so
+`data.sqlite` keeps `data.db-log` and `data.sqlite-wal`). Committed writes sit in the log
+until the store checkpoints them into the database file, so that file alone is not a
+backup. Do not open the database with another SQLite tool while Cairn runs.
+
 CI (`.github/workflows/check.yml`) runs `mise run check` on every push and nightly, and
 `mise run sim` nightly outside the gate.
 
