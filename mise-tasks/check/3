@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
-#MISE description="Rung 3: property tests (PROPTEST_CASES cases each, 256 by default) and cost tests at the limits"
+#MISE description="Rung 3: property tests (PROPTEST_CASES cases each, 64 by default; CI runs 256) and cost tests at the limits"
 # PRACTICES, The validation ladder, rung 3; Property tests. Property tests are the tests in
 # `tests/integration/property_*.rs`, each inside `mod property`, run through
 # patina-dst-proptest from a fixed seed. Cost tests are the tests in
 # `tests/integration/cost_*.rs`, each inside `mod cost`: a pass at the limits, budgeted in
 # operations, not wall-clock time. Both are modules of their crate's one integration test
 # binary, selected by module path. One suite per property or cost test file, counted from
-# the test names (`<file>::property::<test>`, `<file>::cost::<test>`). CI's nightly run
-# raises PROPTEST_CASES.
+# the test names (`<file>::property::<test>`, `<file>::cost::<test>`). The case count is
+# bounded locally and larger in CI: 256 on push and 4096 nightly
+# (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_RUNG=3
@@ -19,7 +20,7 @@ ladder_require_tool node node --version
 # The counts below are read from cargo's output, which must not carry color codes (CI sets
 # CARGO_TERM_COLOR=always).
 export CARGO_TERM_COLOR=never
-export PROPTEST_CASES=${PROPTEST_CASES:-256}
+export PROPTEST_CASES=${PROPTEST_CASES:-64}
 # Zero cases would pass every property while generating nothing.
 [[ $PROPTEST_CASES =~ ^[1-9][0-9]*$ ]] || ladder_fail "PROPTEST_CASES must be a positive count, not '$PROPTEST_CASES'"
 ladder_say "PROPTEST_CASES=$PROPTEST_CASES"

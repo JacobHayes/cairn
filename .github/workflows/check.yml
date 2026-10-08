@@ -28,6 +28,9 @@ jobs:
     env:
       # Only `mise run sim` uses cargo-patina, and it builds from source; the ladder skips it.
       MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
+      # Rung 3's property tests at more cases than a local run's 64
+      # (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
+      PROPTEST_CASES: 256
     steps:
       - uses: actions/checkout@v7
       - uses: jdx/mise-action@v5

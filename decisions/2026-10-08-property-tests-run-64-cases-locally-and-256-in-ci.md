@@ -1,0 +1,6 @@
+# Property tests run 64 cases locally and 256 in CI on push
+
+- Question: rung 3 ran every property test at 256 cases wherever it ran, which made it the second slowest rung of a local check (about 50s), while PRACTICES (The validation ladder, rung 3) already asks for "bounded case count locally (more in CI)" and leaves the counts open (Open questions).
+- Call: `mise run check:3` defaults `PROPTEST_CASES` to 64. CI's check on push sets 256, the count every push ran before, and the nightly run keeps 4096. Setting `PROPTEST_CASES` still overrides the default anywhere. Locally rung 3 goes from about 50s to about 25s; what remains is mostly the engine's cost tests at the limits, which no case count bounds.
+- Alternatives: 256 everywhere (the cost this changes); 32 (saves a few more seconds, but the engine's cost tests dominate rung 3 below 64); optimizing the engine in the debug profile (opt-level 2 cuts the engine's rung 3 tests from 20s to 4s and the cases program from 37s to 10s, but a rebuild after an engine edit goes from 9s to 33s, which every crate-scoped test run of the engine pays).
+- What would change it: a property failure that CI finds at 256 cases on push and a local run at 64 does not, which would raise the local count.
