@@ -10,6 +10,7 @@ use std::fmt::Write;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::Router;
 use cairn::assets::Asset;
@@ -79,6 +80,20 @@ pub async fn serve(app: Router) -> SocketAddr {
     let bound = TcpListener::bind("127.0.0.1:0").await.unwrap();
     let address = bound.local_addr().unwrap();
     tokio::spawn(listener::serve(bound, app, std::future::pending()));
+    address
+}
+
+/// [`serve`] with the listener's `TCP_USER_TIMEOUT` at `user_timeout` instead of the write
+/// stall.
+pub async fn serve_with_user_timeout(app: Router, user_timeout: Duration) -> SocketAddr {
+    let bound = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = bound.local_addr().unwrap();
+    tokio::spawn(listener::serve_with_user_timeout(
+        bound,
+        app,
+        user_timeout,
+        std::future::pending(),
+    ));
     address
 }
 

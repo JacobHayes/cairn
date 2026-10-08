@@ -8,6 +8,7 @@
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
+use std::time::Duration;
 
 use axum::Router;
 use axum::serve::ListenerExt;
@@ -18,25 +19,26 @@ use crate::limits::{
     KEEPALIVE_IDLE, KEEPALIVE_INTERVAL, SHUTDOWN_DRAIN_MAX, UNACKNOWLEDGED_DURATION_MAX,
 };
 
-/// Sets an accepted connection's socket options: keepalive, `TCP_USER_TIMEOUT`, and no
-/// Nagle delay (an SSE tick is one small write that should leave at once).
+/// Sets an accepted connection's socket options: keepalive, `TCP_USER_TIMEOUT` at
+/// `unacknowledged` (the binary's is [`UNACKNOWLEDGED_DURATION_MAX`]), and no Nagle delay (an
+/// SSE tick is one small write that should leave at once).
 ///
 /// # Errors
 ///
 /// When the kernel refuses an option.
-pub fn configure(stream: &TcpStream) -> io::Result<()> {
+pub fn configure(stream: &TcpStream, unacknowledged: Duration) -> io::Result<()> {
     let socket = SockRef::from(stream);
     let keepalive = TcpKeepalive::new()
         .with_time(KEEPALIVE_IDLE)
         .with_interval(KEEPALIVE_INTERVAL);
     socket.set_tcp_keepalive(&keepalive)?;
-    set_user_timeout(&socket)?;
+    set_user_timeout(&socket, unacknowledged)?;
     socket.set_tcp_nodelay(true)
 }
 
 #[cfg(any(target_os = "linux", target_os = "android"))]
-fn set_user_timeout(socket: &SockRef<'_>) -> io::Result<()> {
-    socket.set_tcp_user_timeout(Some(UNACKNOWLEDGED_DURATION_MAX))
+fn set_user_timeout(socket: &SockRef<'_>, unacknowledged: Duration) -> io::Result<()> {
+    socket.set_tcp_user_timeout(Some(unacknowledged))
 }
 
 /// Other kernels have no `TCP_USER_TIMEOUT`: there, a peer that stops reading is caught
@@ -44,7 +46,7 @@ fn set_user_timeout(socket: &SockRef<'_>) -> io::Result<()> {
 /// for the rest (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md, what
 /// would change it). [`warn_unsupported`] says so at startup.
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
-fn set_user_timeout(_socket: &SockRef<'_>) -> io::Result<()> {
+fn set_user_timeout(_socket: &SockRef<'_>, _unacknowledged: Duration) -> io::Result<()> {
     Ok(())
 }
 
@@ -71,8 +73,25 @@ pub async fn serve(
     app: Router,
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> io::Result<()> {
-    let listener = listener.tap_io(|stream| {
-        if let Err(error) = configure(stream) {
+    serve_with_user_timeout(listener, app, UNACKNOWLEDGED_DURATION_MAX, shutdown).await
+}
+
+/// [`serve`] with `TCP_USER_TIMEOUT` at `unacknowledged` instead of the limit, so a test
+/// watches the kernel close a stalled connection without waiting out the write stall
+/// (decisions/2026-10-08-the-write-stall-test-runs-at-a-one-second-user-timeout.md). The
+/// binary serves through [`serve`] only.
+///
+/// # Errors
+///
+/// When serving fails.
+pub async fn serve_with_user_timeout(
+    listener: TcpListener,
+    app: Router,
+    unacknowledged: Duration,
+    shutdown: impl Future<Output = ()> + Send + 'static,
+) -> io::Result<()> {
+    let listener = listener.tap_io(move |stream| {
+        if let Err(error) = configure(stream, unacknowledged) {
             tracing::warn!(%error, "an accepted connection's socket options were not set");
         }
     });
@@ -114,7 +133,7 @@ mod tests {
         let address = listener.local_addr().unwrap();
         let _client = TcpStream::connect(address).await.unwrap();
         let (accepted, _) = listener.accept().await.unwrap();
-        configure(&accepted).unwrap();
+        configure(&accepted, UNACKNOWLEDGED_DURATION_MAX).unwrap();
         let socket = SockRef::from(&accepted);
         assert_eq!(
             socket.tcp_user_timeout().unwrap(),

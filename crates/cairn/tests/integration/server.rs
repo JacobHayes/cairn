@@ -238,14 +238,18 @@ mod in_process {
 
     /// decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md: an SSE client that
     /// stops reading, with the stream still ticking, loses its subscriber slot within the
-    /// write stall plus one coalescing interval of its receive window closing. The kernel
-    /// closes the connection at `TCP_USER_TIMEOUT`, long before the server's send buffer
-    /// could fill and stall the API's own channel. The kernel starts that clock at its first
-    /// zero-window probe, one retransmission timeout (at least Linux's 200 ms minimum) after
-    /// the window closes, which the bound allows for.
+    /// connection's user timeout plus one coalescing interval of its receive window closing.
+    /// The kernel closes the connection at `TCP_USER_TIMEOUT`, long before the server's send
+    /// buffer could fill and stall the API's own channel. The kernel starts that clock at its
+    /// first zero-window probe, one retransmission timeout (at least Linux's 200 ms minimum)
+    /// after the window closes, which the bound allows for. The listener is given a one-second
+    /// user timeout rather than the write stall the binary sets (`listener::tests` checks that
+    /// one), so the test waits a second, not the stall
+    /// (decisions/2026-10-08-the-write-stall-test-runs-at-a-one-second-user-timeout.md); the
+    /// API's own stall cannot free the slot that soon, so the socket option is what freed it.
     #[cfg(any(target_os = "linux", target_os = "android"))]
     #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
-    async fn a_subscriber_that_stops_reading_loses_its_slot_at_the_write_stall() {
+    async fn a_subscriber_that_stops_reading_loses_its_slot_at_the_user_timeout() {
         use std::io::{Read, Write};
         use std::time::{Duration, Instant};
 
@@ -253,10 +257,11 @@ mod in_process {
         use cairn_schema::{Domain, Revision, RevisionOf};
         use cairn_store::Notifier;
 
+        let user_timeout = Duration::from_secs(1);
         let notifier = Arc::new(InProcessNotifier::new());
         let config = support::config(&support::dev_provider(None));
         let app = root::app(&config, support::assembly(Arc::clone(&notifier))).unwrap();
-        let address = support::serve(app).await;
+        let address = support::serve_with_user_timeout(app, user_timeout).await;
 
         // A subscriber with the smallest receive buffer the kernel allows, so its window
         // closes within a moment of ticks once it stops reading.
@@ -300,8 +305,8 @@ mod in_process {
         let started = Instant::now();
         while notifier.subscriber_count() > 0 {
             assert!(
-                started.elapsed() < SSE_WRITE_STALL * 4,
-                "the slot was never freed"
+                started.elapsed() < SSE_WRITE_STALL,
+                "the slot was not freed at the socket"
             );
             let now_waiting = client.peek(&mut buffer).unwrap_or(waiting);
             if now_waiting > waiting {
@@ -317,15 +322,15 @@ mod in_process {
             started.elapsed()
         );
         assert!(
-            freed >= SSE_WRITE_STALL,
-            "freed after {freed:?}, before the stall"
+            freed >= user_timeout,
+            "freed after {freed:?}, before the user timeout"
         );
         // Linux's minimum retransmission timeout (TCP_RTO_MIN): the delay before the first
         // zero-window probe, from which the user timeout counts.
         let first_probe = Duration::from_millis(200);
         assert!(
-            freed <= SSE_WRITE_STALL + SSE_COALESCING_INTERVAL + first_probe,
-            "freed after {freed:?}, past the stall and one interval"
+            freed <= user_timeout + SSE_COALESCING_INTERVAL + first_probe,
+            "freed after {freed:?}, past the user timeout and one interval"
         );
     }
 
