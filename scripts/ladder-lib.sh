@@ -64,6 +64,10 @@ ladder_rung_end() {
   ladder_say "passed"
 }
 
+# The tests rung 2 leaves to later rungs, by name (the module paths PRACTICES lists): rung 2
+# and `mise run test` without a filter run everything else.
+ladder_unit_skips=(--skip property:: --skip conformance:: --skip cost:: --skip in_process:: --skip binary::binary::)
+
 # ladder_cargo_test [--test NAME] [-- TEST_ARGUMENT...]: the workspace's tests (every crate,
 # every feature), TEST_ARGUMENT being the name filters. Prints the run's output and sets
 # `ladder_tests` to one "package<TAB>test<TAB>result" line per test it ran. Every rung runs

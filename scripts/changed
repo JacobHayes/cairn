@@ -1,0 +1,53 @@
+#!/usr/bin/env node
+// What the current change touches, so the inner loop (`mise run check:fast`, `mise run test`)
+// runs only the tests it can affect. The change is the files `jj diff -r @ --name-only` lists,
+// or `-r @-` when the working copy is empty (the usual state right after `jj commit`). When jj
+// is missing or the diff fails, everything counts as changed, so the answer errs toward
+// running more. The full `mise run check` and CI never ask.
+//
+// usage: scripts/changed
+//   Prints one line, "RUST WEB COUNT": RUST and WEB are 1 when the change touches that side's
+//   inputs (see below) and 0 when it does not, COUNT the number of changed files ("-" when the
+//   diff was unavailable, which sets both to 1).
+import { execFileSync } from "node:child_process";
+
+// A path is an input of the Rust side when anything Cargo builds or a Rust test reads can
+// change with it: the crates and their lock, the fixtures, the generated schema and OpenAPI
+// the tests compare with, and the skill text the MCP crate embeds.
+const rustInputs = /^(crates|testbeds|fixtures|schema|openapi|instructions)\/|^(Cargo\.toml|Cargo\.lock|clippy\.toml)$/;
+// And of the web side: the web packages, the design they import, and the fixtures the
+// browser tests walk.
+const webInputs = /^(web|design|fixtures)\/|^(package\.json|package-lock\.json|tsconfig\.json|eslint\.config\.js)$/;
+// The tooling that runs the checks and the pinned tools are inputs of both.
+const bothInputs = /^(scripts|mise-tasks|\.github)\/|^mise\.(toml|lock)$/;
+
+/** The files of the current change: the working copy's, or its parent's when that is empty. */
+function changedFiles() {
+  for (const revision of ["@", "@-"]) {
+    const output = execFileSync("jj", ["diff", "-r", revision, "--name-only", "--color=never", "--no-pager"], {
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "pipe"],
+    });
+    const files = output.split("\n").filter((file) => file !== "");
+    if (files.length > 0) return files;
+  }
+  return [];
+}
+
+/** @returns {{ rust: boolean, web: boolean, count: number | null, error?: string }} */
+function changedInputs() {
+  try {
+    const files = changedFiles();
+    return {
+      rust: files.some((file) => rustInputs.test(file) || bothInputs.test(file)),
+      web: files.some((file) => webInputs.test(file) || bothInputs.test(file)),
+      count: files.length,
+    };
+  } catch (error) {
+    return { rust: true, web: true, count: null, error: String(error instanceof Error ? error.message : error).split("\n")[0] ?? "" };
+  }
+}
+
+const { rust, web, count, error } = changedInputs();
+if (error !== undefined) console.error(`changed: no diff (${error}); treating everything as changed`);
+console.log(`${Number(rust)} ${Number(web)} ${count ?? "-"}`);

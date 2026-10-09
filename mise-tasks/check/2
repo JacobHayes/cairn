@@ -26,11 +26,10 @@ crates=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
   process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
     for (const item of JSON.parse(text).packages) console.log(item.name);
   });')
-skips=(--skip property:: --skip conformance:: --skip cost:: --skip in_process:: --skip binary::binary::)
 # Every workspace crate is a suite, whatever test binaries it builds, unit and integration
 # together, each test counted for the crate whose binary ran it. The doc tests are rung 4's:
 # no crate has one, and the pass that looks for them costs seconds.
-ladder_cargo_test -- "${skips[@]}" || ladder_fail "cargo test reported failures"
+ladder_cargo_test -- "${ladder_unit_skips[@]}" || ladder_fail "cargo test reported failures"
 while IFS= read -r crate; do
   [ -n "$crate" ] || continue
   ladder_suite "$crate tests" "$(ladder_tests_matching "$crate" "")" tests

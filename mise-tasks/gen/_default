@@ -1,18 +1,34 @@
 #!/usr/bin/env bash
-#MISE description="Regenerate the generated paths: runs every gen:<name> task"
+#MISE description="Regenerate the generated paths: runs every gen:<name> task, side by side"
 # ARCHITECTURE, Generated artifacts. A generator is a task file mise-tasks/gen/<name> that
-# writes only into its generated path; adding the file adds it here.
+# writes only into its generated path; adding the file adds it here. They write disjoint
+# paths, so they run in parallel: the native build the OpenAPI and schema generators share
+# (cargo's lock lets the second find it done) runs beside the wasm build (a different target
+# directory of cargo's), where one after another they added up. Each one's output is kept in
+# dist/gen/<name>.out and printed in order once all are done.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/../.."
 generators=()
-for path in *; do
-  [ "$path" = _default ] || generators+=("$path")
+for path in mise-tasks/gen/*; do
+  [ "${path##*/}" = _default ] || generators+=("${path##*/}")
 done
 if [ ${#generators[@]} -eq 0 ]; then
   echo "gen: no generators exist yet; the generated paths are empty"
   exit 0
 fi
+mkdir -p dist/gen
+pids=()
 for name in "${generators[@]}"; do
-  echo "gen: $name"
-  "./$name"
+  mise-tasks/gen/"$name" >dist/gen/"$name".out 2>&1 &
+  pids+=($!)
 done
+failed=0
+for index in "${!generators[@]}"; do
+  name=${generators[$index]}
+  status=0
+  wait "${pids[$index]}" || status=$?
+  echo "gen: $name"
+  cat dist/gen/"$name".out
+  [ "$status" -eq 0 ] || { echo "gen: $name FAILED ($status)" >&2; failed=1; }
+done
+exit "$failed"

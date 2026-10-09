@@ -6,7 +6,9 @@
 # in-browser host. Each one's wait (the cargo no-op, the seeding, Vite's start) overlaps the
 # others'. Prints READY once all four answer, which is what Playwright waits for, and exits
 # non-zero when any of them stops. The ports are the config's, passed in the environment:
-# CAIRN_APP_PORT, CAIRN_SERVER_PORT, CAIRN_E2E_PORT, and CAIRN_DEMO_PORT.
+# CAIRN_APP_PORT, CAIRN_SERVER_PORT, CAIRN_E2E_PORT, and CAIRN_DEMO_PORT. With
+# CAIRN_E2E_BINARY=0 the binary is left out (`mise run e2e` does so for a spec that does not
+# run against it, which then needs no web build embedded in it).
 #
 # usage: scripts/e2e-servers
 set -euo pipefail
@@ -19,8 +21,12 @@ vite=$PWD/node_modules/vite/bin/vite.js
 pids=()
 scripts/built examples/fixture_server "$CAIRN_SERVER_PORT" "$app" >/dev/null &
 pids+=($!)
-scripts/e2e-binary "$CAIRN_E2E_PORT" >/dev/null &
-pids+=($!)
+urls=("$server/api/capabilities" "$app/" "http://127.0.0.1:$CAIRN_DEMO_PORT/")
+if [ "${CAIRN_E2E_BINARY:-1}" != 0 ]; then
+  scripts/e2e-binary "$CAIRN_E2E_PORT" >/dev/null &
+  pids+=($!)
+  urls+=("http://127.0.0.1:$CAIRN_E2E_PORT/api/capabilities")
+fi
 (cd web/app && CAIRN_SERVER=$server exec node "$vite" --config vite.config.ts >/dev/null) &
 pids+=($!)
 # The in-browser host's server must not see a CAIRN_SERVER from the caller: it would proxy.
@@ -36,7 +42,7 @@ all_running() {
   done
 }
 
-for url in "$server/api/capabilities" "http://127.0.0.1:$CAIRN_E2E_PORT/api/capabilities" "$app/" "http://127.0.0.1:$CAIRN_DEMO_PORT/"; do
+for url in "${urls[@]}"; do
   until curl --silent --fail --output /dev/null "$url"; do
     all_running || { echo "e2e-servers: a server stopped before $url answered" >&2; exit 1; }
     sleep 0.1

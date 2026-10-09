@@ -6,7 +6,7 @@
 # into web/wasm/generated/.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-mise run build:wasm
+mise-tasks/build/wasm
 from=web/wasm/dist/bindgen
 to=web/wasm/generated
 rm -rf "$to"

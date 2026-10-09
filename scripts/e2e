@@ -1,0 +1,46 @@
+#!/usr/bin/env bash
+# One Playwright spec of the app, in Chromium (`mise run e2e SPEC [GREP]`), with what it runs
+# against built first, and only if cargo or the web build says it is stale.
+#
+# usage: scripts/e2e SPEC [GREP]
+#   SPEC: a spec file of web/app/e2e, with or without its directory and `.spec.ts`
+#     (`canvas`, `canvas.spec.ts`, `web/app/e2e/canvas.spec.ts`).
+#   GREP: only the tests whose title matches (Playwright's -g).
+# Runs the spec's tests of the `chromium` project and its @server tests of the `server`
+# project (web/app/playwright.config.ts); server.spec.ts, which only runs against the real
+# binary, runs in the `binary` project. The browser host's module is bound (build:wasm: cargo
+# decides, and the bindings are rebound only if it changed), the programs the servers start are
+# built (scripts/built: cargo), and the four servers start side by side (scripts/e2e-servers),
+# as in rung 6. The binary and its embedded web build matter only to server.spec.ts, so the
+# other specs start no binary and build no web app.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+spec=${1:?usage: scripts/e2e SPEC [GREP]}
+spec=${spec##*/}
+spec=${spec%.spec.ts}
+spec=${spec%.ts}
+file=web/app/e2e/$spec.spec.ts
+[ -f "$file" ] || { echo "e2e: no spec $file; the specs: $(cd web/app/e2e && for f in *.spec.ts; do printf '%s ' "${f%.spec.ts}"; done)" >&2; exit 1; }
+playwright=$PWD/node_modules/.bin/playwright
+[ -x "$playwright" ] || { echo "e2e: $playwright is missing: run npm ci" >&2; exit 1; }
+
+mise-tasks/build/wasm
+if [ "$spec" = server ]; then
+  projects=(--project=binary)
+  # The binary serves the web build it embeds: build it when any source it comes from is
+  # newer than it (what make would do), before cargo links the binary around it. Directories
+  # count, so a file removed from one does too, and so do the manifests, for a dependency
+  # that changed.
+  build=web/app/dist/build/index.html
+  if [ ! -f "$build" ] || [ -n "$(find web/app/src web/app/index.html web/app/vite.config.ts web/app/package.json \
+    web/client/src web/client/package.json web/wasm/src web/wasm/package.json web/wasm/dist/bindgen design \
+    package-lock.json -newer "$build" -print -quit)" ]; then
+    (cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts)
+  fi
+else
+  projects=(--project=chromium --project=server)
+  export CAIRN_E2E_BINARY=0
+fi
+scripts/built
+cd web/app
+exec "$playwright" test "${projects[@]}" "e2e/$spec.spec.ts" ${2:+-g "$2"}

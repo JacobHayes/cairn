@@ -22,7 +22,14 @@ cargo build --quiet --locked --profile "$profile" --target wasm32-unknown-unknow
 target_dir=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
   let text = "";
   process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => console.log(JSON.parse(text).target_directory));')
+module=$target_dir/wasm32-unknown-unknown/$profile/cairn_wasm.wasm
+# Cargo has just decided whether the module changed; bind it only if it did, so a run that
+# changed nothing leaves the bindings (and their timestamps) alone. The bindings come from
+# one profile or the other, so a switch rebinds too (the module is then the newer file).
+if [ "$out/cairn_wasm_bg.wasm" -nt "$module" ] && [ "$(cat "$out/profile" 2>/dev/null)" = "$profile" ]; then
+  exit 0
+fi
 rm -rf "$out"
 mkdir -p "$out"
-wasm-bindgen --target web --out-dir "$out" --out-name cairn_wasm \
-  "$target_dir/wasm32-unknown-unknown/$profile/cairn_wasm.wasm"
+wasm-bindgen --target web --out-dir "$out" --out-name cairn_wasm "$module"
+echo "$profile" >"$out/profile"

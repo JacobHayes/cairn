@@ -29,7 +29,9 @@ Tools are pinned in `mise.toml`; tasks live in `mise-tasks/`.
 ```sh
 mise install          # pinned Rust toolchain, Node, wasm tool, and cargo-patina
 mise run check        # every rung of the validation ladder that exists
-mise run check:fast   # rungs 1 to 3: the inner loop
+mise run check:fast   # rungs 1 to 3: the inner loop (Rust rungs skipped when the change has no Rust input)
+mise run test dates   # the Rust and web tests matching a filter; none: those for what changed
+mise run e2e canvas   # one Playwright spec in Chromium, optionally one test by title
 mise run check:1      # one rung
 mise run gen          # regenerate the generated paths
 mise run sim          # simulation campaigns under patina; not part of check

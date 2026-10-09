@@ -235,11 +235,19 @@ flowchart TB
 | 5 | generated artifacts: regenerate the generated paths and fail if any file in them changed, appeared, or disappeared | tens of seconds |
 | 6 | web unit tests; in-browser end-to-end against the wasm host | minutes |
 
-`mise run check:fast` is rungs 1 to 3: the inner loop for an agent after every change. The full ladder runs before handing work off and in CI on every push; CI adds a nightly run with a larger property case count, and runs `mise run sim` nightly, outside the gate.
+`mise run check:fast` is rungs 1 to 3: the inner loop for an agent after every change. It leaves out the Rust rungs (2 and 3) when the current change touches no Rust input (`scripts/changed`: the files of `jj diff -r @ --name-only`, or of `@-` when the working copy is empty; any failure to diff runs everything), and says so in one line; rung 1 always runs whole, since a Rust change can break the web app through the API and the generated types. The full `mise run check` and CI never skip. The full ladder runs before handing work off and in CI on every push; CI adds a nightly run with a larger property case count, and runs `mise run sim` nightly, outside the gate.
 
 A rung that runs zero tests fails. Every rung's command reports how many tests each of its suites ran, and the rung fails if any suite it lists ran none, so one suite vanishing cannot hide behind another's count. Rung 1 runs tools, not tests: it fails if any tool is missing or reports nothing checked. Outside CI it first applies what its tools can fix themselves (`cargo fmt`, `cargo clippy --fix` for machine-applicable suggestions, `eslint --fix`) and prints `rung 1 fixed: N files`, so only what needs a person fails; with `CI` set it only verifies (`decisions/2026-10-09-local-checks-fix-and-ci-verifies.md`).
 
 Each crate's integration tests are one test binary, `tests/integration/main.rs`, with one module per file beside it, so the crate's dependencies are linked once rather than once per file. A new test file goes in `tests/integration/` and is declared in `main.rs` as `mod <file>;`. Rungs pick tests by module path, not by file: `mod property` in `property_*.rs` and `mod cost` in `cost_*.rs` for rung 3, `mod conformance` and `mod in_process` for rung 4, `mod binary` in the binary's `binary.rs` for rung 6, and the rest in rung 2.
+
+Three commands cover the inner loop, so nobody needs a cargo, vitest, or playwright incantation:
+
+- `mise run test [filter]` while coding: the Rust tests whose names contain the filter (built as the ladder builds them, so nothing is compiled twice) and the Vitest files or tests that match; with no filter, the tests for what the current change touches. It fails when nothing matches.
+- `mise run check:fast` after a change, before review: rungs 1 to 3, as above.
+- `mise run e2e <spec> [grep]` for a browser flow you changed: one Playwright spec in Chromium (its `@server` tests too), with the module and the programs built only if stale; `-g` narrows to one test, so a one-line fix never re-runs a whole spec.
+
+The full `mise run check` is the gate before landing. `mise run gen` runs its generators side by side and rebinds the wasm module only when cargo rebuilt it.
 
 The ladder's Rust tests run in one pass: `scripts/ladder-tests` builds every test binary once (before rung 2, when the full ladder runs) and runs them in parallel, and each rung counts its suites by test name from that run, so a suite keeps its name and count whichever rung owns it. The tests of the engine, schema, service, store, and wasm crates are built at opt-level 2 in the `test` profile (`[profile.test.package.<crate>]`, debug assertions on; `dev` and `wasm-dev` are untouched so the module's bindings do not change), and `scripts/built` uses that profile so the programs the browser tests start are the same units. Doc tests run in rung 4 only. In rung 1 eslint caches per file, and in rung 6 `cairn-wasm-cases` is reused while the crates it links and the fixtures are unchanged (`web/wasm/dist/cases.hash`). The Playwright servers of web/app start side by side (`scripts/e2e-servers`). The call is in `decisions/2026-10-09-the-ladder-runs-its-tests-in-parallel-from-an-optimized-test-profile.md`.
 
@@ -249,7 +257,7 @@ The table above is the finished ladder, and every rung in it now exists. It was 
 
 ## For implementers and agents
 
-- Run `check:fast` after every change and `mise run check` (every rung that exists) before declaring work done. A rung that fails is the next thing to fix, not a note in the handoff.
+- Run `check:fast` after every change (and `mise run test <filter>` while coding) and `mise run check` (every rung that exists) before declaring work done. A rung that fails is the next thing to fix, not a note in the handoff.
 - A new pass over the graph comes with its cost at `node_count_max` and a property test.
 - A bug found by simulation or a property test becomes an example-based scenario test, then is fixed.
 - Adding or changing a limit needs the user's sign-off first. Then it goes in the table above and in the crate's `limits.rs` in the same commit, with its "why".
