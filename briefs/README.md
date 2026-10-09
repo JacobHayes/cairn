@@ -51,7 +51,7 @@ The shape every brief follows.
 | 5.8 | Assistant panel | `web/app` | 5.7, 4.4 | landed |
 | 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 | landed |
 | 6.2 | Durability testbed | `testbeds/durability` | 4.1 | landed |
-| 7.1 | Unlocked nodes first in a pass | `web/app` | 8.2, 8.9 | planned |
+| 7.1 | Unlocked nodes first in a pass | `web/app` | 8.2, 8.9 | landed |
 | 7.2 | A rationale on answers | `crates/schema`, `crates/engine`, `crates/store`, `crates/store-turso`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.4 (screens: 8.7, 8.9) | landed |
 | 7.3 | The `requires_note` guard | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `openapi/`, `web/client`, `web/app` | 5.6 (screens: 8.7, 8.9) | landed |
 | 7.4 | Snoozing a container | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.3 (screens: 8.7, 8.9) | landed |

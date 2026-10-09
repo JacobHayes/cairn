@@ -7,12 +7,14 @@
 // node is opened. Triage always reads the current frontier (the engine's `next` projection over
 // the tab's derivation, kept current, H6), so an answer that unblocks new nodes surfaces them in
 // the same pass. Pass is client state for this pass only (pass.ts): kept per tab in session
-// storage, never sent.
-import { useCallback, useEffect, useMemo } from "react";
+// storage, never sent. What a write made from the pass unlocked (the patch's consequences, never
+// a diff of the frontier) comes next, each card labeled with the card that unlocked it.
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
 import { useDraft } from "../data/drafts.ts";
+import { useSaves, useSession } from "../data/react.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { titleOf, type Ready } from "../detail/model.ts";
 import { screenPath } from "../detail/parts.tsx";
@@ -22,7 +24,7 @@ import { typing } from "../ui/typing.ts";
 import { ACTING_KINDS, NEXT_FILTER_FLAGS, triagePath, triageQueryOf, type TriageSettings } from "./address.ts";
 import { Check, Checks, FlagChecks } from "./Controls.tsx";
 import { DetailLink } from "./Parts.tsx";
-import { begin, passedAll, passOn, passOrder, roundAgain, surfaced, type Pass } from "./pass.ts";
+import { acted, begin, passedAll, passOn, passOrder, roundAgain, surfaced, unlockedBy, type Pass } from "./pass.ts";
 import { PassRail } from "./PassRail.tsx";
 import { withFlags } from "./rows.ts";
 import { StalledPanel } from "./Stalled.tsx";
@@ -44,7 +46,7 @@ export function TriageControls({ settings, onChange }: { settings: TriageSetting
   );
 }
 
-/** What reached the acting frontier since the pass began: an answer's newly unblocked nodes. */
+/** What reached the acting frontier since the pass began, other than what the pass's own actions unlocked (the card's band and the rail name those). */
 function Surfaced({ view, keys }: { view: Ready; keys: string[] }) {
   if (keys.length === 0) {
     return null;
@@ -87,15 +89,39 @@ function Empty({ view, settings, stalled, onContinue }: { view: Ready; settings:
 
 /** The journey's pass, begun over its acting frontier the first time triage opens in this tab. */
 function usePass(view: Ready): [Pass, (pass: Pass) => void] {
-  const [stored, setStored] = useDraft<Pass>(`triage-pass:${view.journey.header.id}`);
+  // A pass kept by an earlier version of the app has no unlocks or acted-on nodes.
+  const [stored, setStored] = useDraft<Omit<Pass, "unlocked" | "acted"> & Partial<Pick<Pass, "unlocked" | "acted">>>(`triage-pass:${view.journey.header.id}`);
   const frontier = view.derived.acting_frontier;
-  const pass = useMemo(() => stored ?? begin(frontier), [stored, frontier]);
+  const pass = useMemo(() => (stored === undefined ? begin(frontier) : { ...stored, unlocked: stored.unlocked ?? [], acted: stored.acted ?? [] }), [stored, frontier]);
   useEffect(() => {
     if (stored === undefined) {
       setStored(pass);
     }
   }, [stored, pass, setStored]);
   return [pass, setStored];
+}
+
+/**
+ * Hears the writes sent while the pass is on screen, the card's and those made in a node opened
+ * from it: each one's unlocks come next. Writes sent before the pass opened (on another page,
+ * even if they land after) and writes in another tab are never heard.
+ */
+function useUnlocks(journey: string, pass: Pass, setPass: (pass: Pass) => void): void {
+  const saves = useSaves();
+  const { activity } = useSession();
+  const opened = useRef(activity.began);
+  const heard = useRef(0);
+  useEffect(() => {
+    const fresh = saves.filter((save) => save.id > heard.current).reverse();
+    if (fresh.length === 0) {
+      return;
+    }
+    heard.current = Math.max(...fresh.map((save) => save.id));
+    const next = fresh.reduce((now, { unlocks }) => (unlocks?.journey === journey && unlocks.began > opened.current ? acted(now, unlocks.by, unlocks.nodes) : now), pass);
+    if (next !== pass) {
+      setPass(next);
+    }
+  }, [saves, journey, pass, setPass]);
 }
 
 /** The card's keyboard: P passes, unless a field has the keys, a modifier is held, or the key sheet is open. */
@@ -118,12 +144,19 @@ function usePassKey(onPass: (() => void) | undefined): void {
 }
 
 /** The card: the focus node's inspector panel, with its place in the pass and Pass on the frame's top edge. */
-function PassCard({ view, card, place, onPass }: { view: Ready; card: NodeRow; place: string; onPass: () => void }) {
+function PassCard({ view, card, place, by, onPass }: { view: Ready; card: NodeRow; place: string; by: string | undefined; onPass: () => void }) {
   return (
     <div className="pass-frame stack" data-testid="triage-card" data-node={card.key} data-kind={card.kind}>
       <span className="pass-edge row">
-        <span className="muted small" data-testid="card-position">
-          {place}
+        <span className="row">
+          <span className="muted small" data-testid="card-position">
+            {place}
+          </span>
+          {by === undefined ? null : (
+            <span className="small unlocked-by" data-testid="unlocked-by">
+              <span className="label">↳ Unlocked by</span> <DetailLink view={view} node={by} />
+            </span>
+          )}
         </span>
         <Button onClick={onPass} data-testid="pass" title="Pass: later in this pass; nothing is saved">
           Pass <kbd>P</kbd>
@@ -141,6 +174,7 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
   const wide = useMedia(COLUMN);
   const journey = view.journey.header.id;
   const [pass, setPass] = usePass(view);
+  useUnlocks(journey, pass, setPass);
   const request = useMemo(() => ({ projection: "next" as const, query: triageQueryOf(settings) }), [settings]);
   const { value: next, error } = useProjected(view, request);
   const wanted = settings.text.trim().toLowerCase();
@@ -174,7 +208,7 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
         </p>
       ) : null}
       {error === undefined ? null : <p className="callout callout-bad">The frontier could not be read: {error}</p>}
-      <Surfaced view={view} keys={surfaced(view.derived.acting_frontier, pass)} />
+      <Surfaced view={view} keys={surfaced(view.derived.acting_frontier, pass).filter((key) => unlockedBy(pass, key) === undefined)} />
       {next === undefined ? <p className="muted small">Reading the frontier...</p> : null}
       {next !== undefined && rows.length === 0 ? (
         <Empty view={view} settings={settings} stalled={next.stalled != null} onContinue={() => void navigate(triagePath(journey, { ...settings, decisions: false }, selected))} />
@@ -194,7 +228,7 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
           {rail}
         </details>
       )}
-      {card === undefined ? null : <PassCard view={view} card={card} place={`${String(Math.min(passedCount + 1, order.length))} of ${String(order.length)}`} onPass={onPass} />}
+      {card === undefined ? null : <PassCard view={view} card={card} place={`${String(Math.min(passedCount + 1, order.length))} of ${String(order.length)}`} by={unlockedBy(pass, card.key)} onPass={onPass} />}
       {wide && !opened ? <Inspector focus={journey} reveal={false}>{rail}</Inspector> : null}
     </section>
   );

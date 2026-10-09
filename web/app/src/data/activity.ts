@@ -64,6 +64,15 @@ export function mayNotApply(unanswered: string[], title: (key: string) => string
   return `May not apply, since ${names} ${unanswered.length === 1 ? "is" : "are"} unanswered`;
 }
 
+/** D7: the node a save acted on and the nodes it newly brought onto the acting frontier (maybe none). */
+export interface Unlocks {
+  journey: string;
+  by: string;
+  nodes: string[];
+  /** When the write was sent, as `Activity.begin` counted it: a save sent before a screen opened is not that screen's. */
+  began: number;
+}
+
 /** A node's title, given the journey it is in. */
 export type TitleOf = (journey: string, node: string) => string;
 
@@ -108,6 +117,8 @@ export interface SaveEvent {
   text: string;
   /** The receipt's warning sentence, when the write had warning consequences. */
   warning: string | undefined;
+  /** What the write acted on and unlocked, for a pass over the acting frontier (never shown as a warning). */
+  unlocks: Unlocks | undefined;
 }
 
 /** The saves the popover lists. */
@@ -124,6 +135,17 @@ export class Activity extends Emitter {
   #saves: readonly SaveEvent[] = [];
   #toast: Toast | undefined;
   #next = 0;
+  #began = 0;
+
+  /** How many writes have been sent: a later write has a higher count. */
+  get began(): number {
+    return this.#began;
+  }
+
+  /** Counts a write being sent, and returns its count. */
+  begin(): number {
+    return ++this.#began;
+  }
 
   /** This tab's last saves, newest first. */
   get saves(): readonly SaveEvent[] {

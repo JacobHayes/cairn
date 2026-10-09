@@ -7,7 +7,7 @@ import { Activity, consequenceLines, warningOf } from "./activity.ts";
 import { FakeHost } from "./fake.test-support.ts";
 import { SkewLatch } from "./skew.ts";
 import { SyncStatus } from "./sync.ts";
-import { newPatchId, patchOf, write, type WriteEnv, type WriteIntent } from "./writes.ts";
+import { newPatchId, patchOf, unlocksOf, write, type WriteEnv, type WriteIntent } from "./writes.ts";
 
 const intent: WriteIntent = {
   target: { journey: "j_one" },
@@ -74,6 +74,17 @@ describe("write", () => {
     expect(env.sync.problems).toEqual([]);
   });
 
+});
+
+describe("unlocksOf (D7)", () => {
+  const answer = (unlocked: string[]) => ({ outcome: "applied" as const, receipt, consequences: { j_one: { unlocked } } });
+  const complete = { op: "transition" as const, node: "n_a", transition: "complete" as const };
+
+  it("names the node acted on even when an evidence annotation comes first, and when nothing was unlocked", () => {
+    const annotate = { op: "add_annotation" as const, annotation: { key: "a_x", node: "n_a", note: "Done" } };
+    expect(unlocksOf({ ...intent, mutations: [annotate, complete] }, answer(["n_b"]), 7)).toEqual({ journey: "j_one", by: "n_a", nodes: ["n_b"], began: 7 });
+    expect(unlocksOf({ ...intent, mutations: [complete] }, answer([]), 8)).toMatchObject({ by: "n_a", nodes: [] });
+  });
 });
 
 describe("warningOf (D7)", () => {

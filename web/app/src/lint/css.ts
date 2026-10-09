@@ -2,7 +2,7 @@
 // scroller per region and use the design's tokens. A rule outside its allowlist is a violation:
 //   - `overflow` or `overflow-y` of auto or scroll, except on the frame's scrollers;
 //   - `max-height` in `vh`, and `100vh` anywhere (the frame is `100dvh`);
-//   - `position: sticky`, except table headers, the list's pinned columns, the timeline axis, and the strip below 720px;
+//   - `position: sticky`, except table headers, the list's pinned columns, the timeline axis, the way back to the pass, and the strip below 720px;
 //   - a raw hex colour (tokens carry colours);
 //   - a border radius over 4px (DESIGN's `--radius-lg`).
 // A small reader, not a CSS parser: it tracks braces and at-rules, which is all these need.
@@ -24,8 +24,8 @@ export interface Source {
 
 /** The only elements that scroll (design 3.2): the rail, the workspace body, and the inspector's, sheet's, popover's and modal's bodies. */
 const SCROLLERS = [".rail", ".ws-body", ".inspector-body", ".sheet-body", ".popover-body", ".modal-body"];
-/** Elements that may stick: table headers, the Plan list's pinned columns, the timeline's axis, and the strip on a phone. */
-const STICKY = ["th", ".list-pinned", ".timeline-axis"];
+/** Elements that may stick: table headers, the Plan list's pinned columns, the timeline's axis, the inspector's way back to the pass, and the strip on a phone. */
+const STICKY = ["th", ".list-pinned", ".timeline-axis", ".back-to-pass"];
 const STICKY_ON_PHONE = [".strip"];
 const PHONE = "max-width: 719px";
 /** DESIGN's `--radius-lg`, the largest radius there is (px); a rem is the design's 17px. */
@@ -116,7 +116,7 @@ function broken(declaration: Declaration): string | undefined {
   if (property === "position" && value === "sticky") {
     const onPhone = context.some((each) => each.includes(PHONE));
     if (!styles(selector, STICKY) && !(onPhone && styles(selector, STICKY_ON_PHONE))) {
-      return `position: sticky on ${selector}: only table headers, the list's pinned columns, the timeline axis, and the strip below 720px stick`;
+      return `position: sticky on ${selector}: only table headers, the list's pinned columns, the timeline axis, the way back to the pass, and the strip below 720px stick`;
     }
   }
   if (/#[0-9a-f]{3,8}\b/i.test(value)) {

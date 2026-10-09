@@ -301,6 +301,17 @@
   gap: var(--space-2);
 }
 
+/* What an action unlocked sits under the work it came from, one level however deep the chain. */
+.pass-unlocked {
+  margin-left: var(--space-4);
+}
+
+.pass-unlocked-mark {
+  margin-right: var(--space-2);
+  color: var(--color-secondary);
+  font-family: var(--font-mono);
+}
+
 /* The decision's why gives way when the region cannot hold it: it is narrower than the window by
    the rail, and by the inspector's column while a node is open. The columns Columns adds stay and
    the region scrolls to them, with Status and Title held at the left. A phone drops the owner, so
@@ -512,5 +523,23 @@ table.data.list-table th.bulk-head {
 }
 
 .back-to-pass {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: block;
+  padding: var(--space-2) 0;
+  background: var(--chrome-bg);
   color: var(--rail-ink);
+}
+
+/* The band's title gives way before Pass does. */
+.pass-edge > .row {
+  flex: 1;
+  min-width: 0;
+}
+.unlocked-by {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }

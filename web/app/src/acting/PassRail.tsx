@@ -7,7 +7,7 @@ import { Link, useLocation } from "react-router";
 import { titleOf, type Ready } from "../detail/model.ts";
 import { nodePath, screenPath } from "../detail/parts.tsx";
 import { Button } from "../ui/kit.tsx";
-import { doneThisPass, type Pass } from "./pass.ts";
+import { doneThisPass, unlockedBy, type Pass } from "./pass.ts";
 
 /** How many nodes a rail group names before it says how many more. */
 const SHOWN = 5;
@@ -18,11 +18,12 @@ function finished(view: Ready, key: string): boolean {
   return state === "done" || state === "skipped";
 }
 
-function Group({ view, title, keys, testId }: { view: Ready; title: string; keys: readonly string[]; testId: string }) {
+function Group({ view, title, keys, testId, pass }: { view: Ready; title: string; keys: readonly string[]; testId: string; pass?: Pass }) {
   const { pathname, search } = useLocation();
   if (keys.length === 0) {
     return null;
   }
+  const by = (key: string) => (pass === undefined ? undefined : unlockedBy(pass, key));
   return (
     <section className="stack pass-group" aria-label={title} data-testid={testId}>
       <span className="muted small">
@@ -30,7 +31,12 @@ function Group({ view, title, keys, testId }: { view: Ready; title: string; keys
       </span>
       <ul className="plain-list stack">
         {keys.slice(0, SHOWN).map((key) => (
-          <li key={key} data-node={key}>
+          <li key={key} data-node={key} className={by(key) === undefined ? undefined : "pass-unlocked"} title={by(key) === undefined ? undefined : `Unlocked by ${titleOf(view, by(key) ?? key)}`}>
+            {by(key) === undefined ? null : (
+              <span className="pass-unlocked-mark" aria-hidden="true">
+                ↳
+              </span>
+            )}
             <Link to={{ pathname: nodePath(screenPath(pathname), key), search }}>{titleOf(view, key)}</Link>
           </li>
         ))}
@@ -46,7 +52,7 @@ export function PassRail({ view, order, pass, onNewPass }: { view: Ready; order:
   const waiting = order.filter((key) => !pass.passed.includes(key));
   return (
     <section className="detail-panel panel stack pass-rail" aria-label="This pass" data-testid="pass-rail">
-      <Group view={view} title="Up next" keys={waiting.slice(1)} testId="up-next" />
+      <Group view={view} title="Up next" keys={waiting.slice(1)} testId="up-next" pass={pass} />
       <Group view={view} title="Passed" keys={passed} testId="passed" />
       <Group view={view} title="Done in this pass" keys={doneThisPass(pass, (key) => finished(view, key))} testId="done-this-pass" />
       <Button onClick={onNewPass} data-testid="new-pass">

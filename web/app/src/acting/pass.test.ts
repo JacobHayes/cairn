@@ -1,8 +1,9 @@
 // C11: a triage pass reorders the current frontier for this pass only: passed cards go to the
-// back in the order passed, new ones surface where they rank, and what surfaced is named.
+// back in the order passed, new ones surface where they rank, and what surfaced is named; what
+// an action unlocked comes next, the latest action's first.
 import { describe, expect, it } from "vitest";
 
-import { begin, passedAll, passOn, passOrder, roundAgain, surfaced } from "./pass.ts";
+import { acted, begin, doneThisPass, passedAll, passOn, passOrder, roundAgain, surfaced, unlockedBy } from "./pass.ts";
 
 const ranked = ["n_a", "n_b", "n_c", "n_d"];
 
@@ -40,5 +41,30 @@ describe("a triage pass", () => {
     const now = ["n_new", ...ranked];
     expect(passOrder(now, pass)).toEqual(now);
     expect(surfaced(now, pass)).toEqual(["n_new"]);
+  });
+
+  it("puts what an action unlocked next, in rank order, and a later action's ahead of an earlier one's", () => {
+    // n_a is answered and unlocks n_d and n_c; then n_d is acted on and unlocks n_e.
+    const first = acted(begin(ranked), "n_a", ["n_d", "n_c"]);
+    expect(passOrder(["n_b", "n_c", "n_d"], first)).toEqual(["n_c", "n_d", "n_b"]);
+    const second = acted(first, "n_d", ["n_e"]);
+    const now = ["n_b", "n_c", "n_e"];
+    expect(passOrder(now, second)).toEqual(["n_e", "n_c", "n_b"]);
+    expect(unlockedBy(second, "n_e")).toBe("n_d");
+    expect(unlockedBy(second, "n_d")).toBeUndefined();
+    // n_e was not on the frontier when the pass began; finished from its card, it is still done in this pass.
+    expect(doneThisPass(acted(second, "n_e", []), (key) => key === "n_a" || key === "n_e")).toEqual(["n_a", "n_e"]);
+  });
+
+  it("drops an unlocked card's label once it is acted on or passed, for good", () => {
+    const pass = passOn(acted(begin(ranked), "n_a", ["n_c", "n_d"]), "n_c");
+    expect(unlockedBy(pass, "n_c")).toBeUndefined();
+    expect(passOrder(["n_b", "n_c", "n_d"], pass)).toEqual(["n_d", "n_b", "n_c"]);
+    expect(passOrder(["n_b", "n_c", "n_d"], roundAgain(pass))).toEqual(["n_d", "n_b", "n_c"]);
+  });
+
+  it("skips an unlocked card that has left the frontier before it is reached", () => {
+    const pass = acted(begin(ranked), "n_a", ["n_x", "n_c"]);
+    expect(passOrder(["n_b", "n_c"], pass)).toEqual(["n_c", "n_b"]);
   });
 });

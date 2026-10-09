@@ -15,6 +15,7 @@ import {
   nextKeys,
   openActing,
   passOrder,
+  publishFollowUpRoute,
   revisionAfter,
   select,
   turnOn,
@@ -221,13 +222,38 @@ test("C11: the walkthrough opens on the decisions at the start; answering the pa
   await page.getByTestId("chip-decisions").click();
   await expect.poll(() => passOrder(page)).toContain("n_criteria");
   // Every kind holds the journey's acting frontier: kickoff, the decision meeting, the
-  // decisions still open, and the partner-led work the answer surfaced, in the next list's
-  // order.
+  // decisions still open, and the partner-led work the answer surfaced; the next list keeps
+  // the shared rank, which the pass's order for it (surfaced work first) does not change.
   const pass = await passOrder(page);
   const everyKind = ["n_criteria", "n_decision_meeting", "n_kickoff", ...UP_FRONT.filter((key) => key !== "n_partner_runs")];
   expect([...pass].sort()).toEqual(everyKind.sort());
   await goTo(page, "next", "list");
-  expect(await nextKeys(page)).toEqual(pass);
+  expect(await nextKeys(page)).toEqual(["n_kickoff", "n_criteria", ...pass.slice(2)]);
+});
+
+test("C11: what an answer unlocked comes next in the pass, labeled; passing sends it to the back, and a node completed from the pass unlocks into it too", async ({ page }) => {
+  const route = await publishFollowUpRoute(page);
+  await startJourney(page, "browser", journeyName("Follow-up"), { route, version: 1 });
+  await expect(card(page)).toHaveAttribute("data-node", "n_partner_runs");
+  await answerCard(page, "yes");
+  // The follow-up ranks below the up-front decisions still open, and still comes first.
+  await expect(card(page)).toHaveAttribute("data-node", "n_partner_scope");
+  await expect(page.getByTestId("unlocked-by").getByRole("link", { name: "Partner runs testing" })).toBeVisible();
+  await card(page).getByTestId("pass").click();
+  await expect(page.getByTestId("unlocked-by")).toHaveCount(0);
+  expect((await passOrder(page)).at(-1)).toBe("n_partner_scope");
+  // Every kind: the partner decision's other unlock is next, until a new pass returns to rank order.
+  await page.getByTestId("chip-decisions").click();
+  await expect(card(page)).toHaveAttribute("data-node", "n_criteria");
+  await page.getByTestId("new-pass").click();
+  await expect(card(page)).toHaveAttribute("data-node", "n_kickoff");
+  await expect(page.getByTestId("unlocked-by")).toHaveCount(0);
+  // Completed in its own inspector, opened from the pass, the action unlocks what waits on it.
+  await page.getByTestId("pass-rail").getByRole("link", { name: "Review the partner's criteria" }).click();
+  await nodePanel(page, "n_criteria").getByTestId("actions").getByRole("button", { name: "Mark done" }).click();
+  await page.getByTestId("back-to-pass").click();
+  await expect(card(page)).toHaveAttribute("data-node", "n_partner_results");
+  await expect(page.getByTestId("unlocked-by").getByRole("link", { name: "Review the partner's criteria" })).toBeVisible();
 });
 
 test("B2, C8, C12: a rationale given on a triage card shows in node detail; a revision without one drops it", async ({ page }) => {

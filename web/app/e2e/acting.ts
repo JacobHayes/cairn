@@ -1,9 +1,12 @@
 // What the acting surfaces' browser tests and proof share: opening the list, the next list,
 // and triage the way a person does, reading their rows and cards, and starting a fresh journey
 // from the vendor evaluation's route on the server host (the creation screen is 5.5's).
+import { readFileSync } from "node:fs";
+
 import { expect, type Locator, type Page } from "@playwright/test";
 
-import { derivedRevision, fresh, openAt, openFilter, type HostKind } from "./shell.ts";
+import { fixtureRoute } from "./around.ts";
+import { derivedRevision, fresh, open, openAt, openFilter, type HostKind } from "./shell.ts";
 
 /** Opens journey `journey`'s projection at `path` (`next/list`, `plan/list`, `next/cards`, with a query) on `host`, once derived. */
 export async function openActing(page: Page, host: HostKind, journey: string, path: string): Promise<void> {
@@ -108,4 +111,25 @@ export async function startVendorJourney(page: Page): Promise<string> {
   });
   expect(response.ok(), await response.text()).toBe(true);
   return id;
+}
+
+/**
+ * Publishes, on the in-browser host, a route like the vendor evaluation with one more decision,
+ * relevant only when a partner runs the testing and ranking below the up-front decisions: the
+ * partner decision unlocks it along with the partner-led work. Its id.
+ */
+export async function publishFollowUpRoute(page: Page): Promise<string> {
+  const route = "vendor-follow-up";
+  const file = readFileSync(fixtureRoute("vendor-evaluation"), "utf8")
+    .replace("route: vendor-evaluation\nname: Vendor evaluation\n", `route: ${route}\nname: Vendor evaluation with a follow-up\n`)
+    .replace(
+      "- key: n_kickoff\n",
+      "- key: n_partner_scope\n  id: partner-scope\n  kind: decision\n  title: Partner scope\n  prompt: Does the partner run all of the testing?\n  answer_type: boolean\n  weight: 0\n  relevant_when:\n    equals:\n      decision: partner-runs\n      value: true\n- key: n_kickoff\n",
+    );
+  await open(page, "browser", "/library");
+  await page.getByLabel("Import a route file").setInputFiles({ name: `${route}.yaml`, mimeType: "text/yaml", buffer: Buffer.from(file) });
+  await expect(page.getByTestId("draft")).toHaveAttribute("data-status", "open");
+  await page.getByTestId("route-actions").getByRole("button", { name: "Publish the draft" }).click();
+  await expect(page.locator('[data-testid="version"][data-version="1"]')).toBeVisible();
+  return route;
 }

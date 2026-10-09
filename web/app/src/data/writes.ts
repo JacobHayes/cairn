@@ -6,7 +6,7 @@
 import { submit, type HttpFailure, type Schema } from "@cairn/client";
 
 import type { Host, Markdown, Patch } from "./host.ts";
-import { consequenceLines, warningOf, type Activity, type ConsequenceLine, type TitleOf } from "./activity.ts";
+import { consequenceLines, warningOf, type Activity, type ConsequenceLine, type TitleOf, type Unlocks } from "./activity.ts";
 import type { SkewLatch } from "./skew.ts";
 import type { SyncStatus } from "./sync.ts";
 
@@ -65,14 +65,45 @@ export function reasonOf(rejection: Rejection): string {
   }
 }
 
+/** The journey a write targets, if it targets one. */
+function journeyOf(intent: WriteIntent): string | undefined {
+  return typeof intent.target === "object" && "journey" in intent.target ? intent.target.journey : undefined;
+}
+
+/** The node a mutation is about: the decision it answers, the node it acts on, or the one its annotation is on. */
+function subjectOf(mutation: Mutation): string | undefined {
+  if ("decision" in mutation) {
+    return mutation.decision;
+  }
+  if ("annotation" in mutation && typeof mutation.annotation === "object") {
+    return mutation.annotation.node ?? undefined;
+  }
+  return "node" in mutation && typeof mutation.node === "string" ? mutation.node : undefined;
+}
+
+/**
+ * D7: the node a landed write acted on (the first mutation about one: an evidence annotation or
+ * a new entity may come before the action) and what it unlocked, for a pass over the acting
+ * frontier; undefined when the write is about no node.
+ */
+export function unlocksOf(intent: WriteIntent, answer: Schema<"PatchAnswer">, began: number): Unlocks | undefined {
+  const journey = journeyOf(intent);
+  const by = intent.mutations.map(subjectOf).find((node) => node !== undefined);
+  if (journey === undefined || by === undefined) {
+    return undefined;
+  }
+  const nodes = answer.outcome === "applied" ? (answer.consequences?.[journey]?.unlocked ?? []) : [];
+  return { journey, by, nodes, began };
+}
+
 /** What a write does, in words for the popover's Recent: "Answered Who runs testing?". */
 export function describe(intent: WriteIntent, titleOf: TitleOf): string {
-  const journey = typeof intent.target === "object" && "journey" in intent.target ? intent.target.journey : undefined;
+  const journey = journeyOf(intent);
   const [first] = intent.mutations;
   if (first === undefined) {
     return "Saved a change";
   }
-  const node = "decision" in first ? first.decision : "node" in first && typeof first.node === "string" ? first.node : undefined;
+  const node = subjectOf(first);
   const title = node === undefined || journey === undefined ? undefined : titleOf(journey, node);
   const of = (verb: string, fallback: string) => (title === undefined ? `${verb} ${fallback}` : `${verb} ${title}`);
   const rest = intent.mutations.length > 1 ? ` and ${String(intent.mutations.length - 1)} more` : "";
@@ -110,10 +141,10 @@ export interface WriteEnv {
  * Records a save of this tab: in Recent with the warning sentence its consequences call for
  * (D7), and on the chip as SAVED. The warning is what a receipt shows.
  */
-export function recordSave(env: Pick<WriteEnv, "activity" | "sync" | "titleOf">, text: string, lines: ConsequenceLine[]): string | undefined {
+export function recordSave(env: Pick<WriteEnv, "activity" | "sync" | "titleOf">, text: string, lines: ConsequenceLine[], unlocks?: Unlocks): string | undefined {
   const warning = warningOf(lines, env.titleOf);
   const at = new Date();
-  env.activity.saved({ at, text, warning });
+  env.activity.saved({ at, text, warning, unlocks });
   env.sync.saved(at.toLocaleTimeString([], { hour12: false }));
   return warning;
 }
@@ -138,6 +169,7 @@ export async function write(env: WriteEnv, intent: WriteIntent): Promise<WriteRe
     });
     return { outcome: "stopped" };
   }
+  const began = env.activity.begin();
   const submitted = await sync.track(
     submit(patchOf(intent), (patch) => host.send(patch, intent.note), {
       overlaps: host.overlaps,
@@ -146,7 +178,7 @@ export async function write(env: WriteEnv, intent: WriteIntent): Promise<WriteRe
   );
   switch (submitted.outcome) {
     case "landed": {
-      const warning = recordSave(env, describe(intent, titleOf), consequenceLines(submitted.answer));
+      const warning = recordSave(env, describe(intent, titleOf), consequenceLines(submitted.answer), unlocksOf(intent, submitted.answer, began));
       sync.resolve(failedKey);
       return { ...submitted, warning };
     }
