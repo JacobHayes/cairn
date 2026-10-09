@@ -46,12 +46,13 @@ fn set_user_timeout(socket: &SockRef<'_>, unacknowledged: Duration) -> io::Resul
 /// for the rest (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md, what
 /// would change it). [`warn_unsupported`] says so at startup.
 #[cfg(not(any(target_os = "linux", target_os = "android")))]
+#[allow(clippy::unnecessary_wraps)] // Linux's can fail, and `configure` calls either.
 fn set_user_timeout(_socket: &SockRef<'_>, _unacknowledged: Duration) -> io::Result<()> {
     Ok(())
 }
 
-/// Logs, once at startup, that this platform cannot close a stalled connection at the
-/// socket.
+/// Logs, once at startup and after `listening`, that this platform cannot close a stalled
+/// connection at the socket.
 pub fn warn_unsupported() {
     if cfg!(not(any(target_os = "linux", target_os = "android"))) {
         tracing::warn!(
@@ -119,14 +120,13 @@ pub async fn serve_with_user_timeout(
     Ok(())
 }
 
-#[cfg(test)]
+#[cfg(all(test, any(target_os = "linux", target_os = "android")))]
 mod tests {
     use super::*;
 
     /// An accepted connection carries the write stall as its user timeout, and
     /// keepalive at the write stall, probing at the heartbeat interval
     /// (decisions/2026-10-06-where-the-sse-write-stall-is-enforced.md).
-    #[cfg(any(target_os = "linux", target_os = "android"))]
     #[tokio::test]
     async fn an_accepted_connection_carries_the_stall_and_keepalive() {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();

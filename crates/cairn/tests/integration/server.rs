@@ -24,9 +24,6 @@ mod in_process {
         ("GET", "/api/metrics"),
     ];
 
-    /// The revision stream of every journey.
-    const JOURNEY_TICKS: &str = "/api/events/stream?domain=journeys";
-
     const INITIALIZE: &str = r#"{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"test","version":"1"}}}"#;
 
     async fn request(
@@ -164,55 +161,53 @@ mod in_process {
 
     /// Behind an authenticating proxy on another machine (Tailscale proxy mode listing the
     /// proxy's address): through the real listener, the proxy's headers sign its user in
-    /// at the public host, the same headers from any other peer are refused, the proxy's
-    /// anonymous health check is answered, and a request naming the listener's address
-    /// rather than the public host is refused before any of it.
+    /// at the public host, the same headers from a peer the list does not name (this
+    /// machine) are refused, the proxy's anonymous health check is answered, and a request
+    /// naming the listener's address rather than the public host is refused before any of
+    /// it. The peer is always 127.0.0.1, the one loopback address every kernel answers, so
+    /// one server lists it as the proxy and another lists a different machine.
     #[tokio::test]
     async fn behind_a_listed_proxy_only_its_identity_headers_sign_in() {
-        const PROXY: [u8; 4] = [127, 0, 0, 2];
-        const NEIGHBOUR: [u8; 4] = [127, 0, 0, 3];
-        let tailscale = "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\ntrusted_proxies = [\"127.0.0.2\"]\n";
-        let mut config = support::config(tailscale);
-        // A listener on every address, as one on a private network is: only the listed
-        // proxy's headers are trusted on it, not this machine's.
-        config.listen = "0.0.0.0:0".parse().unwrap();
-        let app = root::app(
-            &config,
-            support::assembly(Arc::new(InProcessNotifier::new())),
-        )
-        .unwrap();
-        let address = support::serve(app).await;
+        async fn serve_listing(proxy: &str) -> std::net::SocketAddr {
+            let tailscale = format!(
+                "[[auth]]\nkind = \"tailscale\"\nname = \"tailnet\"\nmode = \"proxy\"\ntrusted_proxies = [\"{proxy}\"]\n"
+            );
+            let mut config = support::config(&tailscale);
+            // A listener on every address, as one on a private network is: only the listed
+            // proxy's headers are trusted on it, not this machine's.
+            config.listen = "0.0.0.0:0".parse().unwrap();
+            let app = root::app(
+                &config,
+                support::assembly(Arc::new(InProcessNotifier::new())),
+            )
+            .unwrap();
+            support::serve(app).await
+        }
         let login = [
             ("tailscale-user-login", "ann@example.org"),
             ("tailscale-user-name", "Ann"),
         ];
-        let me =
-            support::send_from(PROXY.into(), address, "/api/users/me", PUBLIC_HOST, &login).await;
+
+        let proxied = serve_listing("127.0.0.1").await;
+        let me = support::send(proxied, "GET", PUBLIC_HOST, "/api/users/me", &login, None).await;
         assert_eq!(me.status, 200, "{}", me.text());
         let identity = &me.json()["identities"][0];
         assert_eq!(identity["provider"], json!("tailnet"));
         assert_eq!(identity["subject"], json!("ann@example.org"));
-        for (source, headers, status) in [
-            (NEIGHBOUR, &login[..], 403),
-            ([127, 0, 0, 1], &login[..], 403),
-            (PROXY, &[][..], 401),
-        ] {
-            let reply = support::send_from(
-                source.into(),
-                address,
-                "/api/users/me",
-                PUBLIC_HOST,
-                headers,
-            )
-            .await;
-            assert_eq!(reply.status, status, "{source:?} {headers:?}");
-        }
-        let health = support::send_from(PROXY.into(), address, "/healthz", PUBLIC_HOST, &[]).await;
+        let anonymous =
+            support::send(proxied, "GET", PUBLIC_HOST, "/api/users/me", &[], None).await;
+        assert_eq!(anonymous.status, 401);
+        let health = support::send(proxied, "GET", PUBLIC_HOST, "/healthz", &[], None).await;
         assert_eq!(health.status, 200);
-        let listener_address = format!("127.0.0.1:{}", address.port());
+        let listener_address = format!("127.0.0.1:{}", proxied.port());
         let misdirected =
-            support::send_from(PROXY.into(), address, "/healthz", &listener_address, &[]).await;
+            support::send(proxied, "GET", &listener_address, "/healthz", &[], None).await;
         assert_eq!(misdirected.status, 421);
+
+        let elsewhere = serve_listing("127.0.0.2").await;
+        let refused =
+            support::send(elsewhere, "GET", PUBLIC_HOST, "/api/users/me", &login, None).await;
+        assert_eq!(refused.status, 403, "{}", refused.text());
     }
 
     /// I5: the assistant is in the capabilities exactly when it is configured; MCP and SSE
@@ -387,6 +382,9 @@ mod in_process {
         use cairn::limits::{SSE_COALESCING_INTERVAL, SSE_WRITE_STALL};
         use cairn_schema::{Domain, Revision, RevisionOf};
         use cairn_store::Notifier;
+
+        /// The revision stream of every journey.
+        const JOURNEY_TICKS: &str = "/api/events/stream?domain=journeys";
 
         let user_timeout = Duration::from_secs(1);
         let notifier = Arc::new(InProcessNotifier::new());

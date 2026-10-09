@@ -237,13 +237,13 @@ pub async fn serve(
         address: config.listen,
         error,
     })?;
-    listener::warn_unsupported();
     tracing::info!(
         %address,
         public_url = %config.public_url,
         database = %config.database.display(),
         "listening"
     );
+    listener::warn_unsupported();
     listener::serve(listener, app, shutdown)
         .await
         .map_err(StartupError::Serve)

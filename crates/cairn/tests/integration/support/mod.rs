@@ -130,21 +130,6 @@ pub async fn send(
     exchange(stream, method, host, path, headers, body).await
 }
 
-/// [`send`] from the loopback address `source` (any of 127.0.0.0/8), so the server sees a
-/// chosen peer.
-pub async fn send_from(
-    source: std::net::IpAddr,
-    address: SocketAddr,
-    path: &str,
-    host: &str,
-    headers: &[(&str, &str)],
-) -> Reply {
-    let socket = tokio::net::TcpSocket::new_v4().unwrap();
-    socket.bind(SocketAddr::new(source, 0)).unwrap();
-    let stream = socket.connect(address).await.unwrap();
-    exchange(stream, "GET", host, path, headers, None).await
-}
-
 async fn exchange(
     mut stream: TcpStream,
     method: &str,
