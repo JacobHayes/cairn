@@ -5,6 +5,7 @@
 import type { Schema } from "@cairn/client";
 
 import { rankParts, type NodeRow } from "../acting/why.ts";
+import { rollups } from "../plan/tree.ts";
 import { dateWords } from "../timeline/model.ts";
 import { guardFailureText, namer } from "./explain.ts";
 import { INITIAL_STATE, isTerminal, nodeOf, titleOf, unansweredOf, type NodeDetail, type NodeDerived, type Ready } from "./model.ts";
@@ -80,19 +81,26 @@ function listed(items: Piece[][]): Piece[] {
   return out;
 }
 
+/** A node as a phrase, with its link and owner. */
+function namedWithOwner(view: Ready, node: string): Piece[] {
+  const owner = ownerName(view, node);
+  return [{ node }, ...(owner === undefined ? [] : [` (${owner})`])];
+}
+
 /** One thing the node waits on, as a phrase with its link and owner. */
 export function holdingPhrase(view: Ready, held: Holding): Piece[] {
   if (typeof held.via === "object" && "stage_opening" in held.via) {
     return ["the ", { node: held.via.stage_opening.group }, " stage opening"];
   }
-  const owner = ownerName(view, held.node);
-  return [{ node: held.node }, ...(owner === undefined ? [] : [` (${owner})`])];
+  return namedWithOwner(view, held.node);
 }
 
 /** The things the node waits on, as a phrase: "A (Ben) and the B stage opening". */
 export function waitingPhrase(view: Ready, key: string): Piece[] {
   const held = waitingOn(view, key);
-  return held.length === 0 ? ["earlier work"] : listed(held.map((each) => holdingPhrase(view, each)));
+  // A stage's own opening is what holds it: name the milestone, not the stage itself.
+  const own = (each: Holding) => each.holder === undefined && typeof each.via === "object" && "stage_opening" in each.via && each.via.stage_opening.group === key;
+  return held.length === 0 ? ["earlier work"] : listed(held.map((each) => (own(each) ? namedWithOwner(view, each.node) : holdingPhrase(view, each))));
 }
 
 const cap = (word: string) => word.slice(0, 1).toUpperCase() + word.slice(1);
@@ -143,30 +151,29 @@ export function rankClause(view: Ready, derived: NodeDerived, facts: RankFacts):
       case "late":
         return slack == null ? [] : [`is ${plural(-slack, "day")} past its latest start`];
       case "gravity":
-        return derived.gravity_from.total > 0 ? [`gates ${plural(derived.gravity_from.total, "node")}`] : [];
+        return derived.gravity_from.total > 0 ? [`holds up ${plural(derived.gravity_from.total, "node")}`] : [];
       case "leverage":
         return derived.leverage_from.total > 0 ? [`unblocks ${plural(derived.leverage_from.total, "node")}`] : [];
     }
   });
-  // Whatever the blend's top terms were, say at least one thing in words: its date, or what it gates.
+  // Whatever the blend's top terms were, say at least one thing in words: its date, or what it holds up.
   const fallback =
     due !== undefined
       ? [`is due ${relativeDays(daysFrom(due, view.derived.today))}`]
       : derived.gravity_from.total > 0
-        ? [`gates ${plural(derived.gravity_from.total, "node")}`]
+        ? [`holds up ${plural(derived.gravity_from.total, "node")}`]
         : [];
   const said = phrases.length === 0 ? fallback : phrases;
   return said.length === 0 ? ` Ranks #${String(position)}.` : ` Ranks #${String(position)}: it ${said.join(" and ")}.`;
 }
 
-/** A container's roll-up: how much of it is done, the decisions still to make, and the open child with the least slack. */
+/** A container's roll-up: how much of it is done (the plan's one rule, plan/tree.ts), the decisions still to make, and the open child with the least slack. */
 function rollUp(view: Ready, detail: NodeDetail): Piece[] {
-  const counted = detail.children.filter((child) => child.displayState !== "not_relevant" && child.displayState !== "skipped");
-  if (counted.length === 0) {
+  const { done, total, toDecide } = rollups(view).get(detail.node.key) ?? { done: 0, total: 0, toDecide: 0 };
+  if (total === 0) {
     return [];
   }
-  const done = counted.filter((child) => isTerminal(child.state)).length;
-  const toDecide = counted.filter((child) => child.kind === "decision" && child.displayState === "ready").length;
+  const counted = detail.children.filter((child) => child.displayState !== "not_relevant" && child.displayState !== "skipped");
   const tightest = counted
     .filter((child) => !isTerminal(child.state))
     .flatMap((child) => {
@@ -175,8 +182,8 @@ function rollUp(view: Ready, detail: NodeDetail): Piece[] {
     })
     .sort((a, b) => a.slack - b.slack)[0];
   const slack: Piece[] =
-    tightest === undefined ? [] : ["; ", tightest.slack < 0 ? `${plural(-tightest.slack, "day")} past the latest start of ` : `least slack ${plural(tightest.slack, "day")} (`, { node: tightest.key }, tightest.slack < 0 ? "" : ")"];
-  return [`${String(done)} of ${String(counted.length)} done${toDecide === 0 ? "" : `; ${String(toDecide)} to decide`}`, ...slack, ". "];
+    tightest === undefined ? [] : ["; ", tightest.slack < 0 ? `${plural(-tightest.slack, "day")} past the latest start of ` : "the tightest item, ", { node: tightest.key }, tightest.slack < 0 ? "" : `, has ${plural(tightest.slack, "day")} to spare`];
+  return [`${String(done)} of ${String(total)} done${toDecide === 0 ? "" : `; ${String(toDecide)} to decide`}`, ...slack, ". "];
 }
 
 /** The sentence for the node: pieces of text, links, and the Unsnooze action. A container's starts with its roll-up. */

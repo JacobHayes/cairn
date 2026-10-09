@@ -93,8 +93,21 @@ function markOf(card: Card, trace: Trace, sets: { up: Set<string>; down: Set<str
 export function traceOverlay(trace: Trace, model: CanvasModel, title: string): CanvasOverlay {
   const sets = { up: new Set(trace.upstream), down: new Set(trace.downstream), contributors: new Set(trace.gravity_contributors) };
   const marks: Record<string, OverlayMark> = {};
+  // A selected container's own members are not tagged: they are what it is made of, and its outline
+  // stands for them. Their lines to the cards outside it are still lit. (A leaf rolled up into a
+  // container is not a selected container: its neighbours are traced as usual.)
+  const cardOf = new Map(model.cards.map((card) => [card.key, card]));
+  const inside = (card: Card): boolean => {
+    for (let at = cardOf.get(card.parent ?? ""); at !== undefined; at = cardOf.get(at.parent ?? "")) {
+      if (at.key === trace.node) {
+        return true;
+      }
+    }
+    return false;
+  };
+  const members = new Set(model.cards.filter(inside).map((card) => card.key));
   for (const card of model.cards) {
-    const mark = markOf(card, trace, sets);
+    const mark = members.has(card.key) ? { tone: "accent" as const, label: TRACE_LABELS.traced, quiet: true as const } : markOf(card, trace, sets);
     if (mark !== undefined) {
       marks[card.key] = mark;
     }
@@ -104,6 +117,9 @@ export function traceOverlay(trace: Trace, model: CanvasModel, title: string): C
   const downward = (key: string) => label(key) === TRACE_LABELS.unblocks || label(key) === TRACE_LABELS.traced || label(key) === TRACE_LABELS.both;
   const lines: Record<string, LineMark> = {};
   for (const line of model.lines) {
+    if (label(line.from) === TRACE_LABELS.traced && label(line.to) === TRACE_LABELS.traced) {
+      continue;
+    }
     if (upward(line.from) && upward(line.to)) {
       lines[line.id] = line.satisfied === true ? "faint" : "ink";
     } else if (downward(line.from) && downward(line.to)) {

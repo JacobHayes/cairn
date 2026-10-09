@@ -15,3 +15,38 @@
 .icon-button:hover {
   border-color: var(--color-secondary);
 }
+
+/* Narrow: each journey is a stacked row (title, status, "19 of 24 done · next milestone"), not a
+   table to scroll sideways; Route, Flag and Mine are left to the journey itself. */
+@media (max-width: 719px) {
+  table.data.journey-table,
+  .journey-table tbody {
+    display: block;
+    overflow: visible;
+  }
+  .journey-table thead,
+  .journey-table td:is([data-column="route"], [data-column="flag"], [data-column="mine"]) {
+    display: none;
+  }
+  .journey-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--space-1) var(--space-3);
+    padding: var(--space-3) 0;
+    border-top: 1px solid var(--color-border);
+  }
+  .journey-table td {
+    display: block;
+    padding: 0;
+    border: 0;
+    min-width: 0;
+  }
+  .journey-table td[data-column="title"] {
+    flex: 0 0 100%;
+    font-weight: 600;
+  }
+  .journey-table td[data-column="milestone"]::before {
+    content: "\00b7\00a0";
+  }
+}

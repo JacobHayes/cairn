@@ -48,7 +48,7 @@ function LifecycleMenu({ ready, write, onDelete }: { ready: Ready; write: Screen
       align="end"
       className="no-print"
       trigger={
-        <span data-status={header.status} data-testid="overview-status">
+        <span className="lifecycle-label" data-status={header.status} data-testid="overview-status">
           {header.status} ▾
         </span>
       }

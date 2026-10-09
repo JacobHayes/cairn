@@ -9,6 +9,7 @@ import { useNavigate } from "react-router";
 
 import type { SaveEvent } from "../data/activity.ts";
 import { useDerivation, useSaves, useSession, useSkew, useStreamStatus, useSync } from "../data/react.ts";
+import { dateWords } from "../timeline/model.ts";
 import { SYNC_SAVED_MS, type Problem, type SyncSummary } from "../data/sync.ts";
 import { Button } from "../ui/kit.tsx";
 
@@ -102,10 +103,11 @@ function Popover({ summary, problems, onClose }: { summary: SyncSummary; problem
           <strong>{summary.label}</strong>
           <span className="muted"> · live updates {stream === "live" ? "on" : stream === "reconnecting" ? "paused" : "off"}</span>
         </p>
-        <p className="mono small muted">
-          {derivation === undefined ? null : `Revision ${String(derivation.revision)} · `}Engine {session.host.engineVersion}
-          {derivation === undefined ? null : ` · Today ${derivation.today}`}
-        </p>
+        {derivation === undefined ? null : (
+          <p className="mono small muted" title={`Engine ${session.host.engineVersion}`}>
+            Revision {derivation.revision} · Today {dateWords(derivation.today, derivation.today)}
+          </p>
+        )}
         {skew === undefined ? null : (
           <p className="stack" data-testid="sync-skew">
             <span>Cairn was updated. Reload to keep saving; your unsent edits are kept.</span>

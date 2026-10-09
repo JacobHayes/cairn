@@ -41,16 +41,16 @@ export function LineageCell({ summary, routes }: { summary: JourneySummary; rout
 export function JourneyCells({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
   return (
     <>
-      <td>
+      <td data-column="title">
         <Link to={overviewPath(summary.id)} title={summary.id}>{summary.name}</Link>
       </td>
-      <td>
+      <td data-column="route">
         <span className="stack">
           <LineageCell summary={summary} routes={routes} />
           <UpgradeMark summary={summary} />
         </span>
       </td>
-      <td>
+      <td data-column="status">
         <Badge>{summary.status}</Badge>
       </td>
     </>
@@ -95,7 +95,7 @@ function Rows({ filters, items, routes }: { filters: IndexFilters; items: Journe
   return (
     <div className="table-wrap">
       {empty ? <p className="muted small" data-testid="index-empty">No journeys match: nothing in them is yours.</p> : null}
-      <table className="data">
+      <table className="data journey-table">
         {empty ? null : (
           <thead>
             <tr>

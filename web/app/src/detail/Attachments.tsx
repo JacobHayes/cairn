@@ -6,6 +6,7 @@
 // node, and no artifact.
 import type { Schema } from "@cairn/client";
 
+import { useUserWords } from "../data/react.ts";
 import { dateWords } from "../timeline/model.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { Markdown, safeHref } from "../ui/markdown.tsx";
@@ -104,6 +105,7 @@ function Item({ annotation, today, write, onEdit }: { annotation: Annotation; to
   const { type, text } = contentOf(body);
   const link = type !== "note";
   const designates = link && body.node != null;
+  const userWords = useUserWords();
   return (
     <li className="stack attachment" data-testid="annotation" data-key={body.key} data-type={type}>
       <span className="row">
@@ -113,7 +115,7 @@ function Item({ annotation, today, write, onEdit }: { annotation: Annotation; to
       </span>
       {link ? null : <Markdown text={text} />}
       <span className="muted small">
-        Added by {annotation.created_by} on {dateWords(annotation.created_at.slice(0, 10), today)}
+        Added by {userWords(annotation.created_by)} on {dateWords(annotation.created_at.slice(0, 10), today)}
         {annotation.edited_at == null ? "" : `; edited ${dateWords(annotation.edited_at.slice(0, 10), today)}`}
       </span>
       <span className="row">

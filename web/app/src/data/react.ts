@@ -43,6 +43,12 @@ export function useViewer(): { viewer: Viewer | undefined; failed: string | unde
   return { viewer: current, failed };
 }
 
+/** A user id as people read it: "you" for the viewer, else "someone else" (the host holds no names for users). */
+export function useUserWords(): (user: string) => string {
+  const { viewer } = useViewer();
+  return (user) => (user === viewer?.user ? "you" : "someone else");
+}
+
 /** The deployment context (E6), once fetched. */
 export function useDeployment(): Deployment | undefined {
   const { deployment } = useSession();

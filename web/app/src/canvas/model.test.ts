@@ -64,7 +64,7 @@ describe("C1: what a card says", () => {
     });
     expect(card(model(wholeLevel(), [], [], decided), "n_choose").journey?.body).toEqual({ kind: "answer", text: "yes", rationale: "It is the cheaper one." });
     expect(card(whole, "n_choose").journey?.body).toBeUndefined();
-    expect(card(whole, "n_stage").journey?.body).toEqual({ kind: "progress", done: 0, total: 1, badge: undefined });
+    expect(card(whole, "n_stage").journey?.body).toEqual({ kind: "progress", done: 0, total: 2, badge: undefined });
     expect(card(whole, "n_option").journey?.body).toEqual({ kind: "depends", text: "If Approach" });
     expect(card(whole, "n_old").journey?.body).toBeUndefined();
   });
@@ -193,6 +193,13 @@ describe("C7: the trace of a selected node", () => {
     expect(overlay.marks["n_check"]?.contributor).toBeUndefined();
     expect(overlay.lines).toEqual({ "n_choose->n_option": "ink", "n_option->n_build": "accent" });
     expect(overlay.outside).toEqual([]);
+  });
+
+  test("a selected container does not tag its own members, and keeps the lines from them to cards outside it", () => {
+    const overlay = traceOverlay({ ...trace, node: "n_stage", upstream: ["n_build", "n_check", "n_option"], downstream: [] }, whole, "Build stage");
+    const quiet = (key: string) => overlay.marks[key]?.quiet;
+    expect([quiet("n_build"), quiet("n_check"), overlay.marks["n_option"]?.label]).toEqual([true, true, TRACE_LABELS.needs]);
+    expect(overlay.lines).toEqual({ "n_option->n_build": "ink" });
   });
 
   test("a finished upstream line is faint", () => {

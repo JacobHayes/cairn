@@ -7,6 +7,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 import { assignOwner } from "../acting/acts.ts";
+import { isStage } from "../canvas/ladder.ts";
 import { useDraft } from "../data/drafts.ts";
 import { unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
 import type { Rejection, WriteResult } from "../data/writes.ts";
@@ -187,7 +188,7 @@ export function Header({ view, detail, position, rename, removeTo }: { view: Rea
     <div className="stack detail-head" data-testid="detail-header">
       <div className="row detail-band">
         <span className="detail-kind">
-          <span className="label">{node.kind}</span>
+          <span className="label">{isStage(node) ? "stage" : node.kind}</span>
           {detail.ancestors.map((ancestor) => (
             <span key={ancestor.key} className="muted small">
               {" › "}

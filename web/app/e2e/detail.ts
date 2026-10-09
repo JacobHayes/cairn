@@ -21,7 +21,14 @@ export async function section(panel: Locator, testId: string): Promise<Locator> 
 
 /** A date row of the panel (`Due`, `Latest start`, `Earliest start`), its chain unfolded. */
 export async function dateChain(panel: Locator, label: string): Promise<Locator> {
-  const row = (await section(panel, "dates")).locator(`[data-testid="date"][data-label="${label}"]`);
+  const dates = await section(panel, "dates");
+  if (label !== "Due") {
+    const more = dates.getByTestId("more-dates");
+    if ((await more.getAttribute("open")) === null) {
+      await more.locator(":scope > summary").click();
+    }
+  }
+  const row = dates.locator(`[data-testid="date"][data-label="${label}"]`);
   await row.locator("summary").click();
   await expect(row.getByTestId("chain")).toBeVisible();
   return row;

@@ -70,21 +70,26 @@ export const NODE_GAP_PX = 24;
 export const LAYER_GAP_PX = 96;
 export const CONTAINER_PAD_PX = 20;
 
+/** The spacing a container's children need, the same as the top level's so arrows keep room to bend. */
+const INNER_SPACING: LayoutOptions = {
+  "elk.spacing.nodeNode": String(NODE_GAP_PX),
+  "elk.layered.spacing.nodeNodeBetweenLayers": String(LAYER_GAP_PX),
+  "elk.layered.spacing.edgeNodeBetweenLayers": "24",
+  "elk.layered.spacing.edgeEdgeBetweenLayers": "12",
+  "elk.spacing.edgeNode": "16",
+  "elk.spacing.edgeEdge": "10",
+};
+
 /** C15: ELK's options for every layout; left to right, as the PRD's flowcharts read. */
 const ROOT_OPTIONS: LayoutOptions = {
   "elk.algorithm": "layered",
   "elk.direction": "RIGHT",
   // Edges between levels of the tree are laid out with the whole graph (C3: one canvas).
   "elk.hierarchyHandling": "INCLUDE_CHILDREN",
-  "elk.spacing.nodeNode": String(NODE_GAP_PX),
-  "elk.layered.spacing.nodeNodeBetweenLayers": String(LAYER_GAP_PX),
+  ...INNER_SPACING,
   "elk.spacing.componentComponent": String(LAYER_GAP_PX),
-  // Edges are routed in the gaps these leave, so an arrowhead is never under a card (5.6).
+  // Edges are routed in the gaps INNER_SPACING leaves, so an arrowhead is never under a card (5.6).
   "elk.edgeRouting": "ORTHOGONAL",
-  "elk.layered.spacing.edgeNodeBetweenLayers": "24",
-  "elk.layered.spacing.edgeEdgeBetweenLayers": "12",
-  "elk.spacing.edgeNode": "16",
-  "elk.spacing.edgeEdge": "10",
   // Brandes-Koepf balanced, not network simplex: on the vendor evaluation, one added requirement
   // moved up to 12 of its 27 nodes with network simplex, past C15's bound; balanced keeps every
   // edit within it (layout.test.ts holds the five edits).
@@ -115,6 +120,9 @@ export function elkGraph(request: LayoutRequest): ElkNode {
         // A container is never narrower than its own card.
         "elk.nodeSize.constraints": "MINIMUM_SIZE",
         "elk.nodeSize.minimum": `(${String(node.width)}, ${String(node.height)})`,
+        // With INCLUDE_CHILDREN ELK reads a nested graph's spacing from its own container, not the
+        // root, so the children would fall back to ELK's defaults (about 20px between layers).
+        ...INNER_SPACING,
       };
     } else {
       shape.width = node.width;

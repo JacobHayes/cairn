@@ -49,7 +49,7 @@ describe("the inspector's offers", () => {
 
   it("opens a container's sentence with what is done and the open child with the least slack, or the one that is late", () => {
     const say = (view: Ready) => plainSentence(view, sentenceOf(view, detailOf(view, "n_stage"), { position: undefined, row: undefined }));
-    expect(say(testView())).toBe("0 of 2 done; least slack 24 days (Report). In progress.");
+    expect(say(testView())).toBe("0 of 2 done; the tightest item, Report, has 24 days to spare. In progress.");
     expect(say(made("n_report", { dates: { slack_days: -2 } }))).toBe("0 of 2 done; 2 days past the latest start of Report. In progress.");
   });
 });

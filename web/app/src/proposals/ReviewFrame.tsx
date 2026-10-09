@@ -6,6 +6,7 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
+import { useUserWords } from "../data/react.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import type { Graph } from "../authoring/graph.ts";
@@ -52,10 +53,11 @@ function DestinationLink({ proposal, journeyTitle }: { proposal: Proposal; journ
 }
 
 /** Who the proposal is for and by whom, at the top of the proposal card. */
-export function ProposalOrigin({ proposal, journeyTitle, names }: { proposal: Proposal; journeyTitle: string | undefined; names: Names }) {
+export function ProposalOrigin({ proposal, journeyTitle }: { proposal: Proposal; journeyTitle: string | undefined }) {
+  const userWords = useUserWords();
   return (
     <p className="muted small">
-      For <DestinationLink proposal={proposal} journeyTitle={journeyTitle} />, proposed by {names.entity(proposal.created_by)}
+      For <DestinationLink proposal={proposal} journeyTitle={journeyTitle} />, proposed by {userWords(proposal.created_by)}
       {proposal.proposing_agent == null ? "" : ` with the agent ${proposal.proposing_agent}`}.
     </p>
   );

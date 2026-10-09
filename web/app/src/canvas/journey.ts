@@ -5,6 +5,7 @@
 // its local derive; the words are words.ts's.
 import { nodeOf, recordOf, startedEarly, type GraphNode, type NodeDerived, type Ready } from "../detail/model.ts";
 import { answerText, entityName } from "../detail/sections.tsx";
+import { rollups } from "../plan/tree.ts";
 import type { DisplayState } from "../status/words.ts";
 import { currentStages, isStage } from "./ladder.ts";
 import type { CardBadge, CardBody, CardState, JourneyExtras, LevelNode, Looks, Signals } from "./model.ts";
@@ -61,32 +62,6 @@ interface Context {
   children: Map<string, string[]>;
 }
 
-/** The leaves under `key` that count toward its progress: those in scope, and how many are finished. */
-function progressOf(context: Context, key: string): { done: number; total: number } {
-  const { view, children } = context;
-  let done = 0;
-  let total = 0;
-  const seen = new Set<string>();
-  const walk = (at: string) => {
-    if (seen.has(at)) {
-      return;
-    }
-    seen.add(at);
-    const below = children.get(at) ?? [];
-    if (below.length > 0) {
-      below.forEach(walk);
-      return;
-    }
-    const state = view.derived.nodes[at]?.display_state;
-    if (state !== undefined && state !== "not_relevant") {
-      total += 1;
-      done += finishedState(state) ? 1 : 0;
-    }
-  };
-  (children.get(key) ?? []).forEach(walk);
-  return { done, total };
-}
-
 /** What a conditional node depends on, as one sentence: `If Who runs testing? = Partner, once Budget is answered`. */
 function dependsBody(context: Context, node: GraphNode, derived: NodeDerived): CardBody | undefined {
   const { view } = context;
@@ -118,7 +93,7 @@ function bodyOf(context: Context, node: GraphNode, derived: NodeDerived, at: Lev
     return { kind: "answer", text: answerText(view, answer, node), rationale: rationale === undefined || rationale === "" ? undefined : firstParagraph(rationale) };
   }
   if (context.children.has(node.key)) {
-    const { done, total } = progressOf(context, node.key);
+    const { done, total } = rollups(view).get(node.key) ?? { done: 0, total: 0 };
     return total === 0 ? undefined : { kind: "progress", done, total, badge: rollUpBadge(derived, at) };
   }
   return undefined;

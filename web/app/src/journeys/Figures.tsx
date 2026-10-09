@@ -19,12 +19,12 @@ function ReadyFigures({ ready }: { ready: Ready }) {
   const next = model?.upcoming[0];
   return (
     <>
-      <td className="mono" data-testid="row-progress" data-done={progress?.done ?? ""} data-in-scope={progress?.inScope ?? ""}>
-        {progress === undefined ? "" : `${String(progress.done)}/${String(progress.inScope)}`}
+      <td className="mono" data-column="progress" data-testid="row-progress" data-done={progress?.done ?? ""} data-in-scope={progress?.inScope ?? ""}>
+        {progress === undefined ? "" : `${String(progress.done)} of ${String(progress.inScope)} done`}
       </td>
-      <td data-testid="row-milestone">{next === undefined ? <span className="muted small">none</span> : `${next.title}, ${dateAway(next.date, ready.derived.today)}`}</td>
-      <td className="mono" data-testid="row-flag">{flag}</td>
-      <td className="mono" data-testid="row-mine">{actionable === 0 ? "" : `${String(actionable)} ready`}</td>
+      <td data-column="milestone" data-testid="row-milestone">{next === undefined ? <span className="muted small">none</span> : `${next.title}, ${dateAway(next.date, ready.derived.today)}`}</td>
+      <td className="mono" data-column="flag" data-testid="row-flag">{flag}</td>
+      <td className="mono" data-column="mine" data-testid="row-mine">{actionable === 0 ? "" : `${String(actionable)} ready`}</td>
     </>
   );
 }

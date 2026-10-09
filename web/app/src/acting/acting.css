@@ -98,11 +98,8 @@
   color: var(--color-muted);
 }
 
-/* One width for every state's chip, so the titles line up down the list. */
 .next-row-main > .badge {
   flex: none;
-  min-width: 104px;
-  text-align: center;
 }
 
 .next-row-text {
@@ -211,11 +208,7 @@
     min-width: 0;
   }
 
-  /* The chip, rank tag and title share a phone's width: the chip takes only its word, an empty tag nothing. */
-  .next-row-main > .badge {
-    min-width: 0;
-  }
-
+  /* The rank tag, chip and title share a phone's width: an empty tag takes nothing. */
   .next-tag:empty {
     display: none;
   }
@@ -324,6 +317,13 @@
 
 @container journey-scroll (max-width: 560px) {
   .list-table [data-column="owner"] {
+    display: none;
+  }
+}
+
+/* A phone has no room for the Due column: it runs off the edge. */
+@media (max-width: 719px) {
+  .list-table [data-column="due"] {
     display: none;
   }
 }

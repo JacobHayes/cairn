@@ -478,7 +478,7 @@ function ProposalCard(props: InspectorProps) {
   return (
     <aside className="detail-panel panel stack" aria-label="The proposal" data-testid="proposal-card">
       <h2>The proposal</h2>
-      <ProposalOrigin proposal={proposal} journeyTitle={ready?.journey.header.name} names={model.names} />
+      <ProposalOrigin proposal={proposal} journeyTitle={ready?.journey.header.name} />
       {proposal.draft.description == null ? null : <Markdown text={proposal.draft.description} />}
       {waiting.length === 0 ? null : (
         <section className="stack" aria-label="Still to decide" data-testid="to-decide">

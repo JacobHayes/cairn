@@ -58,7 +58,8 @@ export function reasonOf(rejection: Rejection): string {
     case "invalid": {
       const [first] = rejection.violations;
       const more = rejection.violations.length - 1;
-      return first === undefined ? "The change breaks a rule." : `${first.message}${more > 0 ? ` (and ${String(more)} more)` : ""}`;
+      // The engine ends a message with the rule's code, "(F5)": for the docs, not for people.
+      return first === undefined ? "The change breaks a rule." : `${first.message.replace(/\s*\([A-Z]\d+\)$/, "")}${more > 0 ? ` (and ${String(more)} more)` : ""}`;
     }
     case "patch_id_reused":
       return "That change was already sent with different content.";

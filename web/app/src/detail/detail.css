@@ -220,6 +220,7 @@ dl.kv dd {
   padding-left: var(--space-5);
 }
 
+.date-more > summary,
 .date-row summary {
   cursor: pointer;
   display: inline;
