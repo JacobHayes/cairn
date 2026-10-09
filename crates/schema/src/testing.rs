@@ -7,9 +7,9 @@
 use proptest::prelude::*;
 
 use crate::{
-    AgentId, AttachmentKey, Date, Days, Email, EntityKey, JourneyId, KindKey, Markdown, NodeKey,
-    PatchId, Path, ProposalId, Reason, Revision, RoleKey, RouteId, Slug, Timestamp, Title, Url,
-    UserId, VersionNumber, Weight,
+    AgentId, AttachmentKey, Date, Days, Email, EntityKey, InsertionKey, JourneyId, KindKey,
+    Markdown, NodeKey, PatchId, Path, ProposalId, Reason, Revision, RoleKey, RouteId, Slug,
+    Timestamp, Title, Url, UserId, VersionNumber, Weight,
 };
 
 const SLUG_REGEX: &str = "[a-z0-9][a-z0-9_-]{0,11}";
@@ -63,6 +63,10 @@ arb_prefixed!(
 arb_prefixed!(
     /// An attachment key.
     arb_attachment_key, AttachmentKey, "a_"
+);
+arb_prefixed!(
+    /// An insertion key.
+    arb_insertion_key, InsertionKey, "i_"
 );
 arb_prefixed!(
     /// A journey id.

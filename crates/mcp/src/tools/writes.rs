@@ -797,6 +797,9 @@ pub(crate) struct NewRoute {
     /// What it is for.
     #[serde(default)]
     description: Option<Markdown>,
+    /// `process` (the default) or `segment`: a reusable piece that is inserted, never started.
+    #[serde(default)]
+    kind: cairn_schema::RouteKind,
 }
 
 impl OpenDraft {
@@ -807,6 +810,7 @@ impl OpenDraft {
             .map(|route| Mutation::CreateRoute {
                 name: route.name,
                 description: route.description,
+                kind: route.kind,
             })
             .collect();
         mutations.push(Mutation::OpenDraft {

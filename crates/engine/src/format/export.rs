@@ -13,7 +13,7 @@ use cairn_schema::{
     AnswerSpec, BoundedVec, Clause, Comparison, Condition, DateRule, DateSource, Decision,
     FileRefs, FormatVersion, Group, KeyRefs, KindKey, Markdown, Membership, MessageTemplate, Node,
     NodeKey, OneOrMany, ParticipationKind, ParticipationSource, Participations, Path, Payload,
-    Resource, ResourceContent, Role, RoleKey, RouteFile, RouteId, Segment, Slug, Title,
+    Resource, ResourceContent, Role, RoleKey, RouteFile, RouteId, RouteKind, Segment, Slug, Title,
     VersionNumber,
 };
 
@@ -28,6 +28,8 @@ pub struct RouteHeading {
     pub name: Title,
     /// What the route is for.
     pub description: Option<Markdown>,
+    /// Process or segment.
+    pub kind: RouteKind,
     /// The published version the exported graph extends, if any.
     pub extends: Option<VersionNumber>,
 }
@@ -79,6 +81,7 @@ pub fn export(graph: &Graph, heading: &RouteHeading) -> RouteFile {
         route: heading.route.clone(),
         name: heading.name.clone(),
         description: heading.description.clone(),
+        kind: heading.kind,
         extends: heading.extends,
         default_owner: document.default_owner.as_ref().map(|role| names.role(role)),
         roles: bounded(roles),

@@ -86,14 +86,27 @@ mod open {
         )
     }
 
-    /// An answer's rationale and a node's `requires_note` flag: a database from before the
-    /// columns existed keeps its answers and nodes, which load with no rationale and the flag
-    /// off, and takes a rationale on a later revision (a revision that gives none stores none,
-    /// B2) and nodes that set the flag (G4). The older database is the current one with both
-    /// columns and their records taken away, so the migrations run over a stored answer and
-    /// node.
+    /// Whether the loaded journey's action `node` requires a note.
+    fn requires_note(loaded: Option<Document>, node: &str) -> bool {
+        let Some(Document::Journey(journey)) = loaded else {
+            panic!("the journey loads: {loaded:?}");
+        };
+        let node = journey
+            .graph
+            .nodes
+            .get(&cairn_store::build::id(node))
+            .unwrap();
+        matches!(&node.payload, cairn_schema::Payload::Action(action) if action.requires_note)
+    }
+
+    /// An answer's rationale, a node's `requires_note` flag, and a route's kind: a database
+    /// from before the columns existed keeps its answers, nodes, and routes, which load with
+    /// no rationale, the flag off, and the kind `process`, and takes a rationale on a later
+    /// revision (a revision that gives none stores none, B2) and nodes that set the flag (G4).
+    /// The older database is the current one with the columns and the insertions table taken
+    /// away, so the migrations run over a stored answer, node, and route.
     #[test]
-    fn a_database_from_before_rationales_and_requires_note_loads_and_takes_them() {
+    fn a_database_from_before_rationales_requires_note_and_kinds_loads_and_takes_them() {
         let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
             .join(format!("rationale-{}", std::process::id()));
         std::fs::create_dir_all(&root).unwrap();
@@ -108,6 +121,8 @@ mod open {
                 create_journey("p_one", "j_one", vec![decision, action("n_a", "a", None)]).commit();
             store.commit(create).await.unwrap();
             store.commit(revise("p_two", 1, true, None)).await.unwrap();
+            let route = cairn_store::build::create_route("p_route", "vendor").commit();
+            store.commit(route).await.unwrap();
             drop(store);
 
             let database = turso::Builder::new_local(path.to_str().unwrap())
@@ -118,6 +133,8 @@ mod open {
             for statement in [
                 "ALTER TABLE nodes DROP COLUMN requires_note",
                 "ALTER TABLE answers DROP COLUMN rationale",
+                "ALTER TABLE routes DROP COLUMN kind",
+                "DROP TABLE insertions",
                 "DELETE FROM schema_migrations WHERE version >= 5",
             ] {
                 connection.execute(statement, ()).await.unwrap();
@@ -145,20 +162,17 @@ mod open {
             }));
             let create = create_journey("p_new", "j_new", vec![flagged]).commit();
             store.commit(create).await.unwrap();
-            let required = |loaded: Option<Document>, node: &str| {
-                let Some(Document::Journey(journey)) = loaded else {
-                    panic!("the journey loads: {loaded:?}");
-                };
-                let node = journey
-                    .graph
-                    .nodes
-                    .get(&cairn_store::build::id(node))
-                    .unwrap();
-                matches!(&node.payload, cairn_schema::Payload::Action(action) if action.requires_note)
-            };
             let load = |journey: &str| LoadTarget::Journey(cairn_store::build::id(journey));
-            assert!(!required(store.load(&load("j_one")).await.unwrap(), "n_a"));
-            assert!(required(
+            let route = LoadTarget::Route(cairn_store::build::id("vendor"));
+            let Some(Document::Route(route)) = store.load(&route).await.unwrap() else {
+                panic!("the route loads");
+            };
+            assert_eq!(route.header.kind, cairn_schema::RouteKind::Process);
+            assert!(!requires_note(
+                store.load(&load("j_one")).await.unwrap(),
+                "n_a"
+            ));
+            assert!(requires_note(
                 store.load(&load("j_new")).await.unwrap(),
                 "n_write"
             ));
@@ -174,7 +188,8 @@ mod open {
             &["deployment.revision", "entities", "entity_aliases"],
         ),
         ("Graph", &["graphs"]),
-        ("Route", &["routes"]),
+        ("Route, Segment", &["routes", "routes.kind"]),
+        ("Insertion", &["insertions"]),
         ("Route version", &["route_versions"]),
         ("Route draft", &["route_drafts"]),
         ("Journey", &["journeys"]),

@@ -79,6 +79,7 @@ fn node_of(key: &GraphKey, journey: Option<&Graph>) -> Option<NodeKey> {
         GraphKey::Role(_)
         | GraphKey::Kind(_)
         | GraphKey::DefaultOwner
+        | GraphKey::Insertion(_)
         | GraphKey::RetiredKey(_)
         | GraphKey::RoleFill(_) => None,
     }

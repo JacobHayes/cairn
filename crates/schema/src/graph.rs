@@ -3,13 +3,17 @@
 //! [`Graph`], the graph document resolved (keys everywhere), which also carries journey
 //! state. Route versions and drafts are graphs with empty state.
 
-use std::collections::BTreeSet;
-
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::BTreeSet;
 
-use crate::collections::{BoundedVec, HasKey, Keyed, KindCount, NodeCount, RoleCount};
-use crate::id::{KindKey, NodeKey, RoleKey, RouteId, Slug};
+use std::collections::BTreeMap;
+
+use crate::collections::{
+    BoundedVec, HasKey, InsertionCount, Keyed, KindCount, NodeCount, RoleCount,
+};
+use crate::domain::{Lineage, RouteKind};
+use crate::id::{InsertionKey, KindKey, NodeKey, RoleKey, RouteId, Slug};
 use crate::node::Node;
 use crate::number::VersionNumber;
 use crate::refs::{FileRefs, KeyRefs, References, key_absent};
@@ -123,6 +127,9 @@ pub struct RouteFile {
     /// What the route is for.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub description: Option<Markdown>,
+    /// Process or segment (A21); a file that leaves it out is a process.
+    #[serde(default, skip_serializing_if = "RouteKind::is_process")]
+    pub kind: RouteKind,
     /// The published version this one extends, or none for a new route.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub extends: Option<VersionNumber>,
@@ -184,9 +191,52 @@ pub struct Graph {
     /// Every key the graph has retired.
     #[serde(default, skip_serializing_if = "RetiredKeys::is_empty")]
     pub retired_keys: RetiredKeys,
+    /// The segment insertions the graph holds (B13).
+    #[serde(default, skip_serializing_if = "Keyed::is_empty")]
+    pub insertions: Keyed<Insertion, InsertionCount>,
     /// Journey state; empty for a route version or draft.
     #[serde(default, skip_serializing_if = "JourneyState::is_empty")]
     pub state: JourneyState,
+}
+
+/// One placement of a segment version in a graph (PRD glossary, Insertion; B13). Its local
+/// edits are not stored: they are its members' differences from the version it is on.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct Insertion {
+    /// The key, minted by the client like any new key; unique in the graph.
+    pub key: InsertionKey,
+    /// The segment and the version the insertion is on.
+    pub segment: Lineage,
+    /// Where it was inserted: the parent the root went under, or none for the top level.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub parent: Option<NodeKey>,
+    /// Each segment role, mapped to the graph role it became.
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map_per_role"
+    )]
+    pub roles: BTreeMap<RoleKey, RoleKey>,
+    /// Each segment participation kind beyond `owner`, likewise.
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map_per_kind"
+    )]
+    pub kinds: BTreeMap<KindKey, KindKey>,
+    /// Its members: each graph node it copied that the graph still holds, with that node's
+    /// key in the segment.
+    #[serde(deserialize_with = "crate::serde_util::unique_map_per_node")]
+    pub nodes: BTreeMap<NodeKey, NodeKey>,
+}
+
+impl HasKey for Insertion {
+    type Key = InsertionKey;
+
+    fn key(&self) -> &InsertionKey {
+        &self.key
+    }
 }
 
 /// An explicit `requires` edge (A3), identified by its two ends: `node` requires `requires`.

@@ -4,9 +4,9 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AnswerValue, Domain, Edge, Entity, GraphId, GraphRecord, JourneyHeader, Lineage, Node, NodeKey,
-    ParticipationKind, ParticipationSource, Proposal, ProposalDraft, Record, RecordKey, Resource,
-    RetiredKey, Revision, Role, RouteHeader, SnoozeTarget, Write,
+    AnswerValue, Domain, Edge, Entity, GraphId, GraphRecord, Insertion, JourneyHeader, Lineage,
+    Node, NodeKey, ParticipationKind, ParticipationSource, Proposal, ProposalDraft, Record,
+    RecordKey, Resource, RetiredKey, Revision, Role, RouteHeader, SnoozeTarget, Write,
     limits::{EDGE_COUNT_PER_NODE_MAX, KIND_COUNT_MAX},
     refs::KeyRefs,
 };
@@ -20,7 +20,7 @@ use crate::sql::{
 };
 
 /// The tables holding one graph's records, children before parents.
-pub(crate) const GRAPH_TABLES: [&str; 19] = [
+pub(crate) const GRAPH_TABLES: [&str; 20] = [
     "participation_entities",
     "answer_entities",
     "role_fill_entities",
@@ -31,6 +31,7 @@ pub(crate) const GRAPH_TABLES: [&str; 19] = [
     "roles",
     "participation_kinds",
     "retired_keys",
+    "insertions",
     "node_states",
     "local_edits",
     "answers",
@@ -217,10 +218,11 @@ impl<'connection> Writer<'connection> {
             name,
             description,
             retired,
+            kind,
         } = header;
         self.run(
-            "INSERT INTO routes (id, revision, name, description, retired) \
-             VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT (id) DO UPDATE SET \
+            "INSERT INTO routes (id, revision, name, description, retired, kind) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT (id) DO UPDATE SET \
              name = excluded.name, description = excluded.description, \
              retired = excluded.retired",
             vec![
@@ -229,6 +231,7 @@ impl<'connection> Writer<'connection> {
                 text(name),
                 opt_text(description.as_ref()),
                 flag(*retired),
+                json_enum(kind)?,
             ],
         )
         .await?;
@@ -361,6 +364,7 @@ impl<'connection> Writer<'connection> {
                 self.node_exists(id, node).await?;
                 self.put_resource(id, node, resource).await
             }
+            GraphRecord::Insertion(insertion) => self.put_insertion(id, insertion).await,
             GraphRecord::RetiredKey(_)
             | GraphRecord::NodeState { .. }
             | GraphRecord::LocalEdit { .. }
@@ -372,6 +376,34 @@ impl<'connection> Writer<'connection> {
             | GraphRecord::Tombstone(_)
             | GraphRecord::Annotation(_) => crate::write_state::put(self, id, record).await,
         }
+    }
+
+    async fn put_insertion(&self, id: &str, insertion: &Insertion) -> Result<(), Abort> {
+        let Insertion {
+            key,
+            segment,
+            parent,
+            roles,
+            kinds,
+            nodes,
+        } = insertion;
+        self.run(
+            "INSERT OR REPLACE INTO insertions \
+             (graph_id, key, segment, version, parent_key, roles, kinds, nodes) \
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)",
+            vec![
+                text(id),
+                text(key),
+                text(&segment.route),
+                int(segment.version.get()),
+                opt_text(parent.as_ref()),
+                json(roles)?,
+                json(kinds)?,
+                json(nodes)?,
+            ],
+        )
+        .await?;
+        Ok(())
     }
 
     async fn put_edge(&self, id: &str, node: &NodeKey, requires: &NodeKey) -> Result<(), Abort> {

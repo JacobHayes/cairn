@@ -6,7 +6,8 @@ use std::collections::BTreeSet;
 use cairn_schema::{
     DraftSource, GraphId, GraphKey, GraphRecord, JourneyHeader, JourneyId, JourneyStatus, Limit,
     Lineage, LocalEdit, Markdown, Mutation, NodeKey, NodeState, PatchTarget, Provenance, Record,
-    RecordKey, RetiredKey, RouteHeader, RouteId, Title, VersionNumber, ViolationCode, Write,
+    RecordKey, RetiredKey, RouteHeader, RouteId, RouteKind, Title, VersionNumber, ViolationCode,
+    Write,
 };
 
 use super::Session;
@@ -40,9 +41,14 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
         ],
         (PatchTarget::Journey(_), Mutation::Upgrade { to }) => upgrade(session, *to),
         (PatchTarget::Journey(_), Mutation::Relink { lineage }) => relink(session, lineage),
-        (PatchTarget::Route(id), Mutation::CreateRoute { name, description }) => {
-            vec![route_header(id, name, description.as_ref(), false)]
-        }
+        (
+            PatchTarget::Route(id),
+            Mutation::CreateRoute {
+                name,
+                description,
+                kind,
+            },
+        ) => vec![route_header(id, name, description.as_ref(), false, *kind)],
         (PatchTarget::Route(id), route_mutation) => route(session, id, route_mutation),
         (_, other) => unreachable!("{other:?} is not a lifecycle mutation of this target"),
     }
@@ -74,6 +80,9 @@ fn create_journey(
     let Some(lineage) = from else {
         return writes;
     };
+    if refuse_segment(session, &lineage.route) {
+        return Vec::new();
+    }
     let Some(version) = session.candidate.versions.get(lineage) else {
         session.reject(
             ViolationCode::LineageInvalid,
@@ -102,9 +111,40 @@ fn create_journey(
             },
         }));
     }
-    // B1: the header, the copy, and one initial state per copied node.
-    assert_eq!(writes.len(), version.graph.nodes.len() + 2);
+    // B13: the nodes are the route's own here, so the insertions the version holds are the
+    // route's to upgrade, not the journey's.
+    writes.extend(
+        version
+            .graph
+            .insertions
+            .as_map()
+            .keys()
+            .map(|key| session.remove(GraphKey::Insertion(key.clone()))),
+    );
+    // B1: the header, the copy, one initial state per copied node, and the insertions dropped.
+    assert_eq!(
+        writes.len(),
+        version.graph.nodes.len() + version.graph.insertions.len() + 2
+    );
     writes
+}
+
+/// A21: a journey is not started from a segment, follows one, or is saved as one. True, with
+/// the violation recorded, when `route` is one.
+pub(super) fn refuse_segment(session: &mut Session<'_>, route: &RouteId) -> bool {
+    let segment = session
+        .candidate
+        .routes
+        .get(route)
+        .is_some_and(|held| held.header.kind == RouteKind::Segment);
+    if segment {
+        session.reject(
+            ViolationCode::NotAProcessRoute,
+            None,
+            format!("route {route} is a segment: a journey is never started from one, follows one, or is saved as one (A21)"),
+        );
+    }
+    segment
 }
 
 fn edit_journey(session: &Session<'_>, change: impl FnOnce(&mut JourneyHeader)) -> Vec<Write> {
@@ -234,6 +274,9 @@ fn past_resource_limit(changes: &[crate::upgrade::Change]) -> Vec<NodeKey> {
 /// from the version's (B4) and unmarked where it matches; every other node is the journey's
 /// own; the version's roles and kinds the journey lacks are added.
 fn relink(session: &mut Session<'_>, lineage: &Lineage) -> Vec<Write> {
+    if refuse_segment(session, &lineage.route) {
+        return Vec::new();
+    }
     let (Some(version), Some(journey)) = (
         session.candidate.versions.get(lineage).cloned(),
         session.journey().cloned(),
@@ -273,12 +316,16 @@ fn relink(session: &mut Session<'_>, lineage: &Lineage) -> Vec<Write> {
                 edit: edit.clone(),
             }));
         }
+        let held = graph.state.nodes.get(&node.key);
+        let segment_member = held.is_some_and(|state| state.provenance == Provenance::FromSegment);
         let provenance = if routed.is_some() {
             Provenance::FromRoute
+        } else if segment_member {
+            Provenance::FromSegment
         } else {
             Provenance::Local
         };
-        if let Some(state) = graph.state.nodes.get(&node.key)
+        if let Some(state) = held
             && state.provenance != provenance
         {
             writes.push(session.put(GraphRecord::NodeState {
@@ -290,17 +337,32 @@ fn relink(session: &mut Session<'_>, lineage: &Lineage) -> Vec<Write> {
             }));
         }
     }
-    for role in version.graph.roles.values() {
-        if graph.roles.get(&role.key).is_none() {
-            writes.push(session.put(GraphRecord::Role(role.clone())));
-        }
-    }
-    for kind in version.graph.participation_kinds.values() {
-        if graph.participation_kinds.get(&kind.key).is_none() {
-            writes.push(session.put(GraphRecord::Kind(kind.clone())));
-        }
-    }
+    // B13: a member the version holds is the route's now; an insertion left with no member
+    // goes.
+    writes.extend(super::insertion::narrowed(session, |member| {
+        version.graph.nodes.get(member).is_none()
+    }));
+    writes.extend(missing_roles_and_kinds(session, &version.graph, graph));
     writes
+}
+
+/// The roles and kinds `version` holds that `graph` lacks, as writes.
+fn missing_roles_and_kinds(
+    session: &Session<'_>,
+    version: &cairn_schema::Graph,
+    graph: &cairn_schema::Graph,
+) -> Vec<Write> {
+    let roles = version
+        .roles
+        .values()
+        .filter(|role| graph.roles.get(&role.key).is_none())
+        .map(|role| session.put(GraphRecord::Role(role.clone())));
+    let kinds = version
+        .participation_kinds
+        .values()
+        .filter(|kind| graph.participation_kinds.get(&kind.key).is_none())
+        .map(|kind| session.put(GraphRecord::Kind(kind.clone())));
+    roles.chain(kinds).collect()
 }
 
 fn route_header(
@@ -308,12 +370,14 @@ fn route_header(
     name: &Title,
     description: Option<&Markdown>,
     retired: bool,
+    kind: RouteKind,
 ) -> Write {
     Write::Put(Record::RouteHeader(RouteHeader {
         id: id.clone(),
         name: name.clone(),
         description: description.cloned(),
         retired,
+        kind,
     }))
 }
 
@@ -330,15 +394,20 @@ fn route(session: &mut Session<'_>, id: &RouteId, mutation: &Mutation) -> Vec<Wr
     ];
     let header = &route.header;
     match mutation {
-        Mutation::EditRoute { name, description } => {
-            vec![route_header(id, name, description.as_ref(), header.retired)]
-        }
+        Mutation::EditRoute { name, description } => vec![route_header(
+            id,
+            name,
+            description.as_ref(),
+            header.retired,
+            header.kind,
+        )],
         Mutation::SetRouteRetired { retired } => {
             vec![route_header(
                 id,
                 &header.name,
                 header.description.as_ref(),
                 *retired,
+                header.kind,
             )]
         }
         Mutation::OpenDraft { .. } | Mutation::DiscardDraft {} | Mutation::PublishDraft {}
@@ -462,6 +531,26 @@ fn publish(
     clear_draft: [Write; 2],
 ) -> Vec<Write> {
     let draft = GraphId::RouteDraft(id.clone());
+    if route.header.kind == RouteKind::Segment
+        && let Some(held) = &route.draft
+    {
+        let roots = held
+            .graph
+            .nodes
+            .values()
+            .filter(|node| node.parent.is_none())
+            .count();
+        if roots != 1 {
+            session.reject(
+                ViolationCode::SegmentRule,
+                None,
+                format!(
+                    "a segment version has exactly one root node and the draft has {roots} (A21)"
+                ),
+            );
+            return Vec::new();
+        }
+    }
     let Some(retired) = retire_omitted(session, id, route.draft.as_ref()) else {
         return Vec::new();
     };
@@ -510,6 +599,9 @@ fn open_draft(
             .is_some_and(|route| route.draft.is_none()),
         "a draft is opened only when none is open (A11)"
     );
+    if matches!(source, DraftSource::SaveAsRoute { .. }) && refuse_segment(session, id) {
+        return Vec::new();
+    }
     let mut writes = vec![Write::Put(Record::RouteDraft {
         route: id.clone(),
         extends: latest,

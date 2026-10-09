@@ -319,6 +319,7 @@ impl RemovalIndex {
                     | GraphRecord::Participation { .. }
                     | GraphRecord::Resource { .. }
                     | GraphRecord::RetiredKey(_)
+                    | GraphRecord::Insertion(_)
                     | GraphRecord::NodeState { .. }
                     | GraphRecord::LocalEdit { .. }
                     | GraphRecord::Answer { .. }

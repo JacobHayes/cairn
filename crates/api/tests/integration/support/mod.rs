@@ -288,7 +288,12 @@ pub fn scenario(name: &str) -> Scenario {
 /// The patch that creates a fixture's route and publishes its file as version 1, as every
 /// scenario expects (fixtures/README.md).
 pub fn publish_fixture_route(name: &str) -> Patch {
-    let path = fixtures_root().join(name).join("route.yaml");
+    let route = fixtures_root().join(name).join("route.yaml");
+    let path = if route.exists() {
+        route
+    } else {
+        fixtures_root().join(name).join("segment.yaml")
+    };
     let file: RouteFile = from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap();
     let graph = from_file(&file, &mut SequentialKeys::default())
         .unwrap()
@@ -297,6 +302,7 @@ pub fn publish_fixture_route(name: &str) -> Patch {
         Mutation::CreateRoute {
             name: file.name.clone(),
             description: file.description.clone(),
+            kind: file.kind,
         },
         Mutation::OpenDraft {
             source: DraftSource::Import,

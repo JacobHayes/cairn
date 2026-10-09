@@ -57,6 +57,7 @@ fn seed(file: &RouteFile, out: &mut String) -> Result<Records> {
                 name: file.name.clone(),
                 description: None,
                 retired: false,
+                kind: cairn_schema::RouteKind::Process,
             },
             revision: cairn_schema::Revision::NONE.next(),
             versions: [version].into(),

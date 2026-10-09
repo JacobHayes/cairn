@@ -16,6 +16,7 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
         Mutation::SetNodeField { node, value } => set_field(session, node, value),
         Mutation::ReplaceNode { node } => replace_node(session, node),
         Mutation::RemoveNode { removal } => super::removal::remove(session, removal),
+        Mutation::InsertSegment { .. } => super::insertion::apply(session, mutation),
         Mutation::AddEdge { edge } => change_edge(session, edge, true),
         Mutation::RemoveEdge { edge } => change_edge(session, edge, false),
         Mutation::SetParticipation { node, kind, source } => {

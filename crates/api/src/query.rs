@@ -11,7 +11,8 @@ use std::str::FromStr;
 use cairn_schema::{
     Cursor, Domain, EntityKey, EventType, JourneyId, JourneyStatus, KindKey, LevelDisplay,
     LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId, ProposalId, Revision,
-    RevisionOf, RouteId, SnapshotScope, SortBy, State, Timestamp, Title, UserId, VersionNumber,
+    RevisionOf, RouteId, RouteKind, SnapshotScope, SortBy, State, Timestamp, Title, UserId,
+    VersionNumber,
 };
 use cairn_store::{EventQuery, JourneyQuery, PageSize, SearchQuery, Watch};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
@@ -92,6 +93,7 @@ pub const JOURNEY_PARAMS: &[ParamSpec] = &[
 
 /// `GET /api/routes`.
 pub const ROUTE_PARAMS: &[ParamSpec] = &[
+    ParamSpec::one::<RouteKind>("kind", "Only routes of this kind; all kinds when absent."),
     ParamSpec::one::<RouteId>("after", "The page starts after this route."),
     SIZE,
 ];
@@ -355,13 +357,13 @@ pub fn journeys(params: &Params) -> Result<JourneyQuery, ApiError> {
     })
 }
 
-/// The route index's page: where it starts and its size.
+/// The route index's page: the kind it lists, where it starts, and its size.
 ///
 /// # Errors
 ///
 /// A bad request for a parameter that does not parse.
-pub fn routes(params: &Params) -> Result<(Option<RouteId>, PageSize), ApiError> {
-    Ok((params.one("after")?, params.size()?))
+pub fn routes(params: &Params) -> Result<(Option<RouteKind>, Option<RouteId>, PageSize), ApiError> {
+    Ok((params.one("kind")?, params.one("after")?, params.size()?))
 }
 
 /// The search query.

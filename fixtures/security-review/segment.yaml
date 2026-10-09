@@ -1,0 +1,44 @@
+format: 1
+route: security-review
+name: Security review
+description: "A reusable security check: classify the data, model threats unless it is low sensitivity, and name who reviews."
+kind: segment
+roles:
+- key: r_reviewer
+  id: reviewer
+  title: Reviewer
+nodes:
+- key: n_review
+  id: security-review
+  kind: group
+  title: Security review
+- key: n_sensitivity
+  id: sensitivity
+  parent: security-review
+  kind: decision
+  title: Data sensitivity
+  prompt: How sensitive is the data involved?
+  answer_type: single_choice
+  choices:
+  - low
+  - moderate
+  - high
+- key: n_threat_model
+  id: threat-model
+  parent: security-review
+  kind: deliverable
+  title: Threat model
+  relevant_when:
+    not_equals:
+      decision: security-review/sensitivity
+      value: low
+  participations:
+    owner: reviewer
+- key: n_who_reviews
+  id: who-reviews
+  parent: security-review
+  kind: decision
+  title: Who reviews?
+  prompt: Who performs the security review?
+  answer_type: entity
+  fills_role: reviewer

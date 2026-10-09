@@ -1150,6 +1150,21 @@
       "pattern": "^[a-z0-9][a-z0-9_-]*$",
       "type": "string"
     },
+    "RouteKind": {
+      "description": "What a route is for (PRD glossary, Route): fixed when it is created.",
+      "oneOf": [
+        {
+          "const": "process",
+          "description": "A process template: journeys start from it.",
+          "type": "string"
+        },
+        {
+          "const": "segment",
+          "description": "A reusable piece of a process: it is only inserted, never started (A21).",
+          "type": "string"
+        }
+      ]
+    },
     "Slug": {
       "description": "An id: lowercase letters, digits, '_' and '-', at most id_bytes_max (64) bytes.",
       "maxLength": 64,
@@ -1220,6 +1235,10 @@
     "format": {
       "$ref": "#/$defs/FormatVersion",
       "description": "The file format version."
+    },
+    "kind": {
+      "$ref": "#/$defs/RouteKind",
+      "description": "Process or segment (A21); a file that leaves it out is a process."
     },
     "name": {
       "$ref": "#/$defs/Title",

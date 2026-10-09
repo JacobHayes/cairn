@@ -56,7 +56,7 @@ The shape every brief follows.
 | 7.3 | The `requires_note` guard | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `openapi/`, `web/client`, `web/app` | 5.6 (screens: 8.7, 8.9) | landed |
 | 7.4 | Snoozing a container | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.3 (screens: 8.7, 8.9) | landed |
 | 7.5 | Notices: work the final milestone cannot see | `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.6 (draft card: 8.11) | landed |
-| 7.6 | Segments: model and insert | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `fixtures/` | 4.3 | planned |
+| 7.6 | Segments: model and insert | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `fixtures/` | 4.3 | landed |
 | 7.7 | Segment screens | `web/app` | 7.6, 8.6, 8.11 | planned |
 | 7.8 | Insertion upgrade | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `web/app`, `fixtures/` | 7.6 (screens: 7.7) | planned |
 | 7.9 | Save as segment and link | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `web/app` | 7.6 (screens: 7.7) | planned |

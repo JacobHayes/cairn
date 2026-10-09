@@ -8,12 +8,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_schema::collections::LimitOf;
+use cairn_schema::collections::{InsertionCount, LimitOf};
 use cairn_schema::{
     Action, AnswerSpec, AnswerType, BoundedSet, Choices, Days, Decision, Deliverable, EntityKey,
-    Graph, GraphId, Group, HasKey, Keyed, KindField, KindKey, Markdown, Milestone, Node, NodeKey,
-    NodeKind, ParticipationKind, ParticipationSource, Participations, Payload, Resource,
-    ResourceContent, RetiredKeys, Role, RoleKey, Weight, node::Requires, refs::KeyRefs,
+    Graph, GraphId, Group, HasKey, Insertion, Keyed, KindField, KindKey, Lineage, Markdown,
+    Milestone, Node, NodeKey, NodeKind, ParticipationKind, ParticipationSource, Participations,
+    Payload, Resource, ResourceContent, RetiredKeys, Role, RoleKey, Weight, node::Requires,
+    refs::KeyRefs,
 };
 use cairn_store::StoreError;
 use turso::{Connection, Value};
@@ -482,6 +483,7 @@ pub(crate) async fn load(connection: &Connection, graph: &GraphId) -> Result<Gra
         participation_kinds: keyed(kinds, "participation kinds")?,
         nodes: keyed(nodes, "nodes")?,
         retired_keys: retired_keys(connection, &id).await?,
+        insertions: insertions(connection, &id).await?,
         state: crate::state::load(connection, &id).await?,
     })
 }
@@ -501,6 +503,29 @@ async fn labeled(
         found.push((row.text(0)?, row.text(1)?, row.opt_text(2)?, row.flag(3)?));
     }
     Ok(found)
+}
+
+async fn insertions(
+    connection: &Connection,
+    id: &str,
+) -> Result<Keyed<Insertion, InsertionCount>, StoreError> {
+    let select = "SELECT key, segment, version, parent_key, roles, kinds, nodes \
+                  FROM insertions WHERE graph_id = ?1 ORDER BY key";
+    let mut found = Vec::new();
+    for row in rows(connection, select, vec![text(id)]).await? {
+        found.push(Insertion {
+            key: row.parse(0)?,
+            segment: Lineage {
+                route: row.parse(1)?,
+                version: row.number(2)?,
+            },
+            parent: row.opt_parse(3)?,
+            roles: row.json(4)?,
+            kinds: row.json(5)?,
+            nodes: row.json(6)?,
+        });
+    }
+    keyed(found, "insertions")
 }
 
 async fn retired_keys(connection: &Connection, id: &str) -> Result<RetiredKeys, StoreError> {

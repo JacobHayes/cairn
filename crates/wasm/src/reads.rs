@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 
 use cairn_schema::{
     AgentId, Email, EntityKey, JourneyId, JourneyStatus, Markdown, PatchId, Revision, RouteFile,
-    RouteHeader, RouteId, Slug, Timestamp, Title, UserId, VersionNumber,
+    RouteHeader, RouteId, RouteKind, Slug, Timestamp, Title, UserId, VersionNumber,
 };
 use cairn_service::WriteError;
 use cairn_store::{JourneyQuery, PageSize};
@@ -193,14 +193,19 @@ impl BrowserRoot {
         })
     }
 
-    /// The route index: every route, in id order, as `GET /api/routes` answers its first page
-    /// at the page limit.
+    /// The route index: every process route, in id order, as `GET /api/routes?kind=process`
+    /// answers its first page at the page limit. The screens that list segments are later.
     ///
     /// # Errors
     ///
     /// When the store fails.
     pub fn route_page(&self, after: Option<&RouteId>) -> Result<RoutePage, HostError> {
-        let page = now_or_never(self.service().routes(after, PageSize::MAX)).map_err(failed)?;
+        let page = now_or_never(self.service().routes(
+            Some(RouteKind::Process),
+            after,
+            PageSize::MAX,
+        ))
+        .map_err(failed)?;
         let items = page.items.into_iter().map(|summary| RouteSummary {
             header: summary.header,
             revision: summary.revision,

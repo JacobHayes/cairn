@@ -6,13 +6,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    ChangeSet, Deployment, Domain, EntityKey, EventType, Graph, GraphId, GraphRecord, JourneyId,
-    JourneyState, Limit, Location, NodeKey, PatchReceipt, PatchTarget, ProposalId, Record,
-    RecordKey, Rejection, RetiredKey, RetiredKeys, Revision, RevisionConflict, RevisionOf, Slug,
-    Subject, TouchedSet, Violation, ViolationCode, Violations, Write, limits::GRAPH_BYTES_MAX,
+    ChangeSet, Deployment, Domain, EntityKey, EventType, Graph, GraphId, GraphRecord, InsertionKey,
+    JourneyId, JourneyState, Limit, Location, NodeKey, PatchReceipt, PatchTarget, ProposalId,
+    Record, RecordKey, Rejection, RetiredKey, RetiredKeys, Revision, RevisionConflict, RevisionOf,
+    RouteId, Slug, Subject, TouchedSet, VersionNumber, Violation, ViolationCode, Violations, Write,
+    limits::GRAPH_BYTES_MAX,
 };
 
 use crate::commit::{Commit, CommitError, Committed, StoreError};
+use crate::query::InsertionUse;
 
 /// What a commit's change set says about itself, checked before anything is read.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -716,6 +718,7 @@ pub fn graph_records(graph: &Graph) -> Vec<GraphRecord> {
                 roles: retired_roles,
                 kinds: retired_kinds,
             },
+        insertions,
         state,
     } = graph;
     let mut records: Vec<GraphRecord> = Vec::new();
@@ -727,6 +730,7 @@ pub fn graph_records(graph: &Graph) -> Vec<GraphRecord> {
         .chain(retired_roles.iter().cloned().map(RetiredKey::Role))
         .chain(retired_kinds.iter().cloned().map(RetiredKey::Kind));
     records.extend(retired.map(GraphRecord::RetiredKey));
+    records.extend(insertions.values().cloned().map(GraphRecord::Insertion));
     records.extend(state_records(state));
     records
 }
@@ -832,6 +836,74 @@ pub fn check_conversation_size(
 #[must_use]
 pub fn no_such_user(user: &cairn_schema::UserId) -> StoreError {
     StoreError::Malformed(format!("user {user} does not exist"))
+}
+
+/// C19: the insertions of `segment`'s versions across `graphs`, each under the version it is on:
+/// journeys, route drafts, and each route's latest version, where an insertion a draft also
+/// holds is listed once, as the draft's. `latest` is a route's latest published version, and
+/// `root` the key of a version of `segment`'s one root. Cost: one pass over the insertions of
+/// the graphs given.
+#[must_use]
+pub fn insertion_uses<'g>(
+    segment: &RouteId,
+    latest: impl Fn(&RouteId) -> Option<VersionNumber>,
+    root: impl Fn(VersionNumber) -> Option<NodeKey>,
+    graphs: impl IntoIterator<Item = (&'g GraphId, &'g Graph)>,
+) -> BTreeMap<VersionNumber, Vec<InsertionUse>> {
+    let graphs: Vec<_> = graphs.into_iter().collect();
+    let drafted: BTreeSet<(&RouteId, &InsertionKey)> = graphs
+        .iter()
+        .filter_map(|(id, graph)| match id {
+            GraphId::RouteDraft(route) => Some((route, graph)),
+            _ => None,
+        })
+        .flat_map(|(route, graph)| graph.insertions.values().map(move |i| (route, &i.key)))
+        .collect();
+    let newest = latest(segment);
+    let mut found: BTreeMap<VersionNumber, Vec<InsertionUse>> = BTreeMap::new();
+    for (id, graph) in graphs {
+        let (host, current) = match id {
+            GraphId::Journey(journey) => (Domain::Journey(journey.clone()), true),
+            GraphId::RouteDraft(route) => (Domain::Route(route.clone()), true),
+            GraphId::RouteVersion { route, version } => (
+                Domain::Route(route.clone()),
+                latest(route) == Some(*version),
+            ),
+        };
+        for insertion in graph.insertions.values() {
+            let held_by_draft = matches!(id, GraphId::RouteVersion { route, .. }
+                if drafted.contains(&(route, &insertion.key)));
+            if insertion.segment.route != *segment || !current || held_by_draft {
+                continue;
+            }
+            // Members may move, so the root is the member copied from the version's root; once
+            // it is removed, the insertion is listed under what is left of it.
+            let version_root = root(insertion.segment.version);
+            let members = insertion.nodes.iter();
+            let copied = members
+                .clone()
+                .find(|(_, from)| Some(*from) == version_root.as_ref());
+            let root = copied
+                .or_else(|| members.clone().next())
+                .and_then(|(member, _)| graph.nodes.get(member));
+            let Some(root) = root else { continue };
+            found
+                .entry(insertion.segment.version)
+                .or_default()
+                .push(InsertionUse {
+                    host: host.clone(),
+                    graph: id.clone(),
+                    insertion: insertion.key.clone(),
+                    title: root.title.clone(),
+                    upgrade_available: newest
+                        .is_some_and(|newest| newest > insertion.segment.version),
+                });
+        }
+    }
+    for uses in found.values_mut() {
+        uses.sort_by(|a, b| (&a.graph, &a.insertion).cmp(&(&b.graph, &b.insertion)));
+    }
+    found
 }
 
 #[cfg(test)]

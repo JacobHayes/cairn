@@ -72,6 +72,7 @@ pub fn exported(request: &ExportRequest) -> Result<RouteFile, HostError> {
         route: route.header.id.clone(),
         name: route.header.name.clone(),
         description: route.header.description.clone(),
+        kind: route.header.kind,
         extends,
     };
     // A route has no answers, so no deployment changes what it means.

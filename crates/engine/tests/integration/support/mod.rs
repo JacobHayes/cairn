@@ -11,12 +11,12 @@ pub fn fixtures_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
 }
 
-/// The fixture directories, sorted.
+/// The fixture directories with a scenario, sorted.
 pub fn fixture_names() -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(fixtures_root())
         .unwrap()
         .map(|entry| entry.unwrap().path())
-        .filter(|path| path.is_dir())
+        .filter(|path| path.join("journey.yaml").exists())
         .map(|path| path.file_name().unwrap().to_string_lossy().into_owned())
         .collect();
     names.sort();
@@ -51,11 +51,24 @@ use cairn_schema::{
 /// Records holding a fixture's route with its route file published as version 1, as each
 /// scenario expects (fixtures/README.md), in a fresh deployment.
 pub fn seeded(name: &str) -> Records {
-    let mut records = Records::default();
-    let Some(file) = route_file(name) else {
-        return records;
-    };
-    let graph = route_graph(name).into_document();
+    let records = Records::default();
+    match route_file(name) {
+        Some(file) => published(records, &file, route_graph(name).into_document()),
+        None => records,
+    }
+}
+
+/// The records with a segment fixture's `segment.yaml` published as version 1 of its route.
+pub fn with_segment(records: Records, name: &str) -> Records {
+    let path = fixtures_root().join(name).join("segment.yaml");
+    let file: RouteFile = from_yaml(&std::fs::read_to_string(&path).unwrap()).unwrap();
+    let graph = from_file(&file, &mut SequentialKeys::default())
+        .unwrap_or_else(|violations| panic!("{name}: {violations:#?}"))
+        .into_document();
+    published(records, &file, graph)
+}
+
+fn published(mut records: Records, file: &RouteFile, graph: cairn_schema::Graph) -> Records {
     let version = VersionNumber::FIRST;
     records.routes.insert(
         file.route.clone(),
@@ -65,6 +78,7 @@ pub fn seeded(name: &str) -> Records {
                 name: file.name.clone(),
                 description: file.description.clone(),
                 retired: false,
+                kind: file.kind,
             },
             revision: cairn_schema::Revision::NONE.next(),
             versions: [version].into(),

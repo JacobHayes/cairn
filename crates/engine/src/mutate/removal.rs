@@ -163,6 +163,11 @@ pub(super) fn remove(session: &mut Session<'_>, removal: &Removal) -> Vec<Write>
             writes.push(session.put(GraphRecord::Tombstone(key.clone())));
         }
     }
+    // B13: a removed member leaves its insertion, which goes with its last (no tombstone: a
+    // member is not route-copied).
+    writes.extend(super::insertion::narrowed(session, |member| {
+        !inside.contains(member)
+    }));
     assert!(writes.len() >= reach.nodes.len() * 2);
     writes
 }

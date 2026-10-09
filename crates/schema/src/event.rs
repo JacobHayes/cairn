@@ -13,8 +13,8 @@ use crate::domain::Domain;
 use crate::field::NodeField;
 use crate::graph::Edge;
 use crate::id::{
-    AgentId, AttachmentKey, EntityKey, JourneyId, KindKey, NodeKey, PatchId, ProposalId, RoleKey,
-    RouteId, UserId,
+    AgentId, AttachmentKey, EntityKey, InsertionKey, JourneyId, KindKey, NodeKey, PatchId,
+    ProposalId, RoleKey, RouteId, UserId,
 };
 use crate::number::Revision;
 use crate::patch::{DraftSource, Mutation, Override, Patch, PatchTarget, Transition};
@@ -54,6 +54,7 @@ pub enum EventType {
     DefaultOwnerChanged,
     ParticipationChanged,
     ResourceChanged,
+    SegmentInserted,
     NodeTransitioned,
     MilestoneReached,
     AnswerSet,
@@ -100,6 +101,8 @@ pub enum Subject {
     Kind(KindKey),
     /// A resource, note, or link.
     Attachment(AttachmentKey),
+    /// A segment insertion.
+    Insertion(InsertionKey),
     /// An entity.
     Entity(EntityKey),
     /// A journey.
@@ -215,6 +218,7 @@ impl Mutation {
             Mutation::AddResource { .. }
             | Mutation::EditResource { .. }
             | Mutation::RemoveResource { .. } => EventType::ResourceChanged,
+            Mutation::InsertSegment { .. } => EventType::SegmentInserted,
             // One event records a container's skip; the cascade is derived (D1a).
             Mutation::Transition {
                 transition: Transition::Reach,
@@ -320,6 +324,7 @@ impl Mutation {
             }
             Mutation::MergeEntities { merged, .. } => Subject::Entity(merged.clone()),
             Mutation::ApplyProposal { proposal, .. } => Subject::Proposal(proposal.clone()),
+            Mutation::InsertSegment { insertion, .. } => Subject::Insertion(insertion.clone()),
             other => other
                 .node_subject()
                 .unwrap_or_else(|| domain_subject(target)),

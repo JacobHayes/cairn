@@ -10,9 +10,10 @@ use serde::{Deserialize, Serialize};
 use crate::attachment::{Annotation, Resource};
 use crate::domain::{Domain, Entity, GraphId, JourneyHeader, RouteHeader};
 use crate::field::{NodeField, NodeFieldValue};
-use crate::graph::{Edge, ParticipationKind, Role};
+use crate::graph::{Edge, Insertion, ParticipationKind, Role};
 use crate::id::{
-    AttachmentKey, EntityKey, JourneyId, KindKey, NodeKey, ProposalId, RoleKey, RouteId,
+    AttachmentKey, EntityKey, InsertionKey, JourneyId, KindKey, NodeKey, ProposalId, RoleKey,
+    RouteId,
 };
 use crate::node::{EntitySet, Node, ParticipationSource};
 use crate::number::VersionNumber;
@@ -77,6 +78,8 @@ pub enum GraphRecord {
     },
     /// A retired key.
     RetiredKey(RetiredKey),
+    /// A segment insertion (B13).
+    Insertion(Insertion),
     /// A node's stored state.
     NodeState {
         /// The node.
@@ -227,6 +230,8 @@ pub enum GraphKey {
     },
     /// A retired key.
     RetiredKey(RetiredKey),
+    /// A segment insertion.
+    Insertion(InsertionKey),
     /// A node's stored state.
     NodeState(NodeKey),
     /// A local-edit marker.
@@ -339,6 +344,7 @@ impl GraphRecord {
                 resource: resource.key.clone(),
             },
             GraphRecord::RetiredKey(key) => GraphKey::RetiredKey(key.clone()),
+            GraphRecord::Insertion(insertion) => GraphKey::Insertion(insertion.key.clone()),
             GraphRecord::NodeState { node, .. } => GraphKey::NodeState(node.clone()),
             GraphRecord::LocalEdit { node, edit } => GraphKey::LocalEdit {
                 node: node.clone(),
@@ -384,6 +390,7 @@ impl GraphKey {
             | GraphKey::Kind(_)
             | GraphKey::DefaultOwner
             | GraphKey::RetiredKey(_)
+            | GraphKey::Insertion(_)
             | GraphKey::RoleFill(_)
             | GraphKey::Annotation { node: None, .. } => None,
         }

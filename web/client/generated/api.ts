@@ -1686,6 +1686,12 @@ export interface components {
             /** @description The node it requires. */
             requires: components["schemas"]["NodeKey"];
         };
+        /** @description One end of an edge an insertion adds: a node of the segment, or of the graph. */
+        EdgeEnd: {
+            segment: components["schemas"]["NodeKey"];
+        } | {
+            host: components["schemas"]["NodeKey"];
+        };
         /** @description C2: how an edge on the canvas arose (C1: implicit gates are drawn dotted). */
         EdgeOrigin: "explicit" | "condition" | "stage_opening";
         /**
@@ -1797,7 +1803,7 @@ export interface components {
          *     their content ([`Mutation::event_type`]).
          * @enum {string}
          */
-        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "node_transitioned" | "milestone_reached" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "entity_created" | "entity_edited" | "entities_merged" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
+        EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "milestone_reached" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "entity_created" | "entity_edited" | "entities_merged" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
         /**
          * @description A list of explanation entries with its total (ARCHITECTURE, Read path): complete inside
          *     the engine and the browser; a server response keeps the largest entries up to
@@ -1868,6 +1874,8 @@ export interface components {
         Graph: {
             /** @description The role that owns nodes no ancestor gives an owner (A6). */
             default_owner?: components["schemas"]["RoleKey"] | null;
+            /** @description The segment insertions the graph holds (B13). */
+            insertions?: components["schemas"]["Insertion"][];
             /** @description The nodes. */
             nodes?: components["schemas"]["Node"][];
             /** @description The participation kinds beyond `owner`. */
@@ -1924,6 +1932,8 @@ export interface components {
             };
         } | {
             retired_key: components["schemas"]["RetiredKey"];
+        } | {
+            insertion: components["schemas"]["InsertionKey"];
         } | {
             node_state: components["schemas"]["NodeKey"];
         } | {
@@ -1989,6 +1999,8 @@ export interface components {
             };
         } | {
             retired_key: components["schemas"]["RetiredKey"];
+        } | {
+            insertion: components["schemas"]["Insertion"];
         } | {
             node_state: {
                 /** @description The node. */
@@ -2095,6 +2107,58 @@ export interface components {
             next?: number | null;
             /** @description At most a page of events, grouped by patch, in log order; a large patch spans pages. */
             patches: components["schemas"]["PatchEvents"][];
+        };
+        /**
+         * @description An edge an insertion adds: `node` requires `requires`, one end in the segment and the
+         *     other in the graph (B13).
+         */
+        InsertedEdge: {
+            /** @description The dependent. */
+            node: components["schemas"]["EdgeEnd"];
+            /** @description What it requires. */
+            requires: components["schemas"]["EdgeEnd"];
+        };
+        /**
+         * @description One placement of a segment version in a graph (PRD glossary, Insertion; B13). Its local
+         *     edits are not stored: they are its members' differences from the version it is on.
+         */
+        Insertion: {
+            /** @description The key, minted by the client like any new key; unique in the graph. */
+            key: components["schemas"]["InsertionKey"];
+            /** @description Each segment participation kind beyond `owner`, likewise. */
+            kinds?: {
+                [key: string]: components["schemas"]["KindKey"];
+            };
+            /**
+             * @description Its members: each graph node it copied that the graph still holds, with that node's
+             *     key in the segment.
+             */
+            nodes: {
+                [key: string]: components["schemas"]["NodeKey"];
+            };
+            /** @description Where it was inserted: the parent the root went under, or none for the top level. */
+            parent?: components["schemas"]["NodeKey"] | null;
+            /** @description Each segment role, mapped to the graph role it became. */
+            roles?: {
+                [key: string]: components["schemas"]["RoleKey"];
+            };
+            /** @description The segment and the version the insertion is on. */
+            segment: components["schemas"]["Lineage"];
+        };
+        /** @description Starts with "i_"; at most id_bytes_max (64) bytes. */
+        InsertionKey: string;
+        /** @description One insertion of a segment version (C19). */
+        InsertionUse: {
+            /** @description The graph holding it. */
+            graph: components["schemas"]["GraphId"];
+            /** @description The domain holding it. */
+            host: components["schemas"]["Domain"];
+            /** @description The insertion. */
+            insertion: components["schemas"]["InsertionKey"];
+            /** @description The root member's current title. */
+            title: components["schemas"]["Title"];
+            /** @description Whether the segment has a later published version. */
+            upgrade_available: boolean;
         };
         /**
          * @description A point in time the date network solves for (ARCHITECTURE, Date network). A container's
@@ -2267,6 +2331,10 @@ export interface components {
         } | {
             kind: components["schemas"]["KindKey"];
         } | "default_owner";
+        /** @description What a segment participation kind becomes in the graph it is inserted into (B13). */
+        KindChoice: {
+            existing: components["schemas"]["KindKey"];
+        } | "add";
         /** @description Starts with "k_"; at most id_bytes_max (64) bytes. */
         KindKey: string;
         /**
@@ -2508,6 +2576,8 @@ export interface components {
         } | {
             /** @description The description. */
             description?: components["schemas"]["Markdown"] | null;
+            /** @description Process (the default) or segment; fixed from here on (A21). */
+            kind?: components["schemas"]["RouteKind"];
             /** @description The name. */
             name: components["schemas"]["Title"];
             /** @constant */
@@ -2639,6 +2709,34 @@ export interface components {
             op: "remove_resource";
             /** @description The resource. */
             resource: components["schemas"]["AttachmentKey"];
+        } | {
+            /** @description The wiring: each edge joins one segment node and one node of the graph. */
+            edges?: components["schemas"]["InsertedEdge"][];
+            /** @description The insertion's key, new in the graph. */
+            insertion: components["schemas"]["InsertionKey"];
+            /** @description What each segment participation kind becomes, likewise. */
+            kinds?: {
+                [key: string]: components["schemas"]["KindChoice"];
+            };
+            /** @description Segment nodes left out, each with its subtree. */
+            omit?: components["schemas"]["NodeKey"][];
+            /** @constant */
+            op: "insert_segment";
+            /** @description The group, deliverable, or action the root goes under; none for the top level. */
+            parent?: components["schemas"]["NodeKey"] | null;
+            /**
+             * @description What each segment role becomes; a role not named takes the graph's role with its
+             *     id and cardinality, else is added.
+             */
+            roles?: {
+                [key: string]: components["schemas"]["RoleChoice"];
+            };
+            /** @description The root's id; the segment root's own, suffixed when a sibling has it, if none. */
+            root_id?: components["schemas"]["Slug"] | null;
+            /** @description The root's title; the segment root's own if none. */
+            root_title?: components["schemas"]["Title"] | null;
+            /** @description The segment and one of its published versions. */
+            segment: components["schemas"]["Lineage"];
         } | {
             /** @description The node. */
             node: components["schemas"]["NodeKey"];
@@ -3726,7 +3824,7 @@ export interface components {
             patch_id: components["schemas"]["PatchId"];
         };
         /** @description A node's origin in a journey (PRD glossary, Provenance). */
-        Provenance: "from_route" | "local" | "orphaned";
+        Provenance: "from_route" | "local" | "orphaned" | "from_segment";
         /**
          * @description The rank constants (Priority: normative formulas, configurable constants, defaults
          *     shown). The four coefficients sum to a finite number, so every rank is finite.
@@ -4041,6 +4139,10 @@ export interface components {
             /** @description A label. */
             title?: components["schemas"]["Title"] | null;
         };
+        /** @description What a segment role becomes in the graph it is inserted into (B13). */
+        RoleChoice: {
+            existing: components["schemas"]["RoleKey"];
+        } | "add";
         /** @description Starts with "r_"; at most id_bytes_max (64) bytes. */
         RoleKey: string;
         /**
@@ -4163,6 +4265,8 @@ export interface components {
             extends?: components["schemas"]["VersionNumber"] | null;
             /** @description The file format version. */
             format: components["schemas"]["FormatVersion"];
+            /** @description Process or segment (A21); a file that leaves it out is a process. */
+            kind?: components["schemas"]["RouteKind"];
             /** @description The route's name. */
             name: components["schemas"]["Title"];
             /** @description The nodes, each naming its parent by path. */
@@ -4180,6 +4284,8 @@ export interface components {
             description?: components["schemas"]["Markdown"] | null;
             /** @description The route's id. */
             id: components["schemas"]["RouteId"];
+            /** @description Process or segment (A21); routes stored before segments existed are processes. */
+            kind?: components["schemas"]["RouteKind"];
             /** @description Its name. */
             name: components["schemas"]["Title"];
             /** @description Hidden from new-journey creation (A19); its journeys still see upgrades. */
@@ -4199,6 +4305,8 @@ export interface components {
             /** @description The import's patch id (H5): the same file under the same id is the same patch. */
             patch_id: components["schemas"]["PatchId"];
         };
+        /** @description What a route is for (PRD glossary, Route): fixed when it is created. */
+        RouteKind: "process" | "segment";
         /** @description A page of the route index; `next` is where the next page starts, absent on the last. */
         RoutePage: {
             /** @description The routes, in id order. */
@@ -4551,6 +4659,8 @@ export interface components {
         } | {
             attachment: components["schemas"]["AttachmentKey"];
         } | {
+            insertion: components["schemas"]["InsertionKey"];
+        } | {
             entity: components["schemas"]["EntityKey"];
         } | {
             journey: components["schemas"]["JourneyId"];
@@ -4721,6 +4831,8 @@ export interface components {
         UserId: string;
         /** @description One published version and the journeys on it. */
         VersionJourneys: {
+            /** @description Where this version of a segment is inserted (C19). */
+            insertions?: components["schemas"]["InsertionUse"][];
             /** @description The journeys whose lineage is this version. */
             journeys: components["schemas"]["JourneyId"][];
             /**
@@ -4779,7 +4891,7 @@ export interface components {
          * @description What a violation breaks (PRD Invariants, D1, D4, A11, A18, A19, B6, E3, E6, H3).
          * @enum {string}
          */
-        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "entity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "entity_key_taken" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open" | "unresolved_review_item";
+        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "entity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "segment_rule" | "insertion_invalid" | "insertion_key_taken" | "not_a_process_route" | "entity_key_taken" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open" | "unresolved_review_item";
         /** @description A violation list with at least one entry (a rejection always says why). */
         Violations: components["schemas"]["Violation"][];
         /** @description What a stream watches: `deployment`, `journey:<id>`, `route:<id>`, `proposal:<id>`, `journeys`, `routes`, or `proposals`. */
@@ -8134,6 +8246,8 @@ export interface operations {
     listRoutes: {
         parameters: {
             query?: {
+                /** @description Only routes of this kind; all kinds when absent. */
+                kind?: components["schemas"]["RouteKind"];
                 /** @description The page starts after this route. */
                 after?: components["schemas"]["RouteId"];
                 /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */

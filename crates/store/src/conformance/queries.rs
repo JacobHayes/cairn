@@ -5,7 +5,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Domain, EventType, GraphRecord, JourneyId, JourneyStatus, Record, Subject, ViolationCode, Write,
+    Domain, EventType, GraphId, GraphRecord, Insertion, JourneyId, JourneyStatus, Lineage, Record,
+    Subject, ViolationCode, Write,
 };
 use serde_json::json;
 
@@ -15,7 +16,9 @@ use crate::build::{
     journey_header, journey_patch, node, node_key, put_in, revision, route_patch, version,
 };
 use crate::commit::CommitError;
-use crate::query::{EventQuery, JourneyQuery, PageSize, SearchHit, SearchQuery, VersionJourneys};
+use crate::query::{
+    EventQuery, InsertionUse, JourneyQuery, PageSize, SearchHit, SearchQuery, VersionJourneys,
+};
 use crate::store::Store;
 
 fn keys(items: &[&str]) -> Vec<JourneyId> {
@@ -176,7 +179,21 @@ async fn index_fixture<S: Store>(store: &S) {
     applied(store, create_route("p_vendor", "vendor").commit()).await;
     applied(
         store,
-        build::publish(route_patch("p_v1", "vendor", 1), "vendor", 1, 1).commit(),
+        build::publish(
+            // The one root an insertion of this version is copied from (C19).
+            route_patch("p_v1", "vendor", 1).event(
+                EventType::NodeAdded,
+                Subject::Node(node_key("n_root")),
+                vec![put_in(
+                    &GraphId::RouteDraft(id("vendor")),
+                    GraphRecord::Node(action("n_root", "root", None)),
+                )],
+            ),
+            "vendor",
+            1,
+            1,
+        )
+        .commit(),
     )
     .await;
     applied(
@@ -214,6 +231,25 @@ async fn index_fixture<S: Store>(store: &S) {
                         "key": "n_task", "id": "task", "kind": "action", "title": "Task",
                         "participations": {"k_owner": ["e_x"]},
                     }))),
+                )],
+            );
+            // C19: an insertion of vendor's first version, whose second is later.
+            builder = builder.event(
+                EventType::SegmentInserted,
+                Subject::Insertion(id("i_task")),
+                vec![put_in(
+                    &journey_graph(journey),
+                    GraphRecord::Insertion(Insertion {
+                        key: id("i_task"),
+                        segment: Lineage {
+                            route: id("vendor"),
+                            version: version(1),
+                        },
+                        parent: None,
+                        roles: BTreeMap::new(),
+                        kinds: BTreeMap::new(),
+                        nodes: BTreeMap::from([(node_key("n_task"), id("n_root"))]),
+                    }),
                 )],
             );
         }
@@ -381,7 +417,8 @@ pub async fn the_journey_index_events_and_search_page<B: Backend>(backend: &B) {
     assert_eq!(found, keys(&names));
 }
 
-/// C17: route detail lists a route's versions, oldest first, with the journeys on each.
+/// C17, C19: route detail lists a route's versions, oldest first, with the journeys on each
+/// and the insertions of it.
 pub async fn route_detail_lists_versions_with_their_journeys<B: Backend>(backend: &B) {
     let store = open(backend).await;
     index_fixture(&store).await;
@@ -395,11 +432,19 @@ pub async fn route_detail_lists_versions_with_their_journeys<B: Backend>(backend
                 version: version(1),
                 published_at: build::at(1),
                 journeys: BTreeSet::from([id("j_a")]),
+                insertions: vec![InsertionUse {
+                    host: Domain::Journey(id("j_d")),
+                    graph: journey_graph("j_d"),
+                    insertion: id("i_task"),
+                    title: build::title("Task"),
+                    upgrade_available: true,
+                }],
             },
             VersionJourneys {
                 version: version(2),
                 published_at: build::at(2),
                 journeys: BTreeSet::from([id("j_b")]),
+                insertions: Vec::new(),
             },
         ]
     );

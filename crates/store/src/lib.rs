@@ -34,8 +34,8 @@ pub use notifier::{
     InProcessNotifier, Notifier, Ready, SubscriberLimit, Subscription, Take, Tick, Watch,
 };
 pub use query::{
-    EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page, PageSize,
-    Revisions, RouteDetail, SearchHit, SearchQuery, VersionJourneys,
+    EventQuery, InsertionUse, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page,
+    PageSize, Revisions, RouteDetail, SearchHit, SearchQuery, VersionJourneys,
 };
 pub use records::{
     AgentTokenRecord, AuthEvent, AuthLogEntry, AuthLogQuery, ConversationMessage,

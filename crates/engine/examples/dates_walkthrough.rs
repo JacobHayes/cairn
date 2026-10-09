@@ -82,6 +82,7 @@ fn seed(file: &RouteFile) -> Result<Records> {
         name: file.name.clone(),
         description: None,
         retired: false,
+        kind: cairn_schema::RouteKind::Process,
     };
     let route = Route {
         header,

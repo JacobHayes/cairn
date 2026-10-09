@@ -114,6 +114,7 @@ pub fn publish_fixture_route(name: &str) -> Patch {
         Mutation::CreateRoute {
             name: file.name.clone(),
             description: file.description.clone(),
+            kind: file.kind,
         },
         Mutation::OpenDraft {
             source: DraftSource::Import,

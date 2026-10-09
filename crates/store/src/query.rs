@@ -5,8 +5,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AttachmentKey, Domain, EntityKey, Event, EventType, JourneyId, JourneyStatus, Lineage, NodeKey,
-    PatchId, ProposalId, Revision, RouteHeader, RouteId, Timestamp, Title, UserId, VersionNumber,
+    AttachmentKey, Domain, EntityKey, Event, EventType, GraphId, InsertionKey, JourneyId,
+    JourneyStatus, Lineage, NodeKey, PatchId, ProposalId, Revision, RouteHeader, RouteId,
+    Timestamp, Title, UserId, VersionNumber,
 };
 
 use crate::limits::PAGE_ITEM_COUNT_MAX;
@@ -157,6 +158,23 @@ pub struct VersionJourneys {
     pub published_at: Timestamp,
     /// The journeys whose lineage is this version.
     pub journeys: BTreeSet<JourneyId>,
+    /// The insertions of this version, when the route is a segment (C19).
+    pub insertions: Vec<InsertionUse>,
+}
+
+/// One insertion of a segment version, as the segment's detail lists it (C19).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct InsertionUse {
+    /// The domain holding it.
+    pub host: Domain,
+    /// The graph holding it.
+    pub graph: GraphId,
+    /// The insertion.
+    pub insertion: InsertionKey,
+    /// The root member's current title.
+    pub title: Title,
+    /// Whether the segment has a later published version.
+    pub upgrade_available: bool,
 }
 
 /// J5: event filters. Every filter given must hold.

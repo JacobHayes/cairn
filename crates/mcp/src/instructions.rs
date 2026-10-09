@@ -19,10 +19,14 @@ pub struct Workflow {
 pub const SKILL: &str = include_str!("../../../instructions/SKILL.md");
 
 /// The workflow files, by name.
-const WORKFLOW_FILES: [(&str, &str); 8] = [
+const WORKFLOW_FILES: [(&str, &str); 9] = [
     (
         "author-route",
         include_str!("../../../instructions/workflows/author-route.md"),
+    ),
+    (
+        "insert-segment",
+        include_str!("../../../instructions/workflows/insert-segment.md"),
     ),
     (
         "structure-journey",

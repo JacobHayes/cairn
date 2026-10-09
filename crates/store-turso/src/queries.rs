@@ -61,6 +61,20 @@ pub(crate) async fn route_detail(
     let Some((header, revision)) = load::route_row(connection, route).await? else {
         return Ok(None);
     };
+    let latest = latest_versions(connection).await?;
+    let select = "SELECT DISTINCT graph_id FROM insertions WHERE segment = ?1";
+    let mut graphs = Vec::new();
+    for row in rows(connection, select, vec![text(route)]).await? {
+        let id = crate::sql::graph_from(&row.text(0)?)?;
+        graphs.push((id.clone(), crate::graph::load(connection, &id).await?));
+    }
+    let roots = version_roots(connection, route).await?;
+    let mut uses = backend::insertion_uses(
+        route,
+        |held| latest.get(held).copied(),
+        |version| roots.get(&version).cloned(),
+        graphs.iter().map(|(id, graph)| (id, graph)),
+    );
     let select = "SELECT version_number, published_at FROM route_versions WHERE route_id = ?1 \
                   ORDER BY version_number";
     let mut versions = Vec::new();
@@ -75,6 +89,7 @@ pub(crate) async fn route_detail(
             version,
             published_at: row.timestamp(1)?,
             journeys,
+            insertions: uses.remove(&version).unwrap_or_default(),
         });
     }
     Ok(Some(RouteDetail {
@@ -82,6 +97,40 @@ pub(crate) async fn route_detail(
         revision,
         versions,
     }))
+}
+
+/// The key of each published version's root of `route`.
+async fn version_roots(
+    connection: &Connection,
+    route: &RouteId,
+) -> Result<BTreeMap<cairn_schema::VersionNumber, cairn_schema::NodeKey>, StoreError> {
+    let select = "SELECT graph_id, key FROM nodes WHERE parent_key IS NULL AND graph_id LIKE ?1";
+    let pattern = format!("version/{route}/%");
+    let mut roots = BTreeMap::new();
+    for row in rows(connection, select, vec![text(&pattern)]).await? {
+        // `_` in a route's id matches any character in LIKE, so the graph is checked exactly.
+        if let cairn_schema::GraphId::RouteVersion {
+            route: held,
+            version,
+        } = crate::sql::graph_from(&row.text(0)?)?
+            && held == *route
+        {
+            roots.insert(version, row.parse(1)?);
+        }
+    }
+    Ok(roots)
+}
+
+/// Each route's latest published version.
+async fn latest_versions(
+    connection: &Connection,
+) -> Result<BTreeMap<RouteId, cairn_schema::VersionNumber>, StoreError> {
+    let select = "SELECT route_id, max(version_number) FROM route_versions GROUP BY route_id";
+    let mut latest = BTreeMap::new();
+    for row in rows(connection, select, Vec::new()).await? {
+        latest.insert(row.parse(0)?, row.number(1)?);
+    }
+    Ok(latest)
 }
 
 /// E6: the journeys referring to any of `entities`, directly or through an alias.

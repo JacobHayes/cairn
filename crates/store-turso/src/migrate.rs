@@ -9,13 +9,14 @@ use crate::sql::{execute, first, int, rows};
 
 /// Every migration, numbered from 1, in order. A migration is never edited once released;
 /// a change is a new one.
-pub(crate) const MIGRATIONS: [(u32, &str); 6] = [
+pub(crate) const MIGRATIONS: [(u32, &str); 7] = [
     (1, include_str!("migrations/0001_initial.sql")),
     (2, include_str!("migrations/0002_outside_domains.sql")),
     (3, include_str!("migrations/0003_receipt_footprints.sql")),
     (4, include_str!("migrations/0004_log_barrier.sql")),
     (5, include_str!("migrations/0005_answer_rationale.sql")),
     (6, include_str!("migrations/0006_requires_note.sql")),
+    (7, include_str!("migrations/0007_segments.sql")),
 ];
 
 /// Puts the database in MVCC mode and applies the migrations it lacks.

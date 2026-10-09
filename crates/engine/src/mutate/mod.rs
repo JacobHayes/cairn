@@ -7,6 +7,7 @@
 mod annotations;
 mod deployment;
 mod graph_parts;
+mod insertion;
 mod journey;
 mod lifecycle;
 mod proposal;
@@ -60,6 +61,9 @@ pub(crate) struct Session<'a> {
     pub created_entities: BTreeSet<EntityKey>,
     /// Route versions published in this patch.
     pub published: Vec<Lineage>,
+    /// Roles and kinds a mutation in this patch gave the other cardinality: no insertion may
+    /// map onto one in the graph the patch produces (B13).
+    pub cardinality_changed: BTreeSet<Subject>,
     /// Journeys the entity merges in this patch are checked against, every merge's (E6).
     pub merge_checked: BTreeSet<JourneyId>,
     /// What node removals reach in the patch's graph, built at the first removal and kept
@@ -140,7 +144,8 @@ fn scope(mutation: &Mutation) -> Scope {
         | Mutation::ClearParticipation { .. }
         | Mutation::AddResource { .. }
         | Mutation::EditResource { .. }
-        | Mutation::RemoveResource { .. } => Scope::Graph,
+        | Mutation::RemoveResource { .. }
+        | Mutation::InsertSegment { .. } => Scope::Graph,
         Mutation::EditEntity { .. } | Mutation::MergeEntities { .. } => Scope::Deployment,
         Mutation::CreateEntity { .. } => Scope::AnyDomain,
         Mutation::ApplyProposal { .. } => Scope::Apply,
@@ -203,6 +208,7 @@ impl<'a> Session<'a> {
             completed: BTreeMap::new(),
             bypassed: BTreeMap::new(),
             snoozed: BTreeMap::new(),
+            cardinality_changed: BTreeSet::new(),
             unsnoozed_through: BTreeMap::new(),
             created_entities: BTreeSet::new(),
             published: Vec::new(),

@@ -61,15 +61,17 @@ pub use document::{
 };
 pub use domain::{
     Deployment, Domain, Entity, GraphId, Journey, JourneyHeader, JourneyStatus, Lineage, Route,
-    RouteDraft, RouteHeader, RouteVersion,
+    RouteDraft, RouteHeader, RouteKind, RouteVersion,
 };
 pub use event::{Actor, ChangeSet, ContentHash, Event, EventType, PatchReceipt, Subject};
 pub use field::{NodeField, NodeFieldValue};
-pub use graph::{Edge, FormatVersion, Graph, ParticipationKind, RetiredKeys, Role, RouteFile};
+pub use graph::{
+    Edge, FormatVersion, Graph, Insertion, ParticipationKind, RetiredKeys, Role, RouteFile,
+};
 pub use id::{
-    AgentId, AttachmentKey, ConversationId, EntityKey, IdError, JourneyId, KeyAllocator, KindKey,
-    NodeKey, PatchId, Path, Prefixed, ProposalId, RoleKey, RouteId, SequentialKeys, Slug, UserId,
-    mint,
+    AgentId, AttachmentKey, ConversationId, EntityKey, IdError, InsertionKey, JourneyId,
+    KeyAllocator, KindKey, NodeKey, PatchId, Path, Prefixed, ProposalId, RoleKey, RouteId,
+    SequentialKeys, Slug, UserId, mint,
 };
 pub use identity::Identity;
 pub use jiff::Timestamp;
@@ -83,8 +85,8 @@ pub use node::{
 pub use notice::{Notice, NoticeCode};
 pub use number::{Days, NumberError, Revision, SignedDays, VersionNumber, Weight};
 pub use patch::{
-    ChangeClass, DraftSource, Mutation, Mutations, Override, ParticipationRef, Patch, PatchTarget,
-    RecordedEnd, Removal, Transition,
+    ChangeClass, DraftSource, EdgeEnd, InsertedEdge, KindChoice, Mutation, Mutations, Override,
+    ParticipationRef, Patch, PatchTarget, RecordedEnd, Removal, RoleChoice, Transition,
 };
 pub use projection::{
     AffectedNodes, AnswerEffects, ChoiceEffect, Cursor, DecisionEntry, DecisionView, EdgeOrigin,

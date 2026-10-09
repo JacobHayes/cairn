@@ -6,8 +6,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::{
     AttachmentKey, Consequences, Cursor, JourneyId, JourneyStatus, KeyRefs, Lineage, Node, NodeKey,
     Notice, ParticipationKind, PatchEvents, Proposal, ProposalId, ProposalPreview, Revision,
-    RevisionConflict, Role, RoleKey, RouteHeader, RouteId, Title, TouchedSet, UnresolvedItem,
-    VersionNumber, Violation, to_yaml,
+    RevisionConflict, Role, RoleKey, RouteHeader, RouteId, RouteKind, Title, TouchedSet,
+    UnresolvedItem, VersionNumber, Violation, to_yaml,
 };
 use cairn_service::{Call, ProposalReview, StaleBase};
 use cairn_store::{JourneyQuery, PageSize, SearchHit, SearchQuery, Store};
@@ -34,7 +34,9 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "list_routes",
         description: "The route index, in id order, a page at a time: each route's name, \
-            revision, latest published version, and whether a draft is open.",
+            kind (absent means a process; a segment is a reusable piece that is inserted, \
+            never started), revision, latest published version, and whether a draft is open. \
+            Pass kind to list one kind.",
         writes: false,
         destructive: false,
         schema: schema::<ListRoutes>,
@@ -42,7 +44,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "get_route",
-        description: "A route's draft, or a published version by number: its roles, \
+        description: "A route's draft, or a published version by number, with its kind: its roles, \
             participation kinds, default owner, and a page of its nodes in key order.",
         writes: false,
         destructive: false,
@@ -118,6 +120,9 @@ impl<S: Store + 'static> ToolSet<S> {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub(crate) struct ListRoutes {
+    /// Only routes of this kind: `process` or `segment`.
+    #[serde(default)]
+    kind: Option<RouteKind>,
     /// The page starts after this route: the `next` of the page before.
     #[serde(default)]
     after: Option<RouteId>,
@@ -444,7 +449,7 @@ impl<S: Store + 'static> ToolSet<S> {
     async fn list_routes(&self, arguments: ListRoutes) -> Result<RoutesOutput, ToolError> {
         let page = self
             .service
-            .routes(arguments.after.as_ref(), PageSize::MAX)
+            .routes(arguments.kind, arguments.after.as_ref(), PageSize::MAX)
             .await?;
         let routes = page.items.into_iter().map(|summary| RouteRow {
             header: summary.header,

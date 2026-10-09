@@ -2916,6 +2916,37 @@
         ],
         "type": "object"
       },
+      "EdgeEnd": {
+        "description": "One end of an edge an insertion adds: a node of the segment, or of the graph.",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "A node by its key in the segment version.",
+            "properties": {
+              "segment": {
+                "$ref": "#/components/schemas/NodeKey"
+              }
+            },
+            "required": [
+              "segment"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A node by its key in the graph.",
+            "properties": {
+              "host": {
+                "$ref": "#/components/schemas/NodeKey"
+              }
+            },
+            "required": [
+              "host"
+            ],
+            "type": "object"
+          }
+        ]
+      },
       "EdgeOrigin": {
         "description": "C2: how an edge on the canvas arose (C1: implicit gates are drawn dotted).",
         "oneOf": [
@@ -3228,6 +3259,7 @@
           "default_owner_changed",
           "participation_changed",
           "resource_changed",
+          "segment_inserted",
           "node_transitioned",
           "milestone_reached",
           "answer_set",
@@ -3424,6 +3456,14 @@
               }
             ],
             "description": "The role that owns nodes no ancestor gives an owner (A6)."
+          },
+          "insertions": {
+            "description": "The segment insertions the graph holds (B13).",
+            "items": {
+              "$ref": "#/components/schemas/Insertion"
+            },
+            "maxItems": 2000,
+            "type": "array"
           },
           "nodes": {
             "description": "The nodes.",
@@ -3673,6 +3713,19 @@
             },
             "required": [
               "retired_key"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A segment insertion.",
+            "properties": {
+              "insertion": {
+                "$ref": "#/components/schemas/InsertionKey"
+              }
+            },
+            "required": [
+              "insertion"
             ],
             "type": "object"
           },
@@ -3998,6 +4051,19 @@
             },
             "required": [
               "retired_key"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A segment insertion (B13).",
+            "properties": {
+              "insertion": {
+                "$ref": "#/components/schemas/Insertion"
+              }
+            },
+            "required": [
+              "insertion"
             ],
             "type": "object"
           },
@@ -4409,6 +4475,127 @@
         },
         "required": [
           "patches"
+        ],
+        "type": "object"
+      },
+      "InsertedEdge": {
+        "additionalProperties": false,
+        "description": "An edge an insertion adds: `node` requires `requires`, one end in the segment and the\nother in the graph (B13).",
+        "properties": {
+          "node": {
+            "$ref": "#/components/schemas/EdgeEnd",
+            "description": "The dependent."
+          },
+          "requires": {
+            "$ref": "#/components/schemas/EdgeEnd",
+            "description": "What it requires."
+          }
+        },
+        "required": [
+          "node",
+          "requires"
+        ],
+        "type": "object"
+      },
+      "Insertion": {
+        "additionalProperties": false,
+        "description": "One placement of a segment version in a graph (PRD glossary, Insertion; B13). Its local\nedits are not stored: they are its members' differences from the version it is on.",
+        "properties": {
+          "key": {
+            "$ref": "#/components/schemas/InsertionKey",
+            "description": "The key, minted by the client like any new key; unique in the graph."
+          },
+          "kinds": {
+            "additionalProperties": false,
+            "description": "Each segment participation kind beyond `owner`, likewise.",
+            "patternProperties": {
+              "^k_[a-z0-9][a-z0-9_-]*$": {
+                "$ref": "#/components/schemas/KindKey"
+              }
+            },
+            "type": "object"
+          },
+          "nodes": {
+            "additionalProperties": false,
+            "description": "Its members: each graph node it copied that the graph still holds, with that node's\nkey in the segment.",
+            "patternProperties": {
+              "^n_[a-z0-9][a-z0-9_-]*$": {
+                "$ref": "#/components/schemas/NodeKey"
+              }
+            },
+            "type": "object"
+          },
+          "parent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where it was inserted: the parent the root went under, or none for the top level."
+          },
+          "roles": {
+            "additionalProperties": false,
+            "description": "Each segment role, mapped to the graph role it became.",
+            "patternProperties": {
+              "^r_[a-z0-9][a-z0-9_-]*$": {
+                "$ref": "#/components/schemas/RoleKey"
+              }
+            },
+            "type": "object"
+          },
+          "segment": {
+            "$ref": "#/components/schemas/Lineage",
+            "description": "The segment and the version the insertion is on."
+          }
+        },
+        "required": [
+          "key",
+          "segment",
+          "nodes"
+        ],
+        "type": "object"
+      },
+      "InsertionKey": {
+        "description": "Starts with \"i_\"; at most id_bytes_max (64) bytes.",
+        "maxLength": 64,
+        "minLength": 1,
+        "pattern": "^i_[a-z0-9][a-z0-9_-]*$",
+        "type": "string"
+      },
+      "InsertionUse": {
+        "additionalProperties": false,
+        "description": "One insertion of a segment version (C19).",
+        "properties": {
+          "graph": {
+            "$ref": "#/components/schemas/GraphId",
+            "description": "The graph holding it."
+          },
+          "host": {
+            "$ref": "#/components/schemas/Domain",
+            "description": "The domain holding it."
+          },
+          "insertion": {
+            "$ref": "#/components/schemas/InsertionKey",
+            "description": "The insertion."
+          },
+          "title": {
+            "$ref": "#/components/schemas/Title",
+            "description": "The root member's current title."
+          },
+          "upgrade_available": {
+            "description": "Whether the segment has a later published version.",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "host",
+          "graph",
+          "insertion",
+          "title",
+          "upgrade_available"
         ],
         "type": "object"
       },
@@ -4895,6 +5082,29 @@
           {
             "const": "default_owner",
             "description": "The graph's `default_owner`, which the journey changed.",
+            "type": "string"
+          }
+        ]
+      },
+      "KindChoice": {
+        "description": "What a segment participation kind becomes in the graph it is inserted into (B13).",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "A kind the graph has.",
+            "properties": {
+              "existing": {
+                "$ref": "#/components/schemas/KindKey"
+              }
+            },
+            "required": [
+              "existing"
+            ],
+            "type": "object"
+          },
+          {
+            "const": "add",
+            "description": "A new kind, minted from the insertion.",
             "type": "string"
           }
         ]
@@ -5641,6 +5851,10 @@
                 ],
                 "description": "The description."
               },
+              "kind": {
+                "$ref": "#/components/schemas/RouteKind",
+                "description": "Process (the default) or segment; fixed from here on (A21)."
+              },
               "name": {
                 "$ref": "#/components/schemas/Title",
                 "description": "The name."
@@ -6132,6 +6346,98 @@
               "op",
               "node",
               "resource"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "Insert a published segment version under a parent, wired to the graph's own nodes and\nwith its roles and kinds mapped, in one event (B13).",
+            "properties": {
+              "edges": {
+                "description": "The wiring: each edge joins one segment node and one node of the graph.",
+                "items": {
+                  "$ref": "#/components/schemas/InsertedEdge"
+                },
+                "type": "array"
+              },
+              "insertion": {
+                "$ref": "#/components/schemas/InsertionKey",
+                "description": "The insertion's key, new in the graph."
+              },
+              "kinds": {
+                "additionalProperties": false,
+                "description": "What each segment participation kind becomes, likewise.",
+                "patternProperties": {
+                  "^k_[a-z0-9][a-z0-9_-]*$": {
+                    "$ref": "#/components/schemas/KindChoice"
+                  }
+                },
+                "type": "object"
+              },
+              "omit": {
+                "description": "Segment nodes left out, each with its subtree.",
+                "items": {
+                  "$ref": "#/components/schemas/NodeKey"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
+              "op": {
+                "const": "insert_segment",
+                "type": "string"
+              },
+              "parent": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/NodeKey"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The group, deliverable, or action the root goes under; none for the top level."
+              },
+              "roles": {
+                "additionalProperties": false,
+                "description": "What each segment role becomes; a role not named takes the graph's role with its\nid and cardinality, else is added.",
+                "patternProperties": {
+                  "^r_[a-z0-9][a-z0-9_-]*$": {
+                    "$ref": "#/components/schemas/RoleChoice"
+                  }
+                },
+                "type": "object"
+              },
+              "root_id": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Slug"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The root's id; the segment root's own, suffixed when a sibling has it, if none."
+              },
+              "root_title": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Title"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The root's title; the segment root's own if none."
+              },
+              "segment": {
+                "$ref": "#/components/schemas/Lineage",
+                "description": "The segment and one of its published versions."
+              }
+            },
+            "required": [
+              "op",
+              "insertion",
+              "segment"
             ],
             "type": "object"
           },
@@ -10316,6 +10622,11 @@
             "const": "orphaned",
             "description": "Copied from a route version that no longer has it (B7).",
             "type": "string"
+          },
+          {
+            "const": "from_segment",
+            "description": "Copied in from a segment version: a member of an insertion (B13).",
+            "type": "string"
           }
         ]
       },
@@ -11525,6 +11836,29 @@
         ],
         "type": "object"
       },
+      "RoleChoice": {
+        "description": "What a segment role becomes in the graph it is inserted into (B13).",
+        "oneOf": [
+          {
+            "additionalProperties": false,
+            "description": "A role the graph has.",
+            "properties": {
+              "existing": {
+                "$ref": "#/components/schemas/RoleKey"
+              }
+            },
+            "required": [
+              "existing"
+            ],
+            "type": "object"
+          },
+          {
+            "const": "add",
+            "description": "A new role, minted from the insertion.",
+            "type": "string"
+          }
+        ]
+      },
       "RoleKey": {
         "description": "Starts with \"r_\"; at most id_bytes_max (64) bytes.",
         "maxLength": 64,
@@ -11880,6 +12214,10 @@
             "$ref": "#/components/schemas/FormatVersion",
             "description": "The file format version."
           },
+          "kind": {
+            "$ref": "#/components/schemas/RouteKind",
+            "description": "Process or segment (A21); a file that leaves it out is a process."
+          },
           "name": {
             "$ref": "#/components/schemas/Title",
             "description": "The route's name."
@@ -11940,6 +12278,10 @@
             "$ref": "#/components/schemas/RouteId",
             "description": "The route's id."
           },
+          "kind": {
+            "$ref": "#/components/schemas/RouteKind",
+            "description": "Process or segment (A21); routes stored before segments existed are processes."
+          },
           "name": {
             "$ref": "#/components/schemas/Title",
             "description": "Its name."
@@ -11991,6 +12333,21 @@
           "file"
         ],
         "type": "object"
+      },
+      "RouteKind": {
+        "description": "What a route is for (PRD glossary, Route): fixed when it is created.",
+        "oneOf": [
+          {
+            "const": "process",
+            "description": "A process template: journeys start from it.",
+            "type": "string"
+          },
+          {
+            "const": "segment",
+            "description": "A reusable piece of a process: it is only inserted, never started (A21).",
+            "type": "string"
+          }
+        ]
       },
       "RoutePage": {
         "additionalProperties": false,
@@ -13018,6 +13375,19 @@
           },
           {
             "additionalProperties": false,
+            "description": "A segment insertion.",
+            "properties": {
+              "insertion": {
+                "$ref": "#/components/schemas/InsertionKey"
+              }
+            },
+            "required": [
+              "insertion"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
             "description": "An entity.",
             "properties": {
               "entity": {
@@ -13506,6 +13876,13 @@
         "additionalProperties": false,
         "description": "One published version and the journeys on it.",
         "properties": {
+          "insertions": {
+            "description": "Where this version of a segment is inserted (C19).",
+            "items": {
+              "$ref": "#/components/schemas/InsertionUse"
+            },
+            "type": "array"
+          },
           "journeys": {
             "description": "The journeys whose lineage is this version.",
             "items": {
@@ -13721,6 +14098,10 @@
           "draft_exists",
           "no_draft",
           "version_in_use",
+          "segment_rule",
+          "insertion_invalid",
+          "insertion_key_taken",
+          "not_a_process_route",
           "entity_key_taken",
           "email_taken",
           "alias_cycle",
@@ -18284,6 +18665,17 @@
       "get": {
         "operationId": "listRoutes",
         "parameters": [
+          {
+            "description": "Only routes of this kind; all kinds when absent.",
+            "explode": true,
+            "in": "query",
+            "name": "kind",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/RouteKind"
+            },
+            "style": "form"
+          },
           {
             "description": "The page starts after this route.",
             "explode": true,

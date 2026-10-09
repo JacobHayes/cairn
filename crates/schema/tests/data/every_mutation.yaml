@@ -201,6 +201,26 @@ mutations:
   lineage:
     route: sample
     version: 3
+- op: insert_segment
+  insertion: i_review
+  segment:
+    route: security-review
+    version: 1
+  parent: n_plan
+  root_id: review
+  root_title: Security review
+  roles:
+    r_reviewer:
+      existing: r_lead
+  kinds:
+    k_reviewer: add
+  omit:
+  - n_who_reviews
+  edges:
+  - node:
+      segment: n_review
+    requires:
+      host: n_plan
 - op: set_provenance
   node: n_plan
   provenance: orphaned

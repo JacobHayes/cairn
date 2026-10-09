@@ -81,6 +81,11 @@ pub enum ViolationCode {
     DraftExists,
     NoDraft,
     VersionInUse,
+    // Segments (A21, B13).
+    SegmentRule,
+    InsertionInvalid,
+    InsertionKeyTaken,
+    NotAProcessRoute,
     // Entities (E6, H3).
     EntityKeyTaken,
     EmailTaken,

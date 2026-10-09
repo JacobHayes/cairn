@@ -14,7 +14,9 @@ first patch
 creates its journey at base revision 0 from version 1 of the route beside it; the route
 file is that version. Route files carry every key, so scenario patches can refer to nodes,
 roles, and kinds by key. Every file is written in canonical form: parsing and writing it
-gives the same bytes, which `crates/schema/tests/integration/fixtures.rs` checks.
+gives the same bytes, which `crates/schema/tests/integration/fixtures.rs` checks. A segment
+fixture holds a `segment.yaml` (a route file of kind `segment`) and no scenario of its own:
+the engine's matrix inserts it into another fixture's journey.
 
 The derived values below are read from this file by
 `crates/engine/tests/integration/fixture_readme.rs` and checked against the engine: its
@@ -235,6 +237,23 @@ next list.
 - `bake-off`, after step 4, visible with actions hidden: `n_comparison`, `n_criteria`, `n_judges`, `n_summary`, `n_trial_a`, `n_trial_b`, `n_winner`, `n_wrap_up`.
 - `bake-off`, after step 4, actions rolled up: nothing.
 - `bake-off`, after step 4, next: `n_trial_a`, `n_trial_b`, `n_wrap_up`.
+
+## `security-review/`
+
+A segment: a group root holding *Data sensitivity* (a single choice: low, moderate, high),
+*Threat model* (a deliverable relevant unless the sensitivity is low, owned by the `reviewer`
+role), and *Who reviews?* (an entity decision that fills `reviewer`). It has no final milestone
+and no default owner (a segment declares neither). The matrix scenario "segment insertion twice
+into one graph" (`crates/engine/tests/integration/matrix.rs`) publishes it as version 1 and
+inserts it into the finished hiring-loop journey twice: first with the defaults, wired after the
+panel decision, then with *Who reviews?* left out (the first insertion's decision already fills
+`reviewer`, which the default mapping reuses by id), wired before the offer decision.
+
+After the two insertions the journey holds the root paths `security-review` (insertion
+`i_review_one`, four members) and `security-review-2` (`i_review_two`, three), with disjoint
+keys. The frontier is `offer`, each insertion's `sensitivity`, and the first insertion's
+`who-reviews`; the threat models are conditional until their sensitivity is answered. The
+matrix scenario checks the root paths and the frontier.
 
 ## Status summaries
 

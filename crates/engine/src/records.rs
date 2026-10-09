@@ -359,6 +359,10 @@ fn put_in_graph(graph: &mut Graph, record: &GraphRecord) {
                 RetiredKey::Kind(key) => graph.retired_keys.kinds.insert(key.clone()),
             };
         }
+        GraphRecord::Insertion(insertion) => {
+            let put = graph.insertions.put(insertion.clone());
+            assert!(put.is_ok(), "an insertion write past node_count_max");
+        }
         state => put_state(graph, state),
     }
 }
@@ -415,7 +419,8 @@ fn put_state(graph: &mut Graph, record: &GraphRecord) {
         | GraphRecord::DefaultOwner(_)
         | GraphRecord::Participation { .. }
         | GraphRecord::Resource { .. }
-        | GraphRecord::RetiredKey(_) => unreachable!("handled by put_in_graph"),
+        | GraphRecord::RetiredKey(_)
+        | GraphRecord::Insertion(_) => unreachable!("handled by put_in_graph"),
     }
 }
 
@@ -443,6 +448,9 @@ fn remove_in_graph(graph: &mut Graph, key: &GraphKey) {
             edit::update_node(graph, node, |node| {
                 node.resources.retain(|existing| existing.key != *resource);
             });
+        }
+        GraphKey::Insertion(insertion) => {
+            graph.insertions.remove(insertion);
         }
         GraphKey::NodeField { .. } | GraphKey::RetiredKey(_) => {
             panic!("{key:?} is never removed: a field is written, a retired key is kept")
@@ -495,7 +503,8 @@ fn remove_state(graph: &mut Graph, key: &GraphKey) {
         | GraphKey::DefaultOwner
         | GraphKey::Participation { .. }
         | GraphKey::Resource { .. }
-        | GraphKey::RetiredKey(_) => unreachable!("handled by remove_in_graph"),
+        | GraphKey::RetiredKey(_)
+        | GraphKey::Insertion(_) => unreachable!("handled by remove_in_graph"),
     }
 }
 

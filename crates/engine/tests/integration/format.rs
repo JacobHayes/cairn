@@ -16,6 +16,7 @@ fn heading() -> RouteHeading {
         route: "exported".parse().unwrap(),
         name: "Exported".parse().unwrap(),
         description: None,
+        kind: cairn_schema::RouteKind::Process,
         extends: None,
     }
 }
@@ -43,6 +44,33 @@ fn fixture_routes_round_trip_byte_for_byte() {
         assert_eq!(back.document(), graph.document(), "{name}");
         assert_eq!(first, second, "{name}");
     }
+}
+
+/// A13: a segment's file keeps its kind and reads back to the same graph, and a route holding
+/// an insertion writes its nodes as plain nodes, with no insertion to read back.
+#[test]
+fn a_segment_file_keeps_its_kind_and_insertions_are_not_written() {
+    let path = support::fixtures_root().join("security-review/segment.yaml");
+    let file: RouteFile = from_yaml(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let graph = from_file(&file, &mut SequentialKeys::default()).unwrap();
+    let kind = cairn_schema::RouteKind::Segment;
+    let written = export(&graph, &RouteHeading { kind, ..heading() });
+    assert_eq!(written.kind, kind);
+    let back = from_file(&written, &mut SequentialKeys::default()).unwrap();
+    assert_eq!(back.document(), graph.document());
+
+    let records = support::with_segment(support::seeded("hiring-loop"), "security-review");
+    let insert = "- op: open_draft\n  source: edit\n- op: insert_segment\n  insertion: i_review\n  segment: {route: security-review, version: 1}\n";
+    let records = support::accepted_to(&records, "{route: hiring-loop}", insert);
+    let draft = records
+        .routes
+        .values()
+        .find_map(|route| route.draft.as_ref())
+        .unwrap();
+    let draft = Graph::new(draft.graph.clone(), &records.deployment).unwrap();
+    let (back, ..) = round_trip(&draft);
+    assert_eq!(back.document().nodes.len(), draft.document().nodes.len());
+    assert!(back.document().insertions.is_empty() && !draft.document().insertions.is_empty());
 }
 
 /// A generated journey's structure as a route graph, with no state; none when its pins were

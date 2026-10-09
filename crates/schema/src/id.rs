@@ -295,6 +295,11 @@ prefixed!(
     KindKey, "k_"
 );
 prefixed!(
+    /// A segment insertion's key (`i_`), minted by the client like any new key; every key
+    /// the insertion creates derives from it (B13).
+    InsertionKey, "i_"
+);
+prefixed!(
     /// An entity's key (`e_`): deployment-scoped, so one person is one entity everywhere.
     EntityKey, "e_"
 );
@@ -368,6 +373,21 @@ string_serde!(
     Some(SLUG_PATTERN),
     Some(Limit::IdBytes)
 );
+
+/// The FNV-1a hash of `parts`, hashed in order, as 16 hex digits: the body of every key a
+/// host or the engine derives instead of drawing (an import's, an insertion's), so the same
+/// inputs always mint the same key. Callers put their own separators between the parts.
+#[must_use]
+pub fn fnv1a_body(parts: &[&[u8]]) -> String {
+    const OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+    const PRIME: u64 = 0x0100_0000_01b3;
+    let mut hash = OFFSET;
+    for byte in parts.iter().copied().flatten() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(PRIME);
+    }
+    format!("{hash:016x}")
+}
 
 /// Mints key bodies (PRD, Identity and references: a key is assigned once, when its object
 /// is first created). The engine mints through this trait so the host decides how: random

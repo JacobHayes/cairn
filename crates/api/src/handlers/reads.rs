@@ -60,8 +60,8 @@ pub async fn routes<S: Store + 'static>(
     RawQuery(raw): RawQuery,
 ) -> Answer<RoutePage> {
     let params = Params::parse(raw.as_deref(), query::ROUTE_PARAMS)?;
-    let (after, size) = query::routes(&params)?;
-    let page = api.service.routes(after.as_ref(), size).await?;
+    let (kind, after, size) = query::routes(&params)?;
+    let page = api.service.routes(kind, after.as_ref(), size).await?;
     Ok(Json(RoutePage {
         items: page.items.into_iter().map(Into::into).collect(),
         next: page.next,

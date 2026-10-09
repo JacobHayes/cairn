@@ -34,6 +34,8 @@ macro_rules! limit_markers {
 limit_markers! {
     /// `node_count_max`.
     NodeCount => NodeCount,
+    /// `node_count_max`, for the insertions of a graph: each holds at least one node.
+    InsertionCount => NodeCount,
     /// `edge_count_per_node_max`.
     EdgeCountPerNode => EdgeCountPerNode,
     /// `mutation_count_per_patch_max`.

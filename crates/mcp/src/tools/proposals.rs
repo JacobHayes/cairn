@@ -27,7 +27,11 @@ pub(crate) const SPECS: &[Spec] = &[
             and apply, as one patch. A destination that does not exist yet is created at \
             destination revision 0. Use it for structure, breakdowns, and any change a person \
             should see whole before it lands. Resubmitting the same id answers the proposal \
-            as it stands.",
+            as it stands. To reuse a segment, propose one insert_segment mutation: \
+            {\"op\": \"insert_segment\", \"insertion\": \"i_<new key>\", \"segment\": \
+            {\"route\": \"security-review\", \"version\": 1}, \"parent\": \"<node key or \
+            omit>\", \"edges\": [{\"node\": {\"segment\": \"<segment node key>\"}, \
+            \"requires\": {\"host\": \"<node key>\"}}]}.",
         writes: true,
         destructive: false,
         schema: schema_citing_mutations::<CreateProposal>,

@@ -34,6 +34,34 @@ fn statement(sql: &str, params: Vec<Value>) -> Statement {
     (sql.to_owned(), params)
 }
 
+/// The statements putting a role's fill: its row, then its entities.
+fn role_fill_puts(
+    id: &str,
+    role: &cairn_schema::RoleKey,
+    entities: &cairn_schema::EntitySet,
+) -> Vec<Statement> {
+    let params = || vec![text(id), text(role)];
+    let mut statements = vec![
+        statement(
+            "INSERT OR IGNORE INTO role_fills (graph_id, role) VALUES (?1, ?2)",
+            params(),
+        ),
+        statement(
+            "DELETE FROM role_fill_entities WHERE graph_id = ?1 AND role = ?2",
+            params(),
+        ),
+    ];
+    for entity in entities.iter() {
+        let mut values = params();
+        values.push(text(entity));
+        statements.push(statement(
+            "INSERT INTO role_fill_entities (graph_id, role, entity) VALUES (?1, ?2, ?3)",
+            values,
+        ));
+    }
+    statements
+}
+
 /// The statements putting a state record (or a retired key) into graph `id`.
 fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, Abort> {
     let graph = text(id);
@@ -55,28 +83,7 @@ fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, Abort> {
             )]
         }
         GraphRecord::Answer { .. } => answer_puts(id, record)?,
-        GraphRecord::RoleFill { role, entities } => {
-            let params = || vec![text(id), text(role)];
-            let mut statements = vec![
-                statement(
-                    "INSERT OR IGNORE INTO role_fills (graph_id, role) VALUES (?1, ?2)",
-                    params(),
-                ),
-                statement(
-                    "DELETE FROM role_fill_entities WHERE graph_id = ?1 AND role = ?2",
-                    params(),
-                ),
-            ];
-            for entity in entities.iter() {
-                let mut values = params();
-                values.push(text(entity));
-                statements.push(statement(
-                    "INSERT INTO role_fill_entities (graph_id, role, entity) VALUES (?1, ?2, ?3)",
-                    values,
-                ));
-            }
-            statements
-        }
+        GraphRecord::RoleFill { role, entities } => role_fill_puts(id, role, entities),
         GraphRecord::Pin { node, date: day } => vec![statement(
             "INSERT OR REPLACE INTO pins (graph_id, node, date) VALUES (?1, ?2, ?3)",
             vec![graph, text(node), date(*day)],
@@ -102,7 +109,8 @@ fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, Abort> {
         | GraphRecord::Kind(_)
         | GraphRecord::DefaultOwner(_)
         | GraphRecord::Participation { .. }
-        | GraphRecord::Resource { .. } => {
+        | GraphRecord::Resource { .. }
+        | GraphRecord::Insertion(_) => {
             return Err(malformed(format!("{record:?} is graph content, not state")));
         }
     })
@@ -270,6 +278,7 @@ fn removal(id: &str, key: &GraphKey) -> Result<Vec<Statement>, Abort> {
         }
         GraphKey::Role(_)
         | GraphKey::Kind(_)
+        | GraphKey::Insertion(_)
         | GraphKey::RetiredKey(_)
         | GraphKey::NodeState(_)
         | GraphKey::Answer(_)
@@ -288,6 +297,7 @@ fn keyed_removal(id: &str, key: &GraphKey) -> Vec<Statement> {
     let tables: Vec<(&str, &str, &str)> = match key {
         GraphKey::Role(role) => vec![("roles", "key", role.as_str())],
         GraphKey::Kind(kind) => vec![("participation_kinds", "key", kind.as_str())],
+        GraphKey::Insertion(insertion) => vec![("insertions", "key", insertion.as_str())],
         GraphKey::RetiredKey(key) => {
             retired = retired_columns(key).1;
             vec![("retired_keys", "key", retired.as_str())]

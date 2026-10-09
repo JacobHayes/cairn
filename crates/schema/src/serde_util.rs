@@ -173,6 +173,23 @@ where
     )
 }
 
+/// `deserialize_with` for a map with one entry per participation kind: [`unique_entries`] held
+/// to `kind_count_max`.
+pub(crate) fn unique_map_per_kind<'de, D, K, V>(
+    deserializer: D,
+) -> Result<std::collections::BTreeMap<K, V>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    K: serde::Deserialize<'de> + Ord + std::fmt::Display,
+    V: serde::Deserialize<'de>,
+{
+    unique_entries(
+        deserializer,
+        "a map from participation kind to its entry, each kind once",
+        Some(crate::limits::Limit::KindCount),
+    )
+}
+
 /// `deserialize_with` for a map with one entry per role: [`unique_entries`] held to
 /// `role_count_max`, since a graph has no more roles to key it by.
 pub(crate) fn unique_map_per_role<'de, D, K, V>(

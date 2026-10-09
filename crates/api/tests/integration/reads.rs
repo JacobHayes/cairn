@@ -53,6 +53,46 @@ mod in_process {
         );
     }
 
+    /// A21, C19: a segment is inserted through the service, the route index filters by kind,
+    /// and the segment's detail lists where its version is inserted.
+    #[tokio::test]
+    async fn a_segment_is_listed_by_kind_and_lists_its_insertions() {
+        let world = World::start().await;
+        let ann = world.vendor_after(1).await;
+        // Two process routes sort before the segment, so a page of one must look past them.
+        for name in ["hiring-loop", "product-launch"] {
+            let seed = support::publish_fixture_route(name);
+            let path = format!("/api/routes/{name}/patches");
+            support::ok::<serde_json::Value>(&post(&ann, &path, &support::request(&seed)).await);
+        }
+        let seed = support::publish_fixture_route("security-review");
+        support::ok::<serde_json::Value>(
+            &post(
+                &ann,
+                "/api/routes/security-review/patches",
+                &support::request(&seed),
+            )
+            .await,
+        );
+        let insert = "- op: insert_segment\n  insertion: i_review\n  segment: {route: security-review, version: 1}\n";
+        let patch = support::patch("p_insert", "{journey: j_vendor_eval}", 1, insert);
+        let reply = post(
+            &ann,
+            "/api/journeys/j_vendor_eval/patches",
+            &support::request(&patch),
+        )
+        .await;
+        support::ok::<serde_json::Value>(&reply);
+
+        let listed: RoutePage = get(&ann, "/api/routes?kind=segment&size=1").await;
+        assert_eq!(listed.items.len(), 1);
+        let detail: RouteDetail = get(&ann, "/api/routes/security-review/versions").await;
+        assert_eq!(
+            detail.versions[0].insertions[0].title.as_str(),
+            "Security review"
+        );
+    }
+
     /// Every read answers what the service holds (C16, C17, E6, H3, J5), and capabilities
     /// what the host offers.
     #[tokio::test]

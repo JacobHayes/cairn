@@ -16,7 +16,26 @@ fn fixtures_root() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures")
 }
 
-/// Each fixture directory, with its route file if it has one and its journey scenario.
+/// Each segment fixture: a route file of kind segment, with no scenario of its own (the
+/// scenario that inserts it is in the engine's matrix).
+fn segments() -> Vec<(String, RouteFile)> {
+    let mut found = Vec::new();
+    for entry in std::fs::read_dir(fixtures_root()).unwrap() {
+        let directory = entry.unwrap().path();
+        let path = directory.join("segment.yaml");
+        if path.exists() {
+            let name = directory
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
+            found.push((name, read_canonical::<RouteFile>(&path)));
+        }
+    }
+    found
+}
+
+/// Each fixture directory with a scenario, with its route file if it has one.
 fn fixtures() -> Vec<(String, Option<RouteFile>, Scenario)> {
     let mut found = Vec::new();
     for entry in std::fs::read_dir(fixtures_root()).unwrap() {
@@ -29,6 +48,9 @@ fn fixtures() -> Vec<(String, Option<RouteFile>, Scenario)> {
             .unwrap()
             .to_string_lossy()
             .into_owned();
+        if !directory.join("journey.yaml").exists() {
+            continue;
+        }
         let route_path = directory.join("route.yaml");
         let route = route_path
             .exists()
@@ -81,8 +103,10 @@ fn every_fixture_parses_and_round_trips_byte_for_byte() {
 fn every_route_file_validates_against_the_json_schema() {
     let schema: serde_json::Value = serde_json::from_str(&json_schema::route_file()).unwrap();
     let validator = jsonschema::draft202012::new(&schema).unwrap();
-    for (name, route, _) in fixtures() {
-        let Some(route) = route else { continue };
+    let routes = fixtures()
+        .into_iter()
+        .filter_map(|(name, route, _)| route.map(|route| (name, route)));
+    for (name, route) in routes.chain(segments()) {
         let document: serde_json::Value = serde_json::from_str(&to_json(&route).unwrap()).unwrap();
         let errors: Vec<String> = validator
             .iter_errors(&document)

@@ -147,6 +147,7 @@ fn finished(fixtures: &Path) -> Result<Records> {
         name: file.name.clone(),
         description: None,
         retired: false,
+        kind: cairn_schema::RouteKind::Process,
     };
     let route = Route {
         header,
@@ -179,6 +180,7 @@ fn round_trip(out: &mut String, fixtures: &Path) -> Result<()> {
         route: file.route.clone(),
         name: file.name.clone(),
         description: file.description.clone(),
+        kind: file.kind,
         extends: None,
     };
     let first = to_yaml(&export(&built, &heading))?;

@@ -9,6 +9,7 @@ mod edit;
 mod entity;
 pub mod format;
 pub mod graph;
+mod insertion;
 mod mutate;
 mod notices;
 pub mod pipeline;

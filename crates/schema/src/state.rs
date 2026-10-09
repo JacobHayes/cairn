@@ -105,6 +105,8 @@ pub enum Provenance {
     Local,
     /// Copied from a route version that no longer has it (B7).
     Orphaned,
+    /// Copied in from a segment version: a member of an insertion (B13).
+    FromSegment,
 }
 
 /// What a journey changed on a route-copied node (B4), so an upgrade leaves it alone. A

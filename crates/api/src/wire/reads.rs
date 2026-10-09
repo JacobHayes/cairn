@@ -4,8 +4,8 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AttachmentKey, Event, JourneyId, JourneyStatus, Lineage, NodeKey, Revision, RouteHeader,
-    RouteId, Timestamp, Title, VersionNumber,
+    AttachmentKey, Domain, Event, GraphId, InsertionKey, JourneyId, JourneyStatus, Lineage,
+    NodeKey, Revision, RouteHeader, RouteId, Timestamp, Title, VersionNumber,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -135,6 +135,25 @@ pub struct VersionJourneys {
     pub published_at: Timestamp,
     /// The journeys whose lineage is this version.
     pub journeys: BTreeSet<JourneyId>,
+    /// Where this version of a segment is inserted (C19).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub insertions: Vec<InsertionUse>,
+}
+
+/// One insertion of a segment version (C19).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InsertionUse {
+    /// The domain holding it.
+    pub host: Domain,
+    /// The graph holding it.
+    pub graph: GraphId,
+    /// The insertion.
+    pub insertion: InsertionKey,
+    /// The root member's current title.
+    pub title: Title,
+    /// Whether the segment has a later published version.
+    pub upgrade_available: bool,
 }
 
 impl From<cairn_store::RouteDetail> for RouteDetail {
@@ -149,11 +168,31 @@ impl From<cairn_store::RouteDetail> for RouteDetail {
                 version,
                 published_at,
                 journeys,
+                insertions,
             } = version;
             VersionJourneys {
                 version,
                 published_at,
                 journeys,
+                insertions: insertions
+                    .into_iter()
+                    .map(|held| {
+                        let cairn_store::InsertionUse {
+                            host,
+                            graph,
+                            insertion,
+                            title,
+                            upgrade_available,
+                        } = held;
+                        InsertionUse {
+                            host,
+                            graph,
+                            insertion,
+                            title,
+                            upgrade_available,
+                        }
+                    })
+                    .collect(),
             }
         });
         Self {

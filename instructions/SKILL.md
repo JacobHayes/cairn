@@ -108,6 +108,19 @@ transition); `transition_node` alone is refused with the `has_note` guard. Bypas
 `override` only when the person says no note is needed. Removing the last note later marks
 a finished node `stale` with "missing note".
 
+## Reuse a segment
+
+A **segment** is a reusable piece of a process (a security review, a reference check): a
+route whose `kind` is `segment`, with one root, inserted and never started. Before you
+structure a recurring piece by hand, look for one with `list_routes` and `kind` `segment`.
+Insert it with an `insert_segment` mutation in a proposal, under the right `parent`, with `edges` that
+make its root wait for what comes before and make what comes after wait for its root. Roles
+default by id, so a segment's reviewer role becomes the journey's role with the same id. If the journey
+already has a decision that fills that role, `omit` the segment's own. Propose it rather than
+writing it directly, and let a person apply it. After insertion the nodes are ordinary: edit,
+skip, or remove them as you would any other. A segment cannot be started as a journey, and
+it declares no final milestone or default owner. The insert-segment workflow has an example.
+
 ## Ids and keys
 
 Every node, role, and participation kind has a `key` (`n_`, `r_`, and so on, with a slug)
@@ -121,6 +134,7 @@ them.
 Each workflow is also served as an MCP prompt by its name.
 
 - [author-route](workflows/author-route.md): author or revise a route in conversation.
+- [insert-segment](workflows/insert-segment.md): reuse a segment by proposing its insertion.
 - [structure-journey](workflows/structure-journey.md): give an empty journey its shape.
 - [walk-decisions](workflows/walk-decisions.md): walk the open decisions with a person.
 - [record-answers](workflows/record-answers.md): record answers given in conversation.

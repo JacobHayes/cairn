@@ -63,7 +63,7 @@ fn every_fixture_prints_back_unchanged() {
         for file in std::fs::read_dir(&directory).unwrap() {
             let path = file.unwrap().path();
             let name = path.file_name().unwrap().to_string_lossy().into_owned();
-            let kind = if name.starts_with("route") {
+            let kind = if name.starts_with("route") || name.starts_with("segment") {
                 "route-file"
             } else {
                 "scenario"

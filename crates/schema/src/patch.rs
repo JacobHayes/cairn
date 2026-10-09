@@ -24,11 +24,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::attachment::{AnnotationBody, Resource};
 use crate::collections::{BoundedVec, CollectionError, MutationCountPerPatch};
-use crate::domain::{Domain, Entity, JourneyStatus, Lineage};
+use crate::domain::{Domain, Entity, JourneyStatus, Lineage, RouteKind};
 use crate::field::{NodeField, NodeFieldValue};
 use crate::graph::{Edge, ParticipationKind, Role};
 use crate::id::{
-    AttachmentKey, EntityKey, JourneyId, KindKey, NodeKey, PatchId, ProposalId, RoleKey, RouteId,
+    AttachmentKey, EntityKey, InsertionKey, JourneyId, KindKey, NodeKey, PatchId, ProposalId,
+    RoleKey, RouteId, Slug,
 };
 use crate::node::{EntitySet, Node, ParticipationSource};
 use crate::number::{Revision, SignedDays, VersionNumber};
@@ -163,6 +164,55 @@ pub enum DraftSource {
         /// The journey saved.
         journey: JourneyId,
     },
+}
+
+/// What a segment role becomes in the graph it is inserted into (B13).
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum RoleChoice {
+    /// A role the graph has.
+    Existing(RoleKey),
+    /// A new role, minted from the insertion.
+    Add,
+}
+
+/// What a segment participation kind becomes in the graph it is inserted into (B13).
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum KindChoice {
+    /// A kind the graph has.
+    Existing(KindKey),
+    /// A new kind, minted from the insertion.
+    Add,
+}
+
+/// One end of an edge an insertion adds: a node of the segment, or of the graph.
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum EdgeEnd {
+    /// A node by its key in the segment version.
+    Segment(NodeKey),
+    /// A node by its key in the graph.
+    Host(NodeKey),
+}
+
+/// An edge an insertion adds: `node` requires `requires`, one end in the segment and the
+/// other in the graph (B13).
+#[derive(
+    Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(deny_unknown_fields)]
+pub struct InsertedEdge {
+    /// The dependent.
+    pub node: EdgeEnd,
+    /// What it requires.
+    pub requires: EdgeEnd,
 }
 
 /// A state-machine transition (D1). Answering a decision is [`Mutation::Answer`]; the dates a
@@ -333,6 +383,9 @@ pub enum Mutation {
         /// The description.
         #[serde(skip_serializing_if = "Option::is_none")]
         description: Option<Markdown>,
+        /// Process (the default) or segment; fixed from here on (A21).
+        #[serde(default, skip_serializing_if = "RouteKind::is_process")]
+        kind: RouteKind,
     },
     /// Rename or redescribe the route.
     EditRoute {
@@ -462,6 +515,36 @@ pub enum Mutation {
         node: NodeKey,
         /// The resource.
         resource: AttachmentKey,
+    },
+    /// Insert a published segment version under a parent, wired to the graph's own nodes and
+    /// with its roles and kinds mapped, in one event (B13).
+    InsertSegment {
+        /// The insertion's key, new in the graph.
+        insertion: InsertionKey,
+        /// The segment and one of its published versions.
+        segment: Lineage,
+        /// The group, deliverable, or action the root goes under; none for the top level.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        parent: Option<NodeKey>,
+        /// The root's id; the segment root's own, suffixed when a sibling has it, if none.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        root_id: Option<Slug>,
+        /// The root's title; the segment root's own if none.
+        #[serde(skip_serializing_if = "Option::is_none")]
+        root_title: Option<Title>,
+        /// What each segment role becomes; a role not named takes the graph's role with its
+        /// id and cardinality, else is added.
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        roles: BTreeMap<RoleKey, RoleChoice>,
+        /// What each segment participation kind becomes, likewise.
+        #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+        kinds: BTreeMap<KindKey, KindChoice>,
+        /// Segment nodes left out, each with its subtree.
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        omit: BTreeSet<NodeKey>,
+        /// The wiring: each edge joins one segment node and one node of the graph.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        edges: Vec<InsertedEdge>,
     },
 
     // Journey state (B2, B5, B6, B10, D1, F1, F5, G1).
@@ -706,6 +789,7 @@ impl Mutation {
             | Mutation::AddResource { .. }
             | Mutation::EditResource { .. }
             | Mutation::RemoveResource { .. }
+            | Mutation::InsertSegment { .. }
             | Mutation::Upgrade { .. }
             | Mutation::Relink { .. }
             | Mutation::SetProvenance { .. }

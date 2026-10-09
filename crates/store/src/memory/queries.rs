@@ -53,12 +53,28 @@ impl State {
 
     pub(super) fn route_detail(&self, route: &RouteId) -> Option<RouteDetail> {
         let (header, revision) = self.domains.routes.get(route)?;
+        let mut uses = backend::insertion_uses(
+            route,
+            |held| self.latest_version(held),
+            |version| {
+                let id = GraphId::RouteVersion {
+                    route: route.clone(),
+                    version,
+                };
+                let root = self.domains.graphs.get(&id)?.nodes.values();
+                root.into_iter()
+                    .find(|node| node.parent.is_none())
+                    .map(|node| node.key.clone())
+            },
+            self.domains.graphs.iter(),
+        );
         let versions = self
             .domains
             .versions
             .iter()
             .filter(|((held, _), _)| held == route)
             .map(|((_, version), published_at)| VersionJourneys {
+                insertions: uses.remove(version).unwrap_or_default(),
                 version: *version,
                 published_at: *published_at,
                 journeys: self

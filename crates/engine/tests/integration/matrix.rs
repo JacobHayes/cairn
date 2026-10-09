@@ -275,6 +275,12 @@ const MATRIX: &[Entry] = &[
         brief: "2.5",
         run: launch_ranked_for_a_viewer,
     },
+    Entry {
+        scenario: "segment insertion twice into one graph",
+        prd: &["A21", "B13", "H5"],
+        brief: "7.6",
+        run: segment_inserted_twice,
+    },
 ];
 
 /// The vendor evaluation's frontier and acting frontier after each step, as
@@ -555,6 +561,126 @@ fn inserted_dependency_goes_stale() -> Run {
         [GuardFailure::OpenDependency(key("n_extra"))].into()
     );
     run
+}
+
+const HIRING: &str = "{journey: j_hiring}";
+
+/// An `insert_segment` of the security review's first version, with the rest of its fields.
+fn insert_review(insertion: &str, rest: &str) -> String {
+    let segment = "{route: security-review, version: 1}";
+    format!("- op: insert_segment\n  insertion: {insertion}\n  segment: {segment}\n{rest}")
+}
+
+/// The journey's nodes with this title.
+fn titled(run: &Run, title: &str) -> Vec<cairn_schema::NodeKey> {
+    let nodes = run.journey().nodes.values();
+    let found = nodes.filter(|node| node.title.as_str() == title);
+    found.map(|node| node.key.clone()).collect()
+}
+
+/// A21, B13, H5: the security review segment inserted into the finished hiring journey. A
+/// second default mapping fills `reviewer` twice, a cardinality mismatch and a cycle reject
+/// the whole insert, and leaving the second *Who reviews?* out is accepted; the second
+/// insertion gets other keys and the next root id, and its owner resolves through the first
+/// insertion's role. A stale insert is rejected, and removing an insertion's last member
+/// removes the insertion.
+fn segment_inserted_twice() -> Run {
+    let records = support::with_segment(support::finished("hiring-loop"), "security-review");
+    let mut run = Run::from(records);
+    let wire = "  edges: [{node: {segment: n_review}, requires: {host: n_choose_panel}}]\n";
+    run.accept(HIRING, &insert_review("i_one", wire));
+    let reviewer = run
+        .journey()
+        .roles
+        .values()
+        .find(|role| role.id.as_str() == "reviewer");
+    let reviewer = reviewer.unwrap().key.clone();
+
+    let panel = "  roles: {r_reviewer: {existing: r_panel}}\n";
+    let cycle = "  omit: [n_who_reviews]\n  edges: [{node: {segment: n_review}, requires: {host: n_loop}}, {node: {host: n_loop}, requires: {segment: n_review}}]\n";
+    for (rest, code) in [
+        ("", ViolationCode::SeveralFillingDecisions),
+        (panel, ViolationCode::InsertionInvalid),
+        (cycle, ViolationCode::DependencyCycle),
+    ] {
+        let Rejection::Invalid { violations } = run.reject(HIRING, &insert_review("i_two", rest))
+        else {
+            panic!("rejected as invalid")
+        };
+        assert!(violations.as_slice().iter().any(|found| found.code == code));
+    }
+    let flip = format!("- op: edit_role\n  role: {{key: {reviewer}, id: reviewer, multi: true}}\n");
+    let Rejection::Invalid { violations } = run.reject(HIRING, &flip) else {
+        panic!("a mapped role keeps its cardinality")
+    };
+    let invalid = ViolationCode::InsertionInvalid;
+    assert!(
+        violations
+            .as_slice()
+            .iter()
+            .any(|found| found.code == invalid)
+    );
+    let offer = "  omit: [n_who_reviews]\n  edges: [{node: {host: n_make_offer}, requires: {segment: n_review}}]\n";
+    run.accept(HIRING, &insert_review("i_two", offer));
+    let journey = run.journey();
+    let node = |key: &cairn_schema::NodeKey| journey.nodes.get(key).unwrap();
+    let mut ids: Vec<_> = titled(&run, "Security review")
+        .iter()
+        .map(|key| node(key).id.as_str())
+        .collect();
+    ids.sort_unstable();
+    assert_eq!(ids, ["security-review", "security-review-2"]);
+    let from_segment = cairn_schema::Provenance::FromSegment;
+    let copied = journey
+        .state
+        .nodes
+        .values()
+        .filter(|state| state.provenance == from_segment);
+    assert_eq!(
+        copied.count(),
+        7,
+        "four and three, each with its initial state"
+    );
+    for threat in titled(&run, "Threat model") {
+        let owner = node(&threat).participations.as_map().values().next();
+        assert!(matches!(owner, Some(ParticipationSource::Role(role)) if *role == reviewer));
+    }
+    assert!(journey.state.local_edits.contains_key(&key("n_make_offer")));
+    let derived = derived(&run);
+    let frontier = derived.blocking().frontier().iter();
+    let mut frontier: Vec<_> = frontier.map(|key| node(key).id.as_str()).collect();
+    frontier.sort_unstable();
+    assert_eq!(
+        frontier,
+        ["offer", "sensitivity", "sensitivity", "who-reviews"]
+    );
+
+    stale_insert_and_last_member_removal(&mut run);
+    run
+}
+
+/// H5: an insert against a revision the journey has moved past is stale; B13: removing an
+/// insertion's last member removes the insertion.
+fn stale_insert_and_last_member_removal(run: &mut Run) {
+    let mut stale = support::patch_to(run.records(), HIRING, &insert_review("i_three", ""));
+    stale.base_revision = cairn_schema::Revision::NONE;
+    assert!(matches!(
+        apply(run.records(), &stale, &support::fixed_inputs()),
+        Err(Rejection::Stale { .. })
+    ));
+    let root_only = "  omit: [n_sensitivity, n_threat_model, n_who_reviews]\n";
+    run.accept(HIRING, &insert_review("i_three", root_only));
+    let third = run
+        .journey()
+        .insertions
+        .values()
+        .find(|i| i.key.as_str() == "i_three");
+    let removal = format!(
+        "- op: remove_node\n  removal: {{node: {}}}\n",
+        third.unwrap().nodes.keys().next().unwrap()
+    );
+    run.accept(HIRING, &removal);
+    assert_eq!(run.journey().insertions.len(), 2);
 }
 
 #[test]

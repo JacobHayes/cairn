@@ -87,6 +87,7 @@ mod cost {
                     name: parse("Limits"),
                     description: None,
                     retired: false,
+                    kind: cairn_schema::RouteKind::Process,
                 },
                 revision: Revision::NONE.next(),
                 versions: [first, second].into(),

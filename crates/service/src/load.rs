@@ -15,7 +15,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_engine::Records;
 use cairn_schema::{
     AnswerType, Domain, EntityKey, JourneyId, Lineage, Mutation, Patch, PatchTarget, Payload,
-    ProposalId, Revision, RevisionOf,
+    ProposalId, Revision, RevisionOf, RouteId,
 };
 use cairn_store::{Document, LoadTarget, Precondition, Store, StoreError};
 
@@ -126,6 +126,13 @@ pub(crate) async fn records<S: Store>(store: &S, patch: &Patch) -> Result<Loaded
     let mutations = effective_mutations(&records, patch);
     let read = versions_read(&records, patch, &mutations);
     let merges = merges(&mutations);
+    for id in kinds_read(&mutations) {
+        if !records.routes.contains_key(&id)
+            && let Some(Document::Route(route)) = store.load(&LoadTarget::Route(id.clone())).await?
+        {
+            records.routes.insert(id, route);
+        }
+    }
     for lineage in read {
         let target = LoadTarget::RouteVersion {
             route: lineage.route.clone(),
@@ -261,6 +268,9 @@ fn versions_read(records: &Records, patch: &Patch, mutations: &[&Mutation]) -> B
                 follows = Some(from.clone());
                 read.insert(from.clone());
             }
+            (Mutation::InsertSegment { segment, .. }, _) => {
+                read.insert(segment.clone());
+            }
             (Mutation::Upgrade { to }, _) => {
                 if let Some(current) = follows.take() {
                     let target = Lineage {
@@ -289,6 +299,22 @@ fn versions_read(records: &Records, patch: &Patch, mutations: &[&Mutation]) -> B
         }
     }
     read
+}
+
+/// A21: the routes whose kind the mutations check: the one a journey is created from, re-linked
+/// to, or a segment is inserted from.
+fn kinds_read(mutations: &[&Mutation]) -> BTreeSet<RouteId> {
+    mutations
+        .iter()
+        .filter_map(|mutation| match mutation {
+            Mutation::CreateJourney {
+                from: Some(from), ..
+            }
+            | Mutation::Relink { lineage: from }
+            | Mutation::InsertSegment { segment: from, .. } => Some(from.route.clone()),
+            _ => None,
+        })
+        .collect()
 }
 
 /// E6: each entity merge's two entities and the journeys it names.

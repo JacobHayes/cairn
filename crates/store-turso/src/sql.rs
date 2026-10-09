@@ -311,6 +311,20 @@ pub(crate) fn graph_id(graph: &GraphId) -> String {
     }
 }
 
+/// A graph from its row id.
+pub(crate) fn graph_from(id: &str) -> Result<GraphId, StoreError> {
+    let parts: Vec<&str> = id.split('/').collect();
+    match parts.as_slice() {
+        ["journey", journey] => Ok(GraphId::Journey(parse(journey)?)),
+        ["draft", route] => Ok(GraphId::RouteDraft(parse(route)?)),
+        ["version", route, version] => Ok(GraphId::RouteVersion {
+            route: parse(route)?,
+            version: number(version.parse().map_err(|_| corrupt(id))?)?,
+        }),
+        _ => Err(corrupt(&format!("graph id {id:?}"))),
+    }
+}
+
 /// A domain as its kind and id columns.
 pub(crate) fn domain_columns(domain: &Domain) -> (&'static str, Value) {
     match domain {

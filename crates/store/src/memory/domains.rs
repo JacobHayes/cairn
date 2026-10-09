@@ -343,6 +343,12 @@ fn put_graph_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
             }
             put_node(graph, changed)?;
         }
+        GraphRecord::Insertion(insertion) => {
+            graph
+                .insertions
+                .put(insertion.clone())
+                .map_err(collection)?;
+        }
         GraphRecord::RetiredKey(_)
         | GraphRecord::NodeState { .. }
         | GraphRecord::LocalEdit { .. }
@@ -418,7 +424,8 @@ fn put_state_record(graph: &mut Graph, record: &GraphRecord) -> Result<(), Store
         | GraphRecord::Kind(_)
         | GraphRecord::DefaultOwner(_)
         | GraphRecord::Participation { .. }
-        | GraphRecord::Resource { .. } => {
+        | GraphRecord::Resource { .. }
+        | GraphRecord::Insertion(_) => {
             return malformed(format!("{record:?} is graph content, not state"));
         }
     }
@@ -468,6 +475,9 @@ fn remove_graph_key(graph: &mut Graph, key: &GraphKey) -> Result<(), StoreError>
                 changed.resources.retain(|held| held.key != *resource);
                 put_node(graph, changed)?;
             }
+        }
+        GraphKey::Insertion(insertion) => {
+            graph.insertions.remove(insertion);
         }
         GraphKey::RetiredKey(_)
         | GraphKey::NodeState(_)
@@ -539,7 +549,8 @@ fn remove_state_key(graph: &mut Graph, key: &GraphKey) {
         | GraphKey::Kind(_)
         | GraphKey::DefaultOwner
         | GraphKey::Participation { .. }
-        | GraphKey::Resource { .. } => {}
+        | GraphKey::Resource { .. }
+        | GraphKey::Insertion(_) => {}
     }
 }
 

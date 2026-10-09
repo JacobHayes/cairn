@@ -5,12 +5,13 @@ use proptest::prelude::*;
 use super::model::bounded_vec;
 use super::{
     arb_agent_id, arb_annotation, arb_annotation_body, arb_answer_value, arb_attachment_key,
-    arb_choices, arb_date, arb_entity, arb_entity_key, arb_entity_set, arb_guard,
-    arb_journey_header, arb_journey_id, arb_journey_status, arb_kind_key, arb_lineage,
-    arb_local_edit, arb_markdown, arb_node, arb_node_field_value, arb_node_key, arb_node_state,
-    arb_overrides, arb_participation_kind, arb_patch_id, arb_proposal_id, arb_reason, arb_resource,
-    arb_revision, arb_role, arb_role_key, arb_route_header, arb_route_id, arb_slug,
-    arb_snooze_target, arb_timestamp, arb_title, arb_user_id, arb_version_number,
+    arb_choices, arb_date, arb_entity, arb_entity_key, arb_entity_set, arb_guard, arb_insertion,
+    arb_insertion_key, arb_journey_header, arb_journey_id, arb_journey_status, arb_kind_key,
+    arb_lineage, arb_local_edit, arb_markdown, arb_node, arb_node_field_value, arb_node_key,
+    arb_node_state, arb_overrides, arb_participation_kind, arb_patch_id, arb_proposal_id,
+    arb_reason, arb_resource, arb_revision, arb_role, arb_role_key, arb_route_header, arb_route_id,
+    arb_route_kind, arb_slug, arb_snooze_target, arb_timestamp, arb_title, arb_user_id,
+    arb_version_number,
 };
 use crate::domain::{Domain, GraphId};
 use crate::event::{Actor, ChangeSet, Event, PatchReceipt, Subject};
@@ -18,8 +19,8 @@ use crate::graph::Edge;
 use crate::node::ParticipationSource;
 use crate::number::SignedDays;
 use crate::patch::{
-    DraftSource, Mutation, Mutations, Override, ParticipationRef, Patch, PatchTarget, RecordedEnd,
-    Removal, Transition,
+    DraftSource, EdgeEnd, InsertedEdge, KindChoice, Mutation, Mutations, Override,
+    ParticipationRef, Patch, PatchTarget, RecordedEnd, Removal, RoleChoice, Transition,
 };
 use crate::proposal::{
     Conflict, ConflictResolution, Kept, ParticipationMapping, Proposal, ProposalDraft,
@@ -122,8 +123,16 @@ fn arb_lifecycle_mutation() -> BoxedStrategy<Mutation> {
             .prop_map(|(name, description)| Mutation::EditJourney { name, description }),
         arb_journey_status().prop_map(|status| Mutation::SetJourneyStatus { status }),
         Just(Mutation::DeleteJourney {}),
-        (arb_title(), prop::option::of(arb_markdown()))
-            .prop_map(|(name, description)| Mutation::CreateRoute { name, description }),
+        (
+            arb_title(),
+            prop::option::of(arb_markdown()),
+            arb_route_kind()
+        )
+            .prop_map(|(name, description, kind)| Mutation::CreateRoute {
+                name,
+                description,
+                kind
+            }),
         (arb_title(), prop::option::of(arb_markdown()))
             .prop_map(|(name, description)| Mutation::EditRoute { name, description }),
         any::<bool>().prop_map(|retired| Mutation::SetRouteRetired { retired }),
@@ -171,8 +180,54 @@ fn arb_structure_mutation() -> BoxedStrategy<Mutation> {
             .prop_map(|(node, resource)| Mutation::EditResource { node, resource }),
         (arb_node_key(), arb_attachment_key())
             .prop_map(|(node, resource)| Mutation::RemoveResource { node, resource }),
+        arb_insert_segment(),
     ]
     .boxed()
+}
+
+fn arb_insert_segment() -> BoxedStrategy<Mutation> {
+    let end = prop_oneof![
+        arb_node_key().prop_map(EdgeEnd::Segment),
+        arb_node_key().prop_map(EdgeEnd::Host),
+    ];
+    let edge = (end.clone(), end).prop_map(|(node, requires)| InsertedEdge { node, requires });
+    let role = prop_oneof![
+        arb_role_key().prop_map(RoleChoice::Existing),
+        Just(RoleChoice::Add)
+    ];
+    let kind = prop_oneof![
+        arb_kind_key().prop_map(KindChoice::Existing),
+        Just(KindChoice::Add)
+    ];
+    (
+        (
+            arb_insertion_key(),
+            arb_lineage(),
+            prop::option::of(arb_node_key()),
+            prop::option::of(arb_slug()),
+            prop::option::of(arb_title()),
+        ),
+        prop::collection::btree_map(arb_role_key(), role, 0..3),
+        prop::collection::btree_map(arb_kind_key(), kind, 0..3),
+        prop::collection::btree_set(arb_node_key(), 0..3),
+        prop::collection::vec(edge, 0..3),
+    )
+        .prop_map(
+            |((insertion, segment, parent, root_id, root_title), roles, kinds, omit, edges)| {
+                Mutation::InsertSegment {
+                    insertion,
+                    segment,
+                    parent,
+                    root_id,
+                    root_title,
+                    roles,
+                    kinds,
+                    omit,
+                    edges,
+                }
+            },
+        )
+        .boxed()
 }
 
 fn arb_state_mutation() -> BoxedStrategy<Mutation> {
@@ -230,6 +285,7 @@ fn arb_lineage_and_entity_mutation() -> BoxedStrategy<Mutation> {
         Provenance::FromRoute,
         Provenance::Local,
         Provenance::Orphaned,
+        Provenance::FromSegment,
     ]);
     prop_oneof![
         arb_version_number().prop_map(|to| Mutation::Upgrade { to }),
@@ -609,6 +665,7 @@ fn arb_content_record() -> BoxedStrategy<GraphRecord> {
         (arb_node_key(), arb_resource::<KeyRefs>())
             .prop_map(|(node, resource)| GraphRecord::Resource { node, resource }),
         arb_retired_key().prop_map(GraphRecord::RetiredKey),
+        arb_insertion().prop_map(GraphRecord::Insertion),
     ]
     .boxed()
 }

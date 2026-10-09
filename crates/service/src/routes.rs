@@ -56,6 +56,7 @@ impl<S: Store> Service<S> {
             route: route.clone(),
             name: held.header.name,
             description: held.header.description,
+            kind: held.header.kind,
             extends,
         };
         let domain = cairn_schema::Domain::Route(route.clone());
@@ -92,6 +93,9 @@ impl<S: Store> Service<S> {
     ) -> Result<Written, WriteError> {
         let route = &file.route;
         let held = self.route(route).await?;
+        if let Some(found) = &held {
+            kind_matches(found.header.kind, file)?;
+        }
         let versions: Vec<VersionNumber> = held
             .as_ref()
             .map(|found| found.versions.iter().rev().copied().collect())
@@ -185,6 +189,7 @@ impl<S: Store> Service<S> {
             mutations.push(Mutation::CreateRoute {
                 name: file.name.clone(),
                 description: file.description.clone(),
+                kind: file.kind,
             });
         }
         mutations.push(Mutation::OpenDraft {
@@ -243,23 +248,30 @@ impl PatchKeys {
 
 impl KeyAllocator for PatchKeys {
     fn next_body(&mut self, prefix: &'static str) -> String {
-        const OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
-        const PRIME: u64 = 0x0100_0000_01b3;
         self.count += 1;
-        let mut hash = OFFSET;
-        let parts = [
+        cairn_schema::id::fnv1a_body(&[
             self.seed.as_bytes(),
             &[0],
             prefix.as_bytes(),
             &[0],
             &self.count.to_le_bytes(),
-        ];
-        for byte in parts.into_iter().flatten() {
-            hash ^= u64::from(*byte);
-            hash = hash.wrapping_mul(PRIME);
-        }
-        format!("{hash:016x}")
+        ])
     }
+}
+
+/// A21: a file is imported into a route of its own kind.
+fn kind_matches(kind: cairn_schema::RouteKind, file: &RouteFile) -> Result<(), WriteError> {
+    if kind == file.kind {
+        return Ok(());
+    }
+    Err(invalid(violation(
+        ViolationCode::SegmentRule,
+        None,
+        format!(
+            "route {} is a {kind:?} and a file of kind {:?} cannot be imported into it (A21)",
+            file.route, file.kind
+        ),
+    )))
 }
 
 #[cfg(test)]

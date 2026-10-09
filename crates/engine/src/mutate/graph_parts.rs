@@ -50,6 +50,10 @@ fn put_role(session: &mut Session<'_>, role: &Role<KeyRefs>, add: bool) -> Vec<W
         unreachable!("a graph patch targets an existing graph")
     };
     let exists = graph.roles.get(&role.key).is_some();
+    let flips = graph
+        .roles
+        .get(&role.key)
+        .is_some_and(|held| held.multi != role.multi);
     let problem = match (add, exists) {
         (true, true) => Some(ViolationCode::DuplicateKey),
         (true, false) if graph.retired_keys.roles.contains(&role.key) => {
@@ -77,6 +81,11 @@ fn put_role(session: &mut Session<'_>, role: &Role<KeyRefs>, add: bool) -> Vec<W
         return Vec::new();
     }
     assert_eq!(exists, !add, "an add is new and an edit exists");
+    if flips {
+        session
+            .cardinality_changed
+            .insert(Subject::Role(role.key.clone()));
+    }
     vec![session.put(GraphRecord::Role(role.clone()))]
 }
 
@@ -117,6 +126,8 @@ fn put_kind(session: &mut Session<'_>, kind: &ParticipationKind<KeyRefs>, add: b
         unreachable!("a graph patch targets an existing graph")
     };
     let exists = graph.participation_kinds.get(&kind.key).is_some() || kind.key == KindKey::owner();
+    let held = graph.participation_kinds.get(&kind.key);
+    let flips = held.is_some_and(|held| held.multi != kind.multi);
     let problem = match (add, exists) {
         (true, true) => Some(ViolationCode::DuplicateKey),
         (true, false) if graph.retired_keys.kinds.contains(&kind.key) => {
@@ -150,6 +161,11 @@ fn put_kind(session: &mut Session<'_>, kind: &ParticipationKind<KeyRefs>, add: b
     }
     assert_eq!(exists, !add, "an add is new and an edit exists");
     assert_ne!(kind.key, KindKey::owner(), "owner is built in (A7)");
+    if flips {
+        session
+            .cardinality_changed
+            .insert(Subject::Kind(kind.key.clone()));
+    }
     vec![session.put(GraphRecord::Kind(kind.clone()))]
 }
 

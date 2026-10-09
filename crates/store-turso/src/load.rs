@@ -83,7 +83,7 @@ pub(crate) async fn route_row(
     connection: &Connection,
     id: &RouteId,
 ) -> Result<Option<(RouteHeader, Revision)>, StoreError> {
-    let select = "SELECT name, description, retired, revision FROM routes WHERE id = ?1";
+    let select = "SELECT name, description, retired, revision, kind FROM routes WHERE id = ?1";
     let Some(row) = first(connection, select, vec![text(id)]).await? else {
         return Ok(None);
     };
@@ -92,6 +92,7 @@ pub(crate) async fn route_row(
         name: row.parse(0)?,
         description: row.opt_parse(1)?,
         retired: row.flag(2)?,
+        kind: row.name(4)?,
     };
     Ok(Some((header, row.number(3)?)))
 }
