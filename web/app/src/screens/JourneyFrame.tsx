@@ -16,8 +16,9 @@ import { useProjected } from "../canvas/hooks.ts";
 import { canvasPath, DEFAULT_VIEW, revealing, viewFrom } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
-import { screenPath } from "../detail/parts.tsx";
+import { EdgeCard } from "../detail/EdgeCard.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
+import { screenPath } from "../detail/parts.tsx";
 import type { JourneyPage, Projection } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { rememberProjection } from "../journeys/memory.ts";
@@ -39,6 +40,8 @@ export interface FrameProps {
   projection: Projection | undefined;
   /** The node whose detail is open. */
   selected: string | undefined;
+  /** The link whose card is open, `<from>~<to>`, when no node is. */
+  edge?: string | undefined;
 }
 
 /**
@@ -81,8 +84,31 @@ function BackToPass() {
 }
 
 /** What goes in the frame's inspector column: the open node's detail, or the journey card when nothing is open (the cards' pass rail is theirs). */
-function InspectorSlot({ ready, page, projection, selected, structure, card }: { ready: Ready; page: FrameProps["page"]; projection: FrameProps["projection"]; selected: string | undefined; structure: ReactNode; card: boolean }) {
+function InspectorSlot({
+  ready,
+  page,
+  projection,
+  selected,
+  edge,
+  structure,
+  card,
+}: {
+  ready: Ready;
+  page: FrameProps["page"];
+  projection: FrameProps["projection"];
+  selected: string | undefined;
+  edge: string | undefined;
+  structure: ReactNode;
+  card: boolean;
+}) {
   const journey = ready.journey.header.id;
+  if (selected === undefined && edge !== undefined) {
+    return (
+      <Inspector focus={`${journey}:${edge}`}>
+        <EdgeCard view={ready} edge={edge} />
+      </Inspector>
+    );
+  }
   if (selected !== undefined) {
     return (
       <Inspector focus={`${journey}:${selected}`}>
@@ -99,7 +125,7 @@ function InspectorSlot({ ready, page, projection, selected, structure, card }: {
   );
 }
 
-function ReadyFrame({ ready, page, projection, selected }: { ready: Ready } & Omit<FrameProps, "id">) {
+function ReadyFrame({ ready, page, projection, selected, edge }: { ready: Ready } & Omit<FrameProps, "id">) {
   const { search } = useLocation();
   const navigate = useNavigate();
   const journey = ready.journey.header.id;
@@ -137,7 +163,7 @@ function ReadyFrame({ ready, page, projection, selected }: { ready: Ready } & Om
   const wide = useMedia(COLUMN);
   const phone = useMedia(PHONE_WIDTH);
   const cards = page === "next" && projection === "cards";
-  const card = selected !== undefined || page === "summary" || cards ? "none" : wide ? "column" : fills && !phone ? "none" : "inline";
+  const card = selected !== undefined || edge !== undefined || page === "summary" || cards ? "none" : wide ? "column" : fills && !phone ? "none" : "inline";
   return (
     <ConnectContext value={authored === undefined ? undefined : drawing.connecting}>
       <div className="ws-fill journey-frame" data-testid="journey-frame" data-page={page} data-projection={projection ?? ""}>
@@ -163,11 +189,11 @@ function ReadyFrame({ ready, page, projection, selected }: { ready: Ready } & Om
         {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
       {/* After the head, whose assistant opens its tab as it mounts: a node opened from there brings its detail forward last. */}
-      <InspectorSlot ready={ready} page={page} projection={projection} selected={selected} structure={structure} card={card === "column"} />
+      <InspectorSlot ready={ready} page={page} projection={projection} selected={selected} edge={edge} structure={structure} card={card === "column"} />
     </ConnectContext>
   );
 }
 
-export function JourneyFrame({ id, page, projection, selected }: FrameProps) {
-  return <JourneyGate id={id}>{(ready) => <ReadyFrame ready={ready} page={page} projection={projection} selected={selected} />}</JourneyGate>;
+export function JourneyFrame({ id, page, projection, selected, edge }: FrameProps) {
+  return <JourneyGate id={id}>{(ready) => <ReadyFrame ready={ready} page={page} projection={projection} selected={selected} edge={edge} />}</JourneyGate>;
 }

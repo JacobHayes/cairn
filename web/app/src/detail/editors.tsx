@@ -1,15 +1,17 @@
 // The node's journey state a section edits in place (B5, B6, E3, F5): its pin, routed
-// through the decision that feeds it when one does; its snooze; a force include with its
-// reason; its weight; and its participations. Each is one patch whose rejection shows here,
+// through the decision that feeds it when one does; its snooze (what to set aside, until when);
+// a force include lifted; its weight; and its participations. Each is one patch whose rejection shows here,
 // a pin's with the moves that resolve a contradictory chain.
 import type { Schema } from "@cairn/client";
-import type { ReactNode } from "react";
+import { useId, type ReactNode } from "react";
 
+import { dateWords } from "../timeline/model.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { isTerminal, nodeOf, transition, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { entityName } from "./sections.tsx";
+import { nextMonday, setAsideOptions, tomorrow, withinScope } from "./snooze.ts";
 import { useFormDraft, useNodeWrite, type NodeWrite, type Seen } from "./write.ts";
 
 type Draft = ReturnType<typeof useFormDraft<string>>;
@@ -61,10 +63,6 @@ const dateInput = (label: string) => (value: string, change: (value: string) => 
   <Field type="date" aria-label={label} value={value} onChange={(event) => { change(event.target.value); }} />
 );
 
-const textInput = (label: string) => (value: string, change: (value: string) => void) => (
-  <Field aria-label={label} placeholder={label} value={value} onChange={(event) => { change(event.target.value); }} />
-);
-
 /**
  * E3: a decision's answer while it is in effect: decided and relevant (crates/engine
  * `answer_in_effect`). A decision out of scope or undecided keeps its answer, but what it
@@ -93,7 +91,8 @@ export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail })
   return (
     <div className="stack" data-testid="pin">
       <span>
-        Pin: <strong data-testid="pin-date">{current ?? "none"}</strong>
+        {current === undefined ? null : "Pinned to "}
+        <strong data-testid="pin-date">{current === undefined ? "No pin" : dateWords(current, view.derived.today)}</strong>
         {fedBy === undefined ? null : (
           <span className="muted small" data-testid="pin-through">
             {" "}
@@ -141,20 +140,128 @@ function SnoozedThrough({ view, write, container, target }: { view: Ready; write
   );
 }
 
-/** B6: the node's snooze, until a date or until another node is done or out of scope; a container's holds over its subtree. */
+type Until = "tomorrow" | "monday" | "date" | "node";
+
+const UNTIL_OPTIONS = [
+  { value: "tomorrow", label: "Tomorrow" },
+  { value: "monday", label: "Next Monday" },
+  { value: "date", label: "A date" },
+  { value: "node", label: "When something is done" },
+] as const;
+
+/** B6: the node, or a container above it with its open count: what a snooze sets aside. */
+function SetAside({ options, group, aside, onChange }: { options: ReturnType<typeof setAsideOptions>; group: string; aside: string; onChange: (node: string) => void }) {
+  return (
+    <fieldset className="stack">
+      <legend className="small muted">Set aside</legend>
+      {options.map((option) => (
+        <label key={option.node} className="choice">
+          <input type="radio" name={`${group}-aside`} checked={aside === option.node} onChange={() => { onChange(option.node); }} />
+          <span>{option.open === undefined ? option.title : `All of ${option.title}`}</span>
+          {option.open === undefined ? null : <span className="choice-effect mono muted">{option.open} open</span>}
+        </label>
+      ))}
+    </fieldset>
+  );
+}
+
+/** B6: what the snooze form holds: what to set aside and until when, kept across a reload. */
+export interface SnoozeDraft {
+  aside: string;
+  until: Until;
+  date: string;
+  target: string;
+}
+
+export type SnoozeForm = ReturnType<typeof useFormDraft<SnoozeDraft>>;
+
+/** Opens the snooze form on the node itself, until tomorrow. */
+export function openSnooze(form: SnoozeForm, view: Ready, node: string, seen: Seen): void {
+  form.open({ aside: node, until: "tomorrow", date: tomorrow(view.derived.today), target: "" }, seen);
+}
+
+/**
+ * B6: the snooze form (shown in place of the buttons while its draft is open): what to set aside
+ * (the node, or a container above it with its open count, nearest first) and until when.
+ * Setting a container aside holds everything beneath it; the engine refuses a wait on the
+ * set-aside work itself. Sent against the revisions its author saw.
+ */
+export function SnoozePanel({ view, detail, form }: { view: Ready; detail: NodeDetail; form: SnoozeForm }) {
+  const write = useNodeWrite(view, `snooze:${detail.node.key}`);
+  const group = useId();
+  const options = setAsideOptions(view, detail);
+  const draft = form.draft;
+  if (draft === undefined) {
+    return null;
+  }
+  const { aside, until, date, target } = draft.value;
+  const change = (patch: Partial<SnoozeDraft>) => {
+    form.change({ ...draft.value, ...patch });
+  };
+  const today = view.derived.today;
+  const scope = withinScope(view, aside);
+  const chosen: Schema<"SnoozeTarget"> | undefined =
+    until === "tomorrow" ? { date: tomorrow(today) } : until === "monday" ? { date: nextMonday(today) } : until === "date" ? (date === "" ? undefined : { date }) : target === "" ? undefined : { node: target };
+  return (
+    <div className="stack popover-panel" role="dialog" aria-label="Snooze" data-testid="snooze" data-popover="">
+      {options.length === 1 ? null : <SetAside options={options} group={group} aside={aside} onChange={(node) => { change({ aside: node }); }} />}
+      <fieldset className="stack">
+        <legend className="small muted">Until</legend>
+        {UNTIL_OPTIONS.map((option) => (
+          <label key={option.value} className="choice">
+            <input type="radio" name={`${group}-until`} checked={until === option.value} onChange={() => { change({ until: option.value }); }} />
+            <span>{option.label}</span>
+          </label>
+        ))}
+      </fieldset>
+      {until === "date" ? <Field type="date" aria-label="Snooze until" value={date} onChange={(event) => { change({ date: event.target.value }); }} /> : null}
+      {until === "node" ? (
+        <select aria-label="Snooze until node" value={target} onChange={(event) => { change({ target: event.target.value }); }}>
+          <option value="">Choose</option>
+          {(view.journey.graph.nodes ?? [])
+            .filter((node) => !scope.has(node.key))
+            .map((node) => (
+              <option key={node.key} value={node.key}>
+                {node.title}
+              </option>
+            ))}
+        </select>
+      ) : null}
+      <span className="row">
+        <Button
+          primary
+          disabled={write.disabled || chosen === undefined}
+          onClick={() => {
+            if (chosen !== undefined) {
+              void write.run([{ op: "snooze", node: aside, until: chosen }], draft).then((landed) => {
+                if (landed) {
+                  form.close();
+                }
+              });
+            }
+          }}
+        >
+          Snooze
+        </Button>
+        <Button onClick={form.close}>Cancel</Button>
+      </span>
+      <Rejected view={view} write={write} />
+    </div>
+  );
+}
+
+/** B6: a snooze's state and the way to set one: for a card or row, where the inspector's menu is not. */
 export function SnoozeEditor({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `snooze:${detail.node.key}`, detail.node.key);
   const key = detail.node.key;
-  const dateForm = useFormDraft<string>(write.journey, key, "snooze-date");
-  const nodeForm = useFormDraft<string>(write.journey, key, "snooze-node");
+  const form = useFormDraft<SnoozeDraft>(write.journey, key, "snooze");
   const stored = view.journey.graph.state?.snoozes?.[key];
   const via = detail.derived.snoozed_via ?? undefined;
   const viaStored = via === undefined ? undefined : view.journey.graph.state?.snoozes?.[via];
   // With a container's snooze over it, `snoozed` is the node's own target while that holds, else the container's.
   const holds = via === undefined ? detail.derived.snoozed != null : JSON.stringify(detail.derived.snoozed) === JSON.stringify(stored);
-  const snoozable = !isTerminal(detail.record.state);
   return (
-    <div className="stack" data-testid="snooze">
+    <div className="stack" data-testid="snooze-state">
       {stored === undefined ? null : (
         <span className="row">
           <span>
@@ -167,72 +274,28 @@ export function SnoozeEditor({ view, detail }: { view: Ready; detail: NodeDetail
         </span>
       )}
       {via === undefined || viaStored === undefined ? null : <SnoozedThrough view={view} write={write} container={via} target={viaStored} />}
-      {snoozable ? (
-        <span className="row">
-          <DraftForm
-            write={write}
-            draft={dateForm}
-            form="snooze-date"
-            start={view.key.today}
-            label="Snooze until a date"
-            input={dateInput("Snooze until")}
-            mutations={(date) => [{ op: "snooze", node: key, until: { date } }]}
-          />
-          <DraftForm
-            write={write}
-            draft={nodeForm}
-            form="snooze-node"
-            start=""
-            label="Snooze until a node"
-            input={(value, change) => (
-              <select aria-label="Snooze until node" value={value} onChange={(event) => { change(event.target.value); }}>
-                <option value="">Choose</option>
-                {(view.journey.graph.nodes ?? [])
-                  .filter((node) => node.key !== key)
-                  .map((node) => (
-                    <option key={node.key} value={node.key}>
-                      {node.title}
-                    </option>
-                  ))}
-              </select>
-            )}
-            mutations={(node) => [{ op: "snooze", node: key, until: { node } }]}
-          />
-        </span>
-      ) : null}
+      {isTerminal(detail.record.state) ? null : form.draft !== undefined ? <SnoozePanel view={view} detail={detail} form={form} /> : <Button onClick={() => { openSnooze(form, view, key, write.seen); }}>Snooze…</Button>}
       <Rejected view={view} write={write} />
     </div>
   );
 }
 
-/** B5, Gating: force include with its reason, or lifting it. */
+/** B5, Gating: a force include's reason, and lifting it. Making one is `⋯ › Include anyway`. */
 export function ForceInclude({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `force-include:${detail.node.key}`, detail.node.key);
   const key = detail.node.key;
-  const reasonForm = useFormDraft<string>(write.journey, key, "force-include");
   const forced = detail.overrides?.force_include;
+  if (forced == null) {
+    return null;
+  }
   return (
     <div className="stack" data-testid="force-include">
-      {forced == null ? (
-        detail.derived.relevance.value === "relevant" ? null : (
-          <DraftForm
-            write={write}
-            draft={reasonForm}
-            form="force-include"
-            start=""
-            label="Force include"
-            input={textInput("Why include it")}
-            mutations={(reason) => [{ op: "apply_override", node: key, override: { force_include: { reason } } }]}
-          />
-        )
-      ) : (
-        <span className="row">
-          <span>Force included: {forced}</span>
-          <Button disabled={write.disabled} onClick={() => void write.run([{ op: "remove_override", node: key, kind: "force_include" }])}>
-            Lift
-          </Button>
-        </span>
-      )}
+      <span className="row">
+        <span>Included anyway: {forced}</span>
+        <Button disabled={write.disabled} onClick={() => void write.run([{ op: "remove_override", node: key, kind: "force_include" }])}>
+          Lift
+        </Button>
+      </span>
       <Rejected view={view} write={write} />
     </div>
   );

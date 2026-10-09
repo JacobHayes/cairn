@@ -66,7 +66,7 @@ The shape every brief follows.
 | 8.4 | Frame and Graticule migration | `web/app`, `design/`, `mise-tasks/` | 5.8 | landed |
 | 8.5 | Sync chip | `web/app` | 8.4 | landed |
 | 8.6 | Journey pages, navigation, and addresses | `web/app` | 8.4, 8.1 | landed |
-| 8.7 | Inspector | `web/app` | 8.4, 8.1 (second part: 8.2, 8.3) | planned |
+| 8.7 | Inspector | `web/app` | 8.4, 8.1 (second part: 8.2, 8.3) | landed |
 | 8.8 | Graph | `web/app` | 8.4, 8.1, 8.3 (subtree-gravity chip: 8.2) | planned |
 | 8.9 | Next page | `web/app` | 8.5, 8.6, 8.7 | landed |
 | 8.10 | Plan list and timeline | `crates/schema`, `crates/engine`, `crates/api`, `openapi/`, `web/client`, `web/wasm`, `web/app` | 8.6, 8.1 (Affects: 8.3) | landed |

@@ -1,32 +1,44 @@
-// C8: the node detail panel every later screen opens, for one node of a derived journey. It
-// reads only the journey's document and its local derive (ARCHITECTURE, Web UI: the browser
-// has every explanation), so it follows the journey live (H6) with nothing of its own to
-// fetch. Sections start folded where they explain rather than act (progressive disclosure).
+// C8: the inspector's node detail (design 6): composed in the tab from the journey's document
+// and its local derive (ARCHITECTURE, Web UI: the browser has every explanation), so it follows
+// the journey live (H6) with nothing of its own to fetch but the history. It leads with the node
+// (kind and place, display state, title, owner, date), one plain sentence saying what its state
+// means, and the one thing to do about it, a decision's form being its answer; everything else
+// is a folded row showing its name and a count (DESIGN, Approachable by default).
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
-import { TitleEditor } from "../screens/TitleEditor.tsx";
-import { DecisionAffects } from "../decisions/DecisionView.tsx";
+import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
+import { Markdown } from "../ui/markdown.tsx";
 import { Actions } from "./Actions.tsx";
+import { Affects } from "./Affects.tsx";
 import { AttachmentList } from "./Attachments.tsx";
 import { Checklist } from "./Checklist.tsx";
+import { Connections } from "./Connections.tsx";
 import { DatesSection } from "./DatesSection.tsx";
-import { ForceInclude, ParticipationEditor, PinEditor, SnoozeEditor, WeightEditor } from "./editors.tsx";
+import { PinEditor } from "./editors.tsx";
+import { Origin, People } from "./Facts.tsx";
+import { foldKey } from "./folds.ts";
+import { Header, useRename } from "./Header.tsx";
 import { NodeHistory } from "./History.tsx";
 import { nodeDetail, type NodeDetail, type Ready } from "./model.ts";
 import { FoldedSections, screenPath } from "./parts.tsx";
+import { Pieces } from "./Pieces.tsx";
+import { useRankRow } from "./reads.ts";
 import { Rejected } from "./Rejected.tsx";
 import { ResourceList } from "./Resources.tsx";
-import { About, Blocking, Header, Participations, Priority, Relevance } from "./sections.tsx";
+import { positionOf, sentenceOf, type RankFacts } from "./sentence.ts";
+import { WhyRank } from "./WhyRank.tsx";
 import { useNodeWrite } from "./write.ts";
 
-/** F7, E3: the dates with their pin editor; F6: a shortfall's move sent as one patch. */
+/** F7, E3: the dates with their pin editor; F6: a shortfall's move sent as one patch. Open on a shortfall or when overdue. */
 function Dates({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `dates:${detail.node.key}`, detail.node.key);
   return (
     <DatesSection
       view={view}
       detail={detail}
+      open={detail.derived.dates.shortfall != null || detail.derived.overdue === true}
+      fold={foldKey(detail.node.kind, "dates")}
       onMove={(move) => void write.run([move])}
       pinEditor={
         <>
@@ -38,13 +50,28 @@ function Dates({ view, detail }: { view: Ready; detail: NodeDetail }) {
   );
 }
 
+/** The one plain sentence: what the node's state means, with links, and Unsnooze for the container holding it. */
+function Sentence({ view, detail, rank }: { view: Ready; detail: NodeDetail; rank: RankFacts }) {
+  const write = useNodeWrite(view, `sentence:${detail.node.key}`);
+  return (
+    <div className="stack">
+      <p className="sentence" data-testid="detail-sentence">
+        <Pieces view={view} pieces={sentenceOf(view, detail, rank)} disabled={write.disabled} onUnsnooze={(container) => void write.run([{ op: "unsnooze", node: container }])} />
+      </p>
+      <Rejected view={view} write={write} />
+    </div>
+  );
+}
+
 /**
- * `extra` sits under the header: the node's structure, in a journey's edit mode (5.6), or on a
+ * `extra` sits under the actions: the node's structure, in a journey's edit mode (5.6), or on a
  * card its way past breaking down. `folded` starts every section closed, as a card shows them.
  */
 export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view: Ready; nodeKey: string; extra?: ReactNode; folded?: boolean }) {
   const journey = view.journey.header.id;
   const detail = nodeDetail(view, nodeKey);
+  const rename = useRename(view, nodeKey, detail?.node.title ?? nodeKey);
+  const row = useRankRow(view, nodeKey);
   // Closing keeps the screen it is open on and what that screen shows (5.2).
   const { pathname, search } = useLocation();
   const close = { pathname: screenPath(pathname), search };
@@ -56,26 +83,29 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
       </aside>
     );
   }
+  const { node } = detail;
+  const position = positionOf(view, nodeKey);
+  const description = node.description ?? "";
   return (
     <FoldedSections value={folded}>
-      <aside className="detail-panel panel stack" aria-label={detail.node.title} data-testid="node-detail" data-node={nodeKey}>
-        <Header view={view} detail={detail} />
+      <aside className="detail-panel panel stack" aria-label={node.title} data-testid="node-detail" data-node={nodeKey}>
+        <Header view={view} detail={detail} position={position} rename={rename} removeTo={canvasPath(journey, { ...DEFAULT_VIEW, edit: true }, nodeKey)} />
+        <Sentence view={view} detail={detail} rank={{ position, row }} />
+        {node.kind === "decision" || description === "" ? null : <Markdown text={description} data-testid="description" />}
+        <Actions view={view} detail={detail} onRename={rename.start} />
         {extra}
-        <div data-testid="rename">
-          <TitleEditor journey={journey} node={nodeKey} title={detail.node.title} revision={view.journey.revision} showTitle={false} />
+        <div className="stack detail-folds">
+          <Checklist view={view} detail={detail} />
+          {node.kind === "decision" ? <Affects view={view} detail={detail} /> : null}
+          <Connections view={view} detail={detail} />
+          <ResourceList view={view} detail={detail} />
+          <AttachmentList view={view} detail={detail} />
+          <Dates view={view} detail={detail} />
+          <WhyRank view={view} detail={detail} position={position} row={row} />
+          <People view={view} detail={detail} />
+          <Origin detail={detail} />
+          <NodeHistory view={view} detail={detail} />
         </div>
-        <Actions view={view} detail={detail} />
-        {detail.node.kind === "decision" ? <DecisionAffects ready={view} node={nodeKey} /> : null}
-        <About view={view} detail={detail} />
-        <Checklist view={view} detail={detail} />
-        <AttachmentList view={view} detail={detail} />
-        <ResourceList view={view} detail={detail} />
-        <Dates view={view} detail={detail} />
-        <Blocking view={view} detail={detail} edit={<SnoozeEditor view={view} detail={detail} />} />
-        <Relevance view={view} detail={detail} edit={<ForceInclude view={view} detail={detail} />} />
-        <Priority view={view} detail={detail} edit={<WeightEditor view={view} detail={detail} />} />
-        <Participations view={view} detail={detail} edit={<ParticipationEditor view={view} detail={detail} />} />
-        <NodeHistory view={view} detail={detail} />
       </aside>
     </FoldedSections>
   );

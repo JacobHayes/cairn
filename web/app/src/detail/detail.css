@@ -2,16 +2,165 @@
 .detail-panel {
   min-width: 0;
   overflow-wrap: anywhere;
+  gap: var(--space-5);
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+/* A solid sheet of paper: the ruling and corner ticks that .panel draws would run under the text. */
+.detail-panel.panel {
+  background: var(--color-surface);
+}
+
+/* The header: where the node sits and its state, its title, one line about it. */
+.detail-head {
+  gap: var(--space-2);
+}
+
+.detail-band {
+  flex-wrap: nowrap;
+  align-items: flex-start;
+}
+
+.detail-kind {
+  min-width: 0;
+  font-size: 14px;
+}
+
+.detail-head h2 {
+  margin: 0;
+  text-transform: none;
+  letter-spacing: 0;
+  font-size: 1.25rem;
+  line-height: 1.3;
+}
+
+.meta {
+  font-size: 14px;
+}
+
+/* `Assign ▾` reads as a word in the meta line, not as a form control. */
+.meta .dropdown-button {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: var(--color-accent);
+}
+
+/* The shortcut hint is plain muted text here (the chip is for the graphite strip), and a touch screen has no keys. */
+.detail-panel kbd {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-muted);
+}
+
+@media (pointer: coarse) {
+  .detail-panel kbd {
+    display: none;
+  }
+}
+
+/* The sentence: what the node's state means, in words. */
+.sentence {
+  margin: 0;
+  font-size: 16px;
+}
+
+/* The answer form: the question, what each choice does beside it, a reason, one Save. */
+.answer-form {
+  gap: var(--space-4);
+}
+
+.question {
+  font-size: 16px;
+  font-weight: 500;
+}
+
+.choices {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.choice {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  min-height: var(--control-h);
+  padding: var(--space-1) 0;
+}
+
+.choice-effect {
+  margin-left: auto;
+  font-size: 13px;
+}
+
+textarea.grow {
+  field-sizing: content;
+  min-height: var(--control-h);
+  width: 100%;
+  resize: vertical;
+}
+
+.actions-row {
+  gap: var(--space-3);
+  flex-wrap: wrap;
+}
+
+.popover-panel {
+  padding: var(--space-4);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+/* The panel is the one box: its groups are a small label and their options. */
+.popover-panel fieldset {
+  padding: 0;
+  border: 0;
+}
+
+.menu-group + .menu-group {
+  margin-top: var(--space-1);
+  padding-top: var(--space-1);
+  border-top: 1px solid var(--color-border);
+}
+
+/* The folded rows below: a name and a count, roomy, with a hairline between. */
+.detail-folds {
+  gap: 0;
 }
 
 .detail-section {
   border-top: 1px solid var(--color-border);
-  padding-top: var(--space-2);
+  padding: calc(var(--space-4) + var(--space-1)) 0;
 }
 
 .detail-section > summary {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
   cursor: pointer;
-  list-style-position: inside;
+  list-style: none;
+  font-size: 15px;
+}
+
+.detail-section > summary::-webkit-details-marker {
+  display: none;
+}
+
+.detail-section > summary::after {
+  content: "▸";
+  margin-left: auto;
+  color: var(--color-muted);
+}
+
+.detail-section[open] > summary::after {
+  content: "▾";
 }
 
 .detail-section-title {
@@ -19,7 +168,51 @@
 }
 
 .detail-section-body {
-  padding: var(--space-2) 0 var(--space-2) var(--space-3);
+  padding: var(--space-3) 0 0;
+}
+
+/* Why this rank: the four terms of the blend, on the neutral ramp. */
+.rank-bar {
+  display: flex;
+  gap: 2px;
+  height: 8px;
+}
+
+.rank-seg {
+  min-width: 2px;
+}
+
+.rank-seg-1 {
+  background: var(--ramp-1);
+}
+
+.rank-seg-2 {
+  background: var(--ramp-2);
+}
+
+.rank-seg-3 {
+  background: var(--ramp-3);
+}
+
+.rank-seg-4 {
+  background: var(--ramp-4);
+}
+
+dl.kv {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: var(--space-1) var(--space-3);
+  margin: 0;
+}
+
+dl.kv dd {
+  margin: 0;
+  text-align: right;
+  font-family: var(--font-mono);
+}
+
+.kv-row {
+  display: contents;
 }
 
 .detail-list {
@@ -48,6 +241,24 @@
   list-style: none;
   margin: 0;
   padding: 0;
+}
+
+/* Contents: one row height, and a leading cell on every row so the titles line up with or without a box. */
+.contents li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 44px;
+}
+
+.checklist-mark {
+  flex: none;
+  width: 20px;
+}
+
+.checklist-fact {
+  margin-left: auto;
+  text-align: right;
 }
 
 .attachment {

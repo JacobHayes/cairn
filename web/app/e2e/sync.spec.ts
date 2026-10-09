@@ -36,14 +36,14 @@ test("a write in flight, a revision on its way, and one that cannot be fetched",
   // SAVING: only once the write has been out a moment.
   const send = await hold(one, "**/api/journeys/j_hiring/patches");
   const sending = fresh("Close out");
-  await startRename(one, "n_close_out", sending);
-  await save(one, "n_close_out");
+  await startRename(one, "n_offer", sending);
+  await save(one, "n_offer");
   await expect(syncChip(one)).toHaveAttribute("data-state", "saving");
   await send();
-  await expect(title(one, "n_close_out")).toHaveText(sending);
+  await expect(title(one, "n_offer")).toHaveText(sending);
   // UPDATING: the other page was told, and its refetch is slow.
   const fetch = await hold(two, "**/api/journeys/j_hiring/document");
-  await rename(one, "n_close_out", fresh("Close out"));
+  await rename(one, "n_offer", fresh("Close out"));
   await expect(syncChip(two)).toHaveAttribute("data-state", "updating");
   await fetch();
   await expect(syncChip(two)).toHaveAttribute("data-state", "in-sync");
@@ -51,10 +51,10 @@ test("a write in flight, a revision on its way, and one that cannot be fetched",
   await two.route("**/api/journeys/j_hiring/document", (route) => route.abort());
   const shown = Number(await syncChip(two).getAttribute("data-revision"));
   const latest = fresh("Close out");
-  await rename(one, "n_close_out", latest);
+  await rename(one, "n_offer", latest);
   await expect(syncChip(two)).toHaveText(`BEHIND · REV ${String(shown + 1)}`);
   await two.unroute("**/api/journeys/j_hiring/document");
   await syncChip(two).click();
-  await expect(title(two, "n_close_out")).toHaveText(latest);
+  await expect(title(two, "n_offer")).toHaveText(latest);
   await expect(syncChip(two)).toHaveAttribute("data-state", "in-sync");
 });

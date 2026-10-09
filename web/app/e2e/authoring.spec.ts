@@ -9,7 +9,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { savedText } from "./around.ts";
 import { addNode, addRole, formField, newRoute, nodeForm, openEditing, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";
-import { nodeCard, open, openFromCanvas, syncChip } from "./shell.ts";
+import { menuItem, nodeCard, open, openFromCanvas, syncChip } from "./shell.ts";
 
 /** The fields the open node's form offers. */
 async function offered(page: Page): Promise<string[]> {
@@ -207,9 +207,9 @@ test("A4: a choice added to a decision stays in its unsaved draft, and lands wit
 
 test("H5: a field changed elsewhere while a draft is open is not reverted by the draft's Save", async ({ page }) => {
   await openEditing(page, "browser", "j_vendor_eval");
-  await openFromCanvas(page, "n_access");
+  const panel = await openFromCanvas(page, "n_access");
   await formField(page, "description").getByRole("textbox").fill("Ask the environment team.");
-  await page.getByTestId("rename").getByRole("button", { name: /^Rename/ }).click();
+  await menuItem(panel, "rename");
   await page.getByTestId("rename").getByRole("textbox").fill("Sandbox access");
   await page.getByTestId("rename").getByRole("button", { name: "Save" }).click();
   await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Sandbox access");

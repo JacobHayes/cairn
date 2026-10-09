@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useSession } from "../data/react.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { Markdown, safeHref } from "../ui/markdown.tsx";
+import { foldKey } from "./folds.ts";
 import type { NodeDetail, Ready } from "./model.ts";
 import { Section } from "./parts.tsx";
 
@@ -93,7 +94,7 @@ export function ResourceList({ view, detail }: { view: Ready; detail: NodeDetail
     return null;
   }
   return (
-    <Section title="Resources" summary={String(resources.length)} open testId="resources">
+    <Section title="Guidance" summary={String(resources.length)} open={detail.derived.display_state === "ready" || detail.derived.display_state === "active"} fold={foldKey(detail.node.kind, "guidance")} testId="resources">
       <ul className="checklist stack">
         {resources.map((resource) => (
           <Item key={resource.key} view={view} node={detail.node.key} resource={resource} />

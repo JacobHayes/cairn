@@ -158,6 +158,12 @@ export async function openFromCanvas(page: Page, node: string) {
   return panel;
 }
 
+/** Chooses `item` (`rename`, `reopen`, `done-anyway`, ...) from the inspector's overflow menu. */
+export async function menuItem(panel: Locator, item: string): Promise<void> {
+  await panel.getByTestId("more-actions").click();
+  await panel.page().getByTestId(`menu-${item}`).click();
+}
+
 /** The title editor in `node`'s detail panel. */
 export function renameOf(page: Page, node: string) {
   return nodePanel(page, node).getByTestId("rename");
@@ -166,9 +172,8 @@ export function renameOf(page: Page, node: string) {
 /** Starts renaming `node` from its detail and types `text`, without saving. */
 export async function startRename(page: Page, node: string, text: string): Promise<void> {
   await openFromCanvas(page, node);
-  const editor = renameOf(page, node);
-  await editor.getByRole("button", { name: /^Rename/ }).click();
-  await editor.getByRole("textbox").fill(text);
+  await menuItem(nodePanel(page, node), "rename");
+  await renameOf(page, node).getByRole("textbox").fill(text);
 }
 
 export async function save(page: Page, node: string): Promise<void> {

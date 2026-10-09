@@ -203,12 +203,21 @@ export function isTerminal(state: State): boolean {
  * or through an ancestor. A finished or not-relevant node's `blocked_by` lists what it still
  * holds back beneath it, which does not block it. It names the gates held, not the state a
  * person reads: that is the node's display state (D8), where a container is never blocked by
- * its own children.
+ * its own children. An undecided node's condition gates, its own and its ancestors', are not
+ * ones a transition waits on: finishing undecided work is accepted with a warning (D4); every
+ * other gate still holds it. Without the view, an ancestor's gates are taken as held.
  */
-export function isBlocked(derived: NodeDerived): boolean {
+export function isBlocked(derived: NodeDerived, view?: Ready): boolean {
   const inScope = derived.relevance.value !== "not_relevant";
   const finished = derived.display_state === "done" || derived.display_state === "skipped";
-  const held = (derived.blocked_by ?? []).length > 0 || (derived.blocked_through ?? []).length > 0;
+  const undecided = derived.relevance.value === "undecided";
+  const holds = (blockers: NodeDerived["blocked_by"]) => (blockers ?? []).some((blocker) => !undecided || typeof blocker.via !== "object" || !("condition" in blocker.via));
+  // An ancestor's own gates hold what is beneath it; what it waits on for its children does not.
+  const through = (derived.blocked_through ?? []).some((ancestor) => {
+    const found = view?.derived.nodes[ancestor];
+    return found === undefined || holds(found.blocked_by?.filter((blocker) => blocker.via !== "containment"));
+  });
+  const held = holds(derived.blocked_by) || through;
   return inScope && !finished && held;
 }
 

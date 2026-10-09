@@ -152,17 +152,13 @@ test("H3: the local user, its identity, and its entities, offered for merging; t
 test("B3: an entity answer names a new person, made in the same patch, who joins the deployment's entities", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval");
   const panel = await openFromCanvas(page, "n_findings_reviewer");
-  await panel.getByRole("button", { name: "Revise the answer" }).click();
-  await panel.getByLabel("Or a new entity").fill("Not sent");
-  await panel.getByRole("button", { name: "Cancel" }).click();
-  await panel.getByRole("button", { name: "Revise the answer" }).click();
-  await expect(panel.getByLabel("Or a new entity")).toHaveValue("");
   const person = journeyName("Outside Reviewer");
-  await panel.getByLabel("Or a new entity").fill(person);
+  await panel.getByLabel("Answer").selectOption({ label: "New person" });
+  await panel.getByLabel("New person's name").fill(person);
   await page.reload();
-  await expect(nodePanel(page, "n_findings_reviewer").getByLabel("Or a new entity")).toHaveValue(person);
-  await nodePanel(page, "n_findings_reviewer").getByRole("button", { name: "Save the answer" }).click();
-  await expect(nodePanel(page, "n_findings_reviewer").getByTestId("answer")).toContainText(person);
+  await expect(nodePanel(page, "n_findings_reviewer").getByLabel("New person's name")).toHaveValue(person);
+  await nodePanel(page, "n_findings_reviewer").getByRole("button", { name: "Save change" }).click();
+  await expect(nodePanel(page, "n_findings_reviewer").getByTestId("detail-sentence")).toContainText(person);
   await open(page, "browser", "/entities");
   await expect(page.getByTestId("entity-name").getByText(person, { exact: true })).toBeVisible();
 });

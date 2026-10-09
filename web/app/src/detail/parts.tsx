@@ -6,6 +6,7 @@ import { Link, useLocation } from "react-router";
 
 import "./detail.css";
 import { Markdown } from "../ui/markdown.tsx";
+import { setFold, useFold } from "./folds.ts";
 import { titleOf, type Ready } from "./model.ts";
 
 /** B2: an answer's rationale as the journey records it, rendered as markdown. */
@@ -20,11 +21,11 @@ export function Rationale({ text }: { text: string | undefined }) {
 
 /**
  * The address of the journey screen a node's detail is open on (the canvas, the timeline,
- * ...): `pathname` without its `/nodes/<key>`. Every screen opens the panel at its own address
- * with `/nodes/<key>` added, so the panel's links and its close stay on that screen.
+ * ...): `pathname` without its `/nodes/<key>` or `/edges/<from>~<to>`. Every screen opens the
+ * panel at its own address with that added, so the panel's links and its close stay on that screen.
  */
 export function screenPath(pathname: string): string {
-  return pathname.replace(/\/nodes\/[^/]*$/, "");
+  return pathname.replace(/\/(?:nodes|edges)\/[^/]*$/, "");
 }
 
 /** Node `key`'s detail on the journey screen at `screen` (`screenPath`). */
@@ -48,7 +49,8 @@ export const FoldedSections = createContext(false);
 /**
  * One section of the panel: its heading, a one-line summary always shown, and the rest
  * behind it, open when `open` (the sections a person acts on first). A folded panel opens only
- * the sections that `keep` open, the ones its form needs in view.
+ * the sections that `keep` open, the ones its form needs in view. With a `fold` key the
+ * viewer's own choice is remembered and wins over `open` (folds.ts), except in a folded panel.
  */
 export function Section({
   title,
@@ -56,6 +58,7 @@ export function Section({
   open = false,
   keep = false,
   testId,
+  fold,
   children,
 }: {
   title: string;
@@ -63,11 +66,25 @@ export function Section({
   open?: boolean;
   keep?: boolean;
   testId: string;
+  fold?: string;
   children?: ReactNode;
 }) {
-  const folded = use(FoldedSections);
+  const folded = use(FoldedSections) && !keep;
+  // A card starts calm whatever the inspector remembers, and its own toggles are not remembered.
+  const remembered = folded ? undefined : fold;
+  const shown = useFold(remembered, open && !folded);
   return (
-    <details className="detail-section" open={open && (keep || !folded)} data-testid={testId}>
+    <details
+      className="detail-section"
+      open={shown}
+      data-testid={testId}
+      onToggle={(event) => {
+        // Only a person's click is a choice: setting `open` here fires a toggle too.
+        if (remembered !== undefined && event.currentTarget.open !== shown) {
+          setFold(remembered, event.currentTarget.open);
+        }
+      }}
+    >
       <summary>
         <span className="detail-section-title">{title}</span>
         {summary === undefined ? null : <span className="muted small"> {summary}</span>}

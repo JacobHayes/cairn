@@ -14,6 +14,7 @@ import {
   goWithin,
   live,
   nodeCard,
+  nodePanel,
   open,
   openJourney,
   rename,
@@ -118,7 +119,7 @@ test("version skew stops the tab and asks for a reload, keeping unsent edits", {
   await openJourney(one, "server", "j_vendor_eval");
   await openJourney(two, "server", "j_vendor_eval");
   const unsent = fresh("Unsent");
-  await startRename(two, "n_criteria", unsent);
+  await startRename(two, "n_access", unsent);
   const held = await derivedRevision(two);
   await two.route("**/api/journeys/j_vendor_eval/document", async (route) => {
     const response = await route.fetch();
@@ -127,13 +128,13 @@ test("version skew stops the tab and asks for a reload, keeping unsent edits", {
   });
   await rename(one, "n_plan", fresh("Plan"));
   await expect(syncChip(two)).toHaveAttribute("data-state", "new-version");
-  await expect(renameOf(two, "n_criteria").getByRole("button", { name: "Save" })).toBeDisabled();
+  await expect(renameOf(two, "n_access").getByRole("button", { name: "Save" })).toBeDisabled();
   expect(await derivedRevision(two)).toBe(held);
   await two.unroute("**/api/journeys/j_vendor_eval/document");
   await syncChip(two).click();
   await derived(two);
   await expect(syncChip(two)).not.toHaveAttribute("data-state", "new-version");
-  await expect(renameOf(two, "n_criteria").getByRole("textbox")).toHaveValue(unsent);
+  await expect(renameOf(two, "n_access").getByRole("textbox")).toHaveValue(unsent);
   expect(await derivedRevision(two)).toBe(await derivedRevision(one));
 });
 
@@ -194,8 +195,8 @@ test("a draft follows its journey, not the screen it was typed on", { tag: "@ser
   await startRename(page, "n_offer", draft);
   await goWithin(page, `/journeys/${copy}/plan/graph/nodes/n_offer`);
   await expect(page.getByTestId("journey-name")).toContainText("Hiring copy");
-  await expect(renameOf(page, "n_offer").getByRole("button", { name: /^Rename/ })).toBeVisible();
-  await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveCount(0);
+  await expect(nodePanel(page, "n_offer")).toBeVisible();
+  await expect(renameOf(page, "n_offer")).toHaveCount(0);
   await goWithin(page, "/journeys/j_hiring/plan/graph/nodes/n_offer");
   await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveValue(draft);
 });

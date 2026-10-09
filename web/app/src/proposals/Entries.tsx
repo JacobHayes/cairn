@@ -163,9 +163,9 @@ interface Piece {
 }
 
 /** B10: break `node` down: the pieces typed here open a proposal adding them beneath it. */
-export function BreakDown({ ready, node }: { ready: Ready; node: { key: string; title: string } }) {
+export function BreakDown({ ready, node, startOpen = false, onCancel }: { ready: Ready; node: { key: string; title: string }; startOpen?: boolean; onCancel?: () => void }) {
   const { write, start } = useDraftAndOpen();
-  const [pieces, setPieces] = useState<Piece[] | undefined>();
+  const [pieces, setPieces] = useState<Piece[] | undefined>(startOpen ? [{ kind: "action", title: "" }] : undefined);
   const drafted = useRef<{ asked: string; draft: Schema<"ProposalDraft"> } | undefined>(undefined);
   if (pieces === undefined) {
     return (
@@ -198,7 +198,7 @@ export function BreakDown({ ready, node }: { ready: Ready; node: { key: string; 
         <Button primary disabled={write.disabled || filled.length === 0} onClick={propose} data-testid="propose-breakdown">
           Propose the breakdown
         </Button>
-        <Button onClick={() => { setPieces(undefined); }}>Cancel</Button>
+        <Button onClick={() => { setPieces(undefined); onCancel?.(); }}>Cancel</Button>
       </span>
       <Problem problem={write.problem} onDismiss={write.dismiss} />
     </div>

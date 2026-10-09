@@ -95,6 +95,13 @@ export function Inspector({ focus, reveal = true, children }: { focus: string; r
       actions?.show("inspector");
     }
   }, [actions, focus, reveal]);
+  // The column is one scroller shared by every selection: a node opens at its header and its sentence, not part-way down the last one's body.
+  const body = state?.inspector;
+  useLayoutEffect(() => {
+    if (body !== null && body !== undefined) {
+      body.scrollTop = 0;
+    }
+  }, [body, focus]);
   // On a phone the inspector stacks under the whole page: bring it into view, or opening a node looks like nothing happened.
   const mapOpen = new URLSearchParams(search).get("map") === "1";
   const column = state?.inspector?.parentElement;

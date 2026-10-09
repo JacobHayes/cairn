@@ -6,12 +6,11 @@ import type { Schema } from "@cairn/client";
 
 import { useDraft } from "../data/drafts.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
-import { rebasedOnto } from "../screens/TitleEditor.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { titleOf, type Mutation, type Ready } from "./model.ts";
 import { ShortfallView } from "./ShortfallView.tsx";
-import type { Attempt, NodeWrite, Seen } from "./write.ts";
+import { rebasedOnto, type Attempt, type NodeWrite, type Seen } from "./write.ts";
 
 type Violation = Schema<"Violation">;
 type Guard = Schema<"Guard">;

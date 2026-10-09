@@ -125,14 +125,3 @@ export function RowActions({ view, row, to, owner = true }: { view: Ready; row: 
     </>
   );
 }
-
-/** B10: a placeholder's way past breaking down, on its card: it counts as one piece of work. */
-export function MarkAtomic({ view, node }: { view: Ready; node: string }) {
-  const write = useNodeWrite(view, `atomic:${node}`, node);
-  return (
-    <div className="stack" data-testid="mark-atomic">
-      <Button disabled={write.disabled} onClick={() => void write.run([{ op: "set_atomic", node, atomic: true }])}>Mark atomic</Button>
-      <Rejected view={view} write={write} />
-    </div>
-  );
-}

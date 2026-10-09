@@ -48,6 +48,7 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route path="journeys/:id/plan" element={<BarePageRoute page="plan" />} />
               <Route path="journeys/:id/plan/:projection" element={<JourneyPageRoute page="plan" />} />
               <Route path="journeys/:id/plan/:projection/nodes/:key" element={<JourneyPageRoute page="plan" />} />
+              <Route path="journeys/:id/plan/:projection/edges/:edge" element={<JourneyPageRoute page="plan" />} />
               <Route path="journeys/:id/summary" element={<SummaryRoute />} />
               <Route path="journeys/:id/summary/nodes/:key" element={<SummaryRoute />} />
               <Route path="journeys/:id/:old" element={<LegacyRoute />} />

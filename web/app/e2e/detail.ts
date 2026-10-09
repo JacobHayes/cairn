@@ -21,7 +21,7 @@ export async function section(panel: Locator, testId: string): Promise<Locator> 
 
 /** A date row of the panel (`Due`, `Latest start`, `Earliest start`), its chain unfolded. */
 export async function dateChain(panel: Locator, label: string): Promise<Locator> {
-  const row = panel.locator(`[data-testid="date"][data-label="${label}"]`);
+  const row = (await section(panel, "dates")).locator(`[data-testid="date"][data-label="${label}"]`);
   await row.locator("summary").click();
   await expect(row.getByTestId("chain")).toBeVisible();
   return row;
@@ -29,7 +29,7 @@ export async function dateChain(panel: Locator, label: string): Promise<Locator>
 
 /** Sets node's pin to `date` from the dates section, without waiting for the outcome. */
 export async function pin(panel: Locator, date: string): Promise<void> {
-  const editor = panel.getByTestId("pin");
+  const editor = (await section(panel, "dates")).getByTestId("pin");
   await editor.getByRole("button", { name: /^(Pin a date|Change the pin)$/ }).click();
   await editor.getByLabel("Pin date").fill(date);
   await editor.getByTestId("pin-form").getByRole("button", { name: "Save" }).click();
@@ -37,7 +37,7 @@ export async function pin(panel: Locator, date: string): Promise<void> {
 
 /** Adds a note or link from the notes section and waits for it to show. */
 export async function annotate(panel: Locator, type: "note" | "artifact" | "reference" | "conversation", text: string): Promise<Locator> {
-  const notes = panel.getByTestId("annotations");
+  const notes = await section(panel, "annotations");
   const before = await notes.getByTestId("annotation").count();
   await notes.getByRole("button", { name: "Add a note or link" }).click();
   await notes.getByLabel("Type").selectOption(type);

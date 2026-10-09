@@ -10,15 +10,15 @@ import { deepLinkTarget, landingPath, legacyRedirect, pagePath, projectionOf, ty
 import { recalledProjection } from "../journeys/memory.ts";
 import { JourneyFrame, JourneyGate } from "./JourneyFrame.tsx";
 
-/** `/journeys/<id>/{next|plan}/<projection>[/nodes/<key>]`; a projection the page lacks opens the one it last had. */
+/** `/journeys/<id>/{next|plan}/<projection>[/nodes/<key>|/edges/<from>~<to>]`; a projection the page lacks opens the one it last had. */
 export function JourneyPageRoute({ page }: { page: JourneyPage }) {
-  const { id = "", projection, key } = useParams();
+  const { id = "", projection, key, edge } = useParams();
   const { search } = useLocation();
   const shown = projectionOf(page, projection);
   if (shown === undefined) {
     return <Navigate replace to={pagePath(id, page, recalledProjection(id, page), key, search)} />;
   }
-  return <JourneyFrame key={id} id={id} page={page} projection={shown} selected={key} />;
+  return <JourneyFrame key={id} id={id} page={page} projection={shown} selected={key} edge={edge} />;
 }
 
 /** The bare page address (`/journeys/<id>/plan`): the projection last shown there. */

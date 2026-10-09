@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 
 import { chooseFromMenu, openRouteDetail, openJourneyCard, routeAction, startJourney } from "./around.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits } from "./proposals.ts";
-import { section, state } from "./detail.ts";
+import { state } from "./detail.ts";
 import { goWithin, nodeCard, openFromCanvas, openJourney, rename } from "./shell.ts";
 
 test("B7, C14: the scenario journey upgraded to version 2, each conflict resolved, then applied", async ({ page }) => {
@@ -114,7 +114,7 @@ test("C14: an editor follows its change when edits are dropped or another change
   const kickoff = await openFromCanvas(page, "n_kickoff");
   await kickoff.getByRole("button", { name: "Mark reached" }).click();
   await expect(state(kickoff)).toHaveAttribute("data-status", "done");
-  const workload = await section(await openFromCanvas(page, "n_workload"), "blocking");
+  const workload = await openFromCanvas(page, "n_workload");
   await workload.getByTestId("break-down").click();
   const form = workload.getByTestId("break-down-form");
   await form.getByLabel("Piece title").fill("Ingest workload");

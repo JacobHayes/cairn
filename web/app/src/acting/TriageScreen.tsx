@@ -24,7 +24,6 @@ import { Check, Checks, FlagChecks } from "./Controls.tsx";
 import { DetailLink } from "./Parts.tsx";
 import { begin, passedAll, passOn, passOrder, roundAgain, surfaced, type Pass } from "./pass.ts";
 import { PassRail } from "./PassRail.tsx";
-import { MarkAtomic } from "./RowActions.tsx";
 import { withFlags } from "./rows.ts";
 import { StalledPanel } from "./Stalled.tsx";
 import { WaitingDecisions } from "./Waiting.tsx";
@@ -130,15 +129,7 @@ function PassCard({ view, card, place, onPass }: { view: Ready; card: NodeRow; p
           Pass <kbd>P</kbd>
         </Button>
       </span>
-      <NodeDetailPanel
-        key={card.key}
-        view={view}
-        nodeKey={card.key}
-        folded
-        extra={
-          card.needs_breakdown === true ? <MarkAtomic view={view} node={card.key} /> : undefined
-        }
-      />
+      <NodeDetailPanel key={card.key} view={view} nodeKey={card.key} folded />
     </div>
   );
 }

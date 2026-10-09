@@ -148,9 +148,9 @@ function renderBlock(block: Block, key: number): ReactNode {
 }
 
 /** Markdown text, rendered. */
-export function Markdown({ text, "data-testid": testId }: { text: string; "data-testid"?: string }) {
+export function Markdown({ text, className = "", "data-testid": testId }: { text: string; className?: string; "data-testid"?: string }) {
   return (
-    <div className="markdown" data-testid={testId}>
+    <div className={`markdown ${className}`.trim()} data-testid={testId}>
       {blocks(text).map(renderBlock)}
     </div>
   );

@@ -172,6 +172,11 @@
   max-width: min(36rem, calc(100vw - 2 * var(--space-4)));
 }
 
+.dropdown-popover[data-side="top"] {
+  top: auto;
+  bottom: calc(100% + var(--space-1));
+}
+
 .dropdown-popover .popover-body {
   max-height: none;
   gap: var(--space-1);

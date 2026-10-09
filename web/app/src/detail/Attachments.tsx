@@ -6,8 +6,10 @@
 // node, and no artifact.
 import type { Schema } from "@cairn/client";
 
+import { dateWords } from "../timeline/model.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { Markdown, safeHref } from "../ui/markdown.tsx";
+import { foldKey } from "./folds.ts";
 import type { Annotation, NodeDetail, Ready } from "./model.ts";
 import { Section } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
@@ -97,7 +99,7 @@ function Editor({ write, node, form, types }: { write: NodeWrite; node: string |
   );
 }
 
-function Item({ annotation, write, onEdit }: { annotation: Annotation; write: NodeWrite; onEdit: () => void }) {
+function Item({ annotation, today, write, onEdit }: { annotation: Annotation; today: string; write: NodeWrite; onEdit: () => void }) {
   const { body } = annotation;
   const { type, text } = contentOf(body);
   const link = type !== "note";
@@ -111,8 +113,8 @@ function Item({ annotation, write, onEdit }: { annotation: Annotation; write: No
       </span>
       {link ? null : <Markdown text={text} />}
       <span className="muted small">
-        Added by {annotation.created_by} at {annotation.created_at}
-        {annotation.edited_at == null ? "" : `; edited at ${annotation.edited_at}`}
+        Added by {annotation.created_by} on {dateWords(annotation.created_at.slice(0, 10), today)}
+        {annotation.edited_at == null ? "" : `; edited ${dateWords(annotation.edited_at.slice(0, 10), today)}`}
       </span>
       <span className="row">
         <Button disabled={write.disabled} onClick={onEdit}>Edit</Button>
@@ -140,12 +142,17 @@ export function AnnotationList({
   annotations,
   summary,
   bare = false,
+  open = true,
+  fold,
 }: {
   view: Ready;
   node: string | null;
   annotations: Annotation[];
   summary?: string;
   bare?: boolean;
+  /** Whether the section starts open, and the key its fold is remembered under (folds.ts). */
+  open?: boolean;
+  fold?: string;
 }) {
   const write = useNodeWrite(view, `annotations:${node ?? "journey"}`, node ?? undefined);
   const form = useFormDraft<AnnotationDraft>(write.journey, node ?? "journey", "annotation");
@@ -159,7 +166,7 @@ export function AnnotationList({
       {annotations.length === 0 ? <span className="muted small">None yet.</span> : null}
       <ul className="checklist stack">
         {annotations.map((annotation) => (
-          <Item key={annotation.body.key} annotation={annotation} write={write} onEdit={() => { edit(annotation); }} />
+          <Item key={annotation.body.key} annotation={annotation} today={view.derived.today} write={write} onEdit={() => { edit(annotation); }} />
         ))}
       </ul>
       {form.draft === undefined ? (
@@ -179,20 +186,16 @@ export function AnnotationList({
       {body}
     </div>
   ) : (
-    <Section title="Notes and links" summary={summary} open testId="annotations">
+    <Section title="Notes and links" summary={summary} open={open} {...(fold === undefined ? {} : { fold })} testId="annotations">
       {body}
     </Section>
   );
 }
 
-/** G1, G2: the node's notes and links, with the form that adds or edits one. */
+/** G1, G2: the node's notes and links, with the form that adds or edits one; open once there are any. */
 export function AttachmentList({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { annotations } = detail;
-  const artifacts = annotations.filter((annotation) => annotation.body.artifact !== undefined).length;
-  const summary = [
-    String(annotations.length),
-    detail.node.requires_artifact === true ? `artifact required, ${String(artifacts)} designated` : undefined,
-    detail.node.requires_note === true ? "note required" : undefined,
-  ];
-  return <AnnotationList view={view} node={detail.node.key} annotations={annotations} summary={summary.filter((part) => part !== undefined).join(", ")} />;
+  const requirements = [detail.node.requires_artifact === true ? "a link is required" : undefined, detail.node.requires_note === true ? "a note is required" : undefined].filter((part) => part !== undefined);
+  const summary = [annotations.length === 0 ? undefined : String(annotations.length), ...requirements].filter((part) => part !== undefined).join(", ");
+  return <AnnotationList view={view} node={detail.node.key} annotations={annotations} summary={summary} open={annotations.length > 0} fold={foldKey(detail.node.kind, "notes")} />;
 }

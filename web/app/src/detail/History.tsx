@@ -9,8 +9,11 @@ import { useEffect, useRef, useState } from "react";
 import type { Host } from "../data/host.ts";
 import { useSession } from "../data/react.ts";
 import { Button } from "../ui/kit.tsx";
+import { dateWords } from "../timeline/model.ts";
 import { Markdown } from "../ui/markdown.tsx";
+import { foldKey, useFold } from "./folds.ts";
 import type { AnswerValue, GraphNode, NodeDetail, Ready } from "./model.ts";
+import { Section } from "./parts.tsx";
 import { answerText } from "./sections.tsx";
 
 type PatchEvents = Schema<"PatchEvents">;
@@ -100,7 +103,7 @@ function PatchItem({ view, decision, patch }: { view: Ready; decision: GraphNode
   return (
     <li data-testid="history-patch">
       <span className="muted small">
-        {first.at} by {first.actor.user}
+        {dateWords(first.at.slice(0, 10), view.derived.today)} by {first.actor.user}
         {first.actor.agent == null ? "" : ` (agent ${first.actor.agent})`}
       </span>{" "}
       {[...new Set(patch.events.map((event) => event.event_type.replaceAll("_", " ")))].join(", ")}
@@ -122,7 +125,8 @@ export function NodeHistory({ view, detail }: { view: Ready; detail: NodeDetail 
   const journey = view.journey.header.id;
   const node = detail.node.key;
   const revision = view.journey.revision;
-  const [open, setOpen] = useState(false);
+  const fold = foldKey(detail.node.kind, "history");
+  const open = useFold(fold, false);
   const [loaded, setLoaded] = useState<Loaded | { failed: string } | undefined>();
   const reads = useRef(new Reads()).current;
   const load = (after: number | undefined, shown: PatchEvents[]) => {
@@ -135,26 +139,19 @@ export function NodeHistory({ view, detail }: { view: Ready; detail: NodeDetail 
     }
   }, [host, reads, open, journey, node, revision]);
   return (
-    <details className="detail-section" data-testid="history" onToggle={(event) => { setOpen(event.currentTarget.open); }}>
-      <summary>
-        <span className="detail-section-title">History</span>
-      </summary>
-      <div className="stack detail-section-body">
-        {loaded === undefined ? <span className="muted small">Reading...</span> : null}
-        {loaded !== undefined && "failed" in loaded ? <span className="callout callout-bad">The history could not be read: {loaded.failed}</span> : null}
-        {loaded !== undefined && "patches" in loaded ? (
-          <>
-            <ol className="detail-list">
-              {loaded.patches.map((patch) => (
-                <PatchItem key={patch.patch_id} view={view} decision={detail.node} patch={patch} />
-              ))}
-            </ol>
-            {loaded.next === undefined ? null : (
-              <Button onClick={() => { load(loaded.next, loaded.patches); }}>More</Button>
-            )}
-          </>
-        ) : null}
-      </div>
-    </details>
+    <Section title="History" fold={fold} testId="history">
+      {loaded === undefined ? <span className="muted small">Reading...</span> : null}
+      {loaded !== undefined && "failed" in loaded ? <span className="callout callout-bad">The history could not be read: {loaded.failed}</span> : null}
+      {loaded !== undefined && "patches" in loaded ? (
+        <>
+          <ol className="detail-list">
+            {loaded.patches.map((patch) => (
+              <PatchItem key={patch.patch_id} view={view} decision={detail.node} patch={patch} />
+            ))}
+          </ol>
+          {loaded.next === undefined ? null : <Button onClick={() => { load(loaded.next, loaded.patches); }}>More</Button>}
+        </>
+      ) : null}
+    </Section>
   );
 }

@@ -136,3 +136,20 @@ export function useFormDraft<T>(journey: string, node: string, form: string) {
     },
   };
 }
+
+/**
+ * The revision an author who keeps their edit after a conflict drafts it against: the
+ * journey's revision the rejection reports (only what it shows was compared, H5), or the one
+ * the view holds if it has moved further.
+ */
+export function rebasedOnto(rejection: Rejection, journey: string, revision: number): number {
+  if (rejection.rejection !== "stale") {
+    return revision;
+  }
+  const reported = rejection.conflicts.map((conflict) =>
+    "domain" in conflict.of && typeof conflict.of.domain === "object" && "journey" in conflict.of.domain && conflict.of.domain.journey === journey
+      ? conflict.current
+      : 0,
+  );
+  return Math.max(revision, ...reported);
+}

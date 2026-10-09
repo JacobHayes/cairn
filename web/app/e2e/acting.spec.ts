@@ -21,7 +21,7 @@ import {
 } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
 import { section } from "./detail.ts";
-import { derivedRevision, goTo, goWithin, nodePanel, openAt, syncChip } from "./shell.ts";
+import { derivedRevision, goTo, goWithin, menuItem, nodePanel, openAt, syncChip } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
 /** Starts a fresh journey from version 1 of the vendor evaluation's route (B1); its id. */
@@ -138,10 +138,10 @@ test("B6: a node snoozed from its card leaves, and returns when its target compl
   const first = (await passOrder(page))[0] ?? "";
   await expect(card(page)).toHaveAttribute("data-node", first);
   const target = first === "n_beta_end" ? "n_retro" : "n_beta_end";
-  const blocking = await section(card(page), "blocking");
-  await blocking.getByRole("button", { name: "Snooze until a node" }).click();
-  await blocking.getByLabel("Snooze until node").selectOption(target);
-  await blocking.getByTestId("snooze-node-form").getByRole("button", { name: "Save" }).click();
+  await menuItem(card(page), "snooze");
+  await card(page).getByLabel("When something is done").check();
+  await card(page).getByLabel("Snooze until node").selectOption(target);
+  await card(page).getByTestId("snooze").getByRole("button", { name: "Snooze", exact: true }).click();
   await expect.poll(() => passOrder(page)).not.toContain(first);
   await goTo(page, "next", "list");
   await nextItem(page, target).getByRole("button", { name: "Mark reached" }).click();
@@ -153,10 +153,11 @@ test("D5: an empty acting frontier shows the stalled panel, and unsnooze brings 
   expect(await nextKeys(page)).toEqual(["n_offer"]);
   const today = (await syncChip(page).getAttribute("data-today")) ?? "";
   await nextItem(page, "n_offer").getByRole("link", { name: "Offer letter" }).click();
-  const blocking = await section(nodePanel(page, "n_offer"), "blocking");
-  await blocking.getByRole("button", { name: "Snooze until a date" }).click();
-  await blocking.getByLabel("Snooze until").fill(daysAfter(today, 7));
-  await blocking.getByTestId("snooze-date-form").getByRole("button", { name: "Save" }).click();
+  const panel = nodePanel(page, "n_offer");
+  await menuItem(panel, "snooze");
+  await panel.getByLabel("A date").check();
+  await panel.getByLabel("Snooze until", { exact: true }).fill(daysAfter(today, 7));
+  await panel.getByTestId("snooze").getByRole("button", { name: "Snooze", exact: true }).click();
   const cause = page.locator('[data-testid="stall-cause"][data-status="snooze"]');
   await expect(cause).toHaveAttribute("data-node", "n_offer");
   await expect(page.getByTestId("next-for-you")).toHaveCount(0);
@@ -237,12 +238,11 @@ test("B2, C8, C12: a rationale given on a triage card shows in node detail; a re
   await openAt(page, "browser", journey, "plan/graph?decisions=1", { node: "n_partner_runs" });
   const panel = nodePanel(page, "n_partner_runs");
   await expect(panel.getByTestId("rationale")).toContainText("A partner brings the domain.");
-  await panel.getByRole("button", { name: "Revise the answer" }).click();
   // A new answer starts with no reason: the old one is offered, never carried forward.
   const editor = panel.getByTestId("answer-editor");
+  await editor.getByRole("radio", { name: /^no\b/i }).check();
   await expect(editor.getByLabel("Why")).toHaveValue("");
-  await editor.getByLabel("Answer").selectOption("no");
-  await editor.getByRole("button", { name: "Save the answer" }).click();
+  await editor.getByRole("button", { name: "Save change" }).click();
   await expect(panel.getByTestId("rationale")).toHaveCount(0);
 });
 
@@ -285,7 +285,7 @@ test("C11, B10: a placeholder's card offers mark atomic, and no more once it is 
     await card(page).getByTestId("pass").click();
   }
   await card(page).getByRole("button", { name: "Mark atomic" }).click();
-  await expect(card(page).getByTestId("mark-atomic")).toHaveCount(0);
+  await expect(card(page).getByRole("button", { name: "Mark atomic" })).toHaveCount(0);
 });
 
 test("C11, C9: with every decision skipped in bulk, the walkthrough shows what would unblock the next ones", async ({ page }) => {

@@ -61,31 +61,26 @@ function Actuals({ detail }: { detail: NodeDetail }) {
   );
 }
 
-function summaryOf(detail: NodeDetail): string {
-  const { dates } = detail.derived;
-  const parts = [
-    dates.due == null ? "no due date" : `due ${dates.due.date}`,
-    dates.slack_days == null ? undefined : `slack ${String(dates.slack_days)} days`,
-    dates.shortfall == null ? undefined : `${String(dates.shortfall.shortfall_days)} days short`,
-  ];
-  return parts.filter((part) => part !== undefined).join(", ");
-}
-
 export function DatesSection({
   view,
   detail,
   pinEditor,
   onMove,
+  open = true,
+  fold,
 }: {
   view: Ready;
   detail: NodeDetail;
   pinEditor?: ReactNode;
   onMove?: (move: Mutation) => void;
+  /** Whether it starts open, and the key the viewer's choice is remembered under (folds.ts). */
+  open?: boolean;
+  fold?: string;
 }) {
   const { dates } = detail.derived;
   const key = detail.node.key;
   return (
-    <Section title="Dates" summary={summaryOf(detail)} open testId="dates">
+    <Section title="Dates" open={open} {...(fold === undefined ? {} : { fold })} testId="dates">
       {dates.effective_date == null ? null : (
         <span data-testid="effective-date">
           Effective date <strong>{dates.effective_date.date}</strong> <span className="badge">{dates.effective_date.origin}</span>

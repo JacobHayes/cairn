@@ -8,8 +8,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { LAYOUT_MOVED_FRACTION_MAX } from "../src/canvas/layout.ts";
 import { addNode, openEditing } from "./authoring.ts";
 import { cardKeys, containers, lineBetween, marks, places, showKind, toggle } from "./canvas.ts";
-import { section } from "./detail.ts";
-import { nodeCard, nodePanel, openFromCanvas, openJourney, renameOf, startRename } from "./shell.ts";
+import { menuItem, nodeCard, nodePanel, openFromCanvas, openJourney, renameOf, startRename } from "./shell.ts";
 
 /** The vendor evaluation at the end of its scenario, with its actions hidden: the level's node set, each node in its container. */
 const ACTIONS_HIDDEN: Record<string, string> = {
@@ -83,7 +82,7 @@ test("C7: the trace of the test plan starts and stops", async ({ page }) => {
 async function reopenOffer(page: Page): Promise<void> {
   await openJourney(page, "browser", "j_hiring");
   const panel = await openFromCanvas(page, "n_make_offer");
-  await panel.getByTestId("actions").getByRole("button", { name: "Reopen" }).click();
+  await menuItem(panel, "reopen");
   await expect(nodeCard(page, "n_offer")).toHaveAttribute("data-relevance", "undecided");
 }
 
@@ -110,11 +109,12 @@ test("C5, D5: the stalled surface names what the journey waits on", async ({ pag
   await openJourney(page, "browser", "j_hiring");
   await expect(page.getByTestId("stalled")).toHaveCount(0);
   const panel = await openFromCanvas(page, "n_offer");
-  const blocking = await section(panel, "blocking");
-  await blocking.getByRole("button", { name: "Snooze until a date" }).click();
+  await menuItem(panel, "snooze");
+  const snooze = panel.getByTestId("snooze");
+  await snooze.getByLabel("A date").check();
   const until = new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
-  await blocking.getByLabel("Snooze until").fill(until);
-  await blocking.getByTestId("snooze").getByRole("button", { name: "Save" }).click();
+  await snooze.getByLabel("Snooze until").fill(until);
+  await snooze.getByRole("button", { name: "Snooze", exact: true }).click();
   const stalled = page.getByTestId("stalled");
   await expect(stalled).toBeVisible();
   await expect(stalled.getByTestId("stall-cause")).toHaveAttribute("data-status", "snooze");
@@ -134,8 +134,8 @@ test("a rename started on one node does not follow the panel to another", async 
   await openJourney(page, "browser", "j_vendor_eval");
   await startRename(page, "n_access", "Not the plan");
   await nodeCard(page, "n_plan").getByTestId("card-open").click();
-  await expect(renameOf(page, "n_plan").getByRole("button", { name: /^Rename/ })).toBeVisible();
-  await expect(renameOf(page, "n_plan").getByRole("textbox")).toHaveCount(0);
+  await expect(nodePanel(page, "n_plan")).toBeVisible();
+  await expect(renameOf(page, "n_plan")).toHaveCount(0);
   await nodeCard(page, "n_access").getByTestId("card-open").click();
   await expect(renameOf(page, "n_access").getByRole("textbox")).toHaveValue("Not the plan");
 });

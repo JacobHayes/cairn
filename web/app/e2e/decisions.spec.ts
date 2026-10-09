@@ -23,13 +23,12 @@ const PARTNER_LED = ["n_criteria", "n_partner_led", "n_partner_results"];
 test("C12: the partner decision gates the partner-led subset, and revising it re-gates it", async ({ page }) => {
   await openAt(page, "browser", "j_vendor_eval", "plan/graph?decisions=1", { node: "n_partner_runs", fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("decision-view")).toBeVisible();
-  await expect(nodePanel(page, "n_partner_runs").getByTestId("answer")).toContainText("no");
+  await expect(nodePanel(page, "n_partner_runs").getByRole("radio", { name: /^no\b/i })).toBeChecked();
   await expect.poll(() => affected(page, "n_partner_runs")).toEqual(Object.fromEntries(PARTNER_LED.map((key) => [key, "not_relevant"])));
   const panel = nodePanel(page, "n_partner_runs");
-  await panel.getByRole("button", { name: "Revise the answer" }).click();
-  await panel.getByTestId("answer-editor").getByLabel("Answer").selectOption("yes");
-  await panel.getByRole("button", { name: "Save the answer" }).click();
-  await expect(panel.getByTestId("answer")).toContainText("yes");
+  await panel.getByRole("radio", { name: /^yes\b/i }).check();
+  await panel.getByRole("button", { name: "Save change" }).click();
+  await expect(panel.getByRole("radio", { name: /^yes\b/i })).toBeChecked();
   await expect.poll(() => affected(page, "n_partner_runs")).toEqual(Object.fromEntries(PARTNER_LED.map((key) => [key, "relevant"])));
 });
 

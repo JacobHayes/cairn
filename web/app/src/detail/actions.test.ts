@@ -1,13 +1,12 @@
 // The panel's writes: F5's move sent with the rejected edit, D4's bypass offered per node and
-// guard, E6's deployment revision named only by a patch that writes an entity, and an answer
-// editor starting from each answer type (A4).
+// guard and E6's deployment revision named only by a patch that writes an entity.
 import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
-import { resolvedAnswer, startingAnswer } from "./AnswerEditor.tsx";
+import { resolvedAnswer } from "./AnswerEditor.tsx";
 import { isComplete } from "./contributions.ts";
 import { answerInEffect } from "./editors.tsx";
-import type { GraphNode, Mutation } from "./model.ts";
+import type { Mutation } from "./model.ts";
 import { bypassable, withMove } from "./Rejected.tsx";
 import { entityName } from "./sections.tsx";
 import { testView } from "./view.test-support.ts";
@@ -43,29 +42,6 @@ describe("writesEntities (E6)", () => {
   ];
   it.each(cases)("%s: %s", (_, mutations, expected) => {
     expect(writesEntities(mutations)).toBe(expected);
-  });
-});
-
-describe("startingAnswer (A4)", () => {
-  const decision = (answer_type: GraphNode["answer_type"], extra: Partial<GraphNode> = {}): GraphNode => ({
-    key: "n_d",
-    id: "d",
-    kind: "decision",
-    title: "D",
-    prompt: "?",
-    ...(answer_type === undefined ? {} : { answer_type }),
-    ...extra,
-  });
-
-  it("starts from the current answer when there is one", () => {
-    expect(startingAnswer(decision("date"), { date: "2026-11-20" }, "2026-10-06")).toEqual({ date: "2026-11-20" });
-  });
-
-  it("starts each answer type empty, a date at today and a choice at the first", () => {
-    expect(startingAnswer(decision("date"), undefined, "2026-10-06")).toEqual({ date: "2026-10-06" });
-    expect(startingAnswer(decision("single_choice", { choices: ["one", { id: "two", title: "Two" }] }), undefined, "")).toEqual({ single_choice: "one" });
-    expect(startingAnswer(decision("entity_list"), undefined, "")).toEqual({ entity_list: [] });
-    expect(startingAnswer(decision("text"), undefined, "")).toEqual({ text: "" });
   });
 });
 

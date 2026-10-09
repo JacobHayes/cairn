@@ -71,15 +71,14 @@ export async function revisionAfter(page: Page, revision: number): Promise<numbe
   return derivedRevision(page);
 }
 
-/** Answers the focus card's decision with the select's `option`. */
+/** Answers the focus card's boolean decision with `option` (`yes` or `no`) and, when given, its reason. */
 export async function answerCard(page: Page, option: string, why?: string): Promise<void> {
   const editor = card(page);
-  await editor.getByRole("button", { name: "Answer", exact: true }).click();
-  await editor.getByLabel("Answer").selectOption(option);
+  await editor.getByRole("radio", { name: new RegExp(`^${option}\\b`, "i") }).check();
   if (why !== undefined) {
     await editor.getByLabel("Why").fill(why);
   }
-  await editor.getByRole("button", { name: "Save the answer" }).click();
+  await editor.getByRole("button", { name: "Save", exact: true }).click();
 }
 
 /** A date `days` after `today`, in the form a date input takes. */
