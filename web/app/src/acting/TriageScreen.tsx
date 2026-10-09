@@ -12,10 +12,11 @@ import { useProjected } from "../canvas/hooks.ts";
 import { useDraft } from "../data/drafts.ts";
 import { titleOf, type Ready } from "../detail/model.ts";
 import { Button } from "../ui/kit.tsx";
-import { ACTING_KINDS, triageQueryOf, type TriageSettings } from "./address.ts";
-import { Check, Checks } from "./Controls.tsx";
+import { ACTING_KINDS, NEXT_FILTER_FLAGS, triageQueryOf, type TriageSettings } from "./address.ts";
+import { Check, Checks, FlagChecks } from "./Controls.tsx";
 import { DetailLink } from "./Parts.tsx";
 import { begin, passedAll, passOn, passOrder, surfaced, type Pass } from "./pass.ts";
+import { withFlags } from "./rows.ts";
 import { StalledPanel } from "./Stalled.tsx";
 import { TriageCard } from "./TriageCard.tsx";
 import { WaitingDecisions } from "./Waiting.tsx";
@@ -25,7 +26,7 @@ import "./acting.css";
 /** How many cards after the focus the pass shows by title. */
 const UP_NEXT_SHOWN = 5;
 
-/** C11: mine and kinds: what the filter holds on NEXT, CARDS. */
+/** C11: mine, kinds and flags: what the filter holds on NEXT, CARDS. */
 export function TriageControls({ settings, onChange }: { settings: TriageSettings; onChange: (next: TriageSettings) => void }) {
   return (
     <div className="stack acting-controls" data-testid="triage-controls" data-mode={settings.decisions ? "decisions" : "all"}>
@@ -33,6 +34,7 @@ export function TriageControls({ settings, onChange }: { settings: TriageSetting
       {settings.decisions ? null : (
         <Checks legend="Kinds" options={ACTING_KINDS} chosen={settings.kinds} words={(kind) => kind} testId="kind" stacked onChange={(kinds) => { onChange({ ...settings, kinds }); }} />
       )}
+      <FlagChecks options={NEXT_FILTER_FLAGS} chosen={settings.flags} onChange={(flags) => { onChange({ ...settings, flags }); }} />
     </div>
   );
 }
@@ -97,7 +99,7 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
   const request = useMemo(() => ({ projection: "next" as const, query: triageQueryOf(settings) }), [settings]);
   const { value: next, error } = useProjected(view, request);
   const wanted = settings.text.trim().toLowerCase();
-  const rows = (next?.items ?? []).filter((row) => wanted === "" || titleOf(view, row.key).toLowerCase().includes(wanted));
+  const rows = withFlags(next?.items ?? [], settings.flags).filter((row) => wanted === "" || titleOf(view, row.key).toLowerCase().includes(wanted));
   const order = passOrder(rows.map((row) => row.key), pass);
   const focus = rows.find((row) => row.key === order[0]);
   const onPass = useCallback(() => {

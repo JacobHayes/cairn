@@ -10,7 +10,7 @@ import { useSearchParams } from "react-router";
 import { Button } from "../ui/kit.tsx";
 import { MAP } from "./settings.ts";
 
-const NARROW = "(max-width: 719px)";
+export const NARROW = "(max-width: 719px)";
 
 /** Whether the window is a phone's width. */
 export function useNarrow(): boolean {
@@ -31,7 +31,7 @@ export function useNarrow(): boolean {
 function MapBar({ title, onClose }: { title: string; onClose: () => void }) {
   return (
     <div className="map-bar">
-      <span className="label">{title}</span>
+      <span className="map-title">{title}</span>
       <span className="spacer" />
       <Button aria-label="Close the map" onClick={onClose}>
         ×

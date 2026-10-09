@@ -89,6 +89,7 @@ export function JourneyCanvas({ ready, view, selected, onPick }: JourneyCanvasPr
         actions={actions}
         viewKey={refitKey(laidOut, view.edit)}
         label={`${ready.journey.header.name}: canvas`}
+        title={ready.journey.header.name}
       />
     </>
   );

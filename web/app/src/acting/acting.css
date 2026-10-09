@@ -77,7 +77,9 @@
   gap: var(--space-2);
 }
 
-@media (max-width: 832px) {
+/* The columns past the kind give way when the region cannot hold them: it is narrower than the
+   window by the rail, and by the inspector's column while a node is open. */
+@container journey-scroll (max-width: 810px) {
   .list-table th:nth-child(n + 6),
   .list-table td:nth-child(n + 6) {
     display: none;

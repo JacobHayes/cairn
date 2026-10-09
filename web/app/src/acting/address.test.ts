@@ -73,7 +73,7 @@ describe("the list's address (C9)", () => {
 });
 
 describe("the next list's address (C10)", () => {
-  const settings = { sort: "leverage" as const, mine: true, kinds: ["decision" as const, "milestone" as const], forMe: true, decisions: false, text: "plan" };
+  const settings = { sort: "leverage" as const, mine: true, kinds: ["decision" as const, "milestone" as const], flags: ["overdue" as const, "unassigned" as const], forMe: true, decisions: false, text: "plan" };
 
   it("keeps every setting, and is bare at the defaults", () => {
     expect(nextFrom(nextParams(settings))).toEqual(settings);
@@ -93,18 +93,23 @@ describe("the next list's address (C10)", () => {
   it("offers no group kind: groups are never on the frontier", () => {
     expect(nextFrom(new URLSearchParams("kind=group,action")).kinds).toEqual(["action"]);
   });
+
+  it("reads only the flags a next row carries; the engine's query takes none", () => {
+    expect(nextFrom(new URLSearchParams("flag=stale,snoozed,next_up,overdue")).flags).toEqual(["overdue", "stale"]);
+    expect(nextQueryOf(settings)).not.toHaveProperty("flags");
+  });
 });
 
 describe("triage's address (C11)", () => {
   it("keeps the mode and filters, and is bare at the defaults", () => {
-    const settings = { decisions: false, mine: true, kinds: ["action" as const], text: "" };
+    const settings = { decisions: false, mine: true, kinds: ["action" as const], flags: ["stale" as const], text: "" };
     expect(triageFrom(triageParams(settings))).toEqual(settings);
     expect(triageParams(DEFAULT_TRIAGE).toString()).toBe("");
   });
 
   it("reads the frontier in rank order, decisions only in the walkthrough", () => {
-    expect(triageQueryOf({ decisions: true, mine: false, kinds: ["action"], text: "" })).toEqual({ sort: "rank", mine: false, kinds: ["decision"] });
-    expect(triageQueryOf({ decisions: false, mine: true, kinds: [], text: "" })).toEqual({ sort: "rank", mine: true, kinds: [] });
+    expect(triageQueryOf({ decisions: true, mine: false, kinds: ["action"], flags: [], text: "" })).toEqual({ sort: "rank", mine: false, kinds: ["decision"] });
+    expect(triageQueryOf({ decisions: false, mine: true, kinds: [], flags: [], text: "" })).toEqual({ sort: "rank", mine: true, kinds: [] });
   });
 
   it("opens the walkthrough on the cards with DECISIONS on", () => {

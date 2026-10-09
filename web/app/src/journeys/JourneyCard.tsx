@@ -4,7 +4,7 @@
 // Open decisions, the description, the notes and links, and the lineage are folds. On the
 // Summary page every fold is open and each list is whole: the status summary's parts, with
 // the print view (C18). Kept current (H6): both read the journey's local derivation.
-// What is the viewer's is one muted line under the progress.
+// What is still the viewer's to do is one muted line under the progress.
 import { Link } from "react-router";
 
 import { DEFAULT_LIST, listPath, type ListFlag } from "../acting/address.ts";
@@ -13,11 +13,11 @@ import { useProjected } from "../canvas/hooks.ts";
 import { useLive } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
-import type { Ready } from "../detail/model.ts";
+import { isTerminal, nodeOf, recordOf, type Ready } from "../detail/model.ts";
 import { NodeLink, Section } from "../detail/parts.tsx";
 import { summaryModel, type SummaryModel } from "../summary/model.ts";
 import { StatusSummaryView } from "../summary/StatusSummary.tsx";
-import { dateWords, dayOf } from "../timeline/model.ts";
+import { dateAway, dateWords } from "../timeline/model.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import { pagePath, summaryPath, type JourneyPage } from "./address.ts";
@@ -63,17 +63,34 @@ function LineageFold({ ready, full }: { ready: Ready; full: boolean }) {
   );
 }
 
-/** `You own 3 nodes here, 1 ready`, for a participant who arrives cold (2.4); nothing when nothing is theirs. */
+/** `You have 3 open items here, 2 ready`, for a participant who arrives cold (2.4); nothing when none is open. */
 function Yours({ ready }: { ready: Ready }) {
   const mine = useMineOf(ready.journey.header.id);
-  if (mine.status !== "ready" || mine.entries.length === 0) {
+  if (mine.status !== "ready") {
+    return null;
+  }
+  // Only what is still the viewer's to do: in scope, not finished (an auto-reached milestone is), and not a group.
+  const open = mine.entries.filter((entry) => {
+    const node = nodeOf(ready, entry.node);
+    const derived = ready.derived.nodes[entry.node];
+    return (
+      node !== undefined &&
+      node.kind !== "group" &&
+      derived !== undefined &&
+      derived.relevance.value !== "not_relevant" &&
+      derived.effectively_skipped !== true &&
+      derived.auto_reached !== true &&
+      !isTerminal(recordOf(ready, node).state)
+    );
+  });
+  if (open.length === 0) {
     return null;
   }
   const frontier = new Set(ready.derived.acting_frontier);
-  const actionable = mine.entries.filter((entry) => frontier.has(entry.node)).length;
+  const actionable = open.filter((entry) => frontier.has(entry.node)).length;
   return (
-    <span className="muted small" data-testid="card-yours" data-owned={mine.entries.length} data-ready={actionable}>
-      You own {mine.entries.length} {mine.entries.length === 1 ? "node" : "nodes"} here{actionable === 0 ? "" : `, ${String(actionable)} ready`}
+    <span className="muted small" data-testid="card-yours" data-open={open.length} data-ready={actionable}>
+      You have {open.length} open {open.length === 1 ? "item" : "items"} here{actionable === 0 ? "" : `, ${String(actionable)} ready`}
     </span>
   );
 }
@@ -110,16 +127,25 @@ function NextUp({ ready, all }: { ready: Ready; all: boolean }) {
   if (items.length === 0) {
     return null;
   }
-  return (
+  const list = (
+    <ul className="detail-list">
+      {items.map((row) => (
+        <li key={row.key} data-node={row.key}>
+          <DetailLink view={ready} node={row.key} />
+        </li>
+      ))}
+    </ul>
+  );
+  // On the Summary page it is a panel among the others; on the card, a muted label over a short list.
+  return all ? (
+    <section className="panel stack summary-part" aria-label="Next up" data-testid="card-next-up">
+      <h2 className="title">Next up</h2>
+      {list}
+    </section>
+  ) : (
     <section className="stack" aria-label="Next up" data-testid="card-next-up">
       <span className="muted small">Next up</span>
-      <ul className="detail-list">
-        {items.map((row) => (
-          <li key={row.key} data-node={row.key}>
-            <DetailLink view={ready} node={row.key} />
-          </li>
-        ))}
-      </ul>
+      {list}
     </section>
   );
 }
@@ -129,12 +155,11 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
   if (next === undefined) {
     return null;
   }
-  const days = dayOf(next.date) - dayOf(ready.derived.today);
   return (
     <section className="stack" aria-label="Next milestone" data-testid="card-next-milestone" data-node={next.key}>
       <span className="muted small">Next milestone</span>
       <span>
-        <NodeLink view={ready} node={next.key} /> <span className="muted small">{dateWords(next.date, ready.derived.today)}, {days < 0 ? `${String(-days)} days late` : days === 0 ? "today" : `in ${String(days)} days`}</span>
+        <NodeLink view={ready} node={next.key} /> <span className="muted small">{dateAway(next.date, ready.derived.today)}</span>
       </span>
     </section>
   );
@@ -209,14 +234,14 @@ export function JourneyCard({ ready, page, selected, full = false }: { ready: Re
         summary.error === undefined ? <p className="muted small">Summing up the journey...</p> : null
       ) : (
         <>
-          <span data-testid="card-progress" data-done={done} data-in-scope={model.inScope}>
-            {done} of {model.inScope} in scope done
+          <span data-testid="card-progress" data-done={done} data-in-scope={model.inScope} data-remaining={model.remaining}>
+            {done} of {model.inScope} in scope done{model.remaining === 0 ? "" : `, ${String(model.remaining)} to go`}
           </span>
           <progress value={done} max={Math.max(model.inScope, 1)} aria-label="Progress" />
           <Yours ready={ready} />
           <Flags ready={ready} model={model} />
-          {full ? <NextUp ready={ready} all /> : page === "next" ? null : <NextUp ready={ready} all={false} />}
-          {full ? <StatusSummaryView ready={ready} model={model} selected={selected} /> : <NextMilestone ready={ready} model={model} />}
+          {full || page === "next" ? null : <NextUp ready={ready} all={false} />}
+          {full ? <StatusSummaryView ready={ready} model={model} selected={selected} lead={<NextUp ready={ready} all />} /> : <NextMilestone ready={ready} model={model} />}
           <Folds ready={ready} model={model} full={full} selected={selected} />
         </>
       )}

@@ -126,6 +126,7 @@ export function DecisionCanvas({ ready, selected }: { ready: Ready; selected: st
         actions={actions}
         viewKey={LAYOUT_VIEW}
         label={`${ready.journey.header.name}: decisions`}
+        title={ready.journey.header.name}
       />
     </div>
   );

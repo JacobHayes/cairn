@@ -50,6 +50,10 @@ for (const { id, address, part } of VIEWS) {
 
 test("the journey's menus, the lifecycle chip and the filter open inside the window", async ({ page }) => {
   await openAt(page, "browser", "j_launch", "next/list", { fixedToday: FIXED_TODAY });
+  // The title, the lifecycle chip and the menu share one row.
+  const title = await page.getByTestId("journey-name").boundingBox();
+  const chip = await page.getByTestId("lifecycle-chip").boundingBox();
+  expect(chip?.y).toBeLessThan((title?.y ?? 0) + (title?.height ?? 0));
   for (const trigger of ["journey-menu", "lifecycle-chip", "filter-button"]) {
     await page.getByTestId(trigger).click();
     const box = await page.getByTestId(`${trigger}-menu`).boundingBox();

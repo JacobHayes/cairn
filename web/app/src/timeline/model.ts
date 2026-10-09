@@ -43,6 +43,13 @@ export function dateWords(date: string, today: string): string {
   return date.slice(0, 4) === today.slice(0, 4) ? words : `${words}, ${String(parsed.getUTCFullYear())}`;
 }
 
+/** A date in words with how far off it is from `today`: `Oct 30, in 24 days`, `Oct 2, 4 days late`, `Oct 6, today`. */
+export function dateAway(date: string, today: string): string {
+  const days = dayOf(date) - dayOf(today);
+  const count = (n: number) => `${String(n)} ${n === 1 ? "day" : "days"}`;
+  return `${dateWords(date, today)}, ${days < 0 ? `${count(-days)} late` : days === 0 ? "today" : `in ${count(days)}`}`;
+}
+
 /** A calendar date (`YYYY-MM-DD`) as days since 1970-01-01. */
 export function dayOf(date: string): number {
   const parsed = Date.parse(`${date}T00:00:00Z`);

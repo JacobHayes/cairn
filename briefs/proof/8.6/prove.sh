@@ -20,7 +20,7 @@ mise exec -- cargo build --quiet --locked -p cairn-wasm --example fixture_server
 
 pictures=(1-walkthrough-on-start 2-next-list-and-journey-card 3-plan-graph 4-plan-list 5-plan-timeline
   6-decision-view 7-filter-open 8-active-filter-chips 9-journey-menu 10-summary-page
-  11-phone-menu 12-tablet-toolbar)
+  11-phone-menu 12-tablet-toolbar 13-tablet-sheet)
 rm -f "$proof"/*.png
 (cd web/app && CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/pages.proof.ts --reporter=line)
 missing=0

@@ -1,7 +1,7 @@
 // The proof's media for the journey pages (briefs/proof/8.6/prove.sh): a screenshot of the
 // header, the toolbar, and the inspector on each page and projection, the journey card, the
 // lifecycle and journey menus, the filter with its active chips, the Summary page, and a
-// phone's menu and a tablet's toolbar, written to CAIRN_PROOF_OUT. Each step asserts what its
+// phone's menu and a tablet's toolbar and sheet, written to CAIRN_PROOF_OUT. Each step asserts what its
 // picture is meant to show, so a picture of the wrong state fails the run. Everything runs on
 // the in-browser host, seeded on each load, at the fixed day the browser tests read the
 // fixtures on.
@@ -52,9 +52,8 @@ test("the decision view, an answer's effects in the decision's detail, and the f
   await expect(page.getByTestId("decision-view")).toBeVisible();
   await expect(nodePanel(page, "n_partner_runs").getByTestId("decision-affects")).toBeVisible();
   await shot(page, "6-decision-view");
-  await openAt(page, "browser", "j_vendor_eval", "plan/list?flag=next_up", fixed);
-  await turnOn(page, "kind-milestone");
-  await page.getByTestId("filter-button-menu").evaluate((menu) => { menu.scrollTop = 0; });
+  await openAt(page, "browser", "j_launch", "plan/list?kind=milestone", fixed);
+  await turnOn(page, "flag-shortfall");
   await shot(page, "7-filter-open");
   await page.keyboard.press("Escape");
   await expect(page.getByTestId("active-filter")).toHaveCount(2);
@@ -76,7 +75,7 @@ test("the lifecycle chip and the journey's menu, then the Summary page", async (
   await shot(page, "10-summary-page");
 });
 
-test("a phone's menu and a tablet's two-row toolbar", async ({ page }) => {
+test("a phone's menu, and a tablet's two-row toolbar and bottom sheet", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 780 });
   await openAt(page, "browser", "j_launch", "next/list", fixed);
   await page.getByTestId("journey-menu").click();
@@ -87,4 +86,7 @@ test("a phone's menu and a tablet's two-row toolbar", async ({ page }) => {
   await openAt(page, "browser", "j_launch", "plan/timeline", fixed);
   await expect(page.getByTestId("timeline")).toBeVisible();
   await shot(page, "12-tablet-toolbar");
+  await openAt(page, "browser", "j_launch", "plan/graph", { node: "n_code_freeze", ...fixed });
+  await expect(nodePanel(page, "n_code_freeze")).toBeVisible();
+  await shot(page, "13-tablet-sheet");
 });

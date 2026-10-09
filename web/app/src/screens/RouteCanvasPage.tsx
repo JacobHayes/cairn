@@ -171,7 +171,7 @@ function RouteCanvas({ shown, view, version, selected, onPick }: { shown: Shown;
     return <p className="muted small">Laying out the canvas...</p>;
   }
   return (
-    <GraphCanvas model={laidOut.model} placement={laidOut.placement} overlay={undefined} heat={false} selected={selected} actions={actions} viewKey={refitKey(laidOut, shown.of === "draft")} label={`${shown.route.header.name}: canvas`} />
+    <GraphCanvas model={laidOut.model} placement={laidOut.placement} overlay={undefined} heat={false} selected={selected} actions={actions} viewKey={refitKey(laidOut, shown.of === "draft")} label={`${shown.route.header.name}: canvas`} title={shown.route.header.name} />
   );
 }
 

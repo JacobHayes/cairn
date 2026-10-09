@@ -1,6 +1,6 @@
-// C18: the journey status summary, for observers and reporting: the figures that matter (in
-// scope, remaining; what needs a look is the card's one sentence above it), the in-scope nodes
-// by state, what is overdue, short, or stale and why, the upcoming milestones with their
+// C18: the journey status summary, for observers and reporting: the in-scope nodes by state
+// (the card's progress line above it says how many are done, and what needs a look is its one
+// sentence), what is overdue, short, or stale and why, the upcoming milestones with their
 // effective dates, and the open decisions with their owners. A part with nothing to list is
 // left out. A printable page: printing it leaves out the navigation, the controls, and the
 // inspector (ui/app.css). Each node opens its detail (5.1) beside the summary.
@@ -15,15 +15,6 @@ import "./summary.css";
 
 const ORIGIN_WORDS = { actual: "actual", pin: "pinned", due: "derived due" } as const;
 
-function Figure({ label, count, testId }: { label: string; count: number; testId: string }) {
-  return (
-    <div className="summary-figure" data-testid={testId} data-count={count}>
-      <span className="summary-figure-count">{count}</span>
-      <span className="muted small">{label}</span>
-    </div>
-  );
-}
-
 function Part({ title, testId, count, children }: { title: string; testId: string; count: number; children: ReactNode }) {
   if (count === 0) {
     return null;
@@ -33,15 +24,6 @@ function Part({ title, testId, count, children }: { title: string; testId: strin
       <h2>{title}</h2>
       {children}
     </section>
-  );
-}
-
-function Figures({ model }: { model: SummaryModel }) {
-  return (
-    <div className="summary-figures" data-testid="summary-figures">
-      <Figure label="in scope" count={model.inScope} testId="summary-in-scope" />
-      <Figure label="remaining" count={model.remaining} testId="summary-remaining" />
-    </div>
   );
 }
 
@@ -148,12 +130,12 @@ function Ahead({ ready, model, selected }: { ready: Ready; model: SummaryModel; 
   );
 }
 
-/** C18: the status summary of a projected journey, under the card's own header row. */
-export function StatusSummaryView({ ready, model, selected }: { ready: Ready; model: SummaryModel; selected: string | undefined }) {
+/** C18: the status summary of a projected journey, under the card's own header row; `lead` is the first panel. */
+export function StatusSummaryView({ ready, model, selected, lead }: { ready: Ready; model: SummaryModel; selected: string | undefined; lead: ReactNode }) {
   return (
     <div className="stack summary" data-testid="summary">
-      <Figures model={model} />
       <div className="summary-parts">
+        {lead}
         <Ahead ready={ready} model={model} selected={selected} />
         <Trouble ready={ready} model={model} selected={selected} />
         <ByState model={model} />

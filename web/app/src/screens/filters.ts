@@ -76,11 +76,11 @@ export function activeFilters(journey: string, page: JourneyPage, projection: Pr
     if (settings.mine) {
       filters.push({ id: "mine", label: "mine", without: path({ mine: false }) });
     }
-    if (settings.forMe) {
-      filters.push({ id: "for-me", label: "prioritized for me", without: path({ forMe: false }) });
-    }
     for (const kind of settings.kinds) {
       filters.push({ id: `kind-${kind}`, label: kind, without: path({ kinds: settings.kinds.filter((each) => each !== kind) }) });
+    }
+    for (const flag of settings.flags) {
+      filters.push({ id: `flag-${flag}`, label: FLAG_WORDS[flag] ?? flag, without: path({ flags: settings.flags.filter((each) => each !== flag) }) });
     }
     if (settings.text !== "") {
       filters.push({ id: "text", label: `"${settings.text}"`, without: path({ text: "" }) });
@@ -95,6 +95,9 @@ export function activeFilters(journey: string, page: JourneyPage, projection: Pr
       for (const kind of settings.kinds) {
         filters.push({ id: `kind-${kind}`, label: kind, without: path({ kinds: settings.kinds.filter((each) => each !== kind) }) });
       }
+    }
+    for (const flag of settings.flags) {
+      filters.push({ id: `flag-${flag}`, label: FLAG_WORDS[flag] ?? flag, without: path({ flags: settings.flags.filter((each) => each !== flag) }) });
     }
     if (settings.text !== "") {
       filters.push({ id: "text", label: `"${settings.text}"`, without: path({ text: "" }) });

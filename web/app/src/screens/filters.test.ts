@@ -20,10 +20,11 @@ describe("the active filters under the toolbar", () => {
   });
 
   it("makes a chip for each setting on the next list, each undoing only itself", () => {
-    const chips = activeFilters("j_a", "next", "list", "?mine=1&kind=action,milestone&q=plan&sort=due", "n_x");
-    expect(chips.map((chip) => chip.label)).toEqual(["mine", "action", "milestone", '"plan"']);
-    expect(chips[0]?.without).toBe("/journeys/j_a/next/list/nodes/n_x?sort=due&kind=action%2Cmilestone&q=plan");
-    expect(chips[1]?.without).toBe("/journeys/j_a/next/list/nodes/n_x?sort=due&mine=1&kind=milestone&q=plan");
+    const chips = activeFilters("j_a", "next", "list", "?mine=1&kind=action,milestone&flag=overdue&q=plan&sort=due&me=1", "n_x");
+    // Ranking for me is a sort, not a filter: no chip.
+    expect(chips.map((chip) => chip.label)).toEqual(["mine", "action", "milestone", "overdue", '"plan"']);
+    expect(chips[0]?.without).toBe("/journeys/j_a/next/list/nodes/n_x?sort=due&kind=action%2Cmilestone&flag=overdue&me=1&q=plan");
+    expect(chips[3]?.without).toBe("/journeys/j_a/next/list/nodes/n_x?sort=due&mine=1&kind=action%2Cmilestone&me=1&q=plan");
   });
 
   it("makes a chip for each of the cards' filters, and none for the kinds in the walkthrough", () => {

@@ -331,11 +331,18 @@ body {
 }
 
 /* ---- the map on a phone, and the sheet on a tablet ---------------------------------------------- */
+/* The canvas is transparent, so the preview and the map carry the paper's 24px ruling themselves. */
+.map-preview,
+.map-full {
+  background:
+    linear-gradient(90deg, var(--color-rule) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(0deg, var(--color-rule) 1px, transparent 1px) 0 0 / 24px 24px,
+    var(--color-surface);
+}
 .map-preview {
   position: relative;
   height: 40dvh;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
 }
 .map-inert {
   position: absolute;
@@ -364,7 +371,6 @@ body {
   height: 100dvh;
   display: flex;
   flex-direction: column;
-  background: var(--color-surface);
 }
 .map-bar {
   flex: none;
@@ -374,11 +380,12 @@ body {
   padding: var(--space-2);
   border-bottom: 1px solid var(--color-border);
 }
-.map-bar .label {
+.map-title {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font: 400 15px / 1.4 var(--font-body);
 }
 .map-canvas {
   flex: 1 1 0;
@@ -443,11 +450,16 @@ body {
   html:has(.frame[data-map="open"]) {
     overflow: hidden;
   }
+  /* A short page still ends with the strip at the screen's bottom edge. */
   .frame,
   .frame[data-inspector="off"] {
-    display: block;
+    display: flex;
+    flex-direction: column;
     height: auto;
     min-height: 100dvh;
+  }
+  .frame > .strip {
+    margin-top: auto;
   }
   .frame > .rail {
     overflow-y: visible;
@@ -609,9 +621,11 @@ body {
 table.data {
   font-size: 14.5px;
 }
-/* Dates and numbers stay whole rather than breaking mid-token. */
-table.data td.mono {
-  white-space: nowrap;
+/* Dates and numbers stay whole rather than breaking mid-token, where the table has the room. */
+@media (min-width: 1100px) {
+  table.data td.mono {
+    white-space: nowrap;
+  }
 }
 /* The region is padded, and a sticky header sticks inside the padding: pull it to the region's edge so rows never show above it. */
 @media (min-width: 720px) {

@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { listFrom, nextFrom, nextPath, triageFrom } from "../acting/address.ts";
+import { listFrom, listPath, nextFrom, nextPath, triageFrom } from "../acting/address.ts";
 import { ListBody } from "../acting/ListScreen.tsx";
 import { NextList } from "../acting/NextScreen.tsx";
 import { TriageBody } from "../acting/TriageScreen.tsx";
@@ -71,7 +71,7 @@ export function ProjectionBody({ ready, page, projection, selected, authored, dr
   }
   if (projection === "list") {
     // A new query starts from its first page with nothing selected.
-    return <ListBody key={search} view={ready} settings={listFrom(params)} />;
+    return <ListBody key={search} view={ready} settings={listFrom(params)} onSettings={(next) => void navigate(listPath(ready.journey.header.id, next, selected))} />;
   }
   if (projection === "timeline") {
     return <ProjectedTimeline ready={ready} selected={selected} />;

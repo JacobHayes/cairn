@@ -6,7 +6,7 @@
 .canvas {
   height: 420px;
   border: 1px solid var(--color-border);
-  background: var(--color-surface);
+  background: transparent;
   overflow: hidden;
 }
 
@@ -19,14 +19,13 @@
 }
 
 .canvas .react-flow {
-  --xy-background-color: var(--color-surface);
-  --xy-background-pattern-color: var(--color-border);
+  --xy-background-color: transparent;
   --xy-edge-stroke: var(--color-secondary);
   --xy-controls-button-background-color: var(--color-surface);
   --xy-controls-button-background-color-hover: var(--color-band);
   --xy-controls-button-color: var(--color-text);
   --xy-controls-button-border-color: var(--color-border);
-  background: var(--color-surface);
+  background: transparent;
 }
 
 .toggles {

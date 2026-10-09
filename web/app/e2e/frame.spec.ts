@@ -119,7 +119,12 @@ test.describe("a phone's map", () => {
     const panel = nodePanel(page, "n_final_report");
     await expect(panel).toBeVisible();
     await expect(page.getByTestId("map-full")).toBeVisible();
-    expect((await panel.boundingBox())?.y ?? 0).toBeGreaterThan(300);
+    const sheet = (await page.locator(".inspector").boundingBox())?.y ?? 0;
+    expect(sheet).toBeGreaterThan(300);
+    // The tapped card is centred in the band between the map's bar and the sheet.
+    const bar = await page.locator(".map-bar").boundingBox();
+    const card = await nodeCard(page, "n_final_report").boundingBox();
+    expect(Math.abs((card?.y ?? 0) + (card?.height ?? 0) / 2 - ((bar?.height ?? 0) + sheet) / 2)).toBeLessThan(30);
     // The sheet is bounded and its body scrolls, so the end of the node's detail is reachable.
     const body = page.locator('.inspector-body[data-pane="inspector"]');
     expect(await body.evaluate((element) => element.scrollHeight > element.clientHeight)).toBe(true);
@@ -133,6 +138,13 @@ test.describe("a phone's map", () => {
     await expect(page).toHaveURL(/\/plan\/graph\/nodes\/n_make_offer\?decisions=1&map=1$/);
     await expect(page.getByTestId("map-full")).toBeVisible();
   });
+});
+
+test("on a phone a short page still ends with the strip at the screen's bottom edge", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await open(page, "browser", "/me");
+  const strip = await page.locator(".strip").boundingBox();
+  expect((strip?.y ?? 0) + (strip?.height ?? 0)).toBeCloseTo(844, 0);
 });
 
 test("on a tablet Esc closes the sheet and leaves the screen as it was", async ({ page }) => {

@@ -103,7 +103,7 @@ export function ProposalCanvas({ domain, graphs, marks, deployment, today, selec
         ))}
       </div>
       <div className="proposal-canvas">
-        <GraphCanvas model={laidOut.model} placement={laidOut.placement} overlay={overlay} heat={false} selected={selected} actions={actions} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" inScroller />
+        <GraphCanvas model={laidOut.model} placement={laidOut.placement} overlay={overlay} heat={false} selected={selected} actions={actions} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" title="The proposal's diff" inScroller />
       </div>
       {overlay.outside.length === 0 ? null : <span className="muted small">Also changed, not drawn: {overlay.outside.join(", ")}</span>}
     </div>

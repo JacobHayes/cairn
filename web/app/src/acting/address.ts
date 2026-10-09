@@ -29,6 +29,10 @@ export const LIST_FLAGS: ListFlag[] = [
   "shortfall",
 ];
 
+/** The flags the filter offers: the list's by the engine, NEXT and CARDS by what their rows carry. The rest still read from an old address. */
+export const LIST_FILTER_FLAGS: ListFlag[] = ["overdue", "stale", "unassigned", "shortfall", "snoozed"];
+export const NEXT_FILTER_FLAGS: ListFlag[] = LIST_FILTER_FLAGS.filter((flag) => flag !== "snoozed");
+
 /** C9, C10: the single signals a list sorts by (Priority: effort when estimates exist). */
 export const SORTS: SortBy[] = ["rank", "slack", "gravity", "leverage", "due", "effort"];
 
@@ -60,7 +64,9 @@ export interface NextSettings {
   sort: SortBy;
   mine: boolean;
   kinds: NodeKind[];
-  /** Prioritize for me: rank with the owner factor relative to the viewer (Priority). */
+  /** The rows kept: those with every one of these flags (`NEXT_FILTER_FLAGS`). */
+  flags: ListFlag[];
+  /** Rank for me: rank with the owner factor relative to the viewer (Priority). */
   forMe: boolean;
   /** The DECISIONS chip: the actionable decisions only (C10). */
   decisions: boolean;
@@ -73,6 +79,8 @@ export interface TriageSettings {
   decisions: boolean;
   mine: boolean;
   kinds: NodeKind[];
+  /** The cards kept: those with every one of these flags (`NEXT_FILTER_FLAGS`). */
+  flags: ListFlag[];
   /** The search: cards whose title contains it. */
   text: string;
 }
@@ -171,6 +179,7 @@ export function nextFrom(params: URLSearchParams): NextSettings {
     sort: sortFrom(params),
     mine: params.get("mine") === "1",
     kinds: listed(params, "kind", ACTING_KINDS),
+    flags: listed(params, "flag", NEXT_FILTER_FLAGS),
     forMe: params.get("me") === "1",
     decisions: params.get("decisions") === "1",
     text: params.get("q") ?? "",
@@ -185,6 +194,7 @@ export function nextParams(settings: NextSettings): URLSearchParams {
   }
   setFlag(params, "mine", settings.mine);
   setList(params, "kind", settings.kinds);
+  setList(params, "flag", settings.flags);
   setFlag(params, "me", settings.forMe);
   if (settings.text !== "") {
     params.set("q", settings.text);
@@ -202,6 +212,7 @@ export function triageFrom(params: URLSearchParams): TriageSettings {
     decisions: params.get("decisions") === "1",
     mine: params.get("mine") === "1",
     kinds: listed(params, "kind", ACTING_KINDS),
+    flags: listed(params, "flag", NEXT_FILTER_FLAGS),
     text: params.get("q") ?? "",
   };
 }
@@ -213,6 +224,7 @@ export function triageParams(settings: TriageSettings): URLSearchParams {
   if (!settings.decisions) {
     setList(params, "kind", settings.kinds);
   }
+  setList(params, "flag", settings.flags);
   if (settings.text !== "") {
     params.set("q", settings.text);
   }

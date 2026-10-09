@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 
 import { journeyName, startJourney } from "./around.ts";
-import { nextItem, nextKeys, turnOn } from "./acting.ts";
+import { nextItem, nextKeys, openActing, turnOn } from "./acting.ts";
 import { derivedRevision, follow, goTo, nodePanel, openAt, openFilter, visit } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
@@ -183,6 +183,8 @@ test("the key sheet takes the focus, so Enter cannot press what had it behind th
   await nodePanel(page, "n_docs").locator("button.primary").first().focus();
   await page.keyboard.press("?");
   await expect(page.getByTestId("key-sheet").getByRole("button", { name: "Close" })).toBeFocused();
+  // A modal dialog: the page behind it is inert, and the browser draws the backdrop.
+  expect(await page.getByTestId("key-sheet").evaluate((sheet) => sheet.matches(":modal"))).toBe(true);
   await page.keyboard.press("Enter");
   await expect(page.getByTestId("key-sheet")).toHaveCount(0);
   expect(await derivedRevision(page)).toBe(before);
@@ -193,4 +195,60 @@ test("the tab and the projection you are on keep the address's settings when cli
   await page.getByTestId("projection-graph").click();
   await page.getByTestId("tab-plan").click();
   await expect(page).toHaveURL(/\/plan\/graph\?lens=gravity&kind=group%2Cdecision$/);
+});
+
+test("between 720 and 1100px the projection keeps the width and a canvas fills its region", async ({ page }) => {
+  await page.setViewportSize({ width: 1024, height: 700 });
+  const body = page.locator(".journey-body");
+  for (const address of ["plan/graph", "plan/graph?decisions=1"]) {
+    await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
+    await expect(page.getByTestId("canvas")).toBeVisible();
+    const [scrolls, shown] = await body.evaluate((region) => [region.scrollHeight, region.clientHeight]);
+    expect(scrolls, address).toBe(shown);
+  }
+  await openAt(page, "browser", "j_vendor_eval", "plan/list", { fixedToday: FIXED_TODAY });
+  await expect(page.getByTestId("list-row").first()).toBeVisible();
+  expect(await body.evaluate((region) => region.scrollWidth <= region.clientWidth)).toBe(true);
+  await openAt(page, "browser", "j_vendor_eval", "summary", { fixedToday: FIXED_TODAY });
+  await expect(page.getByTestId("summary-upcoming")).toBeVisible();
+});
+
+test("the plan list's filter holds mine, kinds, flags and the owner; its sort and grouping are in the list's header", async ({ page }) => {
+  await openActing(page, "browser", "j_vendor_eval", "plan/list?flag=next_up");
+  await expect(page.getByTestId("list").getByLabel("Sort by")).toBeVisible();
+  await expect(page.getByTestId("grouped")).toBeVisible();
+  await openFilter(page);
+  const panel = page.getByTestId("filter-panel");
+  for (const offered of ["flag-mine", "kind-milestone", "flag-overdue", "flag-snoozed"]) {
+    await expect(panel.getByTestId(offered)).toBeVisible();
+  }
+  for (const gone of ["state-open", "grouped", "flag-next_up"]) {
+    await expect(panel.getByTestId(gone)).toHaveCount(0);
+  }
+  await expect(panel.getByLabel("Sort by")).toHaveCount(0);
+  // The filter the popover no longer offers is still on, as a chip, and a flag chosen beside it keeps it.
+  await turnOn(page, "flag-stale");
+  await expect(page.getByTestId("active-filter")).toHaveText([/next up/, /stale/]);
+  await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", "0");
+});
+
+test("NEXT's filter has the flags, and Rank for me is in its sort", async ({ page }) => {
+  await openActing(page, "browser", "j_launch", "next/list");
+  expect(await nextKeys(page)).toHaveLength(5);
+  await turnOn(page, "flag-shortfall");
+  await expect.poll(() => nextKeys(page)).toEqual(["n_launch"]);
+  await expect(page.getByTestId("filter-count")).toHaveText("1");
+  await page.keyboard.press("Escape");
+  await page.getByLabel("Sort by").selectOption({ label: "Rank for me" });
+  await expect(page).toHaveURL(/\?flag=shortfall&me=1$/);
+  await expect(page.getByTestId("filter-count")).toHaveText("1");
+  await page.getByLabel("Sort by").selectOption({ label: "Gravity" });
+  await expect(page).toHaveURL(/\?sort=gravity&flag=shortfall$/);
+});
+
+test("the journey card counts only what is still the viewer's to do", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "next/list", { fixedToday: FIXED_TODAY });
+  const yours = page.getByTestId("card-yours");
+  await expect(yours).toHaveText("You have 3 open items here, 2 ready");
+  await expect(yours).toHaveAttribute("data-open", "3");
 });

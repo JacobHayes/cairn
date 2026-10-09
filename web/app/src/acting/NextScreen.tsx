@@ -1,7 +1,7 @@
 // C10: the next list, "what do I do now". The acting frontier in rank order (re-sortable by
-// any single signal, or ranked for the viewer: prioritize for me), each item with its
+// any single signal, or ranked for the viewer: rank for me), each item with its
 // breadcrumb, why it ranks where it does, and its kind's actions inline (C11), an unassigned
-// one with "assign owner" (D2). Filterable to only mine and by kind. When nothing can be acted
+// one with "assign owner" (D2). Filterable to only mine, by kind and by flag. When nothing can be acted
 // on, the stalled diagnostic with unsnooze (D5). The engine's `next` projection answers it from
 // the tab's derivation; what it shows lives in the address. It is NEXT, LIST: the journey page
 // (screens/JourneyFrame.tsx) holds its toolbar and the filters it opens (`NextControls`).
@@ -13,20 +13,21 @@ import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { factsOf } from "./acts.ts";
 import { Acts } from "./Acts.tsx";
-import { ACTING_KINDS, nextQueryOf, type NextSettings } from "./address.ts";
-import { Check, Checks, SortSelect } from "./Controls.tsx";
+import { ACTING_KINDS, NEXT_FILTER_FLAGS, nextQueryOf, type NextSettings } from "./address.ts";
+import { Check, Checks, FlagChecks, SortSelect } from "./Controls.tsx";
 import { Crumb, DetailLink, Flags, Why } from "./Parts.tsx";
+import { withFlags } from "./rows.ts";
 import { StalledPanel } from "./Stalled.tsx";
 import type { NodeRow } from "./why.ts";
 import "./acting.css";
 
-/** C10: the ranking for the viewer, mine, and kinds: what the filter holds on NEXT, LIST (the sort is in the list's header). */
+/** C10: mine, kinds and flags: what the filter holds on NEXT, LIST (the sort, with "Rank for me", is in the list's header). */
 export function NextControls({ settings, onChange }: { settings: NextSettings; onChange: (next: NextSettings) => void }) {
   return (
     <div className="stack acting-controls" data-testid="next-controls">
-      <Check label="Prioritize for me" checked={settings.forMe} testId="for-me" onChange={(forMe) => { onChange({ ...settings, forMe }); }} />
       <Check label="Only mine" checked={settings.mine} testId="only-mine" onChange={(mine) => { onChange({ ...settings, mine }); }} />
       <Checks legend="Kinds" options={ACTING_KINDS} chosen={settings.kinds} words={(kind) => kind} testId="kind" stacked onChange={(kinds) => { onChange({ ...settings, kinds }); }} />
+      <FlagChecks options={NEXT_FILTER_FLAGS} chosen={settings.flags} onChange={(flags) => { onChange({ ...settings, flags }); }} />
     </div>
   );
 }
@@ -63,18 +64,18 @@ function matches(view: Ready, row: NodeRow, text: string): boolean {
 export function NextList({ view, settings, selected, onSettings }: { view: Ready; settings: NextSettings; selected: string | undefined; onSettings: (next: NextSettings) => void }) {
   const request = useMemo(() => ({ projection: "next" as const, query: nextQueryOf(settings) }), [settings]);
   const { value: next, error } = useProjected(view, request);
-  const items = (next?.items ?? []).filter((row) => matches(view, row, settings.text));
+  const items = withFlags(next?.items ?? [], settings.flags).filter((row) => matches(view, row, settings.text));
   return (
     <section className="stack" aria-label="Next" data-testid="next">
       <div className="row acting-pass-controls">
-        <SortSelect sort={settings.sort} onChange={(sort) => { onSettings({ ...settings, sort }); }} />
+        <SortSelect sort={settings.sort} forMe={settings.forMe} onChange={(sort, forMe) => { onSettings({ ...settings, sort, forMe }); }} />
       </div>
       {error === undefined ? null : <p className="callout callout-bad">The next list could not be read: {error}</p>}
       {next === undefined ? <p className="muted small">Ranking the frontier...</p> : null}
       {next !== undefined && items.length === 0 ? (
         next.stalled == null || next.items.length > 0 ? (
           <p className="callout" data-testid="next-empty">
-            {settings.mine || settings.kinds.length > 0 || settings.decisions || settings.text !== ""
+            {settings.mine || settings.kinds.length > 0 || settings.flags.length > 0 || settings.decisions || settings.text !== ""
               ? "Nothing on the acting frontier matches these filters."
               : "Nothing is left to act on in this journey."}
           </p>

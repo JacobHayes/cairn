@@ -6,7 +6,7 @@
 import "@xyflow/react/dist/base.css";
 import "./canvas.css";
 
-import { Background, BackgroundVariant, Controls, MarkerType, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
+import { Controls, MarkerType, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { useEffect, useMemo } from "react";
 
 import { SHEET, useFrameState } from "../shell/frame.tsx";
@@ -14,7 +14,7 @@ import { useResolvedTheme } from "../ui/theme.ts";
 import { cardHeight, cardLines } from "./cards.ts";
 import { EdgeLine, type LineEdge } from "./EdgeLine.tsx";
 import type { Placement } from "./layout.ts";
-import { MapFrame } from "./MapFrame.tsx";
+import { MapFrame, NARROW } from "./MapFrame.tsx";
 import type { CanvasModel } from "./model.ts";
 import { CardActionsContext, NodeCard, type CardActions, type CardNode } from "./NodeCard.tsx";
 import type { CanvasOverlay } from "./overlay.ts";
@@ -25,6 +25,8 @@ const edgeTypes = { line: EdgeLine };
 /** C3: the zoom range, wide enough to see a whole journey at its limits. */
 const ZOOM_MIN = 0.05;
 const ZOOM_MAX = 2;
+/** A small graph fits at 100% rather than blown up to fill the region. */
+const FIT = { maxZoom: 1, padding: 0.1 };
 
 export interface GraphCanvasProps {
   model: CanvasModel;
@@ -35,7 +37,10 @@ export interface GraphCanvasProps {
   actions: CardActions;
   /** What the canvas shows; the view fits the graph again when it changes. */
   viewKey: string;
+  /** The accessible name of the canvas. */
   label: string;
+  /** What the map is of, as its full-screen bar shows it (the journey's name, not the label). */
+  title: string;
   /** The canvas sits inside a page that scrolls: the wheel scrolls the page, and drag and pinch still pan and zoom. */
   inScroller?: boolean;
 }
@@ -97,14 +102,14 @@ function edgesOf({ model, overlay }: GraphCanvasProps): LineEdge[] {
 }
 
 /**
- * On a tablet the inspector is a sheet over the canvas's lower part: a node picked is centred in
- * the band the sheet leaves, so the selection is never under it.
+ * On a tablet, and in a phone's full-screen map, the inspector is a sheet over the canvas's lower
+ * part: a node picked is centred in the band the sheet leaves, so the selection is never under it.
  */
 function useCenterAboveSheet(selected: string | undefined, live: boolean): void {
   const flow = useReactFlow();
   const sheet = useFrameState()?.inspector?.parentElement;
   useEffect(() => {
-    if (!live || selected === undefined || sheet === null || sheet === undefined || !globalThis.matchMedia(SHEET).matches) {
+    if (!live || selected === undefined || sheet === null || sheet === undefined || !(globalThis.matchMedia(SHEET).matches || globalThis.matchMedia(NARROW).matches)) {
       return undefined;
     }
     // After the commit that shows the sheet, so its height is there to read.
@@ -162,11 +167,11 @@ function Flow(props: FlowProps) {
         nodesFocusable={live}
         proOptions={{ hideAttribution: true }}
         fitView
+        fitViewOptions={FIT}
         colorMode={theme}
         aria-label={props.label}
       >
-        <Background variant={BackgroundVariant.Lines} gap={24} lineWidth={1} color="var(--color-rule)" />
-        {live ? <Controls showInteractive={false} /> : null}
+        {live ? <Controls showInteractive={false} fitViewOptions={FIT} /> : null}
       </ReactFlow>
     </CardActionsContext>
   );
@@ -175,7 +180,7 @@ function Flow(props: FlowProps) {
 /** A graph's canvas: laid-out cards and lines, with pan and zoom (a preview on a phone, MapFrame). */
 export function GraphCanvas(props: GraphCanvasProps) {
   return (
-    <MapFrame title={props.label}>
+    <MapFrame title={props.title}>
       {(inert) => (
         <div className="canvas" data-testid="canvas" data-view={props.viewKey}>
           {/* A new view mounts a new flow, which fits the whole graph (C3); a revision keeps the viewport. */}

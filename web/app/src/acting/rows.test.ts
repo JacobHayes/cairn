@@ -1,7 +1,7 @@
-// C9: grouping by container keeps the sort order within and between groups.
+// C9: grouping by container keeps the sort order within and between groups; NEXT narrows by flags.
 import { describe, expect, it } from "vitest";
 
-import { byContainer } from "./rows.ts";
+import { byContainer, withFlags } from "./rows.ts";
 import type { NodeRow } from "./why.ts";
 
 const row = (key: string, ancestors: string[]): NodeRow => ({
@@ -29,5 +29,14 @@ describe("byContainer", () => {
 
   it("keeps each group's place in the tree", () => {
     expect(byContainer([row("n_c", ["n_setup", "n_plan"])])[0]?.path).toEqual(["n_setup", "n_plan"]);
+  });
+});
+
+describe("withFlags", () => {
+  it("keeps the rows that have every flag asked for, and every row when none is", () => {
+    const rows = [{ ...row("n_a", []), overdue: true }, { ...row("n_b", []), overdue: true, stale: true }, row("n_c", [])];
+    expect(withFlags(rows, []).map((each) => each.key)).toEqual(["n_a", "n_b", "n_c"]);
+    expect(withFlags(rows, ["overdue"]).map((each) => each.key)).toEqual(["n_a", "n_b"]);
+    expect(withFlags(rows, ["overdue", "stale"]).map((each) => each.key)).toEqual(["n_b"]);
   });
 });

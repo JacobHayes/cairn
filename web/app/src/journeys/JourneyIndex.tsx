@@ -42,8 +42,7 @@ export function JourneyCells({ summary, routes }: { summary: JourneySummary; rou
   return (
     <>
       <td>
-        <Link to={overviewPath(summary.id)}>{summary.name}</Link>
-        <div className="muted mono">{summary.id}</div>
+        <Link to={overviewPath(summary.id)} title={summary.id}>{summary.name}</Link>
       </td>
       <td>
         <span className="stack">

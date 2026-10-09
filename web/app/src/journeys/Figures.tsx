@@ -5,6 +5,7 @@
 // the engine's status summary read from it.
 import { useJourney } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
+import { dateAway } from "../timeline/model.ts";
 import { flagOf, progressOf, useStatusSummary } from "./figures-model.ts";
 import { useMineOf } from "./mine.ts";
 
@@ -21,7 +22,7 @@ function ReadyFigures({ ready }: { ready: Ready }) {
       <td className="mono" data-testid="row-progress" data-done={progress?.done ?? ""} data-in-scope={progress?.inScope ?? ""}>
         {progress === undefined ? "" : `${String(progress.done)}/${String(progress.inScope)}`}
       </td>
-      <td data-testid="row-milestone">{next === undefined ? <span className="muted small">none</span> : `${next.title} ${next.date}`}</td>
+      <td data-testid="row-milestone">{next === undefined ? <span className="muted small">none</span> : `${next.title}, ${dateAway(next.date, ready.derived.today)}`}</td>
       <td className="mono" data-testid="row-flag">{flag}</td>
       <td className="mono" data-testid="row-mine">{actionable === 0 ? "" : `${String(actionable)} ready`}</td>
     </>

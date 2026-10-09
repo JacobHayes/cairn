@@ -143,7 +143,10 @@ test("H3: the local user, its identity, and its entities, offered for merging; t
   await page.getByTestId("merge-offer").getByRole("link", { name: "Merge them" }).click();
   await expect(page.getByTestId("merge-entities").getByLabel("Keep")).not.toHaveValue("");
   await open(page, "browser", "/journeys?mine=1");
-  await expect(page.locator('[data-testid="journey-row"][data-journey="j_vendor_eval"]').getByTestId("row-mine")).toContainText("ready");
+  const row = page.locator('[data-testid="journey-row"][data-journey="j_vendor_eval"]');
+  await expect(row.getByTestId("row-mine")).toContainText("ready");
+  // Dates in words with the days to go, and no raw id under the name.
+  await expect(row.getByTestId("row-milestone")).toHaveText(/, Oct 30(, \d{4})?, (in \d+ days?|today|\d+ days? late)$/);
 });
 
 test("B3: an entity answer names a new person, made in the same patch, who joins the deployment's entities", async ({ page }) => {

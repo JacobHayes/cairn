@@ -15,6 +15,7 @@
 
 .journey-scroll {
   padding: var(--space-5);
+  container: journey-scroll / inline-size;
 }
 
 /* The sheet covers the workspace's lower part: the projection ends above it, so its last row can be reached. */
@@ -32,6 +33,16 @@
 
 .journey-header {
   gap: var(--space-2);
+}
+
+/* The title, the lifecycle chip and the menu stay on one row, the title wrapping instead. */
+.journey-header > .row {
+  flex-wrap: nowrap;
+}
+
+.journey-header h1 {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 /* One row when it fits: the tabs, the chips, and the switcher at the right end. When the
@@ -195,13 +206,19 @@
   cursor: not-allowed;
 }
 
+/* A modal <dialog>: the browser draws the backdrop and keeps the focus inside. */
 .key-sheet {
-  position: fixed;
-  z-index: 60;
-  top: 20vh;
-  left: 50%;
   width: min(28rem, 92vw);
-  transform: translateX(-50%);
+  color: var(--color-text);
+}
+
+.key-sheet .modal-body {
+  max-height: min(80dvh, 640px);
+  overflow-y: auto;
+}
+
+.key-sheet::backdrop {
+  background: color-mix(in srgb, var(--color-canvas) 60%, transparent);
 }
 
 .journey-card progress {

@@ -2,7 +2,8 @@
 // sort by one signal, text search, and multi-select for bulk actions (BulkBar.tsx). The
 // engine's `list` projection answers it from the tab's derivation a page at a time; what it
 // shows lives in the address. It is PLAN, LIST: the journey page (screens/JourneyFrame.tsx)
-// holds its toolbar and the filters it opens (ListFilters).
+// holds its toolbar and the filters it opens (ListFilters); the sort and the grouping are in the
+// list's header.
 import { Fragment, useMemo, useState } from "react";
 
 import { useProjected } from "../canvas/hooks.ts";
@@ -13,6 +14,7 @@ import { Badge, Button } from "../ui/kit.tsx";
 import { selectionOf } from "./acts.ts";
 import { listQueryOf, type ListSettings } from "./address.ts";
 import { BulkBar } from "./BulkBar.tsx";
+import { Check, SortSelect } from "./Controls.tsx";
 import { Crumb, DetailLink, Flags } from "./Parts.tsx";
 import { byContainer } from "./rows.ts";
 import type { NodeRow } from "./why.ts";
@@ -80,7 +82,7 @@ function Table({ view, rows, settings, chosen, onToggle }: { view: Ready; rows: 
 }
 
 /** PLAN, LIST: keyed by the address's query by its caller, so a new query starts from its first page with nothing selected. */
-export function ListBody({ view, settings }: { view: Ready; settings: ListSettings }) {
+export function ListBody({ view, settings, onSettings }: { view: Ready; settings: ListSettings; onSettings: (next: ListSettings) => void }) {
   const [cursors, setCursors] = useState<number[]>([]);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const cursor = cursors.at(-1);
@@ -103,6 +105,8 @@ export function ListBody({ view, settings }: { view: Ready; settings: ListSettin
         <span className="muted small" data-testid="list-total" data-total={page?.total ?? ""}>
           {page === undefined ? "Reading the list..." : `${String(page.total)} nodes match; showing ${String(rows.length)}.`}
         </span>
+        <SortSelect sort={settings.sort} onChange={(sort) => { onSettings({ ...settings, sort }); }} />
+        <Check label="Group by container" checked={settings.grouped} testId="grouped" onChange={(grouped) => { onSettings({ ...settings, grouped }); }} />
         <Button onClick={() => { setChosen(new Set(rows.map((row) => row.key))); }}>Select all shown</Button>
         <Button onClick={() => { setChosen(new Set()); }}>Clear the selection</Button>
         {cursors.length === 0 ? null : <Button onClick={() => { setCursors(cursors.slice(0, -1)); }}>Previous page</Button>}
