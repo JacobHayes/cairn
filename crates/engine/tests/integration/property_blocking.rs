@@ -49,7 +49,8 @@ mod property {
 
         /// D5: following open dependencies always ends on the frontier, so open in-scope work
         /// leaves the frontier non-empty; a stalled journey names a hold for every frontier
-        /// node and is never all blocked.
+        /// node (its own, or the container's snooze it is held through, B6) and is never all
+        /// blocked.
         #[test]
         fn open_work_always_reaches_the_frontier(graph in arb_journey(1..=120)) {
             let derived = derived(&graph);
@@ -61,8 +62,16 @@ mod property {
             if let Some(stalled) = blocking.stalled() {
                 prop_assert!(blocking.acting_frontier().is_empty());
                 prop_assert!(!stalled.all_blocked);
-                let held = stalled.waiting_on.iter().filter(|cause| !matches!(cause, StallCause::Gate(_))).count();
-                prop_assert_eq!(held, blocking.frontier().len());
+                let named = |key: &_| stalled.waiting_on.iter().any(|cause| matches!(
+                    cause,
+                    StallCause::Snooze { node, .. } | StallCause::AutoReach { node, .. } if node == key
+                ));
+                for key in blocking.frontier() {
+                    prop_assert!(
+                        named(key) || blocking.snoozed_via(key).is_some_and(named),
+                        "{} is held but unnamed", key
+                    );
+                }
             } else {
                 prop_assert!(!blocking.acting_frontier().is_empty() || !open_work);
             }

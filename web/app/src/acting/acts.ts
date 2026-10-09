@@ -141,7 +141,7 @@ function bulkMutation(action: BulkAction, facts: Facts): Mutation | undefined {
     case "assign":
       return assignOwner(node.key, action.entity);
     case "snooze":
-      return finished || node.kind === "group" ? undefined : { op: "snooze", node: node.key, until: action.until };
+      return finished ? undefined : { op: "snooze", node: node.key, until: action.until };
     case "unsnooze":
       return facts.snoozed ? { op: "unsnooze", node: node.key } : undefined;
   }

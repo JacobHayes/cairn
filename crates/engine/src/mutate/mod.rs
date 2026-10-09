@@ -52,6 +52,10 @@ pub(crate) struct Session<'a> {
     pub bypassed: BTreeMap<NodeKey, u32>,
     /// Nodes snoozed in this patch, with the mutation that snoozed them (B6).
     pub snoozed: BTreeMap<NodeKey, u32>,
+    /// Nodes an unsnooze named that hold no snooze of their own but sit under a container
+    /// with one, with the mutation that named them: refused on the graph the patch produces
+    /// while a container's snooze still holds over them (B6).
+    pub unsnoozed_through: BTreeMap<NodeKey, u32>,
     /// Entities created in this patch (E6).
     pub created_entities: BTreeSet<EntityKey>,
     /// Route versions published in this patch.
@@ -199,6 +203,7 @@ impl<'a> Session<'a> {
             completed: BTreeMap::new(),
             bypassed: BTreeMap::new(),
             snoozed: BTreeMap::new(),
+            unsnoozed_through: BTreeMap::new(),
             created_entities: BTreeSet::new(),
             published: Vec::new(),
             merge_checked: BTreeSet::new(),

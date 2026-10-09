@@ -45,6 +45,7 @@ impl DerivedJourney<'_> {
             owners: self.owners(key).clone(),
             unassigned: derived.is_unassigned(self.graph, key),
             snoozed: blocking.snoozed(key).cloned(),
+            snoozed_via: blocking.snoozed_via(key).cloned(),
             overdue: dates.overdue(key),
             stale: derived.is_stale(key),
             needs_breakdown: blocking.needs_breakdown(key),

@@ -61,7 +61,9 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "snooze",
         description: "Hides a node from the frontier until a date, or until another node is \
-            done (B6).",
+            done (B6). A container (a group, or work with children) with open work beneath it \
+            sets its whole subtree aside, each descendant naming it as `snoozed_via`; a \
+            target inside the subtree, or depending on anything in it, is rejected.",
         writes: true,
         destructive: true,
         schema: schema::<Snooze>,
@@ -69,7 +71,8 @@ pub(crate) const SPECS: &[Spec] = &[
     },
     Spec {
         name: "unsnooze",
-        description: "Lifts a node's snooze.",
+        description: "Lifts a node's own snooze. A node held only through a container's \
+            snooze (`snoozed_via`) is refused, naming the container to unsnooze instead.",
         writes: true,
         destructive: true,
         schema: schema::<Unsnooze>,
@@ -480,7 +483,10 @@ impl Assign {
 pub(crate) struct Snooze {
     /// The journey.
     journey: JourneyId,
-    /// The node.
+    /// The node: an actionable node, or a container (a group, or a deliverable or action
+    /// with children) with open work beneath it, which sets its whole subtree aside while
+    /// the snooze holds. A target inside the subtree, or one that depends on anything in it,
+    /// is rejected.
     node: NodeKey,
     /// Until a date, or until a node is done.
     until: SnoozeTarget,
@@ -512,7 +518,8 @@ impl Snooze {
 pub(crate) struct Unsnooze {
     /// The journey.
     journey: JourneyId,
-    /// The node.
+    /// The node. One snoozed only through a container (its `snoozed_via`) is refused,
+    /// naming the container: unsnooze the container instead.
     node: NodeKey,
     /// A new id for this write, unique to it (`p_` and a slug). Resubmitting the same id with
     /// the same content is answered from its receipt, so a lost response is safe to retry.

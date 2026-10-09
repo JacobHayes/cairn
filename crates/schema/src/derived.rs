@@ -493,9 +493,15 @@ pub struct NodeDerived {
     /// A pending auto-reach milestone that reads as reached (F1).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub auto_reached: bool,
-    /// A snooze that holds (B6).
+    /// A snooze that holds over the node (B6): its own, else the one of the container it is
+    /// held through (`snoozed_via`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snoozed: Option<SnoozeTarget>,
+    /// The container whose snooze holds over the node (B6), the reason a descendant names.
+    /// Set even when the node's own snooze holds as well, so a node snoozed twice names its
+    /// container and shows its own target in `snoozed`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snoozed_via: Option<NodeKey>,
     /// A placeholder with no children that is not atomic (B10).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub needs_breakdown: bool,

@@ -107,6 +107,14 @@ describe("C9: bulk actions", () => {
     expect(bulkPlan(action, selected)).toEqual({ unable });
   });
 
+  it("snoozes a container like any node, and one snoozed only through its container is not unsnoozed alone", () => {
+    expect(bulkPlan({ act: "snooze", until: { node: "n_meet" } }, [facts("n_stage")])).toEqual({
+      mutations: [{ op: "snooze", node: "n_stage", until: { node: "n_meet" } }],
+    });
+    const held = facts("n_work", { derived: { ...facts("n_work").derived, snoozed: { node: "n_meet" }, snoozed_via: "n_stage" } });
+    expect(bulkPlan({ act: "unsnooze" }, [held])).toEqual({ unable: ["n_work"] });
+  });
+
   it("skips each with the one reason", () => {
     const plan = bulkPlan({ act: "skip", reason: "not needed" }, work);
     expect("mutations" in plan ? plan.mutations.map((mutation) => mutation.op === "transition" && mutation.transition) : []).toEqual([

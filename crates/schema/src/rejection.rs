@@ -68,6 +68,7 @@ pub enum ViolationCode {
     SnoozeOnSelf,
     SnoozeCycle,
     SnoozeNotActionable,
+    SnoozedThroughContainer,
     FilledThroughDecision,
     PinnedThroughDecision,
     // Domains and lifecycle.

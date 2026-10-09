@@ -122,21 +122,43 @@ export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail })
   );
 }
 
-/** B6: the node's snooze, until a date or until another node is done or out of scope. */
+/** What a snooze waits for: its date, or the node. */
+function SnoozeUntil({ view, target }: { view: Ready; target: Schema<"SnoozeTarget"> }) {
+  return "date" in target ? target.date : <NodeLink view={view} node={target.node} />;
+}
+
+/** B6: a descendant held by its container's snooze, which is the one to lift (the node has no snooze of its own to). */
+function SnoozedThrough({ view, write, container, target }: { view: Ready; write: NodeWrite; container: string; target: Schema<"SnoozeTarget"> }) {
+  return (
+    <span className="row" data-testid="snoozed-via" data-via={container}>
+      <span>
+        Snoozed through <NodeLink view={view} node={container} />, until <SnoozeUntil view={view} target={target} />
+      </span>
+      <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: container }])}>
+        Unsnooze {nodeOf(view, container)?.title ?? container}
+      </Button>
+    </span>
+  );
+}
+
+/** B6: the node's snooze, until a date or until another node is done or out of scope; a container's holds over its subtree. */
 export function SnoozeEditor({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `snooze:${detail.node.key}`);
   const key = detail.node.key;
   const dateForm = useFormDraft<string>(write.journey, key, "snooze-date");
   const nodeForm = useFormDraft<string>(write.journey, key, "snooze-node");
   const stored = view.journey.graph.state?.snoozes?.[key];
-  const holds = detail.derived.snoozed != null;
-  const snoozable = !isTerminal(detail.record.state) && detail.node.kind !== "group";
+  const via = detail.derived.snoozed_via ?? undefined;
+  const viaStored = via === undefined ? undefined : view.journey.graph.state?.snoozes?.[via];
+  // With a container's snooze over it, `snoozed` is the node's own target while that holds, else the container's.
+  const holds = via === undefined ? detail.derived.snoozed != null : JSON.stringify(detail.derived.snoozed) === JSON.stringify(stored);
+  const snoozable = !isTerminal(detail.record.state);
   return (
     <div className="stack" data-testid="snooze">
       {stored === undefined ? null : (
         <span className="row">
           <span>
-            Snoozed until {"date" in stored ? stored.date : <NodeLink view={view} node={stored.node} />}
+            Snoozed until <SnoozeUntil view={view} target={stored} />
             {holds ? "" : " (no longer holding)"}
           </span>
           <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: key }])}>
@@ -144,6 +166,7 @@ export function SnoozeEditor({ view, detail }: { view: Ready; detail: NodeDetail
           </Button>
         </span>
       )}
+      {via === undefined || viaStored === undefined ? null : <SnoozedThrough view={view} write={write} container={via} target={viaStored} />}
       {snoozable ? (
         <span className="row">
           <DraftForm

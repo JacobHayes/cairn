@@ -59,6 +59,19 @@ export function SkipForm({ write, node, form }: { write: NodeWrite; node: string
   );
 }
 
+/** B6: a transition on a snoozed container clears its snooze, and with it the hold on everything beneath. */
+function LiftsSnooze({ view, node }: { view: Ready; node: string }) {
+  const held = Object.values(view.derived.nodes).filter((derived) => derived.snoozed_via === node).length;
+  if (held === 0 || view.journey.graph.state?.snoozes?.[node] === undefined) {
+    return null;
+  }
+  return (
+    <span className="muted" data-testid="lifts-snooze">
+      Moving this on lifts its snooze, and the hold on the {held} open {held === 1 ? "item" : "items"} beneath it.
+    </span>
+  );
+}
+
 export function Actions({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `actions:${detail.node.key}`);
   const { node, record } = detail;
@@ -87,6 +100,7 @@ export function Actions({ view, detail }: { view: Ready; detail: NodeDetail }) {
         )}
         {early ? <span className="muted">Started early: still blocked.</span> : null}
       </div>
+      {moves.length > 0 ? <LiftsSnooze view={view} node={node.key} /> : null}
       {finishes ? <MayNotApply view={view} node={node.key} /> : null}
       {skip.draft === undefined ? null : <SkipForm write={write} node={node.key} form={skip} />}
       <Rejected view={view} write={write} />

@@ -370,7 +370,10 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         prop::collection::btree_map(arb_kind_key(), arb_participation(), 0..2),
         prop::collection::btree_set(arb_guard_failure(), 0..2),
         arb_node_dates(),
-        prop::option::of(arb_snooze_target()),
+        (
+            prop::option::of(arb_snooze_target()),
+            prop::option::of(arb_node_key()),
+        ),
         arb_scores(),
         arb_display_state(),
         prop::option::of(
@@ -391,6 +394,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                 peak,
             )| {
                 let (blocked_by, blocked_through) = blocking;
+                let (snoozed, snoozed_via) = snoozed;
                 let flag = |index: usize| flags.get(index).copied().unwrap_or(false);
                 let (gravity, gravity_from, max_child_gravity, leverage, leverage_from, rank) =
                     scores;
@@ -409,6 +413,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     dates,
                     auto_reached: flag(5),
                     snoozed,
+                    snoozed_via,
                     needs_breakdown: flag(6),
                     gravity,
                     gravity_from,

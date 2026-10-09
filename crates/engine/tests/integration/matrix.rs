@@ -144,6 +144,12 @@ const MATRIX: &[Entry] = &[
         run: snooze_cleared_by_a_transition,
     },
     Entry {
+        scenario: "a container snooze holding over its subtree and clearing",
+        prd: &["B6", "D3", "D5", "C9"],
+        brief: "7.4",
+        run: container_snooze_holds_and_clears,
+    },
+    Entry {
         scenario: "entity merges",
         prd: &["E6", "H3"],
         brief: "2.1",
@@ -913,6 +919,108 @@ fn snooze_cleared_by_a_transition() -> Run {
         "- op: transition\n  node: n_baseline\n  transition: complete\n",
     );
     assert!(run.journey().state.snoozes.is_empty(), "B6");
+    run
+}
+
+/// The vendor evaluation's acting frontier after the run so far.
+fn acting_after(run: &Run) -> Vec<String> {
+    let derived = support::derived(run.records(), "j_vendor_eval");
+    derived
+        .blocking()
+        .acting_frontier()
+        .iter()
+        .map(|node| node.as_str().to_owned())
+        .collect()
+}
+
+/// The container whose snooze holds over `node` after the run so far.
+fn held_through(run: &Run, node: &str) -> Option<cairn_schema::NodeKey> {
+    let derived = support::derived(run.records(), "j_vendor_eval");
+    derived.blocking().snoozed_via(&key(node)).cloned()
+}
+
+/// The codes of a rejected patch to the vendor evaluation.
+fn rejected_codes(run: &Run, mutations: &str) -> Vec<cairn_schema::ViolationCode> {
+    let Rejection::Invalid { violations } = run.reject(VENDOR, mutations) else {
+        panic!("{mutations}")
+    };
+    violations
+        .as_slice()
+        .iter()
+        .map(|found| found.code)
+        .collect()
+}
+
+/// B6, D3, D5: Testing is snoozed until the decision meeting is reached. A target inside it, or
+/// one that depends on it, is rejected with the snooze unchanged; answering the partner
+/// decision brings the partner-led work onto the frontier already snoozed, naming Testing; a
+/// descendant completing does not clear it; a descendant with its own later snooze stays hidden
+/// after the container's lifts, and the container's holds again when the meeting reopens;
+/// skipping the container clears it.
+fn container_snooze_holds_and_clears() -> Run {
+    use cairn_schema::ViolationCode::{SnoozeCycle, SnoozedThroughContainer};
+    let mut run = Run::from(support::vendor_after(7));
+    let transition = |node: &str, change: &str| {
+        format!("- op: transition\n  node: {node}\n  transition: {change}\n")
+    };
+    run.accept(VENDOR, &transition("n_partner_runs", "reopen"));
+    run.accept(
+        VENDOR,
+        "- op: snooze\n  node: n_testing\n  until: {node: n_decision_meeting}\n",
+    );
+    assert_eq!(held_through(&run, "n_baseline"), Some(key("n_testing")));
+    assert_eq!(
+        acting_after(&run),
+        [
+            "n_decision_meeting",
+            "n_partner_runs",
+            "n_workload_ingest",
+            "n_workload_query"
+        ]
+    );
+    for target in ["n_baseline", "n_final_report"] {
+        let again = format!("- op: snooze\n  node: n_testing\n  until: {{node: {target}}}\n");
+        assert_eq!(rejected_codes(&run, &again), [SnoozeCycle], "{target}");
+    }
+    run.accept(
+        VENDOR,
+        "- op: answer\n  decision: n_partner_runs\n  value: {boolean: true}\n",
+    );
+    let derived = support::derived(run.records(), "j_vendor_eval");
+    assert!(derived.blocking().frontier().contains(&key("n_criteria")));
+    assert!(!acting_after(&run).contains(&"n_criteria".to_owned()));
+    assert_eq!(held_through(&run, "n_criteria"), Some(key("n_testing")));
+    run.accept(
+        VENDOR,
+        "- op: snooze\n  node: n_criteria\n  until: {date: \"2026-10-20\"}\n",
+    );
+    let alone = "- op: unsnooze\n  node: n_partner_results\n";
+    assert_eq!(rejected_codes(&run, alone), [SnoozedThroughContainer]);
+    run.accept(VENDOR, &transition("n_baseline", "complete"));
+    assert!(
+        run.journey().state.snoozes.contains_key(&key("n_testing")),
+        "B6: a descendant completing does not clear it"
+    );
+    run.accept(VENDOR, &transition("n_decision_meeting", "reach"));
+    assert_eq!(
+        held_through(&run, "n_criteria"),
+        None,
+        "the container's lifts"
+    );
+    assert!(
+        !acting_after(&run).contains(&"n_criteria".to_owned()),
+        "its own snooze holds"
+    );
+    run.accept(VENDOR, &transition("n_decision_meeting", "reopen"));
+    assert_eq!(held_through(&run, "n_criteria"), Some(key("n_testing")));
+    run.accept(
+        VENDOR,
+        &transition("n_testing", "{skip: {reason: Not needed.}}"),
+    );
+    assert!(
+        !run.journey().state.snoozes.contains_key(&key("n_testing")),
+        "B6: a transition on the container clears it"
+    );
     run
 }
 

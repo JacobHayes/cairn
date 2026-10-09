@@ -470,9 +470,12 @@ pub struct NodeRow {
     /// No owner (E1).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub unassigned: bool,
-    /// A snooze that holds (B6).
+    /// A snooze that holds over the node (B6): its own, else its container's.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snoozed: Option<SnoozeTarget>,
+    /// The container whose snooze holds over the node (B6).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub snoozed_via: Option<NodeKey>,
     /// Non-terminal with its due before today (D3).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub overdue: bool,

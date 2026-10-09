@@ -19,6 +19,7 @@ import {
   turnOn,
 } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
+import { openNode, section } from "./detail.ts";
 import { derivedRevision, nodePanel } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
@@ -126,6 +127,31 @@ test("B6: a node snoozed from its card leaves, and returns when its target compl
   await page.getByTestId("nav-next").click();
   await nextItem(page, target).getByRole("button", { name: "Mark reached" }).click();
   await expect(nextItem(page, first)).toBeVisible();
+});
+
+test("B6: a container snoozed from its detail holds its subtree off the next list, and unsnoozes from a descendant's", async ({ page }) => {
+  await openActing(page, "browser", "j_launch", "next");
+  await expect(nextItem(page, "n_docs")).toBeVisible();
+  const today = (await page.getByTestId("derivation").getAttribute("data-today")) ?? "";
+  const group = await openNode(page, "browser", "j_launch", "n_materials");
+  const blocking = await section(group, "blocking");
+  await blocking.getByRole("button", { name: "Snooze until a date" }).click();
+  await blocking.getByLabel("Snooze until").fill(daysAfter(today, 7));
+  await blocking.getByTestId("snooze").getByRole("button", { name: "Save" }).click();
+  await expect(blocking.getByTestId("snooze")).toContainText("Snoozed until");
+  await expect(group.getByTestId("lifts-snooze")).toContainText("2 open items");
+  await page.getByTestId("nav-next").click();
+  await expect(nextItem(page, "n_beta_end")).toBeVisible();
+  for (const held of ["n_docs", "n_announcement"]) {
+    await expect(nextItem(page, held)).toHaveCount(0);
+  }
+  const part = await openNode(page, "browser", "j_launch", "n_docs");
+  const through = (await section(part, "blocking")).getByTestId("snoozed-via");
+  await expect(through).toHaveAttribute("data-via", "n_materials");
+  await through.getByRole("button", { name: "Unsnooze Launch materials" }).click();
+  await page.getByTestId("nav-next").click();
+  await expect(nextItem(page, "n_docs")).toBeVisible();
+  await expect(nextItem(page, "n_announcement")).toBeVisible();
 });
 
 test("D5: an empty acting frontier shows the stalled panel, and unsnooze brings the node back", async ({ page }) => {

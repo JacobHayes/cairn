@@ -2984,8 +2984,17 @@ export interface components {
             rank?: components["schemas"]["Real"] | null;
             /** @description Relevance and what produced it. */
             relevance: components["schemas"]["RelevanceExplanation"];
-            /** @description A snooze that holds (B6). */
+            /**
+             * @description A snooze that holds over the node (B6): its own, else the one of the container it is
+             *     held through (`snoozed_via`).
+             */
             snoozed?: components["schemas"]["SnoozeTarget"] | null;
+            /**
+             * @description The container whose snooze holds over the node (B6), the reason a descendant names.
+             *     Set even when the node's own snooze holds as well, so a node snoozed twice names its
+             *     container and shows its own target in `snoozed`.
+             */
+            snoozed_via?: components["schemas"]["NodeKey"] | null;
             /** @description Why a terminal node's completing guards would now fail (D4). */
             stale?: components["schemas"]["GuardFailure"][];
             /**
@@ -3143,8 +3152,10 @@ export interface components {
              * @description Latest start minus today; none is no deadline.
              */
             slack_days?: number | null;
-            /** @description A snooze that holds (B6). */
+            /** @description A snooze that holds over the node (B6): its own, else its container's. */
             snoozed?: components["schemas"]["SnoozeTarget"] | null;
+            /** @description The container whose snooze holds over the node (B6). */
+            snoozed_via?: components["schemas"]["NodeKey"] | null;
             /** @description A terminal node whose completing guards would now fail (D4). */
             stale?: boolean;
             /**
@@ -4755,7 +4766,7 @@ export interface components {
          * @description What a violation breaks (PRD Invariants, D1, D4, A11, A18, A19, B6, E3, E6, H3).
          * @enum {string}
          */
-        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "entity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "entity_key_taken" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open" | "unresolved_review_item";
+        ViolationCode: "duplicate_sibling_id" | "duplicate_key" | "retired_key_reused" | "unresolved_reference" | "wrong_reference_kind" | "containment_cycle" | "leaf_with_children" | "dependency_cycle" | "edge_to_ancestor_or_descendant" | "requires_duplicates_condition" | "contradictory_chain" | "condition_answer_type_mismatch" | "condition_on_own_subtree" | "stage_bound_not_milestone" | "undeclared_kind" | "single_kind_on_multi_role" | "fills_role_cardinality" | "several_filling_decisions" | "feeds_milestone_not_milestone" | "several_feeding_decisions" | "several_final_milestones" | "field_not_on_kind" | "state_not_on_kind" | "limit_exceeded" | "dangling_reference" | "removal_widened" | "still_referenced" | "answer_type_mismatch" | "entity_unresolved" | "illegal_transition" | "reason_required" | "guard_failed" | "not_relevant" | "snooze_on_self" | "snooze_cycle" | "snooze_not_actionable" | "snoozed_through_container" | "filled_through_decision" | "pinned_through_decision" | "mutation_not_for_target" | "lineage_invalid" | "archived_journey" | "target_exists" | "target_missing" | "deleted_journey_id" | "draft_exists" | "no_draft" | "version_in_use" | "entity_key_taken" | "email_taken" | "alias_cycle" | "merge_breaks_journey" | "proposal_not_open" | "unresolved_review_item";
         /** @description A violation list with at least one entry (a rejection always says why). */
         Violations: components["schemas"]["Violation"][];
         /** @description What a stream watches: `deployment`, `journey:<id>`, `route:<id>`, `proposal:<id>`, `journeys`, `routes`, or `proposals`. */

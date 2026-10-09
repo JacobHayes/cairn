@@ -8,7 +8,9 @@
 //! a consequence (D7) that it may not apply. A `deps_done` bypass applied in the same patch
 //! accepts the open dependencies present, and they are recorded on it. A snooze the patch made must sit on a node in scope that is not closed: not
 //! effectively skipped and not a milestone that reads as reached (B6; a blocked node may be
-//! snoozed, Gating).
+//! snoozed, Gating); a group has work left beneath it. An unsnooze of a node with no snooze of
+//! its own is refused while a container's snooze still holds over it on that graph, naming the
+//! container (B6).
 //!
 //! Each failure names the transition's mutation and, in `caused_by`, the patch's other
 //! mutations that brought it about: those that wrote the structure of the node, of the
@@ -24,8 +26,8 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    DependencyVia, Event, GraphKey, GraphRecord, Guard, GuardFailure, NodeKey, Record, RecordKey,
-    Relevance, ViolationCode, Write,
+    DependencyVia, Event, GraphKey, GraphRecord, Guard, GuardFailure, NodeKey, NodeKind, Record,
+    RecordKey, Relevance, Subject, ViolationCode, Write,
 };
 
 use super::Check;
@@ -56,7 +58,10 @@ struct Involved<'k> {
 /// Runs the derived checks on the patch's journey.
 pub(super) fn check(check: &mut Check<'_, '_>) {
     let session = check.session;
-    if session.guarded.is_empty() && session.snoozed.is_empty() {
+    if session.guarded.is_empty()
+        && session.snoozed.is_empty()
+        && session.unsnoozed_through.is_empty()
+    {
         return;
     }
     let Some(journey) = session.journey() else {
@@ -80,7 +85,8 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
         relevance(check, &graph, &derived, key, *ordinal);
         deps_done(check, &graph, &derived, key, *ordinal);
     }
-    snoozes(check, &tree, &derived);
+    snoozes(check, &graph, &derived);
+    unsnoozes_through(check, &tree, &derived);
 }
 
 /// D4: a guarded transition needs its node in scope on the graph the patch produces: an
@@ -184,7 +190,8 @@ fn deps_done(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived, key: &
 }
 
 /// B6: a snooze the patch made sits on a node in scope that is not closed.
-fn snoozes(check: &mut Check<'_, '_>, tree: &Tree, derived: &Derived) {
+fn snoozes(check: &mut Check<'_, '_>, graph: &Graph, derived: &Derived) {
+    let tree = graph.tree();
     let session = check.session;
     let Some(journey) = session.journey() else {
         return;
@@ -196,16 +203,56 @@ fn snoozes(check: &mut Check<'_, '_>, tree: &Tree, derived: &Derived) {
         }
         // Closed: effectively skipped, or a milestone that reads as reached (F1).
         let out_of_scope = !derived.relevance().in_scope(key);
-        if !out_of_scope && !derived.blocking().closed(key) {
+        let nothing_beneath = is_group(graph, key) && !work_beneath(graph, derived, key);
+        if !out_of_scope && !derived.blocking().closed(key) && !nothing_beneath {
             continue;
         }
-        let mut violation = at_node(
-            tree,
-            key,
-            ViolationCode::SnoozeNotActionable,
-            "only a node in scope with something left to do is snoozed (B6)",
-        );
+        let message = if nothing_beneath {
+            "a group is snoozed only while work in scope is left beneath it (B6)"
+        } else {
+            "only a node in scope with something left to do is snoozed (B6)"
+        };
+        let mut violation = at_node(tree, key, ViolationCode::SnoozeNotActionable, message);
         violation.at.mutation = Some(*at);
+        check.violations.push(violation);
+    }
+}
+
+fn is_group(graph: &Graph, key: &NodeKey) -> bool {
+    graph
+        .node(key)
+        .is_some_and(|node| node.kind() == NodeKind::Group)
+}
+
+/// B6: whether a node beneath the container is in scope with something left to do.
+fn work_beneath(graph: &Graph, derived: &Derived, key: &NodeKey) -> bool {
+    graph.tree().descendants(key).iter().any(|below| {
+        !is_group(graph, below)
+            && derived.relevance().in_scope(below)
+            && !derived.blocking().closed(below)
+    })
+}
+
+/// B6: an unsnooze of a node whose snooze is not its own: refused while a container's snooze
+/// holds over it, naming the container to unsnooze instead; otherwise the node is not snoozed.
+fn unsnoozes_through(check: &mut Check<'_, '_>, tree: &Tree, derived: &Derived) {
+    for (key, at) in &check.session.unsnoozed_through {
+        let held = derived.blocking().snoozed_via(key);
+        let (code, message) = match held {
+            Some(container) => (
+                ViolationCode::SnoozedThroughContainer,
+                format!("{key} is snoozed through {container}; unsnooze {container} instead (B6)"),
+            ),
+            None => (
+                ViolationCode::UnresolvedReference,
+                "the node is not snoozed".to_owned(),
+            ),
+        };
+        let mut violation = at_node(tree, key, code, message);
+        violation.at.mutation = Some(*at);
+        if let Some(container) = held {
+            violation.related.push(Subject::Node(container.clone()));
+        }
         check.violations.push(violation);
     }
 }

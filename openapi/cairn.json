@@ -6342,7 +6342,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "Snooze an actionable node (B6).",
+            "description": "Snooze an actionable node, or a container (a group, or work with children) that has\nwork left beneath it, which holds every descendant off the acting frontier (B6).",
             "properties": {
               "node": {
                 "$ref": "#/components/schemas/NodeKey",
@@ -6366,7 +6366,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "Lift a snooze (B6).",
+            "description": "Lift a snooze (B6). A node held only through a container's snooze is refused, naming\nthe container to unsnooze instead.",
             "properties": {
               "node": {
                 "$ref": "#/components/schemas/NodeKey",
@@ -7846,7 +7846,18 @@
                 "type": "null"
               }
             ],
-            "description": "A snooze that holds (B6)."
+            "description": "A snooze that holds over the node (B6): its own, else the one of the container it is\nheld through (`snoozed_via`)."
+          },
+          "snoozed_via": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The container whose snooze holds over the node (B6), the reason a descendant names.\nSet even when the node's own snooze holds as well, so a node snoozed twice names its\ncontainer and shows its own target in `snoozed`."
           },
           "stale": {
             "description": "Why a terminal node's completing guards would now fail (D4).",
@@ -8649,7 +8660,18 @@
                 "type": "null"
               }
             ],
-            "description": "A snooze that holds (B6)."
+            "description": "A snooze that holds over the node (B6): its own, else its container's."
+          },
+          "snoozed_via": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The container whose snooze holds over the node (B6)."
           },
           "stale": {
             "description": "A terminal node whose completing guards would now fail (D4).",
@@ -13653,6 +13675,7 @@
           "snooze_on_self",
           "snooze_cycle",
           "snooze_not_actionable",
+          "snoozed_through_container",
           "filled_through_decision",
           "pinned_through_decision",
           "mutation_not_for_target",

@@ -80,6 +80,16 @@ Write directly when the person asked for a state change: answers (`answer_decisi
 transitions (`transition_node`), participations (`assign`), pins and actual dates
 (`set_date`), snoozes (`snooze`, `unsnooze`), and overrides (`override`).
 
+A snooze sets a node aside until a date or until another node is done. Snooze a container
+(a group, or work with children) to set its whole subtree aside in one move: every
+descendant is then held off the next list, names the container in `snoozed_via`, and stays
+actionable in the model, still blocking and counting for priority. A target inside the
+subtree, or one that depends on anything in it, is refused. A descendant held only through
+its container cannot be unsnoozed on its own (the refusal names the container to unsnooze);
+a descendant's own snooze is independent of the container's, and completing a descendant
+does not lift the container's. Any transition on the container itself, such as starting it
+or skipping a group, clears its snooze.
+
 Draft a **proposal** (`create_proposal`) when the change is structural (adding, removing, or
 moving nodes; edges; roles; conditions; date rules), when it touches many nodes, or when the
 person should see it whole first. A proposal has an id you choose (`pr_` and a slug), its

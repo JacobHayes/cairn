@@ -30,9 +30,9 @@
 //! Then, per node: blocked (in scope, not closed, `deps_done` false), actionable (D2:
 //! relevant, not a group, not closed, `deps_done`), `needs_breakdown` (B10), and whether its
 //! snooze holds (B6, from current state: a date snooze while today is before the date, a node
-//! snooze while its target is in scope and does not satisfy dependencies). The frontier is
-//! every actionable node; the acting frontier leaves out snoozed nodes and `auto_reach`
-//! milestones whose date is still ahead; `stalled` (D5) is an empty acting frontier with
+//! snooze while its target is in scope and does not satisfy dependencies), its own or a
+//! container's over its subtree. The frontier is every actionable node; the acting frontier
+//! leaves out snoozed nodes and `auto_reach` milestones whose date is still ahead; `stalled` (D5) is an empty acting frontier with
 //! in-scope work still open, with what it waits on ([`stalled`]).
 //!
 //! Cost at `node_count_max` (2,000 nodes, about 110,000 edges, 8,000 instants): the
@@ -47,6 +47,7 @@ mod stalled;
 
 use std::cell::Cell;
 
+use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{
     Date, KeyRefs, Node, NodeKey, NodeKind, Payload, Relevance, SnoozeTarget, Stalled, State,
 };
@@ -77,8 +78,14 @@ struct Flags {
     reaches_when_unblocked: bool,
     /// B10: a placeholder in scope and open, with no children, not marked atomic.
     needs_breakdown: bool,
-    /// B6: the stored snooze, while it holds.
+    /// B6: the node's own stored snooze, while it holds.
+    snoozed_own: Option<SnoozeTarget>,
+    /// B6: what holds the node: its own snooze, else the nearest container's snooze over
+    /// the subtree it sits in.
     snoozed: Option<SnoozeTarget>,
+    /// B6: the nearest container whose snooze holds over the node, which is open and in
+    /// scope; set even when the node's own snooze holds as well.
+    snoozed_via: Option<NodeKey>,
 }
 
 /// Pass 5's output: per node, its blocking flags; for the journey, the frontier, the acting
@@ -131,7 +138,7 @@ impl Blocking {
                 *slot = value;
             }
         }
-        let flags: Vec<Flags> = dependencies
+        let mut flags: Vec<Flags> = dependencies
             .keys()
             .iter()
             .enumerate()
@@ -140,6 +147,7 @@ impl Blocking {
                 sweep.flags(key, NodeIndex::from_position(at), &satisfied, reached)
             })
             .collect();
+        sweep.hold_subtrees(dependencies.keys(), &mut flags);
         let mut blocking = Blocking {
             keys: dependencies.keys().to_vec(),
             satisfied,
@@ -266,10 +274,26 @@ impl Blocking {
             .is_some_and(|flags| flags.needs_breakdown)
     }
 
-    /// B6: the node's snooze, while it holds.
+    /// B6: what holds the node off the acting frontier: its own snooze while it holds, else
+    /// the snooze of the container it is held through.
     #[must_use]
     pub fn snoozed(&self, key: &NodeKey) -> Option<&SnoozeTarget> {
         self.flags_of(key).and_then(|flags| flags.snoozed.as_ref())
+    }
+
+    /// B6: the node's own snooze, while it holds, whatever a container holds over it.
+    #[must_use]
+    pub fn snoozed_own(&self, key: &NodeKey) -> Option<&SnoozeTarget> {
+        self.flags_of(key)
+            .and_then(|flags| flags.snoozed_own.as_ref())
+    }
+
+    /// B6: the nearest container whose snooze holds over the node (open and in scope), the
+    /// reason a descendant names.
+    #[must_use]
+    pub fn snoozed_via(&self, key: &NodeKey) -> Option<&NodeKey> {
+        self.flags_of(key)
+            .and_then(|flags| flags.snoozed_via.as_ref())
     }
 
     /// PRD Frontier: every actionable node, in key order.
@@ -403,6 +427,7 @@ impl Sweep<'_> {
         let in_scope = relevance != Relevance::NotRelevant;
         let deps_done = value(Point::Start);
         let open = in_scope && !closed;
+        let own = self.holding(key, satisfied);
         Flags {
             closed,
             deps_done,
@@ -411,7 +436,54 @@ impl Sweep<'_> {
             auto_reached: reached,
             reaches_when_unblocked: self.reads_as_reached(node),
             needs_breakdown: open && self.unexpanded(node),
-            snoozed: self.holding(key, satisfied),
+            snoozed: own.clone(),
+            snoozed_own: own,
+            snoozed_via: None,
+        }
+    }
+
+    /// B6: a container's snooze holds over its subtree. Each open node in scope beneath a
+    /// container whose snooze holds names the nearest such container, and is held by that
+    /// snooze unless its own holds. O(nodes x depth), the walk bounded by the depth limit.
+    fn hold_subtrees(&self, keys: &[NodeKey], flags: &mut [Flags]) {
+        let tree = self.graph.tree();
+        let holders: Vec<Option<SnoozeTarget>> = flags
+            .iter()
+            .zip(keys)
+            .map(|(held, key)| {
+                let open = self.early.relevance.in_scope(key) && !held.closed;
+                held.snoozed_own.clone().filter(|_| open)
+            })
+            .collect();
+        if holders.iter().all(Option::is_none) {
+            return;
+        }
+        let holder = |key: &NodeKey| -> Option<&SnoozeTarget> {
+            let at = keys.binary_search(key).ok()?;
+            holders.get(at)?.as_ref()
+        };
+        for (at, key) in keys.iter().enumerate() {
+            let open = self.early.relevance.in_scope(key)
+                && flags.get(at).is_some_and(|held| !held.closed);
+            if !open {
+                continue;
+            }
+            let mut ancestor = tree.parent(key);
+            let mut steps = 0_u32;
+            while let Some(above) = ancestor {
+                if let Some(target) = holder(above) {
+                    if let Some(held) = flags.get_mut(at) {
+                        held.snoozed_via = Some(above.clone());
+                        if held.snoozed.is_none() {
+                            held.snoozed = Some(target.clone());
+                        }
+                    }
+                    break;
+                }
+                steps += 1;
+                assert!(steps <= CONTAINMENT_DEPTH_MAX + 1, "containment is bounded");
+                ancestor = tree.parent(above);
+            }
         }
     }
 

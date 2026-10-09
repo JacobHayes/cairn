@@ -10,10 +10,12 @@
 //!
 //! Snooze wait cycles (B6): a node snooze makes the snoozed node's own work wait for its
 //! target, so a target that transitively depends on the snoozed node (an ancestor of it, a
-//! dependent, or another snoozed node waiting the other way) would hold it hidden forever. The
-//! same search, with each node snooze as a wait from the snoozed node's start to the target's
-//! finish, finds them over the full set, so whether a snooze is legal never changes with an
-//! answer. Each snooze on a cycle is reported at its node. They are looked for only when the
+//! dependent, or another snoozed node waiting the other way) would hold it hidden forever. A
+//! container's snooze holds over its whole subtree, so each node beneath it waits too, which
+//! also catches a target inside the subtree and one that depends on anything in it. The
+//! same search, with each node snooze as a wait from the snoozed node's start (and a
+//! container's descendants' starts) to the target's finish, finds them over the full set, so
+//! whether a snooze is legal never changes with an answer. Each snooze on a cycle is reported at its node. They are looked for only when the
 //! dependency graph itself has no cycle, so one cause is reported once.
 //!
 //! Cost at the limits: building the graph and finding its strongly connected components are
@@ -41,9 +43,10 @@ pub(super) fn check(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     }
 }
 
-/// B6: each node snooze whose target transitively depends on the snoozed node.
+/// B6: each node snooze whose target transitively depends on the snoozed node, or for a
+/// container on anything beneath it, or is beneath it.
 fn snooze_cycles(check: &GraphCheck<'_>, graph: &Dependencies, out: &mut Vec<Violation>) {
-    let snoozes: Vec<(&NodeKey, NodeKey, Instant, Instant)> = check
+    let snoozes: Vec<(&NodeKey, NodeKey, Vec<Instant>, Instant)> = check
         .document
         .state
         .snoozes
@@ -56,7 +59,10 @@ fn snooze_cycles(check: &GraphCheck<'_>, graph: &Dependencies, out: &mut Vec<Vio
             if target == *snoozed {
                 return None;
             }
-            let waiting = Instant::new(graph.node_index(snoozed)?, Point::Start);
+            let held = std::iter::once(snoozed.clone()).chain(check.tree.descendants(snoozed));
+            let waiting: Vec<Instant> = held
+                .filter_map(|key| Some(Instant::new(graph.node_index(&key)?, Point::Start)))
+                .collect();
             let awaited = Instant::new(graph.node_index(&target)?, Point::Finish);
             Some((snoozed, target, waiting, awaited))
         })
@@ -64,16 +70,15 @@ fn snooze_cycles(check: &GraphCheck<'_>, graph: &Dependencies, out: &mut Vec<Vio
     if snoozes.is_empty() {
         return;
     }
-    let waits = Waits::new(
-        snoozes
-            .iter()
-            .map(|(_, _, waiting, awaited)| (*waiting, *awaited)),
-    );
+    let waits =
+        Waits::new(snoozes.iter().flat_map(|(_, _, waiting, awaited)| {
+            waiting.iter().map(|instant| (*instant, *awaited))
+        }));
     let cycles = graph.cycles_with(&waits);
     for (snoozed, target, waiting, awaited) in snoozes {
-        let on_cycle = cycles
-            .iter()
-            .any(|members| members.contains(&waiting) && members.contains(&awaited));
+        let on_cycle = cycles.iter().any(|members| {
+            members.contains(&awaited) && waiting.iter().any(|instant| members.contains(instant))
+        });
         if !on_cycle {
             continue;
         }
@@ -82,7 +87,7 @@ fn snooze_cycles(check: &GraphCheck<'_>, graph: &Dependencies, out: &mut Vec<Vio
             snoozed,
             ViolationCode::SnoozeCycle,
             format!(
-                "{snoozed} is snoozed until {target}, which cannot finish before {snoozed} does (B6)"
+                "{snoozed} is snoozed until {target}, which cannot finish before {snoozed} (or work beneath it) does (B6)"
             ),
         );
         found.related.push(Subject::Node(target));

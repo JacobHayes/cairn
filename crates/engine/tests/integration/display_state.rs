@@ -251,7 +251,12 @@ fn snoozed_while_the_snooze_holds() {
         Snoozed,
         "snoozed beats the work started beneath it: the person set it aside"
     );
-    assert_eq!(held.shown("n_step_a"), Active);
+    assert_eq!(
+        held.shown("n_step_a"),
+        Snoozed,
+        "the container's snooze holds over the work started beneath it"
+    );
+    assert_eq!(held.stored("n_step_a"), State::Active);
 }
 
 /// D8 row 8, scheduled: an unblocked `auto_reach` milestone whose date is ahead; ready

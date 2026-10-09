@@ -80,6 +80,7 @@ impl Derived {
             dates: self.dates.node(graph, key),
             auto_reached: blocking.auto_reached(key),
             snoozed: blocking.snoozed(key).cloned(),
+            snoozed_via: blocking.snoozed_via(key).cloned(),
             needs_breakdown: blocking.needs_breakdown(key),
             gravity: priority.gravity(key),
             gravity_from: for_response(priority.gravity_from(key)),

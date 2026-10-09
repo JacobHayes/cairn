@@ -523,14 +523,16 @@ pub enum Mutation {
         /// The node.
         node: NodeKey,
     },
-    /// Snooze an actionable node (B6).
+    /// Snooze an actionable node, or a container (a group, or work with children) that has
+    /// work left beneath it, which holds every descendant off the acting frontier (B6).
     Snooze {
         /// The node.
         node: NodeKey,
         /// Until a date or a node.
         until: SnoozeTarget,
     },
-    /// Lift a snooze (B6).
+    /// Lift a snooze (B6). A node held only through a container's snooze is refused, naming
+    /// the container to unsnooze instead.
     Unsnooze {
         /// The node.
         node: NodeKey,

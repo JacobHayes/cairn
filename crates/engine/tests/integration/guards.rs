@@ -321,10 +321,12 @@ fn snooze_wait_cycles_are_rejected() {
             "{case}: {codes:?}"
         );
     }
-    assert!(
-        support::journey_patch(&records, &snooze("n_box", "n_inside")).is_ok(),
-        "a container may wait for its own child"
-    );
+    // B6: a container's snooze holds over its subtree, so its own child is no target.
+    let inside = support::codes(support::journey_patch(
+        &records,
+        &snooze("n_box", "n_inside"),
+    ));
+    assert_eq!(inside, [ViolationCode::SnoozeCycle]);
 }
 
 /// Review round 1: an `auto_reach` milestone that reads as reached has nothing left to do, so

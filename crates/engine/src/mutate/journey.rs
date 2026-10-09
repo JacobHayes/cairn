@@ -45,20 +45,7 @@ pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write
             Err(Rejected) => Vec::new(),
         },
         Mutation::Snooze { node, until } => snooze(session, node, until),
-        Mutation::Unsnooze { node } => match stored(session, node) {
-            Some(_) if snoozed(session, node) => {
-                vec![session.remove(GraphKey::Snooze(node.clone()))]
-            }
-            Some(_) => {
-                session.reject(
-                    ViolationCode::UnresolvedReference,
-                    Some(node),
-                    "the node is not snoozed",
-                );
-                Vec::new()
-            }
-            None => Vec::new(),
-        },
+        Mutation::Unsnooze { node } => unsnooze(session, node),
         Mutation::ApplyOverride { node, applied } => apply_override(session, node, applied),
         Mutation::RemoveOverride { node, kind } => remove_override(session, node, *kind),
         Mutation::SetAtomic { node, atomic } => set_atomic(session, node, *atomic),
@@ -89,6 +76,49 @@ fn snoozed(session: &Session<'_>, node: &NodeKey) -> bool {
     session
         .journey()
         .is_some_and(|journey| journey.graph.state.snoozes.contains_key(node))
+}
+
+/// B6: an unsnooze lifts the node's own snooze. A node with none of its own that sits under a
+/// container holding a snooze may be held through it: whether it still is on the graph the
+/// patch produces is the derived stage's to say, which refuses it naming the container. Any
+/// other node is not snoozed.
+fn unsnooze(session: &mut Session<'_>, node: &NodeKey) -> Vec<Write> {
+    if stored(session, node).is_none() {
+        return Vec::new();
+    }
+    if snoozed(session, node) {
+        return vec![session.remove(GraphKey::Snooze(node.clone()))];
+    }
+    if under_snoozed_container(session, node) {
+        session
+            .unsnoozed_through
+            .insert(node.clone(), session.ordinal);
+    } else {
+        session.reject(
+            ViolationCode::UnresolvedReference,
+            Some(node),
+            "the node is not snoozed",
+        );
+    }
+    Vec::new()
+}
+
+/// Whether an ancestor of the node holds a stored snooze, walking at most the depth limit.
+fn under_snoozed_container(session: &Session<'_>, node: &NodeKey) -> bool {
+    let Some(graph) = session.graph() else {
+        return false;
+    };
+    let mut current = graph.nodes.get(node);
+    for _ in 0..=cairn_schema::limits::CONTAINMENT_DEPTH_MAX {
+        let Some(parent) = current.and_then(|found| found.parent.as_ref()) else {
+            return false;
+        };
+        if graph.state.snoozes.contains_key(parent) {
+            return true;
+        }
+        current = graph.nodes.get(parent);
+    }
+    false
 }
 
 fn kind_of(session: &Session<'_>, node: &NodeKey) -> Option<NodeKind> {
@@ -386,9 +416,10 @@ fn shift_pin(session: &mut Session<'_>, node: &NodeKey, offset_days: SignedDays)
     })]
 }
 
-/// B6: only a node that can be acted on is snoozed, never on itself. Its kind and state are
-/// checked here; whether it is in scope is checked on the graph the patch produces (the
-/// derived stage), and a blocked node may be snoozed (Gating).
+/// B6: only a node that can be acted on, or a container with work left beneath it, is snoozed,
+/// never until itself. Its state is checked here; whether it is in scope, and for a group
+/// whether work is left beneath it, is checked on the graph the patch produces (the derived
+/// stage), and a blocked node may be snoozed (Gating).
 fn snooze(
     session: &mut Session<'_>,
     node: &NodeKey,
@@ -397,11 +428,10 @@ fn snooze(
     let Some(stored) = stored(session, node) else {
         return Vec::new();
     };
-    let kind = kind_of(session, node);
-    let (code, message) = if kind == Some(NodeKind::Group) || stored.state.is_terminal() {
+    let (code, message) = if stored.state.is_terminal() {
         (
             ViolationCode::SnoozeNotActionable,
-            "only an actionable node is snoozed (B6)",
+            "only an actionable node, or a container with work left beneath it, is snoozed (B6)",
         )
     } else if *until == cairn_schema::SnoozeTarget::Node(node.clone()) {
         (
