@@ -99,6 +99,7 @@ cairn/
   openapi/         generated OpenAPI document
   schema/          generated JSON Schema for the file format
   decisions/       judgment calls awaiting the user's review, one file each (AGENTS.md)
+  docs/            the guide to running a deployment, and the README's pictures
   mise.toml        pinned tools
   mise-tasks/      tasks, one file each: gen, check and its rungs (check/<N>), sim, build, serve
   scripts/         helpers the tasks share: the ladder runner

@@ -1,130 +1,151 @@
 # Cairn
 
-Cairn structures a process as one graph of nodes that must be decided or done: decisions,
-deliverables, actions, milestones, and groups. A route is the reusable template; a journey is
-a live graph with answers, progress, people, and dates. Every change is a validated, atomic
-patch, and Cairn ranks the frontier to answer "what should I do next?". People use it through
-a web UI; agents use the same capabilities through an HTTP API and an MCP server.
+A cairn is a pile of stones that marks a trail. Cairn does the same for work that has many
+steps, several people, and choices to make along the way: it shows where you are, what is
+waiting on what, and the one thing worth doing next.
 
-Cairn was built in feature briefs, all landed. The binary runs: `mise run serve` starts a local
-deployment at http://127.0.0.1:8080/.
+It is for anyone who runs the same kind of project more than once (evaluating a vendor,
+hiring for a role, launching a product) and keeps finding out too late that something was
+needed by Thursday. It also works for one-off projects that have no plan yet.
 
-## Documents
+![Answering a decision on the Next page: the list updates as soon as the answer is saved](docs/images/walkthrough.gif)
 
-- [`PRD.md`](PRD.md): what Cairn does, and its glossary.
-- [`ARCHITECTURE.md`](ARCHITECTURE.md): how it is built.
-- [`PRACTICES.md`](PRACTICES.md): how code is written and verified.
-- [`AGENTS.md`](AGENTS.md): the entry point for agents changing Cairn.
-- [`briefs/`](briefs/README.md): the milestones that built Cairn, with their proofs.
-- [`decisions/`](decisions/README.md): judgment calls awaiting review, one file each.
+## How it works
 
-## Built with
+- **A route is your plan, written once.** It lists the steps, the questions to settle, who
+  is involved, and the deadlines. You can describe it to an AI assistant, draw it in the
+  app, or write it as a file.
+- **A journey is one real run of that plan.** "Evaluate a search vendor" is a journey
+  started from the vendor evaluation route. It keeps your answers, progress, people,
+  dates, and notes. A journey can also start empty and grow as you go.
+- **Decisions shape the rest.** Some steps only matter for some projects. Answer "Does a
+  partner team run the testing?" with Yes and the partner's steps appear; answer No and
+  they drop out. Some questions only open once earlier work is done, so Cairn asks them
+  when they make sense.
+- **Cairn tells you what to do next.** Of everything you could start now, it puts first
+  what has the most riding on it, what is closest to its deadline, and what frees up other
+  people's work. It says why, in a sentence.
 
-[React Flow](https://reactflow.dev) (xyflow, MIT) draws the graph, [ELK](https://eclipse.dev/elk/) lays it out, and the fonts are Space Grotesk and IBM Plex (SIL OFL 1.1). The graph's attribution badge is hidden, as React Flow's licence allows; xyflow asks organizations that hide it in commercial use to subscribe to [React Flow Pro](https://reactflow.dev/pro) or [sponsor the project](https://github.com/sponsors/xyflow), and a deployment that does is following its request.
+Several people can work in the same journey at once, and every change is recorded with
+who made it and when. AI agents can do everything a person can, by the same rules.
+
+## A look around
+
+### Next: what you can do now
+
+A journey's Next page is a short, ranked list of what is ready, with the decisions that
+are waiting on someone. Hover a row to act on it.
+
+![The Next page of a fresh journey, listing seven things to do now](docs/images/next.png)
+
+### See an answer's effect before you save it
+
+Open a decision and pick an answer. Before you save, Cairn shows what it changes: here,
+Yes brings in three steps and frees one to start.
+
+![A decision open beside the list, with Yes chosen and a preview of what saving does](docs/images/decision.png)
+
+### The graph: what a step needs, and what it unlocks
+
+The Plan page draws the whole journey as a map you can pan and zoom. It opens on the
+current stage. Click a step to trace it: Cairn marks what it needs and what it unblocks,
+and fades the rest.
+
+![The graph traced from one step, with what it needs and what it unblocks marked](docs/images/graph.png)
+
+### The timeline: will the dates work?
+
+The timeline lays the plan out by date. When a deadline can no longer be met, it says so
+plainly, on the dates it affects ("2 days short").
+
+![The timeline of a product launch, with a milestone that is two days short](docs/images/timeline.png)
+
+### Light or dark
+
+Cairn follows your system's theme.
+
+![The graph in the dark theme](docs/images/dark.png)
+
+## Try it
+
+You need [mise](https://mise.jdx.dev), which installs the rest. From a clone:
+
+```sh
+mise install   # the pinned Rust, Node, and build tools
+npm ci         # the web app's packages
+```
+
+**The demo in your browser.** No server and no account: the app runs in the page with a
+few sample journeys (a vendor evaluation, a hiring loop, a product launch). Nothing is
+saved, so a reload starts fresh.
+
+```sh
+mise run build:wasm
+(cd web/app && npx vite)   # then open http://127.0.0.1:5173/
+```
+
+**The real thing, on your machine.** This builds Cairn and runs it with a local database,
+signed in as a development user.
+
+```sh
+mise run serve   # then open http://127.0.0.1:8080/
+```
+
+It starts empty. To get going, open Library, choose New, then "Import a file…", and pick
+one of the sample routes, such as `fixtures/vendor-evaluation/route.yaml`. Publish the
+draft, then start a journey from it.
+
+## Use it with an AI agent
+
+Agents get the same abilities as people, through an HTTP API under `/api/` and an MCP
+server at `/api/mcp`. Point a coding agent or chat assistant at a running Cairn and it can
+start a journey, walk the open decisions, record progress, and answer "what's next?".
+[`instructions/`](instructions/SKILL.md) teaches an agent how. Cairn can also run its own
+in-app assistant when one is configured.
+
+## Run your own
+
+Cairn is one binary over one database file. It serves the app, the API, and the MCP
+server on one port, and leaves TLS to a proxy in front of it. Sign-in can use your
+identity provider (OIDC), Tailscale, or Google Cloud IAP. [`docs/running.md`](docs/running.md)
+covers configuration, sign-in, proxies, upgrades, and backups.
 
 ## Develop
 
 Tools are pinned in `mise.toml`; tasks live in `mise-tasks/`.
 
 ```sh
-mise install          # pinned Rust toolchain, Node, wasm tool, and cargo-patina
-mise run check        # every rung of the validation ladder that exists
-mise run check:fast   # rungs 1 to 3: the inner loop (Rust rungs skipped when the change has no Rust input)
+mise run check        # every rung of the validation ladder
+mise run check:fast   # rungs 1 to 3: the inner loop
+mise run check:1      # one rung
 mise run test dates   # the Rust and web tests matching a filter; none: those for what changed
 mise run e2e canvas   # one Playwright spec in Chromium, optionally one test by title
-mise run check:1      # one rung
-mise run gen          # regenerate the generated paths
+mise run gen          # regenerate the generated files
 mise run sim          # simulation campaigns under patina; not part of check
 mise run build        # the release binary, with the web build embedded
-mise run serve        # a local deployment from cairn.dev.toml, signed in as the dev user
+mise run serve        # a local deployment from cairn.dev.toml
 ```
 
-## Run
+CI runs `mise run check` on every push and nightly, and `mise run sim` nightly.
 
-`cairn` is one binary: `cairn serve` runs the HTTP API, the MCP endpoint at `/api/mcp`,
-the revision stream, the assistant when one is configured, and the web UI on one port, over
-one database file. The API, MCP, metrics, and sign-in live under `/api/`; OAuth metadata
-under `/.well-known/` and the health check at `/healthz` sit beside it; every other path is
-the web UI, so a screen's address (`/journeys/<id>`) loads directly. Build it with
-`mise run build` (the web build is embedded; a binary built without it refuses to serve).
-The other commands: `cairn migrate` creates the database or brings its schema up to date,
-`cairn config check` validates a configuration (providers included) without opening
-anything, and `cairn version`.
+More reading:
 
-The configuration is a TOML file, passed as `--config FILE` or named by `CAIRN_CONFIG`.
-Nothing a deployment must choose has a default; `cairn.dev.toml` is a complete example:
+- [`PRD.md`](PRD.md): what Cairn does, with its glossary.
+- [`ARCHITECTURE.md`](ARCHITECTURE.md): how it is built.
+- [`PRACTICES.md`](PRACTICES.md): how code is written and checked.
+- [`DESIGN.md`](DESIGN.md): the look and feel.
+- [`AGENTS.md`](AGENTS.md): where an agent changing Cairn starts.
+- [`briefs/`](briefs/README.md): the milestones that built Cairn, with their proofs.
+- [`decisions/`](decisions/README.md): judgment calls awaiting review, one file each.
 
-```toml
-database = "/var/lib/cairn/cairn.db"     # relative paths are relative to this file
-listen = "127.0.0.1:8080"
-public_url = "https://cairn.example.com/" # links, OAuth redirects, and the Host served
-timezone = "America/New_York"            # A9: "today" for everyone
+## Built with
 
-[rank]                                   # optional: the PRD's defaults otherwise
-urgency = 0.40
-late = 0.15
-gravity = 0.25
-leverage = 0.20
-horizon_days = 14
-undecided_discount = 0.5
-other_owner_factor = 2.0
-
-[[auth]]                                 # one or more, asked in this order
-kind = "oidc"                            # or dev, builtin_oauth, tailscale, gcp_iap
-name = "corp"
-issuer = "https://login.example.com"
-client_id = "cairn"
-auto_link = true
-
-[[auth]]
-kind = "builtin_oauth"                   # MCP clients and agent tokens
-name = "agents"
-sign_in_with = "corp"
-
-[assistant]                              # optional (I5)
-protocol = "anthropic_messages"          # or openai_responses, chat_completions
-endpoint = "https://api.anthropic.com/v1"
-model = "a-model-name"
-```
-
-Each provider kind's settings: `dev` (`user`, `verified_emails`, `token`, `auto_link`,
-`allow_off_loopback`), `oidc` (`issuer`, `client_id`, `client_secret`, `auto_link`),
-`builtin_oauth` (`sign_in_with`), `tailscale` (`mode` direct with `socket`, or proxy, with
-`trusted_proxies` listing the addresses or networks of a proxy on another machine, or left
-out for `tailscale serve` on this one; `auto_link`), `gcp_iap` (`audience`, the IAP-protected backend service as
-`/projects/<number>/global/backendServices/<id>`; `auto_link`). Behind Google Cloud
-Identity-Aware Proxy, `gcp_iap` verifies the signed assertion IAP adds to every request
-(`x-goog-iap-jwt-assertion`) against Google's keys, so each person is signed in as their
-Google account with no sign-in step of Cairn's own. The environment overrides `database`, `listen`, `public_url`, and `timezone`
-with `CAIRN_DATABASE`, `CAIRN_LISTEN`, `CAIRN_PUBLIC_URL`, and `CAIRN_TIMEZONE`, and supplies
-secrets: `CAIRN_ASSISTANT_API_KEY`, and `CAIRN_AUTH_<NAME>_TOKEN` (dev) or
-`CAIRN_AUTH_<NAME>_CLIENT_SECRET` (OIDC), `<NAME>` being the provider's name in capitals
-with `-` as `_`.
-
-Cairn serves plain HTTP. TLS termination, process supervision, and containers are left to
-what runs it: put it behind a proxy that terminates TLS and forwards the `Host` header, and
-set `public_url` to the address people use. Requests naming any other host are refused
-(421), as are loopback names unless the listener is bound to loopback. `GET /healthz` needs
-no credential, for the proxy's health check: it answers 200 while the server is serving and
-503 once its database has failed closed (restart the process). Logs are JSON lines on
-standard error; metrics are at `/api/metrics` in Prometheus's format, behind the same auth
-as the API (a scraper uses an agent token). An OIDC provider's redirect URI is
-`<public_url>api/auth/<name>/callback`.
-
-A process that opens the database holds it exclusively, so `cairn serve` and `cairn migrate`
-never share one: run against a live server, `migrate` fails with a locking error. The server
-applies any migrations the database lacks when it starts. To upgrade, stop the server, run
-`cairn migrate` with the new binary (a failed migration then shows before anything serves),
-and start it again. There is no online backup: stop the server, copy the database file
-together with the two files the store keeps beside it, its log and its write-ahead log, and
-start it again; restore all three together. For `cairn.db` those are `cairn.db-log` and
-`cairn.db-wal` (the log takes the database's name with its extension set to `.db-log`, so
-`data.sqlite` keeps `data.db-log` and `data.sqlite-wal`). Committed writes sit in the log
-until the store checkpoints them into the database file, so that file alone is not a
-backup. Do not open the database with another SQLite tool while Cairn runs.
-
-CI (`.github/workflows/check.yml`) runs `mise run check` on every push and nightly, and
-`mise run sim` nightly outside the gate.
+[React Flow](https://reactflow.dev) (xyflow, MIT) draws the graph, [ELK](https://eclipse.dev/elk/)
+lays it out, and the fonts are Space Grotesk and IBM Plex (SIL OFL 1.1). The graph's
+attribution badge is hidden, as React Flow's licence allows; xyflow asks organizations that
+hide it in commercial use to subscribe to [React Flow Pro](https://reactflow.dev/pro) or
+[sponsor the project](https://github.com/sponsors/xyflow), and a deployment that does is
+following its request.
 
 ## License
 

@@ -1,6 +1,6 @@
 # The development deployment `mise run serve` runs: loopback only, every request signed in
 # as the dev user, the database under .cairn/ (ignored). A real deployment writes its own
-# file; see README.md, Run. Every value here is chosen, none defaulted.
+# file; see docs/running.md. Every value here is chosen, none defaulted.
 database = ".cairn/dev.db"
 listen = "127.0.0.1:8080"
 public_url = "http://127.0.0.1:8080/"
