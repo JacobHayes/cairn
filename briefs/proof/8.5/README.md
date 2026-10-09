@@ -60,9 +60,9 @@ Demo: sample data in this tab, nothing persists.
 
 ## Guard rails
 
-- `data/sync.test.ts`: the precedence, each state's colour by the rule, the 300ms, 5s and 2s thresholds.
-- `e2e/sync.spec.ts`: saving, updating, behind (a click retries), reconnecting, offline, and a
-  rejected change kept under Needs you until discarded.
+- `data/sync.test.ts`: the precedence and the 300ms, 5s and 2s thresholds.
+- `e2e/sync.spec.ts`: saving, updating, behind (a click retries), and a rejected change kept under
+  Needs you until discarded.
 
 Known limits:
 - Undo, and "N kept" edits while offline, are not built: offline is a state only.

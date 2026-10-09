@@ -1,20 +1,22 @@
 # Proof for brief 8.2: Priority explanations and informational consequences
 
 Priority now explains itself where a person or an agent reads it. A container reports the
-peak gravity inside it, naming the node. A node's detail lists what finishing it would free and
+gravity of its whole area. A node's detail lists what finishing it would free and
 what it would not yet free, with what else each waits on. Every write reports what it
 unlocked and what it moved in or out of scope, apart from its warnings. The gravity, leverage
 and rank formulas are unchanged.
 
-## A container's peak gravity
+## A container's subtree gravity
 
-Hiring loop, fixture values, one level down against any depth. The container's own gravity
-stays what rides on the whole container.
+A container reports the gravity of its whole area: itself, its open descendants and everything
+downstream of any of them, each node once. A stage holds two actions, each of weight 1, and a
+weight-5 action waits on both.
 
-| After | Container | Own gravity | One level down (old) | Peak gravity |
-|---|---|---|---|---|
-| created | Panel debrief | 3 | 4 (Collect written feedback) | 5, `n_debrief_scorecard` |
-| interviews broken down | Interview loop | 2 | 9 (the skipped phone screen, closed) | 7, `n_interview_one` |
+| State | Each action's gravity | The stage's subtree gravity |
+|---|---|---|
+| Nothing done | 6 | 7 (the shared action counts once, not twice) |
+| One action done | | 6 (the other action and what waits on it) |
+| Both done | | 0 |
 
 ## What finishing a node frees, and what it does not
 

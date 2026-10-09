@@ -34,12 +34,11 @@ Revising an answer counts progress: dropping a started action says so, and the r
 choice reports no effect. A date decision names the milestone it pins and an entity decision
 the role it fills.
 
-## Budgets (browser worker, median of nine, including the message round trip)
+## Size figures (browser worker, median of nine, including the message round trip; reported, not gated)
 
 | Generated journey | Level with collapse and a class left out | Trace |
 |---|---|---|
-| 500 nodes | 5.3 ms (budget 16) | 1.6 ms (budget 8) |
-| 2,000 nodes | 23.4 ms (budget 60) | 0.5 ms (budget 30) |
+| 2,000 nodes | 23.4 ms | 0.5 ms |
 
 ## Known limits
 

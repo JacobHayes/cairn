@@ -54,13 +54,6 @@ so Back closes it) where a tapped node opens as a sheet over the map:
 ![Full-screen map](phone-map.png)
 ![Node sheet](phone-sheet.png)
 
-## Guard rails
-
-- `mise run lint:css` (rung 1): one scroller per region, no `vh` heights, tokens for colour and radius.
-- `e2e/frame.spec.ts`: History reachable at the end of the inspector (or sheet) on the canvas, decisions,
-  timeline and summary at 1440 and 1024px; a tablet's scrolling screens end above the sheet; the
-  decision canvas leaves the wheel to itself; the phone's swipe, wheel and map; the theme across a reload.
-
 Known limits:
 - The journey head is still several rows (the journey pages brief shrinks it); a taller-than-window head scrolls the region.
 - The rail has no Recent list yet, and the strip still carries the old Live badge until the sync chip lands.

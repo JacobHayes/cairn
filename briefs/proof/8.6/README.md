@@ -20,14 +20,12 @@ lineage, named by its route and version:
 
 ![NEXT, LIST and the journey card](2-next-list-and-journey-card.png)
 
-PLAN's three projections, with the switcher's right edge where it was on NEXT:
+PLAN's projections, with the switcher's right edge where it was on NEXT:
 
 ![PLAN, GRAPH](3-plan-graph.png)
 ![PLAN, LIST](4-plan-list.png)
-![PLAN, TIMELINE](5-plan-timeline.png)
 
-The toolbar has the same chips on every projection; on the timeline DECISIONS, the filter's
-kinds and the search narrow its rows. The decision view is PLAN, GRAPH with DECISIONS on;
+The toolbar has the same chips on every projection. The decision view is PLAN, GRAPH with DECISIONS on;
 what a decision's answer affects moved into the decision's own detail, unchanged:
 
 ![The decision view](6-decision-view.png)
@@ -39,7 +37,6 @@ header); every active one is a removable chip under the toolbar, and the count s
 button. NEXT's filter has the same shape:
 
 ![The filter](7-filter-open.png)
-![Active filters](8-active-filter-chips.png)
 
 The journey's `...` menu holds what the overview did: edit structure, rename, save as a
 route, re-link, upgrade when one is available, the Summary page, the keys, and the link. The
@@ -60,16 +57,10 @@ than 48rem puts the tabs and switcher on one row and the chips on the next. From
 the projection keeps the whole width, a node's detail is a sheet along the bottom (the journey
 card shrinks to one line), and a canvas fills its region instead of scrolling inside it:
 
-![The journey menu on a phone](11-phone-menu.png)
 ![The toolbar on a tablet](12-tablet-toolbar.png)
 ![A node's sheet on a tablet](13-tablet-sheet.png)
 
 ## Known limits
 
 - Deeper per-projection behaviour (the decision view's fading, the Plan list's tree and
-  Columns, MINE on the graph) comes with the tracks that redesign each projection. In the
-  decision view the filter only says that decisions are all it shows.
-- The tablet sheet and the phone's inert map with its full-screen layer belong to the frame
-  (8.4), which replaces this unit's interim rules at integration.
-- Proposal chips, Insert segment, Select, and the Library's segments are not here: the
-  features they open do not exist yet.
+  Columns, MINE on the graph) comes with the tracks that redesign each projection.

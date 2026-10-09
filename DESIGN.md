@@ -148,7 +148,7 @@ Mono uppercase is kept for labels, column headers, keys and status chips; button
 - **Selection bar.** A graphite bar floating bottom-centre over the workspace, above the strip, while several items are selected: the count, the bulk actions, and Clear.
 - **Rank tag.** A small square hanging off a card's top-left corner: the primary-button pair (`--ink-fill` with `--color-surface` mono figures), so it flips with the theme.
 - **Hanging tag.** A small mono label hanging off a card's top-right or bottom-right edge for transient or lens information (a trace role, a signal value). Each slot has one owner, so two tags never displace each other.
-- **Dates.** Words first: `Decide by Oct 14`, `Due in 3 days`, `3 days late`. A date is `Oct 14` in the current year and `Oct 14 2027` otherwise; ISO dates appear only in tooltips and History. A soon date is in warning ink and an overdue one in error ink, always with its words. Dates in a column or on an axis are mono with tabular figures.
+- **Dates.** Words first: `Decide by Oct 14`, `Due in 3 days`, `3 days late`. A date is `Oct 14` in the current year and `Oct 14, 2027` otherwise; ISO dates appear only in tooltips and History. A soon date is in warning ink and an overdue one in error ink, always with its words. Dates in a column or on an axis are mono with tabular figures.
 - **Diff and log blocks.** Mono, hairline border. Added and removed lines get `--color-add` and `--color-del`, and hunk headers are steel.
 
 ## Charts

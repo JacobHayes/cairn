@@ -52,27 +52,29 @@ The shape every brief follows.
 | 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 | landed |
 | 6.2 | Durability testbed | `testbeds/durability` | 4.1 | landed |
 | 7.1 | Unlocked nodes first in a pass | `web/app` | 8.2, 8.9 | planned |
-| 7.2 | A rationale on answers | `crates/schema`, `crates/engine`, `crates/store`, `crates/store-turso`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.4 (screens: 8.7, 8.9) | planned |
-| 7.3 | The `requires_note` guard | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `openapi/`, `web/client`, `web/app` | 5.6 (screens: 8.7, 8.9) | planned |
-| 7.4 | Snoozing a container | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.3 (screens: 8.7, 8.9) | planned |
-| 7.5 | Notices: work the final milestone cannot see | `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.6 (draft card: 8.11) | planned |
+| 7.2 | A rationale on answers | `crates/schema`, `crates/engine`, `crates/store`, `crates/store-turso`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.4 (screens: 8.7, 8.9) | landed |
+| 7.3 | The `requires_note` guard | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `openapi/`, `web/client`, `web/app` | 5.6 (screens: 8.7, 8.9) | landed |
+| 7.4 | Snoozing a container | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.3 (screens: 8.7, 8.9) | landed |
+| 7.5 | Notices: work the final milestone cannot see | `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.6 (draft card: 8.11) | landed |
 | 7.6 | Segments: model and insert | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `fixtures/` | 4.3 | planned |
 | 7.7 | Segment screens | `web/app` | 7.6, 8.6, 8.11 | planned |
 | 7.8 | Insertion upgrade | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `web/app`, `fixtures/` | 7.6 (screens: 7.7) | planned |
 | 7.9 | Save as segment and link | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `web/app` | 7.6 (screens: 7.7) | planned |
-| 8.1 | Display state | `crates/schema`, `crates/engine`, `crates/mcp`, `instructions/`, `fixtures/`, `openapi/`, `web/client`, `web/app` | 2.6 | planned |
-| 8.2 | Priority explanations and consequences | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `fixtures/` | 8.1 | planned |
-| 8.3 | Level collapse and answer effects | `crates/schema`, `crates/engine`, `crates/wasm`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/wasm`, `web/app` | 8.2 | planned |
-| 8.4 | Frame and Graticule migration | `web/app`, `design/`, `mise-tasks/` | 5.8 | planned |
-| 8.5 | Sync chip | `web/app` | 8.4 | planned |
-| 8.6 | Journey pages, navigation, and addresses | `web/app` | 8.4, 8.1 | planned |
+| 8.1 | Display state | `crates/schema`, `crates/engine`, `crates/mcp`, `instructions/`, `fixtures/`, `openapi/`, `web/client`, `web/app` | 2.6 | landed |
+| 8.2 | Priority explanations and consequences | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `fixtures/` | 8.1 | landed |
+| 8.3 | Level collapse and answer effects | `crates/schema`, `crates/engine`, `crates/wasm`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/wasm`, `web/app` | 8.2 | landed |
+| 8.4 | Frame and Graticule migration | `web/app`, `design/`, `mise-tasks/` | 5.8 | landed |
+| 8.5 | Sync chip | `web/app` | 8.4 | landed |
+| 8.6 | Journey pages, navigation, and addresses | `web/app` | 8.4, 8.1 | landed |
 | 8.7 | Inspector | `web/app` | 8.4, 8.1 (second part: 8.2, 8.3) | planned |
-| 8.8 | Graph | `web/app` | 8.4, 8.1, 8.3 (peak chip: 8.2) | planned |
+| 8.8 | Graph | `web/app` | 8.4, 8.1, 8.3 (subtree-gravity chip: 8.2) | planned |
 | 8.9 | Next page | `web/app` | 8.5, 8.6, 8.7 | planned |
 | 8.10 | Plan list and timeline | `web/app` | 8.6, 8.1 (Affects: 8.3) | planned |
 | 8.11 | Authoring and proposal review in the frame | `web/app` | 8.6, 8.7, 8.8 | planned |
 
 Rule for links between screens: a screen only links to screens that already exist. The brief that builds a screen adds the entry points into it from earlier screens (5.7 adds "break down" to triage and the upgrade, save-as-route, and re-link entries to the overview; 5.8 mounts its panel on earlier screens).
+
+Until 8.8 lands, the graph still filters per kind, drills into a container with `open=`, shows not-relevant nodes by default, sets a card's border from its gravity, and does not draw the layout's own edge sections. PRD C1, C2, C4 and C6 and ARCHITECTURE's Canvas section describe the state 8.8 delivers.
 
 ## Order
 
@@ -124,7 +126,7 @@ Every PRD requirement id and named section, mapped to the brief that owns its ac
 | Identity and references | 1.2 | 2.1 (import matching, key minting) |
 | Containment | 2.2 (effective graph), 2.4 (what it blocks) | 2.1, 2.3, 2.5 |
 | Gating | 2.2 (relevance), 2.4 (blocked, frontier) | - |
-| Priority | 2.5 | 2.6, 5.2, 5.3, 8.2 (peak gravity, still waiting) |
+| Priority | 2.5 | 2.6, 5.2, 5.3, 8.2 (subtree gravity, still waiting) |
 | Invariants: graph structural | 2.1 | 2.2 (cycle check over the effective graph), 2.4 (snooze wait cycles) |
 | Invariants: date network | 2.3 | 2.1 |
 | Invariants: journey state | 2.1 | 3.1 (revision), 4.1 |
