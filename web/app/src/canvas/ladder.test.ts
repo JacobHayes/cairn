@@ -13,6 +13,7 @@ test("at Stages the stage holding the frontier is open and the rest collapsed; t
   expect(collapsedAt("stages", nodes, current, [], [])).toEqual(["s2", "s3"]);
   expect(collapsedAt("stages", nodes, current, ["s2"], ["s1"])).toEqual(["s1", "s3"]);
   expect(collapsedAt("work", nodes, current, [], ["s1g"])).toEqual(["s1g"]);
+  expect(collapsedAt("work", nodes, current, [], ["s1g", "removed"])).toEqual(["s1g"]);
   expect(withStep({ step: undefined, open: ["a"], shut: ["b"] }, "work")).toEqual({ step: "work", open: [], shut: [] });
   // Stages leaves out a top-level decision and what is beneath it, never a stage, a milestone or a node inside a stage.
   const mixed = [...nodes, node("d", "decision"), node("da", "action", "d"), node("m", "milestone"), node("sd", "decision", "s1")];

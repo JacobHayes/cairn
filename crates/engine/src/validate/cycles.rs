@@ -10,13 +10,20 @@
 //!
 //! Snooze wait cycles (B6): a node snooze makes the snoozed node's own work wait for its
 //! target, so a target that transitively depends on the snoozed node (an ancestor of it, a
-//! dependent, or another snoozed node waiting the other way) would hold it hidden forever. A
-//! container's snooze holds over its whole subtree, so each node beneath it waits too, which
-//! also catches a target inside the subtree and one that depends on anything in it. The
-//! same search, with each node snooze as a wait from the snoozed node's start (and a
-//! container's descendants' starts) to the target's finish, finds them over the full set, so
-//! whether a snooze is legal never changes with an answer. Each snooze on a cycle is reported at its node. They are looked for only when the
-//! dependency graph itself has no cycle, so one cause is reported once.
+//! dependent, or another snoozed node waiting the other way) would hold it hidden forever. The
+//! search treats each node snooze as a wait from the snoozed node's start to the target's
+//! finish, over the full set, so whether a snooze is legal never changes with an answer.
+//!
+//! A container's snooze holds over its whole subtree, so when the patch being applied sets a
+//! snooze (`GraphCheck::snoozes_made`), a second search lets every container snooze in the
+//! graph make each node beneath it wait, and reports the snoozes the patch set: a target
+//! inside the subtree, or one that depends on anything in it, and a cycle through a
+//! container snooze set earlier. That stricter rule is a write-time check, not an invariant of
+//! the stored graph: a journey stored before it existed may hold a container snoozed until its
+//! own descendant, and it must keep loading, deriving and accepting writes (an unsnooze above
+//! all). Such a snooze holds like any other until its target completes. Each snooze on a cycle
+//! is reported at its node. They are looked for only when the dependency graph itself has no
+//! cycle, so one cause is reported once.
 //!
 //! Cost at the limits: building the graph and finding its strongly connected components are
 //! both O(instants + edges), about 120,000 steps.
@@ -38,14 +45,24 @@ pub(super) fn check(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let graph = Dependencies::build(check.document, check.tree);
     let found_before = out.len();
     dependency_cycles(check, &graph, out);
-    if out.len() == found_before {
-        snooze_cycles(check, &graph, out);
+    if out.len() > found_before {
+        return;
+    }
+    snooze_cycles(check, &graph, out, false);
+    if out.len() == found_before && check.snoozes_made.is_some_and(|made| !made.is_empty()) {
+        snooze_cycles(check, &graph, out, true);
     }
 }
 
-/// B6: each node snooze whose target transitively depends on the snoozed node, or for a
-/// container on anything beneath it, or is beneath it.
-fn snooze_cycles(check: &GraphCheck<'_>, graph: &Dependencies, out: &mut Vec<Violation>) {
+/// B6: each node snooze whose target transitively depends on the snoozed node. With
+/// `subtrees`, each container snooze holds over everything beneath the container, and only the
+/// snoozes the patch set are reported.
+fn snooze_cycles(
+    check: &GraphCheck<'_>,
+    graph: &Dependencies,
+    out: &mut Vec<Violation>,
+    subtrees: bool,
+) {
     let snoozes: Vec<(&NodeKey, NodeKey, Vec<Instant>, Instant)> = check
         .document
         .state
@@ -59,7 +76,12 @@ fn snooze_cycles(check: &GraphCheck<'_>, graph: &Dependencies, out: &mut Vec<Vio
             if target == *snoozed {
                 return None;
             }
-            let held = std::iter::once(snoozed.clone()).chain(check.tree.descendants(snoozed));
+            let beneath = if subtrees {
+                check.tree.descendants(snoozed)
+            } else {
+                Vec::new()
+            };
+            let held = std::iter::once(snoozed.clone()).chain(beneath);
             let waiting: Vec<Instant> = held
                 .filter_map(|key| Some(Instant::new(graph.node_index(&key)?, Point::Start)))
                 .collect();
@@ -79,7 +101,11 @@ fn snooze_cycles(check: &GraphCheck<'_>, graph: &Dependencies, out: &mut Vec<Vio
         let on_cycle = cycles.iter().any(|members| {
             members.contains(&awaited) && waiting.iter().any(|instant| members.contains(instant))
         });
-        if !on_cycle {
+        let reported = !subtrees
+            || check
+                .snoozes_made
+                .is_some_and(|made| made.contains_key(snoozed));
+        if !on_cycle || !reported {
             continue;
         }
         let mut found = super::at_node(

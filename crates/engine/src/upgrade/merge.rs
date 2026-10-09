@@ -535,7 +535,9 @@ impl Merger<'_> {
                 }
                 (Some(before), None, Some(held)) => {
                     let references = references();
-                    if held == before && references.is_empty() {
+                    // An insertion's map onto it uses it as much as a participation does.
+                    let unused = references.is_empty() && !maps_role(&self.found.merged, key);
+                    if held == before && unused {
                         self.found.merged.roles.remove(key);
                         self.found.merged.retired_keys.roles.insert(key.clone());
                         None
@@ -584,7 +586,8 @@ impl Merger<'_> {
                 }
                 (Some(_), Some(after), Some(held)) => held != after,
                 (Some(before), None, Some(held)) => {
-                    let unused = kind_references(&self.found.merged, key).is_empty();
+                    let unused = kind_references(&self.found.merged, key).is_empty()
+                        && !maps_kind(&self.found.merged, key);
                     if held == before && unused {
                         self.found.merged.participation_kinds.remove(key);
                         self.found.merged.retired_keys.kinds.insert(key.clone());
@@ -736,6 +739,22 @@ pub(crate) fn role_references(graph: &Document, role: &RoleKey) -> BTreeSet<Role
         found.insert(RoleReference::DefaultOwner);
     }
     found
+}
+
+/// B13: whether an insertion in the graph maps a segment role onto the role.
+fn maps_role(graph: &Document, role: &RoleKey) -> bool {
+    graph
+        .insertions
+        .values()
+        .any(|insertion| insertion.roles.values().any(|mapped| mapped == role))
+}
+
+/// B13: whether an insertion in the graph maps a segment kind onto the kind.
+fn maps_kind(graph: &Document, kind: &KindKey) -> bool {
+    graph
+        .insertions
+        .values()
+        .any(|insertion| insertion.kinds.values().any(|mapped| mapped == kind))
 }
 
 /// A7: every node's participation of a kind.

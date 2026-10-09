@@ -57,6 +57,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             document,
             tree: &tree,
             journey: true,
+            snoozes_made: None,
         };
         let mut broken = unresolved(document, &tree, &candidate.deployment);
         crate::validate::with_plan(&graph, &candidate.deployment, &mut broken);

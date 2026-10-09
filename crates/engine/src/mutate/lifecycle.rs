@@ -6,8 +6,8 @@ use std::collections::BTreeSet;
 use cairn_schema::{
     DraftSource, GraphId, GraphKey, GraphRecord, JourneyHeader, JourneyId, JourneyStatus, Limit,
     Lineage, LocalEdit, Markdown, Mutation, NodeKey, NodeState, PatchTarget, Provenance, Record,
-    RecordKey, RetiredKey, RouteHeader, RouteId, RouteKind, Title, VersionNumber, ViolationCode,
-    Write,
+    RecordKey, RetiredKey, RouteHeader, RouteId, RouteKind, Subject, Title, VersionNumber,
+    ViolationCode, Write,
 };
 
 use super::Session;
@@ -237,12 +237,43 @@ fn upgrade(session: &mut Session<'_>, to: VersionNumber) -> Vec<Write> {
         }
         return Vec::new();
     }
+    let flipped = cardinality_flips(&journey.graph, &changes);
+    session.cardinality_changed.extend(flipped);
     let mut writes = edit_journey(session, |header| header.lineage = Some(target));
     writes.extend(changes.into_iter().map(|change| match change {
         crate::upgrade::Change::Put(record) => session.put(*record),
         crate::upgrade::Change::Remove(key) => session.remove(key),
     }));
     writes
+}
+
+/// B13: the roles and kinds the upgrade writes with a cardinality other than the journey's,
+/// for the insertion guard that `put_role` and `put_kind` feed on an ordinary edit.
+fn cardinality_flips(
+    graph: &crate::graph::Document,
+    changes: &[crate::upgrade::Change],
+) -> Vec<Subject> {
+    changes
+        .iter()
+        .filter_map(|change| {
+            let crate::upgrade::Change::Put(record) = change else {
+                return None;
+            };
+            match record.as_ref() {
+                GraphRecord::Role(role) => graph
+                    .roles
+                    .get(&role.key)
+                    .is_some_and(|held| held.multi != role.multi)
+                    .then(|| Subject::Role(role.key.clone())),
+                GraphRecord::Kind(kind) => graph
+                    .participation_kinds
+                    .get(&kind.key)
+                    .is_some_and(|held| held.multi != kind.multi)
+                    .then(|| Subject::Kind(kind.key.clone())),
+                _ => None,
+            }
+        })
+        .collect()
 }
 
 /// Each node the upgrade would write with more than `resource_count_per_node_max` resources

@@ -124,10 +124,13 @@ export function currentStages(nodes: readonly GraphNode[], frontier: Iterable<st
 
 /**
  * The containers the level collapses: at Stages every stage that is not current, unless the
- * viewer expanded it; at any step every container the viewer collapsed.
+ * viewer expanded it; at any step every container the viewer collapsed. A remembered collapse
+ * of a node the graph no longer has (removed in another tab) is dropped: the projection rejects
+ * unknown keys.
  */
 export function collapsedAt(step: Step, nodes: readonly GraphNode[], current: ReadonlySet<string>, open: readonly string[], shut: readonly string[]): string[] {
-  const collapsed = new Set(shut);
+  const known = new Set(nodes.map((node) => node.key));
+  const collapsed = new Set(shut.filter((key) => known.has(key)));
   if (step === "stages") {
     for (const node of nodes) {
       if (isStage(node) && !current.has(node.key) && !open.includes(node.key)) {

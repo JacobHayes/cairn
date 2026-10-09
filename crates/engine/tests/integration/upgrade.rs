@@ -824,3 +824,55 @@ fn a_dangling_field_conflict_offers_only_the_journeys_side() {
         .collect();
     assert_eq!(reasons, [cairn_schema::UnresolvedReason::NotOffered; 2]);
 }
+
+/// B13, B7: a role an insertion maps onto, unused otherwise, is neither flipped to
+/// multi-valued nor silently removed by an upgrade: the flip is rejected, and the removal is
+/// a conflict that keeps the role by default.
+#[test]
+fn an_upgrade_leaves_alone_what_an_insertion_maps_onto() {
+    let spare: cairn_schema::Role<cairn_schema::KeyRefs> =
+        cairn_schema::from_yaml("{key: r_spare, id: spare}").unwrap();
+    let mut records = support::with_segment(support::vendor_after(1), "security-review");
+    let first = cairn_schema::Lineage {
+        route: "vendor-evaluation".parse().unwrap(),
+        version: VersionNumber::FIRST,
+    };
+    let held = records.versions.get_mut(&first).unwrap();
+    held.graph.roles.put(spare.clone()).unwrap();
+    let records = support::accepted_on(
+        &records,
+        "j_vendor_eval",
+        "- op: add_role\n  role: {key: r_spare, id: spare}\n\
+         - op: insert_segment\n  insertion: i_one\n  segment: {route: security-review, version: 1}\n  \
+         omit: [n_threat_model, n_who_reviews]\n  roles: {r_reviewer: {existing: r_spare}}\n",
+    );
+
+    let mut multi = support::vendor_v2();
+    multi
+        .roles
+        .put(cairn_schema::Role {
+            multi: true,
+            ..spare
+        })
+        .unwrap();
+    let flipped = support::publish_vendor(&records, multi);
+    let proposed = support::propose(&flipped, "pr_upgrade", JOURNEY, &upgrade_to_two(&flipped));
+    assert_eq!(
+        support::codes(support::apply_proposal(&proposed, "pr_upgrade")),
+        [ViolationCode::InsertionInvalid]
+    );
+
+    let removed = support::publish_vendor(&records, support::vendor_v2());
+    let draft = upgrade_to_two(&removed);
+    assert!(matches!(
+        conflicts(&draft)[..],
+        [Conflict::Role { route: None, .. }]
+    ));
+    let kept = applied(&removed, &draft);
+    assert!(
+        support::vendor_graph(&kept)
+            .roles
+            .get(&"r_spare".parse().unwrap())
+            .is_some()
+    );
+}

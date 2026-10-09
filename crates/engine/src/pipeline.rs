@@ -234,6 +234,7 @@ fn reverify(candidate: &Records, patch: &Patch, published: &[cairn_schema::Linea
             document: graph,
             tree: &tree,
             journey: !graph.state.is_empty(),
+            snoozes_made: None,
         };
         let mut violations = Vec::new();
         crate::validate::with_plan(&check, &candidate.deployment, &mut violations);
