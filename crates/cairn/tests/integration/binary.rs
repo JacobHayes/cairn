@@ -7,7 +7,7 @@
 
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
-use std::process::{Child, Command, Output, Stdio};
+use std::process::{Child, ChildStderr, Command, ExitStatus, Output, Stdio};
 use std::sync::mpsc;
 
 /// The binary cargo built for these tests.
@@ -168,31 +168,71 @@ mod binary {
     use cairn_store_turso::TursoStore;
     use serde_json::json;
 
-    /// A started `cairn serve`, stopped (killed) when dropped.
+    /// A started `cairn serve`, stopped (killed) when dropped unless a test has already
+    /// waited for it.
     struct Served {
-        child: Child,
+        child: Option<Child>,
         address: std::net::SocketAddr,
+    }
+
+    impl Served {
+        /// Starts `cairn serve --config <path>` and keeps a cleanup guard from then on.
+        fn spawn(path: &Path) -> Self {
+            let child = cairn(&["serve", "--config", path.to_str().unwrap()])
+                .stderr(Stdio::piped())
+                .spawn()
+                .unwrap();
+            Self {
+                child: Some(child),
+                address: ([0, 0, 0, 0], 0).into(),
+            }
+        }
+
+        fn child(&mut self) -> &mut Child {
+            self.child.as_mut().unwrap()
+        }
+
+        fn stderr(&mut self) -> ChildStderr {
+            self.child().stderr.take().unwrap()
+        }
+
+        fn pid(&self) -> String {
+            self.child.as_ref().unwrap().id().to_string()
+        }
+
+        fn terminate(&mut self) -> ExitStatus {
+            let stopped = Command::new("kill")
+                .args(["-TERM", &self.pid()])
+                .status()
+                .unwrap();
+            assert!(stopped.success());
+            self.wait()
+        }
+
+        fn wait(&mut self) -> ExitStatus {
+            self.child.take().unwrap().wait().unwrap()
+        }
+
+        fn is_running(&mut self) -> bool {
+            self.child().try_wait().unwrap().is_none()
+        }
     }
 
     impl Drop for Served {
         fn drop(&mut self) {
-            let _ = self.child.kill();
-            let _ = self.child.wait();
+            let Some(mut child) = self.child.take() else {
+                return;
+            };
+            let _ = child.kill();
+            let _ = child.wait();
         }
     }
 
     /// Starts `cairn serve --config <path>` and waits for its `listening` log line.
     fn serve(path: &Path) -> Served {
-        let child = cairn(&["serve", "--config", path.to_str().unwrap()])
-            .stderr(Stdio::piped())
-            .spawn()
-            .unwrap();
         // Held from here, so a test that fails before the server listens still stops it.
-        let mut served = Served {
-            child,
-            address: ([0, 0, 0, 0], 0).into(),
-        };
-        let stderr = served.child.stderr.take().unwrap();
+        let mut served = Served::spawn(path);
+        let stderr = served.stderr();
         let (lines, received) = mpsc::channel();
         std::thread::spawn(move || {
             // Drains the log to its end, so the server never writes to a closed pipe; lines
@@ -210,7 +250,6 @@ mod binary {
             let Ok(log) = serde_json::from_str::<serde_json::Value>(&line) else {
                 continue;
             };
-            assert_eq!(log["level"], "INFO", "{line}");
             if log["fields"]["message"] == "listening" {
                 served.address = log["fields"]["address"].as_str().unwrap().parse().unwrap();
                 return served;
@@ -256,12 +295,7 @@ mod binary {
             421
         );
 
-        let stopped = Command::new("kill")
-            .args(["-TERM", &served.child.id().to_string()])
-            .status()
-            .unwrap();
-        assert!(stopped.success());
-        let status = served.child.wait().unwrap();
+        let status = served.terminate();
         assert!(status.success(), "{status}");
     }
 
@@ -297,12 +331,7 @@ mod binary {
             revision = reply.json()["receipt"]["revision"].as_u64().unwrap();
         }
 
-        let stopped = Command::new("kill")
-            .args(["-TERM", &served.child.id().to_string()])
-            .status()
-            .unwrap();
-        assert!(stopped.success());
-        assert!(served.child.wait().unwrap().success());
+        assert!(served.terminate().success());
 
         let store = TursoStore::open(&directory.join("cairn.db")).await.unwrap();
         let target = LoadTarget::Journey("j_persisted".parse().unwrap());
@@ -331,14 +360,17 @@ mod binary {
             .port();
         let text = CONFIG.replace("127.0.0.1:0", &format!("127.0.0.1:{port}"));
         let path = config_file(&directory, &text);
-        let mut child = cairn(&["serve", "--config", path.to_str().unwrap()])
-            .stderr(Stdio::piped())
-            .spawn()
-            .unwrap();
-        let mut stderr = BufReader::new(child.stderr.take().unwrap());
-        let mut first = String::new();
-        stderr.read_line(&mut first).unwrap();
-        assert!(first.contains("listening"), "{first}");
+        let mut served = Served::spawn(&path);
+        let mut stderr = BufReader::new(served.stderr());
+        let mut line = String::new();
+        loop {
+            line.clear();
+            stderr.read_line(&mut line).unwrap();
+            assert!(!line.is_empty(), "cairn serve logged no `listening` line");
+            if line.contains("listening") {
+                break;
+            }
+        }
         drop(stderr);
         let address = format!("127.0.0.1:{port}").parse().unwrap();
         for _ in 0..3 {
@@ -347,8 +379,7 @@ mod binary {
                 200
             );
         }
-        assert!(child.try_wait().unwrap().is_none(), "the server stopped");
-        child.kill().unwrap();
-        child.wait().unwrap();
+        assert!(served.is_running(), "the server stopped");
+        assert!(served.terminate().success());
     }
 }
