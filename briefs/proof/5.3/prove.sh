@@ -2,7 +2,7 @@
 # Regenerates the media of briefs/proof/5.3/: a screenshot of each acceptance state of the
 # list, the next list, triage, and the decision walkthrough, and a short video of the
 # walkthrough. Builds the module (mise run build:wasm) and the fixture server, runs the proof's
-# pictures (web/app/proof/acting.proof.ts), which assert the state each picture shows, and
+# pictures (web/app/proof/acting.proof.ts), which only wait for the state each picture shows, and
 # prints the product launch's next list by rank and by slack as a Markdown table. Exits
 # non-zero if the run fails or a picture is missing. The README is written by hand.
 #

@@ -6,7 +6,7 @@
 # a short video of the upgrade. Builds the module (mise run build:wasm) and the fixture server,
 # runs proposal review's web unit tests (Vitest, the offers checked against the module's
 # engine) and browser tests (Playwright, e2e/proposals.spec.ts), runs the proof's pictures
-# (web/app/proof/proposals.proof.ts), which assert what each shows, then checks the planted
+# (web/app/proof/proposals.proof.ts), which only wait for the state each picture shows, then checks the planted
 # bug: a refresh that carries the reviewer's confirmation over, caught by I6's tests. The plant
 # is made in place and always restored (checked byte for byte). Exits non-zero if any outcome
 # differs from the one expected.
@@ -34,7 +34,7 @@ mise exec -- cargo build --quiet --locked -p cairn-wasm --example fixture_server
 (cd web/app && "$repo/node_modules/.bin/playwright" test e2e/proposals.spec.ts --reporter=line >/dev/null) \
   || miss "proposal review's browser tests failed"
 
-# The pictures, each asserted as it is taken.
+# The pictures.
 pictures=(1-overview-proposes 2-upgrade-as-a-diff 3-conflicts-resolved 4-applied 5-stale 6-refreshed-review-again
   7-save-as-route-mapped 8-relinked 9-break-down-from-triage 10-breakdown-with-its-frontier 11-dark-theme 12-narrow-screen)
 rm -f "$proof"/*.png "$proof"/*.webm

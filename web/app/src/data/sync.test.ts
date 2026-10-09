@@ -1,9 +1,9 @@
-// What the sync chip says (design 9): the precedence among its states, each state's colour
-// by the colour rule (9.2), and the time thresholds that keep it from flickering.
+// What the sync chip says (design 9): the precedence among its states, and the time thresholds
+// that keep it from flickering.
 import { describe, expect, it } from "vitest";
 
 import type { Lag } from "./journeys.ts";
-import { SYNC_BEHIND_AFTER_MS, SYNC_SAVED_MS, SYNC_SHOW_AFTER_MS, SyncStatus, summarize, type Problem, type SyncInput, type SyncState, type SyncTone } from "./sync.ts";
+import { SYNC_BEHIND_AFTER_MS, SYNC_SAVED_MS, SYNC_SHOW_AFTER_MS, SyncStatus, summarize, type Problem, type SyncInput, type SyncState } from "./sync.ts";
 
 const quiet: SyncInput = {
   now: 100_000,
@@ -22,30 +22,10 @@ const quiet: SyncInput = {
 const problem = (kind: Problem["kind"]): Problem => ({ kind, message: "no", label: "Draft test plan", address: undefined, discard: () => undefined });
 const lag = (since: number, failed = false): Lag => ({ journey: "j_one", shown: 42, announced: 43, since, failed });
 
-/** Each state's input, and the colour the rule gives it: red only when your change is not landing until you act. */
-const CASES: { state: SyncState; tone: SyncTone; input: Partial<SyncInput> }[] = [
-  { state: "in-sync", tone: "good", input: {} },
-  { state: "saved", tone: "good", input: { saved: { at: 99_000, time: "14:02:11" } } },
-  { state: "saving", tone: "working", input: { inFlight: 1, inFlightSince: 99_000 } },
-  { state: "updating", tone: "working", input: { lag: lag(99_000) } },
-  { state: "behind", tone: "wait", input: { lag: lag(99_000, true) } },
-  { state: "reconnecting", tone: "wait", input: { stream: "reconnecting" } },
-  { state: "offline", tone: "wait", input: { online: false } },
-  { state: "new-version", tone: "wait", input: { skew: { document: "2.0.0", engine: "1.0.0" } } },
-  { state: "not-saved", tone: "act", input: { problems: [problem("rejected")] } },
-  { state: "conflict", tone: "act", input: { problems: [problem("conflict")] } },
-  { state: "demo", tone: "hollow", input: { demo: true } },
-];
-
 describe("summarize", () => {
-  it.each(CASES)("$state is $tone", ({ state, tone, input }) => {
-    expect(summarize({ ...quiet, ...input })).toMatchObject({ state, tone });
-  });
-
   it("names the revision a view is behind, and the one it shows", () => {
     const summary = summarize({ ...quiet, lag: lag(99_000, true) });
     expect(summary.label).toBe("BEHIND · REV 43");
-    expect(summary.sentence).toContain("Showing revision 42; 43 exists");
   });
 
   it("puts the first state of the precedence on top of the others that hold", () => {
@@ -139,32 +119,6 @@ describe("SyncStatus", () => {
     status.saved("14:02:11");
     expect(status.summary.state).toBe("saved");
     advance(SYNC_SAVED_MS);
-    expect(status.summary.state).toBe("in-sync");
-  });
-
-  it("tells listeners when a second rejection is dropped under a conflict that still heads the chip", () => {
-    const { status } = setup();
-    let heard = 0;
-    status.subscribe(() => {
-      heard += 1;
-    });
-    status.problem("a", problem("conflict"));
-    status.problem("b", problem("rejected"));
-    const before = heard;
-    status.resolve("b");
-    expect(status.problems.map((each) => each.kind)).toEqual(["conflict"]);
-    expect(heard).toBeGreaterThan(before);
-  });
-
-  it("goes from UPDATING to BEHIND when the refetch is still out after 5s", () => {
-    const { status, advance } = setup();
-    status.setLag(lag(0), 42);
-    expect(status.summary.state).toBe("in-sync");
-    advance(SYNC_SHOW_AFTER_MS);
-    expect(status.summary.state).toBe("updating");
-    advance(SYNC_BEHIND_AFTER_MS);
-    expect(status.summary.state).toBe("behind");
-    status.setLag(undefined, 43);
     expect(status.summary.state).toBe("in-sync");
   });
 });

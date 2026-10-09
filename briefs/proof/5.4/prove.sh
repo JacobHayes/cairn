@@ -2,7 +2,7 @@
 # Regenerates the media of briefs/proof/5.4/: a screenshot of each acceptance state of the
 # decision view, the timeline, and the status summary, and a short video of their main flow.
 # Builds the module (mise run build:wasm) and the fixture server, then runs the proof's
-# pictures (web/app/proof/views.proof.ts), which assert the state each picture shows. Exits
+# pictures (web/app/proof/views.proof.ts), which only wait for the state each picture shows. Exits
 # non-zero if the run fails or a picture is missing. The README is written by hand.
 #
 # usage: briefs/proof/5.4/prove.sh

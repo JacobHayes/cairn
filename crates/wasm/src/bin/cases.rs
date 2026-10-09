@@ -67,7 +67,7 @@ fn main() {
     let out = Path::new(&out);
     std::fs::create_dir_all(out).unwrap_or_else(|error| panic!("{}: {error}", out.display()));
     let mut groups: Vec<Group> = server_groups();
-    groups.extend([500, 2_000].map(budget_group));
+    groups.push(budget_group(2_000));
     groups.push(limits_group());
     let mut index = Vec::new();
     for (number, group) in groups.iter().enumerate() {

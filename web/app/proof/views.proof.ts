@@ -1,7 +1,6 @@
 // The proof's media for the decision view, the timeline, and the Summary page
 // (briefs/proof/5.4/prove.sh): a screenshot of each acceptance state and a short video of the
-// main flow, written to CAIRN_PROOF_OUT. Each step asserts what its picture is meant to show,
-// so a picture of the wrong state fails the run. Everything runs on the in-browser host,
+// main flow, written to CAIRN_PROOF_OUT. Steps only wait for the state they picture; the e2e specs assert it. Everything runs on the in-browser host,
 // seeded on each load, at the fixed day the browser tests read the fixtures on.
 import { join } from "node:path";
 

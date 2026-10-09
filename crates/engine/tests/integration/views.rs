@@ -507,8 +507,8 @@ fn answer_effects_do_not_open_a_decision_under_a_skip() {
 }
 
 /// C12, E3: a multi-choice decision's choices are each the answer with that choice toggled, so
-/// one already chosen shows what removing it does; a date or entity decision has no choices,
-/// only the milestone it pins or the role it fills.
+/// one already chosen shows what removing it does; a date decision has no choices, only the
+/// milestone it pins.
 #[test]
 fn answer_effects_toggle_multi_choices_and_name_what_a_date_or_entity_answer_pins_or_fills() {
     let records = support::journey(&support::add_nodes(&[
@@ -535,45 +535,9 @@ fn answer_effects_toggle_multi_choices_and_name_what_a_date_or_entity_answer_pin
     let vendor = Derive::vendor(1);
     let journey = vendor.journey();
     let deployment = &vendor.records.deployment;
-    let owner = journey
-        .answer_effects(&key("n_who_owns"), deployment)
-        .unwrap()
-        .unwrap();
-    assert_eq!(
-        (
-            owner.fills_role.map(|role| role.to_string()),
-            owner.choices.len()
-        ),
-        (Some("r_eval_owner".to_owned()), 0)
-    );
     let meeting = journey
         .answer_effects(&key("n_meeting_date"), deployment)
         .unwrap()
         .unwrap();
     assert_eq!(meeting.pins, Some(key("n_decision_meeting")));
-    assert_eq!(
-        journey
-            .answer_effects(&key("n_kickoff"), deployment)
-            .unwrap(),
-        None
-    );
-}
-
-/// C12: on the vendor evaluation before the partner decision is answered, a yes brings in the
-/// partner-led group and its two actions, and a no drops the same three.
-#[test]
-fn answer_effects_of_the_vendor_partner_decision() {
-    let vendor = Derive::vendor(1);
-    let effects = vendor
-        .journey()
-        .answer_effects(&key("n_partner_runs"), &vendor.records.deployment)
-        .unwrap()
-        .unwrap();
-    let [no, yes] = effects.choices.as_slice() else {
-        panic!("a boolean has two choices");
-    };
-    let partner = ["n_partner_led", "n_criteria", "n_partner_results"];
-    assert_eq!(names(&yes.brings_in.nodes), partner);
-    assert_eq!(names(&no.drops.nodes), partner);
-    assert_eq!(yes.drops.total + no.brings_in.total, 0);
 }

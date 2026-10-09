@@ -193,31 +193,32 @@ fn noticed(written: &Written) -> Vec<String> {
     }
 }
 
-/// A20, A15: publishing and importing list the notices of the graph they leave, a proposal's
-/// review lists those of the draft it would leave, and a draft edit lists none; every write is
-/// applied regardless, and a requirement added to the draft clears that node's notice from
-/// the publish that follows, applied from a proposal.
+/// A20, A15: a proposal's review lists the notices of the draft it would leave, and a draft edit
+/// lists none; every write is applied regardless, and a requirement added to the draft clears
+/// that node's notice from the publish that follows, applied from a proposal. (Import and
+/// seeded-publish notices are the transports' tests'.)
 #[test]
-fn an_import_and_a_publish_list_notices_and_a_draft_edit_lists_none() {
+fn a_proposal_review_and_a_publish_list_notices_and_a_draft_edit_lists_none() {
     support::run(async {
         let (service, _) = service_over(Arc::new(cairn_store::MemoryStore::new()));
         let author = call("u_author", AT);
-        let seeded = service
-            .patch(&author, &domain(publish_fixture_route("vendor-evaluation")))
-            .await;
-        assert_eq!(noticed(&applied(seeded)), ["purpose", "setup/workload"]);
+        applied(
+            service
+                .patch(&author, &domain(publish_fixture_route("vendor-evaluation")))
+                .await,
+        );
         let route = vendor_route();
+        // The import opens the draft the proposal and the edit are made against.
         let file = service
             .export_route(&route, Some(VersionNumber::FIRST))
             .await
             .unwrap()
             .unwrap();
-        let imported = applied(
+        applied(
             service
                 .import_route(&author, id("p_import"), &file, None)
                 .await,
         );
-        assert_eq!(noticed(&imported), ["purpose", "setup/workload"]);
         let held = service.route(&route).await.unwrap().unwrap();
         let spare: ProposalDraft = from_yaml(&format!(
             "title: Spare\ndestination_revision: {}\nmutations:\n- op: add_node\n  node: {{key: n_spare, id: spare, kind: action, title: Spare}}\n",

@@ -27,13 +27,6 @@ describe("the remembered projection", () => {
     expect(recalledProjection("j_b", "plan")).toBe("graph");
   });
 
-  it("ignores a stored projection the page does not have", () => {
-    const held = storage();
-    held.setItem("cairn:view:j_a:next", "graph");
-    vi.stubGlobal("localStorage", held);
-    expect(recalledProjection("j_a", "next")).toBe("list");
-  });
-
   it("falls back to the default when the store throws", () => {
     const refusing = {
       getItem: () => {

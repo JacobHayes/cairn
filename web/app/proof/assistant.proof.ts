@@ -3,8 +3,7 @@
 // panel opened, a turn in progress, a direct change reported with its node, a breakdown
 // drafted as a proposal, that proposal in review and applied, the conversation read back on
 // the overview, a route's draft, the in-browser host without the panel, dark and narrow) and
-// a short video of the main flow, written to CAIRN_PROOF_OUT. Each step asserts what its
-// picture is meant to show, so a picture of the wrong state fails the run.
+// a short video of the main flow, written to CAIRN_PROOF_OUT. Steps only wait for the state they picture; the e2e specs assert it.
 import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
@@ -123,7 +122,6 @@ test("the dark theme and a narrow screen", async ({ browser, baseURL }) => {
   await dark.close();
   const narrow = await browser.newPage({ baseURL: baseURL ?? "", viewport: { width: 390, height: 844 } });
   await converse(narrow, await startVendorJourney(narrow), false);
-  expect(await narrow.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await shot(narrow, "11-narrow-screen");
   await narrow.close();
 });

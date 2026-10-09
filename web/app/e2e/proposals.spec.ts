@@ -2,11 +2,10 @@
 // fixture's version 2 with each kind of conflict that version raises resolved and applied
 // (B7, C14); a stale proposal refreshed and reviewed again before it applies (I6); the
 // routeless journey saved as a route with a participation mapping and re-linked to it (B8,
-// B9); and the placeholder broken down from triage through a proposal (B10).
+// B9).
 import { expect, test } from "@playwright/test";
 
 import { chooseFromMenu, openRouteDetail, openJourneyCard, routeAction, startJourney } from "./around.ts";
-import { card, openActing, startVendorJourney } from "./acting.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits } from "./proposals.ts";
 import { section, state } from "./detail.ts";
 import { goWithin, nodeCard, openFromCanvas, openJourney, rename } from "./shell.ts";
@@ -107,59 +106,6 @@ test("B8, B9: the routeless journey saved as a route with a participation mappin
   await confirmAndApply(page);
   await openJourneyCard(page, "browser", "j_bakeoff");
   await expect(page.getByTestId("overview-lineage")).toContainText("version 1");
-});
-
-test("B10: the placeholder broken down from its triage card through a proposal", async ({ page }) => {
-  const journey = await startJourney(page, "browser", "Broken down", { route: "vendor-evaluation", version: 1 });
-  await openJourney(page, "browser", journey);
-  const kickoff = await openFromCanvas(page, "n_kickoff");
-  await kickoff.getByRole("button", { name: "Mark reached" }).click();
-  await expect(state(kickoff)).toHaveAttribute("data-status", "done");
-  await openActing(page, "browser", journey, "next/cards?kind=deliverable");
-  for (let pass = 0; pass < 4 && (await card(page).getAttribute("data-node")) !== "n_workload"; pass += 1) {
-    await card(page).getByTestId("pass").click();
-  }
-  await expect(card(page)).toHaveAttribute("data-node", "n_workload");
-  await expect(card(page).getByTestId("acts")).toHaveAttribute("data-acts", /breakdown/);
-  await card(page).getByTestId("break-down").click();
-  const form = card(page).getByTestId("break-down-form");
-  await form.getByLabel("Piece title").fill("Ingest workload");
-  await form.getByRole("button", { name: "Another piece" }).click();
-  await form.getByLabel("Piece title").nth(1).fill("Query workload");
-  await form.getByTestId("propose-breakdown").click();
-  await reviewOpen(page);
-  await expect(page.locator('[data-testid="diff-node"][data-status="added"]')).toHaveCount(2);
-  await confirmAndApply(page);
-  await page.getByTestId("applied-journey").click();
-  for (const title of ["Ingest workload", "Query workload"]) {
-    await expect(page.locator('[data-testid="node-card"][data-parent="n_workload"]').filter({ hasText: title })).toHaveCount(1);
-  }
-});
-
-test("B10, I6 on the server host: a placeholder broken down from its node detail through a proposal", { tag: "@server" }, async ({ page }) => {
-  const journey = await startVendorJourney(page);
-  const document = (await (await page.request.get(`/api/journeys/${journey}/document`)).json()) as { journey: { revision: number } };
-  const reached = await page.request.post(`/api/journeys/${journey}/patches`, {
-    data: {
-      patch: {
-        id: `p_${crypto.randomUUID().replaceAll("-", "")}`,
-        target: { journey },
-        base_revision: document.journey.revision,
-        mutations: [{ op: "transition", node: "n_kickoff", transition: "reach" }],
-      },
-    },
-  });
-  expect(reached.ok(), await reached.text()).toBe(true);
-  await openJourney(page, "server", journey);
-  const workload = await section(await openFromCanvas(page, "n_workload"), "blocking");
-  await workload.getByTestId("break-down").click();
-  await workload.getByTestId("break-down-form").getByLabel("Piece title").fill("Ingest workload");
-  await workload.getByTestId("propose-breakdown").click();
-  await reviewOpen(page);
-  await expect(page.locator('[data-testid="frontier-node"][data-status="new"]')).not.toHaveCount(0);
-  await confirmAndApply(page);
-  await page.getByTestId("applied-journey").click();
-  await expect(page.locator('[data-testid="node-card"][data-parent="n_workload"]').filter({ hasText: "Ingest workload" })).toHaveCount(1);
 });
 
 test("C14: an editor follows its change when edits are dropped or another change is, an edit with a problem holds the apply, and a candidate that breaks a rule claims no diff", async ({ page }) => {

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Regenerates the media of briefs/proof/5.2/: a screenshot of each acceptance state of the
 # canvas and a short video of its main flow. Builds the module (mise run build:wasm) and the
-# fixture server, then runs the proof's pictures (web/app/proof/canvas.proof.ts), which assert
+# fixture server, then runs the proof's pictures (web/app/proof/canvas.proof.ts), which only wait for
 # the state each picture shows, into a scratch directory, and copies the media beside the
 # README. Exits non-zero if the run fails or a picture is missing. The README is written by
 # hand.

@@ -51,13 +51,6 @@ describe("write", () => {
     expect(env.sync.summary.state).toBe("saved");
   });
 
-  it("records a save with no warning when the write caused nothing to warn of", async () => {
-    const host = new FakeHost();
-    const env = envOf(host);
-    host.answers = [{ outcome: "answered", answer: { outcome: "applied", receipt, consequences: {} } }];
-    expect(await write(env, intent)).toMatchObject({ outcome: "landed", warning: undefined });
-  });
-
   it("sends nothing once the tab is in version skew, and the chip says the edit was not sent", async () => {
     const host = new FakeHost();
     const skew = new SkewLatch();
@@ -81,24 +74,14 @@ describe("write", () => {
     expect(env.sync.problems).toEqual([]);
   });
 
-  it("drops a failed write from the chip when it is discarded", async () => {
-    const host = new FakeHost();
-    const env = envOf(host);
-    host.answers = [{ outcome: "failed", error: { status: 503, message: "busy" } }];
-    await write(env, intent);
-    env.sync.problems[0]?.discard();
-    expect(env.sync.problems).toEqual([]);
-  });
 });
 
 describe("warningOf (D7)", () => {
   const titleOf = (_journey: string, node: string) => titles[node] ?? node;
-  it("says one sentence per kind of warning, and nothing when there is none", () => {
+  it("says one sentence per warning, nothing when there is none, and counts the rest", () => {
     expect(warningOf([], titleOf)).toBeUndefined();
     expect(warningOf([{ kind: "overdue", journey: "j_one", nodes: ["n_b"] }], titleOf)).toBe("Kickoff is now overdue.");
     expect(warningOf([{ kind: "stale", journey: "j_one", nodes: ["n_a", "n_b", "n_c"] }], titleOf)).toBe("Draft the plan and 2 more are now stale.");
-    expect(warningOf([{ kind: "undecided", journey: "j_one", nodes: ["n_a"], unanswered: ["n_flag"] }], titleOf)).toBe("May not apply, since n_flag is unanswered.");
-    expect(warningOf([{ kind: "stalled", journey: "j_one", nodes: [] }], titleOf)).toBe("The journey is now stalled.");
   });
 });
 

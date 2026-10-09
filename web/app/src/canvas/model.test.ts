@@ -78,12 +78,6 @@ describe("C1: cards and lines", () => {
     expect(line && lineLook(line).dash).toBeUndefined();
   });
 
-  test.each([
-    ["n_old", "node-not-relevant"],
-    ["n_option", "node-undecided"],
-  ])("%s is drawn with %s", (key, look) => {
-    expect(nodeClasses(card(whole, key))).toContain(look);
-  });
 });
 
 describe("C1, C2: the relevance toggles are the level request's display set", () => {

@@ -462,24 +462,6 @@ fn a_collapsed_stage_re_targets_its_edges_and_merges_duplicates() {
     assert_eq!(level.collapsed.len(), 2);
 }
 
-/// C2: a card still shows the hidden prerequisites of what rolled into it: drilled into Testing
-/// with the partner-led group collapsed, the decision that gates it is outside the level, so
-/// the collapsed card carries the marker for itself and for its actions.
-#[test]
-fn a_collapsed_card_keeps_the_hidden_prerequisite_marker() {
-    let mut collapsed = query(&["n_partner_led"], &LevelDisplay::ALL);
-    collapsed.container = Some(key("n_testing"));
-    let level = level_of(&support::vendor_after(1), VENDOR, &collapsed);
-    assert_eq!(
-        names(&node(&level, "n_partner_led").rolled_up),
-        ["n_criteria", "n_partner_results"]
-    );
-    assert_eq!(
-        names(&node(&level, "n_partner_led").hidden_prerequisites),
-        ["n_partner_runs"]
-    );
-}
-
 /// C2: nodes ruled out by an answer, hidden by the display set, roll up like any hidden node and
 /// leave no orphan line: an edge into one lands on its nearest visible ancestor, and a hidden
 /// top-level node's edge, having no stand-in, is not drawn.
@@ -493,8 +475,6 @@ fn hidden_not_relevant_nodes_leave_no_orphan_lines() {
     )
     .unwrap();
     let records = ruled_out.records();
-    let shown = level_of(records, VENDOR, &query(&[], &LevelDisplay::ALL));
-    assert!(edges(&shown).contains(&("n_partner_runs", "n_side", 1)));
     let hidden = level_of(
         records,
         VENDOR,

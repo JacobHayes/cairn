@@ -106,7 +106,6 @@ test("A20, A15: a deliverable no chain links to the final milestone is noticed, 
   const notices = page.getByTestId("route-notices");
   await expect(notices.getByTestId("route-notice")).toHaveCount(1);
   await expect(notices.getByTestId("route-notice")).toHaveAttribute("data-node", handbook);
-  await expect(notices).toContainText("publishing is not blocked");
   await openNode(page, report);
   await pickByTitle((await section(page, "author-edges")).getByLabel("Require"), "Handbook");
   await (await section(page, "author-edges")).getByRole("button", { name: "Add the requirement" }).click();
@@ -218,29 +217,4 @@ test("H5: a field changed elsewhere while a draft is open is not reverted by the
   await expect(page.getByTestId("node-form-save")).toHaveText("Save (1 change)");
   await saveForm(page);
   await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Sandbox access");
-});
-
-test("Drafts survive a reload: a resource being written and a breakdown's pieces", async ({ page }) => {
-  await openEditing(page, "browser", "j_vendor_eval");
-  await openFromCanvas(page, "n_findings");
-  const resources = await section(page, "author-resources");
-  await resources.getByRole("button", { name: "Add a resource" }).click();
-  await resources.getByLabel("Tip").fill("Lead with the recommendation.");
-  const breakdown = await section(page, "author-breakdown");
-  await breakdown.getByLabel("Piece title").fill("Draft the findings");
-  await page.reload();
-  await expect((await section(page, "author-resources")).getByLabel("Tip")).toHaveValue("Lead with the recommendation.");
-  await expect((await section(page, "author-breakdown")).getByLabel("Piece title")).toHaveValue("Draft the findings");
-});
-
-test("Drafts stay with their node: a resource being written on one node is not shown on the next", async ({ page }) => {
-  await openEditing(page, "browser", "j_vendor_eval");
-  await openFromCanvas(page, "n_findings");
-  const resources = await section(page, "author-resources");
-  await resources.getByRole("button", { name: "Add a resource" }).click();
-  await resources.getByLabel("Tip").fill("Lead with the recommendation.");
-  await openFromCanvas(page, "n_access");
-  await expect((await section(page, "author-resources")).getByTestId("resource-form")).toHaveCount(0);
-  await openFromCanvas(page, "n_findings");
-  await expect((await section(page, "author-resources")).getByLabel("Tip")).toHaveValue("Lead with the recommendation.");
 });

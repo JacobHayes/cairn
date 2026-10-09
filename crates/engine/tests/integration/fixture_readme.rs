@@ -3,7 +3,7 @@
 //! relevance and participations at each decision point (Gating, E2, E3), its latest starts
 //! and due dates once the meeting is pinned (F3, F4), its frontier after each step (D2, B6),
 //! its ranked frontier with each node's gravity, leverage, and slack (Priority), and each
-//! fixture's projection lines, which every fixture has (C2, C4, C10).
+//! fixture's projection lines and status summary, which every fixture has (C2, C4, C10, C18).
 #![cfg(test)]
 
 use crate::support;
@@ -389,6 +389,73 @@ fn the_projection_lines_are_what_the_engine_projects() {
     for fixture in support::fixture_names() {
         let labels = checked.get(fixture.as_str()).cloned().unwrap_or_default();
         assert_eq!(labels, LABELS.into(), "{fixture}'s projection lines");
+    }
+}
+
+/// C18: each fixture's status-summary line, read at the end of its scenario on the scenario
+/// matrix's day: the in-scope nodes by display state, how many remain, the overdue, short and
+/// stale nodes, the milestones not yet reached with their dates, and the open decisions.
+#[test]
+fn the_status_summary_lines_are_what_the_engine_summarizes() {
+    let text = readme();
+    let keys = |keys: Vec<&str>| {
+        if keys.is_empty() {
+            "none".to_owned()
+        } else {
+            keys.iter()
+                .map(|key| format!("`{key}`"))
+                .collect::<Vec<_>>()
+                .join(", ")
+        }
+    };
+    for fixture in support::fixture_names() {
+        let prefix = format!("- `{fixture}`, status summary: ");
+        let line = text
+            .lines()
+            .find_map(|line| line.strip_prefix(&prefix))
+            .unwrap_or_else(|| panic!("{fixture} has a status-summary line"));
+        let journey = support::scenario(&fixture).journey.to_string();
+        let records = support::finished(&fixture);
+        let graph = support::journey_graph(&records, &journey);
+        let derived = support::derived(&records, &journey);
+        let summary = DerivedJourney::new(&graph, &derived).status_summary();
+        let mut counted: Vec<String> = summary
+            .by_display_state
+            .iter()
+            .map(|(state, count)| {
+                let word = serde_json::to_value(state).unwrap();
+                format!("{} {count}", word.as_str().unwrap())
+            })
+            .collect();
+        counted.sort();
+        let upcoming = if summary.upcoming_milestones.is_empty() {
+            "none".to_owned()
+        } else {
+            let each = summary
+                .upcoming_milestones
+                .iter()
+                .map(|found| format!("`{}` {}", found.node, found.date.date));
+            each.collect::<Vec<_>>().join(", ")
+        };
+        let others = format!(
+            "remaining {}; overdue {}; short {}; stale {}; upcoming {upcoming}; open decisions {}.",
+            summary.remaining,
+            keys(summary.overdue.iter().map(NodeKey::as_str).collect()),
+            keys(summary.shortfalls.iter().map(NodeKey::as_str).collect()),
+            keys(summary.stale.iter().map(NodeKey::as_str).collect()),
+            keys(
+                summary
+                    .open_decisions
+                    .iter()
+                    .map(|each| each.node.as_str())
+                    .collect()
+            ),
+        );
+        let (listed, rest) = line.split_once("; ").unwrap();
+        let mut stated: Vec<&str> = listed.split(", ").collect();
+        stated.sort_unstable();
+        assert_eq!(stated, counted, "{fixture}'s counts by display state");
+        assert_eq!(rest, others, "{fixture}'s status summary");
     }
 }
 

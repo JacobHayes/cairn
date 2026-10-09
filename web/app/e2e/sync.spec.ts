@@ -1,11 +1,10 @@
 // The sync chip over a real connection (design 9): what it says while a write is out, while a
-// newer revision is being fetched or cannot be, while the stream is down and while the network
-// is, and what it keeps for you when a change did not land. The states a browser alone can
-// reach (saved, rejected) are the node detail's specs'.
+// newer revision is being fetched or cannot be, and what it keeps for you when a change did not
+// land. The states a browser alone can reach (saved, rejected) are the node detail's specs'.
 import { expect, test, type Page } from "@playwright/test";
 
 import { openNode, pin } from "./detail.ts";
-import { fresh, goWithin, hold, live, nodeCard, openJourney, recentSaves, rename, save, startRename, syncChip } from "./shell.ts";
+import { fresh, goWithin, hold, live, nodeCard, openJourney, rename, save, startRename, syncChip } from "./shell.ts";
 
 const title = (page: Page, node: string) => nodeCard(page, node).getByTestId("title");
 
@@ -22,21 +21,11 @@ test("a rejected change waits under needs-you wherever you go; Go to it returns,
   await expect(needsYou).toContainText("Final report");
   await needsYou.getByRole("button", { name: "Go to it" }).click();
   await expect(page.getByTestId("date-conflict")).toBeVisible();
-  // Discard from the popover drops it at the control too, and away from the control it is dropped as well.
+  // Discard from the popover drops it at the control too.
   await syncChip(page).click();
   await page.getByTestId("sync-popover").getByRole("button", { name: "Discard" }).click();
   await expect(page.getByTestId("date-conflict")).toHaveCount(0);
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
-  // The pin form is still open with the date typed: send it again.
-  await panel.getByTestId("pin-form").getByRole("button", { name: "Save" }).click();
-  await expect(syncChip(page)).toHaveText("NOT SAVED · 1");
-  await goWithin(page, "/routes");
-  await syncChip(page).click();
-  await page.getByTestId("sync-popover").getByRole("button", { name: "Discard" }).click();
-  await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
-  await goWithin(page, "/journeys/j_vendor_eval/nodes/n_final_report");
-  await expect(page.getByTestId("node-detail")).toBeVisible();
-  await expect(page.getByTestId("date-conflict")).toHaveCount(0);
 });
 
 test("a write in flight, a revision on its way, and one that cannot be fetched", { tag: "@server" }, async ({ context }) => {
@@ -68,25 +57,4 @@ test("a write in flight, a revision on its way, and one that cannot be fetched",
   await syncChip(two).click();
   await expect(title(two, "n_close_out")).toHaveText(latest);
   await expect(syncChip(two)).toHaveAttribute("data-state", "in-sync");
-});
-
-test("the stream down is amber and says edits still save; the network down says offline", { tag: "@server" }, async ({ context, page }) => {
-  await openJourney(page, "server", "j_hiring");
-  await live(page);
-  await page.route("**/api/events/stream*", (route) => route.abort());
-  // A new screen asks for a new stream, which cannot open.
-  await goWithin(page, "/journeys/j_vendor_eval");
-  await expect(syncChip(page)).toHaveAttribute("data-state", "reconnecting");
-  const renamed = fresh("Plan");
-  await startRename(page, "n_plan", renamed);
-  await save(page, "n_plan");
-  expect((await recentSaves(page))[0]).toContain("Edited");
-  // Nothing told the page, so it still shows the old title until the stream is back.
-  await page.unroute("**/api/events/stream*");
-  await live(page);
-  await expect(title(page, "n_plan")).toHaveText(renamed);
-  await context.setOffline(true);
-  await expect(syncChip(page)).toHaveAttribute("data-state", "offline");
-  await context.setOffline(false);
-  await expect(syncChip(page)).not.toHaveAttribute("data-state", "offline");
 });

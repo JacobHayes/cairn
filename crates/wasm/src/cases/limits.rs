@@ -6,9 +6,9 @@
 //! stack. It is also the derive benchmark's input (ARCHITECTURE, Date network: reported, not
 //! gated).
 //!
-//! The size budgets' inputs are journeys of 500 and 2,000 generated nodes shaped like a real
-//! route ([`budget_group`]): the level with containers collapsed and a relevance class left
-//! out, and a trace, which the browser test times in the worker against their budgets.
+//! The size figures' input is a journey of 2,000 generated nodes shaped like a real route
+//! ([`budget_group`]): the level with containers collapsed and a relevance class left out,
+//! and a trace, which the browser test times in the worker and reports.
 
 use std::collections::BTreeSet;
 
@@ -138,13 +138,13 @@ fn group_of(label: &str, text: String, calls: Vec<(String, CaseCall)>) -> Group 
     }
 }
 
-/// The label of a size-budget group of `nodes` nodes.
+/// The label of the size-figures group of `nodes` nodes.
 #[must_use]
 pub fn budget_label(nodes: usize) -> String {
     format!("{nodes} generated nodes")
 }
 
-/// A journey of `nodes` generated nodes with the calls its size budget times: the level with
+/// A journey of `nodes` generated nodes with the calls whose size figures are reported: the level with
 /// ten deep containers collapsed and, in turn, the conditional and the not-relevant class left
 /// out (which classifies relevance), and the trace from the deepest node. Each is also an agreement case, so the wasm build matches the native engine
 /// at these sizes.

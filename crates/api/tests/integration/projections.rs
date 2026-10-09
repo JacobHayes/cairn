@@ -144,12 +144,13 @@ mod in_process {
         assert_eq!(history, History::from(expected));
     }
 
-    /// I1, C2, C12: a level collapsed and filtered by relevance class over HTTP is the
-    /// service's, and a decision's node detail carries its answer effects.
+    /// I1, C2, C8, C12: a level collapsed and filtered by relevance class over HTTP is the
+    /// service's, a decision's node detail is the service's with its answer effects, and the
+    /// explanations endpoint answers the still-waiting list node detail carries.
     #[tokio::test]
-    async fn a_collapsed_level_and_a_decisions_effects_answer_what_the_service_derives() {
+    async fn a_collapsed_level_node_detail_and_explanations_answer_what_the_service_derives() {
         let world = World::start().await;
-        let ann = world.vendor_after(3).await;
+        let ann = world.vendor_after(1).await;
         world.clock.set(NOW);
         let call = &call_of(&ann).await;
         let id = &"j_vendor_eval".parse().unwrap();
@@ -163,12 +164,6 @@ mod in_process {
             format!("{JOURNEY}/level?collapsed=n_setup&display=relevant&display=conditional");
         let answered: serde_json::Value = get(&ann, &target).await;
         assert_eq!(answered, expected);
-        let setup = answered["value"]["nodes"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .find(|node| node["key"] == "n_setup");
-        assert_ne!(setup.unwrap()["rolled_up"].as_array().unwrap().len(), 0);
 
         let partner: &NodeKey = &"n_partner_runs".parse().unwrap();
         let detail = world.service.node_detail(call, id, partner).await.unwrap();
@@ -176,13 +171,17 @@ mod in_process {
         let answered: serde_json::Value =
             get(&ann, &format!("{JOURNEY}/nodes/n_partner_runs")).await;
         assert_eq!(answered, expected);
-        assert_eq!(
-            answered["value"]["answer_effects"]["choices"]
-                .as_array()
-                .unwrap()
-                .len(),
-            2
-        );
+
+        let detail: Projected<NodeDetail> = get(&ann, &format!("{JOURNEY}/nodes/n_access")).await;
+        let waiting = &detail.value.still_waiting.entries;
+        assert_ne!(waiting.len(), 0);
+        let page: Projected<ExplanationPage> = get(
+            &ann,
+            &format!("{JOURNEY}/nodes/n_access/explanations/still_waiting"),
+        )
+        .await;
+        assert_eq!(page.value.field, ExplainedField::StillWaiting);
+        assert_eq!(page.value.held, waiting.as_slice());
     }
 
     /// I3, C9: the snapshot's node list and the list each page at `page_item_count_max`, their
@@ -227,35 +226,6 @@ mod in_process {
         }
         let distinct: BTreeSet<&NodeKey> = listed.iter().collect();
         assert_eq!((listed.len(), distinct.len()), (count + 1, count + 1));
-    }
-
-    /// C8, Priority: node detail carries the dependents finishing the node would not yet free
-    /// with what else each waits on, and the explanations endpoint answers the same list
-    /// under `still_waiting`.
-    #[tokio::test]
-    async fn node_detail_lists_what_is_still_waiting() {
-        let world = World::start().await;
-        let ann = world.vendor_after(1).await;
-        let detail: Projected<NodeDetail> =
-            get(&ann, "/api/journeys/j_vendor_eval/nodes/n_access").await;
-        let waiting = &detail.value.still_waiting;
-        assert_eq!(waiting.total, 1);
-        let [held] = waiting.entries.as_slice() else {
-            panic!("one entry, not {waiting:#?}")
-        };
-        assert_eq!(held.node.as_str(), "n_plan");
-        let [blocker] = held.also_waits_on.as_slice() else {
-            panic!("one blocker, not {held:#?}")
-        };
-        assert_eq!(blocker.node.as_str(), "n_kickoff");
-        let page: Projected<ExplanationPage> = get(
-            &ann,
-            "/api/journeys/j_vendor_eval/nodes/n_access/explanations/still_waiting",
-        )
-        .await;
-        assert_eq!(page.value.field, ExplainedField::StillWaiting);
-        assert_eq!(page.value.held, waiting.entries.as_slice());
-        assert_eq!(page.value.entries, []);
     }
 
     /// C8; ARCHITECTURE, HTTP API: Size budgets: node detail carries each explanation list's

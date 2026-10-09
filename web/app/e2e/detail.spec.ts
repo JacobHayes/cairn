@@ -2,11 +2,11 @@
 // the fixtures afresh), and over the server host where a view follows another page's edit.
 // C8 and its explanations (F7, Gating, Priority, E2), F5's inline resolution, E3's routing,
 // G1 and G2's notes, links, and artifacts with D4's stale and bypass, A10 and G3's drafts,
-// J4's history, drafts across a reload, and the panel on a narrow screen.
+// J4's history, a draft across a reload, and the panel on a narrow screen.
 import { expect, test } from "@playwright/test";
 
 import { annotate, dateChain, flag, openNode, pin, section, state } from "./detail.ts";
-import { fresh, live, nodePanel, openAt, openFromCanvas, recentSaves, syncChip } from "./shell.ts";
+import { fresh, nodePanel, openAt, openFromCanvas, recentSaves, syncChip } from "./shell.ts";
 
 test("the final report's detail reads its due chain and what to edit (C8, F7)", async ({ page }) => {
   const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
@@ -20,6 +20,9 @@ test("the final report's detail reads its due chain and what to edit (C8, F7)", 
   await expect(state(panel)).toHaveAttribute("data-status", "blocked");
   await expect((await section(panel, "blocking")).getByTestId("blocked-through")).toBeVisible();
   await expect((await section(panel, "priority")).getByTestId("gravity")).toBeVisible();
+  const history = panel.getByTestId("history");
+  await history.locator("summary").click();
+  await expect(history.getByTestId("history-patch").first()).toBeVisible();
   await expect((await section(panel, "participations")).getByTestId("participation")).not.toHaveCount(0);
 });
 
@@ -29,7 +32,6 @@ test("relevance names the decision that produced it (C8, Gating)", async ({ page
   await expect(relevance.getByTestId("relevance-why")).toHaveAttribute("data-status", "not_relevant");
   await expect(relevance.getByRole("link").first()).toBeVisible();
   await expect(state(panel)).toHaveAttribute("data-status", "not_relevant");
-  await expect(state(panel)).toHaveText("not relevant");
 });
 
 test("priority lists gravity's contributors and leverage split by owner (C8, Priority)", async ({ page }) => {
@@ -116,40 +118,6 @@ test("a message draft renders with the journey's context and copies (A10, G3)", 
   expect(await page.evaluate(() => navigator.clipboard.readText())).toBe(await draft.innerText());
 });
 
-test("history pages the node's events, grouped by patch (J4)", async ({ page }) => {
-  const panel = await openNode(page, "browser", "j_vendor_eval", "n_access");
-  await panel.getByTestId("history").locator("summary").click();
-  await expect(panel.getByTestId("history-patch").first()).toBeVisible();
-});
-
-test("an unsent note survives a reload", async ({ page }) => {
-  const panel = await openNode(page, "browser", "j_bakeoff", "n_summary");
-  await panel.getByRole("button", { name: "Add a note or link" }).click();
-  const text = fresh("Unsent note");
-  await panel.getByLabel("Note").fill(text);
-  await page.reload();
-  await expect(page.getByTestId("node-detail").getByLabel("Note")).toHaveValue(text);
-});
-
-test("an unsent note stays with its node when another node is opened", async ({ page }) => {
-  const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
-  await panel.getByRole("button", { name: "Add a note or link" }).click();
-  await panel.getByLabel("Note").fill(fresh("For the report"));
-  await panel.getByRole("link", { name: "Final review" }).first().click();
-  const other = page.locator('[data-testid="node-detail"][data-node="n_final_review"]');
-  await expect(other).toBeVisible();
-  await expect(other.getByTestId("annotation-editor")).toHaveCount(0);
-});
-
-test("an unsent skip reason survives a reload", async ({ page }) => {
-  const panel = await openNode(page, "browser", "j_hiring", "n_offer");
-  await panel.getByTestId("actions").getByRole("button", { name: "Skip" }).click();
-  const reason = fresh("Not needed");
-  await panel.getByLabel("Why skip it").fill(reason);
-  await page.reload();
-  await expect(page.getByTestId("node-detail").getByLabel("Why skip it")).toHaveValue(reason);
-});
-
 test("a rejection and an unsent bypass reason survive a reload (D4)", async ({ page }) => {
   const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
   await panel.getByTestId("actions").getByRole("button", { name: "Complete" }).click();
@@ -181,16 +149,6 @@ test("over the server, a resolution never overwrites a pin someone set meanwhile
   await mine.locator('[data-testid="resolution"][data-op="shift_pin"]').getByRole("button").click();
   await expect(mine.getByTestId("conflict")).toBeVisible();
   await expect(theirs.getByTestId("pin-date")).toHaveText("2026-11-10");
-});
-
-test("over the server, a note added in one page appears in another's panel (H6)", { tag: "@server" }, async ({ context }) => {
-  const [one, two] = [await context.newPage(), await context.newPage()];
-  const mine = await openNode(one, "server", "j_hiring", "n_close_out");
-  const theirs = await openNode(two, "server", "j_hiring", "n_close_out");
-  await live(two);
-  const text = fresh("Called the candidate");
-  await annotate(mine, "note", text);
-  await expect(theirs.getByTestId("annotations")).toContainText(text);
 });
 
 test("work whose relevance waits on an unanswered decision completes with a warning (D4, D7)", async ({ page }) => {

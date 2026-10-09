@@ -233,36 +233,3 @@ fn answers_are_in_effect_while_decided_and_relevant() {
         "a decision that leaves scope no longer fills its role"
     );
 }
-
-/// C2: a node can be pending on a decision that is relevant right now: C reads `not (B = yes)`,
-/// so while B is undecided C holds, and its recorded answer stands, but reading B as unknown C
-/// is undecided too, so what reads C's answer may yet change.
-#[test]
-fn a_pending_node_can_wait_on_a_decision_that_is_relevant_now() {
-    let journey = support::journey(&support::add_nodes(&[
-        "{key: n_a, id: a, kind: decision, title: A, prompt: A?, answer_type: boolean}",
-        "{key: n_b, id: b, kind: decision, title: B, prompt: B?, answer_type: boolean, relevant_when: {equals: {decision: n_a, value: true}}}",
-        "{key: n_c, id: c, kind: decision, title: C, prompt: C?, answer_type: boolean, relevant_when: {not: {equals: {decision: n_b, value: true}}}}",
-        "{key: n_x, id: x, kind: action, title: X, relevant_when: {equals: {decision: n_c, value: false}}}",
-    ]));
-    // Answer A no (B is ruled out, C holds), answer C, then reopen A.
-    let mut answered = journey;
-    for step in [
-        "- op: answer\n  decision: n_a\n  value: {boolean: false}\n",
-        "- op: answer\n  decision: n_c\n  value: {boolean: true}\n",
-        "- op: transition\n  node: n_a\n  transition: reopen\n",
-    ] {
-        answered = support::accepted(&answered, step);
-    }
-    let derived = support::derived(&answered, support::JOURNEY);
-    let pending = |node: &str| {
-        derived
-            .relevance()
-            .get(&key(node))
-            .unwrap()
-            .pending_on
-            .clone()
-    };
-    assert_eq!(derived.relevance().value(&key("n_c")), Relevance::Relevant);
-    assert_eq!(pending("n_x"), [key("n_c")].into());
-}

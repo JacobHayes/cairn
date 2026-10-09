@@ -5,7 +5,7 @@
 # short video of the main flow. Builds the module (mise run build:wasm) and the fixture server,
 # runs authoring's web unit tests (Vitest, against the module's engine) and browser tests
 # (Playwright, e2e/authoring.spec.ts), runs the proof's pictures
-# (web/app/proof/authoring.proof.ts), which assert what each shows, then checks the planted
+# (web/app/proof/authoring.proof.ts), which only wait for the state each picture shows, then checks the planted
 # bug: a removal sent without its cascade, caught by A18's cascade tests. The plant is made in
 # place and always restored (checked byte for byte). Exits non-zero if any outcome differs from
 # the one expected.
@@ -33,7 +33,7 @@ mise exec -- cargo build --quiet --locked -p cairn-wasm --example fixture_server
 (cd web/app && "$repo/node_modules/.bin/playwright" test e2e/authoring.spec.ts --reporter=line >/dev/null) \
   || miss "authoring's browser tests failed"
 
-# The pictures, each asserted as it is taken, and the values behind them.
+# The pictures, and the values behind them.
 pictures=(2-empty-draft 3-a-decision-fills-a-role 4-a-condition 5-a-date-rule 6-an-edge-to-its-own-stage-refused
   7-the-route-on-its-canvas 8-published-exported-and-imported-back 9-three-violations-at-three-fields
   10-journey-edit-mode-a-local-node 11-a-route-copied-title-edited-here 12-a-removal-and-its-cascade

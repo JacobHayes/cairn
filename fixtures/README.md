@@ -243,8 +243,7 @@ Each scenario's journey at its end, summarized for observers (brief 5.4, C18), r
 stored state), how many are left to finish, the overdue, short, and stale nodes, the milestones not yet
 reached with their effective dates, and the open decisions in rank order. Nothing is
 overdue on that day; the product launch's late code freeze leaves it and the launch short
-(F6). The app's browser tests (`web/app/e2e/summary.spec.ts`) check these lines against the
-summary page on the in-browser host.
+(F6). The engine's tests (`crates/engine/tests/integration/fixture_readme.rs`) check these lines.
 
 - `vendor-evaluation`, status summary: active 1, ready 2, blocked 2, done 19; remaining 5; overdue none; short none; stale none; upcoming `n_review_opens` 2026-10-30, `n_decision_meeting` 2026-11-20; open decisions none.
 - `hiring-loop`, status summary: ready 1, done 11, skipped 1; remaining 1; overdue none; short none; stale none; upcoming none; open decisions none.

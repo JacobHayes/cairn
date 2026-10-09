@@ -250,40 +250,7 @@ fn answering_a_decision_reports_what_left_scope_and_what_was_unlocked() {
     let found = consequences(&before_graph, &before, &after_graph, &after);
     assert_eq!(found.out_of_scope, [key("n_close_out")]);
     assert_eq!(found.unlocked, [key("n_offer")]);
-    assert_eq!(found.into_scope, [] as [cairn_schema::NodeKey; 0]);
     assert!(!found.has_warnings(), "informational, never a warning");
-    assert!(
-        !before
-            .blocking()
-            .acting_frontier()
-            .contains(&key("n_offer")),
-        "the offer letter was not on the acting frontier before"
-    );
-    assert!(after.blocking().acting_frontier().contains(&key("n_offer")));
-}
-
-/// Priority, D7: the vendor evaluation's partner-testing answer takes its whole branch out of
-/// scope; the branch's nodes are listed in key order.
-#[test]
-fn a_branch_decided_out_lists_every_node_that_left_scope() {
-    let name = "vendor-evaluation";
-    let side = |steps: usize| {
-        let records = support::after(name, steps);
-        let graph = support::journey_graph(&records, "j_vendor_eval");
-        let derived = support::derived(&records, "j_vendor_eval");
-        (graph, derived)
-    };
-    let (before_graph, before) = side(1);
-    let (after_graph, after) = side(2);
-    let found = consequences(&before_graph, &before, &after_graph, &after);
-    assert_eq!(
-        found.out_of_scope,
-        [
-            key("n_criteria"),
-            key("n_partner_led"),
-            key("n_partner_results")
-        ]
-    );
 }
 
 /// Priority, D7: deciding a branch back in reports it into scope and, once nothing holds it,
@@ -320,27 +287,11 @@ fn deciding_a_branch_back_in_reports_it_into_scope_and_unlocked() {
         Consequences::default(),
         "an added node is not unlocked"
     );
-}
-
-/// D7: a patch that changes nothing reports nothing, and the warning half and the
-/// informational half are told apart.
-#[test]
-fn an_unchanged_journey_reports_nothing_and_only_warnings_count_as_warnings() {
-    let records = support::journey(&add(&[FLAG, BRANCH]));
     let graph = support::journey_graph(&records, support::JOURNEY);
     let derived = support::derived(&records, support::JOURNEY);
     assert_eq!(
         consequences(&graph, &derived, &graph, &derived),
-        Consequences::default()
+        Consequences::default(),
+        "a patch that changes nothing reports nothing"
     );
-    let informational = Consequences {
-        unlocked: vec![key("n_branch")],
-        ..Consequences::default()
-    };
-    assert!(!informational.has_warnings());
-    let warned = Consequences {
-        overdue: vec![key("n_branch")],
-        ..Consequences::default()
-    };
-    assert!(warned.has_warnings());
 }

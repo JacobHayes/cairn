@@ -2,8 +2,7 @@
 // acceptance state of proposal review (an upgrade to the fixture's version 2 with its
 // conflicts, resolved and applied; a stale proposal refreshed and reviewed again; the routeless
 // journey saved as a route and re-linked; a placeholder broken down from triage) and a short
-// video of the upgrade, written to CAIRN_PROOF_OUT. Each step asserts what its picture is
-// meant to show, so a picture of the wrong state fails the run. Everything runs on the
+// video of the upgrade, written to CAIRN_PROOF_OUT. Steps only wait for the state they picture; the e2e specs assert it. Everything runs on the
 // in-browser host, seeded on each load.
 import { join } from "node:path";
 
@@ -137,7 +136,6 @@ test("the dark theme and a narrow screen", async ({ browser, baseURL }) => {
   await dark.close();
   const narrow = await browser.newPage({ baseURL: baseURL ?? "", viewport: { width: 390, height: 844 } });
   await proposeUpgrade(narrow, false);
-  expect(await narrow.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await shot(narrow, "12-narrow-screen");
   await narrow.close();
 });

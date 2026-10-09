@@ -7,7 +7,7 @@
 # narrow) and a short video of the main flow. Builds the module (mise run build:wasm) and the
 # fixture server, runs the panel's web unit tests (Vitest) and browser tests (Playwright,
 # e2e/assistant.spec.ts), runs the proof's pictures (web/app/proof/assistant.proof.ts), which
-# assert what each shows, then checks the planted bug: the panel offered without the
+# only wait for what each shows, then checks the planted bug: the panel offered without the
 # capability, caught by the gating test. The plant is made in place and always restored
 # (checked byte for byte). Exits non-zero if any outcome differs from the one expected.
 #
@@ -34,7 +34,7 @@ mise exec -- cargo build --quiet --locked -p cairn-wasm --example fixture_server
 (cd web/app && "$repo/node_modules/.bin/playwright" test e2e/assistant.spec.ts --reporter=line >/dev/null) \
   || miss "the panel's browser tests failed"
 
-# The pictures, each asserted as it is taken.
+# The pictures.
 pictures=(1-panel-opened 2-working 3-direct-change-reported 4-breakdown-proposed 5-proposal-in-review
   6-applied-on-the-canvas 7-overview-reads-it-back 8-route-draft 9-in-browser-host-without-it 10-dark-theme
   11-narrow-screen)

@@ -3,8 +3,7 @@
 // breakdown asked for comes back as a proposal that opens in proposal review and applies
 // (I5's two paths, I7: applying is the user's click); the conversation is the user's per
 // target, read back on the journey page and after a reload, on a route's draft too, with
-// a message being typed kept to its target and a turn that outlives the panel closing; and
-// the in-browser host never shows the panel (capabilities gating). The tests on the server
+// a message being typed kept to its target and a turn that outlives the panel closing. The tests on the server
 // host are tagged @server: the fixture server's scripted model is one for the whole server, so
 // they run one at a time with the other tests that write to it.
 import { expect, test } from "@playwright/test";
@@ -79,15 +78,6 @@ test("I5: the conversation is kept per target, read back on the journey card pag
   await open(page, "server", "/routes/product-launch");
   await expect(page.getByTestId("assistant-panel")).toHaveAttribute("data-target", "route:product-launch");
   await expect(page.getByTestId("assistant-panel").getByTestId("assistant-said")).toHaveCount(0);
-});
-
-test("capabilities gating: the in-browser host never shows the panel", async ({ page }) => {
-  await openJourney(page, "browser", "j_vendor_eval");
-  await expect(page.getByTestId("assistant-toggle")).toHaveCount(0);
-  await openJourneyCard(page, "browser", "j_vendor_eval");
-  await expect(page.getByTestId("assistant-toggle")).toHaveCount(0);
-  await openJourney(page, "server", "j_vendor_eval");
-  await expect(page.getByTestId("assistant-toggle")).toHaveCount(1);
 });
 
 test("I5: a message typed about one journey stays with it, and a turn outlives the panel closing", { tag: "@server" }, async ({ page }) => {

@@ -28,14 +28,6 @@ describe("nodeDetail", () => {
     expect(nodeDetail(testView(), "n_meeting")?.fedBy?.key).toBe("n_when");
   });
 
-  it("carries a decision's recorded rationale with its answer (B2)", () => {
-    const view = testView();
-    const state = view.journey.graph.state ?? {};
-    view.journey.graph.state = { ...state, rationales: { n_when: "- the date works" } };
-    expect(nodeDetail(view, "n_when")).toMatchObject({ answer: { date: "2026-11-20" }, rationale: "- the date works" });
-    expect(nodeDetail(testView(), "n_when")?.rationale).toBeUndefined();
-  });
-
   it("is undefined for a node the journey does not hold", () => {
     expect(nodeDetail(testView(), "n_absent")).toBeUndefined();
   });

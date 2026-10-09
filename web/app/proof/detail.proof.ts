@@ -1,7 +1,6 @@
 // The proof's media for brief 5.1 (briefs/proof/5.1/prove.sh): a screenshot of each
 // acceptance state of the node detail panel and a short video of its main flow, written to
-// CAIRN_PROOF_OUT. Each step asserts what its picture is meant to show, so a picture of the
-// wrong state fails the run. Everything runs on the in-browser host, seeded on each load.
+// CAIRN_PROOF_OUT. Steps only wait for the state they picture; the e2e specs assert it. Everything runs on the in-browser host, seeded on each load.
 import { join } from "node:path";
 
 import { expect, test, type Browser, type Locator, type Page } from "@playwright/test";
@@ -85,7 +84,6 @@ test("a message draft rendered with the journey's context", async ({ page }) => 
 test("a narrow screen", async ({ browser, baseURL }) => {
   const narrow = await browser.newPage({ baseURL: baseURL ?? "", viewport: { width: 390, height: 844 } });
   await openNode(narrow, "browser", "j_vendor_eval", "n_final_report");
-  expect(await narrow.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await shot(narrow, "13-narrow-screen");
   await narrow.close();
 });

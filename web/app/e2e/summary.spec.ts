@@ -1,57 +1,12 @@
-// The Summary page (C18): each fixture's counts and lists as fixtures/README.md states them
-// (read on the browser host at the scenario matrix's day), the journey card's way to it, and a
-// print of it leaving out the navigation and the detail panel. The server host draws it from
-// the page's own derivation of the server's document, which web/wasm's agreement cases hold
-// to the server's projection.
-import { readFileSync } from "node:fs";
-
-import { expect, test, type Page } from "@playwright/test";
+// The Summary page (C18): the journey card's way to it, a node opening beside it, and a print of
+// it leaving out the navigation and the detail panel. Each fixture's counts and lists are held to
+// fixtures/README.md by the engine's tests. The server host draws it from the page's own
+// derivation of the server's document, which web/wasm's agreement cases hold to the server's
+// projection.
+import { expect, test } from "@playwright/test";
 
 import { nodePanel, openAt } from "./shell.ts";
-import { FIXED_TODAY, FIXTURE_JOURNEYS } from "./views.ts";
-
-// The page lists no groups row (a group's state is derived from its children).
-const README = readFileSync(new URL("../../../fixtures/README.md", import.meta.url), "utf8")
-  .split("\n")
-  .map((line) => line.replace(/, derived \d+/, ""));
-
-/** The keys a part of the summary lists, in its order. */
-function listed(page: Page, part: string): Promise<string[]> {
-  return page
-    .locator(`[data-testid="${part}"] [data-testid="summary-item"]`)
-    .evaluateAll((items) => items.map((item) => item.getAttribute("data-node") ?? ""));
-}
-
-const keys = (list: string[]) => (list.length === 0 ? "none" : list.map((key) => `\`${key}\``).join(", "));
-
-/** The summary on the page as fixtures/README.md states it, one line per fixture. */
-async function summaryLine(page: Page, fixture: string): Promise<string> {
-  const states = await page
-    .getByTestId("summary-state")
-    .evaluateAll((rows) => rows.map((row) => `${row.getAttribute("data-state") ?? ""} ${row.getAttribute("data-count") ?? ""}`));
-  const remaining = await page.getByTestId("card-progress").getAttribute("data-remaining");
-  const upcoming = await page
-    .locator('[data-testid="summary-upcoming"] [data-testid="summary-item"]')
-    .evaluateAll((items) => items.map((item) => `\`${item.getAttribute("data-node") ?? ""}\` ${item.getAttribute("data-date") ?? ""}`));
-  return [
-    `- \`${fixture}\`, status summary: ${states.join(", ")}`,
-    `remaining ${remaining ?? ""}`,
-    `overdue ${keys(await listed(page, "summary-overdue"))}`,
-    `short ${keys(await listed(page, "summary-shortfalls"))}`,
-    `stale ${keys(await listed(page, "summary-stale"))}`,
-    `upcoming ${upcoming.length === 0 ? "none" : upcoming.join(", ")}`,
-    `open decisions ${keys(await listed(page, "summary-open"))}.`,
-  ].join("; ");
-}
-
-for (const [fixture, journey] of Object.entries(FIXTURE_JOURNEYS)) {
-  test(`C18: the ${fixture} summary matches the fixture README`, async ({ page }) => {
-    await openAt(page, "browser", journey, "summary", { fixedToday: FIXED_TODAY });
-    await expect(page.getByTestId("summary")).toBeVisible();
-    expect(README).toContain(await summaryLine(page, fixture));
-  });
-}
-
+import { FIXED_TODAY } from "./views.ts";
 
 test("C18: the journey card opens the Summary page, a node opens beside it, and a print leaves out navigation and the panel", async ({ page }) => {
   await openAt(page, "browser", "j_bakeoff", "next/list", { fixedToday: FIXED_TODAY });

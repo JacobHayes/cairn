@@ -939,6 +939,21 @@ fn held_through(run: &Run, node: &str) -> Option<cairn_schema::NodeKey> {
     derived.blocking().snoozed_via(&key(node)).cloned()
 }
 
+/// The container the snoozed list names on `node`'s row after the run so far.
+fn listed_snoozed_via(run: &Run, node: &str) -> Option<cairn_schema::NodeKey> {
+    let graph = support::journey_graph(run.records(), "j_vendor_eval");
+    let derived = support::derived(run.records(), "j_vendor_eval");
+    let query = cairn_schema::ListQuery {
+        flags: [cairn_schema::ListFlag::Snoozed].into(),
+        ..cairn_schema::ListQuery::default()
+    };
+    let listed = cairn_engine::DerivedJourney::new(&graph, &derived)
+        .list(&query, &std::collections::BTreeSet::new())
+        .unwrap();
+    let row = listed.rows.iter().find(|row| row.key == key(node))?;
+    row.snoozed_via.clone()
+}
+
 /// The codes of a rejected patch to the vendor evaluation.
 fn rejected_codes(run: &Run, mutations: &str) -> Vec<cairn_schema::ViolationCode> {
     let Rejection::Invalid { violations } = run.reject(VENDOR, mutations) else {
@@ -969,6 +984,11 @@ fn container_snooze_holds_and_clears() -> Run {
         "- op: snooze\n  node: n_testing\n  until: {node: n_decision_meeting}\n",
     );
     assert_eq!(held_through(&run, "n_baseline"), Some(key("n_testing")));
+    assert_eq!(
+        listed_snoozed_via(&run, "n_baseline"),
+        Some(key("n_testing")),
+        "the snoozed list names the container on its descendants"
+    );
     assert_eq!(
         acting_after(&run),
         [

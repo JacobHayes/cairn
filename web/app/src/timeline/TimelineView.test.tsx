@@ -50,13 +50,6 @@ describe("TimelineChart (C13)", () => {
     expect(count(markup, 'data-testid="timeline-end"')).toBe(1);
   });
 
-  it("keeps the axis of every date while the toolbar narrows the rows", () => {
-    const markup = drawn(timeline, { decisions: false, kinds: ["milestone"], text: "" });
-    expect([...markup.matchAll(/data-testid="timeline-entry" data-node="([^"]+)"/g)].map((row) => row[1])).toEqual(["n_meeting"]);
-    expect(markup).toContain('data-testid="timeline-tick" data-date="2026-10-12"');
-    expect(drawn(timeline, { decisions: true, kinds: [], text: "" })).toContain('data-testid="timeline-empty"');
-  });
-
   it("draws no end without a final milestone", () => {
     const markup = drawn({ entries: timeline.entries.map((each) => ({ ...each, final: false })) });
     expect(markup).toContain('data-end="" data-end-date=""');

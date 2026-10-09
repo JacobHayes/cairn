@@ -22,14 +22,11 @@ describe("an entity answer with a new entity (B3)", () => {
 });
 
 describe("an answer's rationale (B2)", () => {
-  it("rides on the answer, trimmed, and is left off when blank so a revision gives none", () => {
+  it("rides on the answer, also one that names a new entity, trimmed, and is left off when blank so a revision gives none", () => {
     expect(answerMutations("n_ok", { boolean: true }, "", "- cheaper\n- [quote](https://example.org)\n", key)).toEqual([
       { op: "answer", decision: "n_ok", value: { boolean: true }, rationale: "- cheaper\n- [quote](https://example.org)" },
     ]);
     expect(answerMutations("n_ok", { boolean: false }, "", " \n ", key)).toEqual([{ op: "answer", decision: "n_ok", value: { boolean: false } }]);
-  });
-
-  it("goes with the answer that names a new entity", () => {
     expect(answerMutations("n_who", { entity: "" }, "Ann", "Knows the system", key)[1]).toEqual({ op: "answer", decision: "n_who", value: { entity: "e_new" }, rationale: "Knows the system" });
   });
 });

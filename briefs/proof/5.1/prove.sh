@@ -2,7 +2,7 @@
 # Regenerates the media of briefs/proof/5.1/: a screenshot of each acceptance state of the node
 # detail panel and a short video of its main flow. Builds the module (mise run build:wasm) and
 # the fixture server, then runs the proof's pictures (web/app/proof/detail.proof.ts), which
-# assert the state each picture shows. Exits non-zero if the run fails or a picture is missing.
+# only wait for the state each picture shows. Exits non-zero if the run fails or a picture is missing.
 # The README is written by hand.
 #
 # usage: briefs/proof/5.1/prove.sh

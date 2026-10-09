@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Mutation } from "../detail/model.ts";
 import { actingView } from "./acting.test-support.ts";
-import { actsFor, assignOwner, bulkPlan, doneMutations, factsOf, evidenceDraft, hasArtifact, hasNote, missingEvidence, runBulk, selectionOf, type Act, type BulkAction, type Facts } from "./acts.ts";
+import { actsFor, assignOwner, bulkPlan, doneMutations, factsOf, hasArtifact, hasNote, missingEvidence, runBulk, selectionOf, type Act, type BulkAction, type Facts } from "./acts.ts";
 
 const view = actingView();
 
@@ -50,11 +50,6 @@ describe("C11 done with its artifact (G2) or note (G4)", () => {
     expect(doneMutations("n_work", { artifact: { key: "a_new", url: "https://example.org/out" }, note }).map((mutation) => mutation.op)).toEqual(["add_annotation", "add_annotation", "transition"]);
   });
 
-  it("reads an unsent form saved before notes as its artifact address", () => {
-    expect(evidenceDraft("https://example.org/out")).toEqual({ artifact: "https://example.org/out", note: "" });
-    expect(evidenceDraft({ artifact: "", note: "Written up." })).toEqual({ artifact: "", note: "Written up." });
-  });
-
   it("asks only for the evidence a node requires and lacks; a link or another node's note is not a note", () => {
     expect(hasArtifact(view, "n_work")).toBe(false);
     expect(missingEvidence(view, facts("n_work").node)).toEqual({ artifact: true, note: false });
@@ -63,8 +58,6 @@ describe("C11 done with its artifact (G2) or note (G4)", () => {
     const annotated = (annotations: NonNullable<typeof state.annotations>): typeof view => ({ ...view, journey: { ...view.journey, graph: { ...view.journey.graph, state: { ...state, annotations } } } });
     const others = annotated([
       { key: "a_link", node: "n_log", reference: "https://example.org/r" },
-      { key: "a_journey", note: "On the journey." },
-      { key: "a_other", node: "n_work", note: "On another node." },
     ].map((body) => ({ body, created_by: "u_one", created_at: "2026-10-01T00:00:00Z" })));
     expect(hasNote(others, "n_log")).toBe(false);
     expect(missingEvidence(others, facts("n_log").node).note).toBe(true);

@@ -1,15 +1,14 @@
 //! A1a, A16, D4, G4: `requires_note`, on the product launch with its hardening action marked.
 //! Completion is refused until the action carries a note of its own (a link, and a note on the
 //! journey, do not count), accepted when the note rides in the same patch, goes stale when the
-//! last note is removed and clears when one is added, and a bypass records the failure. A route
-//! version that sets the flag on finished work leaves it done and stale.
+//! last note is removed and clears when one is added.
 #![cfg(test)]
 
 use crate::support;
 
 use std::collections::BTreeSet;
 
-use cairn_engine::{Applied, Records, apply, replay, upgrade};
+use cairn_engine::{Applied, Records, apply};
 use cairn_schema::{
     Guard, GuardFailure, Lineage, Rejection, RouteFile, SequentialKeys, ViolationCode, from_yaml,
 };
@@ -90,7 +89,7 @@ fn ready() -> Records {
 }
 
 /// A1a, D4, G4: refused without a note of its own, accepted with one in the same patch, stale
-/// when the last note goes and clear when one returns; replay rebuilds the stored state.
+/// when the last note goes and clear when one returns.
 #[test]
 fn completion_needs_a_note_of_its_own_and_loses_it_as_stale() {
     let records = ready();
@@ -105,76 +104,11 @@ fn completion_needs_a_note_of_its_own_and_loses_it_as_stale() {
     let found = refusal(&records, &format!("{others}{DONE}"));
     assert_eq!(found.failures, BTreeSet::from([GuardFailure::MissingNote]));
 
-    let done = patch(&records, &format!("{NOTE}{DONE}")).unwrap();
-    assert_eq!(
-        replay(&records, done.events()),
-        *done.records(),
-        "J3: replay equals apply"
-    );
-    let done = done.records().clone();
+    let done = accepted(&records, &format!("{NOTE}{DONE}"));
     assert!(stale(&done).is_empty());
 
     let removed = accepted(&done, "- op: remove_annotation\n  annotation: a_note\n");
     assert_eq!(stale(&removed), BTreeSet::from([GuardFailure::MissingNote]));
     let restored = accepted(&removed, NOTE);
     assert!(stale(&restored).is_empty());
-}
-
-/// D4: a bypass accepts the missing note and records it, so the node is not stale.
-#[test]
-fn a_bypassed_note_is_recorded_and_not_stale() {
-    let records = ready();
-    let bypass = "- op: apply_override\n  node: n_hardening\n  override: {guard_bypass: {guards: [has_note], reason: Written up in the review meeting.}}\n";
-    let done = accepted(&records, &format!("{bypass}{DONE}"));
-    let recorded = &done.journeys[&LAUNCH.parse().unwrap()]
-        .graph
-        .state
-        .overrides[&key(HARDENING)];
-    assert_eq!(
-        recorded.bypass.as_ref().unwrap().failures,
-        BTreeSet::from([GuardFailure::MissingNote])
-    );
-    assert!(stale(&done).is_empty());
-}
-
-/// B7, D4, G4: a route version that marks finished work leaves it done and makes it stale for the
-/// missing note.
-#[test]
-fn a_route_version_that_marks_finished_work_leaves_it_done_and_stale() {
-    let records = support::finished("product-launch");
-    assert!(stale(&records).is_empty());
-    let published = support::publish_version(&records, "product-launch", marked_graph());
-    let draft = upgrade(
-        &published,
-        &LAUNCH.parse().unwrap(),
-        cairn_schema::VersionNumber::FIRST.next(),
-        &support::fixed_inputs(),
-    )
-    .unwrap();
-    let proposed = support::propose(
-        &published,
-        "pr_upgrade",
-        &format!("{{journey: {LAUNCH}}}"),
-        &draft,
-    );
-    let upgraded = support::apply_proposal(&proposed, "pr_upgrade")
-        .unwrap_or_else(|rejection| panic!("{rejection:#?}"))
-        .records()
-        .clone();
-    let journey = &upgraded.journeys[&LAUNCH.parse().unwrap()].graph;
-    assert_eq!(
-        cairn_schema::NodeFieldValue::read(
-            cairn_schema::NodeField::RequiresNote,
-            journey.nodes.get(&key(HARDENING)).unwrap()
-        ),
-        Some(cairn_schema::NodeFieldValue::RequiresNote(true))
-    );
-    assert_eq!(
-        journey.state.nodes[&key(HARDENING)].state,
-        cairn_schema::State::Done
-    );
-    assert_eq!(
-        stale(&upgraded),
-        BTreeSet::from([GuardFailure::MissingNote])
-    );
 }

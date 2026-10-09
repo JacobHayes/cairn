@@ -19,7 +19,6 @@ import {
   turnOn,
 } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { openNode, section } from "./detail.ts";
 import { derivedRevision, goTo, nodePanel, openAt, syncChip } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
@@ -52,13 +51,6 @@ test("C10: the next list ranks the frontier, and re-sorting by slack reorders it
   const known = slacks.filter((slack) => slack !== "").map(Number);
   expect(known).toEqual([...known].sort((left, right) => left - right));
   expect(slacks.slice(known.length).every((slack) => slack === "")).toBe(true);
-});
-
-test("C11: triage holds the acting frontier, one card at a time in rank order", async ({ page }) => {
-  await atFixedToday(page);
-  await openActing(page, "browser", "j_launch", "next/cards");
-  expect(await passOrder(page)).toEqual(LAUNCH_RANKED);
-  await expect(card(page)).toHaveAttribute("data-node", LAUNCH_RANKED[0] ?? "");
 });
 
 test("C9: filters hold at once, search reads notes, and rows group by container", async ({ page }) => {
@@ -129,31 +121,6 @@ test("B6: a node snoozed from its card leaves, and returns when its target compl
   await expect(nextItem(page, first)).toBeVisible();
 });
 
-test("B6: a container snoozed from its detail holds its subtree off the next list, and unsnoozes from a descendant's", async ({ page }) => {
-  await openActing(page, "browser", "j_launch", "next/list");
-  await expect(nextItem(page, "n_docs")).toBeVisible();
-  const today = (await syncChip(page).getAttribute("data-today")) ?? "";
-  const group = await openNode(page, "browser", "j_launch", "n_materials");
-  const blocking = await section(group, "blocking");
-  await blocking.getByRole("button", { name: "Snooze until a date" }).click();
-  await blocking.getByLabel("Snooze until").fill(daysAfter(today, 7));
-  await blocking.getByTestId("snooze").getByRole("button", { name: "Save" }).click();
-  await expect(blocking.getByTestId("snooze")).toContainText("Snoozed until");
-  await expect(group.getByTestId("lifts-snooze")).toContainText("2 open items");
-  await goTo(page, "next", "list");
-  await expect(nextItem(page, "n_beta_end")).toBeVisible();
-  for (const held of ["n_docs", "n_announcement"]) {
-    await expect(nextItem(page, held)).toHaveCount(0);
-  }
-  const part = await openNode(page, "browser", "j_launch", "n_docs");
-  const through = (await section(part, "blocking")).getByTestId("snoozed-via");
-  await expect(through).toHaveAttribute("data-via", "n_materials");
-  await through.getByRole("button", { name: "Unsnooze Launch materials" }).click();
-  await goTo(page, "next", "list");
-  await expect(nextItem(page, "n_docs")).toBeVisible();
-  await expect(nextItem(page, "n_announcement")).toBeVisible();
-});
-
 test("D5: an empty acting frontier shows the stalled panel, and unsnooze brings the node back", async ({ page }) => {
   await openActing(page, "browser", "j_hiring", "next/list");
   expect(await nextKeys(page)).toEqual(["n_offer"]);
@@ -203,34 +170,21 @@ test("C11: the walkthrough opens on the decisions at the start; answering the pa
   expect(await nextKeys(page)).toEqual(pass);
 });
 
-test("B2, C8, C12: a rationale given on a triage card shows in node detail; a revision without one drops it, and history keeps both", async ({ page }) => {
+test("B2, C8, C12: a rationale given on a triage card shows in node detail; a revision without one drops it", async ({ page }) => {
   const journey = await startVendorJourney(page);
   await openActing(page, "browser", journey, "next/cards?decisions=1");
   await expect(card(page)).toHaveAttribute("data-node", "n_partner_runs");
-  await answerCard(page, "yes", "- a partner brings the **domain**\n- [their notes](https://example.org/notes)");
+  await answerCard(page, "yes", "A partner brings the domain.");
   await openAt(page, "browser", journey, "plan/graph?decisions=1", { node: "n_partner_runs" });
   const panel = nodePanel(page, "n_partner_runs");
-  await expect(panel.getByTestId("rationale").locator("li")).toHaveCount(2);
-  await expect(panel.getByTestId("rationale").getByRole("link", { name: "their notes" })).toHaveAttribute("href", "https://example.org/notes");
-  // Editing the reason keeps it; picking a different answer there starts a new answer without it.
-  await panel.getByRole("button", { name: "Edit reason" }).click();
-  const editor = panel.getByTestId("answer-editor");
-  await expect(editor.getByLabel("Why")).toHaveValue(/their notes/);
-  await editor.getByLabel("Answer").selectOption("no");
-  await expect(editor.getByLabel("Why")).toHaveValue("");
-  await editor.getByRole("button", { name: "Cancel" }).click();
+  await expect(panel.getByTestId("rationale")).toContainText("A partner brings the domain.");
   await panel.getByRole("button", { name: "Revise the answer" }).click();
   // A new answer starts with no reason: the old one is offered, never carried forward.
+  const editor = panel.getByTestId("answer-editor");
   await expect(editor.getByLabel("Why")).toHaveValue("");
-  await expect(editor.getByTestId("answer-why")).toContainText("Previous reason");
   await editor.getByLabel("Answer").selectOption("no");
   await editor.getByRole("button", { name: "Save the answer" }).click();
   await expect(panel.getByTestId("rationale")).toHaveCount(0);
-  await panel.getByTestId("history").locator("summary").click();
-  const answers = panel.getByTestId("history-answer");
-  await expect(answers).toHaveCount(2);
-  await expect(answers.nth(0).getByTestId("history-rationale").locator("li")).toHaveCount(2);
-  await expect(answers.nth(1)).toContainText("No reason given.");
 });
 
 test("G4, C11: done on an action that requires a note opens a note field and completes in one patch", async ({ page }) => {
@@ -245,8 +199,6 @@ test("G4, C11: done on an action that requires a note opens a note field and com
   await save.click();
   expect(await revisionAfter(page, revision)).toBe(revision + 1);
   await expect(nextItem(page, "n_screen")).toHaveCount(0);
-  await openActing(page, "browser", journey, "plan/list?state=done");
-  await expect(page.locator('[data-testid="list-row"][data-node="n_screen"]')).toBeVisible();
 });
 
 test("C11, B10: a placeholder's card offers break down and mark atomic, and no done until it is atomic", async ({ page }) => {

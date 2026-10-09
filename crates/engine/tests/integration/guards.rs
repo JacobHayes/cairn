@@ -261,7 +261,7 @@ fn a_bypass_accepts_only_the_failures_it_recorded() {
 }
 
 /// B6, Gating: a blocked node may be snoozed; a node out of scope or effectively skipped may
-/// not.
+/// not, nor a group with no open work left beneath it.
 #[test]
 fn a_snooze_sits_on_a_node_in_scope() {
     let records = support::journey(&add(&[FIRST, SECOND, FLAG, BRANCH]));
@@ -291,6 +291,18 @@ fn a_snooze_sits_on_a_node_in_scope() {
             &skipped,
             &snooze("n_inside", "n_first")
         )),
+        [ViolationCode::SnoozeNotActionable]
+    );
+    let group = support::accepted(
+        &support::journey(&add(&[
+            "{key: n_pack, id: pack, kind: group, title: Pack}",
+            "{key: n_item, id: item, parent: n_pack, kind: action, title: Item}",
+            FIRST,
+        ])),
+        &complete("n_item"),
+    );
+    assert_eq!(
+        support::codes(support::journey_patch(&group, &snooze("n_pack", "n_first"))),
         [ViolationCode::SnoozeNotActionable]
     );
 }

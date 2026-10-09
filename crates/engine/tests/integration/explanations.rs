@@ -6,9 +6,7 @@
 use crate::support;
 
 use cairn_engine::{Derived, DerivedJourney, Records};
-use cairn_schema::{
-    Blocker, Cursor, DependencyVia, Deployment, ExplainedField, HeldDependent, LevelQuery, Score,
-};
+use cairn_schema::{DependencyVia, Deployment, HeldDependent, LevelQuery, Score};
 use support::{add_nodes as add, key};
 
 /// A fixture's journey after its first `steps` steps, and its derive at the fixed clock.
@@ -138,13 +136,13 @@ fn held_journey() -> Records {
 
 /// C8, Priority: a node with leverage from one dependent lists that unblock, and lists the
 /// dependents it would not free with what else each waits on, here a condition and another
-/// action, largest weight first.
+/// action, largest weight first. Answering the decision frees the held dependent, which then
+/// leaves the list and joins the unblocks; reaching the gate leaves nothing waiting on it.
 #[test]
-fn a_node_lists_what_it_unblocks_and_what_is_still_waiting_with_its_condition() {
-    let records = held_journey();
-    let graph = support::journey_graph(&records, support::JOURNEY);
-    let derived = support::derived(&records, support::JOURNEY);
-    let journey = DerivedJourney::new(&graph, &derived);
+fn a_node_lists_what_it_unblocks_and_what_is_still_waiting() {
+    let before = held_journey();
+    let graph = support::journey_graph(&before, support::JOURNEY);
+    let derived = support::derived(&before, support::JOURNEY);
     assert_eq!(derived.priority().leverage(&key("n_gate")).value(), 10.0);
     let freed = derived.priority().leverage_from(&key("n_gate"));
     assert_eq!(
@@ -154,7 +152,9 @@ fn a_node_lists_what_it_unblocks_and_what_is_still_waiting_with_its_condition() 
             .collect::<Vec<_>>(),
         ["n_freed"]
     );
-    let waiting = journey.still_waiting(&key("n_gate")).unwrap();
+    let waiting = DerivedJourney::new(&graph, &derived)
+        .still_waiting(&key("n_gate"))
+        .unwrap();
     assert_eq!(
         held(&waiting),
         [
@@ -162,18 +162,13 @@ fn a_node_lists_what_it_unblocks_and_what_is_still_waiting_with_its_condition() 
             ("n_both", vec![("n_other", "explicit".to_owned())]),
         ]
     );
-}
 
-/// Priority: answering the decision frees the held dependent, which then leaves the list and
-/// joins the unblocks; a dependent is never listed with nothing it waits on.
-#[test]
-fn a_dependent_leaves_still_waiting_once_nothing_else_holds_it() {
-    let records = support::accepted(
-        &held_journey(),
+    let answered = support::accepted(
+        &before,
         "- op: answer\n  decision: n_flag\n  value: {boolean: true}\n",
     );
-    let graph = support::journey_graph(&records, support::JOURNEY);
-    let derived = support::derived(&records, support::JOURNEY);
+    let graph = support::journey_graph(&answered, support::JOURNEY);
+    let derived = support::derived(&answered, support::JOURNEY);
     let waiting = DerivedJourney::new(&graph, &derived)
         .still_waiting(&key("n_gate"))
         .unwrap();
@@ -188,6 +183,17 @@ fn a_dependent_leaves_still_waiting_once_nothing_else_holds_it() {
         .map(|found| found.node)
         .collect();
     assert_eq!(freed, [key("n_freed"), key("n_cond")]);
+
+    let reached = support::accepted(
+        &answered,
+        "- op: transition\n  node: n_gate\n  transition: reach\n",
+    );
+    let graph = support::journey_graph(&reached, support::JOURNEY);
+    let derived = support::derived(&reached, support::JOURNEY);
+    let waiting = DerivedJourney::new(&graph, &derived)
+        .still_waiting(&key("n_gate"))
+        .unwrap();
+    assert_eq!(waiting, [], "a reached gate holds nothing back");
 }
 
 /// Priority, Leverage: completing a node cascades through derived group completion, so a
@@ -239,71 +245,5 @@ fn inherited_holds_and_stage_openings_are_listed_with_their_source() {
                 ("n_kickoff", "opening n_setup".to_owned()),
             ]
         )]
-    );
-}
-
-/// Priority: finished work, groups, and unknown nodes hold nothing back.
-#[test]
-fn nothing_is_still_waiting_on_closed_work_a_group_or_an_unknown_node() {
-    let records = support::accepted(
-        &held_journey(),
-        "- op: transition\n  node: n_gate\n  transition: reach\n",
-    );
-    let graph = support::journey_graph(&records, support::JOURNEY);
-    let derived = support::derived(&records, support::JOURNEY);
-    let journey = DerivedJourney::new(&graph, &derived);
-    assert_eq!(journey.still_waiting(&key("n_gate")).unwrap(), []);
-    assert!(journey.still_waiting(&key("n_nowhere")).is_err());
-    let (records, name) = fixture("vendor-evaluation", 1);
-    let graph = support::journey_graph(&records, &name);
-    let derived = support::derived(&records, &name);
-    assert_eq!(
-        DerivedJourney::new(&graph, &derived)
-            .still_waiting(&key("n_setup"))
-            .unwrap(),
-        []
-    );
-}
-
-/// ARCHITECTURE, Read path: a long still-waiting list pages through the explanations the way
-/// gravity's does, largest first, with its total.
-#[test]
-fn a_long_still_waiting_list_pages() {
-    let mut nodes = vec![
-        "{key: n_root, id: root, kind: action, title: Root}".to_owned(),
-        "{key: n_other, id: other, kind: action, title: Other}".to_owned(),
-    ];
-    nodes.extend((0..60).map(|at| {
-        format!(
-            "{{key: n_held{at:02}, id: held{at:02}, kind: action, title: Held, requires: [n_root, n_other]}}"
-        )
-    }));
-    let nodes: Vec<&str> = nodes.iter().map(String::as_str).collect();
-    let records = support::journey(&add(&nodes));
-    let graph = support::journey_graph(&records, support::JOURNEY);
-    let derived = support::derived(&records, support::JOURNEY);
-    let journey = DerivedJourney::new(&graph, &derived);
-    let limit = usize::try_from(cairn_schema::limits::EXPLANATION_ENTRY_COUNT_MAX).unwrap();
-    let first = journey
-        .explanations(&key("n_root"), ExplainedField::StillWaiting, Cursor::START)
-        .unwrap();
-    assert_eq!((first.held.len(), first.total), (limit, 60));
-    assert_eq!(first.entries, []);
-    let next = first.next.unwrap();
-    let second = journey
-        .explanations(&key("n_root"), ExplainedField::StillWaiting, next)
-        .unwrap();
-    assert_eq!((second.held.len(), second.next), (60 - limit, None));
-    assert_eq!(
-        first.held.first().map(|found| found.node.clone()),
-        Some(key("n_held00"))
-    );
-    let blocker = Blocker {
-        node: key("n_other"),
-        via: DependencyVia::Explicit,
-    };
-    assert_eq!(
-        first.held.first().map(|found| found.also_waits_on.clone()),
-        Some(vec![blocker])
     );
 }

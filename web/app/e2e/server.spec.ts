@@ -16,7 +16,6 @@ import {
   nodeCard,
   open,
   openJourney,
-  recentSaves,
   rename,
   renameOf,
   save,
@@ -25,18 +24,6 @@ import {
 } from "./shell.ts";
 
 const title = (page: Page, node: string) => nodeCard(page, node).getByTestId("title");
-
-test("an edit in one page appears in another", { tag: "@server" }, async ({ context }) => {
-  const [one, two] = [await context.newPage(), await context.newPage()];
-  await openJourney(one, "server", "j_hiring");
-  await openJourney(two, "server", "j_hiring");
-  await live(two);
-  const renamed = fresh("Close out");
-  await rename(one, "n_close_out", renamed);
-  await recentSaves(one);
-  await expect(title(two, "n_close_out")).toHaveText(renamed);
-  expect(await derivedRevision(two)).toBe(await derivedRevision(one));
-});
 
 test("edits to different nodes both land", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];

@@ -14,7 +14,6 @@ mod support;
 mod apply;
 mod blocking;
 mod consequences;
-mod container_snooze;
 mod cost_blocking;
 mod cost_dates;
 mod cost_priority;

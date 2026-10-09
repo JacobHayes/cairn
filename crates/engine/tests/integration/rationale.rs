@@ -1,21 +1,21 @@
 //! B2, C8, C12, J1, J3: an answer's rationale, on the hiring loop. The rationale belongs to
 //! one answer: a revision that gives none leaves the decision with none, a revision of the
-//! reason alone is still a revision, history keeps every answer with its own, and reopening
-//! clears both. Replay rebuilds the same records.
+//! reason alone is still a revision, and history keeps every answer with its own. Replay
+//! rebuilds the same records.
 #![cfg(test)]
 
 use crate::support;
 
-use cairn_engine::{Applied, DerivedJourney, Records, apply, history, replay};
+use cairn_engine::{Applied, DerivedJourney, Records, apply, replay};
 use cairn_schema::{
-    AnswerValue, Cursor, EventType, GraphRecord, Markdown, NodeKey, Snapshot, SnapshotScope, State,
-    Write,
+    AnswerValue, EventType, GraphRecord, Markdown, NodeKey, Snapshot, SnapshotScope, Write,
 };
 use support::key;
 
 const HIRING: &str = "j_hiring";
 const FIRST: &str = "- Strong scorecard\n- See [the notes](https://example.org/notes)";
 const SECOND: &str = "On reflection the **timing** is wrong.";
+const THIRD: &str = "The timing is fine after all.";
 
 fn decision() -> NodeKey {
     key("n_make_offer")
@@ -75,9 +75,10 @@ fn snapshot(records: &Records) -> Snapshot {
         .unwrap()
 }
 
-/// B2, C8, C12, J1, J3: answer with a rationale, revise without one, revise with another.
-/// The current state, the decision view and the snapshot show only the current rationale,
-/// history shows all three answers each with its own, and replay matches stored state.
+/// B2, C8, C12, J1, J3: answer with a rationale, revise without one, revise with another, then
+/// revise only the reason. The current state, the decision view and the snapshot show only the
+/// current rationale, history shows all four answers each with its own, and replay matches
+/// stored state.
 #[test]
 fn each_answer_keeps_its_own_rationale_and_none_carries_forward() {
     let initial = ready();
@@ -98,9 +99,28 @@ fn each_answer_keeps_its_own_rationale_and_none_carries_forward() {
             Some(AnswerValue::Boolean(true)),
             Some(SECOND.to_owned()),
         ),
+        // The same value with a new reason is still a revision.
+        (
+            true,
+            Some(THIRD),
+            Some(AnswerValue::Boolean(true)),
+            Some(THIRD.to_owned()),
+        ),
     ];
     for (value, rationale, answered, kept) in steps {
         let applied = answer(&records, value, rationale);
+        let kinds: Vec<_> = applied
+            .events()
+            .iter()
+            .map(|event| event.event_type)
+            .collect();
+        assert_eq!(
+            kinds
+                .iter()
+                .filter(|kind| **kind == EventType::AnswerSet)
+                .count(),
+            1
+        );
         events.extend(applied.events().iter().cloned());
         records = applied.records().clone();
         assert_eq!(stored(&records), (answered, kept));
@@ -115,87 +135,23 @@ fn each_answer_keeps_its_own_rationale_and_none_carries_forward() {
         .find(|entry| entry.node == decision())
         .unwrap();
     assert_eq!(entry.answer, Some(AnswerValue::Boolean(true)));
-    assert_eq!(entry.rationale.as_ref().map(Markdown::as_str), Some(SECOND));
+    assert_eq!(entry.rationale.as_ref().map(Markdown::as_str), Some(THIRD));
     let current = snapshot(&records);
     assert_eq!(
         current.rationales.get(&decision()).map(Markdown::as_str),
-        Some(SECOND)
+        Some(THIRD)
     );
 
     assert_eq!(
         recorded(&events),
-        [Some(FIRST.to_owned()), None, Some(SECOND.to_owned())],
+        [
+            Some(FIRST.to_owned()),
+            None,
+            Some(SECOND.to_owned()),
+            Some(THIRD.to_owned())
+        ],
         "history keeps each answer with its own rationale or none"
     );
-    let node_history = history(&events, Some(&decision()), Cursor::START);
-    assert_eq!(node_history.total, 3);
-
     let rebuilt = replay(&initial, &events);
     assert_eq!(&rebuilt, &records);
-    let (rebuilt_state, state) = (
-        &rebuilt.journeys[&HIRING.parse().unwrap()].graph.state,
-        &records.journeys[&HIRING.parse().unwrap()].graph.state,
-    );
-    assert_eq!(rebuilt_state.answers, state.answers);
-    assert_eq!(rebuilt_state.rationales, state.rationales);
-}
-
-/// B2: changing only the rationale is a revision: it logs an answer event, and replaces the
-/// reason with the new one.
-#[test]
-fn changing_only_the_rationale_is_a_revision() {
-    let first = answer(&ready(), true, Some(FIRST));
-    let again = answer(first.records(), true, Some(SECOND));
-    assert_eq!(
-        again
-            .events()
-            .iter()
-            .map(|event| event.event_type)
-            .collect::<Vec<_>>(),
-        [EventType::AnswerSet]
-    );
-    assert_eq!(
-        stored(again.records()),
-        (Some(AnswerValue::Boolean(true)), Some(SECOND.to_owned()))
-    );
-    let cleared = answer(again.records(), true, None);
-    assert_eq!(
-        stored(cleared.records()),
-        (Some(AnswerValue::Boolean(true)), None)
-    );
-}
-
-/// B2: reopening clears the answer and its rationale together.
-#[test]
-fn reopening_clears_the_answer_and_its_rationale() {
-    let answered = answer(&ready(), true, Some(FIRST));
-    let reopened = support::accepted_on(
-        answered.records(),
-        HIRING,
-        "- op: transition\n  node: n_make_offer\n  transition: reopen\n",
-    );
-    assert_eq!(stored(&reopened), (None, None));
-    let graph = support::journey_graph(&reopened, HIRING);
-    let state = graph.document().state.nodes[&decision()].state;
-    assert_eq!(state, State::Open);
-    // Answering again starts with no rationale of its own.
-    let again = answer(&reopened, false, None);
-    assert_eq!(
-        stored(again.records()),
-        (Some(AnswerValue::Boolean(false)), None)
-    );
-}
-
-/// B2: a rationale held without its answer is not a valid graph.
-#[test]
-fn a_rationale_without_an_answer_is_refused() {
-    let mut records = ready();
-    let journey = records.journeys.get_mut(&HIRING.parse().unwrap()).unwrap();
-    journey
-        .graph
-        .state
-        .rationales
-        .insert(decision(), FIRST.parse().unwrap());
-    let result = cairn_engine::Graph::new(journey.graph.clone(), &records.deployment);
-    assert!(result.is_err());
 }

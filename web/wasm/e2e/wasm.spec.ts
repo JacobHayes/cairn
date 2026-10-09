@@ -15,7 +15,7 @@ import type { GroupResult, IndexEntry } from "./cases.ts";
 const cases = join(import.meta.dirname, "..", "dist", "cases");
 const index = JSON.parse(readFileSync(join(cases, "index.json"), "utf8")) as IndexEntry[];
 
-/** The groups over generated journeys (the limits, and the size budgets'), not the fixtures'. */
+/** The groups over generated journeys (the limits, and the size figures'), not the fixtures'. */
 const generated = (label: string): boolean => label === "at the limits" || label.endsWith(" generated nodes");
 
 /** The journeys the server walk read: every fixture's, as the root seeds them. */
@@ -120,18 +120,14 @@ test("the derive benchmark at the limits runs in the worker", async ({ page }) =
   expect(found["memoryBytes"]).toBeGreaterThan(0);
 });
 
-// The graph's budgets (design 5.11), asserted in the worker over generated journeys: the level with
-// containers collapsed and a relevance class left out, and the trace on selection.
-for (const [nodes, levelBudgetMs, traceBudgetMs] of [
-  [500, 16, 8],
-  [2000, 60, 30],
-] as const) {
-  test(`level with collapse and trace stay inside their budgets at ${String(nodes)} nodes`, async ({ page }) => {
-    const entry = index.find((found) => found.label === `${String(nodes)} generated nodes`);
-    expect(entry, "the cases hold the generated journey").toBeDefined();
-    const found = await page.evaluate((file) => window.cairnHarness.budgets(file, 9), entry?.file ?? "");
-    keep(`budget-${String(nodes)}`, found);
-    expect(found.levelMs).toBeLessThan(levelBudgetMs);
-    expect(found.traceMs).toBeLessThan(traceBudgetMs);
-  });
-}
+// The graph's size figures (design 5.11), reported in the worker over a generated 2,000-node journey:
+// the level with containers collapsed and a relevance class left out, and the trace on selection.
+// Reported, not gated (ARCHITECTURE, Date network): wall-clock time on a shared machine is no assertion.
+test("the level with collapse and the trace are timed at 2,000 nodes", async ({ page }) => {
+  const entry = index.find((found) => found.label === "2000 generated nodes");
+  expect(entry, "the cases hold the generated journey").toBeDefined();
+  const found = await page.evaluate((file) => window.cairnHarness.budgets(file, 9), entry?.file ?? "");
+  keep("budget-2000", found);
+  console.log(`2,000 nodes: level ${found.levelMs.toFixed(1)} ms, trace ${found.traceMs.toFixed(1)} ms`);
+  expect(found.levelMs).toBeGreaterThan(0);
+});

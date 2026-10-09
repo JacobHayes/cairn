@@ -1,8 +1,7 @@
 // The proof's media for brief 5.3 (briefs/proof/5.3/prove.sh): a screenshot of each
 // acceptance state of the list, the next list, triage, and the decision walkthrough, a short
 // video of the walkthrough, and the next list's values, written to CAIRN_PROOF_OUT.
-// Each step asserts what its picture is meant to show, so a picture of the wrong state fails
-// the run. The walkthrough runs on the server host over a journey started from the vendor
+// Steps only wait for the state they picture; the e2e specs assert it. The walkthrough runs on the server host over a journey started from the vendor
 // evaluation's route; everything else on the in-browser host, seeded on each load.
 import { writeFileSync } from "node:fs";
 import { join } from "node:path";
