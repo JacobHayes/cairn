@@ -68,7 +68,7 @@ The shape every brief follows.
 | 8.6 | Journey pages, navigation, and addresses | `web/app` | 8.4, 8.1 | landed |
 | 8.7 | Inspector | `web/app` | 8.4, 8.1 (second part: 8.2, 8.3) | planned |
 | 8.8 | Graph | `web/app` | 8.4, 8.1, 8.3 (subtree-gravity chip: 8.2) | planned |
-| 8.9 | Next page | `web/app` | 8.5, 8.6, 8.7 | planned |
+| 8.9 | Next page | `web/app` | 8.5, 8.6, 8.7 | landed |
 | 8.10 | Plan list and timeline | `web/app` | 8.6, 8.1 (Affects: 8.3) | planned |
 | 8.11 | Authoring and proposal review in the frame | `web/app` | 8.6, 8.7, 8.8 | planned |
 

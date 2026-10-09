@@ -1,43 +1,40 @@
-// The controls the acting surfaces share: a sort by one signal (C9, C10: so the trade-off rank
-// blends is visible), a set of checkboxes, a single checkbox, and the flags a filter offers.
+// The controls the acting surfaces share: the next list's sort (C10), a set of checkboxes, a
+// single checkbox, and the flags a filter offers.
 import type { ReactNode } from "react";
 
-import { SORTS, type ListFlag, type SortBy } from "./address.ts";
+import type { ListFlag, SortBy } from "./address.ts";
 
-const FOR_ME = "rank-for-me";
+/** The sort menu's choices: each signal, and the ranking for the viewer (Priority: rank for me). */
+type SortChoice = SortBy | "me";
 
-const SORT_WORDS: Record<SortBy, string> = {
-  rank: "Rank",
-  slack: "Slack (least first)",
-  gravity: "Gravity",
-  leverage: "Leverage",
-  due: "Due (soonest first)",
-  effort: "Gravity per day of effort",
-};
+const SORT_CHOICES: { value: SortChoice; words: string }[] = [
+  { value: "rank", words: "Rank" },
+  { value: "me", words: "Rank for me" },
+  { value: "due", words: "Due" },
+  { value: "slack", words: "Start by" },
+  { value: "gravity", words: "Gravity" },
+  { value: "leverage", words: "Unblocks" },
+  { value: "effort", words: "Effort" },
+];
 
-/**
- * The sort by one signal. Given `forMe` (NEXT), "Rank for me" follows "Rank" in the options: it
- * is the rank with the owner factor relative to the viewer, a way of ranking and not a filter.
- */
+/** C9, C10: the sort, in the list's header: one signal, or (given `forMe`) the rank for the viewer. */
 export function SortSelect({ sort, forMe, onChange }: { sort: SortBy; forMe?: boolean; onChange: (sort: SortBy, forMe: boolean) => void }) {
-  const value = forMe === true && sort === "rank" ? FOR_ME : sort;
   return (
-    <label className="row">
-      <span className="muted small">Sort by</span>
+    <label className="row next-sort">
+      <span className="muted small">Sort</span>
       <select
         aria-label="Sort by"
-        value={value}
+        value={forMe === true && sort === "rank" ? "me" : sort}
         onChange={(event) => {
-          const chosen = event.target.value;
-          onChange(chosen === FOR_ME ? "rank" : (SORTS.find((each) => each === chosen) ?? "rank"), chosen === FOR_ME);
+          const chosen = SORT_CHOICES.find((each) => each.value === event.target.value)?.value ?? "rank";
+          onChange(chosen === "me" ? "rank" : chosen, chosen === "me");
         }}
       >
-        {SORTS.flatMap((each) => [
-          <option key={each} value={each}>
-            {SORT_WORDS[each]}
-          </option>,
-          ...(each === "rank" && forMe !== undefined ? [<option key={FOR_ME} value={FOR_ME}>Rank for me</option>] : []),
-        ])}
+        {SORT_CHOICES.filter((each) => each.value !== "me" || forMe !== undefined).map((each) => (
+          <option key={each.value} value={each.value}>
+            {each.words}
+          </option>
+        ))}
       </select>
     </label>
   );

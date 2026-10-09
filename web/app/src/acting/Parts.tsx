@@ -1,13 +1,11 @@
-// What a row or card on the acting surfaces shows besides its actions: a link to the node's
-// detail beside the screen, its breadcrumb (C10), its derived flags (D3), and why it ranks where
-// it does (C10).
+// What a row on the acting surfaces shows besides its actions: a link to the node's detail
+// beside the screen, its breadcrumb (C9), and its derived flags (D3).
 import { Link, useLocation } from "react-router";
 
-import { nodeOf, startedEarly, titleOf, type Ready } from "../detail/model.ts";
+import { startedEarly, titleOf, type Ready } from "../detail/model.ts";
 import { nodePath, screenPath } from "../detail/parts.tsx";
 import { Badge, type Tone } from "../ui/kit.tsx";
-import type { SortBy } from "./address.ts";
-import { whyWords, type NodeRow } from "./why.ts";
+import type { NodeRow } from "./why.ts";
 
 /** Node `key`'s detail in the inspector beside the screen it is on, keeping what the screen shows (5.1). */
 export function DetailLink({ view, node, className }: { view: Ready; node: string; className?: string }) {
@@ -19,7 +17,7 @@ export function DetailLink({ view, node, className }: { view: Ready; node: strin
   );
 }
 
-/** C10: the row's ancestors, root first, each opening its detail. */
+/** C9: the row's ancestors, root first, each opening its detail. */
 export function Crumb({ view, row }: { view: Ready; row: NodeRow }) {
   const ancestors = row.ancestors ?? [];
   if (ancestors.length === 0) {
@@ -57,16 +55,6 @@ export function Flags({ view, row }: { view: Ready; row: NodeRow }) {
             {flag}
           </Badge>
         ))}
-    </span>
-  );
-}
-
-/** C10: why the row ranks where it does under `sort`, the blend's parts in words. */
-export function Why({ view, row, sort }: { view: Ready; row: NodeRow; sort: SortBy }) {
-  const estimate = nodeOf(view, row.key)?.estimate ?? undefined;
-  return (
-    <span className="muted small" data-testid="why" data-rank={row.rank?.rank}>
-      Why here: {whyWords(row, view.inputs.rank, sort, estimate)}
     </span>
   );
 }

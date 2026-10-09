@@ -3,7 +3,7 @@
 // (next and previous row), `Enter` (the open node's primary action), `Esc` (close a popover,
 // then the sheet, then clear the selection),
 // `v` (next projection), `d` and `m` (DECISIONS and MINE), `/` (search), `?` (the sheet). `p`
-// (pass) is the cards' own (acting/TriageCard.tsx). Pure helpers carry the decisions, so they
+// (pass) is the cards' own (acting/TriageScreen.tsx). Pure helpers carry the decisions, so they
 // are tested without a page.
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -43,9 +43,9 @@ function visibleRows(): string[] {
   return [...rows].map((row) => row.dataset["node"] ?? "").filter(Boolean);
 }
 
-/** Presses the open node's primary button: its answer form, its Done. False when it has none. */
-function pressPrimary(): boolean {
-  const button = document.querySelector<HTMLButtonElement>('[data-testid="node-detail"] button.primary:not(:disabled)');
+/** Presses the selected node's primary button in its inspector: its answer form, its Done. False when it has none. */
+function pressPrimary(node: string): boolean {
+  const button = document.querySelector<HTMLButtonElement>(`[data-testid="node-detail"][data-node="${node}"] button.primary:not(:disabled)`);
   button?.click();
   return button !== null;
 }
@@ -134,7 +134,7 @@ function heardKey(event: KeyboardEvent, heard: Heard): void {
     event.preventDefault();
     setSheetOpen(!sheetOpen);
   } else if (event.key === "Enter" && selected !== undefined && !(event.target instanceof Element && event.target.closest("a, button, summary"))) {
-    if (pressPrimary()) {
+    if (pressPrimary(selected)) {
       event.preventDefault();
     }
   } else if (page !== "summary" && projection !== undefined && onProjection(event.key, heard, page, projection)) {

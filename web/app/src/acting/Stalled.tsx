@@ -4,6 +4,7 @@
 import { transition, type Ready } from "../detail/model.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useNodeWrite, type NodeWrite } from "../detail/write.ts";
+import { dateWords } from "../timeline/model.ts";
 import { Button } from "../ui/kit.tsx";
 import { DetailLink } from "./Parts.tsx";
 
@@ -23,7 +24,7 @@ function CauseLine({ view, write, cause }: { view: Ready; write: NodeWrite; caus
       <li className="row" data-testid="stall-cause" data-status="snooze" data-node={node}>
         <span>
           <DetailLink view={view} node={node} /> is snoozed until{" "}
-          {"date" in until ? until.date : <><DetailLink view={view} node={until.node} /> is finished</>}
+          {"date" in until ? dateWords(until.date, view.derived.today) : <><DetailLink view={view} node={until.node} /> is finished</>}
         </span>
         <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node }])}>
           Unsnooze

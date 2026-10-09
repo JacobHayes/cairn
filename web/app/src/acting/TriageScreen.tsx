@@ -1,30 +1,36 @@
-// C11: triage, a card flow over the acting frontier, one focus card at a time in rank order,
-// for "act, or move on"; and its decisions-only mode, the decision walkthrough, which starting
-// a journey opens (address.ts, `walkthroughPath`). It is NEXT, CARDS, with DECISIONS on for the
-// walkthrough: the journey page (screens/JourneyFrame.tsx) holds its toolbar and the filters
-// it opens (`TriageControls`). Triage always reads the current frontier
-// (the engine's `next` projection over the tab's derivation, kept current, H6), so an answer
-// that unblocks new nodes surfaces them in the same pass. Pass is client state for this pass
-// only (pass.ts): kept per tab in session storage, never sent.
+// C11: triage, a queue of cards over the acting frontier, one at a time in rank order, for "act,
+// or move on"; and its decisions-only mode, the decision walkthrough, which starting a journey
+// opens (address.ts, `walkthroughPath`). It is NEXT, CARDS, with DECISIONS on for the
+// walkthrough: the journey page (screens/JourneyFrame.tsx) holds its toolbar and the filters it
+// opens (`TriageControls`). A card is the inspector's own component with Pass on the frame's
+// edge, apart from the node's actions; the inspector column holds the pass rail until a linked
+// node is opened. Triage always reads the current frontier (the engine's `next` projection over
+// the tab's derivation, kept current, H6), so an answer that unblocks new nodes surfaces them in
+// the same pass. Pass is client state for this pass only (pass.ts): kept per tab in session
+// storage, never sent.
 import { useCallback, useEffect, useMemo } from "react";
+import { useLocation, useNavigate } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
 import { useDraft } from "../data/drafts.ts";
+import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { titleOf, type Ready } from "../detail/model.ts";
+import { screenPath } from "../detail/parts.tsx";
+import { COLUMN, Inspector, useMedia } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
-import { ACTING_KINDS, NEXT_FILTER_FLAGS, triageQueryOf, type TriageSettings } from "./address.ts";
+import { typing } from "../ui/typing.ts";
+import { ACTING_KINDS, NEXT_FILTER_FLAGS, triagePath, triageQueryOf, type TriageSettings } from "./address.ts";
 import { Check, Checks, FlagChecks } from "./Controls.tsx";
 import { DetailLink } from "./Parts.tsx";
-import { begin, passedAll, passOn, passOrder, surfaced, type Pass } from "./pass.ts";
+import { begin, passedAll, passOn, passOrder, roundAgain, surfaced, type Pass } from "./pass.ts";
+import { PassRail } from "./PassRail.tsx";
+import { MarkAtomic } from "./RowActions.tsx";
 import { withFlags } from "./rows.ts";
 import { StalledPanel } from "./Stalled.tsx";
-import { TriageCard } from "./TriageCard.tsx";
 import { WaitingDecisions } from "./Waiting.tsx";
+import type { NodeRow } from "./why.ts";
 import { actingDecisions } from "./waiting.ts";
 import "./acting.css";
-
-/** How many cards after the focus the pass shows by title. */
-const UP_NEXT_SHOWN = 5;
 
 /** C11: mine, kinds and flags: what the filter holds on NEXT, CARDS. */
 export function TriageControls({ settings, onChange }: { settings: TriageSettings; onChange: (next: TriageSettings) => void }) {
@@ -59,7 +65,7 @@ function Surfaced({ view, keys }: { view: Ready; keys: string[] }) {
  * can be made by anyone, so what would unblock the next ones; or the journey is stalled (D5);
  * or nothing is left.
  */
-function Empty({ view, settings, stalled }: { view: Ready; settings: TriageSettings; stalled: boolean }) {
+function Empty({ view, settings, stalled, onContinue }: { view: Ready; settings: TriageSettings; stalled: boolean; onContinue: () => void }) {
   const filtered = settings.decisions ? actingDecisions(view).length > 0 : view.derived.acting_frontier.length > 0;
   if (filtered) {
     return (
@@ -69,7 +75,7 @@ function Empty({ view, settings, stalled }: { view: Ready; settings: TriageSetti
     );
   }
   if (settings.decisions) {
-    return <WaitingDecisions view={view} />;
+    return <WaitingDecisions view={view} onContinue={onContinue} />;
   }
   return stalled ? (
     <StalledPanel view={view} />
@@ -93,8 +99,56 @@ function usePass(view: Ready): [Pass, (pass: Pass) => void] {
   return [pass, setStored];
 }
 
-/** NEXT, CARDS: one focus card at a time, in the order of this pass. */
+/** The card's keyboard: P passes, unless a field has the keys, a modifier is held, or the key sheet is open. */
+function usePassKey(onPass: (() => void) | undefined): void {
+  useEffect(() => {
+    if (onPass === undefined) {
+      return undefined;
+    }
+    const heard = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() === "p" && !event.ctrlKey && !event.metaKey && !event.altKey && !typing(event.target) && document.querySelector('[data-testid="key-sheet"]') === null) {
+        event.preventDefault();
+        onPass();
+      }
+    };
+    document.addEventListener("keydown", heard);
+    return () => {
+      document.removeEventListener("keydown", heard);
+    };
+  }, [onPass]);
+}
+
+/** The card: the focus node's inspector panel, with its place in the pass and Pass on the frame's top edge. */
+function PassCard({ view, card, place, onPass }: { view: Ready; card: NodeRow; place: string; onPass: () => void }) {
+  return (
+    <div className="pass-frame stack" data-testid="triage-card" data-node={card.key} data-kind={card.kind}>
+      <span className="pass-edge row">
+        <span className="muted small" data-testid="card-position">
+          {place}
+        </span>
+        <Button onClick={onPass} data-testid="pass" title="Pass: later in this pass; nothing is saved">
+          Pass <kbd>P</kbd>
+        </Button>
+      </span>
+      <NodeDetailPanel
+        key={card.key}
+        view={view}
+        nodeKey={card.key}
+        folded
+        extra={
+          card.needs_breakdown === true ? <MarkAtomic view={view} node={card.key} /> : undefined
+        }
+      />
+    </div>
+  );
+}
+
+/** NEXT, CARDS: one card at a time, in the order of this pass. */
 export function TriageBody({ view, settings, selected }: { view: Ready; settings: TriageSettings; selected: string | undefined }) {
+  const navigate = useNavigate();
+  const { pathname, search } = useLocation();
+  const wide = useMedia(COLUMN);
+  const journey = view.journey.header.id;
   const [pass, setPass] = usePass(view);
   const request = useMemo(() => ({ projection: "next" as const, query: triageQueryOf(settings) }), [settings]);
   const { value: next, error } = useProjected(view, request);
@@ -102,40 +156,55 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
   const rows = withFlags(next?.items ?? [], settings.flags).filter((row) => wanted === "" || titleOf(view, row.key).toLowerCase().includes(wanted));
   const order = passOrder(rows.map((row) => row.key), pass);
   const focus = rows.find((row) => row.key === order[0]);
-  const onPass = useCallback(() => {
-    if (focus !== undefined) {
-      setPass(passOn(pass, focus.key));
-    }
-  }, [focus, pass, setPass]);
   const done = passedAll(order, pass);
+  const card = done ? undefined : focus;
+  const onPass = useCallback(() => {
+    if (card !== undefined) {
+      setPass(passOn(pass, card.key));
+    }
+  }, [card, pass, setPass]);
+  usePassKey(card === undefined ? undefined : onPass);
+  // The card is the focus node's inspector, so opening that node leaves one editor: the address drops it.
+  useEffect(() => {
+    if (selected !== undefined && selected === card?.key) {
+      void navigate(`${screenPath(pathname)}${search}`, { replace: true });
+    }
+  }, [selected, card?.key, navigate, pathname, search]);
+  const newPass = () => { setPass(begin(view.derived.acting_frontier)); };
   const passedCount = order.filter((key) => pass.passed.includes(key)).length;
+  const rail = <PassRail view={view} order={order} pass={pass} onNewPass={newPass} />;
+  const opened = selected !== undefined && selected !== card?.key;
+  const open = settings.decisions ? actingDecisions(view).length : 0;
   return (
-    <section className="stack" aria-label={settings.decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
-      <span className="row acting-pass-controls">
-        <Button onClick={() => { setPass(begin(view.derived.acting_frontier)); }}>Start a new pass</Button>
-      </span>
+    <section className="stack pass" aria-label={settings.decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
+      {settings.decisions && view.journey.revision <= 1 && card !== undefined ? (
+        <p className="next-for-you" data-testid="walkthrough-intro">
+          Start with the decisions that shape this journey. {open} open now; each answer can open more.
+        </p>
+      ) : null}
       {error === undefined ? null : <p className="callout callout-bad">The frontier could not be read: {error}</p>}
       <Surfaced view={view} keys={surfaced(view.derived.acting_frontier, pass)} />
       {next === undefined ? <p className="muted small">Reading the frontier...</p> : null}
-      {next !== undefined && rows.length === 0 ? <Empty view={view} settings={settings} stalled={next.stalled != null} /> : null}
+      {next !== undefined && rows.length === 0 ? (
+        <Empty view={view} settings={settings} stalled={next.stalled != null} onContinue={() => void navigate(triagePath(journey, { ...settings, decisions: false }, selected))} />
+      ) : null}
       {done ? (
-        <p className="callout" data-testid="pass-done">
-          Every card has been passed once in this pass; they come round again in the order you passed them.
-        </p>
+        <div className="callout stack" data-testid="pass-done">
+          <span>Every card has been seen once · {passedCount} passed.</span>
+          <span className="row">
+            <Button onClick={() => { setPass(roundAgain(pass)); }}>Go round again</Button>
+            <Button onClick={newPass}>Start a new pass</Button>
+          </span>
+        </div>
       ) : null}
-      {focus === undefined ? null : <TriageCard key={focus.key} view={view} row={focus} position={Math.min(passedCount + 1, order.length)} total={order.length} onPass={onPass} inspected={focus.key === selected} />}
-      {order.length > 1 ? (
-        <section className="stack" aria-label="Up next" data-testid="up-next">
-          <span className="muted small">Up next in this pass:</span>
-          <ol className="detail-list">
-            {order.slice(1, 1 + UP_NEXT_SHOWN).map((key) => (
-              <li key={key} data-node={key}>
-                <DetailLink view={view} node={key} />
-              </li>
-            ))}
-          </ol>
-        </section>
-      ) : null}
+      {wide ? null : (
+        <details className="fold" data-testid="pass-fold">
+          <summary>This pass</summary>
+          {rail}
+        </details>
+      )}
+      {card === undefined ? null : <PassCard view={view} card={card} place={`${String(Math.min(passedCount + 1, order.length))} of ${String(order.length)}`} onPass={onPass} />}
+      {wide && !opened ? <Inspector focus={journey} reveal={false}>{rail}</Inspector> : null}
     </section>
   );
 }

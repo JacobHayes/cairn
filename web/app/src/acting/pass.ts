@@ -42,3 +42,13 @@ export function surfaced(frontier: readonly string[], pass: Pass): string[] {
   const seen = new Set(pass.seen);
   return frontier.filter((key) => !seen.has(key));
 }
+
+/** "Go round again": every card is waiting once more, in rank order; what surfaced since the pass began stays named. */
+export function roundAgain(pass: Pass): Pass {
+  return { ...pass, passed: [] };
+}
+
+/** What was on the frontier when the pass began and is finished now, in the order it was seen. */
+export function doneThisPass(pass: Pass, finished: (key: string) => boolean): string[] {
+  return pass.seen.filter(finished);
+}

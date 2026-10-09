@@ -1,7 +1,7 @@
 // The small pieces every node detail section is built from: a collapsible section (C8 shows
 // everything, so most of it starts folded: progressive disclosure), a link to another node's
 // detail, and a list of contributing nodes.
-import type { ReactNode } from "react";
+import { createContext, use, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import "./detail.css";
@@ -42,25 +42,32 @@ export function NodeLink({ view, node }: { view: Ready; node: string }) {
   );
 }
 
+/** Whether the panel starts every section folded, as a card does; `Section`'s `keep` opts one out. */
+export const FoldedSections = createContext(false);
+
 /**
  * One section of the panel: its heading, a one-line summary always shown, and the rest
- * behind it, open when `open` (the sections a person acts on first).
+ * behind it, open when `open` (the sections a person acts on first). A folded panel opens only
+ * the sections that `keep` open, the ones its form needs in view.
  */
 export function Section({
   title,
   summary,
   open = false,
+  keep = false,
   testId,
   children,
 }: {
   title: string;
   summary?: ReactNode;
   open?: boolean;
+  keep?: boolean;
   testId: string;
   children?: ReactNode;
 }) {
+  const folded = use(FoldedSections);
   return (
-    <details className="detail-section" open={open} data-testid={testId}>
+    <details className="detail-section" open={open && (keep || !folded)} data-testid={testId}>
       <summary>
         <span className="detail-section-title">{title}</span>
         {summary === undefined ? null : <span className="muted small"> {summary}</span>}

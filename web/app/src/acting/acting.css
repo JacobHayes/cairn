@@ -42,20 +42,242 @@
   overflow-wrap: anywhere;
 }
 
-.next-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* NEXT, LIST: roomy rows (about 64px) with one fact; the owner and the primary action wait for
+   hover, focus or selection, so the list reads calmly and nothing moves when they appear. */
+.next-head {
+  padding: 0 var(--space-4);
 }
 
-.next-position {
-  min-width: 24px;
-  font-weight: 700;
+.next-sort select {
+  width: auto;
+}
+
+.next-for-you {
+  margin: 0;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  background: var(--color-tint);
+}
+
+.next-list {
+  gap: var(--space-1);
+}
+
+.next-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+  min-height: 64px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+}
+
+.next-row:hover,
+.next-row[data-selected="true"] {
+  background: var(--color-hover);
+}
+
+.next-row[data-selected="true"] {
+  box-shadow: inset 2px 0 0 var(--color-text);
+}
+
+.next-row-main {
+  display: flex;
+  flex: 1 1 280px;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+}
+
+.next-tag {
+  flex: none;
+  width: 24px;
+  font-size: 13px;
   color: var(--color-muted);
 }
 
+/* One width for every state's chip, so the titles line up down the list. */
+.next-row-main > .badge {
+  flex: none;
+  min-width: 104px;
+  text-align: center;
+}
+
+.next-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
 .next-title {
+  font-size: 16px;
   font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.next-fact {
+  font-size: 14px;
+}
+
+.next-row-side {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+}
+
+/* A row with no owner slot and no action (Mine's, when nothing can be done) takes no height. */
+.next-row-side:not(:has(button, select, .next-owner)) {
+  display: none;
+}
+
+.next-owner {
+  min-width: 88px;
+  font-size: 14px;
+  color: var(--color-muted);
+  text-align: right;
+}
+
+.next-owner-other,
+.next-row-act {
+  opacity: 0;
+}
+
+:is(.next-row, .unblocker):hover :is(.next-owner-other, .next-row-act),
+:is(.next-row, .unblocker):focus-within :is(.next-owner-other, .next-row-act),
+.next-row[data-selected="true"] :is(.next-owner-other, .next-row-act) {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .next-owner-other,
+  .next-row-act {
+    opacity: 1;
+  }
+}
+
+/* Room for both Start and Done, so the owner and the buttons keep their place from row to row. */
+.next-row-act {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  min-width: 176px;
+}
+
+/* An unowned row says "Unassigned" quietly; the picker takes its place when the row is reached. */
+.next-assign-slot {
+  display: grid;
+  align-items: center;
+  justify-items: end;
+}
+
+.next-assign-slot > * {
+  grid-area: 1 / 1;
+}
+
+.next-assign {
+  width: 128px;
+}
+
+:is(.next-row, .unblocker):hover .next-unassigned,
+:is(.next-row, .unblocker):focus-within .next-unassigned,
+.next-row[data-selected="true"] .next-unassigned {
+  opacity: 0;
+}
+
+@media (hover: none) {
+  .next-unassigned {
+    opacity: 0;
+  }
+}
+
+/* Where the region cannot hold the owner and the buttons beside the title, they take a line of
+   their own under it: the owner at the left, the buttons at the right. */
+@container journey-scroll (max-width: 720px) {
+  .next-row-side {
+    flex-basis: 100%;
+    justify-content: space-between;
+    padding-left: 36px;
+  }
+
+  .next-owner {
+    min-width: 0;
+  }
+
+  .next-row-act {
+    min-width: 0;
+  }
+
+  /* The chip, rank tag and title share a phone's width: the chip takes only its word, an empty tag nothing. */
+  .next-row-main > .badge {
+    min-width: 0;
+  }
+
+  .next-tag:empty {
+    display: none;
+  }
+
+  .next-row-text {
+    flex: 1;
+  }
+}
+
+.next-row > :not(.next-row-main, .next-row-side) {
+  flex-basis: 100%;
+  padding-left: 36px;
+}
+
+/* The folds under the list: closed, their names and counts only. */
+.folds {
+  margin-top: var(--space-4);
+  gap: var(--space-2);
+}
+
+.fold > summary {
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+}
+
+.fold-count {
+  margin-left: var(--space-1);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  color: var(--color-muted);
+}
+
+.fold-body {
+  padding: 0 var(--space-4) var(--space-3);
+}
+
+.fold-list {
+  gap: var(--space-4);
+}
+
+.fold-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  min-height: 48px;
+  padding: var(--space-2) 0;
+}
+
+.fold-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.fold-group {
+  gap: var(--space-1);
+}
+
+.fold-group-head {
+  justify-content: space-between;
 }
 
 .list-node {
@@ -68,12 +290,19 @@
   color: var(--color-text);
 }
 
-.triage-card {
-  border-color: var(--color-text);
-  max-width: 816px;
+/* NEXT, CARDS: the card is the inspector's own panel at a readable width, Pass on the frame's
+   edge below it. */
+.pass-frame {
+  max-width: 560px;
 }
 
-.acts .stack {
+/* On the frame's top edge with the card's place in the pass, apart from the node's own actions
+   and in reach however long the card runs. */
+.pass-edge {
+  justify-content: space-between;
+}
+
+.pass-group {
   gap: var(--space-2);
 }
 
@@ -84,4 +313,18 @@
   .list-table td:nth-child(n + 6) {
     display: none;
   }
+}
+
+/* Mine: each journey's group, its rows in that journey's rank. */
+.mine-list {
+  gap: var(--space-6);
+}
+
+.mine-head {
+  padding: 0 var(--space-4);
+  gap: var(--space-4);
+}
+
+.back-to-pass {
+  color: var(--rail-ink);
 }

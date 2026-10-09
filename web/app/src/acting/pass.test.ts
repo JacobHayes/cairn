@@ -2,7 +2,7 @@
 // back in the order passed, new ones surface where they rank, and what surfaced is named.
 import { describe, expect, it } from "vitest";
 
-import { begin, passedAll, passOn, passOrder, surfaced } from "./pass.ts";
+import { begin, passedAll, passOn, passOrder, roundAgain, surfaced } from "./pass.ts";
 
 const ranked = ["n_a", "n_b", "n_c", "n_d"];
 
@@ -33,5 +33,12 @@ describe("a triage pass", () => {
     expect(passedAll(ranked, pass)).toBe(true);
     expect(passedAll(["n_new", ...ranked], pass)).toBe(false);
     expect(passedAll([], pass)).toBe(false);
+  });
+
+  it("goes round again in rank order, still naming what surfaced since it began", () => {
+    const pass = roundAgain(ranked.reduce(passOn, begin(ranked)));
+    const now = ["n_new", ...ranked];
+    expect(passOrder(now, pass)).toEqual(now);
+    expect(surfaced(now, pass)).toEqual(["n_new"]);
   });
 });

@@ -73,7 +73,7 @@ export function About({ view, detail, edit }: { view: Ready; detail: NodeDetail;
   const { node, answer, rationale } = detail;
   const decision = node.kind === "decision";
   return (
-    <Section title={decision ? "Decision" : "Description"} open={decision || (node.description ?? "") !== ""} testId="about">
+    <Section title={decision ? "Decision" : "Description"} open={decision || (node.description ?? "") !== ""} keep={decision} testId="about">
       {decision && node.prompt !== undefined ? <Markdown text={node.prompt} data-testid="prompt" /> : null}
       {decision && node.help !== undefined ? <Markdown text={node.help} /> : null}
       {decision ? (

@@ -3,9 +3,11 @@
 // whose rejection shows here, with a bypass when a guard failed (D4). Finishing undecided
 // work is accepted, and says beside the action that it may not apply (D4). A decision that fills a
 // role or pins a milestone says so: those values are edited by answering it (E3).
+import { missingEvidence, type EvidenceDraft } from "../acting/acts.ts";
+import { mayNotApply } from "../data/activity.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { AnswerEditor } from "./AnswerEditor.tsx";
-import { mayNotApply } from "../data/activity.ts";
+import { DoneButton, EvidenceForm } from "./DoneEvidence.tsx";
 import { movesFrom, startedEarly, titleOf, transition, unansweredOf, type Move, type NodeDetail, type Ready } from "./model.ts";
 import { Rejected } from "./Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
@@ -76,14 +78,21 @@ export function Actions({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const write = useNodeWrite(view, `actions:${detail.node.key}`, detail.node.key);
   const { node, record } = detail;
   const skip = useFormDraft<string>(write.journey, node.key, "skip");
-  const moves = movesFrom(node.kind, record.state);
+  const evidence = useFormDraft<EvidenceDraft | string>(write.journey, node.key, "done-evidence");
+  // G2, G4: work that requires a note or a link and has none is finished by Done..., which adds them with the completion.
+  const needs = missingEvidence(view, node);
+  const evidenceFirst = needs.artifact || needs.note;
+  // C11, B10: a placeholder cannot be finished until it is broken down or marked atomic.
+  const moves = movesFrom(node.kind, record.state).filter((move) => !(move === "complete" && detail.derived.needs_breakdown === true));
   const early = startedEarly(detail.derived, record.state);
   const finishes = moves.includes("complete") || moves.includes("reach") || (node.kind === "decision" && record.state === "open");
   return (
     <div className="stack" data-testid="actions">
       <div className="row">
         {moves.map((move) =>
-          move === "skip" ? (
+          move === "complete" && evidenceFirst ? (
+            <DoneButton key={move} write={write} form={evidence} />
+          ) : move === "skip" ? (
             <Button key={move} disabled={write.disabled} onClick={() => { skip.open("", write.seen); }}>
               {LABEL[move]}
             </Button>
@@ -103,6 +112,7 @@ export function Actions({ view, detail }: { view: Ready; detail: NodeDetail }) {
       {moves.length > 0 ? <LiftsSnooze view={view} node={node.key} /> : null}
       {finishes ? <MayNotApply view={view} node={node.key} /> : null}
       {skip.draft === undefined ? null : <SkipForm write={write} node={node.key} form={skip} />}
+      <EvidenceForm write={write} node={node.key} needs={needs} form={evidence} />
       <Rejected view={view} write={write} />
       {node.kind === "decision" ? <AnswerEditor view={view} detail={detail} /> : null}
     </div>

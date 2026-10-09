@@ -8,7 +8,7 @@ import "./ui/app.css";
 
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Route, Routes } from "react-router";
+import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
 import { boot } from "./boot.ts";
 import { LayoutsContext } from "./canvas/hooks.ts";
@@ -38,6 +38,8 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route index element={<Home />} />
               <Route path="journeys" element={<JourneyIndex />} />
               <Route path="mine" element={<MineScreen />} />
+              <Route path="mine/:id" element={<Navigate replace to="/mine" />} />
+              <Route path="mine/:id/nodes/:key" element={<MineScreen />} />
               <Route path="new" element={<NewJourney />} />
               <Route path="journeys/:id" element={<JourneyLanding />} />
               <Route path="journeys/:id/nodes/:key" element={<JourneyDeepLink />} />

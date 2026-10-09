@@ -1,8 +1,9 @@
 // The acting surfaces in Chromium (rung 6): the list's filters, grouping, search, and bulk
-// actions as one patch (C9); the next list's ranking, re-sort, and stalled panel (C10, D5);
-// triage's pass and per-kind cards (C11, B10); snoozes leaving and returning (B6); and the
-// decision walkthrough over a fresh journey started from the vendor evaluation's route (C11,
-// D2). Every test runs on the in-browser host, whose fixtures are fresh on every load.
+// actions as one patch (C9); the next list's ranking, re-sort, rows, folds and stalled panel
+// (C10, D5); the cards' pass and the inspector component they hold (C11, B10); snoozes leaving
+// and returning (B6); Mine across journeys (C16); and the decision walkthrough over a fresh
+// journey started from the vendor evaluation's route (C11, D2). Every test runs on the
+// in-browser host, whose fixtures are fresh on every load.
 import { expect, test, type Page } from "@playwright/test";
 
 import {
@@ -19,7 +20,8 @@ import {
   turnOn,
 } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { derivedRevision, goTo, nodePanel, openAt, syncChip } from "./shell.ts";
+import { section } from "./detail.ts";
+import { derivedRevision, goTo, goWithin, nodePanel, openAt, syncChip } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
 /** Starts a fresh journey from version 1 of the vendor evaluation's route (B1); its id. */
@@ -42,8 +44,7 @@ test("C10: the next list ranks the frontier, and re-sorting by slack reorders it
   // leverage rank: the launch leads, then the work feeding it; the retrospective, with no
   // deadline, sorts last by slack.
   expect(await nextKeys(page)).toEqual(LAUNCH_RANKED);
-  await expect(page.getByTestId("breadcrumb").first()).toBeVisible();
-  const ranks = await page.getByTestId("why").evaluateAll((whys) => whys.map((why) => Number(why.getAttribute("data-rank"))));
+  const ranks = await page.getByTestId("next-item").evaluateAll((items) => items.map((item) => Number(item.getAttribute("data-rank"))));
   expect(ranks).toEqual([...ranks].sort((left, right) => right - left));
   await page.getByLabel("Sort by").selectOption("slack");
   await expect.poll(() => nextKeys(page)).toEqual(["n_docs", "n_announcement", "n_beta_end", "n_launch", "n_retro"]);
@@ -51,6 +52,11 @@ test("C10: the next list ranks the frontier, and re-sorting by slack reorders it
   const known = slacks.filter((slack) => slack !== "").map(Number);
   expect(known).toEqual([...known].sort((left, right) => left - right));
   expect(slacks.slice(known.length).every((slack) => slack === "")).toBe(true);
+  const fold = page.getByTestId("fold-look");
+  await expect(fold).toHaveAttribute("data-count", "2");
+  await expect(fold.getByTestId("fold-item").first()).toBeHidden();
+  await fold.locator("summary").click();
+  await expect(fold.locator('[data-testid="fold-item"][data-node="n_launch"]')).toHaveAttribute("data-reason", "open");
 });
 
 test("C9: filters hold at once, search reads notes, and rows group by container", async ({ page }) => {
@@ -98,13 +104,18 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the next list and an
   await expect(nextItem(page, "n_beta_end")).toBeVisible();
   await expect(nextItem(page, "n_docs")).toHaveCount(0);
   await expect(nextItem(page, "n_announcement")).toHaveCount(0);
+  const fold = page.getByTestId("fold-snoozed");
+  await expect(fold).toHaveAttribute("data-count", "2");
+  await fold.locator("summary").click();
+  await expect(fold.getByTestId("snooze-group")).toHaveCount(1);
+  await fold.locator('[data-testid="fold-item"][data-node="n_docs"]').getByRole("button", { name: "Unsnooze" }).click();
+  await expect(nextItem(page, "n_docs")).toBeVisible();
   await goTo(page, "plan", "list");
-  await select(page, "n_docs");
   await select(page, "n_announcement");
   await page.getByTestId("bulk-bar").getByRole("button", { name: "Unsnooze" }).click();
-  expect(await revisionAfter(page, revision + 1)).toBe(revision + 2);
+  expect(await revisionAfter(page, revision + 2)).toBe(revision + 3);
   await goTo(page, "next", "list");
-  await expect(nextItem(page, "n_docs")).toBeVisible();
+  await expect(nextItem(page, "n_announcement")).toBeVisible();
 });
 
 test("B6: a node snoozed from its card leaves, and returns when its target completes", async ({ page }) => {
@@ -112,9 +123,10 @@ test("B6: a node snoozed from its card leaves, and returns when its target compl
   const first = (await passOrder(page))[0] ?? "";
   await expect(card(page)).toHaveAttribute("data-node", first);
   const target = first === "n_beta_end" ? "n_retro" : "n_beta_end";
-  await card(page).getByRole("button", { name: "Snooze until a node" }).click();
-  await card(page).getByLabel("Snooze until node").selectOption(target);
-  await card(page).getByTestId("snooze-node-form").getByRole("button", { name: "Save" }).click();
+  const blocking = await section(card(page), "blocking");
+  await blocking.getByRole("button", { name: "Snooze until a node" }).click();
+  await blocking.getByLabel("Snooze until node").selectOption(target);
+  await blocking.getByTestId("snooze-node-form").getByRole("button", { name: "Save" }).click();
   await expect.poll(() => passOrder(page)).not.toContain(first);
   await goTo(page, "next", "list");
   await nextItem(page, target).getByRole("button", { name: "Mark reached" }).click();
@@ -125,19 +137,33 @@ test("D5: an empty acting frontier shows the stalled panel, and unsnooze brings 
   await openActing(page, "browser", "j_hiring", "next/list");
   expect(await nextKeys(page)).toEqual(["n_offer"]);
   const today = (await syncChip(page).getAttribute("data-today")) ?? "";
-  await nextItem(page, "n_offer").getByRole("button", { name: "Snooze until a date" }).click();
-  await nextItem(page, "n_offer").getByLabel("Snooze until").fill(daysAfter(today, 7));
-  await nextItem(page, "n_offer").getByTestId("snooze-date-form").getByRole("button", { name: "Save" }).click();
+  await nextItem(page, "n_offer").getByRole("link", { name: "Offer letter" }).click();
+  const blocking = await section(nodePanel(page, "n_offer"), "blocking");
+  await blocking.getByRole("button", { name: "Snooze until a date" }).click();
+  await blocking.getByLabel("Snooze until").fill(daysAfter(today, 7));
+  await blocking.getByTestId("snooze-date-form").getByRole("button", { name: "Save" }).click();
   const cause = page.locator('[data-testid="stall-cause"][data-status="snooze"]');
   await expect(cause).toHaveAttribute("data-node", "n_offer");
+  await expect(page.getByTestId("next-for-you")).toHaveCount(0);
+  await expect(page.getByTestId("fold-snoozed")).toHaveAttribute("data-count", "1");
   await cause.getByRole("button", { name: "Unsnooze" }).click();
   await expect(nextItem(page, "n_offer")).toBeVisible();
   await expect(page.getByTestId("stalled")).toHaveCount(0);
 });
 
-test("C11: pass writes nothing and sends the card to the back of the pass", async ({ page }) => {
+test("C11: a card is the inspector's panel with Pass apart; pass writes nothing, a rail link swaps the rail for its inspector, and a finished pass goes round again", async ({ page }) => {
+  await atFixedToday(page);
   await openActing(page, "browser", "j_launch", "next/cards");
   const revision = await derivedRevision(page);
+  const detail = card(page).getByTestId("node-detail");
+  await expect(detail.getByRole("button", { name: "Mark reached" })).toBeVisible();
+  await expect(detail.getByTestId("pass")).toHaveCount(0);
+  const rail = page.getByTestId("pass-rail");
+  await rail.getByRole("link", { name: "Documentation" }).click();
+  await expect(nodePanel(page, "n_docs")).toBeVisible();
+  await expect(rail).toHaveCount(0);
+  await page.getByTestId("back-to-pass").click();
+  await expect(rail).toBeVisible();
   const [first = "", second = ""] = await passOrder(page);
   await card(page).getByTestId("pass").click();
   await expect(card(page)).toHaveAttribute("data-node", second);
@@ -145,16 +171,34 @@ test("C11: pass writes nothing and sends the card to the back of the pass", asyn
   await page.keyboard.press("p");
   await expect(card(page)).not.toHaveAttribute("data-node", second);
   expect(await derivedRevision(page)).toBe(revision);
+  for (let at = 2; at < LAUNCH_RANKED.length; at += 1) {
+    await card(page).getByTestId("pass").click();
+  }
+  const done = page.getByTestId("pass-done");
+  await expect(done).toBeVisible();
+  await done.getByRole("button", { name: "Go round again" }).click();
+  await expect(card(page)).toBeVisible();
+});
+
+test("C10: rows keep their order under hover and selection", async ({ page }) => {
+  const journey = await startJourney(page, "browser", journeyName("Order"), { route: "vendor-evaluation", version: 1 });
+  await openActing(page, "browser", journey, "next/list");
+  const order = await nextKeys(page);
+  await nextItem(page, order[0] ?? "").hover();
+  expect(await nextKeys(page)).toEqual(order);
+  await nextItem(page, order[2] ?? "").click();
+  await expect(nodePanel(page, order[2] ?? "")).toBeVisible();
+  await page.keyboard.press("j");
+  await expect(nodePanel(page, order[3] ?? "")).toBeVisible();
+  expect(await nextKeys(page)).toEqual(order);
 });
 
 test("C11: the walkthrough opens on the decisions at the start; answering the partner decision surfaces its work in the same pass", async ({ page }) => {
   const journey = await startVendorJourney(page);
   await openActing(page, "browser", journey, "next/cards?decisions=1");
+  await expect(page.getByTestId("walkthrough-intro")).toBeVisible();
   expect((await passOrder(page)).sort()).toEqual(UP_FRONT);
   await expect(card(page)).toHaveAttribute("data-node", "n_partner_runs");
-  await card(page).getByLabel("Assign owner").selectOption("e_lead");
-  await card(page).getByRole("button", { name: "Assign", exact: true }).click();
-  await expect(card(page).locator('[data-testid="flag"][data-status="unassigned"]')).toHaveCount(0);
   await answerCard(page, "yes");
   await expect(page.getByTestId("surfaced").locator('[data-node="n_criteria"]')).toBeVisible();
   expect((await passOrder(page)).sort()).toEqual(UP_FRONT.filter((key) => key !== "n_partner_runs"));
@@ -187,11 +231,13 @@ test("B2, C8, C12: a rationale given on a triage card shows in node detail; a re
   await expect(panel.getByTestId("rationale")).toHaveCount(0);
 });
 
-test("G4, C11: done on an action that requires a note opens a note field and completes in one patch", async ({ page }) => {
+test("G4, C11, D4: done on an action that requires a note completes in one patch; losing the note later is listed to fix", async ({ page }) => {
   const journey = await startJourney(page, "browser", journeyName("Screening"), { route: "hiring-loop", version: 1 });
-  await openActing(page, "browser", journey, "next/list");
+  await openActing(page, "browser", journey, "next/cards");
+  await expect(card(page).getByTestId("actions").getByRole("button", { name: "Done...", exact: true })).toBeVisible();
+  await goTo(page, "next", "list");
   const item = nextItem(page, "n_screen");
-  await item.getByRole("button", { name: "Done", exact: true }).click();
+  await item.getByRole("button", { name: "Done...", exact: true }).click();
   const save = item.getByRole("button", { name: "Add note and mark done" });
   await expect(save).toBeDisabled();
   const revision = await derivedRevision(page);
@@ -199,9 +245,21 @@ test("G4, C11: done on an action that requires a note opens a note field and com
   await save.click();
   expect(await revisionAfter(page, revision)).toBe(revision + 1);
   await expect(nextItem(page, "n_screen")).toHaveCount(0);
+  // Finished work that later loses its note is listed under needs a look, with its fix beside it.
+  await goWithin(page, `/journeys/${journey}/next/list/nodes/n_screen`);
+  const notes = await section(nodePanel(page, "n_screen"), "annotations");
+  await notes.getByTestId("annotation").getByRole("button", { name: "Remove" }).click();
+  const fold = page.getByTestId("fold-look");
+  await fold.locator("summary").click();
+  const stale = fold.locator('[data-testid="fold-item"][data-node="n_screen"]');
+  await expect(stale).toHaveAttribute("data-reason", "note");
+  await stale.getByRole("button", { name: "Add note" }).click();
+  await stale.getByLabel("Note").fill("Covered the role.");
+  await stale.getByRole("button", { name: "Save note" }).click();
+  await expect(fold).toHaveCount(0);
 });
 
-test("C11, B10: a placeholder's card offers break down and mark atomic, and no done until it is atomic", async ({ page }) => {
+test("C11, B10: a placeholder's card offers mark atomic, and no more once it is atomic", async ({ page }) => {
   const journey = await startVendorJourney(page);
   await openActing(page, "browser", journey, "next/cards");
   await expect(card(page)).toHaveAttribute("data-node", "n_kickoff");
@@ -211,10 +269,8 @@ test("C11, B10: a placeholder's card offers break down and mark atomic, and no d
   while ((await card(page).getAttribute("data-node")) !== "n_workload") {
     await card(page).getByTestId("pass").click();
   }
-  const acts = card(page).getByTestId("acts");
-  await expect(acts).toHaveAttribute("data-acts", "breakdown atomic snooze");
-  await acts.getByRole("button", { name: "Mark atomic" }).click();
-  await expect(acts).toHaveAttribute("data-acts", /\bdone\b/);
+  await card(page).getByRole("button", { name: "Mark atomic" }).click();
+  await expect(card(page).getByTestId("mark-atomic")).toHaveCount(0);
 });
 
 test("C11, C9: with every decision skipped in bulk, the walkthrough shows what would unblock the next ones", async ({ page }) => {
@@ -230,6 +286,9 @@ test("C11, C9: with every decision skipped in bulk, the walkthrough shows what w
   await page.getByTestId("chip-decisions").click();
   const comparison = page.locator('[data-testid="waiting-decision"][data-node="n_comparison_set"]');
   await expect(comparison.locator('[data-testid="unblocker"][data-node="n_plan"]')).toBeVisible();
+  await page.getByRole("button", { name: "Continue with everything" }).click();
+  await expect(page.getByTestId("chip-decisions")).toHaveAttribute("aria-pressed", "false");
+  await expect.poll(() => passOrder(page)).toContain("n_kickoff");
 });
 
 test("C11: a walkthrough filtered to only mine says the open decisions are others', not that none can be made", async ({ page }) => {

@@ -31,7 +31,8 @@ export interface Waiting {
 /** How many waiting decisions the walkthrough shows: the earliest few are what to unblock first. */
 export const WAITING_SHOWN_MAX = 5;
 
-function unblockersOf(view: Ready, decision: GraphNode): { unblockers: Unblocker[]; snoozedUntil: string | undefined } {
+/** What `decision` (or any node) waits on: its unblockers, milestones first by the caller, and the date a snooze waits for. */
+export function unblockersOf(view: Ready, decision: GraphNode): { unblockers: Unblocker[]; snoozedUntil: string | undefined } {
   const derived = view.derived.nodes[decision.key];
   const found = new Map<string, Unblocker>();
   const add = (node: string, via: Unblocker["via"], through?: string) => {

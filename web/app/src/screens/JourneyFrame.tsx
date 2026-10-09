@@ -16,6 +16,7 @@ import { useProjected } from "../canvas/hooks.ts";
 import { canvasPath, DEFAULT_VIEW, revealing, viewFrom } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
+import { screenPath } from "../detail/parts.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import type { JourneyPage, Projection } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
@@ -69,12 +70,23 @@ function findNode(ready: Ready, text: string): string | undefined {
   return (nodes.find((node) => node.title.toLowerCase() === wanted) ?? nodes.find((node) => node.title.toLowerCase().includes(wanted)))?.key;
 }
 
-/** What goes in the frame's inspector column: the open node's detail, or the journey card when nothing is open. */
-function InspectorSlot({ ready, page, selected, structure, card }: { ready: Ready; page: FrameProps["page"]; selected: string | undefined; structure: ReactNode; card: boolean }) {
+/** Back from a node opened off the pass to the pass rail, which the cards put in the inspector's place. */
+function BackToPass() {
+  const { pathname, search } = useLocation();
+  return (
+    <Link className="back-to-pass" to={`${screenPath(pathname)}${search}`} data-testid="back-to-pass">
+      ‹ Back to pass
+    </Link>
+  );
+}
+
+/** What goes in the frame's inspector column: the open node's detail, or the journey card when nothing is open (the cards' pass rail is theirs). */
+function InspectorSlot({ ready, page, projection, selected, structure, card }: { ready: Ready; page: FrameProps["page"]; projection: FrameProps["projection"]; selected: string | undefined; structure: ReactNode; card: boolean }) {
   const journey = ready.journey.header.id;
   if (selected !== undefined) {
     return (
       <Inspector focus={`${journey}:${selected}`}>
+        {page === "next" && projection === "cards" ? <BackToPass /> : null}
         {/* Keyed by journey and node, so every form and rejection in it is that node's. */}
         <NodeDetailPanel key={`${journey}:${selected}`} view={ready} nodeKey={selected} extra={structure} />
       </Inspector>
@@ -124,7 +136,8 @@ function ReadyFrame({ ready, page, projection, selected }: { ready: Ready } & Om
   // narrower, it follows the projection (a graph that fills the page has no room for it on a tablet).
   const wide = useMedia(COLUMN);
   const phone = useMedia(PHONE_WIDTH);
-  const card = selected !== undefined || page === "summary" ? "none" : wide ? "column" : fills && !phone ? "none" : "inline";
+  const cards = page === "next" && projection === "cards";
+  const card = selected !== undefined || page === "summary" || cards ? "none" : wide ? "column" : fills && !phone ? "none" : "inline";
   return (
     <ConnectContext value={authored === undefined ? undefined : drawing.connecting}>
       <div className="ws-fill journey-frame" data-testid="journey-frame" data-page={page} data-projection={projection ?? ""}>
@@ -150,7 +163,7 @@ function ReadyFrame({ ready, page, projection, selected }: { ready: Ready } & Om
         {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
       {/* After the head, whose assistant opens its tab as it mounts: a node opened from there brings its detail forward last. */}
-      <InspectorSlot ready={ready} page={page} selected={selected} structure={structure} card={card === "column"} />
+      <InspectorSlot ready={ready} page={page} projection={projection} selected={selected} structure={structure} card={card === "column"} />
     </ConnectContext>
   );
 }
