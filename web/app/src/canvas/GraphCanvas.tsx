@@ -105,6 +105,11 @@ function Flow(props: GraphCanvasProps) {
         zIndexMode="auto"
         minZoom={ZOOM_MIN}
         maxZoom={ZOOM_MAX}
+        // Two-finger scroll pans; pinch (and ctrl+wheel) zooms.
+        panOnScroll
+        zoomOnScroll={false}
+        zoomOnPinch
+        proOptions={{ hideAttribution: true }}
         fitView
         colorMode="system"
         aria-label={props.label}
