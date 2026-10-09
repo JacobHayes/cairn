@@ -88,7 +88,10 @@ function binariesToRun() {
 function run(binary) {
   return new Promise((resolve) => {
     // Cargo runs a test binary from its package's directory.
-    const child = spawn(binary.executable, testArguments, { cwd: binary.directory, stdio: ["ignore", "pipe", "pipe"] });
+    // Each binary gets its share of the cores, so the parallel binaries together use about one thread
+    // per core instead of each starting one per core.
+    const env = { RUST_TEST_THREADS: String(threads), ...process.env };
+    const child = spawn(binary.executable, testArguments, { cwd: binary.directory, env, stdio: ["ignore", "pipe", "pipe"] });
     let output = "";
     child.stdout.on("data", (chunk) => (output += chunk));
     child.stderr.on("data", (chunk) => (output += chunk));
@@ -105,6 +108,7 @@ const binaries = binariesToRun();
 // The biggest binaries hold the slowest tests, so they start first.
 binaries.sort((left, right) => right.size - left.size);
 const limit = Math.max(2, Math.floor(availableParallelism() / 2));
+const threads = Math.max(1, Math.floor(availableParallelism() / limit));
 const lines = [];
 let failed = 0;
 let next = 0;
