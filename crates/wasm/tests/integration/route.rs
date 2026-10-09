@@ -119,6 +119,7 @@ fn route_apply(route: Option<Route>, patch: &str) -> Result<Route, HostError> {
     apply_route_locally(&RouteApplyRequest {
         route,
         versions: Vec::new(),
+        segments: Vec::new(),
         deployment,
         patch: serde_json::from_str(patch).unwrap(),
         today: "2026-10-06".parse().unwrap(),

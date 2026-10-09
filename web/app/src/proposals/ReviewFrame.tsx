@@ -145,8 +145,8 @@ function foot(entry: ReviewEntry, names: Names): string {
 /** The List: each marked node with its word and what differs, a cascaded removal under its cause, then the edges. */
 export function ReviewList({ entries, diff, names, filter, selected, onPick }: { entries: readonly ReviewEntry[]; diff: GraphDiff; names: Names; filter: ReviewFilter; selected: string | undefined; onPick: (key: string) => void }) {
   const shown = entries.filter((entry) => filter === "all" || filterOf(entry.mark) === filter);
-  const edges = filter === "all" || filter === "change";
-  if (shown.length === 0 && !(edges && diff.edgesAdded.length + diff.edgesRemoved.length > 0)) {
+  const edges = [...diff.edgesAdded.map((edge) => ({ edge, status: "added" as const })), ...diff.edgesRemoved.map((edge) => ({ edge, status: "removed" as const }))].filter(({ status }) => filter === "all" || filter === (status === "added" ? "add" : "remove"));
+  if (shown.length === 0 && edges.length === 0) {
     return (
       <p className="muted" data-testid="diff-empty">
         As it stands, it changes nothing in the graph.
@@ -172,16 +172,14 @@ export function ReviewList({ entries, diff, names, filter, selected, onPick }: {
           {foot(entry, names) === "" ? null : <span className="muted small">{foot(entry, names)}</span>}
         </li>
       ))}
-      {!edges
-        ? null
-        : [...diff.edgesAdded.map((edge) => ({ edge, status: "added" as const })), ...diff.edgesRemoved.map((edge) => ({ edge, status: "removed" as const }))].map(({ edge, status }) => (
-            <li key={`${status}:${edge.node}>${edge.requires}`} className="route-list-row" data-testid="diff-edge" data-status={status}>
-              <Badge tone={status === "added" ? "good" : "bad"}>{status === "added" ? DIFF_LABELS.added : DIFF_LABELS.removed}</Badge>
-              <span className="route-list-title">
-                {names.node(edge.node)} {status === "added" ? "now requires" : "no longer requires"} {names.node(edge.requires)}
-              </span>
-            </li>
-          ))}
+      {edges.map(({ edge, status }) => (
+        <li key={`${status}:${edge.node}>${edge.requires}`} className="route-list-row" data-testid="diff-edge" data-status={status}>
+          <Badge tone={status === "added" ? "good" : "bad"}>{status === "added" ? DIFF_LABELS.added : DIFF_LABELS.removed}</Badge>
+          <span className="route-list-title">
+            {names.node(edge.node)} {status === "added" ? "now requires" : "no longer requires"} {names.node(edge.requires)}
+          </span>
+        </li>
+      ))}
     </ul>
   );
 }

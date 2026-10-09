@@ -7,8 +7,9 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    AgentId, Email, EntityKey, JourneyId, JourneyStatus, Markdown, PatchId, Revision, RouteFile,
-    RouteHeader, RouteId, RouteKind, Slug, Timestamp, Title, UserId, VersionNumber,
+    AgentId, Domain, Email, EntityKey, GraphId, InsertionKey, JourneyId, JourneyStatus, Markdown,
+    PatchId, Revision, RouteFile, RouteHeader, RouteId, Slug, Timestamp, Title, UserId,
+    VersionNumber,
 };
 use cairn_service::WriteError;
 use cairn_store::{JourneyQuery, PageSize};
@@ -98,6 +99,25 @@ pub struct VersionJourneys {
     pub published_at: Timestamp,
     /// The journeys whose lineage is this version.
     pub journeys: BTreeSet<JourneyId>,
+    /// Where this version of a segment is inserted (C19).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub insertions: Vec<InsertionUse>,
+}
+
+/// One insertion of a segment version, as the API's `InsertionUse` (C19).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct InsertionUse {
+    /// The domain holding it.
+    pub host: Domain,
+    /// The graph holding it.
+    pub graph: GraphId,
+    /// The insertion.
+    pub insertion: InsertionKey,
+    /// The root member's current title.
+    pub title: Title,
+    /// Whether the segment has a later published version.
+    pub upgrade_available: bool,
 }
 
 /// C17: a route's versions with the journeys on each, as the API's `RouteDetail`.
@@ -193,19 +213,15 @@ impl BrowserRoot {
         })
     }
 
-    /// The route index: every process route, in id order, as `GET /api/routes?kind=process`
-    /// answers its first page at the page limit. The screens that list segments are later.
+    /// The route index: every route and segment, in id order, as `GET /api/routes` answers its
+    /// first page at the page limit.
     ///
     /// # Errors
     ///
     /// When the store fails.
     pub fn route_page(&self, after: Option<&RouteId>) -> Result<RoutePage, HostError> {
-        let page = now_or_never(self.service().routes(
-            Some(RouteKind::Process),
-            after,
-            PageSize::MAX,
-        ))
-        .map_err(failed)?;
+        let page =
+            now_or_never(self.service().routes(None, after, PageSize::MAX)).map_err(failed)?;
         let items = page.items.into_iter().map(|summary| RouteSummary {
             header: summary.header,
             revision: summary.revision,
@@ -233,6 +249,17 @@ impl BrowserRoot {
             version: version.version,
             published_at: version.published_at,
             journeys: version.journeys,
+            insertions: version
+                .insertions
+                .into_iter()
+                .map(|held| InsertionUse {
+                    host: held.host,
+                    graph: held.graph,
+                    insertion: held.insertion,
+                    title: held.title,
+                    upgrade_available: held.upgrade_available,
+                })
+                .collect(),
         });
         Ok(RouteDetail {
             header: detail.header,

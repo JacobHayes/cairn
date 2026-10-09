@@ -375,6 +375,7 @@ fn previews(
             let request = PreviewRequest {
                 proposal,
                 versions: Vec::new(),
+                segments: Vec::new(),
                 at: now(),
                 actor: local(),
             };
@@ -443,6 +444,8 @@ fn apply_and_after(service: &Service<MemoryStore>, group: &mut Group, id: &Journ
     let request = ApplyRequest {
         patch,
         note: None,
+        versions: Vec::new(),
+        segments: Vec::new(),
         at: now(),
         actor: local(),
     };

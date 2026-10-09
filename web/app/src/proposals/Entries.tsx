@@ -13,7 +13,7 @@ import { slugOf } from "../authoring/keys.ts";
 import { Picker } from "../authoring/parts.tsx";
 import { journeyAuthored } from "../authoring/target.ts";
 import type { NodeKind } from "../authoring/graph.ts";
-import { routeIndex } from "../data/reads.ts";
+import { isSegment, routeIndex } from "../data/reads.ts";
 import { newProposalId, proposalOf, type ProposalWritten } from "../data/proposals.ts";
 import { newPatchId } from "../data/writes.ts";
 import { useLive } from "../data/react.ts";
@@ -32,7 +32,7 @@ type ProposalAnswer = Schema<"ProposalAnswer">;
  * whose answer never came (I6, H5) is sent again under the same proposal and patch ids while
  * it asks the same, so a draft that was saved after all is found rather than made twice.
  */
-function useDraftAndOpen() {
+export function useDraftAndOpen() {
   const write = useProposalWrite();
   const navigate = useNavigate();
   const unanswered = useRef<Attempt | undefined>(undefined);
@@ -54,7 +54,7 @@ function useDraftAndOpen() {
   return { write, start };
 }
 
-function Problem({ problem, onDismiss }: { problem: WriteProblem | undefined; onDismiss: () => void }) {
+export function Problem({ problem, onDismiss }: { problem: WriteProblem | undefined; onDismiss: () => void }) {
   if (problem === undefined) {
     return null;
   }
@@ -112,7 +112,7 @@ function SaveAsRoute({ ready }: { ready: Ready }) {
 /** B9: the journey re-linked to a published version of a route. */
 function Relink({ ready, routes }: { ready: Ready; routes: readonly Schema<"RouteSummary">[] }) {
   const { write, start } = useDraftAndOpen();
-  const published = routes.filter((each) => each.latest_version != null);
+  const published = routes.filter((each) => each.latest_version != null && !isSegment(each));
   const [route, setRoute] = useState("");
   const [version, setVersion] = useState("");
   const latest = published.find((each) => each.header.id === route)?.latest_version ?? undefined;

@@ -3,9 +3,21 @@
 // proposal review (5.7) draws its diff with it. A marked card shows its tag; when the overlay
 // dims, unmarked cards and the lines it does not light fade to the one fade level, so the marked
 // set stands out without anything moving.
-import type { CanvasModel, Card, Trace } from "./model.ts";
+import type { CanvasModel, Card, Line, Trace } from "./model.ts";
 
 export type MarkTone = "ink" | "accent" | "good" | "warn" | "bad" | "plain";
+
+/** A requirement: `node` needs `requires`. */
+export interface RequirementEdge {
+  node: string;
+  requires: string;
+}
+
+/** The requirements a diff adds and removes. */
+export interface EdgeChanges {
+  added: readonly RequirementEdge[];
+  removed: readonly RequirementEdge[];
+}
 
 /** What an overlay says about one card. */
 export interface OverlayMark {
@@ -22,8 +34,8 @@ export interface OverlayMark {
   ghost?: true;
 }
 
-/** How a line is lit: ink (upstream) or accent (downstream), faint when it is a finished upstream line, or lit for a diff. */
-export type LineMark = "ink" | "accent" | "faint" | "lit";
+/** How a line is lit: ink (upstream) or accent (downstream), faint when it is a finished upstream line, lit for a card a diff marks, or add or remove for a requirement the diff adds or removes. */
+export type LineMark = "ink" | "accent" | "faint" | "lit" | "add" | "remove";
 
 /** A layer over a canvas: marks by card, lines it lights, and what it marks off this canvas. */
 export interface CanvasOverlay {
@@ -107,9 +119,10 @@ export function traceOverlay(trace: Trace, model: CanvasModel, title: string): C
  * C14: marks by node drawn over a canvas (proposal review's diff): each card shows the mark of
  * the node it stands for, or of one rolled up into it; lines into or out of a marked card are
  * lit; nothing dims unless `dim` (a filter is on), so what a change leaves alone stays readable.
+ * A line that stands for a requirement in `edges` is drawn as added or removed instead.
  * A marked node with no card is listed as outside.
  */
-export function marksOverlay(title: string, marks: Record<string, OverlayMark>, model: CanvasModel, dim = false): CanvasOverlay {
+export function marksOverlay(title: string, marks: Record<string, OverlayMark>, model: CanvasModel, dim = false, edges: EdgeChanges = { added: [], removed: [] }): CanvasOverlay {
   const shown: Record<string, OverlayMark> = {};
   for (const card of model.cards) {
     const key = standsFor(card).find((each) => marks[each] !== undefined);
@@ -118,7 +131,13 @@ export function marksOverlay(title: string, marks: Record<string, OverlayMark>, 
       shown[card.key] = mark;
     }
   }
-  const lines = Object.fromEntries(model.lines.filter((line) => shown[line.from] !== undefined || shown[line.to] !== undefined).map((line) => [line.id, "lit" as const]));
+  const cardOf = new Map(model.cards.map((card) => [card.key, card]));
+  const stands = (line: Line, edge: RequirementEdge) => {
+    const [from, to] = [line.from, line.to].map((key) => cardOf.get(key)).map((card) => (card === undefined ? [] : standsFor(card)));
+    return (from?.includes(edge.node) === true && to?.includes(edge.requires) === true) || (from?.includes(edge.requires) === true && to?.includes(edge.node) === true);
+  };
+  const toned = (line: Line): LineMark => (edges.added.some((edge) => stands(line, edge)) ? "add" : edges.removed.some((edge) => stands(line, edge)) ? "remove" : "lit");
+  const lines = Object.fromEntries(model.lines.filter((line) => shown[line.from] !== undefined || shown[line.to] !== undefined || toned(line) !== "lit").map((line) => [line.id, toned(line)]));
   const drawn = new Set(model.cards.flatMap(standsFor));
   const outside = Object.keys(marks).filter((key) => !drawn.has(key)).sort();
   return { title, marks: shown, lines, dim, outside, screenTags: true };

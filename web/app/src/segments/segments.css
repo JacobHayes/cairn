@@ -1,0 +1,17 @@
+/* The insert stepper's list of segments: each one a roomy button holding its name, a line of
+   what it is, and its size, so choosing is one click (approachable: one primary thing per row). */
+.segment-offers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.segment-choice {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+  padding: var(--space-3) var(--space-4);
+  text-align: left;
+}

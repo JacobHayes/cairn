@@ -23,6 +23,8 @@ import type { CardActions } from "./NodeCard.tsx";
 import { standsFor, traceOverlay } from "./overlay.ts";
 import { refitKey } from "./refit.ts";
 import { canvasPath, edgePath, layoutViewOf, levelRequest, type CanvasView } from "./settings.ts";
+import { insertionOrigins, withOriginFoots } from "../segments/model.ts";
+import { useSegmentNames } from "../segments/read.ts";
 
 /** C1, C2, C5, C6: the journey's canvas model for one level. */
 export function journeyModel(ready: Ready, level: Level, extras: JourneyExtras): CanvasModel {
@@ -112,16 +114,19 @@ function useJourneyModel(ready: Ready, view: CanvasView, collapsed: string[], st
   const level = useProjected(ready, levelRequest(shown, { kinds: revealed === undefined ? kindsAt(step) : KINDS, collapsed }));
   const next = useProjected(ready, { projection: "next" });
   const mine = useProjected(ready, { projection: "mine" });
+  const nameOf = useSegmentNames();
+  // Editing structure names where each insertion came from on its root card (C19).
+  const roots = useMemo(() => (view.edit ? insertionOrigins(undefined, ready.journey.graph, nameOf).roots : {}), [view.edit, ready, nameOf]);
   const model = useMemo(() => {
     if (level.value === undefined) {
       return undefined;
     }
     const ranked = (next.value?.items ?? []).map((item) => item.key);
     const entries = mine.value ?? [];
-    const whole = journeyModel(ready, level.value, { ranked, mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node) });
+    const whole = withOriginFoots(journeyModel(ready, level.value, { ranked, mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node) }), roots);
     const leftOut = leftOutAt(step, ready.journey.graph.nodes ?? []);
     return revealed === undefined ? withoutLeftOut(whole, leftOut) : onlyTraced(whole, revealed, view, step, leftOut);
-  }, [ready, level.value, next.value, mine.value, revealed, view, step]);
+  }, [ready, level.value, next.value, mine.value, revealed, view, step, roots]);
   // Fading a kind lays nothing out again, so the kinds shown are not part of what the layout is keyed by.
   return { model, error: level.error, layoutView: layoutViewOf({ ...shown, shown: KINDS }, step) };
 }

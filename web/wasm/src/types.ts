@@ -115,6 +115,9 @@ export interface RouteNoticesRequest {
 export interface ApplyRequest {
   patch: Schema<"Patch">;
   note?: Schema<"Markdown">;
+  /** The segment versions an `insert_segment` in the patch reads, and the segments they belong to. */
+  versions?: Schema<"RouteVersion">[];
+  segments?: Schema<"Route">[];
   at: string;
   actor: Schema<"Actor">;
 }
@@ -129,6 +132,8 @@ export interface AppliedLocally {
 export interface RouteApplyRequest {
   route?: Schema<"Route">;
   versions?: Schema<"RouteVersion">[];
+  /** The segments an insertion in the patch reads. */
+  segments?: Schema<"Route">[];
   deployment: Schema<"Deployment">;
   patch: Schema<"Patch">;
   today: string;
@@ -140,6 +145,8 @@ export interface RouteApplyRequest {
 export interface PreviewRequest {
   proposal: Schema<"Proposal">;
   versions?: Schema<"RouteVersion">[];
+  /** The segments an insertion in it reads. */
+  segments?: Schema<"Route">[];
   at: string;
   actor: Schema<"Actor">;
 }

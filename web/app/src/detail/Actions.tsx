@@ -9,17 +9,20 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import { assignOwner, missingEvidence, type EvidenceDraft } from "../acting/acts.ts";
-import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
+import { ancestorsOf } from "../canvas/ladder.ts";
+import { canvasPath, DEFAULT_VIEW, revealing } from "../canvas/settings.ts";
 import { mayNotApply } from "../data/activity.ts";
 import { deepLinkPath } from "../journeys/address.ts";
 import { BreakDown } from "../proposals/Entries.tsx";
 import { Menu } from "../screens/Menu.tsx";
+import { useInsertEntry } from "../segments/entry.ts";
+import { insertionRoot, memberOrigin } from "../segments/model.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { AnswerEditor } from "./AnswerEditor.tsx";
 import { DoneButton, EvidenceForm, type DoneForm } from "./DoneEvidence.tsx";
 import { openSnooze, SnoozePanel, WeightEditor, type SnoozeDraft } from "./editors.tsx";
 import { foldKey, setFold } from "./folds.ts";
-import { answerable, isBlocked, movesFrom, titleOf, transition, unansweredOf, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, isBlocked, movesFrom, nodeOf, titleOf, transition, unansweredOf, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type MenuId } from "./offers.ts";
 import { Rejected } from "./Rejected.tsx";
 import { entityName } from "./sections.tsx";
@@ -179,11 +182,14 @@ interface Menus {
   forms: Record<"skip" | "keep" | "include" | "bypass" | "anyway", ReasonDraft> & { snooze: ReturnType<typeof useFormDraft<SnoozeDraft>> };
   openPanel: (panel: Panel) => void;
   onCopied: () => void;
+  /** Starts inserting a segment under a container; none where the screen has no stepper. */
+  insertHere: ((parent: string) => void) | undefined;
 }
 
 /** What each menu entry does: its one move, or the form it opens. */
-function runnersOf({ view, detail, write, onRename, forms, openPanel, onCopied }: Menus, navigate: (to: string) => void): Record<MenuId, () => void> {
+function runnersOf({ view, detail, write, onRename, forms, openPanel, onCopied, insertHere }: Menus, navigate: (to: string, state?: unknown) => void): Record<MenuId, () => void> {
   const key = detail.node.key;
+  const origin = memberOrigin(view.journey.graph, key);
   const journey = view.journey.header.id;
   const move = (...mutations: Mutation[]) => () => void write.run(mutations);
   const form = (draft: ReasonDraft) => () => { draft.open("", write.seen); };
@@ -205,16 +211,28 @@ function runnersOf({ view, detail, write, onRename, forms, openPanel, onCopied }
     pin: () => { setFold(foldKey(detail.node.kind, "dates"), true); },
     "break-down": () => { openPanel("break-down"); },
     "show-in-graph": () => { navigate(canvasPath(journey, DEFAULT_VIEW, key)); },
+    "insert-segment": () => { insertHere?.(key); },
+    "show-insertion": () => {
+      const root = (origin === undefined ? undefined : insertionRoot(view.journey.graph, origin.insertion)) ?? key;
+      const at = nodeOf(view, root);
+      // As Find does, with the ancestors expanded; at the All step, which draws every branch whatever its kind.
+      const shown = at === undefined ? DEFAULT_VIEW : { ...revealing(DEFAULT_VIEW, { kind: at.kind, ancestors: ancestorsOf(view.journey.graph.nodes ?? [], root) }, view.derived.nodes[root]?.display_state), step: "all" as const };
+      navigate(canvasPath(journey, shown, root), { reveal: { key: root, how: "centre" } });
+    },
     "edit-node": () => { navigate(canvasPath(journey, { ...DEFAULT_VIEW, edit: true }, key)); },
     "copy-link": () => { globalThis.navigator.clipboard.writeText(link).then(onCopied, () => undefined); },
   };
 }
 
 /** The `⋯`: each entry does its one thing or opens its form. */
-function Overflow(menus: Menus) {
+function Overflow(menus: Omit<Menus, "insertHere">) {
   const navigate = useNavigate();
-  const groups = menuOf(menus.view, menus.detail);
-  const runners = runnersOf(menus, (to) => void navigate(to));
+  const insertHere = useInsertEntry();
+  // Only a frame with a stepper can insert: elsewhere the entry is not offered.
+  const groups = menuOf(menus.view, menus.detail)
+    .map((group) => group.filter((item) => item.id !== "insert-segment" || insertHere !== undefined))
+    .filter((group) => group.length > 0);
+  const runners = runnersOf({ ...menus, insertHere }, (to, state) => void navigate(to, state === undefined ? {} : { state }));
   if (groups.length === 0) {
     return null;
   }

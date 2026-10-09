@@ -16,6 +16,7 @@ import { summaryPath } from "../journeys/address.ts";
 import { DeleteJourney } from "../journeys/DeleteJourney.tsx";
 import { HeaderEditor } from "../journeys/HeaderEditor.tsx";
 import { statusActions } from "../journeys/lifecycle.ts";
+import { useInsertEntry } from "../segments/entry.ts";
 import { useSuggested } from "../journeys/suggested.ts";
 import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
 import { Button } from "../ui/kit.tsx";
@@ -99,6 +100,7 @@ function copyLink(): void {
 function JourneyMenu({ ready, view, selected, onPanel, onKeys }: { ready: Ready; view: CanvasView; selected: string | undefined; onPanel: (panel: Panel) => void; onKeys: () => void }) {
   const { header } = ready.journey;
   const upgradeTo = useLatestVersion(ready);
+  const insert = useInsertEntry();
   const archived = header.status === "archived";
   return (
     <Menu label="Journey actions" testId="journey-menu" align="end" className="no-print" trigger={<span aria-hidden="true">⋯</span>}>
@@ -121,6 +123,11 @@ function JourneyMenu({ ready, view, selected, onPanel, onKeys }: { ready: Ready;
               </Link>
             )}
             {item("menu-rename", "Edit name and description", "rename", archived)}
+            {insert === undefined || archived ? null : (
+              <button type="button" role="menuitem" className="menu-item" data-testid="menu-insert-segment" onClick={() => { close(); insert(); }}>
+                Insert segment...
+              </button>
+            )}
             {upgradeTo === undefined ? null : item("menu-upgrade", `Upgrade to v${String(upgradeTo)}...`, "upgrade")}
             {item("menu-save", "Save as route...", "save")}
             {item("menu-relink", "Re-link...", "relink")}

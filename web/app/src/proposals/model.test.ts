@@ -10,6 +10,7 @@ import {
   DIFF_LABELS,
   DIFF_NOTES,
   diffMarks,
+  filterCounts,
   filterOf,
   reviewEntries,
   graphDiff,
@@ -68,6 +69,13 @@ describe("graphDiff (C14)", () => {
 
   it("from nothing, adds every node of a graph a proposal creates", () => {
     expect(graphDiff(undefined, after).added).toEqual(["n_a", "n_c", "n_d"]);
+  });
+});
+
+describe("filterCounts (C14)", () => {
+  it("counts an edge as an addition or a removal, never as a change", () => {
+    const diff = graphDiff(before, after);
+    expect(filterCounts(diffMarks(diff, []), diff)).toEqual({ all: 6, conflicts: 0, add: 2, change: 2, remove: 2 });
   });
 });
 

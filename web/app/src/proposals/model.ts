@@ -397,16 +397,16 @@ export function filterOf(mark: DiffMark): Exclude<ReviewFilter, "all"> {
   }
 }
 
-/** How many items each chip holds: the marked nodes by kind, and the diff's edges as changes. */
+/** How many items each chip holds: the marked nodes by kind, and the diff's edges as additions and removals (an edge is never a change). */
 export function filterCounts(marks: Record<string, DiffMark>, diff: GraphDiff): Record<ReviewFilter, number> {
   const counts: Record<ReviewFilter, number> = { all: 0, conflicts: 0, add: 0, change: 0, remove: 0 };
   for (const mark of Object.values(marks)) {
     counts[filterOf(mark)] += 1;
     counts.all += 1;
   }
-  const edges = diff.edgesAdded.length + diff.edgesRemoved.length;
-  counts.change += edges;
-  counts.all += edges;
+  counts.add += diff.edgesAdded.length;
+  counts.remove += diff.edgesRemoved.length;
+  counts.all += diff.edgesAdded.length + diff.edgesRemoved.length;
   return counts;
 }
 

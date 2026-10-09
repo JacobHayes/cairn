@@ -74,6 +74,7 @@ export function RouteHeader({ route, of, write, blocked, onPublish, onImported, 
   return (
     <section className="stack route-header" aria-label={route.header.name} data-testid="route-header">
       <div className="row">
+        {route.header.kind === "segment" ? <span className="label" data-testid="route-kind">Segment</span> : null}
         <h1 data-testid="route-name">{route.header.name}</h1>
         <Badge tone={drafting ? "warn" : "plain"} data-testid="route-graph" data-status={String(of)}>
           {drafting ? draftWords(route) : `Version ${String(of)}`}

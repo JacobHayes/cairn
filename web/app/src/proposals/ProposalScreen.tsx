@@ -20,6 +20,8 @@ import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
 import { ShortfallView } from "../detail/ShortfallView.tsx";
 import { RejectionView } from "../screens/RejectionView.tsx";
+import { addedRoles, insertionOrigins, noteOrigins } from "../segments/model.ts";
+import { useSegmentNames } from "../segments/read.ts";
 import { Inspector } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { Badge, Button, Panel } from "../ui/kit.tsx";
@@ -63,7 +65,7 @@ interface Kept {
 
 const NOTHING_COMPARED: GraphDiff = { added: [], removed: [], changed: {}, edgesAdded: [], edgesRemoved: [] };
 
-/** The route versions a journey proposal's mutations read: an upgrade's target and the journey's own, a re-link's new version. */
+/** The route versions a journey proposal's mutations read: an upgrade's target and the journey's own, a re-link's new version, an insertion's segment. */
 function versionsRead(ready: Ready, draft: ProposalDraft): Schema<"Lineage">[] {
   const own = ready.journey.header.lineage ?? undefined;
   return (draft.mutations ?? []).flatMap((mutation) => {
@@ -73,7 +75,7 @@ function versionsRead(ready: Ready, draft: ProposalDraft): Schema<"Lineage">[] {
     if (mutation.op === "relink") {
       return own === undefined ? [mutation.lineage] : [own, mutation.lineage];
     }
-    return [];
+    return mutation.op === "insert_segment" ? [mutation.segment] : [];
   });
 }
 
@@ -96,7 +98,9 @@ function useLocalPreview(ready: Ready | undefined, proposal: Proposal, draft: Pr
       const read = async (): Promise<LocalPreview> => {
         const lineages = versionsRead(previewed, draft);
         const versions: RouteVersion[] = await Promise.all(lineages.map((lineage) => host.routeVersion(lineage.route, lineage.version)));
-        const request = { proposal: { ...proposal, draft }, versions, at: new Date().toISOString(), actor: { user: viewer?.user ?? "u_local" } };
+        // B13: the engine reads a segment's header for its kind and retirement.
+        const segments = await Promise.all([...new Set((draft.mutations ?? []).flatMap((mutation) => (mutation.op === "insert_segment" ? [mutation.segment.route] : [])))].map((route) => host.route(route)));
+        const request = { proposal: { ...proposal, draft }, versions, segments, at: new Date().toISOString(), actor: { user: viewer?.user ?? "u_local" } };
         return { preview: await deriver.preview(previewed.journey.header.id, request) };
       };
       read().then(
@@ -304,6 +308,9 @@ interface Model {
   after: Graph | undefined;
   diff: GraphDiff;
   marks: Record<string, DiffMark>;
+  /** C19: the insertions it adds, named on their root cards and by member, and the roles it adds. */
+  origins: ReturnType<typeof insertionOrigins>;
+  rolesAdded: ReturnType<typeof addedRoles>;
   entries: ReviewEntry[];
   counts: Record<ReviewFilter, number>;
   graphs: Graph[];
@@ -324,7 +331,9 @@ function useReviewModel({ review, ready, before, deployment }: BodyProps, draft:
   // A candidate that breaks a rule has no graph after; that is not an empty graph, so nothing is compared.
   const known = after !== undefined;
   const diff = useMemo(() => (known ? graphDiff(before, after) : NOTHING_COMPARED), [known, before, after]);
-  const marks = useMemo(() => diffMarks(diff, draft.items ?? []), [diff, draft.items]);
+  const nameOf = useSegmentNames();
+  const origins = useMemo(() => insertionOrigins(before, after, nameOf), [before, after, nameOf]);
+  const marks = useMemo(() => noteOrigins(diffMarks(diff, draft.items ?? []), origins.members), [diff, draft.items, origins]);
   const added = useMemo<Graph>(() => ({ nodes: (draft.mutations ?? []).flatMap((mutation) => (mutation.op === "add_node" ? [mutation.node] : [])) }), [draft.mutations]);
   const structure = useMemo<Graph>(() => after ?? before ?? { nodes: [] }, [after, before]);
   return {
@@ -337,6 +346,8 @@ function useReviewModel({ review, ready, before, deployment }: BodyProps, draft:
     after,
     diff,
     marks,
+    origins,
+    rolesAdded: useMemo(() => addedRoles(before, after), [before, after]),
     entries: useMemo(() => reviewEntries(diff, marks, before), [diff, marks, before]),
     counts: useMemo(() => filterCounts(marks, diff), [marks, diff]),
     graphs: useMemo(() => (known ? [unionGraph(before, after), after, ...(before === undefined ? [] : [before])] : before === undefined ? [] : [before]), [known, before, after]),
@@ -492,6 +503,11 @@ function ProposalCard(props: InspectorProps) {
         </section>
       )}
       <ItemList context={contexts.items} itemNode={itemNode} only={loose} />
+      {model.rolesAdded.length === 0 ? null : (
+        <p className="muted small" data-testid="roles-added">
+          It adds {model.rolesAdded.length === 1 ? "the role" : "the roles"} {model.rolesAdded.map((role) => role.title ?? role.id).join(", ")}.
+        </p>
+      )}
       <Violations preview={model.preview} ready={ready} names={model.names} onMove={model.editable ? (move) => { contexts.changes.edit(withMutationsAdded(draft, [move])); } : undefined} />
       {model.preview.frontier === undefined || journey === undefined || !model.known ? null : (
         <Section title="What can be acted on after" testId="frontier-section">
@@ -512,7 +528,7 @@ function Workspace({ model, filter, listed, selected, domain, deployment, onPick
   if (listed) {
     return model.known ? <ReviewList entries={model.entries} diff={model.diff} names={model.names} filter={filter} selected={selected} onPick={onPick} /> : <NoGraphAfter preview={model.preview} />;
   }
-  return model.graphs.length === 0 ? <NoGraphAfter preview={model.preview} /> : <ProposalCanvas domain={domain} graphs={model.graphs} marks={kept} dim={filter !== "all"} deployment={deployment} today={model.today} selected={selected} onPick={onPick} />;
+  return model.graphs.length === 0 ? <NoGraphAfter preview={model.preview} /> : <ProposalCanvas domain={domain} graphs={model.graphs} marks={kept} edges={model.diff} origins={model.origins.roots} dim={filter !== "all"} deployment={deployment} today={model.today} selected={selected} onPick={onPick} />;
 }
 
 function ReviewBody(props: BodyProps) {

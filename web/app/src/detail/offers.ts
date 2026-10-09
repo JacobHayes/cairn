@@ -71,6 +71,8 @@ export type MenuId =
   | "pin"
   | "break-down"
   | "show-in-graph"
+  | "insert-segment"
+  | "show-insertion"
   | "edit-node"
   | "copy-link";
 
@@ -96,6 +98,8 @@ const LABELS: Record<MenuId, string> = {
   pin: "Pin a date…",
   "break-down": "Break down…",
   "show-in-graph": "Show in graph",
+  "insert-segment": "Insert segment here…",
+  "show-insertion": "Show insertion",
   "edit-node": "Edit node…",
   "copy-link": "Copy link",
 };
@@ -118,7 +122,8 @@ export function menuOf(view: Ready, detail: NodeDetail): MenuItem[][] {
   const needs = missingEvidence(view, node);
   const guardFails = blocked || needs.artifact || needs.note || derived.needs_breakdown === true;
   const keptUnder = derived.effectively_skipped === true && state !== "skipped";
-  const where = (...extra: (MenuId | false)[]): MenuItem[] => items(["show-in-graph", ...extra, "copy-link"]);
+  const member = (view.journey.graph.insertions ?? []).some((insertion) => node.key in insertion.nodes);
+  const where = (...extra: (MenuId | false)[]): MenuItem[] => items(["show-in-graph", member && "show-insertion", ...extra, "copy-link"]);
   const groups = (...all: MenuItem[][]) => all.filter((group) => group.length > 0);
   if (derived.display_state === "not_relevant") {
     return groups(items(["include"]), where());
@@ -144,7 +149,7 @@ export function menuOf(view: Ready, detail: NodeDetail): MenuItem[][] {
       ],
       branch ? { snooze: "Snooze branch…", skip: "Skip branch…" } : {},
     ),
-    items(["rename", "assign", kind !== "milestone" && "weight", "pin", breakable(node) && !container && derived.needs_breakdown !== true && "break-down"], {
+    items(["rename", "assign", kind !== "milestone" && "weight", "pin", breakable(node) && !container && derived.needs_breakdown !== true && "break-down", container && "insert-segment"], {
       pin: kind === "decision" ? "Pin decide-by…" : kind === "milestone" ? "Pin date…" : "Pin a date…",
     }),
     where("edit-node"),

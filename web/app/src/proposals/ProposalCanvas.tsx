@@ -15,8 +15,9 @@ import { KINDS, cardsOf, linesOf, type CanvasModel, type Level } from "../canvas
 import type { CardActions } from "../canvas/NodeCard.tsx";
 import { marksOverlay } from "../canvas/overlay.ts";
 import type { Deployment } from "../data/host.ts";
+import { withOriginFoots } from "../segments/model.ts";
 import { useSession } from "../data/react.ts";
-import type { DiffMark } from "./model.ts";
+import type { DiffMark, GraphDiff } from "./model.ts";
 
 /** C2: the level of `graph` with every kind shown, or why there is none. */
 function useLevel(graph: Graph | undefined, deployment: Deployment, today: string): { level: Level; graph: Graph } | { error: string } | undefined {
@@ -52,6 +53,10 @@ export interface ProposalCanvasProps {
   /** What is drawn: the graph after with the removed nodes put back; the graph after alone when that does not hold together. */
   graphs: Graph[];
   marks: Record<string, DiffMark>;
+  /** The diff's requirements, which the canvas draws as added or removed lines. */
+  edges: Pick<GraphDiff, "edgesAdded" | "edgesRemoved">;
+  /** C19: the foot of an insertion's root card, naming its segment and version, by card. */
+  origins?: Record<string, string>;
   /** A filter is on: the cards it does not keep fade. */
   dim: boolean;
   deployment: Deployment;
@@ -60,7 +65,7 @@ export interface ProposalCanvasProps {
   onPick: (key: string) => void;
 }
 
-export function ProposalCanvas({ domain, graphs, marks, dim, deployment, today, selected, onPick }: ProposalCanvasProps) {
+export function ProposalCanvas({ domain, graphs, marks, edges, origins = {}, dim, deployment, today, selected, onPick }: ProposalCanvasProps) {
   // The first graph that the engine draws: a union can break an invariant a graph after holds.
   const [tried, setTried] = useState(0);
   useEffect(() => {
@@ -78,10 +83,10 @@ export function ProposalCanvas({ domain, graphs, marks, dim, deployment, today, 
       return undefined;
     }
     const nodes = answer.graph.nodes ?? [];
-    return { cards: cardsOf(answer.level, nodes), lines: linesOf(answer.level, nodes) };
-  }, [answer]);
+    return withOriginFoots({ cards: cardsOf(answer.level, nodes), lines: linesOf(answer.level, nodes) }, origins);
+  }, [answer, origins]);
   const { laidOut, error } = useLaidOut(`proposal:${domain}`, "diff", model);
-  const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the proposal changes", marks, laidOut.model, dim)), [laidOut, marks, dim]);
+  const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the proposal changes", marks, laidOut.model, dim, { added: edges.edgesAdded, removed: edges.edgesRemoved })), [laidOut, marks, edges, dim]);
   // The view opens on the changes (all of them when they fit at a readable zoom, else the first one), not fitted to a journey whose cards are too small to read.
   const focus = useMemo(() => {
     const changed = Object.keys(marks);

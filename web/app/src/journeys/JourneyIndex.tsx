@@ -5,7 +5,7 @@
 // "Mine" keeps the journeys where the caller holds something.
 import { Link, useLocation, useNavigate } from "react-router";
 
-import { journeyIndex, indexKey, routeIndex, type JourneySummary, type RouteSummary } from "../data/reads.ts";
+import { journeyIndex, indexKey, isSegment, routeIndex, type JourneySummary, type RouteSummary } from "../data/reads.ts";
 import { useLive, useViewer } from "../data/react.ts";
 import { Badge } from "../ui/kit.tsx";
 import { filtersFrom, indexPath, newJourneyPath, overviewPath, queryOf, type IndexFilters } from "./address.ts";
@@ -136,7 +136,7 @@ export function JourneyIndex() {
         <span className="spacer" />
         <Link className="button" to={newJourneyPath()} data-testid="new-journey">New journey</Link>
       </div>
-      <IndexFilterBar filters={filters} routes={known} onChange={(next) => void navigate(indexPath(next))} />
+      <IndexFilterBar filters={filters} routes={known.filter((route) => !isSegment(route))} onChange={(next) => void navigate(indexPath(next))} />
       {filters.mine && viewer === undefined && failed !== undefined ? <p className="callout callout-bad">Who you are could not be read, so neither can what is yours: {failed}</p> : null}
       {view.status === "loading" || waiting ? <p className="muted small">Loading the journeys...</p> : null}
       {view.status === "failed" ? <p className="callout callout-bad">The journeys could not be read: {view.message}</p> : null}

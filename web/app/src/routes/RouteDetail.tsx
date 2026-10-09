@@ -14,9 +14,11 @@ import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
 import { Badge, Button, Panel } from "../ui/kit.tsx";
 import { ROUTES_PATH } from "./address.ts";
+import { DetailHeader } from "./DetailHeader.tsx";
 import { useExport } from "./exporting.ts";
 import { upgradable, versionRows, type VersionRow } from "./model.ts";
 import { RouteActions } from "./RouteActions.tsx";
+import { SegmentDetail } from "./SegmentDetail.tsx";
 
 function Version({ read, row, latest }: { read: RouteRead; row: VersionRow; latest: number | undefined }) {
   const id = read.route.header.id;
@@ -53,12 +55,7 @@ function Detail({ read }: { read: RouteRead }) {
   const waiting = upgradable(rows).length;
   return (
     <Panel aria-label={header.name} data-testid="route-detail">
-      <span className="row">
-        <h1 data-testid="route-detail-name">{header.name}</h1>
-        {header.retired === true ? <Badge data-testid="retired">Retired: hidden from new journeys</Badge> : null}
-        <span className="spacer" />
-        <Link to={ROUTES_PATH}>All routes</Link>
-      </span>
+      <DetailHeader header={header} />
       {header.description == null ? null : <p>{header.description}</p>}
       <span className="muted small" data-testid="route-revision" data-revision={read.route.revision}>
         {rows.length} published {rows.length === 1 ? "version" : "versions"}; {waiting} {waiting === 1 ? "journey has" : "journeys have"} an upgrade available.
@@ -84,6 +81,6 @@ export function RouteDetailPage() {
     case "failed":
       return <p className="callout callout-bad">The route could not be read: {view.message}</p>;
     case "ready":
-      return <Detail read={view.value} />;
+      return view.value.route.header.kind === "segment" ? <SegmentDetail read={view.value} /> : <Detail read={view.value} />;
   }
 }

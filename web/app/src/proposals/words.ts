@@ -141,6 +141,11 @@ export function mutationWords(mutation: Mutation, names: Names): string {
       return `${mutation.op === "add_role" ? "Add" : "Change"} the role ${quoted(mutation.role.title ?? mutation.role.id)}`;
     case "remove_role":
       return `Remove the role ${quoted(names.role(mutation.role))}`;
+    case "insert_segment": {
+      const parent = mutation.parent;
+      const left = (mutation.omit ?? []).length;
+      return `Insert the segment ${mutation.segment.route} version ${String(mutation.segment.version)}${parent == null ? " at the top level" : ` under ${node(parent)}`}${left === 0 ? "" : `, leaving ${String(left)} ${left === 1 ? "step" : "steps"} out`}`;
+    }
     default:
       return `${mutation.op.replaceAll("_", " ")}${"node" in mutation && typeof mutation.node === "string" ? ` on ${node(mutation.node)}` : ""}`;
   }

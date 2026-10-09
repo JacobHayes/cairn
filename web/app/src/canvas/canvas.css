@@ -766,6 +766,27 @@
   fill: var(--color-accent);
 }
 
+/* A diff's added requirement is drawn in the Add tag's success hairline, a removed one in the Remove tag's error. */
+.line-lit-add .react-flow__edge-path,
+.line-lit-add .line-marker {
+  stroke: var(--color-success);
+  stroke-width: 1px;
+}
+
+.line-lit-add.line-requires .line-marker {
+  fill: var(--color-success);
+}
+
+.line-lit-remove .react-flow__edge-path,
+.line-lit-remove .line-marker {
+  stroke: var(--color-error);
+  stroke-width: 1px;
+}
+
+.line-lit-remove.line-requires .line-marker {
+  fill: var(--color-error);
+}
+
 .line-lit-faint .react-flow__edge-path,
 .line-lit-faint .line-marker {
   stroke: var(--color-border);

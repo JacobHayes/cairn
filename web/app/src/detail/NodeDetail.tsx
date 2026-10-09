@@ -103,7 +103,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
           <Dates view={view} detail={detail} />
           <WhyRank view={view} detail={detail} position={position} row={row} />
           <People view={view} detail={detail} />
-          <Origin detail={detail} />
+          <Origin view={view} detail={detail} />
           <NodeHistory view={view} detail={detail} />
         </div>
       </aside>

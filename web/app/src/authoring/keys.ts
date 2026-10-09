@@ -4,7 +4,7 @@
 import { ID_BYTES_MAX } from "./limits.ts";
 
 /** The key prefixes (crates/schema `id.rs`). */
-export type KeyPrefix = "n_" | "r_" | "k_" | "a_";
+export type KeyPrefix = "n_" | "r_" | "k_" | "a_" | "i_";
 
 /** Random key bodies: twelve base-36 digits from the browser's random UUID. */
 function randomBody(): string {

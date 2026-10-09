@@ -22,9 +22,9 @@ describe("starting a journey (B1)", () => {
     expect(createMutation("Ad hoc", "Why", undefined)).toEqual({ op: "create_journey", name: "Ad hoc", description: "Why" });
   });
 
-  it("starts only from routes that are not retired and have a published version (A19)", () => {
-    const route = (id: string, retired: boolean, latest: number | null): RouteSummary => ({ header: { id, name: id, retired }, revision: 1, draft_open: false, latest_version: latest });
-    const offered = startableRoutes([route("open", false, 2), route("retired", true, 3), route("unpublished", false, null)]);
+  it("starts only from routes that are not retired or segments and have a published version (A19, A21)", () => {
+    const route = (id: string, retired: boolean, latest: number | null, kind: "process" | "segment" = "process"): RouteSummary => ({ header: { id, name: id, retired, kind }, revision: 1, draft_open: false, latest_version: latest });
+    const offered = startableRoutes([route("open", false, 2), route("retired", true, 3), route("unpublished", false, null), route("piece", false, 1, "segment")]);
     expect(offered.map((each) => each.header.id)).toEqual(["open"]);
   });
 });

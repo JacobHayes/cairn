@@ -36,6 +36,11 @@ import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { openDraft } from "../routes/model.ts";
 import { routeDetailPath } from "../routes/address.ts";
 import type { ImportedHandler } from "../routes/ImportFile.tsx";
+import { useInserting } from "../segments/entry.ts";
+import { insertionOrigins, withOriginFoots } from "../segments/model.ts";
+import { useSegmentNames } from "../segments/read.ts";
+import { InsertionCanvas } from "../segments/Preview.tsx";
+import { InsertStepper } from "../segments/Stepper.tsx";
 import { Button } from "../ui/kit.tsx";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
 
@@ -136,6 +141,7 @@ function useRouteModel(shown: Shown, view: CanvasView, unanchored: ReadonlySet<s
   const { deriver } = useSession();
   const deployment = useDeployment();
   const step = routeStepOf(view, shown.graph.nodes ?? []);
+  const nameOf = useSegmentNames();
   const [answer, setAnswer] = useState<{ level: Level; shown: Shown; view: string } | { error: string } | undefined>(undefined);
   useEffect(() => {
     if (deployment === undefined) {
@@ -172,8 +178,10 @@ function useRouteModel(shown: Shown, view: CanvasView, unanchored: ReadonlySet<s
       const node = tree.byKey.get(card.key);
       return { ...card, route: { foot: node === undefined ? undefined : ruleFoot(node, tree), unanchored: unanchored.has(card.key) } };
     });
-    return { cards, lines: linesOf(answer.level, nodes) };
-  }, [answer, shown, view, step, unanchored]);
+    // A draft names where each insertion came from on its root card (C19).
+    const roots = shown.of === "draft" ? insertionOrigins(undefined, shown.graph, nameOf).roots : {};
+    return withOriginFoots({ cards, lines: linesOf(answer.level, nodes) }, roots);
+  }, [answer, shown, view, step, unanchored, nameOf]);
   return { model, error: answer !== undefined && "error" in answer ? answer.error : undefined };
 }
 
@@ -330,11 +338,37 @@ function DraftSummary({ violations, notices, list }: { violations: number; notic
   );
 }
 
+/** What a draft's inspector holds: the stepper while a segment is being inserted, else the draft card (where the inspector has a column) or the open node's form. */
+function DraftInspector({ authored, selected, card, close, inserting }: { authored: Authored; selected: string | undefined; card: ReactNode; close: string; inserting: ReturnType<typeof useInserting> }) {
+  const navigate = useNavigate();
+  const id = "route" in authored.target ? authored.target.route : "";
+  if (inserting.at !== undefined) {
+    return (
+      <Inspector focus="insert-segment">
+        <InsertStepper key={inserting.at.parent ?? ""} authored={authored} parent={inserting.at.parent} onClose={inserting.close} onPreview={inserting.setPreview} />
+      </Inspector>
+    );
+  }
+  if (selected === undefined) {
+    return card === undefined ? null : (
+      <Inspector focus={`${id}:draft`} reveal={false}>
+        {card}
+      </Inspector>
+    );
+  }
+  return (
+    <Inspector focus={`${id}:${selected}`}>
+      <RouteNodePanel authored={authored} nodeKey={selected} close={close} onRemoved={() => void navigate(close)} />
+    </Inspector>
+  );
+}
+
 /** A draft: the palette, the cards' forms, and the draft card in the inspector. */
 function DraftFrame({ shown, authored, view, version, selected, listed, write, result, setResult, onImported }: FrameProps & { authored: Authored }) {
   const navigate = useNavigate();
   const id = shown.route.header.id;
   const drawing = useEdgeDrawing(authored);
+  const inserting = useInserting(`route:${id}`);
   const { notices } = useRouteNotices(authored.graph);
   const violations = useDraftViolations(authored);
   const blocked = blockedWords(violations);
@@ -378,26 +412,20 @@ function DraftFrame({ shown, authored, view, version, selected, listed, write, r
           <ResultOf result={result} setResult={setResult} hrefOf={hrefOf} />
           {wide || listed ? null : <DraftSummary violations={violations.length} notices={notices.length} list={routeCanvasPath(id, version, { ...view, rest: [["view", "list"]] })} />}
           <RouteSwitch id={id} version={version} view={view} listed={listed} selected={selected}>
-            <StructureTools authored={authored} container={view.container} onAdded={(node) => void navigate(routeNodePath(id, shownAt(view, authored.graph.nodes ?? [], node), node.key))} />
+            <StructureTools authored={authored} container={view.container} onAdded={(node) => void navigate(routeNodePath(id, shownAt(view, authored.graph.nodes ?? [], node), node.key))} onInsert={() => { inserting.start(view.container); }} />
           </RouteSwitch>
           <DrawingBanner drawing={drawing} />
         </div>
-        <div className={listed ? "journey-body journey-scroll stack" : "ws-canvas journey-body"}>
-          <RouteBody shown={shown} view={view} version={version} selected={selected} listed={listed} unanchored={unanchored} onPick={drawing.pick} />
+        <div className={listed && inserting.preview === undefined ? "journey-body journey-scroll stack" : "ws-canvas journey-body"}>
+          {inserting.preview === undefined ? (
+            <RouteBody shown={shown} view={view} version={version} selected={selected} listed={listed} unanchored={unanchored} onPick={drawing.pick} />
+          ) : (
+            <InsertionCanvas preview={inserting.preview} domain={id} today={authored.today} />
+          )}
           {wide || !listed || selected !== undefined ? null : card}
         </div>
       </div>
-      {selected === undefined ? (
-        wide ? (
-          <Inspector focus={`${id}:draft`} reveal={false}>
-            {card}
-          </Inspector>
-        ) : null
-      ) : (
-        <Inspector focus={`${id}:${selected}`}>
-          <RouteNodePanel authored={authored} nodeKey={selected} close={close} onRemoved={() => void navigate(close)} />
-        </Inspector>
-      )}
+      <DraftInspector authored={authored} selected={selected} card={wide ? card : undefined} close={close} inserting={inserting} />
     </ConnectContext>
   );
 }

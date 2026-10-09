@@ -25,6 +25,12 @@ export async function open(page: Page, host: HostKind, path = "/"): Promise<void
   await expect(syncChip(page)).toHaveAttribute("data-host", host);
 }
 
+/** On the Library, imports a route file through its `New` menu: a new route, or a new draft of the one it names. */
+export async function importIntoLibrary(page: Page, file: string | { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
+  await page.getByTestId("new-menu").click();
+  await page.getByLabel("Import a file…").setInputFiles(file);
+}
+
 /** The sync chip at the strip's right end. */
 export function syncChip(page: Page): Locator {
   return page.getByTestId("sync");

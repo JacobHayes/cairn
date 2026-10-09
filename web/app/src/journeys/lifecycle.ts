@@ -3,6 +3,7 @@
 // typed confirmation (A19). Each is one patch to the journey; the host's answer is the truth.
 import type { Schema } from "@cairn/client";
 
+import { isSegment } from "../data/reads.ts";
 import type { Mutation } from "../data/writes.ts";
 import type { JourneyStatus } from "./address.ts";
 
@@ -41,11 +42,11 @@ export function createMutation(name: string, description: string, start: Start):
 }
 
 /**
- * A19: the routes a journey can start from: not retired, with a published version. A retired
- * route is hidden from creation only; its journeys still see upgrades.
+ * A19, A21: the routes a journey can start from: not a segment, not retired, with a published
+ * version. A retired route is hidden from creation only; its journeys still see upgrades.
  */
 export function startableRoutes(routes: readonly RouteSummary[]): RouteSummary[] {
-  return routes.filter((route) => route.header.retired !== true && route.latest_version != null);
+  return routes.filter((route) => !isSegment(route) && route.header.retired !== true && route.latest_version != null);
 }
 
 /** One status change the overview offers, and what it is called. */

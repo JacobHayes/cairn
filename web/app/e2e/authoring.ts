@@ -12,9 +12,11 @@ export const routeName = (stem: string) => fresh(stem);
 export async function newRoute(page: Page, host: HostKind, name: string): Promise<string> {
   await open(page, host, "/library");
   const form = page.getByTestId("new-route");
+  await form.getByTestId("new-menu").click();
+  await form.getByTestId("new-process").click();
   await form.getByLabel("New route name").fill(name);
   const id = await form.getByLabel("New route id").inputValue();
-  await form.getByRole("button", { name: "Start a route with an empty draft" }).click();
+  await form.getByTestId("new-create").click();
   await expect(page.getByTestId("route-graph")).toHaveAttribute("data-status", "draft");
   return id;
 }
