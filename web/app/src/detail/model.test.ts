@@ -60,17 +60,25 @@ describe("movesFrom (D1)", () => {
 });
 
 describe("flags (D3)", () => {
-  it("marks a node with an unsatisfied requirement blocked, and one ready actionable", () => {
+  it("flags only real attention: work started before its gates are met, not what the display state says", () => {
     const view = testView();
-    const flags = (key: string, state: State) => flagsOf(view.derived.nodes[key] ?? { relevance: { value: "relevant" }, actionable: false, dates: {}, gravity: 0, gravity_from: { entries: [], total: 0 }, leverage: 0, leverage_from: { entries: [], total: 0 } }, state).map((each) => each.flag);
-    expect(flags("n_report", "active")).toContain("blocked");
-    expect(flags("n_findings", "todo")).toEqual(["actionable"]);
+    const flags = (key: string, state: State) => {
+      const derived = view.derived.nodes[key];
+      if (derived === undefined) {
+        throw new Error(`no ${key}`);
+      }
+      return flagsOf(derived, state).map((each) => each.flag);
+    };
+    expect(flags("n_report", "active")).toEqual(["started early"]);
+    expect(flags("n_report", "todo")).toEqual([]);
+    expect(flags("n_findings", "todo")).toEqual([]);
+    expect(flags("n_stage", "active")).toEqual([]);
   });
 
   it("does not call a finished node blocked by what it still holds back", () => {
     const derived = testView().derived.nodes["n_report"];
-    expect(derived && isBlocked(derived, "done")).toBe(false);
-    expect(derived && isBlocked({ ...derived, relevance: { value: "not_relevant" } }, "todo")).toBe(false);
+    expect(derived && isBlocked({ ...derived, display_state: "done" })).toBe(false);
+    expect(derived && isBlocked({ ...derived, relevance: { value: "not_relevant" }, display_state: "not_relevant" })).toBe(false);
   });
 });
 

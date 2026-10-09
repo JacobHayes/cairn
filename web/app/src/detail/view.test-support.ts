@@ -87,9 +87,10 @@ export function testView(): Ready {
       frontier: ["n_findings"],
       acting_frontier: ["n_findings"],
       nodes: {
-        n_stage: { ...relevant, actionable: false, dates: {}, gravity_from: none, leverage_from: none, blocked_by: [{ node: "n_findings", via: "containment" }] },
+        n_stage: { ...relevant, display_state: "active", actionable: false, dates: {}, gravity_from: none, leverage_from: none, blocked_by: [{ node: "n_findings", via: "containment" }] },
         n_report: {
           ...relevant,
+          display_state: "active",
           actionable: false,
           blocked_by: [{ node: "n_findings", via: "explicit" }],
           dates: { due: pinnedDue, slack_days: 24 },
@@ -99,14 +100,15 @@ export function testView(): Ready {
         },
         n_findings: {
           ...relevant,
+          display_state: "ready",
           actionable: true,
           dates: { due: derivedDue },
           gravity_from: none,
           leverage: 2,
           leverage_from: { entries: [{ node: "n_report", score: 1.5, other_owner: true }], total: 1 },
         },
-        n_meeting: { ...relevant, actionable: false, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, leverage_from: none },
-        n_when: { ...relevant, actionable: false, dates: {}, gravity_from: none, leverage_from: none },
+        n_meeting: { ...relevant, display_state: "ready", actionable: false, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, leverage_from: none },
+        n_when: { ...relevant, display_state: "ready", actionable: false, dates: {}, gravity_from: none, leverage_from: none },
       },
     },
   };

@@ -52,9 +52,27 @@ values.
 
 Every other node (23 at step 8) is relevant at every point, with no condition applying.
 
+Display state (D8) at the same points: what every surface shows for a node, with the stored
+state it is composed with (`display_state` / `state`). A node ruled out by an answer is not
+relevant whatever it recorded; before the partner decision, the partner-led subtree is
+conditional; a deliverable or stage whose work has started is active, and one still waiting
+on a gate is blocked. The scenario's `fixture_readme.rs` checks these values.
+
+| Node, display state / stored state | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
+|---|---|---|---|---|
+| `kickoff` | `ready` / `pending` | `ready` / `pending` | `done` / `reached` | `done` / `reached` |
+| `partner-runs` | `ready` / `open` | `done` / `decided` | `done` / `decided` | `done` / `decided` |
+| `setup` | `blocked` / `derived` | `blocked` / `derived` | `active` / `derived` | `done` / `derived` |
+| `setup/access` | `blocked` / `todo` | `blocked` / `todo` | `done` / `done` | `done` / `done` |
+| `testing/comparison-set` | `blocked` / `open` | `blocked` / `open` | `done` / `decided` | `done` / `decided` |
+| `testing/baseline` | `conditional` / `todo` | `conditional` / `todo` | `ready` / `todo` | `done` / `done` |
+| `testing/partner-led` | `conditional` / `derived` | `not_relevant` / `derived` | `not_relevant` / `derived` | `not_relevant` / `derived` |
+| `testing/partner-led/criteria` | `conditional` / `todo` | `not_relevant` / `todo` | `not_relevant` / `todo` | `not_relevant` / `todo` |
+| `reporting` | `blocked` / `derived` | `blocked` / `derived` | `blocked` / `derived` | `active` / `derived` |
+
 | Node and kind | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
 |---|---|---|---|---|
-| every node, `owner` | none (default owner `eval_owner`); all unassigned | `e_lead` (default owner `eval_owner`) | `e_lead` (default owner `eval_owner`) | `e_lead` (default owner `eval_owner`) |
+| every node, `owner` | none (default owner `eval_owner`); every unfinished node but the groups flagged unassigned | `e_lead` (default owner `eval_owner`) | `e_lead` (default owner `eval_owner`) | `e_lead` (default owner `eval_owner`) |
 | `reporting`, `informed` | none (role `stakeholders`) | `e_stakeholder_a`, `e_stakeholder_b` (role `stakeholders`) | `e_stakeholder_a`, `e_stakeholder_b` (role `stakeholders`) | `e_stakeholder_a`, `e_stakeholder_b` (role `stakeholders`) |
 | `reporting/final-review`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
 | `reporting/final-review/final-report`, `informed` | none (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) | `e_stakeholder_a`, `e_stakeholder_b` (from `reporting`) |
@@ -207,14 +225,14 @@ next list.
 ## Status summaries
 
 Each scenario's journey at its end, summarized for observers (brief 5.4, C18), read on
-2026-10-06: the in-scope nodes by stored state (`derived` is a group that is not skipped),
-how many are left to finish, the overdue, short, and stale nodes, the milestones not yet
+2026-10-06: the in-scope nodes by display state (D8; `by_state` counts the same nodes by
+stored state), how many are left to finish, the overdue, short, and stale nodes, the milestones not yet
 reached with their effective dates, and the open decisions in rank order. Nothing is
 overdue on that day; the product launch's late code freeze leaves it and the launch short
 (F6). The app's browser tests (`web/app/e2e/summary.spec.ts`) check these lines against the
 summary page on the in-browser host.
 
-- `vendor-evaluation`, status summary: todo 1, done 9, decided 7, pending 2, reached 1, derived 4; remaining 5; overdue none; short none; stale none; upcoming `n_review_opens` 2026-10-30, `n_decision_meeting` 2026-11-20; open decisions none.
-- `hiring-loop`, status summary: todo 1, done 7, skipped 1, decided 2, derived 2; remaining 1; overdue none; short none; stale none; upcoming none; open decisions none.
-- `product-launch`, status summary: todo 4, done 2, pending 4, reached 2, derived 3; remaining 10; overdue none; short `n_code_freeze`, `n_launch`; stale none; upcoming `n_beta_start` 2026-11-13, `n_beta_end` 2026-11-18, `n_launch` 2026-11-23; open decisions none.
-- `bake-off`, status summary: todo 2, active 2, open 1, decided 2, pending 1; remaining 6; overdue none; short none; stale none; upcoming `n_wrap_up` 2026-10-19; open decisions `n_winner`.
+- `vendor-evaluation`, status summary: active 1, ready 2, blocked 2, done 19; remaining 5; overdue none; short none; stale none; upcoming `n_review_opens` 2026-10-30, `n_decision_meeting` 2026-11-20; open decisions none.
+- `hiring-loop`, status summary: ready 1, done 11, skipped 1; remaining 1; overdue none; short none; stale none; upcoming none; open decisions none.
+- `product-launch`, status summary: ready 6, blocked 3, scheduled 1, done 5; remaining 10; overdue none; short `n_code_freeze`, `n_launch`; stale none; upcoming `n_beta_start` 2026-11-13, `n_beta_end` 2026-11-18, `n_launch` 2026-11-23; open decisions none.
+- `bake-off`, status summary: active 2, ready 1, blocked 3, done 2; remaining 6; overdue none; short none; stale none; upcoming `n_wrap_up` 2026-10-19; open decisions `n_winner`.

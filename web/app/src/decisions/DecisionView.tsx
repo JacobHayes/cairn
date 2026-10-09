@@ -14,6 +14,7 @@ import type { CardActions } from "../canvas/NodeCard.tsx";
 import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
 import { titleOf, type Ready } from "../detail/model.ts";
 import { NodeLink, nodePath, screenPath } from "../detail/parts.tsx";
+import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import "./decisions.css";
 import { canvasHeightPx, decisionLevel, decisionPlacement, decisionRows, type DecisionRow, type DecisionView as Projected } from "./model.ts";
@@ -36,8 +37,6 @@ function useDecisionCanvas(ready: Ready, projected: Projected | undefined): Canv
   }, [ready, projected, next.value, mine.value]);
 }
 
-const RELEVANCE_WORDS = { relevant: "relevant", not_relevant: "not relevant", undecided: "undecided" } as const;
-
 function AffectsList({ ready, row }: { ready: Ready; row: DecisionRow }) {
   if (row.affects.length === 0) {
     return <span className="muted">No node's relevance reads it.</span>;
@@ -47,9 +46,11 @@ function AffectsList({ ready, row }: { ready: Ready; row: DecisionRow }) {
       {row.affects.map((node) => (
         <li key={node.key} data-testid="affected" data-node={node.key} data-relevance={node.relevance}>
           <NodeLink view={ready} node={node.key} />{" "}
-          <Badge tone={node.relevance === "not_relevant" ? "plain" : node.relevance === "undecided" ? "warn" : "good"}>
-            {node.relevance === undefined ? "unknown" : RELEVANCE_WORDS[node.relevance]}
-          </Badge>
+          {node.displayState === undefined ? (
+            <Badge>unknown</Badge>
+          ) : (
+            <Badge tone={statusTone(node.displayState)}>{statusWord(node.displayState, node.kind ?? "action")}</Badge>
+          )}
         </li>
       ))}
     </ul>
@@ -71,8 +72,7 @@ function RowView({ ready, row, selected }: { ready: Ready; row: DecisionRow; sel
         )}
       </td>
       <td>
-        <Badge tone={row.state === "decided" ? "good" : "plain"}>{row.state}</Badge>
-        {row.relevance === "relevant" ? null : <Badge tone="warn">{RELEVANCE_WORDS[row.relevance]}</Badge>}
+        <Badge tone={statusTone(row.displayState)}>{statusWord(row.displayState, "decision")}</Badge>
       </td>
       <td data-testid="decision-answer">{row.answer ?? <span className="muted">none in effect</span>}</td>
       <td>{row.owners.length === 0 ? <span className="muted">unassigned</span> : row.owners.join(", ")}</td>

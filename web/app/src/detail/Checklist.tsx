@@ -1,6 +1,7 @@
 // C8: a node's children as a checklist. Work (actions and deliverables) is checked off and
 // unchecked in place, each one transition patch (complete, reopen); any other child shows its
 // state and opens its own detail.
+import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { isTerminal, transition, type Child, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink, Section } from "./parts.tsx";
@@ -22,7 +23,7 @@ function Item({ view, child, write }: { view: Ready; child: Child; write: NodeWr
           onChange={() => void write.run([transition(child.key, done ? "reopen" : "complete")])}
         />
       ) : null}{" "}
-      <NodeLink view={view} node={child.key} /> <Badge>{child.state}</Badge>
+      <NodeLink view={view} node={child.key} /> <Badge tone={statusTone(child.displayState)}>{statusWord(child.displayState, child.kind)}</Badge>
     </li>
   );
 }

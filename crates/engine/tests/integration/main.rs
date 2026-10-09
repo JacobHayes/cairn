@@ -22,6 +22,7 @@ mod cost_removal;
 mod cost_upgrade;
 mod dates;
 mod dependencies;
+mod display_state;
 mod document;
 mod domains;
 mod fixture_readme;

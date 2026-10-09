@@ -67,11 +67,12 @@ impl Derived {
         let priority = &self.priority;
         NodeDerived {
             relevance: self.relevance_explanation(key),
+            display_state: self.display_state(graph, key),
             effectively_skipped: self.skips.skipped_by(key).is_some(),
             blocked_by: self.blocked_by(key),
             blocked_through: self.blocked_through(graph, key),
             actionable: blocking.actionable(key),
-            unassigned: self.participation.is_unassigned(key),
+            unassigned: self.is_unassigned(graph, key),
             participations: self.participations(graph, key),
             membership_lost: !self.participation.membership_lost(key).is_empty(),
             stale: self.stale(graph, key),
@@ -93,7 +94,8 @@ impl Derived {
     }
 
     /// C8: the relevance value and what produced it: the node whose condition or force
-    /// include decided it, when not the node itself, and the decisions a condition read.
+    /// include decided it, when not the node itself, and the decisions a condition read; D8:
+    /// the undecided decisions a `not_relevant` value is pending on.
     fn relevance_explanation(&self, key: &NodeKey) -> RelevanceExplanation {
         let Some(found) = self.relevance.get(key) else {
             panic!("the graph derived holds {key}");
@@ -109,6 +111,7 @@ impl Derived {
             condition_on,
             decisions,
             forced,
+            pending_on: found.pending_on.clone(),
         }
     }
 

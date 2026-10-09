@@ -16,8 +16,8 @@
 //!   stand-in of the node holding it (the node itself, or the ancestor whose requirement,
 //!   condition, or opening it is) is not drawn. So hiding a kind never makes blocked work
 //!   look free.
-//! - Each visible container carries its roll-ups (C2's badges), and each group its display
-//!   state (D1).
+//! - Each visible container carries its roll-ups (C2's badges), each node its display state
+//!   (D8), and each group its legacy group state (D1).
 //!
 //! Cost at `node_count_max` (2,000 nodes, about 110,000 edges): stand-ins in one pass in tree
 //! order, O(nodes); the edges in one pass with a sorted map, O(edges log edges); the marker
@@ -28,12 +28,12 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    DependencyVia, EdgeOrigin, GroupState, Level, LevelEdge, LevelNode, NodeKey, NodeKind,
-    Relevance, RollUp, State, UnderlyingEdge,
+    DependencyVia, EdgeOrigin, Level, LevelEdge, LevelNode, NodeKey, NodeKind, Relevance, RollUp,
+    State, UnderlyingEdge,
 };
 
 use super::{DerivedJourney, ProjectionError};
-use crate::derive::dependencies::{EdgeClass, EdgeSet, EdgeSource, Instant, Point};
+use crate::derive::dependencies::{EdgeClass, EdgeSet, EdgeSource};
 use crate::derive::held_by;
 
 /// Each node within the level and its stand-in: itself when visible, else its nearest visible
@@ -94,8 +94,9 @@ impl<'a> DerivedJourney<'a> {
                 rolled_up: rolled_up.remove(key).unwrap_or_default(),
                 hidden_prerequisites: self.hidden_prerequisites(&stand_ins, key),
                 kept_work_pending: self.kept_work_pending(key),
+                display_state: self.derived.display_state(self.graph, key),
                 group_state: (self.node(key).kind() == NodeKind::Group)
-                    .then(|| self.group_state(key)),
+                    .then(|| self.derived.group_state(self.graph, key)),
                 roll_up: tree.is_container(key).then(|| self.roll_up(key)),
             })
             .collect();
@@ -203,45 +204,6 @@ impl<'a> DerivedJourney<'a> {
         let skipped =
             self.state(key) == State::Skipped || self.derived.skips().skipped_by(key).is_some();
         skipped && self.derived.relevance().in_scope(key) && !self.derived.blocking().satisfies(key)
-    }
-
-    /// D1: a group's display state from its children and dependencies.
-    fn group_state(&self, key: &NodeKey) -> GroupState {
-        let blocking = self.derived.blocking();
-        if self.derived.relevance().value(key) == Relevance::NotRelevant {
-            return GroupState::NotRelevant;
-        }
-        if self.state(key) == State::Skipped || self.derived.skips().skipped_by(key).is_some() {
-            return GroupState::Skipped;
-        }
-        if blocking.satisfies(key) {
-            return GroupState::Done;
-        }
-        let dependencies = self.derived.dependencies();
-        let entered = dependencies.node_index(key).is_some_and(|at| {
-            let points: &[Point] = if dependencies.is_container(at) {
-                &[Point::Entry, Point::ConditionEntry]
-            } else {
-                &[Point::Start]
-            };
-            points
-                .iter()
-                .all(|&point| blocking.instant(Instant::new(at, point)))
-        });
-        if !entered {
-            return GroupState::Waiting;
-        }
-        let started = self.graph.tree().descendants(key).iter().any(|below| {
-            matches!(
-                self.state(below),
-                State::Active | State::Done | State::Decided | State::Reached
-            )
-        });
-        if started {
-            GroupState::Active
-        } else {
-            GroupState::NotStarted
-        }
     }
 
     /// C2: a container's badges, from its children.

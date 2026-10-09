@@ -45,7 +45,7 @@ describe("a journey's status (B11, A19)", () => {
 });
 
 describe("completion suggested (B11)", () => {
-  const summary = (remaining: number): Schema<"StatusSummary"> => ({ by_state: {}, remaining });
+  const summary = (remaining: number): Schema<"StatusSummary"> => ({ by_state: {}, by_display_state: {}, remaining });
   const derived = (autoReached: boolean): Schema<"Derived"> => ({
     today: "2026-10-06",
     frontier: [],

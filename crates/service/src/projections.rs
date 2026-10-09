@@ -13,10 +13,11 @@ use std::sync::Arc;
 
 use cairn_engine::{DerivedJourney, ProjectionError};
 use cairn_schema::{
-    Annotation, AnswerValue, Cursor, Date, DecisionView, Domain, EntityKey, ExplainedField,
-    ExplanationPage, JourneyId, KeyRefs, KindKey, Level, ListPage, ListQuery, LocalEdit, MineEntry,
-    Next, NextQuery, Node, NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path,
-    ProposalId, Revision, Snapshot, SnapshotScope, State, StatusSummary, Timeline, Title, Trace,
+    Annotation, AnswerValue, Cursor, Date, DecisionView, DisplayState, Domain, EntityKey,
+    ExplainedField, ExplanationPage, JourneyId, KeyRefs, KindKey, Level, ListPage, ListQuery,
+    LocalEdit, MineEntry, Next, NextQuery, Node, NodeDerived, NodeKey, NodeKind, NodeState,
+    Overrides, PatchEvents, Path, ProposalId, Revision, Snapshot, SnapshotScope, State,
+    StatusSummary, Timeline, Title, Trace,
 };
 use cairn_store::{EventQuery, PageSize, Store};
 
@@ -117,6 +118,8 @@ pub struct ChildEntry {
     pub kind: NodeKind,
     /// Its stored state.
     pub state: State,
+    /// D8: the state every surface shows for it.
+    pub display_state: DisplayState,
 }
 
 /// J4: a page of a journey's history, or of one node's, grouped by patch.
@@ -439,6 +442,7 @@ fn detail(journey: &DerivedJourney<'_>, key: &NodeKey) -> Result<NodeDetail, Pro
                 title: found.title.clone(),
                 kind: found.kind(),
                 state: stored(child, found.kind()).state,
+                display_state: journey.derived().display_state(graph, child),
             }
         })
         .collect();

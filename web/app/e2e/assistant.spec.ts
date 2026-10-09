@@ -31,7 +31,7 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
   await expect(applied).toHaveCount(1);
   await expect(panel.getByTestId("assistant-reply")).toContainText("Kickoff is marked reached.");
   await applied.locator('[data-testid="assistant-node"][data-node="n_kickoff"]').click();
-  await expect(state(nodePanel(page, "n_kickoff"))).toHaveAttribute("data-status", "reached");
+  await expect(state(nodePanel(page, "n_kickoff"))).toHaveAttribute("data-status", "done");
 
   const pieces = ["Ingest workload", "Query workload"].map((title, index) => ({
     op: "add_node",

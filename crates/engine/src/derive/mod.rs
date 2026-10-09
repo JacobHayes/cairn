@@ -32,6 +32,7 @@ mod condition;
 pub mod consequences;
 pub mod dates;
 pub mod dependencies;
+mod display;
 pub mod participation;
 pub mod priority;
 mod project;

@@ -9,6 +9,7 @@
 import type { Schema } from "@cairn/client";
 
 import type { GraphNode, NodeKind } from "../detail/model.ts";
+import type { DisplayState } from "../status/words.ts";
 
 export type Level = Schema<"Level">;
 export type LevelNode = Schema<"LevelNode">;
@@ -90,9 +91,9 @@ export interface Card {
 
 /** A journey card's state and derived values (C1, C5, C6, C2's roll-ups). */
 export interface CardState {
-  /** The stored state, or a group's display state (D1). */
-  state: string;
-  /** Terminal (D1): done, skipped, decided, or reached. */
+  /** The engine's display state (D8). */
+  state: DisplayState;
+  /** Done or skipped: nothing is left to do. */
   finished: boolean;
   owner: string;
   relevance: Relevance;

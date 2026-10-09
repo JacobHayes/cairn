@@ -11,6 +11,7 @@ const row = (key: string, ancestors: string[]): NodeRow => ({
   path: key,
   title: key,
   state: "todo",
+  display_state: "ready",
   relevance: "relevant",
   gravity: 1,
   leverage: 0,

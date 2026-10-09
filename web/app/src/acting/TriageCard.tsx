@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 
 import { nodeOf, type Ready } from "../detail/model.ts";
+import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { factsOf } from "./acts.ts";
@@ -53,7 +54,8 @@ export function TriageCard({ view, row, position, total, onPass }: { view: Ready
           <DetailLink view={view} node={row.key} />
         </h2>
         <Badge>{row.kind}</Badge>
-        <Flags row={row} />
+        <Badge tone={statusTone(row.display_state)}>{statusWord(row.display_state, row.kind)}</Badge>
+        <Flags view={view} row={row} />
       </div>
       {node.kind === "decision" && node.prompt !== undefined ? <Markdown text={node.prompt} data-testid="prompt" /> : null}
       {node.description == null || node.description === "" ? null : <Markdown text={node.description} />}

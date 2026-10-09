@@ -12,6 +12,7 @@ const row: NodeRow = {
   path: "a",
   title: "A",
   state: "todo",
+  display_state: "ready",
   relevance: "relevant",
   gravity: 6,
   leverage: 2,

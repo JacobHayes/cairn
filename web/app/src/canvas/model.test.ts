@@ -200,35 +200,22 @@ const modelOf = (view: ReturnType<typeof canvasView>, level: Level): CanvasModel
 });
 
 describe("C1, C2: what the canvas shows as finished, and markers through roll-ups and ancestors", () => {
-  test("an effectively skipped node shows skipped and finished, and checks off in its container's checklist", () => {
+  test("a card shows the engine's display state (D8): a skipped node is finished, and checks off in its container's checklist", () => {
     const view = changed((each) => {
-      derivedOf(each, "n_build").effectively_skipped = true;
-      derivedOf(each, "n_check").effectively_skipped = true;
+      derivedOf(each, "n_build").display_state = "skipped";
+      derivedOf(each, "n_check").display_state = "skipped";
     });
     const build = card(modelOf(view, wholeLevel()), "n_build");
     expect([build.journey?.state, build.journey?.finished, hereWords(build)]).toEqual(["skipped", true, []]);
     expect(card(modelOf(view, actionsAndDecisionsHidden()), "n_build").checklist[0]?.done).toBe(true);
   });
 
-  test("an auto-reached milestone shows reached and finished", () => {
-    const view = changed((each) => {
-      const kick = each.journey.graph.state?.nodes?.["n_kick"];
-      if (kick !== undefined) {
-        kick.state = "pending";
-      }
-      derivedOf(each, "n_kick").auto_reached = true;
-    });
-    const kick = card(modelOf(view, wholeLevel()), "n_kick");
-    expect([kick.journey?.state, kick.journey?.finished]).toEqual(["reached", true]);
-  });
-
   test("a finished group's due date carries no urgency", () => {
     const view = changed((each) => {
       derivedOf(each, "n_stage").dates = { due: { date: "2026-10-07", chain: { constraints: [], fixed: [] } } };
+      derivedOf(each, "n_stage").display_state = "done";
     });
-    const level = wholeLevel();
-    level.nodes = level.nodes.map((node) => (node.key === "n_stage" ? { ...node, group_state: "done" } : node));
-    expect(card(modelOf(view, level), "n_stage").journey?.due?.tone).toBe("plain");
+    expect(card(modelOf(view, wholeLevel()), "n_stage").journey?.due?.tone).toBe("plain");
   });
 
   test("hiding undecided nodes marks a container whose rolled-up child they block", () => {
@@ -243,6 +230,7 @@ describe("C1, C2: what the canvas shows as finished, and markers through roll-up
   test("hiding an undecided container marks what its shown child inherits from it", () => {
     const view = changed((each) => {
       derivedOf(each, "n_stage").relevance = { value: "undecided", decisions: ["n_choose"] };
+      derivedOf(each, "n_stage").display_state = "conditional";
       derivedOf(each, "n_stage").blocked_by = [{ node: "n_kick", via: { stage_opening: { group: "n_stage" } } }];
       derivedOf(each, "n_build").blocked_by = [];
       derivedOf(each, "n_build").blocked_through = ["n_stage"];

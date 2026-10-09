@@ -55,7 +55,7 @@ async function converse(page: Page, journey: string, pictures: boolean): Promise
   }
   await beat(page);
   await panel.locator('[data-testid="assistant-node"][data-node="n_kickoff"]').click();
-  await expect(state(nodePanel(page, "n_kickoff"))).toHaveAttribute("data-status", "reached");
+  await expect(state(nodePanel(page, "n_kickoff"))).toHaveAttribute("data-status", "done");
   await beat(page);
 
   const pieces = ["Ingest workload", "Query workload"].map((title, index) => ({

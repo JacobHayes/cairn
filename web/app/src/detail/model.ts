@@ -6,6 +6,7 @@
 import type { Schema } from "@cairn/client";
 
 import type { JourneyView } from "../data/journeys.ts";
+import type { DisplayState } from "../status/words.ts";
 
 export type Ready = Extract<JourneyView, { status: "ready" }>;
 export type GraphNode = Schema<"Node">;
@@ -22,7 +23,10 @@ export interface Child {
   key: string;
   title: string;
   kind: NodeKind;
+  /** Its stored state: which transition a checkbox would make. */
   state: State;
+  /** D8: the state it shows. */
+  displayState: DisplayState;
 }
 
 /** C8: everything the node detail panel shows about one node. */
@@ -121,7 +125,13 @@ export function nodeDetail(view: Ready, key: string): NodeDetail | undefined {
   const ancestors = ancestorsOf(view, node);
   const children = (view.journey.graph.nodes ?? [])
     .filter((child) => child.parent === key)
-    .map((child) => ({ key: child.key, title: child.title, kind: child.kind, state: recordOf(view, child).state }));
+    .map((child) => ({
+      key: child.key,
+      title: child.title,
+      kind: child.kind,
+      state: recordOf(view, child).state,
+      displayState: view.derived.nodes[child.key]?.display_state ?? "ready",
+    }));
   return {
     node,
     path: [...ancestors, node].map((each) => each.id).join("/"),
@@ -193,12 +203,24 @@ export function isTerminal(state: State): boolean {
 /**
  * Gating, Blocked: a node in scope and not finished with an unsatisfied dependency of its own
  * or through an ancestor. A finished or not-relevant node's `blocked_by` lists what it still
- * holds back beneath it, which does not block it.
+ * holds back beneath it, which does not block it. It names the gates held, not the state a
+ * person reads: that is the node's display state (D8), where a container is never blocked by
+ * its own children.
  */
-export function isBlocked(derived: NodeDerived, state: State): boolean {
-  const inScope = derived.relevance.value !== "not_relevant" && derived.effectively_skipped !== true;
+export function isBlocked(derived: NodeDerived): boolean {
+  const inScope = derived.relevance.value !== "not_relevant";
+  const finished = derived.display_state === "done" || derived.display_state === "skipped";
   const held = (derived.blocked_by ?? []).length > 0 || (derived.blocked_through ?? []).length > 0;
-  return inScope && !TERMINAL.includes(state) && held;
+  return inScope && !finished && held;
+}
+
+/**
+ * Work started before its own gates are met: stored `active` while a requirement of its own
+ * or an ancestor's is unsatisfied. A container's unfinished children are not a gate (D8).
+ */
+export function startedEarly(derived: NodeDerived, state: State): boolean {
+  const gates = (derived.blocked_by ?? []).some((blocker) => blocker.via !== "containment") || (derived.blocked_through ?? []).length > 0;
+  return state === "active" && gates && isBlocked(derived);
 }
 
 /**
@@ -236,7 +258,11 @@ export function unansweredOf(view: Ready, key: string): string[] {
 
 export type FlagTone = "good" | "warn" | "bad" | "plain";
 
-/** D3: the derived flags a node carries (C8), those that are set. */
+/**
+ * D3: the derived flags a node carries (C8) that are real attention, those that are set. What
+ * its display state already says (blocked, snoozed, skipped, actionable, auto-reached) is not
+ * a flag (D8); `state` is the stored one, for work started before its gates are met.
+ */
 export function flagsOf(derived: NodeDerived, state: State): { flag: string; tone: FlagTone }[] {
   const flags: { flag: string; tone: FlagTone }[] = [];
   const add = (set: boolean | undefined, flag: string, tone: FlagTone) => {
@@ -244,15 +270,11 @@ export function flagsOf(derived: NodeDerived, state: State): { flag: string; ton
       flags.push({ flag, tone });
     }
   };
-  add(derived.actionable, "actionable", "good");
-  add(isBlocked(derived, state), "blocked", "warn");
+  add(startedEarly(derived, state), "started early", "plain");
   add(derived.unassigned, "unassigned", "warn");
   add((derived.stale ?? []).length > 0, "stale", "warn");
   add(derived.overdue, "overdue", "bad");
-  add(derived.snoozed != null, "snoozed", "plain");
   add(derived.needs_breakdown, "needs_breakdown", "warn");
-  add(derived.effectively_skipped, "effectively skipped", "plain");
-  add(derived.auto_reached, "auto-reached", "good");
   add(derived.membership_lost, "membership lost", "warn");
   return flags;
 }

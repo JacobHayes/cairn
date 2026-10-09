@@ -162,6 +162,33 @@ fn the_relevance_table_is_what_derive_gives() {
     }
 }
 
+/// The display-state table: each listed node's display state and stored state at each
+/// decision point (D8).
+#[test]
+fn the_display_state_table_is_what_derive_gives() {
+    let header = "| Node, display state / stored state | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |";
+    let steps: Vec<usize> = cells(header)[1..]
+        .iter()
+        .map(|cell| step_of(cell))
+        .collect();
+    let vendor = Vendor::run();
+    for row in table(header) {
+        for (column, step) in steps.iter().enumerate() {
+            let graph = vendor.graph(*step);
+            let key = at_path(&graph, quoted(&row[0])[0]);
+            let shown = vendor.derived(*step).display_state(&graph, &key);
+            let stored = graph.document().state.nodes.get(&key).unwrap().state;
+            let word = |json: String| json.trim_matches('"').to_owned();
+            let found = format!(
+                "`{}` / `{}`",
+                word(serde_json::to_string(&shown).unwrap()),
+                word(serde_json::to_string(&stored).unwrap())
+            );
+            assert_eq!(found, row[column + 1], "step {step}: {}", row[0]);
+        }
+    }
+}
+
 /// The participation table: the entities in each node's participation of each kind at each
 /// decision point, for every node where the row says so.
 #[test]

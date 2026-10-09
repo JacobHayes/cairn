@@ -16,8 +16,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AnswerSpec, Condition, DateOrigin, DecisionEntry, DecisionView, NodeKey, NodeKind,
-    OpenDecision, Payload, State, StatusSummary, Timeline, TimelineEntry, UpcomingMilestone,
+    AnswerSpec, Condition, DateOrigin, DecisionEntry, DecisionView, DisplayState, NodeKey,
+    NodeKind, OpenDecision, Payload, State, StatusSummary, Timeline, TimelineEntry,
+    UpcomingMilestone,
 };
 
 use super::DerivedJourney;
@@ -59,6 +60,7 @@ impl DerivedJourney<'_> {
                 };
                 DecisionEntry {
                     state: self.state(&key),
+                    display_state: node.display_state,
                     relevance: self.derived.relevance().value(&key),
                     answer: self.answer(&key),
                     owners: self.owners(&key).clone(),
@@ -180,8 +182,11 @@ impl DerivedJourney<'_> {
             .filter(|key| derived.relevance().in_scope(key))
             .collect();
         let mut by_state: BTreeMap<State, u32> = BTreeMap::new();
+        let mut by_display_state: BTreeMap<DisplayState, u32> = BTreeMap::new();
         for key in &in_scope {
             *by_state.entry(self.state(key)).or_default() += 1;
+            let shown = derived.display_state(self.graph, key);
+            *by_display_state.entry(shown).or_default() += 1;
         }
         let keep = |test: &dyn Fn(&NodeKey) -> bool| -> Vec<NodeKey> {
             in_scope
@@ -215,6 +220,7 @@ impl DerivedJourney<'_> {
         });
         StatusSummary {
             by_state,
+            by_display_state,
             remaining: count(in_scope.iter().filter(|key| open(key)).count()),
             overdue: keep(&|key| derived.dates().overdue(key)),
             shortfalls: keep(&|key| derived.dates().shortfall_days(key).is_some()),

@@ -84,12 +84,12 @@ test("C9: a bulk completion with one node failing its guard is rejected whole, n
   await expect(failed).toHaveAttribute("data-node", "n_final_report");
   await expect(failed).toContainText("Final report");
   // A later write over the same selection settles whatever the rejected action sent: only it
-  // may move the revision, and the milestone the rejected patch would have reached is pending.
+  // may move the revision, and the milestone the rejected patch would have reached is still ready.
   await page.getByRole("button", { name: "Assign owner..." }).click();
   await page.getByLabel("Owner for them").selectOption("e_lead");
   await page.getByRole("button", { name: "Apply to 2" }).click();
   expect(await revisionAfter(page, revision)).toBe(revision + 1);
-  await expect(page.locator('[data-testid="list-row"][data-node="n_decision_meeting"]')).toContainText("pending");
+  await expect(page.locator('[data-testid="list-row"][data-node="n_decision_meeting"]')).toContainText("ready");
 });
 
 test("C9, B6: a bulk snooze is one patch; the snoozed leave the next list and an unsnooze returns them", async ({ page }) => {

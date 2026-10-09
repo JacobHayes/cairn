@@ -11,6 +11,7 @@ import { LAYER_GAP_PX, NODE_GAP_PX, type Placement } from "../canvas/layout.ts";
 import type { Level, Relevance } from "../canvas/model.ts";
 import { nodeOf, titleOf, type GraphNode, type NodeKind, type Ready, type State } from "../detail/model.ts";
 import { answerText, entityName, roleTitle } from "../detail/sections.tsx";
+import type { DisplayState } from "../status/words.ts";
 
 export type DecisionView = Schema<"DecisionView">;
 export type DecisionEntry = Schema<"DecisionEntry">;
@@ -19,7 +20,7 @@ export type DecisionEntry = Schema<"DecisionEntry">;
 export function decisionLevel(view: DecisionView): Level {
   return {
     shown: ["decision"],
-    nodes: view.decisions.map((entry) => ({ key: entry.node, hidden_prerequisites: entry.hidden_prerequisites ?? [] })),
+    nodes: view.decisions.map((entry) => ({ key: entry.node, display_state: entry.display_state, hidden_prerequisites: entry.hidden_prerequisites ?? [] })),
     edges: view.edges,
   };
 }
@@ -78,6 +79,8 @@ export interface Affected {
   title: string;
   kind: NodeKind | undefined;
   relevance: Relevance | undefined;
+  /** D8: what it shows now: a node pending on another decision is conditional, not ruled out. */
+  displayState: DisplayState | undefined;
 }
 
 /** C12: one decision, its answer in effect, and what that answer affected. */
@@ -85,7 +88,10 @@ export interface DecisionRow {
   key: string;
   title: string;
   prompt: string | undefined;
+  /** Its stored state: what the answer was recorded in. */
   state: State;
+  /** D8: the state it shows. */
+  displayState: DisplayState;
   relevance: Relevance;
   /** The answer in effect (decided and in scope, E3), as people read it. */
   answer: string | undefined;
@@ -107,6 +113,7 @@ function affectedOf(ready: Ready, key: string): Affected {
     title: titleOf(ready, key),
     kind: nodeOf(ready, key)?.kind,
     relevance: ready.derived.nodes[key]?.relevance.value,
+    displayState: ready.derived.nodes[key]?.display_state,
   };
 }
 
@@ -117,6 +124,7 @@ function rowOf(ready: Ready, entry: DecisionEntry, node: GraphNode | undefined):
     title: titleOf(ready, entry.node),
     prompt: node?.prompt,
     state: entry.state,
+    displayState: entry.display_state,
     relevance: entry.relevance,
     answer: entry.answer == null ? undefined : answerText(ready, entry.answer, node),
     owners: (entry.owners ?? []).map((owner) => entityName(ready, owner)),

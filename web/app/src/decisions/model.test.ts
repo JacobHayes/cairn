@@ -30,7 +30,7 @@ function decisionJourney(): Ready {
   ];
   view.journey.graph.roles = [{ key: "r_lead", id: "lead", title: "Lead" }];
   const none = { entries: [], total: 0 };
-  const node = (value: "relevant" | "not_relevant") => ({ relevance: { value }, actionable: false, gravity: 0, leverage: 0, dates: {}, gravity_from: none, leverage_from: none });
+  const node = (value: "relevant" | "not_relevant") => ({ relevance: { value }, display_state: value === "relevant" ? ("ready" as const) : ("not_relevant" as const), actionable: false, gravity: 0, leverage: 0, dates: {}, gravity_from: none, leverage_from: none });
   view.derived.nodes = {
     ...view.derived.nodes,
     n_ask: node("relevant"),
@@ -43,9 +43,9 @@ function decisionJourney(): Ready {
 
 const projected: DecisionView = {
   decisions: [
-    { node: "n_when", state: "decided", relevance: "relevant", answer: { date: "2026-11-20" }, owners: ["e_one"], pins: "n_meeting" },
-    { node: "n_ask", state: "decided", relevance: "relevant", answer: { boolean: false }, owners: ["e_one", "e_two"], affects: ["n_optional", "n_optional_step"] },
-    { node: "n_lead", state: "open", relevance: "relevant", fills: "r_lead", hidden_prerequisites: ["n_findings"] },
+    { node: "n_when", state: "decided", display_state: "done", relevance: "relevant", answer: { date: "2026-11-20" }, owners: ["e_one"], pins: "n_meeting" },
+    { node: "n_ask", state: "decided", display_state: "done", relevance: "relevant", answer: { boolean: false }, owners: ["e_one", "e_two"], affects: ["n_optional", "n_optional_step"] },
+    { node: "n_lead", state: "open", display_state: "ready", relevance: "relevant", fills: "r_lead", hidden_prerequisites: ["n_findings"] },
   ],
   edges: [{ from: "n_when", to: "n_ask", gates: true, underlying: [{ requirement: "n_when", dependent: "n_ask", origin: "explicit", gates: true }] }],
 };

@@ -14,8 +14,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
-    KindKey, NextQuery, NodeKey, NodeKind, Relevance, Snapshot, SnapshotCounts, SnapshotNode,
-    SnapshotScope, State,
+    DisplayState, KindKey, NextQuery, NodeKey, NodeKind, Relevance, Snapshot, SnapshotCounts,
+    SnapshotNode, SnapshotScope, State,
 };
 
 use super::rows::{count, page};
@@ -85,9 +85,7 @@ impl DerivedJourney<'_> {
             acting_frontier_rest: rest,
             open_decisions: derived.ranking().sorted(&open_decisions),
             needs_breakdown: pick(&|key| blocking.needs_breakdown(key)),
-            unassigned: pick(&|key| {
-                !blocking.closed(key) && derived.participation().is_unassigned(key)
-            }),
+            unassigned: pick(&|key| derived.is_unassigned(self.graph, key)),
             shortfalls: pick(&|key| derived.dates().shortfall_days(key).is_some()),
             stalled: blocking.stalled().cloned(),
             counts: self.counts(&scoped, &in_scope, listed.len(), frontier.len(), subtree),
@@ -152,8 +150,11 @@ impl DerivedJourney<'_> {
     ) -> SnapshotCounts {
         let derived = self.derived;
         let mut by_state: BTreeMap<State, u32> = BTreeMap::new();
+        let mut by_display_state: BTreeMap<DisplayState, u32> = BTreeMap::new();
         for key in in_scope {
             *by_state.entry(self.state(key)).or_default() += 1;
+            let shown = derived.display_state(self.graph, key);
+            *by_display_state.entry(shown).or_default() += 1;
         }
         let frontier = derived
             .ranking()
@@ -172,6 +173,7 @@ impl DerivedJourney<'_> {
                     .count(),
             ),
             by_state,
+            by_display_state,
             listed: count(listed),
             frontier: count(frontier),
             acting_frontier: count(acting),

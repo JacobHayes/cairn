@@ -9,6 +9,7 @@ import { useLocation, useNavigate, useParams } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
 import type { Ready } from "../detail/model.ts";
+import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { factsOf } from "./acts.ts";
 import { Acts } from "./Acts.tsx";
@@ -39,8 +40,8 @@ function Item({ view, row, at, settings }: { view: Ready; row: NodeRow; at: numb
         <span className="next-position">{at + 1}</span>
         <DetailLink view={view} node={row.key} className="next-title" />
         <Badge>{row.kind}</Badge>
-        <Badge tone="good">{row.state}</Badge>
-        <Flags row={row} />
+        <Badge tone={statusTone(row.display_state)}>{statusWord(row.display_state, row.kind)}</Badge>
+        <Flags view={view} row={row} />
         <span className="muted">
           {row.due == null ? "no deadline" : `due ${row.due}`}
           {row.slack_days == null ? "" : `, slack ${String(row.slack_days)} days`}

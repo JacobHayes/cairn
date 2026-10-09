@@ -47,6 +47,47 @@ pub struct RelevanceExplanation {
     /// A force include made it relevant.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub forced: bool,
+    /// D8: when the value is `not_relevant` only because a decision it reads is itself
+    /// undecided (so unanswered, and every value operator on it false), the undecided
+    /// decisions it rests on: reading them as still to come would leave the node undecided.
+    /// Empty when the value is settled. The value itself is unchanged, so gravity, leverage
+    /// and blocking follow Gating exactly; display state shows such a node as `conditional`.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub pending_on: BTreeSet<NodeKey>,
+}
+
+/// D8: the one state every surface shows for a node, composed from relevance, stored state,
+/// effective skip, auto-reach, blocking and snooze, and from the D3 flags, which it leaves in
+/// place. Stored state is what transitions act on; this is what people and agents read. The
+/// first matching value in this order wins: `not_relevant`, `skipped`, `done`, `snoozed`,
+/// `active`, `conditional`, `blocked`, `scheduled`, `ready`.
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum DisplayState {
+    /// Nothing is in the way and nothing has started: actionable work, a container waiting
+    /// only on its own children with nothing started, or one ready to finish.
+    Ready,
+    /// Started: stored `active`, or a container whose children are the only thing it waits
+    /// on and some work beneath it has started.
+    Active,
+    /// In scope and unfinished, and its own or an inherited gate is unsatisfied. A container
+    /// is never blocked by its own children.
+    Blocked,
+    /// It may apply: relevance is `undecided` and it is unfinished, or relevance is
+    /// `not_relevant` but pending on an undecided decision (`pending_on`).
+    Conditional,
+    /// An `auto_reach` milestone, unblocked, whose date is ahead.
+    Scheduled,
+    /// A snooze holds.
+    Snoozed,
+    /// `done`, `decided`, `reached`, auto-reached, or a group that satisfies dependencies.
+    Done,
+    /// Stored `skipped`, or effectively skipped (D1a).
+    Skipped,
+    /// Does not apply, and settled (Gating): the recorded state survives beneath it.
+    NotRelevant,
 }
 
 /// A dependency that blocks a node (D1, Gating: Blocked).
@@ -426,9 +467,13 @@ pub struct NodeDerived {
     /// conditions block it through containment; each lists them in its own `blocked_by`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub blocked_through: Vec<NodeKey>,
+    /// D8: the state every surface shows for the node, composed from relevance, stored state
+    /// and the flags beside it, which stay as they are.
+    pub display_state: DisplayState,
     /// Relevant, not blocked, and non-terminal (D2).
     pub actionable: bool,
-    /// No owner (E1).
+    /// No owner (E1), for a non-group node that is in scope and unfinished; a not-relevant or
+    /// finished node, or a group, never is.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub unassigned: bool,
     /// Effective participations by kind.

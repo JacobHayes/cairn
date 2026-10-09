@@ -6,7 +6,7 @@
 import { Button, Field } from "../ui/kit.tsx";
 import { AnswerEditor } from "./AnswerEditor.tsx";
 import { mayNotApply } from "../data/notices.ts";
-import { isBlocked, movesFrom, titleOf, transition, unansweredOf, type Move, type NodeDetail, type Ready } from "./model.ts";
+import { movesFrom, startedEarly, titleOf, transition, unansweredOf, type Move, type NodeDetail, type Ready } from "./model.ts";
 import { Rejected } from "./Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
 
@@ -64,7 +64,7 @@ export function Actions({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { node, record } = detail;
   const skip = useFormDraft<string>(write.journey, node.key, "skip");
   const moves = movesFrom(node.kind, record.state);
-  const startedEarly = record.state === "active" && isBlocked(detail.derived, record.state);
+  const early = startedEarly(detail.derived, record.state);
   const finishes = moves.includes("complete") || moves.includes("reach") || (node.kind === "decision" && record.state === "open");
   return (
     <div className="stack" data-testid="actions">
@@ -85,7 +85,7 @@ export function Actions({ view, detail }: { view: Ready; detail: NodeDetail }) {
             </Button>
           ),
         )}
-        {startedEarly ? <span className="muted">Started early: still blocked.</span> : null}
+        {early ? <span className="muted">Started early: still blocked.</span> : null}
       </div>
       {finishes ? <MayNotApply view={view} node={node.key} /> : null}
       {skip.draft === undefined ? null : <SkipForm write={write} node={node.key} form={skip} />}

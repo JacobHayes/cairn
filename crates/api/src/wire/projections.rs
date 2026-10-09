@@ -6,8 +6,8 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Annotation, AnswerValue, Date, KeyRefs, LocalEdit, MineEntry, Node, NodeDerived, NodeKey,
-    NodeKind, NodeState, Overrides, PatchEvents, Path, Revision, State, Title,
+    Annotation, AnswerValue, Date, DisplayState, KeyRefs, LocalEdit, MineEntry, Node, NodeDerived,
+    NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, Revision, State, Title,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -108,6 +108,8 @@ pub struct ChildEntry {
     pub kind: NodeKind,
     /// Its stored state.
     pub state: State,
+    /// D8: the state every surface shows for it.
+    pub display_state: DisplayState,
 }
 
 impl From<cairn_service::NodeDetail> for NodeDetail {
@@ -131,12 +133,14 @@ impl From<cairn_service::NodeDetail> for NodeDetail {
                 title,
                 kind,
                 state,
+                display_state,
             } = child;
             ChildEntry {
                 key,
                 title,
                 kind,
                 state,
+                display_state,
             }
         });
         Self {

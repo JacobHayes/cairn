@@ -1,5 +1,5 @@
 // How cards and lines look, as data the components apply (C1, C5, C6, C7): explicit edges
-// solid and implicit gates dotted, not-relevant cards grayed and undecided ones ghosted,
+// solid and implicit gates dotted, not-relevant cards grayed and conditional ones ghosted,
 // "I am here" outlined, gravity as border weight, and an overlay's dimming. Quiet by rule:
 // nothing animates or flashes (C6). Pure, so the unit tests read the same decisions the
 // canvas draws.
@@ -30,16 +30,16 @@ export function lineLook(line: Line, overlay?: CanvasOverlay): LineLook {
 }
 
 /**
- * C1, C5, C7: a card's classes: its kind, its relevance look, "I am here" (the frontier and
+ * C1, C5, C7: a card's classes: its kind, its display state's look (not relevant, conditional), "I am here" (the frontier and
  * active work outlined; the viewer's own items marked more lightly, since a viewer may own
  * most of a journey), and an overlay's dimming.
  */
 export function cardClasses(card: Card, overlay?: CanvasOverlay): string[] {
   const classes = ["card", `card-${card.kind}`];
   const journey = card.journey;
-  if (journey?.relevance === "not_relevant") {
+  if (journey?.state === "not_relevant") {
     classes.push("card-not-relevant");
-  } else if (journey?.relevance === "undecided") {
+  } else if (journey?.state === "conditional") {
     classes.push("card-undecided");
   }
   if (journey !== undefined && (journey.here.frontier || journey.here.active)) {

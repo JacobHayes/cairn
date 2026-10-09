@@ -110,7 +110,7 @@ test("B10: a placeholder broken down from triage through a proposal", async ({ p
   await openJourney(page, "browser", journey);
   const kickoff = await openFromCanvas(page, "n_kickoff");
   await kickoff.getByRole("button", { name: "Mark reached" }).click();
-  await expect(state(kickoff)).toHaveAttribute("data-status", "reached");
+  await expect(state(kickoff)).toHaveAttribute("data-status", "done");
   await openActing(page, "browser", journey, "triage?kind=deliverable");
   for (let pass = 0; pass < 4 && (await card(page).getAttribute("data-node")) !== "n_workload"; pass += 1) {
     await card(page).getByTestId("pass").click();

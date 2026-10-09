@@ -9,6 +9,7 @@ import { createContext, useContext, type ReactNode } from "react";
 
 import { CARD_PAD_PX, BORDER_MAX_PX, CHECKLIST_SHOWN_MAX, LINE_PX, cardLines, type CardLines } from "./cards.ts";
 import { cardClasses, hereWords } from "./look.ts";
+import { statusWord } from "../status/words.ts";
 import type { Card, CardState } from "./model.ts";
 import type { CanvasOverlay } from "./overlay.ts";
 
@@ -60,7 +61,7 @@ function Head({ card, lines }: { card: Card; lines: CardLines }) {
       <span className="card-kind">{card.kind}</span>
       {card.journey === undefined ? null : (
         <span className="card-state" data-testid="card-state">
-          {card.journey.state.replaceAll("_", " ")}
+          {statusWord(card.journey.state, card.kind)}
         </span>
       )}
       <span className="shell-spacer" />

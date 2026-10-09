@@ -8,6 +8,7 @@ import { useLocation, useNavigate, useParams } from "react-router";
 import { useProjected } from "../canvas/hooks.ts";
 import type { Ready } from "../detail/model.ts";
 import { entityName } from "../detail/sections.tsx";
+import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { selectionOf } from "./acts.ts";
 import { listFrom, listPath, listQueryOf, type ListSettings } from "./address.ts";
@@ -34,7 +35,7 @@ function Row({ view, row, grouped, chosen, onToggle }: { view: Ready; row: NodeR
       </td>
       <td>{row.kind}</td>
       <td>
-        <Badge tone="good">{row.state}</Badge>
+        <Badge tone={statusTone(row.display_state)}>{statusWord(row.display_state, row.kind)}</Badge>
       </td>
       <td>{(row.owners ?? []).map((key) => entityName(view, key)).join(", ") || <span className="muted">none</span>}</td>
       <td className="mono">{row.due ?? <span className="muted">none</span>}</td>
@@ -43,7 +44,7 @@ function Row({ view, row, grouped, chosen, onToggle }: { view: Ready; row: NodeR
       <td className="mono">{row.leverage.toFixed(1)}</td>
       <td className="mono">{row.rank == null ? "" : row.rank.rank.toFixed(3)}</td>
       <td>
-        <Flags row={row} />
+        <Flags view={view} row={row} />
       </td>
     </tr>
   );

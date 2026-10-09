@@ -80,17 +80,26 @@ fn flag(flag: ListFlag) -> ListQuery {
     }
 }
 
-/// C9: "unassigned", "by owner", and "mine" on the vendor evaluation before and after its
-/// owner and stakeholders are decided.
+/// C9, E1: "unassigned", "by owner", and "mine" on the vendor evaluation before and after its
+/// owner and stakeholders are decided. Before, every node that is not a group (a group is
+/// never unassigned) is unassigned: all are in scope and unfinished at this step.
 #[test]
 fn the_people_filters_keep_whose_nodes_they_name() {
     let decided = Derive::vendor(2);
     let all = decided.graph.document().nodes.len();
+    let leaves = decided
+        .graph
+        .document()
+        .nodes
+        .values()
+        .filter(|node| node.kind() != NodeKind::Group)
+        .count();
+    assert!(leaves < all);
     assert_eq!(
         Derive::vendor(1)
             .listed(&flag(ListFlag::Unassigned), &[])
             .len(),
-        all
+        leaves
     );
     assert_eq!(decided.listed(&flag(ListFlag::Unassigned), &[]).len(), 0);
     let lead = ListQuery {

@@ -39,7 +39,7 @@ test("explanations: why relevant, why blocked, the date chain, gravity, particip
   await dateChain(panel, "Latest start");
   await shot(page, "2-due-chain", due);
   const blocking = await section(panel, "blocking");
-  await expect(flag(panel, "blocked")).toBeVisible();
+  await expect(state(panel)).toHaveAttribute("data-status", "blocked");
   await shot(page, "3-why-blocked", blocking);
   const participations = await section(panel, "participations");
   await expect(participations.getByTestId("participation")).not.toHaveCount(0);

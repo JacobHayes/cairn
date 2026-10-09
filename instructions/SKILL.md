@@ -34,6 +34,31 @@ and that user.
    shortfalls, relevance changes, and finished work that may not apply because the decision
    its relevance reads is unanswered). Tell the person what changed, not just that it worked.
 
+## Status: read `display_state`
+
+Every node carries a stored `state` (what its transitions act on: `todo`, `open`, `done`,
+and so on) and a derived `display_state`. To say what a node's status is, use
+`display_state`; keep `state` for which transition applies. A decision that an answer ruled
+out still has the stored state `open`, and its `display_state` is `not_relevant`. The counts
+come both ways: `by_state` counts by stored state and `by_display_state` by display state,
+both over the in-scope nodes.
+
+| `display_state` | Say | Meaning |
+|---|---|---|
+| `ready` | ready (a decision: to decide) | nothing is in the way; work can start now |
+| `active` | active | started, or a container with work beneath it started |
+| `blocked` | blocked | a gate it waits on is unsatisfied |
+| `conditional` | conditional | it may apply, once a decision is answered |
+| `scheduled` | scheduled | an auto-reach milestone whose date is ahead |
+| `snoozed` | snoozed | set aside until a date or a node |
+| `done` | done (a decision: decided; a milestone: reached) | finished |
+| `skipped` | skipped | skipped, or under a skipped container |
+| `not_relevant` | not relevant | an answer ruled it out, whatever it recorded |
+
+A node that rests on a decision which is itself still undecided is `conditional`, not ruled
+out, though its relevance reads `not_relevant` and counts for nothing until then
+(`pending_on` names the decision). A container is never `blocked` by its own children.
+
 ## Revisions, retries, and errors
 
 - **Stale.** A write against a revision that moved is refused as `stale`, naming what

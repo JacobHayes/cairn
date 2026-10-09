@@ -174,7 +174,7 @@ impl DerivedJourney<'_> {
         let dates = derived.dates();
         match flag {
             ListFlag::Mine => !self.kinds_held(key, viewer).is_empty(),
-            ListFlag::Unassigned => derived.participation().is_unassigned(key),
+            ListFlag::Unassigned => derived.is_unassigned(self.graph, key),
             ListFlag::NextUp => next_up.contains(key),
             ListFlag::DecisionsNeeded => {
                 self.node(key).kind() == NodeKind::Decision && blocking.actionable(key)

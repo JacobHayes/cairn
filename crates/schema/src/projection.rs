@@ -11,7 +11,7 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::derived::{
-    Blocker, Contribution, DateOrigin, EffectiveDate, Real, Relevance, Score, Stalled,
+    Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, Real, Relevance, Score, Stalled,
 };
 use crate::event::Event;
 use crate::id::{EntityKey, KindKey, NodeKey, PatchId, Path, RoleKey};
@@ -103,7 +103,9 @@ pub struct LevelEdge {
     pub underlying: Vec<UnderlyingEdge>,
 }
 
-/// D1, C2: a group's display state, derived from its children and dependencies.
+/// D1, C2: a group's display state, derived from its children and dependencies. Deprecated:
+/// [`DisplayState`] (D8) is the state of every node, groups included; this stays, equal in
+/// meaning on groups, until a later breaking release.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -177,8 +179,11 @@ pub struct LevelNode {
     /// (D1a).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub kept_work_pending: bool,
-    /// A group's display state.
+    /// D8: the state every surface shows for the node.
+    pub display_state: DisplayState,
+    /// A group's display state. Deprecated: read `display_state`, which every node carries.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("deprecated" = true))]
     pub group_state: Option<GroupState>,
     /// A container's badges and roll-ups.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -281,8 +286,11 @@ pub struct NodeRow {
     pub kind: NodeKind,
     /// Its title.
     pub title: Title,
-    /// Its stored state.
+    /// Its stored state: what transitions act on. Prefer `display_state` for "what is its
+    /// status".
     pub state: State,
+    /// D8: the state every surface shows for the node.
+    pub display_state: DisplayState,
     /// Its ancestors, root first: the breadcrumb (C10).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub ancestors: Vec<NodeKey>,
@@ -500,6 +508,10 @@ pub struct SnapshotCounts {
     pub not_relevant: u32,
     /// In-scope nodes by stored state; they add up to `in_scope`.
     pub by_state: BTreeMap<State, u32>,
+    /// D8: the same in-scope nodes by display state; they add up to `in_scope`, and none is
+    /// `not_relevant`. A not-relevant node pending on an undecided decision is out of scope
+    /// and so not counted here until its decision is answered.
+    pub by_display_state: BTreeMap<DisplayState, u32>,
     /// In-scope nodes within the depth: the node list across its pages.
     pub listed: u32,
     /// The frontier.
@@ -614,6 +626,8 @@ pub struct DecisionEntry {
     pub node: NodeKey,
     /// Its stored state.
     pub state: State,
+    /// D8: the state every surface shows for it.
+    pub display_state: DisplayState,
     /// Its relevance.
     pub relevance: Relevance,
     /// Its answer, while in effect (decided and in scope, E3).
@@ -717,6 +731,9 @@ pub struct UpcomingMilestone {
 pub struct StatusSummary {
     /// In-scope nodes by stored state.
     pub by_state: BTreeMap<State, u32>,
+    /// D8: the same in-scope nodes by display state; they add up to the same total, and none
+    /// is `not_relevant`. Prefer it to `by_state` for "how is the journey doing".
+    pub by_display_state: BTreeMap<DisplayState, u32>,
     /// In-scope nodes with work left on them.
     pub remaining: u32,
     /// Overdue nodes, by key.

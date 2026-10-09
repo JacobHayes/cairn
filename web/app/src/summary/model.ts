@@ -1,5 +1,5 @@
 // C18: the journey status summary as data, for observers and reporting. The engine's projection
-// counts the in-scope nodes by state and lists what remains, the overdue, short, and stale
+// counts the in-scope nodes by display state (D8) and lists what remains, the overdue, short, and stale
 // nodes, the upcoming milestones with their effective dates, and the open decisions with their
 // owners in rank order; this adds the titles, names, dates, and reasons a reader needs. Pure,
 // so the unit tests check it without a page.
@@ -8,31 +8,16 @@
 import type { Schema } from "@cairn/client";
 
 import { guardFailureText, namer } from "../detail/explain.ts";
-import { titleOf, type Ready, type State } from "../detail/model.ts";
+import { titleOf, type Ready } from "../detail/model.ts";
 import { entityName } from "../detail/sections.tsx";
+import { DISPLAY_STATES, stateWord, type DisplayState } from "../status/words.ts";
 import { dayOf, type DateOrigin } from "../timeline/model.ts";
 
 export type StatusSummary = Schema<"StatusSummary">;
 
-/** The states in the order a summary lists them: work, decisions, milestones, then groups. */
-export const STATE_ORDER: State[] = ["todo", "active", "done", "skipped", "open", "decided", "pending", "reached", "derived"];
-
-/** A state as a reader reads it in a count. */
-const STATE_WORDS: Record<State, string> = {
-  todo: "to do",
-  active: "active",
-  done: "done",
-  skipped: "skipped",
-  open: "open decisions",
-  decided: "decided",
-  pending: "pending milestones",
-  reached: "reached",
-  derived: "groups",
-};
-
-/** One count by state. */
+/** One count by display state. */
 export interface StateCount {
-  state: State;
+  state: DisplayState;
   words: string;
   count: number;
 }
@@ -45,7 +30,7 @@ export interface Listed {
 
 /** C18: the summary a reader sees. */
 export interface SummaryModel {
-  /** In-scope nodes by state, in `STATE_ORDER`, the states with none left out. */
+  /** In-scope nodes by display state, the states with none left out. */
   byState: StateCount[];
   inScope: number;
   remaining: number;
@@ -82,10 +67,10 @@ function staleOf(ready: Ready, key: string): SummaryModel["stale"][number] {
 
 /** C18: the projected summary with what a reader needs to read it. */
 export function summaryModel(ready: Ready, summary: StatusSummary): SummaryModel {
-  const count = (state: State) => summary.by_state[state] ?? 0;
+  const count = (state: DisplayState) => summary.by_display_state[state] ?? 0;
   return {
-    byState: STATE_ORDER.filter((state) => count(state) > 0).map((state) => ({ state, words: STATE_WORDS[state], count: count(state) })),
-    inScope: Object.values(summary.by_state).reduce((sum, each) => sum + each, 0),
+    byState: DISPLAY_STATES.filter((state) => count(state) > 0).map((state) => ({ state, words: stateWord(state), count: count(state) })),
+    inScope: Object.values(summary.by_display_state).reduce((sum, each) => sum + each, 0),
     remaining: summary.remaining,
     overdue: (summary.overdue ?? []).map((key) => overdueOf(ready, key)),
     shortfalls: (summary.shortfalls ?? []).map((key) => ({ ...listed(ready, key), days: ready.derived.nodes[key]?.dates.shortfall?.shortfall_days })),

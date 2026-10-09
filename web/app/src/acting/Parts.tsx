@@ -4,7 +4,7 @@
 import { Link } from "react-router";
 
 import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
-import { nodeOf, titleOf, type Ready } from "../detail/model.ts";
+import { nodeOf, startedEarly, titleOf, type Ready } from "../detail/model.ts";
 import { Badge, type Tone } from "../ui/kit.tsx";
 import type { SortBy } from "./address.ts";
 import { whyWords, type NodeRow } from "./why.ts";
@@ -36,17 +36,16 @@ export function Crumb({ view, row }: { view: Ready; row: NodeRow }) {
   );
 }
 
-/** D3: the row's flags that are set. */
-export function Flags({ row }: { row: NodeRow }) {
+/** D3: the row's flags that are set; what its state chip already says (blocked, snoozed, conditional) is not repeated (D8). */
+export function Flags({ view, row }: { view: Ready; row: NodeRow }) {
+  const derived = view.derived.nodes[row.key];
   const flags: [boolean | undefined, string, Tone][] = [
+    [derived !== undefined && startedEarly(derived, row.state), "started early", "plain"],
     [row.unassigned, "unassigned", "warn"],
     [row.overdue, "overdue", "bad"],
     [row.shortfall_days != null, "shortfall", "bad"],
-    [row.blocked, "blocked", "warn"],
-    [row.snoozed != null, "snoozed", "plain"],
     [row.stale, "stale", "warn"],
     [row.needs_breakdown, "needs breakdown", "warn"],
-    [row.relevance === "undecided", "undecided", "plain"],
   ];
   return (
     <span className="row">

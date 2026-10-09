@@ -50,19 +50,29 @@ export function canvasView(): Ready {
       frontier: ["n_choose", "n_check"],
       acting_frontier: ["n_choose", "n_check"],
       nodes: {
-        n_kick: { ...base, ...relevant, gravity: 9 },
-        n_choose: { ...base, ...relevant, ...owned, actionable: true, gravity: 8, leverage: 1, dates: { due: bound("2026-10-09"), latest_start: bound("2026-10-08"), slack_days: 2 } },
-        n_stage: { ...base, ...relevant, gravity: 4 },
-        n_build: { ...base, ...relevant, ...owned, gravity: 4, overdue: true, blocked_by: [{ node: "n_option", via: "explicit" }], dates: { due: bound("2026-10-01") } },
-        n_check: { ...base, ...relevant, ...owned, actionable: true, gravity: 5, dates: { due: bound("2026-11-30") } },
-        n_option: { ...base, relevance: { value: "undecided", decisions: ["n_choose"] }, gravity: 4.5, blocked_by: [{ node: "n_choose", via: { condition: { condition_on: "n_option" } } }] },
-        n_old: { ...base, relevance: { value: "not_relevant" }, gravity: 0 },
+        n_kick: { ...base, display_state: "done", ...relevant, gravity: 9 },
+        n_choose: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, gravity: 8, leverage: 1, dates: { due: bound("2026-10-09"), latest_start: bound("2026-10-08"), slack_days: 2 } },
+        n_stage: { ...base, display_state: "active", ...relevant, gravity: 4 },
+        n_build: { ...base, display_state: "active", ...relevant, ...owned, gravity: 4, overdue: true, blocked_by: [{ node: "n_option", via: "explicit" }], dates: { due: bound("2026-10-01") } },
+        n_check: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, gravity: 5, dates: { due: bound("2026-11-30") } },
+        n_option: { ...base, display_state: "conditional", relevance: { value: "undecided", decisions: ["n_choose"] }, gravity: 4.5, blocked_by: [{ node: "n_choose", via: { condition: { condition_on: "n_option" } } }] },
+        n_old: { ...base, display_state: "not_relevant", relevance: { value: "not_relevant" }, gravity: 0 },
       },
     },
   };
 }
 
-const node = (key: string, extra: Partial<LevelNode> = {}): LevelNode => ({ key, ...extra });
+/** Each node's display state, as the derive above gives it (D8). */
+const SHOWN: Record<string, LevelNode["display_state"]> = {
+  n_kick: "done",
+  n_choose: "ready",
+  n_stage: "active",
+  n_build: "active",
+  n_check: "ready",
+  n_option: "conditional",
+  n_old: "not_relevant",
+};
+const node = (key: string, extra: Partial<LevelNode> = {}): LevelNode => ({ key, display_state: SHOWN[key] ?? "ready", ...extra });
 const explicit = (requirement: string, dependent: string): LevelEdge => ({
   from: requirement,
   to: dependent,

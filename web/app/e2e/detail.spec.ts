@@ -17,7 +17,7 @@ test("the final report's detail reads its due chain and what to edit (C8, F7)", 
   const latest = await dateChain(panel, "Latest start");
   await expect(latest).toHaveAttribute("data-origin", "derived");
   expect(await latest.getByTestId("chain-link").count()).toBeGreaterThan(0);
-  await expect(flag(panel, "blocked")).toBeVisible();
+  await expect(state(panel)).toHaveAttribute("data-status", "blocked");
   await expect((await section(panel, "blocking")).getByTestId("blocked-through")).toBeVisible();
   await expect((await section(panel, "priority")).getByTestId("gravity")).toBeVisible();
   await expect((await section(panel, "participations")).getByTestId("participation")).not.toHaveCount(0);
@@ -28,6 +28,8 @@ test("relevance names the decision that produced it (C8, Gating)", async ({ page
   const relevance = await section(panel, "relevance");
   await expect(relevance.getByTestId("relevance-why")).toHaveAttribute("data-status", "not_relevant");
   await expect(relevance.getByRole("link").first()).toBeVisible();
+  await expect(state(panel)).toHaveAttribute("data-status", "not_relevant");
+  await expect(state(panel)).toHaveText("not relevant");
 });
 
 test("priority lists gravity's contributors and leverage split by owner (C8, Priority)", async ({ page }) => {
@@ -81,7 +83,7 @@ test("a failed guard is shown and bypassed with a reason (D4)", async ({ page })
   await panel.getByTestId("actions").getByRole("button", { name: "Complete" }).click();
   const bypass = panel.getByTestId("bypass");
   await expect(bypass).toBeVisible();
-  await expect(state(panel)).toHaveAttribute("data-status", "todo");
+  await expect(state(panel)).toHaveAttribute("data-status", "blocked");
   await bypass.getByLabel("Why bypass the guard").fill("Reviewed out of band");
   await bypass.getByRole("button", { name: "Bypass" }).click();
   await expect(state(panel)).toHaveAttribute("data-status", "done");
@@ -190,7 +192,7 @@ test("over the server, a note added in one page appears in another's panel (H6)"
 test("work whose relevance waits on an unanswered decision completes with a warning (D4, D7)", async ({ page }) => {
   const offer = await openNode(page, "browser", "j_hiring", "n_make_offer");
   await offer.getByTestId("actions").getByRole("button", { name: "Reopen" }).click();
-  await expect(state(offer)).toHaveAttribute("data-status", "open");
+  await expect(state(offer)).toHaveAttribute("data-status", "ready");
   const panel = await openFromCanvas(page, "n_close_out");
   const warning = panel.getByTestId("actions").getByTestId("may-not-apply");
   await expect(warning).toHaveAttribute("data-unanswered", "n_make_offer");

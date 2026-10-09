@@ -8,13 +8,15 @@
 //
 // Cost: O(cards + lines + blockers), an ancestor's blockers read once per node blocked through it.
 import { isBlocked, nodeOf, type Ready } from "../detail/model.ts";
-import { stateOf } from "./journey.ts";
 import type { Card, CanvasModel, CanvasSettings } from "./model.ts";
 
-/** Whether the toggles hide a card of this relevance. */
+/**
+ * Whether the toggles hide a card in this display state: settled not-relevant ones, and
+ * conditional ones (undecided, or pending on a decision still to be answered, D8).
+ */
 function hides(settings: Pick<CanvasSettings, "notRelevant" | "undecided">, card: Card): boolean {
-  const relevance = card.journey?.relevance;
-  return (relevance === "not_relevant" && !settings.notRelevant) || (relevance === "undecided" && !settings.undecided);
+  const state = card.journey?.state;
+  return (state === "not_relevant" && !settings.notRelevant) || (state === "conditional" && !settings.undecided);
 }
 
 /**
@@ -25,7 +27,7 @@ function hides(settings: Pick<CanvasSettings, "notRelevant" | "undecided">, card
 function blockersOf(view: Ready, key: string): { node: string; holder: string }[] {
   const node = nodeOf(view, key);
   const derived = view.derived.nodes[key];
-  if (node === undefined || derived === undefined || !isBlocked(derived, stateOf(view, node))) {
+  if (node === undefined || derived === undefined || !isBlocked(derived)) {
     return [];
   }
   const own = (holder: string) =>

@@ -103,7 +103,7 @@ test("B10: the placeholder broken down from its triage card through a proposal",
   await openJourney(page, "browser", journey);
   const kickoff = await openFromCanvas(page, "n_kickoff");
   await kickoff.getByRole("button", { name: "Mark reached" }).click();
-  await expect(state(kickoff)).toHaveAttribute("data-status", "reached");
+  await expect(state(kickoff)).toHaveAttribute("data-status", "done");
   await openActing(page, "browser", journey, "triage?kind=deliverable");
   for (let pass = 0; pass < 4 && (await card(page).getAttribute("data-node")) !== "n_workload"; pass += 1) {
     await card(page).getByTestId("pass").click();
@@ -156,7 +156,7 @@ test("C14: an editor follows its change when edits are dropped or another change
   await openJourney(page, "browser", journey);
   const kickoff = await openFromCanvas(page, "n_kickoff");
   await kickoff.getByRole("button", { name: "Mark reached" }).click();
-  await expect(state(kickoff)).toHaveAttribute("data-status", "reached");
+  await expect(state(kickoff)).toHaveAttribute("data-status", "done");
   const workload = await section(await openFromCanvas(page, "n_workload"), "blocking");
   await workload.getByTestId("break-down").click();
   const form = workload.getByTestId("break-down-form");

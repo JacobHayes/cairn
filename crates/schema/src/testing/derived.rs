@@ -13,10 +13,10 @@ use crate::chain::{
     InstantPoint, ShortChain,
 };
 use crate::derived::{
-    Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DomainDocument,
-    EffectiveDate, EffectiveParticipation, Explained, NodeDates, NodeDerived, ParticipationOrigin,
-    RankConstants, Real, Relevance, RelevanceExplanation, Score, StaleConsequence, StallCause,
-    Stalled,
+    Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DisplayState,
+    DomainDocument, EffectiveDate, EffectiveParticipation, Explained, NodeDates, NodeDerived,
+    ParticipationOrigin, RankConstants, Real, Relevance, RelevanceExplanation, Score,
+    StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
 use crate::rejection::{
@@ -289,13 +289,15 @@ fn arb_relevance() -> BoxedStrategy<RelevanceExplanation> {
         prop::option::of(arb_node_key()),
         prop::collection::btree_set(arb_node_key(), 0..2),
         any::<bool>(),
+        prop::collection::btree_set(arb_node_key(), 0..2),
     )
         .prop_map(
-            |(value, condition_on, decisions, forced)| RelevanceExplanation {
+            |(value, condition_on, decisions, forced, pending_on)| RelevanceExplanation {
                 value,
                 condition_on,
                 decisions,
                 forced,
+                pending_on,
             },
         )
         .boxed()
@@ -337,6 +339,22 @@ fn arb_scores() -> BoxedStrategy<Scores> {
         .boxed()
 }
 
+/// Any display state.
+pub fn arb_display_state() -> BoxedStrategy<DisplayState> {
+    prop::sample::select(vec![
+        DisplayState::Ready,
+        DisplayState::Active,
+        DisplayState::Blocked,
+        DisplayState::Conditional,
+        DisplayState::Scheduled,
+        DisplayState::Snoozed,
+        DisplayState::Done,
+        DisplayState::Skipped,
+        DisplayState::NotRelevant,
+    ])
+    .boxed()
+}
+
 /// One node's derived values.
 pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
     let flags = prop::collection::vec(any::<bool>(), 7);
@@ -353,15 +371,17 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         arb_node_dates(),
         prop::option::of(arb_snooze_target()),
         arb_scores(),
+        arb_display_state(),
     )
         .prop_map(
-            |(relevance, flags, blocking, participations, stale, dates, snoozed, scores)| {
+            |(relevance, flags, blocking, participations, stale, dates, snoozed, scores, shown)| {
                 let (blocked_by, blocked_through) = blocking;
                 let flag = |index: usize| flags.get(index).copied().unwrap_or(false);
                 let (gravity, gravity_from, max_child_gravity, leverage, leverage_from, rank) =
                     scores;
                 NodeDerived {
                     relevance,
+                    display_state: shown,
                     effectively_skipped: flag(0),
                     blocked_by,
                     blocked_through,

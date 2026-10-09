@@ -713,6 +713,10 @@
         "additionalProperties": false,
         "description": "One child in a node's detail.",
         "properties": {
+          "display_state": {
+            "$ref": "#/components/schemas/DisplayState",
+            "description": "D8: the state every surface shows for it."
+          },
           "key": {
             "$ref": "#/components/schemas/NodeKey",
             "description": "The child."
@@ -734,7 +738,8 @@
           "key",
           "title",
           "kind",
-          "state"
+          "state",
+          "display_state"
         ],
         "type": "object"
       },
@@ -2277,6 +2282,10 @@
             ],
             "description": "Its answer, while in effect (decided and in scope, E3)."
           },
+          "display_state": {
+            "$ref": "#/components/schemas/DisplayState",
+            "description": "D8: the state every surface shows for it."
+          },
           "fills": {
             "anyOf": [
               {
@@ -2330,6 +2339,7 @@
         "required": [
           "node",
           "state",
+          "display_state",
           "relevance"
         ],
         "type": "object"
@@ -2565,6 +2575,56 @@
           "acting_frontier"
         ],
         "type": "object"
+      },
+      "DisplayState": {
+        "description": "D8: the one state every surface shows for a node, composed from relevance, stored state,\neffective skip, auto-reach, blocking and snooze, and from the D3 flags, which it leaves in\nplace. Stored state is what transitions act on; this is what people and agents read. The\nfirst matching value in this order wins: `not_relevant`, `skipped`, `done`, `snoozed`,\n`active`, `conditional`, `blocked`, `scheduled`, `ready`.",
+        "oneOf": [
+          {
+            "const": "ready",
+            "description": "Nothing is in the way and nothing has started: actionable work, a container waiting\nonly on its own children with nothing started, or one ready to finish.",
+            "type": "string"
+          },
+          {
+            "const": "active",
+            "description": "Started: stored `active`, or a container whose children are the only thing it waits\non and some work beneath it has started.",
+            "type": "string"
+          },
+          {
+            "const": "blocked",
+            "description": "In scope and unfinished, and its own or an inherited gate is unsatisfied. A container\nis never blocked by its own children.",
+            "type": "string"
+          },
+          {
+            "const": "conditional",
+            "description": "It may apply: relevance is `undecided` and it is unfinished, or relevance is\n`not_relevant` but pending on an undecided decision (`pending_on`).",
+            "type": "string"
+          },
+          {
+            "const": "scheduled",
+            "description": "An `auto_reach` milestone, unblocked, whose date is ahead.",
+            "type": "string"
+          },
+          {
+            "const": "snoozed",
+            "description": "A snooze holds.",
+            "type": "string"
+          },
+          {
+            "const": "done",
+            "description": "`done`, `decided`, `reached`, auto-reached, or a group that satisfies dependencies.",
+            "type": "string"
+          },
+          {
+            "const": "skipped",
+            "description": "Stored `skipped`, or effectively skipped (D1a).",
+            "type": "string"
+          },
+          {
+            "const": "not_relevant",
+            "description": "Does not apply, and settled (Gating): the recorded state survives beneath it.",
+            "type": "string"
+          }
+        ]
       },
       "Domain": {
         "description": "A patch domain, by identity (A17).",
@@ -3992,7 +4052,7 @@
         ]
       },
       "GroupState": {
-        "description": "D1, C2: a group's display state, derived from its children and dependencies.",
+        "description": "D1, C2: a group's display state, derived from its children and dependencies. Deprecated:\n[`DisplayState`] (D8) is the state of every node, groups included; this stays, equal in\nmeaning on groups, until a later breaking release.",
         "oneOf": [
           {
             "const": "not_relevant",
@@ -4716,6 +4776,10 @@
         "additionalProperties": false,
         "description": "C2: one visible node at a level.",
         "properties": {
+          "display_state": {
+            "$ref": "#/components/schemas/DisplayState",
+            "description": "D8: the state every surface shows for the node."
+          },
           "group_state": {
             "anyOf": [
               {
@@ -4725,7 +4789,8 @@
                 "type": "null"
               }
             ],
-            "description": "A group's display state."
+            "deprecated": true,
+            "description": "A group's display state. Deprecated: read `display_state`, which every node carries."
           },
           "hidden_prerequisites": {
             "description": "Its hidden, unsatisfied prerequisites that no visible edge stands for: the \"hidden\nprerequisites\" marker, which opens the trace (C7). Empty when it has none.",
@@ -4773,7 +4838,8 @@
           }
         },
         "required": [
-          "key"
+          "key",
+          "display_state"
         ],
         "type": "object"
       },
@@ -7394,6 +7460,10 @@
             "$ref": "#/components/schemas/NodeDates",
             "description": "Dates."
           },
+          "display_state": {
+            "$ref": "#/components/schemas/DisplayState",
+            "description": "D8: the state every surface shows for the node, composed from relevance, stored state\nand the flags beside it, which stay as they are."
+          },
           "effectively_skipped": {
             "description": "Skipped through an ancestor's skip (D1a).",
             "type": "boolean"
@@ -7482,12 +7552,13 @@
             "uniqueItems": true
           },
           "unassigned": {
-            "description": "No owner (E1).",
+            "description": "No owner (E1), for a non-group node that is in scope and unfinished; a not-relevant or\nfinished node, or a group, never is.",
             "type": "boolean"
           }
         },
         "required": [
           "relevance",
+          "display_state",
           "actionable",
           "dates",
           "gravity",
@@ -8135,6 +8206,10 @@
             "description": "Gating, Blocked.",
             "type": "boolean"
           },
+          "display_state": {
+            "$ref": "#/components/schemas/DisplayState",
+            "description": "D8: the state every surface shows for the node."
+          },
           "due": {
             "description": "The latest it can finish.",
             "format": "date",
@@ -8232,7 +8307,7 @@
           },
           "state": {
             "$ref": "#/components/schemas/State",
-            "description": "Its stored state."
+            "description": "Its stored state: what transitions act on. Prefer `display_state` for \"what is its\nstatus\"."
           },
           "title": {
             "$ref": "#/components/schemas/Title",
@@ -8249,6 +8324,7 @@
           "kind",
           "title",
           "state",
+          "display_state",
           "relevance",
           "gravity",
           "leverage"
@@ -10436,6 +10512,14 @@
             "description": "A force include made it relevant.",
             "type": "boolean"
           },
+          "pending_on": {
+            "description": "D8: when the value is `not_relevant` only because a decision it reads is itself\nundecided (so unanswered, and every value operator on it false), the undecided\ndecisions it rests on: reading them as still to come would leave the node undecided.\nEmpty when the value is settled. The value itself is unchanged, so gravity, leverage\nand blocking follow Gating exactly; display state shows such a node as `conditional`.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
           "value": {
             "$ref": "#/components/schemas/Relevance",
             "description": "The value."
@@ -11922,6 +12006,15 @@
             "minimum": 0,
             "type": "integer"
           },
+          "by_display_state": {
+            "additionalProperties": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": "D8: the same in-scope nodes by display state; they add up to `in_scope`, and none is\n`not_relevant`. A not-relevant node pending on an undecided decision is out of scope\nand so not counted here until its decision is answered.",
+            "type": "object"
+          },
           "by_state": {
             "additionalProperties": {
               "format": "uint32",
@@ -11960,6 +12053,7 @@
           "in_scope",
           "not_relevant",
           "by_state",
+          "by_display_state",
           "listed",
           "frontier",
           "acting_frontier",
@@ -12316,6 +12410,15 @@
         "additionalProperties": false,
         "description": "C18: the journey status summary for observers and reporting.",
         "properties": {
+          "by_display_state": {
+            "additionalProperties": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": "D8: the same in-scope nodes by display state; they add up to the same total, and none\nis `not_relevant`. Prefer it to `by_state` for \"how is the journey doing\".",
+            "type": "object"
+          },
           "by_state": {
             "additionalProperties": {
               "format": "uint32",
@@ -12369,6 +12472,7 @@
         },
         "required": [
           "by_state",
+          "by_display_state",
           "remaining"
         ],
         "type": "object"

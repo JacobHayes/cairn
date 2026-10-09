@@ -7,22 +7,43 @@ import type { ReactNode } from "react";
 import { Badge } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { answerWords, guardFailureText, namer, originText, viaText } from "./explain.ts";
-import { flagsOf, type NodeDetail, type Ready } from "./model.ts";
+import { INITIAL_STATE, flagsOf, titleOf, type NodeDetail, type Ready } from "./model.ts";
+import { statusTone, statusWord } from "../status/words.ts";
 import { useContributions } from "./contributions.ts";
 import { Contributions, NodeLink, Section } from "./parts.tsx";
 import { BreakDown } from "../proposals/Entries.tsx";
 import { breakable } from "../proposals/model.ts";
 
+/**
+ * D8's secondary line: what the state alone leaves out. A node that no longer applies keeps what
+ * it recorded; one pending on a decision still to be answered says which and that it counts for
+ * nothing until then.
+ */
+function stateNote(view: Ready, detail: NodeDetail): string | undefined {
+  const { derived, record, node } = detail;
+  const pending = derived.relevance.pending_on ?? [];
+  if (derived.display_state === "conditional" && pending.length > 0) {
+    return `Once ${pending.map((key) => titleOf(view, key)).join(", ")} is answered; not counted in priority until then.`;
+  }
+  if (derived.display_state === "not_relevant" && record.state !== INITIAL_STATE[node.kind]) {
+    return `Recorded ${record.state}.`;
+  }
+  return undefined;
+}
+
 /** The node's title, kind, state, path, D3 flags, provenance (from route, local, orphaned), and local edits. */
 export function Header({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { node, record, localEdits } = detail;
+  const shown = detail.derived.display_state;
+  const note = stateNote(view, detail);
   return (
     <div className="stack" data-testid="detail-header">
       <div className="row">
         <h2 className="title" data-testid="detail-title">{node.title}</h2>
         <Badge>{node.kind}</Badge>
-        <Badge tone="good" data-testid="detail-state" data-status={record.state}>{record.state}</Badge>
+        <Badge tone={statusTone(shown)} data-testid="detail-state" data-status={shown}>{statusWord(shown, node.kind)}</Badge>
       </div>
+      {note === undefined ? null : <span className="muted" data-testid="detail-state-note">{note}</span>}
       <span className="muted mono">
         {detail.ancestors.map((ancestor) => (
           <span key={ancestor.key}>

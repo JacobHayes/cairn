@@ -13,6 +13,12 @@
 //! dependency graph (the condition entry chain, and a condition gate on the decision), which
 //! validation holds acyclic. A force-included node has no inputs.
 //!
+//! D8's pending rule rides the same walk. A decision that is itself undecided counts as
+//! unanswered in a condition, so a node reading its answer is `not_relevant` though it may well
+//! apply once that decision is answered. Each node therefore also carries its value with those
+//! decisions read as still to come (Kleene unknown): when that is not `not_relevant`, the
+//! node's `not_relevant` is pending on them. The value itself never changes.
+//!
 //! Cost at `node_count_max` (2,000 nodes, 16 clauses each): building the order is
 //! O(nodes + clauses), about 34,000 steps; each node's condition is evaluated once, a few
 //! dozen steps; memory is one record per node, with the decisions its producing condition
@@ -52,6 +58,13 @@ pub struct NodeRelevance {
     pub value: Relevance,
     /// What produced it.
     pub producer: Producer,
+    /// D8: the value with every undecided decision a condition reads taken as still to come
+    /// instead of unanswered. It is never more settled than `value`: `not_relevant` here
+    /// means no answer to those decisions could make the node apply.
+    pub optimistic: Relevance,
+    /// D8: when `value` is `not_relevant` and `optimistic` is not, the undecided decisions it
+    /// rests on; empty otherwise.
+    pub pending_on: BTreeSet<NodeKey>,
 }
 
 /// Every node's relevance (pass 1's output).
@@ -198,12 +211,16 @@ fn evaluate(
             producer: Producer::Forced {
                 on: node.key.clone(),
             },
+            optimistic: Relevance::Relevant,
+            pending_on: BTreeSet::new(),
         };
     }
     let inherited = node.parent.as_ref().map_or(
         NodeRelevance {
             value: Relevance::Relevant,
             producer: Producer::Unconditioned,
+            optimistic: Relevance::Relevant,
+            pending_on: BTreeSet::new(),
         },
         |parent| {
             let found = done.get(parent);
@@ -211,6 +228,8 @@ fn evaluate(
             found.cloned().unwrap_or(NodeRelevance {
                 value: Relevance::NotRelevant,
                 producer: Producer::Unconditioned,
+                optimistic: Relevance::NotRelevant,
+                pending_on: BTreeSet::new(),
             })
         },
     );
@@ -218,21 +237,49 @@ fn evaluate(
         return inherited;
     };
     let term = |decision: &NodeKey| term(document, done, inherited_skips, decision);
-    let own = match condition::evaluate(condition, term, deployment) {
+    let own = relevance_of(condition::evaluate(condition, term, deployment));
+    let hopeful = |decision: &NodeKey| hopeful_term(document, done, inherited_skips, decision);
+    let own_optimistic = relevance_of(condition::evaluate(condition, hopeful, deployment));
+    let value = dominant(inherited.value, own);
+    let optimistic = dominant(inherited.optimistic, own_optimistic);
+    let mut pending_on = BTreeSet::new();
+    if value == Relevance::NotRelevant && optimistic != Relevance::NotRelevant {
+        if inherited.value == Relevance::NotRelevant {
+            pending_on.extend(inherited.pending_on.iter().cloned());
+        }
+        if own == Relevance::NotRelevant {
+            let still_to_come = condition
+                .decisions()
+                .into_iter()
+                .filter(|decision| {
+                    term(decision) == Term::Unanswered && hopeful(decision) == Term::Unknown
+                })
+                .cloned();
+            pending_on.extend(still_to_come);
+        }
+    }
+    let producer = if value == own {
+        Producer::Condition {
+            on: node.key.clone(),
+            decisions: condition.decisions().into_iter().cloned().collect(),
+        }
+    } else {
+        inherited.producer
+    };
+    NodeRelevance {
+        value,
+        producer,
+        optimistic,
+        pending_on,
+    }
+}
+
+/// A condition's truth as the relevance it gives.
+fn relevance_of(truth: Truth) -> Relevance {
+    match truth {
         Truth::True => Relevance::Relevant,
         Truth::False => Relevance::NotRelevant,
         Truth::Unknown => Relevance::Undecided,
-    };
-    let value = dominant(inherited.value, own);
-    if value != own {
-        return inherited;
-    }
-    NodeRelevance {
-        value,
-        producer: Producer::Condition {
-            on: node.key.clone(),
-            decisions: condition.decisions().into_iter().cloned().collect(),
-        },
     }
 }
 
@@ -274,6 +321,46 @@ fn term<'g>(
         State::Decided => done
             .answer_in_effect(document, decision)
             .map_or(Term::Unanswered, Term::Answered),
+        State::Open if !inherited_skips.contains_key(decision) => Term::Unknown,
+        State::Open
+        | State::Skipped
+        | State::Todo
+        | State::Active
+        | State::Done
+        | State::Pending
+        | State::Reached
+        | State::Derived => Term::Unanswered,
+    }
+}
+
+/// D8: what a decision contributes to a condition when decisions that are themselves
+/// undecided are read as still to come: as [`term`] says, except that a decision that is not
+/// relevant yet could still become so (its own `optimistic` value is not `not_relevant`), and
+/// then, unless it is skipped, its answer is to come.
+fn hopeful_term<'g>(
+    document: &'g Document,
+    done: &Relevances,
+    inherited_skips: &BTreeMap<NodeKey, NodeKey>,
+    decision: &NodeKey,
+) -> Term<'g> {
+    let found = done.get(decision);
+    assert!(
+        found.is_some(),
+        "a decision is evaluated before the conditions reading it"
+    );
+    let Some(found) = found else {
+        return Term::Unanswered;
+    };
+    if found.value == Relevance::Relevant || found.optimistic == Relevance::NotRelevant {
+        return term(document, done, inherited_skips, decision);
+    }
+    let Some(node) = document.nodes.get(decision) else {
+        return Term::Unanswered;
+    };
+    match stored_state(document, node) {
+        // A skip above it reaches only a decision still open (D1a): a decided one keeps its
+        // answer for when it applies again.
+        State::Decided => Term::Unknown,
         State::Open if !inherited_skips.contains_key(decision) => Term::Unknown,
         State::Open
         | State::Skipped

@@ -1050,6 +1050,8 @@ export interface components {
         };
         /** @description One child in a node's detail. */
         ChildEntry: {
+            /** @description D8: the state every surface shows for it. */
+            display_state: components["schemas"]["DisplayState"];
             /** @description The child. */
             key: components["schemas"]["NodeKey"];
             /** @description Its kind. */
@@ -1451,6 +1453,8 @@ export interface components {
             affects?: components["schemas"]["NodeKey"][];
             /** @description Its answer, while in effect (decided and in scope, E3). */
             answer?: components["schemas"]["AnswerValue"] | null;
+            /** @description D8: the state every surface shows for it. */
+            display_state: components["schemas"]["DisplayState"];
             /** @description The role its answer fills (E3, `fills_role`). */
             fills?: components["schemas"]["RoleKey"] | null;
             /** @description Its unsatisfied prerequisites that no drawn edge stands for (C2's marker). */
@@ -1545,6 +1549,14 @@ export interface components {
              */
             today: string;
         };
+        /**
+         * @description D8: the one state every surface shows for a node, composed from relevance, stored state,
+         *     effective skip, auto-reach, blocking and snooze, and from the D3 flags, which it leaves in
+         *     place. Stored state is what transitions act on; this is what people and agents read. The
+         *     first matching value in this order wins: `not_relevant`, `skipped`, `done`, `snoozed`,
+         *     `active`, `conditional`, `blocked`, `scheduled`, `ready`.
+         */
+        DisplayState: "ready" | "active" | "blocked" | "conditional" | "scheduled" | "snoozed" | "done" | "skipped" | "not_relevant";
         /** @description A patch domain, by identity (A17). */
         Domain: {
             journey: components["schemas"]["JourneyId"];
@@ -1938,7 +1950,11 @@ export interface components {
         } | {
             annotation: components["schemas"]["Annotation"];
         };
-        /** @description D1, C2: a group's display state, derived from its children and dependencies. */
+        /**
+         * @description D1, C2: a group's display state, derived from its children and dependencies. Deprecated:
+         *     [`DisplayState`] (D8) is the state of every node, groups included; this stays, equal in
+         *     meaning on groups, until a later breaking release.
+         */
         GroupState: "not_relevant" | "skipped" | "done" | "waiting" | "active" | "not_started";
         /** @description A transition guard (D4). */
         Guard: "deps_done" | "has_artifact" | "broken_down";
@@ -2178,7 +2194,12 @@ export interface components {
         };
         /** @description C2: one visible node at a level. */
         LevelNode: {
-            /** @description A group's display state. */
+            /** @description D8: the state every surface shows for the node. */
+            display_state: components["schemas"]["DisplayState"];
+            /**
+             * @deprecated
+             * @description A group's display state. Deprecated: read `display_state`, which every node carries.
+             */
             group_state?: components["schemas"]["GroupState"] | null;
             /**
              * @description Its hidden, unsatisfied prerequisites that no visible edge stands for: the "hidden
@@ -2786,6 +2807,11 @@ export interface components {
             blocked_through?: components["schemas"]["NodeKey"][];
             /** @description Dates. */
             dates: components["schemas"]["NodeDates"];
+            /**
+             * @description D8: the state every surface shows for the node, composed from relevance, stored state
+             *     and the flags beside it, which stay as they are.
+             */
+            display_state: components["schemas"]["DisplayState"];
             /** @description Skipped through an ancestor's skip (D1a). */
             effectively_skipped?: boolean;
             /** @description Gravity and its contributors (Priority). */
@@ -2816,7 +2842,10 @@ export interface components {
             snoozed?: components["schemas"]["SnoozeTarget"] | null;
             /** @description Why a terminal node's completing guards would now fail (D4). */
             stale?: components["schemas"]["GuardFailure"][];
-            /** @description No owner (E1). */
+            /**
+             * @description No owner (E1), for a non-group node that is in scope and unfinished; a not-relevant or
+             *     finished node, or a group, never is.
+             */
             unassigned?: boolean;
         };
         /**
@@ -2914,6 +2943,8 @@ export interface components {
             ancestors?: components["schemas"]["NodeKey"][];
             /** @description Gating, Blocked. */
             blocked?: boolean;
+            /** @description D8: the state every surface shows for the node. */
+            display_state: components["schemas"]["DisplayState"];
             /**
              * Format: date
              * @description The latest it can finish.
@@ -2955,7 +2986,10 @@ export interface components {
             snoozed?: components["schemas"]["SnoozeTarget"] | null;
             /** @description A terminal node whose completing guards would now fail (D4). */
             stale?: boolean;
-            /** @description Its stored state. */
+            /**
+             * @description Its stored state: what transitions act on. Prefer `display_state` for "what is its
+             *     status".
+             */
             state: components["schemas"]["State"];
             /** @description Its title. */
             title: components["schemas"]["Title"];
@@ -3653,6 +3687,14 @@ export interface components {
             decisions?: components["schemas"]["NodeKey"][];
             /** @description A force include made it relevant. */
             forced?: boolean;
+            /**
+             * @description D8: when the value is `not_relevant` only because a decision it reads is itself
+             *     undecided (so unanswered, and every value operator on it false), the undecided
+             *     decisions it rests on: reading them as still to come would leave the node undecided.
+             *     Empty when the value is settled. The value itself is unchanged, so gravity, leverage
+             *     and blocking follow Gating exactly; display state shows such a node as `conditional`.
+             */
+            pending_on?: components["schemas"]["NodeKey"][];
             /** @description The value. */
             value: components["schemas"]["Relevance"];
         };
@@ -4115,6 +4157,14 @@ export interface components {
              * @description Blocked nodes.
              */
             blocked: number;
+            /**
+             * @description D8: the same in-scope nodes by display state; they add up to `in_scope`, and none is
+             *     `not_relevant`. A not-relevant node pending on an undecided decision is out of scope
+             *     and so not counted here until its decision is answered.
+             */
+            by_display_state: {
+                [key: string]: number;
+            };
             /** @description In-scope nodes by stored state; they add up to `in_scope`. */
             by_state: {
                 [key: string]: number;
@@ -4238,6 +4288,13 @@ export interface components {
         State: "todo" | "active" | "done" | "skipped" | "open" | "decided" | "pending" | "reached" | "derived";
         /** @description C18: the journey status summary for observers and reporting. */
         StatusSummary: {
+            /**
+             * @description D8: the same in-scope nodes by display state; they add up to the same total, and none
+             *     is `not_relevant`. Prefer it to `by_state` for "how is the journey doing".
+             */
+            by_display_state: {
+                [key: string]: number;
+            };
             /** @description In-scope nodes by stored state. */
             by_state: {
                 [key: string]: number;

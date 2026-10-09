@@ -1,9 +1,10 @@
-// What a journey adds to its canvas's cards (C1, C2, C5, C6): each card's state, owner, due
+// What a journey adds to its canvas's cards (C1, C2, C5, C6): each card's display state (D8), owner, due
 // date and its urgency, latest start and slack, a decision's answer, its relevance look, the
 // border weight its gravity gives it, the "I am here" marks and the top few rank badges, its
 // derived flags, and a container's roll-ups. All read from the document and its local derive.
-import { isBlocked, isTerminal, nodeOf, type GraphNode, type NodeDerived, type NodeKind, type Ready, type State } from "../detail/model.ts";
+import { nodeOf, recordOf, startedEarly, type GraphNode, type NodeDerived, type Ready } from "../detail/model.ts";
 import { answerText, entityName } from "../detail/sections.tsx";
+import type { DisplayState } from "../status/words.ts";
 import {
   RANK_BADGE_COUNT,
   borderFor,
@@ -15,33 +16,24 @@ import {
   type Looks,
 } from "./model.ts";
 
-const INITIAL: Record<NodeKind, State> = { deliverable: "todo", action: "todo", decision: "open", milestone: "pending", group: "derived" };
-
-/**
- * A node's state as the canvas shows it: skipped when an ancestor's skip covers it (D1a),
- * reached when it reached itself on its date (auto-reach), else its stored state or its
- * kind's initial one. Roll-ups are display only; the stored state stays on the node.
- */
-export function stateOf(view: Ready, node: GraphNode): State {
+/** A node's display state (D8): the engine's one state, which the canvas shows as it is. */
+export function stateOf(view: Ready, node: GraphNode): DisplayState {
   const derived = view.derived.nodes[node.key];
-  if (derived?.effectively_skipped === true) {
-    return "skipped";
+  if (derived === undefined) {
+    throw new Error(`the derive has no node ${node.key}`);
   }
-  if (derived?.auto_reached === true) {
-    return "reached";
-  }
-  return view.journey.graph.state?.nodes?.[node.key]?.state ?? INITIAL[node.kind];
+  return derived.display_state;
+}
+
+/** Done or skipped: nothing is left to do on it. */
+function finishedState(state: DisplayState): boolean {
+  return state === "done" || state === "skipped";
 }
 
 /** In scope and not finished: what gravity is normalized over (Priority). */
 function open(view: Ready, node: GraphNode): boolean {
   const derived = view.derived.nodes[node.key];
-  return (
-    derived !== undefined &&
-    derived.relevance.value !== "not_relevant" &&
-    derived.effectively_skipped !== true &&
-    !isTerminal(stateOf(view, node))
-  );
+  return derived !== undefined && derived.relevance.value !== "not_relevant" && !finishedState(derived.display_state);
 }
 
 /** C6: the largest gravity among the journey's open nodes. */
@@ -57,20 +49,21 @@ function ownersOf(view: Ready, key: string): string {
   return owners.length === 0 ? "unassigned" : owners.map((entity) => entityName(view, entity)).join(", ");
 }
 
-/** D3 flags and C2 roll-up badges a card carries, quiet ones left to the card's other lines. */
-export function badgesOf(derived: NodeDerived, state: State, at: LevelNode, kind: NodeKind): CardBadge[] {
+/**
+ * D3 flags and C2 roll-up badges a card carries, quiet ones left to the card's other lines. What
+ * its state chip already says (blocked, snoozed, skipped) is not repeated; `startedEarly` is
+ * started work whose gates are not met.
+ */
+export function badgesOf(derived: NodeDerived, startedEarly: boolean, at: LevelNode): CardBadge[] {
   const badges: CardBadge[] = [];
   const add = (set: boolean | undefined, flag: string, tone: CardBadge["tone"]) => {
     if (set === true) {
       badges.push({ flag, tone });
     }
   };
-  const blocked = kind !== "group" && isBlocked(derived, state);
-  add(state === "active" && blocked, "started early", "plain");
-  add(blocked, "blocked", "warn");
+  add(startedEarly, "started early", "plain");
   add(derived.overdue, "overdue", "bad");
   add(derived.dates.shortfall != null, "shortfall", "bad");
-  add(derived.snoozed != null, "snoozed", "plain");
   add((derived.stale ?? []).length > 0, "stale", "warn");
   add(derived.needs_breakdown, "needs breakdown", "warn");
   add(at.kept_work_pending, "kept work pending", "warn");
@@ -94,17 +87,19 @@ interface Context {
 function cardState(context: Context, node: GraphNode, at: LevelNode): CardState {
   const { view } = context;
   const derived = view.derived.nodes[node.key];
-  const state = stateOf(view, node);
   if (derived === undefined) {
     throw new Error(`the derive has no node ${node.key}`);
   }
+  const state = stateOf(view, node);
+  const stored = recordOf(view, node).state;
+  const early = startedEarly(derived, stored);
   const { due, latest_start: latestStart, slack_days: slackDays } = derived.dates;
   const answer = view.journey.graph.state?.answers?.[node.key];
   const rank = context.ranked.indexOf(node.key);
   const roll = at.roll_up;
-  const finished = isTerminal(state) || at.group_state === "done" || at.group_state === "skipped";
+  const finished = finishedState(state);
   return {
-    state: at.group_state ?? state,
+    state,
     finished,
     owner: ownersOf(view, node.key),
     relevance: derived.relevance.value,
@@ -117,12 +112,12 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
     leverage: derived.leverage,
     here: {
       frontier: context.frontier.has(node.key),
-      active: state === "active",
-      startedEarly: state === "active" && isBlocked(derived, state),
+      active: stored === "active" && !finishedState(state),
+      startedEarly: early,
       mine: context.mine.has(node.key),
     },
     rank: rank < 0 ? undefined : rank + 1,
-    badges: badgesOf(derived, state, at, node.kind),
+    badges: badgesOf(derived, early, at),
     children:
       roll == null
         ? undefined
@@ -147,7 +142,7 @@ export function journeyLooks(view: Ready, extras: JourneyExtras): Looks {
     card: (node, at) => cardState(context, node, at),
     finished: (key) => {
       const node = nodeOf(view, key);
-      return node !== undefined && isTerminal(stateOf(view, node));
+      return node !== undefined && finishedState(stateOf(view, node));
     },
   };
 }

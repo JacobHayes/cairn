@@ -4,8 +4,8 @@ description: Summarize where a journey stands and what to do next, from its snap
 
 # Summarize the frontier
 
-1. **Read the snapshot.** `get_snapshot` on the journey. Its counts say how much is in
-   scope and done; `acting_frontier` is what can be acted on now, in rank order.
+1. **Read the snapshot.** `get_snapshot` on the journey. Its counts (`by_display_state`) say
+   how much is in scope and done; `acting_frontier` is what can be acted on now, in rank order.
 2. **Lead with what is next.** Name the top few frontier items with their owners and why
    they rank high (a deadline, how much waits on them). `get_node` explains one item's
    rank, blocking, and dates when the person asks why.

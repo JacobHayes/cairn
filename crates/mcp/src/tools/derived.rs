@@ -6,10 +6,10 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Annotation, AnswerValue, Cursor, Date, ExplainedField, ExplanationPage, JourneyId, KeyRefs,
-    Level, LevelEdge, LevelNode, ListFlag, ListQuery, LocalEdit, Next, NextQuery, Node,
-    NodeDerived, NodeKey, NodeKind, NodeRow, NodeState, Overrides, Path, Snapshot, SnapshotScope,
-    SortBy, Stalled,
+    Annotation, AnswerValue, Cursor, Date, DisplayState, ExplainedField, ExplanationPage,
+    JourneyId, KeyRefs, Level, LevelEdge, LevelNode, ListFlag, ListQuery, LocalEdit, Next,
+    NextQuery, Node, NodeDerived, NodeKey, NodeKind, NodeRow, NodeState, Overrides, Path, Snapshot,
+    SnapshotScope, SortBy, Stalled,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use cairn_store::Store;
@@ -26,10 +26,11 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "get_snapshot",
         description: "Call this first. The bounded state of a journey (I3): the answers in \
-            effect, a page of in-scope nodes with state, owners, blocking, and dates, the \
-            ranked acting frontier's top items with the rest as keys, open decisions by rank, \
-            placeholders needing breakdown, unassigned items, shortfalls, and counts. Scope it \
-            to a subtree and depth; page the node list with `cursor`. Its `revision` is the \
+            effect, a page of in-scope nodes with their display state (what to say about \
+            them) beside the stored state (which transition applies), owners, blocking, and \
+            dates, the ranked acting frontier's top items with the rest as keys, open decisions \
+            by rank, placeholders needing breakdown, unassigned items, shortfalls, and counts by \
+            stored state and by display state. Scope it to a subtree and depth; page the node list with `cursor`. Its `revision` is the \
             `base_revision` of a write that follows.",
         writes: false,
         destructive: false,
@@ -52,8 +53,9 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "get_node",
         description: "One node in full: as written (a decision's prompt and choices), its \
             stored state, answer, pin, overrides, notes, a page of its children, and every \
-            derived value with its explanation (relevance, blocking, dates, gravity, \
-            leverage, rank). Explanation lists hold their largest entries; pass \
+            derived value with its explanation (display state, relevance, blocking, dates, \
+            gravity, leverage, rank). Say its status from `display_state`, not the stored \
+            state. Explanation lists hold their largest entries; pass \
             `explanations` to page the rest.",
         writes: false,
         destructive: false,
@@ -214,7 +216,10 @@ pub(crate) struct Child {
     key: NodeKey,
     title: cairn_schema::Title,
     kind: NodeKind,
+    /// Its stored state: which transition applies.
     state: cairn_schema::State,
+    /// What it is doing now; prefer it for status.
+    display_state: DisplayState,
 }
 
 impl Detail {
@@ -239,12 +244,14 @@ impl Detail {
                 title,
                 kind,
                 state,
+                display_state,
             } = child;
             Child {
                 key,
                 title,
                 kind,
                 state,
+                display_state,
             }
         });
         Self {

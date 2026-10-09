@@ -6,7 +6,8 @@ import { describe, expect, it } from "vitest";
 
 import type { Ready } from "../detail/model.ts";
 import { testView } from "../detail/view.test-support.ts";
-import { STATE_ORDER, summaryModel, type StatusSummary } from "./model.ts";
+import { DISPLAY_STATES } from "../status/words.ts";
+import { summaryModel, type StatusSummary } from "./model.ts";
 
 /** The test journey with the findings overdue since 2026-10-01, the report stale and short, and the meeting owned. */
 function summaryJourney(): Ready {
@@ -28,6 +29,7 @@ function summaryJourney(): Ready {
 
 const projected: StatusSummary = {
   by_state: { decided: 1, active: 1, todo: 1, pending: 1, derived: 1 },
+  by_display_state: { done: 1, active: 2, ready: 1, blocked: 1 },
   remaining: 4,
   overdue: ["n_findings"],
   shortfalls: ["n_report"],
@@ -37,11 +39,11 @@ const projected: StatusSummary = {
 };
 
 describe("C18: the status summary", () => {
-  it("counts by state in lifecycle order, leaving out the states with none", () => {
+  it("counts by display state in a fixed order, leaving out the states with none", () => {
     const model = summaryModel(summaryJourney(), projected);
-    const order = model.byState.map((each) => STATE_ORDER.indexOf(each.state));
+    const order = model.byState.map((each) => DISPLAY_STATES.indexOf(each.state));
     expect([...order].sort((a, b) => a - b)).toEqual(order);
-    expect(Object.fromEntries(model.byState.map((each) => [each.state, each.count]))).toEqual(projected.by_state);
+    expect(Object.fromEntries(model.byState.map((each) => [each.state, each.count]))).toEqual(projected.by_display_state);
   });
 
   it("counts what is in scope as every state's count, and what remains as projected", () => {
@@ -69,7 +71,7 @@ describe("C18: the status summary", () => {
   });
 
   it("lists nothing where the projection lists nothing", () => {
-    const model = summaryModel(summaryJourney(), { by_state: {}, remaining: 0 });
+    const model = summaryModel(summaryJourney(), { by_state: {}, by_display_state: {}, remaining: 0 });
     expect([model.byState, model.overdue, model.shortfalls, model.stale, model.upcoming, model.openDecisions]).toEqual([[], [], [], [], [], []]);
     expect(model.inScope).toBe(0);
   });
