@@ -1,119 +1,235 @@
-// C9: the list. The journey flattened to a table with every filter, grouping by container,
-// sort by one signal, text search, and multi-select for bulk actions (BulkBar.tsx). The
-// engine's `list` projection answers it from the tab's derivation a page at a time; what it
-// shows lives in the address. It is PLAN, LIST: the journey page (screens/JourneyFrame.tsx)
-// holds its toolbar and the filters it opens (ListFilters); the sort and the grouping are in the
-// list's header.
-import { Fragment, useMemo, useState } from "react";
+// C9: the Plan list. By default the journey as a tree in plan order, folded to its top level,
+// each container saying how far along it is; opening every level is the flat table. Sorting a
+// column (its header) flattens it and puts each row's container under its title. Not-relevant
+// rows are left out unless asked for, so the list holds what the plan's count does. With
+// DECISIONS on the rows are decisions with their answer, why, and what the answer affects
+// (C12). Hovering a row brings up its checkbox, and a selection turns the header into the
+// bulk actions (BulkBar.tsx). It is PLAN, LIST: the journey page (screens/JourneyFrame.tsx)
+// holds its toolbar and the filter it opens (ListFilters).
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
-import type { Ready } from "../detail/model.ts";
-import { entityName } from "../detail/sections.tsx";
-import { statusTone, statusWord } from "../status/words.ts";
-import { Badge, Button } from "../ui/kit.tsx";
+import { decisionRows } from "../decisions/model.ts";
+import { type Ready } from "../detail/model.ts";
+import { ancestorsOf } from "../plan/tree.ts";
+import { Menu } from "../screens/Menu.tsx";
+import { Button } from "../ui/kit.tsx";
 import { selectionOf } from "./acts.ts";
-import { listQueryOf, type ListSettings } from "./address.ts";
+import { listPath, listQueryOf, type ListSettings } from "./address.ts";
 import { BulkBar } from "./BulkBar.tsx";
-import { Check, SortSelect } from "./Controls.tsx";
-import { Crumb, DetailLink, Flags } from "./Parts.tsx";
-import { byContainer } from "./rows.ts";
-import type { NodeRow } from "./why.ts";
+import { Checks } from "./Controls.tsx";
+import { Cell, type CellContext } from "./ListCells.tsx";
+import { addableColumns, columnsOf, columnWords, flatLines, givesWay, rankPositions, SORT_OF, treeLines, type Column, type Line } from "./listModel.ts";
+import { useRows } from "./useRows.ts";
 import "./acting.css";
 
-const COLUMNS = ["Node", "Kind", "State", "Owner", "Due", "Slack", "Gravity", "Leverage", "Rank", "Flags"];
+/** Whether any filter narrows the list: a narrowed tree opens, so every match is in sight. */
+function narrowed(settings: ListSettings): boolean {
+  return settings.flags.length + settings.states.length + settings.kinds.length > 0 || settings.within !== undefined || settings.owner !== undefined || settings.text.trim() !== "";
+}
 
-function Row({ view, row, grouped, chosen, onToggle }: { view: Ready; row: NodeRow; grouped: boolean; chosen: boolean; onToggle: () => void }) {
+/** The columns held at the left while the table scrolls sideways. */
+function pinned(column: Column): string | undefined {
+  return column === "status" || column === "title" ? "list-pinned" : undefined;
+}
+
+function Head({ column, settings, onSort }: { column: Column; settings: ListSettings; onSort: (sort: ListSettings["sort"]) => void }) {
+  const sort = SORT_OF[column];
+  const words = columnWords(column, settings.decisions);
+  if (sort === undefined) {
+    return <th scope="col" data-column={column} data-gives-way={givesWay(column)} className={pinned(column)}>{words}</th>;
+  }
+  const active = settings.sort === sort;
   return (
-    <tr data-testid="list-row" data-node={row.key} data-slack={row.slack_days ?? ""} data-selected={chosen}>
-      <td>
-        <input type="checkbox" aria-label={`Select ${row.title}`} checked={chosen} onChange={onToggle} />
+    <th scope="col" aria-sort={active ? "descending" : "none"} data-column={column} data-gives-way={givesWay(column)} data-testid={`sort-${column}`}>
+      <button type="button" className="list-sort" aria-label={`Sort by ${words.toLowerCase()}`} onClick={() => { onSort(active ? undefined : sort); }}>
+        {words}
+        {active ? <span aria-hidden="true"> ▾</span> : null}
+      </button>
+    </th>
+  );
+}
+
+function Row({ line, columns, context, chosen, current, onToggle }: { line: Line; columns: Column[]; context: CellContext; chosen: boolean; current: boolean; onToggle: () => void }) {
+  const { row } = line;
+  return (
+    <tr
+      data-testid={row === undefined ? "list-context" : "list-row"}
+      data-node={line.key}
+      data-depth={line.depth}
+      data-slack={row?.slack_days ?? ""}
+      data-selected={chosen}
+      aria-selected={current}
+    >
+      <td className="list-check list-pinned">
+        {row === undefined ? null : <input type="checkbox" className="list-checkbox" aria-label={`Select ${row.title}`} checked={chosen} onChange={onToggle} />}
       </td>
-      <td>
-        <div className="list-node">
-          <DetailLink view={view} node={row.key} />
-          {grouped ? null : <Crumb view={view} row={row} />}
-        </div>
-      </td>
-      <td>{row.kind}</td>
-      <td>
-        <Badge tone={statusTone(row.display_state)}>{statusWord(row.display_state, row.kind)}</Badge>
-      </td>
-      <td>{(row.owners ?? []).map((key) => entityName(view, key)).join(", ") || <span className="muted small">none</span>}</td>
-      <td className="mono">{row.due ?? <span className="muted small">none</span>}</td>
-      <td className="mono">{row.slack_days ?? <span className="muted small">none</span>}</td>
-      <td className="mono">{row.gravity.toFixed(1)}</td>
-      <td className="mono">{row.leverage.toFixed(1)}</td>
-      <td className="mono">{row.rank == null ? "" : row.rank.rank.toFixed(3)}</td>
-      <td>
-        <Flags view={view} row={row} />
-      </td>
+      {columns.map((column) => (
+        <td key={column} data-column={column} data-gives-way={givesWay(column)} className={[column === "title" ? "list-title-cell" : "list-cell", pinned(column)].filter(Boolean).join(" ")}>
+          <Cell column={column} line={line} context={context} />
+        </td>
+      ))}
     </tr>
   );
 }
 
-function Table({ view, rows, settings, chosen, onToggle }: { view: Ready; rows: NodeRow[]; settings: ListSettings; chosen: Set<string>; onToggle: (key: string) => void }) {
-  const groups = settings.grouped ? byContainer(rows) : [{ container: undefined, path: [], rows }];
+/** The table: its header (the column labels, or the bulk actions once something is selected) and its lines. */
+function Table({ view, settings, lines, columns, context, chosen, selected, everyLine, onToggle, onClear, onSelectAll }: {
+  view: Ready;
+  settings: ListSettings;
+  lines: Line[];
+  columns: Column[];
+  context: CellContext;
+  chosen: Set<string>;
+  selected: string | undefined;
+  everyLine: string[];
+  onToggle: (key: string) => void;
+  onClear: () => void;
+  onSelectAll: () => void;
+}) {
+  const navigate = useNavigate();
+  const picked = selectionOf(view, chosen);
   return (
-    <table className="data list-table" data-testid="list-table">
+    <table className="data list-table" data-testid="list-table" data-selecting={chosen.size > 0}>
       <thead>
-        <tr>
-          <th aria-label="Selected" />
-          {COLUMNS.map((column) => (
-            <th key={column}>{column}</th>
-          ))}
-        </tr>
+        {picked.length > 0 ? (
+          <tr>
+            <th colSpan={columns.length + 1} className="bulk-head">
+              <BulkBar view={view} selected={picked} hidden={picked.filter((facts) => !everyLine.includes(facts.node.key)).length} onClear={onClear} onLanded={onClear} />
+            </th>
+          </tr>
+        ) : (
+          <tr>
+            <th scope="col" className="list-check list-pinned">
+              <input type="checkbox" className="list-checkbox" aria-label="Select every row shown" checked={false} onChange={onSelectAll} />
+            </th>
+            {columns.map((column) => (
+              <Head key={column} column={column} settings={settings} onSort={(sort) => void navigate(listPath(view.journey.header.id, { ...settings, sort }, selected))} />
+            ))}
+          </tr>
+        )}
       </thead>
       <tbody>
-        {groups.map((group) => (
-          <Fragment key={group.container ?? ""}>
-            {settings.grouped ? (
-              <tr className="list-group" data-testid="list-group" data-node={group.container ?? ""}>
-                <th colSpan={COLUMNS.length + 1}>{group.container === undefined ? "Top of the journey" : [...group.path].map((key) => view.journey.graph.nodes?.find((node) => node.key === key)?.title ?? key).join(" / ")}</th>
-              </tr>
-            ) : null}
-            {group.rows.map((row) => (
-              <Row key={row.key} view={view} row={row} grouped={settings.grouped} chosen={chosen.has(row.key)} onToggle={() => { onToggle(row.key); }} />
-            ))}
-          </Fragment>
+        {lines.map((line) => (
+          <Row key={line.key} line={line} columns={columns} context={context} chosen={chosen.has(line.key)} current={line.key === selected} onToggle={() => { onToggle(line.key); }} />
         ))}
       </tbody>
     </table>
   );
 }
 
-/** PLAN, LIST: keyed by the address's query by its caller, so a new query starts from its first page with nothing selected. */
-export function ListBody({ view, settings, onSettings }: { view: Ready; settings: ListSettings; onSettings: (next: ListSettings) => void }) {
-  const [cursors, setCursors] = useState<number[]>([]);
-  const [chosen, setChosen] = useState<Set<string>>(new Set());
-  const cursor = cursors.at(-1);
-  const request = useMemo(() => ({ projection: "list" as const, query: listQueryOf(settings, cursor) }), [settings, cursor]);
-  const { value: page, error } = useProjected(view, request);
-  const rows = page?.rows ?? [];
-  // The selection outlives paging, so a bulk action covers every node selected on any page.
-  const selected = selectionOf(view, chosen);
+/** What the strip above the table offers: its columns, the tree's fold, and the not-relevant rows. */
+function Strip({ view, settings, total, hidden, tree, all, onAll, selectedNode }: { view: Ready; settings: ListSettings; total: number | undefined; hidden: number; tree: boolean; all: boolean; onAll: () => void; selectedNode: string | undefined }) {
+  const navigate = useNavigate();
+  const journey = view.journey.header.id;
+  const go = (next: ListSettings) => void navigate(listPath(journey, next, selectedNode));
+  return (
+    <div className="list-strip row">
+      <Menu
+        label="Columns"
+        testId="columns-button"
+        role="dialog"
+        trigger="Columns ▾"
+      >
+        {() => (
+          <Checks
+            legend="Show"
+            options={addableColumns(settings.decisions)}
+            chosen={settings.columns}
+            words={(column) => columnWords(column, settings.decisions)}
+            testId="column"
+            stacked
+            onChange={(columns) => { go({ ...settings, columns }); }}
+          />
+        )}
+      </Menu>
+      {tree ? (
+        <Button ghost data-testid="list-fold-all" onClick={onAll}>
+          {all ? "Fold to the top level" : "Open every level"}
+        </Button>
+      ) : null}
+      <span className="muted" data-testid="list-total" data-total={total ?? ""}>
+        {total === undefined ? "Reading the list..." : `${String(total)} ${settings.decisions ? "decision" : "item"}${total === 1 ? "" : "s"}`}
+      </span>
+      {hidden === 0 && !settings.notRelevant ? null : (
+        <Button ghost data-testid="list-not-relevant" aria-pressed={settings.notRelevant} onClick={() => { go({ ...settings, notRelevant: !settings.notRelevant }); }}>
+          {settings.notRelevant ? `Hide the ${String(hidden)} not relevant` : `Show ${String(hidden)} not relevant`}
+        </Button>
+      )}
+    </div>
+  );
+}
+
+/** A set of keys with the one change a click makes: in if out, out if in. */
+function useKeys(): [Set<string>, (key: string) => void, (keys: Iterable<string>) => void] {
+  const [keys, setKeys] = useState<Set<string>>(new Set());
   const toggle = (key: string) => {
-    const next = new Set(chosen);
+    const next = new Set(keys);
     if (!next.delete(key)) {
       next.add(key);
     }
-    setChosen(next);
+    setKeys(next);
   };
+  return [keys, toggle, (replacement) => { setKeys(new Set(replacement)); }];
+}
+
+/** PLAN, LIST: keyed by the address's query by its caller, so a new query starts with nothing selected and the tree folded. */
+export function ListBody({ view, settings, selected }: { view: Ready; settings: ListSettings; selected?: string | undefined }) {
+  const [chosen, toggle, choose] = useKeys();
+  const [flipped, fold, setFlipped] = useKeys();
+  const [everyLevel, setEveryLevel] = useState<boolean | undefined>(undefined);
+  const query = useMemo(() => listQueryOf(settings), [settings]);
+  const { rows, error } = useRows(view, query);
+  // What Show not relevant would add under the same filters, so the button never promises rows the filters would drop.
+  const ruledOut = useRows(view, useMemo(() => ({ ...query, display_states: ["not_relevant" as const] }), [query])).rows?.length ?? 0;
+  const needsDecisions = settings.decisions || settings.columns.some((column) => ["answer", "why", "affects"].includes(column));
+  const projected = useProjected(view, needsDecisions ? { projection: "decision_view" as const } : undefined);
+  const decisions = useMemo(() => new Map((projected.value === undefined ? [] : decisionRows(view, projected.value)).map((decision) => [decision.key, decision])), [view, projected.value]);
+  const ranks = useMemo(() => rankPositions(view), [view]);
+  const tree = settings.sort === undefined && !settings.decisions;
+  // The open node's containers stay open, so it is not hidden in a fold; a click flips what the rest would do.
+  const holding = useMemo(() => new Set(selected === undefined ? [] : ancestorsOf(view, selected)), [view, selected]);
+  const open = everyLevel ?? narrowed(settings);
+  const lines = useMemo(
+    () => (rows === undefined ? [] : tree ? treeLines(view, rows, (key) => (open || holding.has(key)) !== flipped.has(key)) : flatLines(view, rows, settings.sort)),
+    [view, rows, tree, settings.sort, open, holding, flipped],
+  );
+  const everyLine = lines.flatMap((line) => (line.row === undefined ? [] : [line.row.key]));
+  const columns = columnsOf(settings);
+  const context: CellContext = { view, tree, decisions, ranks, onFold: fold };
   return (
-    <section className="stack" aria-label="List" data-testid="list">
+    <section className="stack list" aria-label="List" data-testid="list">
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
-      <div className="row">
-        <span className="muted small" data-testid="list-total" data-total={page?.total ?? ""}>
-          {page === undefined ? "Reading the list..." : `${String(page.total)} nodes match; showing ${String(rows.length)}.`}
-        </span>
-        <SortSelect sort={settings.sort} onChange={(sort) => { onSettings({ ...settings, sort }); }} />
-        <Check label="Group by container" checked={settings.grouped} testId="grouped" onChange={(grouped) => { onSettings({ ...settings, grouped }); }} />
-        <Button onClick={() => { setChosen(new Set(rows.map((row) => row.key))); }}>Select all shown</Button>
-        <Button onClick={() => { setChosen(new Set()); }}>Clear the selection</Button>
-        {cursors.length === 0 ? null : <Button onClick={() => { setCursors(cursors.slice(0, -1)); }}>Previous page</Button>}
-        {page?.next == null ? null : <Button onClick={() => { setCursors([...cursors, page.next ?? 0]); }}>Next page</Button>}
-      </div>
-      {selected.length === 0 ? null : <BulkBar view={view} selected={selected} hidden={selected.filter((facts) => !rows.some((row) => row.key === facts.node.key)).length} onLanded={() => { setChosen(new Set()); }} />}
-      <Table view={view} rows={rows} settings={settings} chosen={chosen} onToggle={toggle} />
+      <Strip
+        view={view}
+        settings={settings}
+        total={rows?.length}
+        hidden={ruledOut}
+        tree={tree}
+        all={open}
+        selectedNode={selected}
+        onAll={() => {
+          setEveryLevel(!open);
+          setFlipped([]);
+        }}
+      />
+      <Table
+        view={view}
+        settings={settings}
+        lines={lines}
+        columns={columns}
+        context={context}
+        chosen={chosen}
+        selected={selected}
+        everyLine={everyLine}
+        onToggle={toggle}
+        onClear={() => { choose([]); }}
+        onSelectAll={() => { choose(everyLine); }}
+      />
+      {rows !== undefined && lines.length === 0 ? (
+        <p className="muted" data-testid="list-empty">Nothing matches. Change the filter to see more.</p>
+      ) : null}
     </section>
   );
 }

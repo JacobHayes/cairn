@@ -60,6 +60,7 @@ export interface ListQuery {
   within?: NodeKey;
   owner?: Schema<"EntityKey">;
   states?: Schema<"State">[];
+  display_states?: Schema<"DisplayState">[];
   kinds?: Schema<"NodeKind">[];
   text?: Schema<"Title">;
   sort?: Schema<"SortBy">;

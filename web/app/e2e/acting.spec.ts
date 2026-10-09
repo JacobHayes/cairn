@@ -59,7 +59,7 @@ test("C10: the next list ranks the frontier, and re-sorting by slack reorders it
   await expect(fold.locator('[data-testid="fold-item"][data-node="n_launch"]')).toHaveAttribute("data-reason", "open");
 });
 
-test("C9: filters hold at once, search reads notes, and rows group by container", async ({ page }) => {
+test("C9: filters hold at once, and search reads notes", async ({ page }) => {
   await openActing(page, "browser", "j_vendor_eval", "plan/list?flag=next_up");
   expect((await listKeys(page)).sort()).toEqual(["n_decision_meeting", "n_review_opens"]);
   await turnOn(page, "kind-decision");
@@ -68,13 +68,26 @@ test("C9: filters hold at once, search reads notes, and rows group by container"
   await page.getByRole("searchbox", { name: "Search" }).fill("environment team");
   await page.keyboard.press("Enter");
   await expect.poll(() => listKeys(page)).toEqual(["n_access"]);
-  await openActing(page, "browser", "j_vendor_eval", "plan/list?kind=action&group=container");
-  const groups = page.getByTestId("list-group");
-  await expect.poll(async () => (await groups.evaluateAll((rows) => rows.map((row) => row.getAttribute("data-node")))).sort()).toEqual(["n_partner_led", "n_plan"]);
+});
+
+test("C9: the list is a tree folded to its top level, sorting a column flattens it, and not-relevant rows stay out until asked for", async ({ page }) => {
+  await openActing(page, "browser", "j_vendor_eval", "plan/list");
+  const depths = () => page.getByTestId("list-row").evaluateAll((rows) => rows.map((row) => row.getAttribute("data-depth")));
+  expect(new Set(await depths())).toEqual(new Set(["0"]));
+  await page.getByTestId("list-fold-all").click();
+  await expect(page.locator('[data-testid="list-row"][data-node="n_plan_draft"]')).toHaveAttribute("data-depth", "2");
+  await page.getByRole("button", { name: "Sort by due" }).click();
+  await expect.poll(async () => new Set(await depths())).toEqual(new Set(["0"]));
+  await expect(page.locator('[data-testid="list-row"][data-node="n_plan_draft"] [data-testid="breadcrumb"]')).toContainText("Test plan");
+  const total = page.getByTestId("list-total");
+  await expect(page.getByTestId("tab-plan-count")).toHaveText((await total.getAttribute("data-total")) ?? "");
+  expect(await listKeys(page)).not.toContain("n_partner_results");
+  await page.getByTestId("list-not-relevant").click();
+  await expect.poll(() => listKeys(page)).toContain("n_partner_results");
 });
 
 test("C9: a bulk completion with one node failing its guard is rejected whole, naming it", async ({ page }) => {
-  await openActing(page, "browser", "j_vendor_eval", "plan/list");
+  await openActing(page, "browser", "j_vendor_eval", "plan/list?sort=rank");
   const revision = await derivedRevision(page);
   await select(page, "n_final_report");
   await select(page, "n_decision_meeting");
@@ -84,7 +97,8 @@ test("C9: a bulk completion with one node failing its guard is rejected whole, n
   await expect(failed).toContainText("Final report");
   // A later write over the same selection settles whatever the rejected action sent: only it
   // may move the revision, and the milestone the rejected patch would have reached is still ready.
-  await page.getByRole("button", { name: "Assign owner..." }).click();
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Assign owner..." }).click();
   await page.getByLabel("Owner for them").selectOption("e_lead");
   await page.getByRole("button", { name: "Apply to 2" }).click();
   expect(await revisionAfter(page, revision)).toBe(revision + 1);
@@ -96,7 +110,8 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the next list and an
   const revision = await derivedRevision(page);
   await select(page, "n_docs");
   await select(page, "n_announcement");
-  await page.getByRole("button", { name: "Snooze until a node..." }).click();
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Snooze until a node..." }).click();
   await page.getByLabel("Snooze them until node").selectOption("n_beta_end");
   await page.getByRole("button", { name: "Apply to 2" }).click();
   expect(await revisionAfter(page, revision)).toBe(revision + 1);
@@ -277,7 +292,7 @@ test("C11, C9: with every decision skipped in bulk, the walkthrough shows what w
   const journey = await startVendorJourney(page);
   await openActing(page, "browser", journey, "plan/list?flag=decisions_needed");
   await expect.poll(() => listKeys(page)).toHaveLength(UP_FRONT.length);
-  await page.getByRole("button", { name: "Select all shown" }).click();
+  await page.getByLabel("Select every row shown").click();
   await page.getByRole("button", { name: "Skip..." }).click();
   await page.getByLabel("Why skip them").fill("decided elsewhere");
   await page.getByRole("button", { name: `Apply to ${String(UP_FRONT.length)}` }).click();

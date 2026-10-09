@@ -1,56 +1,120 @@
-/* C13: the timeline. Each row is its label beside its track; every track and the axis share
-   one width, so a date falls at the same place in each, and today and the end anchor run down
-   them as one line. */
-.timeline-rows {
+/* C13: the timeline. The labels are a column of rows; the tracks are one drawing beside them on
+   one time axis, so a date falls at the same place in every row and today and the end anchor run
+   down them as one line. Air first: tall rows with no rules between them; the selected row is
+   tinted, and what the selection or a filter does not reach fades to the one fade level. */
+.timeline-controls {
+  gap: var(--space-4);
+}
+
+/* Sentence case in the body face, like the switcher beside them: these are toolbar text, not labels. */
+.timeline-controls .segmented label {
+  font: 500 14px / 1.4 var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.timeline-axis,
+.timeline-body {
+  display: grid;
+  grid-template-columns: minmax(160px, 28%) minmax(0, 1fr);
+}
+
+/* Sticks to the top of the workspace, under its padding, so rows never show above it. */
+.timeline-axis {
+  position: sticky;
+  top: calc(-1 * var(--space-5));
+  z-index: 2;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+}
+
+@media (max-width: 719px) {
+  .timeline-axis {
+    top: 0;
+  }
+}
+
+.timeline-axis-svg,
+.timeline-tracks {
+  display: block;
+}
+
+.timeline-tracks {
+  overflow: hidden;
+}
+
+.timeline-labels {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 
-.timeline-row {
-  display: grid;
-  grid-template-columns: minmax(204px, 408px) minmax(0, 1fr);
-  column-gap: var(--space-3);
-  align-items: center;
-  border-bottom: 1px solid var(--color-border);
-}
-
-.timeline-row-axis {
-  border-bottom: 1px solid var(--color-muted);
-}
-
 .timeline-label {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0 var(--space-2);
-  padding: var(--space-1) 0;
-  font-size: 14px;
+  align-items: center;
+  padding-inline-end: var(--space-3);
+  font-size: 15px;
+  line-height: 1.4;
 }
 
-.timeline-label > a {
-  flex-basis: 100%;
+.timeline-title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  min-width: 0;
 }
 
-button.timeline-why {
-  min-height: 0;
+.timeline-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.timeline-words {
+  white-space: nowrap;
+}
+
+.timeline-late {
+  color: var(--color-error);
+}
+
+button.timeline-fold {
+  flex: none;
+  width: var(--space-5);
+  min-height: 24px;
   padding: 0;
-  border: none;
+  border: 0;
   background: none;
-  color: var(--color-text);
-  font-size: 14px;
-  text-decoration: underline;
+  color: var(--color-muted);
+  line-height: 1.4;
+  text-align: center;
 }
 
-.timeline-explain {
-  grid-column: 1 / -1;
-  padding-bottom: var(--space-2);
+span.timeline-fold {
+  flex: none;
+  width: var(--space-4);
 }
 
-.timeline-track,
-.timeline-axis {
-  display: block;
-  overflow: visible;
+.timeline-label[data-selected="true"] {
+  background: var(--color-tint);
+}
+
+.timeline-label[data-faded="true"],
+.timeline-row[data-faded="true"] {
+  opacity: 0.3;
+}
+
+.timeline-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.timeline-hit:hover {
+  fill: var(--color-hover);
+}
+
+.timeline-row[data-selected="true"] .timeline-hit {
+  fill: var(--color-tint);
 }
 
 .timeline-grid {
@@ -78,7 +142,7 @@ button.timeline-why {
 .timeline-today-label,
 .timeline-end-label {
   fill: var(--color-muted);
-  font-size: 11px;
+  font-size: 12px;
 }
 
 .timeline-today-label {
@@ -90,54 +154,129 @@ button.timeline-why {
   font-weight: 600;
 }
 
-/* F7: an actual is solid, a pin filled with the accent, a derived due date hollow. */
-.timeline-marker {
-  stroke-width: 2;
-}
-
-.timeline-marker-actual {
-  fill: var(--color-text);
-  stroke: var(--color-text);
-}
-
-.timeline-marker-pin {
-  fill: var(--color-accent);
-  stroke: var(--color-accent);
-}
-
-.timeline-marker-due {
+/* A mark is drawn by its shape, and by its display state: finished in the ramp, conditional dashed. */
+.timeline-mark {
   fill: var(--color-surface);
-  stroke: var(--color-muted);
+  stroke: var(--color-text);
+  stroke-width: 1.5;
 }
 
-.timeline-marker-bad {
+.timeline-shape-milestone {
+  fill: var(--color-text);
+}
+
+.timeline-shape-span,
+.timeline-shape-bar {
+  fill: var(--color-band);
+}
+
+.timeline-shape-tick {
+  stroke-width: 3;
+}
+
+.timeline-fill {
+  fill: var(--ramp-2);
+}
+
+.timeline-row[data-state="done"] .timeline-mark {
+  fill: var(--ramp-3);
+  stroke: var(--ramp-3);
+}
+
+.timeline-row[data-state="skipped"] .timeline-mark {
+  fill: none;
+  stroke: var(--ramp-4);
+}
+
+.timeline-row[data-state="conditional"] .timeline-mark {
+  stroke-dasharray: 3 2;
+}
+
+.timeline-row .timeline-bad {
   stroke: var(--color-error);
 }
 
-.timeline-marker-due.timeline-marker-bad {
-  fill: var(--color-del);
+/* Overdue: the stretch from its due date to today, hatched in the error ink. */
+.timeline-overdue {
+  fill: url(#timeline-hatch);
 }
 
-.timeline-legend {
-  font-size: 14px;
-  gap: var(--space-4);
+.timeline-hatch {
+  stroke: var(--color-error);
+  stroke-width: 1.5;
+  opacity: 0.7;
 }
 
-.timeline-legend svg {
-  vertical-align: middle;
+/* The selected row's float: earliest to latest start. */
+.timeline-float line {
+  stroke: var(--color-muted);
+  stroke-width: 1.5;
+  stroke-dasharray: 2 3;
+}
+
+.timeline-float line:nth-child(n + 2) {
+  stroke-dasharray: none;
+}
+
+/* Dependencies in the trace's styles: what it needs in ink, what it unblocks in the accent, the chain it is short on in error ink. */
+.timeline-line line {
+  stroke-width: 1.5;
+  fill: none;
+}
+
+.timeline-line-needs line {
+  stroke: var(--color-text);
+}
+
+.timeline-line-needs circle {
+  fill: var(--color-text);
+}
+
+.timeline-line-unblocks line {
+  stroke: var(--color-accent);
+}
+
+.timeline-line-unblocks circle {
+  fill: var(--color-accent);
+}
+
+.timeline-line-short line {
+  stroke: var(--color-error);
+  stroke-width: 2.5;
+}
+
+.timeline-line-short circle {
+  fill: var(--color-error);
+}
+
+.timeline-undated {
+  font-size: 15px;
+}
+
+.timeline-undated summary {
+  color: var(--color-muted);
+  cursor: pointer;
+}
+
+.timeline-undated-list {
+  margin: var(--space-2) 0 0;
+  padding-inline-start: var(--space-5);
 }
 
 @media (max-width: 640px) {
-  .timeline-row {
-    grid-template-columns: minmax(0, 1fr);
+  .timeline-axis,
+  .timeline-body {
+    grid-template-columns: minmax(120px, 40%) minmax(0, 1fr);
   }
 
-  .timeline-row-axis > span {
-    display: none;
+  .timeline-label {
+    font-size: 14px;
   }
+}
 
-  /* Half the tick labels, so they do not run into each other on a narrow track. */
-  .timeline-tick:nth-of-type(even) {
-    display: none;
+/* A selected row scrolled into view keeps clear of the sheet over the bottom of the region. */
+@media (min-width: 720px) and (max-width: 1099px) {
+  .frame[data-inspector="on"] .timeline-label {
+    scroll-margin-bottom: calc(var(--sheet-h, var(--sheet-half)) + var(--space-5));
   }
 }

@@ -6,7 +6,7 @@
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { listFrom, listPath, nextFrom, nextPath, triageFrom } from "../acting/address.ts";
+import { listFrom, nextFrom, nextPath, triageFrom } from "../acting/address.ts";
 import { ListBody } from "../acting/ListScreen.tsx";
 import { NextList } from "../acting/NextScreen.tsx";
 import { TriageBody } from "../acting/TriageScreen.tsx";
@@ -20,12 +20,17 @@ import { Crumbs, StalledSurface } from "../canvas/Surfaces.tsx";
 import { DecisionCanvas } from "../decisions/DecisionView.tsx";
 import type { Ready } from "../detail/model.ts";
 import type { JourneyPage, Projection } from "../journeys/address.ts";
-import { TimelineChart } from "../timeline/TimelineView.tsx";
+import { TimelineChart, timelineFrom } from "../timeline/TimelineView.tsx";
 
 function ProjectedTimeline({ ready, selected }: { ready: Ready; selected: string | undefined }) {
   const { search } = useLocation();
-  const { kinds, text, decisions } = useMemo(() => listFrom(new URLSearchParams(search)), [search]);
-  const narrowing = useMemo(() => ({ kinds, text, decisions }), [kinds, text, decisions]);
+  const params = useMemo(() => new URLSearchParams(search), [search]);
+  const { kinds, text, decisions, flags } = useMemo(() => listFrom(params), [params]);
+  const { detail, range } = useMemo(() => timelineFrom(params), [params]);
+  const mine = flags.includes("mine");
+  const held = useProjected(ready, mine ? { projection: "mine" } : undefined);
+  const holding = useMemo(() => (mine ? new Set((held.value ?? []).map((entry) => entry.node)) : undefined), [mine, held.value]);
+  const narrow = useMemo(() => ({ kinds, text, decisions, mine: holding }), [kinds, text, decisions, holding]);
   const timeline = useProjected(ready, { projection: "timeline" });
   if (timeline.error !== undefined) {
     return <p className="callout callout-bad">The timeline could not be read: {timeline.error}</p>;
@@ -33,7 +38,7 @@ function ProjectedTimeline({ ready, selected }: { ready: Ready; selected: string
   if (timeline.value === undefined) {
     return <p className="muted small">Placing the dates...</p>;
   }
-  return <TimelineChart ready={ready} timeline={timeline.value} narrowing={narrowing} selected={selected} />;
+  return <TimelineChart ready={ready} timeline={timeline.value} narrow={narrow} selected={selected} detail={detail} range={range} />;
 }
 
 export interface ProjectionProps {
@@ -71,7 +76,7 @@ export function ProjectionBody({ ready, page, projection, selected, authored, dr
   }
   if (projection === "list") {
     // A new query starts from its first page with nothing selected.
-    return <ListBody key={search} view={ready} settings={listFrom(params)} onSettings={(next) => void navigate(listPath(ready.journey.header.id, next, selected))} />;
+    return <ListBody key={search} view={ready} settings={listFrom(params)} selected={selected} />;
   }
   if (projection === "timeline") {
     return <ProjectedTimeline ready={ready} selected={selected} />;

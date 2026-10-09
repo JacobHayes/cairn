@@ -1,8 +1,8 @@
 // C9's filters, as the toolbar's Filter holds them: mine, the kinds, the flags (overdue, stale,
-// unassigned, short of days, snoozed) and the owner; text search is the toolbar's, and the sort
-// and the grouping by container are in the list's header (ListScreen). Every filter holds at
-// once. An address can still carry the filters the popover no longer offers (a group, a state,
-// the other flags): they read as before and show as chips that remove them.
+// unassigned, short of days, snoozed), the owner, and whether to show the not-relevant rows; text
+// search is the toolbar's, and the sort is the table's column headers (ListScreen). Every filter
+// holds at once. An address can still carry the filters the popover no longer offers (a group, a
+// status, the other flags): they read as before and show as chips that remove them.
 import { entityName } from "../detail/sections.tsx";
 import type { Ready } from "../detail/model.ts";
 import { LIST_FILTER_FLAGS, LIST_FLAGS, LIST_KINDS, type ListFlag, type ListSettings } from "./address.ts";
@@ -35,6 +35,7 @@ export function ListFilters({ view, settings, onChange }: { view: Ready; setting
           </option>
         ))}
       </select>
+      <Check label="Show not relevant" checked={settings.notRelevant} testId="show-not-relevant" onChange={(notRelevant) => { set({ notRelevant }); }} />
     </div>
   );
 }

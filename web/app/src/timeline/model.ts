@@ -9,8 +9,6 @@
 // Cost: O(entries) per timeline, plus O(ticks), which `TICK_COUNT_MAX` bounds.
 import type { Schema } from "@cairn/client";
 
-import { titleOf, type NodeKind, type Ready } from "../detail/model.ts";
-
 export type Timeline = Schema<"Timeline">;
 export type TimelineEntry = Schema<"TimelineEntry">;
 export type DateOrigin = Schema<"DateOrigin">;
@@ -76,6 +74,28 @@ export interface Tick {
 export interface Anchor {
   node: string;
   date: string;
+}
+
+/** The days an axis shows, from the first to the last. */
+export interface Window {
+  first: number;
+  last: number;
+}
+
+/** The range control's choices: every date, a month from today, a quarter from today. */
+export const RANGES = ["fit", "month", "quarter"] as const;
+export type Range = (typeof RANGES)[number];
+
+/** Days of today's past each fixed range keeps in view, and its length. */
+const RANGE_DAYS = { month: { before: 3, length: 31 }, quarter: { before: 7, length: 92 } } as const;
+
+/** The window `range` shows around `today`; none for Fit, which is every date. */
+export function rangeWindow(range: Range, today: string): Window | undefined {
+  if (range === "fit") {
+    return undefined;
+  }
+  const first = dayOf(today) - RANGE_DAYS[range].before;
+  return { first, last: first + RANGE_DAYS[range].length };
 }
 
 /** C13: the time axis the timeline's dates lie on. */
@@ -171,11 +191,15 @@ function ticksOf(first: number, last: number, unit: TickUnit): Tick[] {
   }));
 }
 
-/** C13: the axis for `timeline` read on `today`: today and every date, with a margin. */
-export function timelineAxis(timeline: Timeline, today: string): Axis {
-  const days = [today, ...timeline.entries.map((entry) => entry.date)].map(dayOf);
-  const first = Math.min(...days) - AXIS_MARGIN_DAYS;
-  const last = Math.max(...days) + AXIS_MARGIN_DAYS;
+/**
+ * C13: the axis for `timeline` read on `today`: today and every date (`dates` beside the
+ * timeline's own, which the bars add), with a margin; or `window`, the days a range or a pan
+ * and zoom picked.
+ */
+export function timelineAxis(timeline: Timeline, today: string, dates: readonly string[] = [], window?: Window): Axis {
+  const days = [today, ...timeline.entries.map((entry) => entry.date), ...dates].map(dayOf);
+  const first = window?.first ?? Math.min(...days) - AXIS_MARGIN_DAYS;
+  const last = window?.last ?? Math.max(...days) + AXIS_MARGIN_DAYS;
   const unit = unitFor(last - first);
   return {
     start: dateOf(first),
@@ -191,50 +215,4 @@ export function timelineAxis(timeline: Timeline, today: string): Axis {
 export function positionOf(axis: Axis, date: string): number {
   const first = dayOf(axis.start);
   return (dayOf(date) - first) / (dayOf(axis.end) - first);
-}
-
-/** C13, F7: one date on the timeline, told apart as actual, pin, or derived due. */
-export interface TimelineRow {
-  node: string;
-  title: string;
-  kind: NodeKind;
-  date: string;
-  origin: DateOrigin;
-  overdue: boolean;
-  shortfallDays: number | undefined;
-  /** The end anchor. */
-  end: boolean;
-  /** Where it falls along the axis. */
-  at: number;
-}
-
-/** What the toolbar narrows the timeline to: DECISIONS, the kinds the filter holds, and the search text. */
-export interface TimelineNarrowing {
-  decisions: boolean;
-  kinds: readonly NodeKind[];
-  text: string;
-}
-
-/** Whether a node of `kind` and `title` stays on the timeline under `narrowing`. */
-export function timelineKeeps(narrowing: TimelineNarrowing, kind: NodeKind, title: string): boolean {
-  const wanted = narrowing.text.trim().toLowerCase();
-  return (
-    (narrowing.decisions ? kind === "decision" : narrowing.kinds.length === 0 || narrowing.kinds.includes(kind)) &&
-    (wanted === "" || title.toLowerCase().includes(wanted))
-  );
-}
-
-/** C13: the timeline's dates in its order (earliest first), placed on `axis`. */
-export function timelineRows(ready: Ready, timeline: Timeline, axis: Axis): TimelineRow[] {
-  return timeline.entries.map((entry) => ({
-    node: entry.node,
-    title: titleOf(ready, entry.node),
-    kind: entry.kind,
-    date: entry.date,
-    origin: entry.origin,
-    overdue: entry.overdue === true,
-    shortfallDays: entry.shortfall_days ?? undefined,
-    end: entry.node === axis.anchor?.node,
-    at: positionOf(axis, entry.date),
-  }));
 }

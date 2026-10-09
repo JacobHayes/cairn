@@ -604,6 +604,9 @@ pub struct ListQuery {
     /// Only nodes in these stored states; any when empty.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub states: BTreeSet<State>,
+    /// Only nodes showing these display states (D8); any when empty.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub display_states: BTreeSet<DisplayState>,
     /// Only these node kinds; any when empty.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub kinds: BTreeSet<NodeKind>,

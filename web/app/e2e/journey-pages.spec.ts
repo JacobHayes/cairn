@@ -132,16 +132,15 @@ test("between 720 and 1100px the projection keeps the width and a canvas fills i
   await expect(page.getByTestId("summary-upcoming")).toBeVisible();
 });
 
-test("the plan list's filter holds mine, kinds, flags and the owner; its sort and grouping are in the list's header", async ({ page }) => {
+test("the plan list's filter holds mine, kinds, flags and the owner; its sort is in the table's column headers", async ({ page }) => {
   await openActing(page, "browser", "j_vendor_eval", "plan/list?flag=next_up");
-  await expect(page.getByTestId("list").getByLabel("Sort by")).toBeVisible();
-  await expect(page.getByTestId("grouped")).toBeVisible();
+  await expect(page.getByTestId("list").getByRole("button", { name: "Sort by due" })).toBeVisible();
   await openFilter(page);
   const panel = page.getByTestId("filter-panel");
   for (const offered of ["flag-mine", "kind-milestone", "flag-overdue", "flag-snoozed"]) {
     await expect(panel.getByTestId(offered)).toBeVisible();
   }
-  for (const gone of ["state-open", "grouped", "flag-next_up"]) {
+  for (const gone of ["state-open", "flag-next_up"]) {
     await expect(panel.getByTestId(gone)).toHaveCount(0);
   }
   await expect(panel.getByLabel("Sort by")).toHaveCount(0);

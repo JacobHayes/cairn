@@ -10,7 +10,7 @@ import { useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { ACTING_KINDS, listFrom, listPath, nextFrom, nextPath, triageFrom, triagePath } from "../acting/address.ts";
-import { Checks } from "../acting/Controls.tsx";
+import { Check, Checks } from "../acting/Controls.tsx";
 import { ListFilters } from "../acting/ListFilters.tsx";
 import { NextControls } from "../acting/NextScreen.tsx";
 import { TriageControls } from "../acting/TriageScreen.tsx";
@@ -21,6 +21,7 @@ import {
   PAGE_PROJECTIONS,
   carriedSearch,
   pagePath,
+  withMineFlipped,
   withParam,
   type JourneyPage,
   type Projection,
@@ -50,20 +51,24 @@ function FilterBody({ ready, page, projection, node, search }: { ready: Ready; p
     return <TriageControls settings={triageFrom(params)} onChange={(next) => void navigate(triagePath(journey, next, node))} />;
   }
   if (projection === "timeline") {
-    const { kinds, decisions } = listFrom(params);
-    if (decisions) {
-      return <DecisionsOnly />;
-    }
+    const { kinds, decisions, flags } = listFrom(params);
     return (
-      <Checks
-        legend="Kinds"
-        options={ACTING_KINDS}
-        chosen={kinds}
-        words={(kind) => kind}
-        testId="kind"
-        stacked
-        onChange={(chosen) => { void navigate(pagePath(journey, page, projection, node, withParam(search, "kind", chosen.length === 0 ? undefined : chosen.join(",")))); }}
-      />
+      <>
+        <Check label="Mine" checked={flags.includes("mine")} testId="mine" onChange={() => { void navigate(pagePath(journey, page, projection, node, withMineFlipped(search))); }} />
+        {decisions ? (
+          <DecisionsOnly />
+        ) : (
+          <Checks
+            legend="Kinds"
+            options={ACTING_KINDS}
+            chosen={kinds}
+            words={(kind) => kind}
+            testId="kind"
+            stacked
+            onChange={(chosen) => { void navigate(pagePath(journey, page, projection, node, withParam(search, "kind", chosen.length === 0 ? undefined : chosen.join(",")))); }}
+          />
+        )}
+      </>
     );
   }
   if (projection === "list") {

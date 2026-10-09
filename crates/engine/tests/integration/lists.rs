@@ -9,7 +9,9 @@ use crate::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, DerivedJourney, Graph, Records};
-use cairn_schema::{EntityKey, KindKey, ListFlag, ListQuery, NextQuery, NodeKind, SortBy, State};
+use cairn_schema::{
+    DisplayState, EntityKey, KindKey, ListFlag, ListQuery, NextQuery, NodeKind, SortBy, State,
+};
 use support::{add_nodes as add, key};
 
 const VENDOR: &str = "j_vendor_eval";
@@ -223,6 +225,45 @@ fn list_filters_combine_and_search_reads_notes_and_resources() {
         };
         assert_eq!(started.listed(&search, &[]), [expected], "{text}");
     }
+}
+
+/// C9, D8: the list filters by the state each node shows, so the not-relevant nodes can be left
+/// out (or asked for) as the plan's count does.
+#[test]
+fn the_list_filters_by_display_state() {
+    let decided = Derive::vendor(2);
+    let every = decided
+        .journey()
+        .list(&ListQuery::default(), &BTreeSet::new())
+        .unwrap()
+        .rows;
+    let ruled_out = |keep: bool| -> Vec<String> {
+        let rows = every.iter();
+        rows.filter(|row| (row.display_state == DisplayState::NotRelevant) == keep)
+            .map(|row| row.key.as_str().to_owned())
+            .collect()
+    };
+    assert!(
+        !ruled_out(true).is_empty(),
+        "the answer ruled something out"
+    );
+    let only = |states: &[DisplayState]| ListQuery {
+        display_states: states.iter().copied().collect(),
+        ..ListQuery::default()
+    };
+    assert_eq!(
+        sorted(decided.listed(&only(&[DisplayState::NotRelevant]), &[])),
+        sorted(ruled_out(true))
+    );
+    let rest: Vec<DisplayState> = every
+        .iter()
+        .map(|row| row.display_state)
+        .filter(|state| *state != DisplayState::NotRelevant)
+        .collect();
+    assert_eq!(
+        sorted(decided.listed(&only(&rest), &[])),
+        sorted(ruled_out(false))
+    );
 }
 
 const PAGE: usize = 200;

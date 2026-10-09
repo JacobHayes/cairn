@@ -16315,6 +16315,20 @@
             "style": "form"
           },
           {
+            "description": "Only nodes showing these display states; any when none.",
+            "explode": true,
+            "in": "query",
+            "name": "display_state",
+            "required": false,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/DisplayState"
+              },
+              "type": "array"
+            },
+            "style": "form"
+          },
+          {
             "description": "Only nodes of these kinds; every kind when none.",
             "explode": true,
             "in": "query",

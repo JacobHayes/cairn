@@ -7,7 +7,8 @@
 import { listFrom, listPath, nextFrom, nextPath, triageFrom, triagePath, type ListFlag } from "../acting/address.ts";
 import { KINDS } from "../canvas/model.ts";
 import { canvasPath, viewFrom, withKind } from "../canvas/settings.ts";
-import { pagePath, withParam, type JourneyPage, type Projection } from "../journeys/address.ts";
+import { pagePath, withMineFlipped, withParam, type JourneyPage, type Projection } from "../journeys/address.ts";
+import { stateWord } from "../status/words.ts";
 
 /** One active filter: its words, and the address with it taken off. */
 export interface ActiveFilter {
@@ -37,6 +38,9 @@ function timelineFilters(journey: string, page: JourneyPage, search: string, nod
   const settings = listFrom(new URLSearchParams(search));
   const path = (name: string, value: string | undefined) => pagePath(journey, page, "timeline", node, withParam(search, name, value));
   const filters: ActiveFilter[] = [];
+  if (settings.flags.includes("mine")) {
+    filters.push({ id: "mine", label: "mine", without: pagePath(journey, page, "timeline", node, withMineFlipped(search)) });
+  }
   if (!settings.decisions) {
     for (const kind of settings.kinds) {
       const rest = settings.kinds.filter((each) => each !== kind);
@@ -115,7 +119,10 @@ export function activeFilters(journey: string, page: JourneyPage, projection: Pr
       filters.push({ id: "owner", label: "owner", without: path({ owner: undefined }) });
     }
     for (const state of settings.states) {
-      filters.push({ id: `state-${state}`, label: state, without: path({ states: settings.states.filter((each) => each !== state) }) });
+      filters.push({ id: `state-${state}`, label: stateWord(state), without: path({ states: settings.states.filter((each) => each !== state) }) });
+    }
+    if (settings.notRelevant) {
+      filters.push({ id: "not-relevant", label: "with not relevant", without: path({ notRelevant: false }) });
     }
     if (!settings.decisions) {
       for (const kind of settings.kinds) {

@@ -6,13 +6,17 @@
 import { useState } from "react";
 
 import { titleOf, type Ready } from "../detail/model.ts";
+import { Menu } from "../screens/Menu.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
 import { entityName } from "../detail/sections.tsx";
 import { useFormDraft, useNodeWrite, type Seen } from "../detail/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
-import { runBulk, type BulkAction, type Facts } from "./acts.ts";
+import { canTake, runBulk, type BulkAction, type Facts } from "./acts.ts";
 
 type Form = "skip" | "assign" | "snooze-date" | "snooze-node";
+
+/** The actions the bar names: the first few sit inline, the rest under More. */
+const INLINE_MAX = 3;
 
 const FORM_WORDS: Record<Form, string> = {
   skip: "Skip...",
@@ -34,6 +38,21 @@ function actionOf(form: Form, value: string): BulkAction {
       return { act: "snooze", until: { node: value } };
   }
 }
+
+/** One action the bar can offer: what it says, and the action it asks for (a form's, before it is filled). */
+interface Offer {
+  words: string;
+  asks: BulkAction;
+  /** A form to open, when the action needs more than a click. */
+  form?: Form;
+}
+
+const OFFERS: Offer[] = [
+  { words: "Start", asks: { act: "start" } },
+  { words: "Done", asks: { act: "done" } },
+  { words: "Unsnooze", asks: { act: "unsnooze" } },
+  ...(Object.keys(FORM_WORDS) as Form[]).map((form): Offer => ({ words: FORM_WORDS[form], asks: actionOf(form, ""), form })),
+];
 
 function FormInput({ view, form, value, onChange }: { view: Ready; form: Form; value: string; onChange: (value: string) => void }) {
   if (form === "skip") {
@@ -58,8 +77,8 @@ function FormInput({ view, form, value, onChange }: { view: Ready; form: Form; v
   );
 }
 
-/** C9: the bulk actions over `selected`, of which `hidden` are not on the page shown. */
-export function BulkBar({ view, selected, hidden, onLanded }: { view: Ready; selected: Facts[]; hidden: number; onLanded: () => void }) {
+/** C9: the bulk actions over `selected`, of which `hidden` are not in the list shown; `onClear` drops the selection. */
+export function BulkBar({ view, selected, hidden, onLanded, onClear }: { view: Ready; selected: Facts[]; hidden: number; onLanded: () => void; onClear?: () => void }) {
   const write = useNodeWrite(view, "bulk");
   const draft = useFormDraft<{ form: Form; value: string }>(write.journey, "selection", "bulk");
   const [unable, setUnable] = useState<string[]>([]);
@@ -72,19 +91,35 @@ export function BulkBar({ view, selected, hidden, onLanded }: { view: Ready; sel
     }
   };
   const open = draft.draft;
+  // Only what some selected node can take is offered: the others would only be refused.
+  const offered = OFFERS.filter((offer) => selected.some((facts) => canTake(offer.asks, facts)));
+  const pick = (offer: Offer) => {
+    if (offer.form === undefined) {
+      void act(offer.asks);
+    } else {
+      draft.open({ form: offer.form, value: offer.form === "snooze-date" ? view.key.today : "" }, write.seen);
+    }
+  };
   return (
     <div className="panel stack bulk-bar" data-testid="bulk-bar" data-count={selected.length}>
       <div className="row">
         <strong>{selected.length} selected</strong>
-        {hidden === 0 ? null : <span className="muted small" data-testid="selected-elsewhere">({hidden} on other pages)</span>}
-        <Button disabled={write.disabled} onClick={() => void act({ act: "start" })}>Start</Button>
-        <Button disabled={write.disabled} onClick={() => void act({ act: "done" })}>Done</Button>
-        <Button disabled={write.disabled} onClick={() => void act({ act: "unsnooze" })}>Unsnooze</Button>
-        {(Object.keys(FORM_WORDS) as Form[]).map((form) => (
-          <Button key={form} disabled={write.disabled} onClick={() => { draft.open({ form, value: form === "snooze-date" ? view.key.today : "" }, write.seen); }}>
-            {FORM_WORDS[form]}
-          </Button>
+        {hidden === 0 ? null : <span className="muted small" data-testid="selected-elsewhere">({hidden} not shown)</span>}
+        {offered.slice(0, INLINE_MAX).map((offer) => (
+          <Button key={offer.words} disabled={write.disabled} onClick={() => { pick(offer); }}>{offer.words}</Button>
         ))}
+        {offered.length <= INLINE_MAX ? null : (
+          <Menu label="More actions" testId="bulk-more" trigger="More ▾">
+            {(close) =>
+              offered.slice(INLINE_MAX).map((offer) => (
+                <button key={offer.words} type="button" role="menuitem" className="menu-item" disabled={write.disabled} onClick={() => { close(); pick(offer); }}>
+                  {offer.words}
+                </button>
+              ))
+            }
+          </Menu>
+        )}
+        {onClear === undefined ? null : <Button ghost onClick={onClear}>Clear selection</Button>}
       </div>
       {open === undefined ? null : (
         <div className="row" data-testid="bulk-form" data-form={open.value.form}>

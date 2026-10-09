@@ -1,10 +1,8 @@
-// C13, F7: the timeline's axis and rows: the `final` milestone as the end anchor (and none
+// C13, F7: the timeline's axis: the `final` milestone as the end anchor (and none
 // without one), the span holding today and every date, ticks few enough at the finest step
-// that fits, each date placed along the axis, and each row telling actual, pin, and derived
-// due apart with overdue and shortfall marked.
+// that fits, and each date placed along the axis.
 import { describe, expect, it } from "vitest";
 
-import { testView } from "../detail/view.test-support.ts";
 import {
   AXIS_MARGIN_DAYS,
   TICK_COUNT_MAX,
@@ -14,9 +12,8 @@ import {
   dayOf,
   endAnchor,
   positionOf,
+  rangeWindow,
   timelineAxis,
-  timelineKeeps,
-  timelineRows,
   type Timeline,
   type TimelineEntry,
 } from "./model.ts";
@@ -58,14 +55,6 @@ describe("C13: the end anchor", () => {
     const undated: Timeline = { entries: withoutFinal.entries, end: "n_meeting_later", undated: ["n_meeting_later"] };
     expect(endAnchor(undated)).toBeUndefined();
   });
-
-  it("marks only the final milestone's row as the end", () => {
-    const view = testView();
-    const rows = timelineRows(view, withFinal, timelineAxis(withFinal, today));
-    expect(rows.filter((row) => row.end).map((row) => row.node)).toEqual(["n_meeting"]);
-    const without = timelineRows(view, withoutFinal, timelineAxis(withoutFinal, today));
-    expect(without.filter((row) => row.end)).toEqual([]);
-  });
 });
 
 describe("C13: the axis", () => {
@@ -88,6 +77,13 @@ describe("C13: the axis", () => {
     const placed = withFinal.entries.map((each) => positionOf(axis, each.date));
     expect(placed.every((at) => at > 0 && at < 1)).toBe(true);
     expect([...placed].sort((a, b) => a - b)).toEqual(placed);
+  });
+
+  it("shows only a range's days around today, whatever dates lie beyond", () => {
+    const month = timelineAxis(withFinal, today, [], rangeWindow("month", today));
+    expect(month.start).toBe(dateOf(dayOf(today) - 3));
+    expect(dayOf(month.end) - dayOf(month.start)).toBe(31);
+    expect(rangeWindow("fit", today)).toBeUndefined();
   });
 
   const spans: { last: string; unit: string }[] = [
@@ -113,30 +109,6 @@ describe("C13: the axis", () => {
       }
     });
   }
-});
-
-describe("F7: the rows", () => {
-  it("tell actual, pin, and derived due apart and carry overdue and shortfall", () => {
-    const view = testView();
-    const rows = timelineRows(view, withFinal, timelineAxis(withFinal, today));
-    expect(rows.map((row) => [row.node, row.title, row.origin, row.overdue, row.shortfallDays])).toEqual([
-      ["n_findings", "Findings", "due", true, undefined],
-      ["n_meeting", "Meeting", "pin", false, 2],
-      ["n_report", "Report", "pin", false, undefined],
-    ]);
-  });
-});
-
-describe("the toolbar's narrowing", () => {
-  const none = { decisions: false, kinds: [], text: "" } as const;
-  it("keeps what DECISIONS, the kinds and the search all allow", () => {
-    expect(timelineKeeps(none, "action", "Draft the plan")).toBe(true);
-    expect(timelineKeeps({ ...none, decisions: true }, "action", "Draft the plan")).toBe(false);
-    expect(timelineKeeps({ ...none, decisions: true }, "decision", "Who runs testing?")).toBe(true);
-    expect(timelineKeeps({ ...none, kinds: ["milestone"] }, "deliverable", "Report")).toBe(false);
-    expect(timelineKeeps({ ...none, text: " PLAN " }, "action", "Draft the plan")).toBe(true);
-    expect(timelineKeeps({ ...none, text: "budget" }, "action", "Draft the plan")).toBe(false);
-  });
 });
 
 describe("dates in words", () => {

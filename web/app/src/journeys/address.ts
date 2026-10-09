@@ -173,7 +173,7 @@ export function nextProjection(page: JourneyPage, current: Projection): Projecti
  */
 const CHIP_APPLIES: Record<"decisions" | "mine" | "q", (page: JourneyPage, projection: Projection) => boolean> = {
   decisions: () => true,
-  mine: (page, projection) => page === "next" || projection === "list",
+  mine: (page, projection) => page === "next" || projection === "list" || projection === "timeline",
   q: (page, projection) => page === "next" || projection !== "graph",
 };
 

@@ -55,9 +55,14 @@ export async function turnOn(page: Page, testId: string): Promise<void> {
   await expect(control).toHaveAttribute("data-status", "on");
 }
 
-/** Selects node `node`'s row on the list. */
+/** Selects node `node`'s row on the list, opening the tree if it is folded away. */
 export async function select(page: Page, node: string): Promise<void> {
-  await page.locator(`[data-testid="list-row"][data-node="${node}"] input[type=checkbox]`).check();
+  const row = page.locator(`[data-testid="list-row"][data-node="${node}"]`);
+  await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
+  if ((await row.count()) === 0) {
+    await page.getByTestId("list-fold-all").click();
+  }
+  await row.locator("input[type=checkbox]").check();
 }
 
 /** Waits until the page's derivation is past `revision`, and returns where it is. */

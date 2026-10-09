@@ -106,6 +106,12 @@ impl DerivedJourney<'_> {
                     .is_none_or(|owner| self.owners(key).contains(self.canonical(owner)))
             })
             .filter(|key| query.states.is_empty() || query.states.contains(&self.state(key)))
+            .filter(|key| {
+                query.display_states.is_empty()
+                    || query
+                        .display_states
+                        .contains(&self.derived.display_state(self.graph, key))
+            })
             .filter(|key| query.kinds.is_empty() || query.kinds.contains(&self.node(key).kind()))
             .filter(|key| {
                 text.as_ref()

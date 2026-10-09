@@ -147,6 +147,11 @@ function bulkMutation(action: BulkAction, facts: Facts): Mutation | undefined {
   }
 }
 
+/** Whether `facts`' node can take `action`: the bulk bar offers an action when any selected node can. */
+export function canTake(action: BulkAction, facts: Facts): boolean {
+  return bulkMutation(action, facts) !== undefined;
+}
+
 /**
  * C9: `action` over `selected` as one patch, one mutation per node in the order given; or,
  * when any selected node's kind or state cannot take it, those nodes, so nothing is sent

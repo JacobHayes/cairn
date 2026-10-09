@@ -8,7 +8,8 @@
 import type { Schema } from "@cairn/client";
 import type { ListQuery, NextQuery } from "@cairn/wasm";
 
-import type { NodeKind, State } from "../detail/model.ts";
+import type { NodeKind } from "../detail/model.ts";
+import { DISPLAY_STATES, type DisplayState } from "../status/words.ts";
 
 export type ListFlag = Schema<"ListFlag">;
 export type SortBy = Schema<"SortBy">;
@@ -36,8 +37,12 @@ export const NEXT_FILTER_FLAGS: ListFlag[] = LIST_FILTER_FLAGS.filter((flag) => 
 /** C9, C10: the single signals a list sorts by (Priority: effort when estimates exist). */
 export const SORTS: SortBy[] = ["rank", "slack", "gravity", "leverage", "due", "effort"];
 
-/** Every stored state, by kind's machine (D1); a group's is `derived`. */
-export const STATES: State[] = ["open", "decided", "todo", "active", "done", "pending", "reached", "skipped", "derived"];
+/** D8: the states the list's filter offers: every display state but not relevant, which has its own switch. */
+export const STATES: DisplayState[] = DISPLAY_STATES.filter((state) => state !== "not_relevant");
+
+/** C9: the columns Columns adds beyond the ones every list shows, in the order they sit. */
+export const LIST_COLUMNS = ["rank", "start_by", "slack", "gravity", "unblocks", "kind", "answer", "why", "affects", "effort"] as const;
+export type ListColumn = (typeof LIST_COLUMNS)[number];
 
 /** Every kind; groups are never on the frontier, so the acting surfaces offer the others. */
 export const LIST_KINDS: NodeKind[] = ["decision", "deliverable", "action", "milestone", "group"];
@@ -49,12 +54,16 @@ export interface ListSettings {
   /** By group: the container whose subtree the list is narrowed to. */
   within: string | undefined;
   owner: string | undefined;
-  states: State[];
+  /** The display states shown; any (not relevant apart) when empty. */
+  states: DisplayState[];
+  /** Not-relevant rows are hidden unless asked for (C9, 5.2). */
+  notRelevant: boolean;
   kinds: NodeKind[];
   text: string;
-  sort: SortBy;
-  /** Grouping by container. */
-  grouped: boolean;
+  /** The one signal the rows are sorted by, which flattens the tree; none keeps plan order. */
+  sort: SortBy | undefined;
+  /** The columns added to the defaults. */
+  columns: ListColumn[];
   /** The DECISIONS chip: the decisions only (C12). */
   decisions: boolean;
 }
@@ -92,8 +101,12 @@ function listed<T extends string>(params: URLSearchParams, name: string, known: 
 }
 
 function sortFrom(params: URLSearchParams): SortBy {
+  return listSortFrom(params) ?? "rank";
+}
+
+function listSortFrom(params: URLSearchParams): SortBy | undefined {
   const sort = params.get("sort");
-  return SORTS.find((each) => each === sort) ?? "rank";
+  return SORTS.find((each) => each === sort);
 }
 
 function setList(params: URLSearchParams, name: string, values: readonly string[]): void {
@@ -123,10 +136,11 @@ export function listFrom(params: URLSearchParams): ListSettings {
     within: params.get("in") ?? undefined,
     owner: params.get("owner") ?? undefined,
     states: listed(params, "state", STATES),
+    notRelevant: params.get("show") === "notrelevant",
     kinds: listed(params, "kind", LIST_KINDS),
     text: params.get("q") ?? "",
-    sort: sortFrom(params),
-    grouped: params.get("group") === "container",
+    sort: listSortFrom(params),
+    columns: listed(params, "cols", LIST_COLUMNS),
     decisions: params.get("decisions") === "1",
   };
 }
@@ -143,22 +157,34 @@ export function listParams(settings: ListSettings): URLSearchParams {
     params.set("owner", settings.owner);
   }
   setList(params, "state", settings.states);
+  if (settings.notRelevant) {
+    params.set("show", "notrelevant");
+  }
   setList(params, "kind", settings.kinds);
   if (settings.text !== "") {
     params.set("q", settings.text);
   }
-  if (settings.sort !== "rank") {
+  if (settings.sort !== undefined) {
     params.set("sort", settings.sort);
   }
-  if (settings.grouped) {
-    params.set("group", "container");
-  }
+  setList(params, "cols", settings.columns);
   return params;
+}
+
+/**
+ * C9, D8: the display states a list asks for. Not-relevant rows are left out unless asked for,
+ * so the list holds what the plan's count does; states chosen by name are all there is.
+ */
+export function listDisplayStates(settings: ListSettings): DisplayState[] {
+  if (settings.states.length > 0) {
+    return settings.notRelevant ? [...settings.states, "not_relevant"] : settings.states;
+  }
+  return settings.notRelevant ? [] : STATES;
 }
 
 /** C9: the engine's query for `settings`, from `cursor` when paging. */
 export function listQueryOf(settings: ListSettings, cursor?: number): ListQuery {
-  const query: ListQuery = { flags: settings.flags, states: settings.states, kinds: settings.decisions ? ["decision"] : settings.kinds, sort: settings.sort };
+  const query: ListQuery = { flags: settings.flags, display_states: listDisplayStates(settings), kinds: settings.decisions ? ["decision"] : settings.kinds, sort: settings.sort ?? "rank" };
   if (settings.within !== undefined) {
     query.within = settings.within;
   }

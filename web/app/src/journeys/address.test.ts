@@ -85,7 +85,7 @@ describe("the journey's pages (2.2, 2.3)", () => {
     expect(carriedSearch(search, "plan", "list")).toBe("?decisions=1&mine=1&q=plan");
     expect(carriedSearch(search, "next", "cards")).toBe("?decisions=1&mine=1&q=plan");
     expect(carriedSearch(search, "plan", "graph")).toBe("?decisions=1");
-    expect(carriedSearch(search, "plan", "timeline")).toBe("?decisions=1&q=plan");
+    expect(carriedSearch(search, "plan", "timeline")).toBe("?decisions=1&mine=1&q=plan");
     expect(carriedSearch("?sort=due", "plan", "list")).toBe("");
   });
 

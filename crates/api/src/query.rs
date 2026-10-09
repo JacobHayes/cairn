@@ -9,10 +9,10 @@ use std::fmt;
 use std::str::FromStr;
 
 use cairn_schema::{
-    Cursor, Domain, EntityKey, EventType, JourneyId, JourneyStatus, KindKey, LevelDisplay,
-    LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId, ProposalId, Revision,
-    RevisionOf, RouteId, RouteKind, SnapshotScope, SortBy, State, Timestamp, Title, UserId,
-    VersionNumber,
+    Cursor, DisplayState, Domain, EntityKey, EventType, JourneyId, JourneyStatus, KindKey,
+    LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId,
+    ProposalId, Revision, RevisionOf, RouteId, RouteKind, SnapshotScope, SortBy, State, Timestamp,
+    Title, UserId, VersionNumber,
 };
 use cairn_store::{EventQuery, JourneyQuery, PageSize, SearchQuery, Watch};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
@@ -203,6 +203,10 @@ pub const LIST_PARAMS: &[ParamSpec] = &[
     ParamSpec::one::<NodeKey>("within", "Only nodes beneath this container."),
     ParamSpec::one::<EntityKey>("owner", "Only nodes this entity owns."),
     ParamSpec::many::<State>("state", "Only nodes in these stored states; any when none."),
+    ParamSpec::many::<DisplayState>(
+        "display_state",
+        "Only nodes showing these display states; any when none.",
+    ),
     KINDS,
     ParamSpec::one::<Title>(
         "text",
@@ -458,6 +462,7 @@ pub fn list(params: &Params) -> Result<ListQuery, ApiError> {
         within: params.one("within")?,
         owner: params.one("owner")?,
         states: params.all("state")?.into_iter().collect(),
+        display_states: params.all("display_state")?.into_iter().collect(),
         kinds: params.all("kind")?.into_iter().collect(),
         text: params.one("text")?,
         sort: params.one("sort")?.unwrap_or_default(),

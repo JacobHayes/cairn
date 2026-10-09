@@ -64,7 +64,7 @@ test("a placeholder's card, and what would unblock the next decisions", async ({
   await shot(page, "4-placeholder-card");
   await openActing(page, "server", journey, "plan/list?flag=decisions_needed");
   await expect.poll(() => listKeys(page)).toHaveLength(5);
-  await page.getByRole("button", { name: "Select all shown" }).click();
+  await page.getByLabel("Select every row shown").click();
   await page.getByRole("button", { name: "Skip..." }).click();
   await page.getByLabel("Why skip them").fill("decided elsewhere");
   await page.getByRole("button", { name: "Apply to 5" }).click();
@@ -96,8 +96,8 @@ test("the next list ranked, re-sorted, and stalled", async ({ page }) => {
 });
 
 test("the list: filters, grouping, search, bulk", async ({ page }) => {
-  await openActing(page, "browser", "j_vendor_eval", "plan/list?kind=deliverable,action&group=container");
-  await expect(page.getByTestId("list-group").first()).toBeVisible();
+  await openActing(page, "browser", "j_vendor_eval", "plan/list?kind=deliverable,action");
+  await expect(page.getByTestId("list-row").first()).toBeVisible();
   await shot(page, "9-list-filtered-and-grouped");
   await openActing(page, "browser", "j_vendor_eval", "plan/list?q=environment%20team");
   await expect.poll(() => listKeys(page)).toEqual(["n_access"]);
@@ -114,7 +114,8 @@ test("the list: filters, grouping, search, bulk", async ({ page }) => {
   const snoozedFrom = await derivedRevision(page);
   await select(page, "n_docs");
   await select(page, "n_announcement");
-  await page.getByRole("button", { name: "Snooze until a node..." }).click();
+  await page.getByRole("button", { name: "More actions" }).click();
+  await page.getByRole("menuitem", { name: "Snooze until a node..." }).click();
   await page.getByLabel("Snooze them until node").selectOption("n_beta_end");
   await page.getByRole("button", { name: "Apply to 2" }).click();
   record("bulkSnooze", { before: snoozedFrom, after: await revisionAfter(page, snoozedFrom) });

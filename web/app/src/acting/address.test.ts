@@ -24,11 +24,12 @@ const everything: ListSettings = {
   flags: ["mine", "overdue", "snoozed_and_overdue"],
   within: "n_setup",
   owner: "e_lead",
-  states: ["todo", "active"],
+  states: ["active", "ready"],
+  notRelevant: true,
   kinds: ["deliverable", "action"],
   text: "plan",
   sort: "slack",
-  grouped: true,
+  columns: ["rank", "unblocks"],
   decisions: false,
 };
 
@@ -42,6 +43,11 @@ describe("the list's address (C9)", () => {
     expect(listParams(DEFAULT_LIST).toString()).toBe("");
   });
 
+  it("leaves not-relevant out of the display states it asks for, unless asked", () => {
+    expect(listQueryOf({ ...DEFAULT_LIST, notRelevant: true }).display_states).toEqual([]);
+    expect(listQueryOf({ ...DEFAULT_LIST, states: ["done"], notRelevant: true }).display_states).toEqual(["done", "not_relevant"]);
+  });
+
   it("writes the mine flag as the chip's own parameter, and reads either", () => {
     const params = listParams({ ...DEFAULT_LIST, flags: ["mine", "overdue"] });
     expect(params.toString()).toBe("mine=1&flag=overdue");
@@ -50,8 +56,8 @@ describe("the list's address (C9)", () => {
   });
 
   it("drops filters, states, kinds, and sorts it does not know", () => {
-    const settings = listFrom(new URLSearchParams("flag=mine,bogus&state=todo,lost&kind=group,shape&sort=weight"));
-    expect([settings.flags, settings.states, settings.kinds, settings.sort]).toEqual([["mine"], ["todo"], ["group"], "rank"]);
+    const settings = listFrom(new URLSearchParams("flag=mine,bogus&state=done,lost&kind=group,shape&sort=weight&cols=rank,bogus"));
+    expect([settings.flags, settings.states, settings.kinds, settings.sort, settings.columns]).toEqual([["mine"], ["done"], ["group"], undefined, ["rank"]]);
   });
 
   it("asks the engine for every filter at once, a page from its cursor", () => {
@@ -59,7 +65,7 @@ describe("the list's address (C9)", () => {
       flags: everything.flags,
       within: "n_setup",
       owner: "e_lead",
-      states: everything.states,
+      display_states: ["active", "ready", "not_relevant"],
       kinds: everything.kinds,
       text: "plan",
       sort: "slack",

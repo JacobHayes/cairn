@@ -6422,6 +6422,8 @@ export interface operations {
                 owner?: components["schemas"]["EntityKey"];
                 /** @description Only nodes in these stored states; any when none. */
                 state?: components["schemas"]["State"][];
+                /** @description Only nodes showing these display states; any when none. */
+                display_state?: components["schemas"]["DisplayState"][];
                 /** @description Only nodes of these kinds; every kind when none. */
                 kind?: components["schemas"]["NodeKind"][];
                 /** @description Text found in the title, description, notes, or resources, ignoring ASCII case. */

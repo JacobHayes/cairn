@@ -285,11 +285,6 @@
   flex-direction: column;
 }
 
-.list-group th {
-  background: var(--color-band);
-  color: var(--color-text);
-}
-
 /* NEXT, CARDS: the card is the inspector's own panel at a readable width, Pass on the frame's
    edge below it. */
 .pass-frame {
@@ -306,13 +301,204 @@
   gap: var(--space-2);
 }
 
-/* The columns past the kind give way when the region cannot hold them: it is narrower than the
-   window by the rail, and by the inspector's column while a node is open. */
+/* The decision's why gives way when the region cannot hold it: it is narrower than the window by
+   the rail, and by the inspector's column while a node is open. The columns Columns adds stay and
+   the region scrolls to them, with Status and Title held at the left. A phone drops the owner, so
+   Status, Title and Due fit. */
 @container journey-scroll (max-width: 810px) {
-  .list-table th:nth-child(n + 6),
-  .list-table td:nth-child(n + 6) {
+  .list-table [data-gives-way="true"] {
     display: none;
   }
+}
+
+@container journey-scroll (max-width: 560px) {
+  .list-table [data-column="owner"] {
+    display: none;
+  }
+}
+
+/* C9: the Plan list. Air before lines: tall rows, no vertical rules, a quiet header in plain
+   words. A checkbox shows when a row is hovered or focused, or once anything is selected. */
+.list-strip {
+  gap: var(--space-3);
+  align-items: center;
+}
+
+table.data.list-table th,
+table.data.list-table td {
+  padding: var(--space-3) var(--space-2);
+  vertical-align: middle;
+}
+
+table.data.list-table th + th,
+table.data.list-table td + td {
+  border-left: 0;
+}
+
+/* Chrome sticks a header to the scroller's edge, not its padding: the shared pull-up would slice it. */
+table.data.list-table th {
+  top: 0;
+  font: 600 13px / 1.4 var(--font-body);
+  text-transform: none;
+  letter-spacing: 0;
+}
+
+table.data.list-table tbody td {
+  min-height: 64px;
+  height: 64px;
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+.list-table th,
+.list-table td[data-column="due"],
+.list-table td[data-column="affects"],
+.list-table td[data-column="start_by"],
+.list-table td[data-column="slack"],
+.list-table td[data-column="effort"] {
+  white-space: nowrap;
+}
+
+table.data.list-table .badge {
+  font-size: 11px;
+}
+
+/* Status and Title stay at the left while the other columns scroll under them. */
+.list-table .list-pinned {
+  position: sticky;
+  left: 0;
+}
+
+/* A held cell is opaque, so what scrolls under it does not show through; a selected row's tint sits on top. */
+.list-table td.list-pinned {
+  background: var(--color-surface);
+}
+
+.list-table tbody tr:hover td.list-pinned {
+  background: linear-gradient(var(--color-hover), var(--color-hover)), var(--color-surface);
+}
+
+.list-table tr[data-selected="true"] td.list-pinned,
+.list-table tr[aria-selected="true"] td.list-pinned {
+  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--color-surface);
+}
+
+.list-table [data-column="status"].list-pinned {
+  left: var(--space-6);
+}
+
+.list-table [data-column="title"].list-pinned {
+  left: calc(var(--space-6) + 112px);
+}
+
+.list-table th.list-pinned {
+  z-index: 2;
+}
+
+.list-table td[data-column="status"],
+.list-table th[data-column="status"] {
+  width: 112px;
+  min-width: 112px;
+}
+
+@container journey-scroll (min-width: 561px) {
+  .list-table td[data-column="title"],
+  .list-table th[data-column="title"] {
+    min-width: 224px;
+  }
+}
+
+.list-check {
+  width: var(--space-6);
+  min-width: var(--space-6);
+  box-sizing: border-box;
+  padding-inline-end: 0;
+}
+
+.list-checkbox {
+  opacity: 0;
+}
+
+.list-table tr:hover .list-checkbox,
+.list-table .list-checkbox:focus-visible,
+.list-table .list-checkbox:checked,
+.list-table[data-selecting="true"] .list-checkbox {
+  opacity: 1;
+}
+
+@media (hover: none) {
+  .list-checkbox {
+    opacity: 1;
+  }
+}
+
+.list-table tr[aria-selected="true"] td {
+  background: var(--color-tint);
+}
+
+.list-title {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+}
+
+span.list-fold {
+  flex: none;
+  width: var(--space-5);
+}
+
+button.list-fold {
+  flex: none;
+  width: var(--space-5);
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-muted);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: center;
+}
+
+button.list-sort {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+
+.list-late {
+  color: var(--color-error);
+}
+
+.list-unassigned {
+  color: var(--color-warning);
+}
+
+.list-why {
+  display: block;
+  max-width: 28ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* A selection replaces the column labels with the bulk actions: sentence case, not a label. */
+table.data.list-table th.bulk-head {
+  font: inherit;
+  font-weight: 400;
+  color: var(--color-text);
+  background: var(--color-surface);
+  padding: var(--space-3);
+}
+
+/* Padded by the corner ticks' size, so they clear the count. */
+.list-table .bulk-head .bulk-bar {
+  border: 0;
+  padding: var(--space-3);
 }
 
 /* Mine: each journey's group, its rows in that journey's rank. */
