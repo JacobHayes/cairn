@@ -1,12 +1,12 @@
 # Cairn: feature briefs
 
-Every brief here has landed. Together they are the record of the milestones that built Cairn: what each built, in what order, and how it was shown to work, with its decision log and its proof under `briefs/proof/<id>/`. Read the ones that built what your work touches; new work does not start from a brief (`AGENTS.md`), and the proofs of later changes sit beside theirs, under `briefs/proof/YYYY-MM-DD-<short-slug>/`. A brief points into `PRD.md`, `ARCHITECTURE.md`, and `PRACTICES.md` by requirement id and section heading and does not restate them; where a brief and a document disagree, the document wins (`AGENTS.md`).
+Briefs are Cairn's implementation milestones: what each builds, in what order, and how it is shown to work, with its decision log and its proof under `briefs/proof/<id>/`. Phases 1 to 6 have landed and are the record of the milestones that built Cairn; read the ones that built what your work touches. Phase 7 is planned: each of its briefs is a unit of work for whoever picks it up, built and proved the way the landed ones were, and marked landed in the table below in the same commit. Work that no brief covers starts from the documents alone (`AGENTS.md`), and its proof sits beside the briefs' proofs, under `briefs/proof/YYYY-MM-DD-<short-slug>/`. A brief points into `PRD.md`, `ARCHITECTURE.md`, and `PRACTICES.md` by requirement id and section heading and does not restate them; where a brief and a document disagree, the document wins (`AGENTS.md`).
 
 Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase, steps run in order unless the table says otherwise. 4.8 and 4.9 finish what 4.1 and 4.2 start once the engine is complete, so they run before 4.3 and 4.5, which depend on them ([`decisions/2026-10-06-the-service-and-api-split-at-the-engines-2-4-boundary.md`](../decisions/2026-10-06-the-service-and-api-split-at-the-engines-2-4-boundary.md)).
 
 ## Template
 
-The shape every brief followed.
+The shape every brief follows.
 
 1. **Header**: id, title, crates or packages, depends on.
 2. **Goal**: one paragraph.
@@ -51,6 +51,13 @@ The shape every brief followed.
 | 5.8 | Assistant panel | `web/app` | 5.7, 4.4 | landed |
 | 6.1 | Multiplayer testbed | `testbeds/multiplayer` | 4.2, 1.3 | landed |
 | 6.2 | Durability testbed | `testbeds/durability` | 4.1 | landed |
+| 7.1 | Unlocked nodes first in a pass | `web/app` | 5.3 | planned |
+| 7.2 | A rationale on answers | `crates/schema`, `crates/engine`, `crates/store`, `crates/store-turso`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.4 | planned |
+| 7.3 | The `requires_note` guard | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `openapi/`, `web/client`, `web/app` | 5.6 | planned |
+| 7.4 | Snoozing a container | `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `web/app` | 5.3 | planned |
+| 7.5 | Notices: work the final milestone cannot see | `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.6 | planned |
+| 7.6 | Segments: model, insertion, upgrade, save as segment | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `fixtures/` | 4.3 | planned |
+| 7.7 | Segment screens | `web/app` | 7.6, 5.7 | planned |
 
 Rule for links between screens: a screen only links to screens that already exist. The brief that builds a screen adds the entry points into it from earlier screens (5.7 adds "break down" to triage and the upgrade, save-as-route, and re-link entries to the overview; 5.8 mounts its panel on earlier screens).
 
@@ -73,9 +80,16 @@ flowchart LR
     s44 --> s58
     s42 & s13 -.-> s61[6.1]
     s41 -.-> s62[6.2]
+    s53 --> s71[7.1]
+    s54 --> s72[7.2]
+    s56 --> s73[7.3]
+    s53 --> s74[7.4]
+    s56 --> s75[7.5]
+    s43 --> s76[7.6]
+    s76 & s57 --> s77[7.7]
 ```
 
-Dotted: the simulation track (1.3, 6.1, 6.2). It is exploratory and gates nothing (PRACTICES, Simulation): no other brief depends on it, it runs under `mise run sim`, never `mise run check`, and it can be picked up whenever its dependencies exist or skipped if the spike says the shim cannot carry it.
+Phase 7's briefs are independent of each other apart from 7.7 on 7.6, and can run in any order or side by side in separate jj workspaces. Dotted: the simulation track (1.3, 6.1, 6.2). It is exploratory and gates nothing (PRACTICES, Simulation): no other brief depends on it, it runs under `mise run sim`, never `mise run check`, and it can be picked up whenever its dependencies exist or skipped if the spike says the shim cannot carry it.
 
 ## Coverage
 
@@ -97,23 +111,27 @@ Every PRD requirement id and named section, mapped to the brief that owns its ac
 | A10 | 2.6 | 1.2, 5.1 |
 | A11 | 4.1 | 2.1, 5.5 |
 | A12 | 5.6 | 4.1, 4.3, 4.4 |
-| A13 | 2.7 | 2.1 (fixtures load), 4.8, 4.9, 5.5 |
-| A15, A16, A17, A18 | 2.1 | 1.2, 4.1, 4.2 |
-| A19 | 4.1 | 3.1, 5.5 |
-| B1, B2, B3, B5, B10, B11 | 2.1 | 2.2, 4.1, 5.3, 5.5, 5.6 |
+| A13 | 2.7 | 2.1 (fixtures load), 4.8, 4.9, 5.5, 7.6 (segment files) |
+| A15, A16, A17, A18 | 2.1 | 1.2, 4.1, 4.2, 7.3 (`requires_note`), 7.5 (notices), 7.6 (the segment domain) |
+| A19 | 4.1 | 3.1, 5.5, 7.6 (retiring a segment) |
+| A20 | 7.5 | - |
+| A21 | 7.6 | 7.7 |
+| B1, B2, B3, B5, B10, B11 | 2.1 | 2.2, 4.1, 5.3, 5.5, 5.6, 7.2 (rationale) |
 | B4 | 2.1 | 5.6, 2.7 |
-| B6 | 2.4 | 2.1, 5.3 |
+| B6 | 2.4 (actionable nodes), 7.4 (containers) | 2.1, 5.3 |
 | B7, B8, B9 | 2.7 | 4.8, 4.9, 5.7 |
 | B12 | none (reserved) | - |
+| B13, B14, B15 | 7.6 | 7.7 |
 | C1, C3, C4, C5, C6, C7, C15 | 5.2 | 2.6 |
 | C2 | 2.6 (roll-up rules) | 5.2 |
-| C8 | 5.1 | 2.6 |
-| C9, C10, C11 | 5.3 | 2.6 |
-| C12, C13, C18 | 5.4 | 2.6 |
+| C8 | 5.1 | 2.6, 7.2 |
+| C9, C10, C11 | 5.3 | 2.6, 7.1 (pass order after an action), 7.4 |
+| C12, C13, C18 | 5.4 | 2.6, 7.2 (C12) |
 | C14 | 5.7 | 2.7, 4.8, 4.9 |
 | C16, C17 | 5.5 | 3.1, 2.6 |
+| C19 | 7.7 | 7.6 |
 | D1, D1a | 2.1 | 2.2 |
-| D2, D4, D5, D7 | 2.4 | 2.1, 4.1, 4.6 |
+| D2, D4, D5, D7 | 2.4 | 2.1, 4.1, 4.6, 7.3 (`has_note`), 7.4 (D5) |
 | D3, D6 | 2.2 (the `Derived` struct) | every engine brief; 4.8 (memoized reads) |
 | E1, E2, E5 | 2.2 | - |
 | E3 | 2.1 | 5.1 |
@@ -122,17 +140,18 @@ Every PRD requirement id and named section, mapped to the brief that owns its ac
 | F1 to F7 | 2.3 | 2.2, 2.4, 5.1, 5.4 |
 | G1, G2 | 2.1 | 5.1, 5.5 |
 | G3 | 2.6 | 5.1 |
+| G4 | 7.3 | - |
 | H1, H4 | 3.2 | 4.1 |
 | H3 | 4.1 | 3.2 (verified emails), 2.2, 5.5 |
 | H2 | 4.1 (the actor), 4.8 (the confirming user) | 3.2, 4.4 |
 | H5 | 3.1 | 1.2, 2.1, 4.1, 4.2, 6.1 |
 | H6 | 4.6 | 4.1, 4.2, 4.5, 5.5, 6.1 |
 | I1 | 4.2 | 4.9 |
-| I2, I4, I7 | 4.3 | 3.2, 4.8 (I7) |
+| I2, I4, I7 | 4.3 | 3.2, 4.8 (I7), 7.6 (segment tools and instructions) |
 | I3 | 2.6 | 4.8, 4.9, 4.3 |
 | I5 | 4.4 | 5.8 |
 | I6 | 4.8 | 2.7, 4.9, 5.7 |
-| J1, J2, J3 | 2.1 | 3.1, 6.1, 6.2 |
+| J1, J2, J3 | 2.1 | 3.1, 6.1, 6.2, 7.2, 7.4, 7.6 |
 | J4 | 2.6 | 5.1 |
 | J5 | 3.1 | 4.2 |
 | Non-functional: Config-first | 5.6 | 4.4 |
