@@ -33,7 +33,7 @@ You are changing Cairn: a feature, a fix, a refactor, tests or CI, documents, or
 ## Repository conventions
 
 - Version control is jj, not git. Commit only your own files.
-- Commit messages: a short imperative title (at most 72 characters, aim for 50-60), a blank line, then a body wrapped at 72 columns saying what changed and why, with notable design calls and how it was verified. No internal ids (brief, requirement, review-round, or ticket ids) and no trailers.
+- Commit messages: a short imperative title (at most 72 characters, aim for 50-60), a blank line, then a body wrapped at 72 columns saying what changed and why, with notable design calls and how it was verified. No internal ids (brief, requirement, review-round, or ticket ids).
 - Generated files live only in the generated paths ARCHITECTURE lists (Generated artifacts), are marked as generated, and are never edited by hand. They are regenerated with `mise run gen` and committed in the same change as the source that changed them. Hand-written code sits beside them, never inside them.
 - A new dependency is justified in one line in the commit message that adds it (PRACTICES, Dependencies are deliberate).
 - ASCII punctuation in documents and comments: plain hyphens, straight quotes.
