@@ -117,9 +117,8 @@ Tools are pinned in `mise.toml`; tasks live in `mise-tasks/`.
 ```sh
 mise run check        # every rung of the validation ladder
 mise run check:fast   # rungs 1 to 3: the inner loop
+mise run check:fast dates   # only the Rust tests, Vitest files and Playwright spec matching a filter
 mise run check:1      # one rung
-mise run test dates   # the Rust and web tests matching a filter; none: those for what changed
-mise run e2e canvas   # one Playwright spec in Chromium, optionally one test by title
 mise run gen          # regenerate the generated files
 mise run sim          # simulation campaigns under patina; not part of check
 mise run build        # the release binary, with the web build embedded

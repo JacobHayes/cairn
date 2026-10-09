@@ -109,15 +109,18 @@ if [ "$fixing" -eq 1 ]; then
     --all-features -- "${raised[@]}" >"$typescript/clippy-fix.out" 2>&1 || true
   cargo fmt --all >/dev/null 2>&1 || true
   wait "$eslint_job" || true
-  printf 'rung %s fixed: %s files\n' "$LADDER_RUNG" \
-    "$(ladder_changed_files "$sums_before" "$(ladder_source_sums)")"
+  fixed=$(ladder_changed_files "$sums_before" "$(ladder_source_sums)")
+  [ "$fixed" -eq 0 ] || ladder_show "$ladder_name: fixed $fixed files (commit them)"
 fi
 
 # rustfmt -v names each file it checks; a check failure prints the diff.
 fmt_status=0
 fmt_output=$(cargo fmt --all --check -- -v 2>&1) || fmt_status=$?
-grep -v -e '^Formatting ' -e '^Spent ' <<<"$fmt_output" || true
-[ "$fmt_status" -eq 0 ] || ladder_fail "rustfmt: files are not formatted (run: cargo fmt --all)"
+printf '%s\n' "$fmt_output"
+[ "$fmt_status" -eq 0 ] || {
+  { grep -v -e '^Formatting ' -e '^Spent ' <<<"$fmt_output" || true; } | ladder_show
+  ladder_fail "rustfmt: files are not formatted (run: cargo fmt --all)"
+}
 ladder_suite rustfmt "$(grep -c '^Formatting ' <<<"$fmt_output" || true)" files
 
 # clippy over the whole workspace in one run, warnings denied (pedantic included) and each
@@ -128,8 +131,9 @@ ladder_suite rustfmt "$(grep -c '^Formatting ' <<<"$fmt_output" || true)" files
 # `--no-deps` lints the workspace's crates and none of their dependencies.
 scopes=$(for name in "${!scoped_lints[@]}"; do printf '%s\t%s\n' "$name" "${scoped_lints[$name]}"; done)
 clippy_status=0
-clippy_output=$(cargo clippy --locked --workspace --no-deps --all-targets --all-features \
-  --message-format=json -- "${raised[@]}") || clippy_status=$?
+clippy_output=$(cargo clippy -q --locked --workspace --no-deps --all-targets --all-features \
+  --message-format=json -- "${raised[@]}" 2>"$typescript/clippy-cargo.err") || clippy_status=$?
+cat "$typescript/clippy-cargo.err"
 # The diagnostics that fail the rung, rendered, then how many crates were checked; a crate's
 # package id is "path+file:///<dir>#<name>@<version>", or "...<dir>#<version>" when the name
 # is the directory's.
@@ -148,6 +152,7 @@ clippy_result=$(SCOPES="$scopes" node -e '
   let text = "";
   process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
     const checked = new Set();
+    const shown = new Set();
     let failures = 0;
     for (const line of text.split("\n")) {
       if (!line.startsWith("{")) continue;
@@ -161,14 +166,22 @@ clippy_result=$(SCOPES="$scopes" node -e '
       if (level !== "warning" && level !== "error") continue;
       const owners = code === null ? undefined : scoped.get(code.code);
       if (level === "warning" && owners !== undefined && !owners.includes(crate)) continue;
-      process.stderr.write(rendered ?? `${crate}: ${message.message.message}\n`);
+      // The lib and its unit tests are checked as two targets and report the same diagnostic.
+      const text = rendered ?? `${crate}: ${message.message.message}\n`;
+      if (shown.has(text)) continue;
+      shown.add(text);
+      process.stderr.write(text);
       failures++;
     }
     console.log(`${failures} ${checked.size}`);
-  });' <<<"$clippy_output")
+  });' <<<"$clippy_output" 2>"$typescript/clippy.err")
+ladder_show <"$typescript/clippy.err"
 read -r clippy_failures checked <<<"$clippy_result"
-[ "$clippy_status" -eq 0 ] && [ "$clippy_failures" -eq 0 ] \
-  || ladder_fail "clippy reported errors or warnings (above)"
+if [ "$clippy_status" -ne 0 ] || [ "$clippy_failures" -ne 0 ]; then
+  # Cargo itself failed (a lock file out of date, say) when clippy named no diagnostic.
+  [ "$clippy_failures" -ne 0 ] || ladder_show <"$typescript/clippy-cargo.err"
+  ladder_fail "clippy reported errors or warnings"
+fi
 ladder_suite clippy "$checked" crates
 
 # PRACTICES, Simulation with patina: every `sometimes!`, `reachable!`, `always!`, and
@@ -218,8 +231,9 @@ labels=$(node -e '
   }
   for (const line of bad) console.error(line);
   console.log(bad.length === 0 ? count : -1);
-' "${sources[@]}")
-[ "$labels" -ge 0 ] || ladder_fail "a patina site label is not a kebab-case literal (above)"
+' "${sources[@]}" 2>"$typescript/labels.err")
+ladder_show <"$typescript/labels.err"
+[ "$labels" -ge 0 ] || ladder_fail "a patina site label is not a kebab-case literal"
 ladder_suite "patina site labels" "$labels" sites
 
 # ARCHITECTURE, Repository layout: the service is runtime-free (no tokio, database driver,
@@ -230,22 +244,22 @@ wasm_packages=()
 for name in "${wasm_crates[@]}"; do
   wasm_packages+=(-p "$name")
 done
-cargo check --locked --target wasm32-unknown-unknown "${wasm_packages[@]}" \
-  || ladder_fail "a runtime-free crate does not build for wasm32-unknown-unknown"
+ladder_run "a runtime-free crate's build for wasm32-unknown-unknown" \
+  cargo check -q --locked --target wasm32-unknown-unknown "${wasm_packages[@]}"
 ladder_suite "wasm32-unknown-unknown build" "${#wasm_crates[@]}" crates
 
 # The TypeScript checks started at the top. `--listFiles` names every file the typecheck read,
 # after any errors.
 wait
 [ "$(cat "$typescript/tsc.status")" -eq 0 ] || {
-  grep -v "^/" "$typescript/tsc.out" || true
+  { grep -v "^/" "$typescript/tsc.out" || true; } | ladder_show
   ladder_fail "the TypeScript typecheck reported errors"
 }
 typed=$(grep -c "^$PWD/web/" "$typescript/tsc.out" || true)
 ladder_suite "TypeScript typecheck" "$typed" files
 [ "$(cat "$typescript/eslint.status")" -eq 0 ] || {
-  cat "$typescript/eslint.err" >&2
-  node_modules/.bin/eslint --max-warnings 0 . || true
+  ladder_show <"$typescript/eslint.err"
+  { node_modules/.bin/eslint --max-warnings 0 . 2>&1 || true; } | ladder_show
   ladder_fail "eslint reported problems"
 }
 # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
@@ -254,7 +268,10 @@ ladder_suite eslint "$linted" files
 
 # DESIGN, Layout (the frame): one scroller per region, and tokens for colour and radius, in the app's
 # CSS (`mise run lint:css`; its rules are web/app/src/lint/css.ts). It prints the files it checked.
-css_files=$(mise-tasks/lint/css) || ladder_fail "the CSS lint reported violations (above)"
+css_files=$(mise-tasks/lint/css 2>"$typescript/css.err") || {
+  ladder_show <"$typescript/css.err"
+  ladder_fail "the CSS lint reported violations"
+}
 ladder_suite "css lint" "$css_files" files
 
 ladder_rung_end

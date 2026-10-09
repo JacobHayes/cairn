@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// What the current change touches, so the inner loop (`mise run check:fast`, `mise run test`)
+// What the current change touches, so the inner loop (`mise run check:fast`)
 // runs only the tests it can affect. The change is the files `jj diff -r @ --name-only` lists,
 // or `-r @-` when the working copy is empty (the usual state right after `jj commit`). When jj
 // is missing or the diff fails, everything counts as changed, so the answer errs toward

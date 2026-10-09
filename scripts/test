@@ -1,88 +1,161 @@
 #!/usr/bin/env bash
-# The targeted inner loop in one command (`mise run test [FILTER...]`): the Rust tests and the
-# web unit tests that match, and nothing else built or run.
+# The targeted inner loop (`mise run check:fast FILTER...`): only what matches the filters,
+# with nothing else built or run. `mise run check:fast` alone is the diff-aware ladder
+# (scripts/ladder).
 #
-# usage: scripts/test [FILTER...]
-#   With filters: every Rust test whose name contains one of them (any crate, any rung's: unit,
-#   property, conformance, ...), then, in each web package, the Vitest files whose path
-#   contains one, or, where no file does, the tests whose name matches one.
-#   Without: the tests for what the current change touches (scripts/changed): the fast Rust
-#   tests (rung 2's) when it touches a Rust input, and the web unit tests when it touches a
-#   web input.
-# The Rust test binaries are built as the ladder builds them (scripts/ladder-tests: the
-# workspace, every feature, no examples), so cargo recompiles only what the change made stale
-# and the next `mise run check:fast` finds the binaries built. It fails when nothing matched.
-# The binary's own tests that serve the web app (`binary::binary::`, rung 6's) need its build
-# embedded: `mise run build:web` first.
+# usage: scripts/test FILTER...
+#   - Rust: every test whose name contains a filter (any crate, any rung's: unit, property,
+#     conformance, cost, ...), run as the ladder runs them (scripts/ladder-tests: the
+#     workspace, every feature, no examples), so cargo recompiles only what the change made
+#     stale and the next `mise run check:fast` finds the binaries built. The binary's own
+#     tests that serve the web app (`binary::binary::`) need its build embedded: `mise run
+#     build:web` first.
+#   - Vitest, in each web package: the files whose path contains a filter, or, where no file
+#     does, the tests whose name matches one.
+#   - Playwright (web/app/e2e), in Chromium: a spec a filter names (`canvas`, `canvas.spec.ts`)
+#     whole, and a spec whose test titles contain a filter, only those tests. The module is
+#     bound (build:wasm: cargo decides, and the bindings are rebound only if it changed), the
+#     programs the servers start are built (scripts/built: cargo), and the four servers start
+#     side by side (scripts/e2e-servers), as in rung 6. A spec's @server tests run too.
+#     server.spec.ts, which only runs against the real binary, runs in the `binary` project,
+#     with the web build it embeds made first if stale; the other specs start no binary and
+#     build no web app.
+# Quiet, like the ladder: one line per part that ran, a failing test's name, output, and
+# rerun command, and the complete log in dist/ladder/last.log. It fails when nothing matched.
 set -euo pipefail
 cd "$(dirname "$0")/.."
+[ $# -gt 0 ] || { echo "usage: scripts/test FILTER..." >&2; exit 2; }
 filters=("$@")
-if [ ${#filters[@]} -gt 0 ]; then
-  rust=1
-  web=1
-else
-  read -r rust web count < <(scripts/changed)
-  [ "$rust" = 1 ] || [ "$web" = 1 ] || { echo "test: $count files changed, none a Rust or web input: no tests to run"; exit 0; }
-fi
+LADDER_RUNG=filter
+LADDER_NAME=filter
+# shellcheck source=scripts/ladder-lib.sh
+source scripts/ladder-lib.sh
 ran=0
 
-if [ "$rust" = 1 ]; then
-  LADDER_RUNG="test"
-  # shellcheck source=scripts/ladder-lib.sh
-  source scripts/ladder-lib.sh
-  arguments=("${ladder_unit_skips[@]}")
-  [ ${#filters[@]} -eq 0 ] || arguments=("${filters[@]}")
-  mkdir -p dist/ladder
-  results=dist/ladder/test-results
-  # Each binary's result line, except the ones where nothing matched; a failure prints its
-  # whole output, and fails the run (pipefail).
-  scripts/ladder-tests "$results" -- "${arguments[@]}" | { grep -v -E ': test result: ok\. 0 passed' || true; }
-  rust_ran=$(grep -c . "$results" || true)
-  echo "test: Rust: $rust_ran tests passed"
+# done_line PART START COUNT: one line for a part that ran.
+done_line() {
+  ladder_show "$ladder_name $1: passed, $3 tests, $((SECONDS - $2))s"
+}
+
+start=$SECONDS
+ladder_cargo_test -- "${filters[@]}" || ladder_fail "cargo test reported failures"
+rust_ran=$(grep -c . <<<"$ladder_tests" || true)
+if [ "$rust_ran" -gt 0 ]; then
+  done_line Rust "$start" "$rust_ran"
   ran=$((ran + rust_ran))
 fi
 
-if [ "$web" = 1 ]; then
-  built=
-  # A test's full name is its suites' titles and its own joined by " > ", as the reporter
-  # prints it, but the titles sit apart in the source, so grep looks for the last one.
-  names=$(IFS='|'; echo "${filters[*]}")
-  needles=()
-  for filter in "${filters[@]}"; do needles+=(-e "${filter##* > }"); done
-  for config in web/*/vitest.config.ts; do
-    package=$(dirname "$config")
-    mapfile -t files < <(find "$package/src" \( -name '*.test.ts' -o -name '*.test.tsx' \) | sort)
-    selection=()
-    if [ ${#filters[@]} -eq 0 ]; then
-      selection=("${files[@]}")
-    else
-      # The files whose path contains a filter; where none does, the files naming a test that
-      # does (grep finds them, and Vitest's -t then runs only those tests). A cheap look first
-      # keeps a Rust-only filter from paying for Vitest's start.
-      patterns=()
-      for filter in "${filters[@]}"; do patterns+=(-e "$filter"); done
-      mapfile -t selection < <(printf '%s\n' "${files[@]}" | grep -F "${patterns[@]}" || true)
-      if [ ${#selection[@]} -eq 0 ]; then
-        mapfile -t selection < <(grep -lF "${needles[@]}" "${files[@]}" || true)
-        [ ${#selection[@]} -eq 0 ] || selection+=(-t "$names")
-      fi
-    fi
-    [ ${#selection[@]} -gt 0 ] || continue
-    # The authoring tests check the editors against the browser host's module: cargo decides
-    # whether it is stale, and the bindings are rebound only when it was.
-    [ -n "$built" ] || { mise-tasks/build/wasm; built=yes; }
-    report=$PWD/$package/dist/vitest.json
-    mkdir -p "$package/dist"
-    # Paths relative to the package, as Vitest filters its files.
-    run=("${selection[@]#"$package"/}")
-    (cd "$package" && "$OLDPWD/node_modules/.bin/vitest" run --reporter=default --reporter=json \
-      --outputFile.json="$report" "${run[@]}") || { echo "test: web unit tests failed in $package" >&2; exit 1; }
-    # Tests that ran: a name filter skips the rest of every file it opens.
-    # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
-    total=$(node -e 'const report = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); console.log(report.numPassedTests);' "$report")
-    [ "$total" -eq 0 ] || echo "test: $package: $total web unit tests passed"
+# A test's full name is its suites' titles and its own joined by " > ", but the titles sit
+# apart in the source, so grep looks for the last one. Vitest's -t is a regular expression.
+escape() { sed 's/[][\.*^$()+?{}|/]/\\&/g' <<<"$1"; }
+names=$(for filter in "${filters[@]}"; do escape "${filter##* > }"; done | paste -sd'|' -)
+needles=()
+for filter in "${filters[@]}"; do needles+=(-e "${filter##* > }"); done
+built=
+for config in web/*/vitest.config.ts; do
+  package=$(dirname "$config")
+  mapfile -t files < <(find "$package/src" \( -name '*.test.ts' -o -name '*.test.tsx' \) | sort)
+  # The files whose path contains a filter; where none does, the files naming a test that
+  # does (grep finds them, and Vitest's -t then runs only those tests). A cheap look first
+  # keeps a Rust-only filter from paying for Vitest's start.
+  patterns=()
+  for filter in "${filters[@]}"; do patterns+=(-e "$filter"); done
+  mapfile -t selection < <(printf '%s\n' "${files[@]}" | grep -F "${patterns[@]}" || true)
+  if [ ${#selection[@]} -eq 0 ]; then
+    mapfile -t selection < <(grep -lF "${needles[@]}" "${files[@]}" || true)
+    [ ${#selection[@]} -eq 0 ] || selection+=(-t "$names")
+  fi
+  [ ${#selection[@]} -gt 0 ] || continue
+  start=$SECONDS
+  # The authoring tests check the editors against the browser host's module: cargo decides
+  # whether it is stale, and the bindings are rebound only when it was.
+  [ -n "$built" ] || { ladder_run "the browser host's module build" mise-tasks/build/wasm; built=yes; }
+  report=$PWD/$package/dist/vitest.json
+  mkdir -p "$package/dist"
+  rm -f "$report"
+  # Paths relative to the package, as Vitest filters its files.
+  run=("${selection[@]#"$package"/}")
+  status=0
+  output=$(cd "$package" && "$OLDPWD/node_modules/.bin/vitest" run --reporter=dot --reporter=json \
+    --outputFile.json="$report" "${run[@]}" 2>&1) || status=$?
+  printf '%s\n' "$output"
+  [ -f "$report" ] || { ladder_show "$output"; ladder_fail "Vitest wrote no report for $package"; }
+  [ "$status" -eq 0 ] || {
+    ladder_show "$output"
+    node scripts/reruns vitest "$report" | ladder_show
+    ladder_fail "web unit tests failed in $package"
+  }
+  # Tests that ran: a name filter skips the rest of every file it opens.
+  # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
+  total=$(node -e 'const report = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")); console.log(report.numPassedTests);' "$report")
+  if [ "$total" -gt 0 ]; then
+    done_line "Vitest $package" "$start" "$total"
     ran=$((ran + total))
-  done
-fi
+  fi
+done
 
-[ "$ran" -gt 0 ] || { echo "test: nothing matched ${filters[*]}" >&2; exit 1; }
+# The Playwright specs the filters select, each run on its own: a spec a filter names runs
+# whole; one a filter matches by test title runs only the tests whose titles match.
+playwright=$PWD/node_modules/.bin/playwright
+shopt -s nullglob
+module_built=
+for file in web/app/e2e/*.spec.ts; do
+  spec=${file##*/}
+  spec=${spec%.spec.ts}
+  titled=()
+  named=
+  for filter in "${filters[@]}"; do
+    stem=${filter##*/}
+    stem=${stem%.spec.ts}
+    stem=${stem%.ts}
+    if [ "$stem" = "$spec" ]; then
+      named=1
+    elif grep -E '^\s*(test|it)[.(]' "$file" | grep -F -- "$filter" >/dev/null; then
+      titled+=("$(escape "$filter")")
+    fi
+  done
+  [ -n "$named" ] || [ ${#titled[@]} -gt 0 ] || continue
+  [ -x "$playwright" ] || ladder_fail "$playwright is missing: run npm ci"
+  start=$SECONDS
+  [ -n "$module_built" ] || { ladder_run "the browser host's module build" mise-tasks/build/wasm; module_built=yes; }
+  if [ "$spec" = server ]; then
+    projects=(--project=binary)
+    # The binary serves the web build it embeds: build it when any source it comes from is
+    # newer than it (what make would do), before cargo links the binary around it.
+    # Directories count, so a file removed from one does too, and so do the manifests, for a
+    # dependency that changed.
+    build=web/app/dist/build/index.html
+    if [ ! -f "$build" ] || [ -n "$(find web/app/src web/app/index.html web/app/vite.config.ts web/app/package.json \
+      web/client/src web/client/package.json web/wasm/src web/wasm/package.json web/wasm/dist/bindgen design \
+      package-lock.json -newer "$build" -print -quit)" ]; then
+      ladder_run "the app's web build" bash -c 'cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts'
+    fi
+    export CAIRN_E2E_BINARY=1
+  else
+    projects=(--project=chromium --project=server)
+    export CAIRN_E2E_BINARY=0
+  fi
+  ladder_run "the build of the binary, the fixture server, and the seeding example" scripts/built
+  grep=()
+  [ -n "$named" ] || grep=(-g "$(IFS='|'; echo "${titled[*]}")")
+  report=$PWD/web/app/dist/playwright.json
+  rm -f "$report"
+  status=0
+  # The servers Playwright starts must not hold the terminal (descriptor 3) open.
+  output=$(cd web/app && PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
+    "$playwright" test --reporter=dot,json "${projects[@]}" "e2e/$spec.spec.ts" ${grep[@]+"${grep[@]}"} 3>&- 2>&1) || status=$?
+  printf '%s\n' "$output"
+  [ -f "$report" ] || { ladder_show "$output"; ladder_fail "Playwright wrote no report for $spec"; }
+  [ "$status" -eq 0 ] || {
+    ladder_show "$output"
+    node scripts/reruns playwright "$report" | ladder_show
+    ladder_fail "in-browser tests failed in $spec"
+  }
+  # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
+  total=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).stats.expected);' "$report")
+  done_line "Playwright $spec" "$start" "$total"
+  ran=$((ran + total))
+done
+
+[ "$ran" -gt 0 ] || ladder_fail "nothing matched ${filters[*]}"
+ladder_show "$ladder_name: passed, $ran tests, $(ladder_elapsed)" "log: $LADDER_LOG"

@@ -22,11 +22,11 @@ inventory() {
 }
 
 before=$(inventory)
-mise run gen
+ladder_run "mise run gen" mise run gen
 after=$(inventory)
 
 if [ "$before" != "$after" ]; then
-  diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") || true
+  { diff <(printf '%s\n' "$before") <(printf '%s\n' "$after") || true; } | ladder_show
   ladder_fail "generated files differ from their sources: run 'mise run gen' and commit the result"
 fi
 ladder_suite "generated files unchanged" "$(grep -c . <<<"$after" || true)" files

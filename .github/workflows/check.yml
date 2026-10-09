@@ -54,6 +54,9 @@ jobs:
       # Rung 6's browser, at the version @playwright/test pins.
       - run: npx playwright install --with-deps chromium
       - run: mise run check
+      # The check prints only what failed; the complete log is a file.
+      - if: failure()
+        run: cat dist/ladder/last.log
 
   # Every rung that exists, as on push, with rung 3's property tests at a larger case count
   # (PRACTICES, The validation ladder).
@@ -81,6 +84,9 @@ jobs:
       # Rung 6's browser, at the version @playwright/test pins.
       - run: npx playwright install --with-deps chromium
       - run: mise run check
+      # The check prints only what failed; the complete log is a file.
+      - if: failure()
+        run: cat dist/ladder/last.log
 
   # PRACTICES, Simulation with patina: the campaigns, nightly and on demand, never on push and
   # never part of check. mise builds cargo-patina from source at the pinned revision.

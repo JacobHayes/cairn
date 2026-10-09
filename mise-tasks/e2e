@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="One Playwright spec of the app in Chromium (its @server tests too), optionally only the tests matching GREP; builds the module and the programs only if stale"
-exec "$(dirname "$0")/../scripts/e2e" "$@"

@@ -6,8 +6,11 @@
 #
 # A rung exists when its task file mise-tasks/check/<N> exists; adding the file adds the
 # rung to `mise run check` and makes `mise run check:<N>` run it alone. With HIGHEST_RUNG
-# (`check:fast` passes 3), rungs above it are left out. Each rung reports its suites
-# through scripts/ladder-lib.sh; the summary at the end repeats those lines.
+# (`check:fast` passes 3), rungs above it are left out.
+#
+# Quiet: the whole run's output goes to dist/ladder/last.log, and the terminal gets one line
+# per rung (scripts/ladder-lib.sh), what a failure needs (the errors, the failing tests and
+# lines, how to rerun them), and one last line with the log's path.
 #
 # With --changed (`check:fast`), the Rust rungs (2 and 3) are left out when the current change
 # touches no Rust input (scripts/changed), and a line says so. Rung 1 always runs whole: a Rust
@@ -16,17 +19,17 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+export LADDER_LOG=dist/ladder/last.log
+mkdir -p dist/ladder
+: >"$LADDER_LOG"
+
 skipped=()
 if [ "${1:-}" = --changed ]; then
   shift
   read -r changed_rust _ changed_count < <(scripts/changed)
-  if [ "$changed_count" = - ]; then
-    echo "ladder: --changed: no diff available: no rung skipped"
-  elif [ "$changed_rust" = 1 ]; then
-    echo "ladder: --changed: ${changed_count} files changed, Rust inputs among them: no rung skipped"
-  else
+  if [ "$changed_count" != - ] && [ "$changed_rust" != 1 ]; then
     skipped=(2 3)
-    echo "ladder: --changed: ${changed_count} files changed, none a Rust input: skipping rungs 2 and 3 (the Rust tests)"
+    echo "ladder: ${changed_count} files changed, none a Rust input: skipping rungs 2 and 3 (the Rust tests)"
   fi
 fi
 
@@ -44,50 +47,39 @@ if [ ${#rungs[@]} -eq 0 ]; then
   exit 1
 fi
 mapfile -t rungs < <(printf '%s\n' "${rungs[@]}" | sort -n)
-echo "ladder: rungs that exist${highest:+ at or below $highest}: ${rungs[*]}"
 
-# Pass each rung's output through to the terminal on descriptor 3 (inherited, never
-# reopened, so a redirect to a file keeps its order) while keeping its summary lines.
-exec 3>&1
-summary=()
-# Rungs 2 to 4 pick their Rust tests by name out of the same test binaries, which are built
-# once, before the first of them (scripts/ladder-tests). Rung 6 builds its own after the web
-# build changes what the binary embeds.
+# Rungs 2, 3, 4, and 7 pick their Rust tests by name out of the same test binaries, which are
+# built once, before the first of them (scripts/ladder-tests). Rung 6 builds its own after the
+# web build changes what the binary embeds.
 test_list=dist/ladder/test-binaries.json
 tests_built=
+started=$SECONDS
+failed=
 for rung in "${rungs[@]}"; do
-  echo "ladder: rung $rung: starting"
-  start=$SECONDS
+  LADDER_STARTED=$(date +%s)
+  export LADDER_STARTED
   list=
-  if [ "$rung" -ge 2 ] && [ "$rung" -le 4 ]; then
+  case $rung in 2 | 3 | 4 | 7)
     if [ -z "$tests_built" ]; then
-      mkdir -p dist/ladder
-      scripts/ladder-tests --build "$test_list" || { echo "ladder: rung $rung: FAILED: the test binaries did not build" >&2; exit 1; }
+      # stdout is the log; a build error shows on stderr.
+      scripts/ladder-tests --build "$test_list" >>"$LADDER_LOG" || {
+        echo "rung $rung: FAILED in $((SECONDS - started))s: the test binaries did not build"
+        failed=$rung
+        break
+      }
       tests_built=yes
     fi
     list=$test_list
-  fi
-  # pipefail (set above) makes the pipeline's status the rung's.
-  if lines=$(LADDER_TEST_LIST=$list "mise-tasks/check/$rung" 2>&1 3>&- | while IFS= read -r line || [ -n "$line" ]; do
-    printf '%s\n' "$line" >&3
-    case $line in "ladder: rung $rung: "*) printf '%s\n' "$line" ;; esac
-  done); then
-    status=passed
-  else
-    status=FAILED
-  fi
-  summary+=("$lines")
-  summary+=("ladder: rung $rung: $status in $((SECONDS - start))s")
-  if [ "$status" = FAILED ]; then
+    ;;
+  esac
+  LADDER_TEST_LIST=$list "mise-tasks/check/$rung" || {
+    failed=$rung
     break
-  fi
+  }
 done
 
-echo
-echo "ladder: summary"
-printf '%s\n' "${summary[@]}" | grep -v -e ': starting$' -e ': passed$' || true
-if [ "$status" = FAILED ]; then
-  echo "ladder: check FAILED at rung $rung; later rungs did not run"
+if [ -n "$failed" ]; then
+  echo "ladder: FAILED at rung $failed after $((SECONDS - started))s; later rungs did not run; rerun: mise run check:$failed; log: $LADDER_LOG"
   exit 1
 fi
-echo "ladder: check passed: rungs ${rungs[*]}"
+echo "ladder: passed, rungs ${rungs[*]}, $((SECONDS - started))s; log: $LADDER_LOG"

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Rung 2: unit tests for every Rust crate (property and cost tests: rung 3; store conformance and in-process API tests: rung 4)"
+#MISE description="Rung 2: unit tests for every Rust crate (property tests: rung 3; store conformance and in-process API tests: rung 4; cost tests: rung 7)"
 # PRACTICES, The validation ladder, rung 2. One suite per crate, so a crate whose tests
 # vanish fails the rung. A crate's integration tests are modules of its one test binary,
 # tests/integration/main.rs, told apart by module path: property tests live in `mod
@@ -7,7 +7,7 @@
 # conformance suite in `mod conformance` (in `conformance.rs`), the in-process tests of the
 # API and the binary in `mod in_process`, and the binary's tests that need the web build
 # embedded in `mod binary` (in its `binary.rs`, so `binary::binary::`); all are skipped here
-# by name, and rungs 3, 4, and 6 run them. Every rung's tests run through scripts/ladder-tests,
+# by name, and rungs 3, 4, 6, and 7 run them. Every rung's tests run through scripts/ladder-tests,
 # which runs the workspace's test binaries in parallel.
 set -euo pipefail
 cd "$(dirname "$0")/../.."

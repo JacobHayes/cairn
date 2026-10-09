@@ -1,3 +1,8 @@
 #!/usr/bin/env bash
-#MISE description="Rungs 1 to 3 of the validation ladder, those that exist: the inner loop; rungs 2 and 3 are left out when the current change touches no Rust input"
-exec "$(dirname "$0")/../../scripts/ladder" --changed 3
+#MISE quiet=true
+#MISE description="The inner loop: rungs 1 to 3 (the Rust rungs only when the change touches a Rust input), or with FILTER... only the Rust tests, Vitest files or tests, and Playwright spec that match"
+cd "$(dirname "$0")/../.."
+if [ $# -eq 0 ]; then
+  exec scripts/ladder --changed 3
+fi
+exec scripts/test "$@"

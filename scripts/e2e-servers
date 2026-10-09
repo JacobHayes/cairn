@@ -7,12 +7,16 @@
 # others'. Prints READY once all four answer, which is what Playwright waits for, and exits
 # non-zero when any of them stops. The ports are the config's, passed in the environment:
 # CAIRN_APP_PORT, CAIRN_SERVER_PORT, CAIRN_E2E_PORT, and CAIRN_DEMO_PORT. With
-# CAIRN_E2E_BINARY=0 the binary is left out (`mise run e2e` does so for a spec that does not
+# CAIRN_E2E_BINARY=0 the binary is left out (`mise run check:fast` does so for a spec that does not
 # run against it, which then needs no web build embedded in it).
 #
 # usage: scripts/e2e-servers
 set -euo pipefail
 cd "$(dirname "$0")/.."
+# The servers' logs and this script's messages go to a file: a run's output would otherwise be
+# a JSON line per request.
+mkdir -p dist/ladder
+exec 2>dist/ladder/servers.log
 : "${CAIRN_APP_PORT:?}" "${CAIRN_SERVER_PORT:?}" "${CAIRN_E2E_PORT:?}" "${CAIRN_DEMO_PORT:?}"
 app=http://127.0.0.1:$CAIRN_APP_PORT
 server=http://127.0.0.1:$CAIRN_SERVER_PORT

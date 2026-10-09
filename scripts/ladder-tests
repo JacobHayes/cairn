@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // Builds the workspace's test binaries once and runs them side by side (PRACTICES, The
-// validation ladder). Rungs 2, 3, and 4 each pick tests by name out of the same binaries, so
+// validation ladder). Rungs 2, 3, 4, and 7 each pick tests by name out of the same binaries, so
 // the binaries are built in one `cargo test --no-run` and run by this script in parallel,
 // where `cargo test` runs them one after another: most of them finish in under a second and
 // only start-up and the slowest few add up.
@@ -8,16 +8,19 @@
 // usage: scripts/ladder-tests --build LIST
 //        scripts/ladder-tests RESULTS [--test NAME] [-- TEST_ARGUMENT...]
 //   --build LIST: only build, and write the binaries to the file LIST. scripts/ladder does
-//     this once before rung 2 and passes LIST to rungs 2 to 4 in LADDER_TEST_LIST, so the
-//     full ladder builds once; without it (`mise run check:3`) a run builds for itself.
+//     this once before the first rung that runs Rust tests and passes LIST in
+//     LADDER_TEST_LIST, so the full ladder builds once; without it (`mise run check:3`) a
+//     run builds for itself.
 //   RESULTS: a file this writes one "package<TAB>test<TAB>result" line to for every test it
 //     ran, which is how a rung counts its suites (scripts/ladder-lib.sh, ladder_cargo_test).
 //   --test NAME: run only the integration test binary NAME of each crate; by default every
 //     test binary runs, unit tests included.
 //   TEST_ARGUMENT: what `cargo test -- ...` passes each binary (name filters, `--skip`).
-// Prints each binary's result line, and the whole output of one that failed, in the order
-// they finish. Exits non-zero when the build or any binary fails. Doc tests are not run
-// (rung 4 runs them).
+// Quiet by design: stdout is the log (each binary's result line in the order they finish, and
+// the whole output of one that failed); stderr holds only what a person acts on: the
+// diagnostics of a build that failed, and a failed binary's output without its passing tests,
+// then the command that reruns each failing test. Exits non-zero when the build or any binary
+// fails. Doc tests are not run (rung 4 runs them).
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
@@ -53,9 +56,11 @@ function nameOf(id) {
 function build() {
   const built = spawnSync(
     "cargo",
-    ["test", "--locked", "--workspace", "--all-features", "--tests", "--no-run", "--message-format=json-render-diagnostics"],
-    { encoding: "utf8", maxBuffer: 1 << 30, stdio: ["ignore", "pipe", "inherit"] },
+    ["test", "--locked", "--workspace", "--all-features", "--tests", "--no-run", "-q", "--message-format=json-render-diagnostics"],
+    { encoding: "utf8", maxBuffer: 1 << 30, stdio: ["ignore", "pipe", "pipe"] },
   );
+  // Quiet cargo prints only diagnostics, to the log, and to the person when the build failed.
+  process.stdout.write(built.stderr);
   const binaries = [];
   for (const line of built.stdout.split("\n")) {
     if (!line.startsWith('{"reason":')) continue;
@@ -72,6 +77,7 @@ function build() {
     });
   }
   if (built.status !== 0) {
+    process.stderr.write(built.stderr);
     console.error("ladder-tests: the test binaries did not build");
     process.exit(1);
   }
@@ -120,6 +126,9 @@ async function worker() {
     if (status !== 0) {
       failed++;
       console.log(output);
+      // The tests that passed are the log's, as are the names a count reads.
+      console.error(output.split("\n").filter((line) => !/^test .* \.\.\. ok$/.test(line)).join("\n"));
+      for (const [, name] of output.matchAll(/^test (.+) \.\.\. FAILED$/gm)) console.error(`rerun: mise run check:fast ${name}`);
     }
     for (const line of output.split("\n")) {
       const test = /^test (.+) \.\.\. (\S+)/.exec(line);

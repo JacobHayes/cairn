@@ -1,12 +1,10 @@
 #!/usr/bin/env bash
-#MISE description="Rung 3: property tests (PROPTEST_CASES cases each, 64 by default; CI runs 256) and cost tests at the limits"
+#MISE description="Rung 3: property tests (PROPTEST_CASES cases each, 64 by default; CI runs 256)"
 # PRACTICES, The validation ladder, rung 3; Property tests. Property tests are the tests in
 # `tests/integration/property_*.rs`, each inside `mod property`, run through
-# patina-dst-proptest from a fixed seed. Cost tests are the tests in
-# `tests/integration/cost_*.rs`, each inside `mod cost`: a pass at the limits, budgeted in
-# operations, not wall-clock time. Both are modules of their crate's one integration test
-# binary, selected by module path. One suite per property or cost test file, counted from
-# the test names (`<file>::property::<test>`, `<file>::cost::<test>`). The case count is
+# patina-dst-proptest from a fixed seed. They are modules of their crate's one integration
+# test binary, selected by module path. One suite per property test file, counted from the
+# test names (`<file>::property::<test>`). The cost tests are rung 7's. The case count is
 # bounded locally and larger in CI: 256 on push and 4096 nightly
 # (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
 set -euo pipefail
@@ -25,35 +23,8 @@ export PROPTEST_CASES=${PROPTEST_CASES:-64}
 [[ $PROPTEST_CASES =~ ^[1-9][0-9]*$ ]] || ladder_fail "PROPTEST_CASES must be a positive count, not '$PROPTEST_CASES'"
 ladder_say "PROPTEST_CASES=$PROPTEST_CASES"
 
-# Workspace members as "name<TAB>directory" lines, relative to the repository root.
-# shellcheck disable=SC2016 # the backticks are a JavaScript template literal
-members=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
-  const path = require("path");
-  let text = "";
-  process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
-    for (const item of JSON.parse(text).packages)
-      console.log(`${item.name}\t${path.relative(process.cwd(), path.dirname(item.manifest_path))}`);
-  });')
-
-# The tests rung 2 built, run by name (ladder_cargo_test). One suite per file, the crate's
-# directory and the file named by the test's path.
-ladder_cargo_test --test integration -- property:: cost:: || ladder_fail "cargo test reported failures"
-suites=0
-while IFS=$'\t' read -r crate directory; do
-  [ -n "$crate" ] || continue
-  while IFS=$'\t' read -r file count; do
-    [ -n "$file" ] || continue
-    ladder_suite "$directory/tests/integration/$file.rs" "$count" tests
-    suites=$((suites + 1))
-  done < <(awk -F'\t' -v crate="$crate" '
-    $1 == crate && match($2, /^[a-z0-9_]+::(property|cost)::/) {
-      split($2, path, "::"); count[path[1]]++ }
-    END { for (file in count) print file "\t" count[file] }' <<<"$ladder_tests" | sort)
-done <<<"$members"
-
-# The property and cost test files in the tree, so a file that stops building or running,
-# or is not a module of its crate's test binary, fails here.
-expected=$(find crates \( -path '*/tests/integration/property_*.rs' -o -path '*/tests/integration/cost_*.rs' \) | wc -l)
-[ "$suites" -eq "$expected" ] || ladder_fail "ran $suites property and cost test files; the tree has $expected"
+# The tests rung 2 built, run by name (ladder_cargo_test), one suite per file.
+ladder_cargo_test --test integration -- property:: || ladder_fail "cargo test reported failures"
+ladder_file_suites property
 
 ladder_rung_end

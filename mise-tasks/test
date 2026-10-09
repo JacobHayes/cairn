@@ -1,3 +1,0 @@
-#!/usr/bin/env bash
-#MISE description="The targeted inner loop: Rust tests and web unit tests matching FILTER (a test name or Vitest file path), or, with none, the tests for what the current change touches"
-exec "$(dirname "$0")/../scripts/test" "$@"

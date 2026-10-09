@@ -73,6 +73,7 @@ export default defineConfig({
     wait: { stdout: /READY/ },
     timeout: 600_000,
     reuseExistingServer: false,
+    // scripts/e2e-servers writes the servers' logs (a JSON line per request) to a file.
     stdout: "ignore",
   },
 });

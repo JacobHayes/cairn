@@ -45,8 +45,9 @@ ran=$(grep -c . <<<"$ladder_tests" || true)
 # and no crate has a doc test. They are a suite once one exists (a suite that ran none fails).
 doc_status=0
 doc_output=$(cargo test --locked --workspace --all-features --doc 2>&1) || doc_status=$?
+printf '%s\n' "$doc_output"
 [ "$doc_status" -eq 0 ] || {
-  printf '%s\n' "$doc_output"
+  ladder_show "$doc_output"
   ladder_fail "the doc tests reported failures"
 }
 doc_tests=$(awk '/^test result: / { sum += $4 } END { print sum + 0 }' <<<"$doc_output")
