@@ -237,7 +237,7 @@ flowchart TB
 
 `mise run check:fast` is rungs 1 to 3: the inner loop for an agent after every change. The full ladder runs before handing work off and in CI on every push; CI adds a nightly run with a larger property case count, and runs `mise run sim` nightly, outside the gate.
 
-A rung that runs zero tests fails. Every rung's command reports how many tests each of its suites ran, and the rung fails if any suite it lists ran none, so one suite vanishing cannot hide behind another's count. Rung 1 runs tools, not tests: it fails if any tool is missing or reports nothing checked.
+A rung that runs zero tests fails. Every rung's command reports how many tests each of its suites ran, and the rung fails if any suite it lists ran none, so one suite vanishing cannot hide behind another's count. Rung 1 runs tools, not tests: it fails if any tool is missing or reports nothing checked. Outside CI it first applies what its tools can fix themselves (`cargo fmt`, `cargo clippy --fix` for machine-applicable suggestions, `eslint --fix`) and prints `rung 1 fixed: N files`, so only what needs a person fails; with `CI` set it only verifies (`decisions/2026-10-09-local-checks-fix-and-ci-verifies.md`).
 
 Each crate's integration tests are one test binary, `tests/integration/main.rs`, with one module per file beside it, so the crate's dependencies are linked once rather than once per file. A new test file goes in `tests/integration/` and is declared in `main.rs` as `mod <file>;`. Rungs pick tests by module path, not by file: `mod property` in `property_*.rs` and `mod cost` in `cost_*.rs` for rung 3, `mod conformance` and `mod in_process` for rung 4, `mod binary` in the binary's `binary.rs` for rung 6, and the rest in rung 2.
 

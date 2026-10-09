@@ -4,6 +4,9 @@
 # it fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
 # eslint joined with the first TypeScript package, web/client
 # (decisions/2026-10-06-rung-1s-typescript-checks-join-with-the-first-typescript.md).
+# Outside CI it first applies the fixes its tools can make themselves (formatting, the lint
+# fixes that are machine-applicable) and only then checks, so what fails is what a person
+# has to decide (decisions/2026-10-09-local-checks-fix-and-ci-verifies.md).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_RUNG=1
@@ -33,23 +36,36 @@ ladder_require_tool node node --version
 # caches each file's result (dist/ladder/eslint-cache, which a changed config or eslint
 # version discards): a file that did not change is not linted again, so a change to one file's
 # types is not re-linted in its callers until they change; CI starts with no cache.
+# Outside CI that one eslint run also fixes (`--fix`), and the typecheck starts once it is
+# done, so it reads the fixed files.
 for tool in tsc eslint; do
   [ -x "node_modules/.bin/$tool" ] || ladder_fail "tool missing: $tool (run npm ci)"
 done
+fixing=0
+eslint_fix=()
+if ladder_fixing; then
+  fixing=1
+  eslint_fix=(--fix)
+  sums_before=$(ladder_source_sums)
+fi
 typescript=dist/ladder/rung-1
 rm -rf "$typescript"
 mkdir -p "$typescript"
 {
   status=0
-  node_modules/.bin/tsc -p tsconfig.json --listFiles >"$typescript/tsc.out" 2>&1 || status=$?
-  echo "$status" >"$typescript/tsc.status"
-} &
-{
-  status=0
-  node_modules/.bin/eslint --max-warnings 0 --cache --cache-location dist/ladder/eslint-cache \
+  node_modules/.bin/eslint "${eslint_fix[@]}" --max-warnings 0 --cache --cache-location dist/ladder/eslint-cache \
     --format json . >"$typescript/eslint.json" \
     2>"$typescript/eslint.err" || status=$?
   echo "$status" >"$typescript/eslint.status"
+} &
+eslint_job=$!
+{
+  if [ "$fixing" -eq 1 ]; then
+    until [ -f "$typescript/eslint.status" ]; do sleep 0.1; done
+  fi
+  status=0
+  node_modules/.bin/tsc -p tsconfig.json --listFiles >"$typescript/tsc.out" 2>&1 || status=$?
+  echo "$status" >"$typescript/tsc.status"
 } &
 
 # Workspace members as "name<TAB>manifest path" lines.
@@ -76,6 +92,27 @@ while IFS=$'\t' read -r name manifest; do
 done <<<"$members"
 ladder_suite "workspace lints inherited" "$inheriting" crates
 
+# The scoped lints of the clippy run below, raised to warn (explained there).
+raised=()
+for name in "${!scoped_lints[@]}"; do
+  for lint in ${scoped_lints[$name]}; do
+    raised+=(-W "$lint")
+  done
+done
+# Outside CI: format, then apply clippy's machine-applicable suggestions (the same targets,
+# features, and raised lints as the clippy run below, which then checks the result), then
+# format again, as a fix can leave code the formatter would lay out differently. A failure
+# here is not reported: the checks below find it again and report it.
+if [ "$fixing" -eq 1 ]; then
+  cargo fmt --all >/dev/null 2>&1 || true
+  cargo clippy --fix --allow-dirty --allow-staged --locked --workspace --no-deps --all-targets \
+    --all-features -- "${raised[@]}" >"$typescript/clippy-fix.out" 2>&1 || true
+  cargo fmt --all >/dev/null 2>&1 || true
+  wait "$eslint_job" || true
+  printf 'rung %s fixed: %s files\n' "$LADDER_RUNG" \
+    "$(ladder_changed_files "$sums_before" "$(ladder_source_sums)")"
+fi
+
 # rustfmt -v names each file it checks; a check failure prints the diff.
 fmt_status=0
 fmt_output=$(cargo fmt --all --check -- -v 2>&1) || fmt_status=$?
@@ -89,12 +126,6 @@ ladder_suite rustfmt "$(grep -c '^Formatting ' <<<"$fmt_output" || true)" files
 # lints are raised to warn for every crate in that run, and a warning from one counts only in
 # a crate that scopes it: any other warning or error fails the rung, as `-D warnings` did.
 # `--no-deps` lints the workspace's crates and none of their dependencies.
-raised=()
-for name in "${!scoped_lints[@]}"; do
-  for lint in ${scoped_lints[$name]}; do
-    raised+=(-W "$lint")
-  done
-done
 scopes=$(for name in "${!scoped_lints[@]}"; do printf '%s\t%s\n' "$name" "${scoped_lints[$name]}"; done)
 clippy_status=0
 clippy_output=$(cargo clippy --locked --workspace --no-deps --all-targets --all-features \

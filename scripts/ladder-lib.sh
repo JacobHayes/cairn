@@ -21,6 +21,28 @@ ladder_fail() {
   exit 1
 }
 
+# ladder_fixing: true when the rung may change files to apply what its tools can fix itself.
+# A run with CI unset (a developer's machine) does; CI, even set empty, only verifies, so a change that was not
+# formatted or fixed fails there instead of being repaired in a throwaway checkout.
+ladder_fixing() {
+  [ -z "${CI+set}" ]
+}
+
+# ladder_source_sums: one "checksum size path" line per source file a fixer may rewrite (the
+# Rust crates and testbeds, and the web packages), so two runs of it differ by the files that
+# changed in between.
+ladder_source_sums() {
+  find crates testbeds web \( -name node_modules -o -name target -o -name dist \) -prune -o \
+    -type f \( -name '*.rs' -o -name '*.ts' -o -name '*.tsx' -o -name '*.js' -o -name '*.css' \) -print0 |
+    xargs -0 cksum | sort -k3
+}
+
+# ladder_changed_files BEFORE AFTER: how many files differ between two ladder_source_sums
+# outputs (each given as a string).
+ladder_changed_files() {
+  diff <(printf '%s\n' "$1") <(printf '%s\n' "$2") | grep -c '^>' || true
+}
+
 # ladder_require_tool NAME COMMAND...: fail the rung unless COMMAND (a version query) runs.
 ladder_require_tool() {
   local name=$1
