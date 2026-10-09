@@ -95,6 +95,14 @@ export interface Here {
   mine: boolean;
 }
 
+/** What a route's card says instead of a state (8.11): its date rule in words, and an advisory notice (A20). */
+export interface RouteMarks {
+  /** The one foot line: "Due 14 days before Decision meeting". */
+  foot: string | undefined;
+  /** No chain links the node to the final milestone, so neither priority nor dates reach it. */
+  unanchored: boolean;
+}
+
 /** One card on the canvas. Journey fields are absent on a route's graph, which has no state. */
 export interface Card {
   key: string;
@@ -115,6 +123,8 @@ export interface Card {
   /** C2: hidden, unsatisfied prerequisites no drawn edge stands for. */
   hiddenPrerequisites: string[];
   journey: CardState | undefined;
+  /** A route draft's marks; none on a journey. */
+  route?: RouteMarks | undefined;
 }
 
 /** The one secondary line a card may carry (5.5): a decided decision's answer, a container's progress, or what a conditional node depends on. */

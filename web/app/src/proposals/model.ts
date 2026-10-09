@@ -350,22 +350,65 @@ export function breakable(node: Pick<GraphNode, "kind">): boolean {
   return node.kind === "deliverable" || node.kind === "action";
 }
 
-/** C14: how the canvas marks one node a proposal touches. */
+/** C14: how the canvas and the list mark one node a proposal touches: the kind of change as one word, and what more there is to say of it. */
 export interface DiffMark {
   tone: "good" | "warn" | "bad" | "plain" | "accent";
+  /** Add, Change or Remove: the same word on the card's tag and the list's chip. */
   label: string;
+  /** What else holds of it (a conflict, an orphan), for the list's foot and the tag's hover. */
+  note?: string;
+  /** The node needs a choice: it counts under Conflicts. */
+  conflict?: true;
+  /** The node is going: its card is kept, struck and ghosted, where it was. */
+  ghost?: true;
 }
 
-/** The words of each mark, so the canvas, its legend, and the list say the same. */
+/** The words of each kind of change, so the canvas, its legend, and the list say the same. */
 export const DIFF_LABELS = {
-  added: "added",
-  removed: "removed",
-  changed: "changed",
-  conflict: "conflict",
-  orphan: "orphaned, kept",
-  orphanRemoved: "orphaned, removed",
-  excluded: "left out",
+  added: "Add",
+  removed: "Remove",
+  changed: "Change",
 } as const;
+
+/** What a mark adds to its kind of change. */
+export const DIFF_NOTES = {
+  conflict: "Conflict: needs a choice",
+  orphan: "Orphaned, kept",
+  orphanRemoved: "Orphaned, removed",
+  excluded: "Left out",
+} as const;
+
+/** The review's filter chips: everything, what needs a decision, and each kind of change. */
+export const REVIEW_FILTERS = ["all", "conflicts", "add", "change", "remove"] as const;
+export type ReviewFilter = (typeof REVIEW_FILTERS)[number];
+
+/** The chip a mark counts under: a conflict, or the kind of change it is (a kept orphan is a change; one removed or left out is a removal). */
+export function filterOf(mark: DiffMark): Exclude<ReviewFilter, "all"> {
+  if (mark.conflict === true) {
+    return "conflicts";
+  }
+  switch (mark.label) {
+    case DIFF_LABELS.added:
+      return "add";
+    case DIFF_LABELS.removed:
+      return "remove";
+    default:
+      return "change";
+  }
+}
+
+/** How many items each chip holds: the marked nodes by kind, and the diff's edges as changes. */
+export function filterCounts(marks: Record<string, DiffMark>, diff: GraphDiff): Record<ReviewFilter, number> {
+  const counts: Record<ReviewFilter, number> = { all: 0, conflicts: 0, add: 0, change: 0, remove: 0 };
+  for (const mark of Object.values(marks)) {
+    counts[filterOf(mark)] += 1;
+    counts.all += 1;
+  }
+  const edges = diff.edgesAdded.length + diff.edgesRemoved.length;
+  counts.change += edges;
+  counts.all += edges;
+  return counts;
+}
 
 /**
  * C14: the canvas's mark for each node the proposal touches: added, removed, or changed by the
@@ -378,24 +421,55 @@ export function diffMarks(diff: GraphDiff, reviewItems: readonly ReviewItem[]): 
     marks[key] = { tone: "good", label: DIFF_LABELS.added };
   }
   for (const key of Object.keys(diff.changed)) {
-    marks[key] = { tone: "accent", label: DIFF_LABELS.changed };
+    marks[key] = { tone: "warn", label: DIFF_LABELS.changed };
   }
   for (const key of diff.removed) {
-    marks[key] = { tone: "bad", label: DIFF_LABELS.removed };
+    marks[key] = { tone: "bad", label: DIFF_LABELS.removed, ghost: true };
   }
   for (const item of reviewItems) {
     if (item.item === "orphan") {
-      marks[item.node] = item.keep ? { tone: "warn", label: DIFF_LABELS.orphan } : { tone: "bad", label: DIFF_LABELS.orphanRemoved };
+      marks[item.node] = item.keep ? { tone: "warn", label: DIFF_LABELS.changed, note: DIFF_NOTES.orphan } : { tone: "bad", label: DIFF_LABELS.removed, note: DIFF_NOTES.orphanRemoved, ghost: true };
     } else if (item.item === "exclusion" && item.excluded) {
-      marks[item.node] = { tone: "plain", label: DIFF_LABELS.excluded };
+      marks[item.node] = { tone: "plain", label: DIFF_LABELS.removed, note: DIFF_NOTES.excluded };
     } else if (item.item === "conflict") {
       const node = conflictNode(item.conflict);
       if (node !== undefined) {
-        marks[node] = { tone: "bad", label: DIFF_LABELS.conflict };
+        marks[node] = { tone: "bad", label: DIFF_LABELS.changed, note: DIFF_NOTES.conflict, conflict: true };
       }
     }
   }
   return marks;
+}
+
+/** One node the review lists: its mark, the fields that differ, and the removed container it goes with. */
+export interface ReviewEntry {
+  key: string;
+  mark: DiffMark;
+  /** The fields of a node that exists both before and after, that differ. */
+  fields: string[];
+  /** A removal cascaded from this removed ancestor: it is listed beneath it. */
+  cause: string | undefined;
+}
+
+/**
+ * C14: the marked nodes as the list shows them, in the order a reviewer reads them (conflicts, then
+ * adds, changes, and removals), each removal that cascades from a removed container listed
+ * under that container and not beside it.
+ */
+export function reviewEntries(diff: GraphDiff, marks: Record<string, DiffMark>, before: Graph | null | undefined): ReviewEntry[] {
+  const parents = new Map([...byKey(before)].map(([key, node]) => [key, node.parent ?? undefined]));
+  // The outermost removed ancestor: a whole removed subtree is listed under its root.
+  const causeOf = (key: string): string | undefined => {
+    let cause: string | undefined;
+    for (let at = parents.get(key), steps = 0; at !== undefined && steps < parents.size; at = parents.get(at), steps += 1) {
+      cause = marks[at]?.ghost === true ? at : cause;
+    }
+    return cause;
+  };
+  const entries = Object.entries(marks).map(([key, mark]): ReviewEntry => ({ key, mark, fields: diff.changed[key] ?? [], cause: mark.ghost === true ? causeOf(key) : undefined }));
+  const order = ["conflicts", "add", "change", "remove"] as const;
+  const roots = entries.filter((entry) => entry.cause === undefined).sort((left, right) => order.indexOf(filterOf(left.mark)) - order.indexOf(filterOf(right.mark)) || left.key.localeCompare(right.key));
+  return roots.flatMap((root) => [root, ...entries.filter((entry) => entry.cause === root.key).sort((left, right) => left.key.localeCompare(right.key))]);
 }
 
 /**

@@ -32,6 +32,7 @@ export async function pickByTitle(select: Locator, title: string): Promise<void>
 
 /** Adds a node from the palette, at the top level unless `inside` names a container, and waits for its structure to open; its key. */
 export async function addNode(page: Page, kind: string, title: string, inside?: string): Promise<string> {
+  await page.getByTestId("add-menu").click();
   const palette = page.getByTestId("add-node");
   await palette.getByLabel("Kind").selectOption(kind);
   await palette.getByLabel("New node title").fill(title);
@@ -56,19 +57,28 @@ export function formField(page: Page, field: string): Locator {
   return nodeForm(page).locator(`[data-testid="author-field"][data-field="${field}"]`);
 }
 
+/** Opens a folded section of the open node's form (design 4.9): relevance, dates, completion, or weight. */
+export async function openForm(page: Page, name: "relevance" | "dates" | "completion" | "weight"): Promise<Locator> {
+  const found = nodeForm(page).getByTestId(`form-${name}`);
+  if ((await found.getAttribute("open")) === null) {
+    await found.locator("summary").first().click();
+  }
+  return found;
+}
+
 /** Saves the open node's form and waits for its changes to land (nothing left to save). */
 export async function saveForm(page: Page): Promise<void> {
   const save = page.getByTestId("node-form-save");
   await expect(nodeForm(page).getByTestId("preview")).toHaveAttribute("data-status", "accepted");
   await save.click();
-  await expect(save).toHaveText(/^Save\s*$/);
+  await expect(save).toHaveCount(0);
 }
 
 /** Adds a role from the roles panel; waits for it to be listed. */
 export async function addRole(page: Page, title: string, multi = false): Promise<void> {
   const panel = page.getByTestId("roles-and-kinds");
-  if ((await panel.getAttribute("open")) === null) {
-    await panel.locator("summary").first().click();
+  if (!(await panel.isVisible())) {
+    await page.getByTestId("roles-menu").click();
   }
   const roles = panel.getByTestId("roles");
   await roles.getByRole("button", { name: "Add a role" }).click();

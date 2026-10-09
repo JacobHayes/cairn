@@ -5,17 +5,22 @@
 import { useEffect, useId, useState } from "react";
 import { useNavigate } from "react-router";
 
+import type { Schema } from "@cairn/client";
+
 import type { RouteFile } from "../data/host.ts";
-import { consequenceLines } from "../data/activity.ts";
+import { consequenceLines, noticesOf } from "../data/activity.ts";
 import { unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
 import { newPatchId, type Rejection } from "../data/writes.ts";
 import { Refused, violates } from "../screens/Refused.tsx";
 import { Button } from "../ui/kit.tsx";
 import { routeDetailPath } from "./address.ts";
 
+/** What a screen does once a file is imported, in place of going to the route's detail: A20, the notices the import left. */
+export type ImportedHandler = (file: RouteFile, notices: Schema<"Notice">[]) => void;
+
 type Outcome = { status: "idle" } | { status: "unreadable"; message: string } | { status: "rejected"; file: RouteFile; rejection: Rejection };
 
-function useImport() {
+function useImport(onImported: ImportedHandler | undefined) {
   const session = useSession();
   const navigate = useNavigate();
   const [outcome, setOutcome] = useState<Outcome>({ status: "idle" });
@@ -41,7 +46,11 @@ function useImport() {
     if (answered.outcome === "answered") {
       setOutcome({ status: "idle" });
       session.recordSave(`Imported ${file.name} as a draft of ${file.route}`, consequenceLines(answered.answer));
-      void navigate(routeDetailPath(file.route));
+      if (onImported === undefined) {
+        void navigate(routeDetailPath(file.route));
+      } else {
+        onImported(file, noticesOf(answered.answer));
+      }
     } else if (answered.outcome === "rejected") {
       setOutcome({ status: "rejected", file, rejection: answered.rejection });
       report(unlandedOf(answered.rejection));
@@ -71,14 +80,15 @@ function useImport() {
   return { outcome, pending, choose, discardAndImport, dismiss };
 }
 
-export function ImportFile({ label = "Import a route file" }: { label?: string }) {
+export function ImportFile({ label = "Import a route file", onImported }: { label?: string; onImported?: ImportedHandler }) {
   const skew = useSkew();
-  const { outcome, pending, choose, discardAndImport, dismiss } = useImport();
+  const { outcome, pending, choose, discardAndImport, dismiss } = useImport(onImported);
   return (
     <div className="stack" data-testid="import">
-      <label className="row">
-        <span>{label}</span>
+      <label className="button import-button">
+        {label}
         <input
+          className="visually-hidden"
           type="file"
           accept=".yaml,.yml,.json"
           aria-label={label}

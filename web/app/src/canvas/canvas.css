@@ -301,6 +301,17 @@
   line-height: 20px;
 }
 
+/* A20: a route card's advisory notice, a hollow warning chip. */
+.node-notice {
+  margin-left: auto;
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+  color: var(--color-warning);
+  font: 500 12px / 20px var(--font-mono);
+  white-space: nowrap;
+}
+
 .node-title-row {
   display: flex;
   gap: var(--space-2);
@@ -513,6 +524,12 @@
   left: 8px;
 }
 
+/* A diff's tag keeps its size on screen however far out the view is, so the word is always readable. */
+.node-mark-screen {
+  transform: scale(max(1, calc(1 / var(--z, 1))));
+  transform-origin: right bottom;
+}
+
 .node-mark-ink {
   color: var(--color-text);
   border-color: var(--color-text);
@@ -556,6 +573,15 @@
 
 .node-marked-bad {
   border-color: var(--color-error);
+}
+
+/* A proposal's removal: the card stays where it was, ghosted, its title struck. */
+.node-ghost {
+  opacity: 0.65;
+}
+
+.node-ghost .node-title {
+  text-decoration: line-through;
 }
 
 /* The one fade level: filters, the decisions view, and what a trace does not reach all fade the same, and never multiply. */

@@ -240,17 +240,23 @@ function keptWords(kept: Extract<ReviewItem, { item: "kept_local_edit" }>["kept"
   return "role" in kept ? `The role ${names.role(kept.role)}` : `The kind ${names.kind(kept.kind)}`;
 }
 
-/** C14: the proposal's review items, in order, those needing a choice marked. */
-export function ItemList({ context, itemNode }: { context: ItemsContext; itemNode: (item: ReviewItem) => string | undefined }) {
+/**
+ * C14: the proposal's review items, in order, those needing a choice marked. With `only`, just the
+ * items whose node it keeps: the item editor shows a node's own, the proposal card those about none.
+ */
+export function ItemList({ context, itemNode, only }: { context: ItemsContext; itemNode: (item: ReviewItem) => string | undefined; only?: (node: string | undefined) => boolean }) {
   const items = context.draft.items ?? [];
-  if (items.length === 0) {
-    return <p className="muted small">Nothing to resolve: every change applies as listed.</p>;
+  if (items.length === 0 || (only !== undefined && !items.some((item) => only(itemNode(item))))) {
+    return null;
   }
   return (
     <ol className="stack proposal-items" data-testid="review-items">
       {items.map((item, index) => {
         const reason = context.unresolved.get(index);
         const node = itemNode(item);
+        if (only !== undefined && !only(node)) {
+          return null;
+        }
         const about = item.item === "conflict" ? item.conflict.about : undefined;
         return (
           <li key={index} className={node !== undefined && node === context.selected ? "panel stack proposal-item proposal-picked" : "panel stack proposal-item"} data-testid="review-item" data-item={item.item} data-about={about} data-node={node}>

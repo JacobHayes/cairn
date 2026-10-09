@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 
 import { chooseFromMenu, openRouteDetail, openJourneyCard, routeAction, startJourney } from "./around.ts";
-import { blockers, confirmAndApply, editWhereVersionTwoChanges, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits } from "./proposals.ts";
+import { blockers, confirmAndApply, editWhereVersionTwoChanges, openChanges, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
 import { state } from "./detail.ts";
 import { goWithin, nodeCard, openFromCanvas, openJourney, rename } from "./shell.ts";
 
@@ -18,29 +18,33 @@ test("B7, C14: the scenario journey upgraded to version 2, each conflict resolve
   const flow = page.getByTestId("upgrade-flow");
   await expect(flow.getByLabel("Upgrade to version")).toHaveValue("2");
   await flow.getByRole("button", { name: "Propose the upgrade" }).click();
+  await page.setViewportSize({ width: 1440, height: 768 });
   await reviewOpen(page);
-  // The diff canvas sits in the page: the wheel over it scrolls the page and leaves the view where it is.
-  const view = page.locator('[data-testid="proposal-canvas"] .react-flow__viewport');
-  const placed = await view.evaluate((element) => (element as HTMLElement).style.transform);
-  await page.locator(".proposal-canvas").hover();
-  await page.mouse.wheel(0, 300);
-  await expect.poll(() => page.locator(".ws-body").evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
-  expect(await view.evaluate((element) => (element as HTMLElement).style.transform)).toBe(placed);
-
+  // Reviewed, and still a conflict to decide: Apply stays off, for that reason alone.
+  await page.getByTestId("reviewed").check();
+  await expect.poll(() => blockers(page)).toEqual(["unresolved"]);
+  await expect(page.getByTestId("apply-proposal")).toBeDisabled();
+  await expect(page.getByTestId("review-conflicts")).toBeVisible();
+  await expect(page.getByTestId("node-card").and(page.locator('[data-node="n_signoff"]'))).toHaveAttribute("data-trace", "Add");
+  await pickNode(page, "n_access");
   await expect(reviewItem(page, "conflict", "n_access")).toHaveAttribute("data-about", "field");
+  await scrollsOnce(page);
+  await pickNode(page, "n_baseline");
   await expect(reviewItem(page, "conflict", "n_baseline")).toHaveAttribute("data-about", "field");
+  await pickNode(page, "n_kickoff");
   await expect(reviewItem(page, "kept_local_edit", "n_kickoff")).toBeVisible();
+  await pickNode(page, "n_workload");
   await expect(reviewItem(page, "orphan", "n_workload")).toBeVisible();
-  await expect(page.locator('[data-testid="diff-node"][data-node="n_signoff"]')).toHaveAttribute("data-status", "added");
-  await expect(page.locator('[data-testid="node-card"][data-node="n_signoff"]')).toHaveAttribute("data-trace", "added");
-  await expect.poll(() => blockers(page)).toEqual(expect.arrayContaining(["unresolved", "unreviewed"]));
 
   await resolve(page, "n_access", "keep_journey");
   await resolve(page, "n_baseline", "take_route");
+  await pickNode(page, "n_workload");
   const orphan = reviewItem(page, "orphan", "n_workload");
   await orphan.getByTestId("orphan-remove").check();
   await expect(orphan.locator('[data-testid="removal-descendant"]')).toHaveCount(2);
-  await expect(page.locator('[data-testid="diff-node"][data-node="n_workload"]')).toHaveAttribute("data-status", "removed");
+  await page.getByTestId("projection-list").click();
+  await expect(page.locator('[data-testid="diff-node"][data-node="n_workload"]')).toHaveAttribute("data-status", "remove");
+  await expect(page.locator('[data-testid="diff-node"][data-status="remove"]')).toHaveCount(3);
   await saveEdits(page);
   await confirmAndApply(page);
 
@@ -84,15 +88,27 @@ test("B8, B9: the routeless journey saved as a route with a participation mappin
   await save.getByLabel("Route name").fill("Bake-off");
   await save.getByRole("button", { name: "Propose saving it as a route" }).click();
   await reviewOpen(page);
-  const mappings = page.locator('[data-testid="review-item"][data-item="participation"]');
-  await expect(mappings.first()).toBeVisible();
-  const first = mappings.first();
+  // Each entity's mapping is decided at its node; the proposal card lists what is left until none is.
+  const waiting = page.getByTestId("to-decide-item");
+  await expect(waiting.first()).toBeVisible();
+  await waiting.first().getByRole("button", { name: "Open" }).click();
+  const undecided = page.locator('[data-testid="review-item"][data-item="participation"]').filter({ has: page.getByTestId("unresolved") });
+  await scrollsOnce(page);
+  const first = undecided.first();
   await first.getByLabel("New role title").fill("Trial lead");
   await first.getByRole("button", { name: "Map to a new role" }).click();
-  for (const mapping of (await mappings.all()).slice(1)) {
-    await mapping.getByLabel("Map to").selectOption("drop");
+  let more = true;
+  while (more) {
+    for (const mapping of await undecided.all()) {
+      await mapping.getByLabel("Map to").selectOption("drop");
+    }
+    await page.getByRole("link", { name: "Back to the proposal" }).click();
+    more = (await waiting.count()) > 0;
+    if (more) {
+      await waiting.first().getByRole("button", { name: "Open" }).click();
+    }
   }
-  await expect(page.getByTestId("unresolved")).toHaveCount(0);
+  await expect(page.getByTestId("to-decide")).toHaveCount(0);
   await saveEdits(page);
   await confirmAndApply(page);
 
@@ -123,6 +139,7 @@ test("C14: an editor follows its change when edits are dropped or another change
   await form.getByLabel("Piece title").nth(1).fill("Query workload");
   await form.getByTestId("propose-breakdown").click();
   await reviewOpen(page);
+  await openChanges(page);
 
   const added = page.locator('[data-testid="change"][data-op="add_node"]');
   await added.nth(1).getByRole("button", { name: "Edit" }).click();
@@ -148,9 +165,9 @@ test("C14: an editor follows its change when edits are dropped or another change
   await expect(added).toHaveCount(2);
   await added.nth(1).getByRole("button", { name: "Edit" }).click();
   await added.nth(1).getByTestId("added-node-form").getByLabel("Id", { exact: true }).fill("query-workload");
-  await expect(page.getByTestId("diff-unknown")).toBeVisible();
+  await expect(page.getByTestId("no-graph-after")).toBeVisible();
   await expect(page.locator('[data-testid="proposal-violations"] [data-code="duplicate_sibling_id"]').first()).toBeVisible();
-  await expect(page.locator('[data-testid="diff-node"][data-status="removed"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="node-card"][data-trace="Remove"]')).toHaveCount(0);
   await expect(page.getByTestId("frontier-after")).toHaveCount(0);
 });
 

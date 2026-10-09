@@ -6,8 +6,8 @@ import { fileURLToPath } from "node:url";
 import { expect, type Locator, type Page } from "@playwright/test";
 
 import { openRouteDetail, routeAction } from "./around.ts";
-import { formField, openEditing, saveForm } from "./authoring.ts";
-import { openFromCanvas, type HostKind } from "./shell.ts";
+import { formField, openEditing, openForm, saveForm } from "./authoring.ts";
+import { nodeCard, openFromCanvas, type HostKind } from "./shell.ts";
 
 /** The vendor evaluation's version 2 file (fixtures/README.md). */
 export const VERSION_TWO = fileURLToPath(new URL("../../../fixtures/vendor-evaluation/route-v2.yaml", import.meta.url));
@@ -31,6 +31,7 @@ export async function editWhereVersionTwoChanges(page: Page, host: HostKind): Pr
   await formField(page, "title").getByRole("textbox").fill("Access to the environment");
   await saveForm(page);
   await openFromCanvas(page, "n_baseline");
+  await openForm(page, "relevance");
   await formField(page, "relevant_when").getByLabel("Comparison").selectOption("equals");
   await saveForm(page);
   await openFromCanvas(page, "n_kickoff");
@@ -42,17 +43,47 @@ export async function editWhereVersionTwoChanges(page: Page, host: HostKind): Pr
 export async function reviewOpen(page: Page): Promise<Locator> {
   const proposal = page.getByTestId("proposal");
   await expect(proposal).toBeVisible();
-  await expect(page.getByTestId("proposal-canvas")).toBeVisible();
+  await expect(page.getByTestId("canvas")).toBeVisible();
   return proposal;
 }
 
-/** Review item number `index` that is about `node`, of kind `item`. */
+/** Picks `node`'s card on the diff, which puts its item editor in the inspector. The diff opens on its first change, so the card may be off screen: the click is sent to the card itself, as panning to it would. */
+export async function pickNode(page: Page, node: string): Promise<void> {
+  await nodeCard(page, node).getByTestId("card-open").dispatchEvent("click");
+  await expect(page.getByTestId("item-editor")).toHaveAttribute("aria-label", await nodeCard(page, node).getByTestId("title").innerText());
+}
+
+/** The review item of kind `item` about `node`, in the item editor of the node picked. */
 export function reviewItem(page: Page, item: string, node: string): Locator {
   return page.locator(`[data-testid="review-item"][data-item="${item}"][data-node="${node}"]`);
 }
 
+/** Opens the proposal card's folded list of every change, where the changes are edited and added. */
+export async function openChanges(page: Page): Promise<Locator> {
+  const changes = page.getByTestId("all-changes");
+  if ((await changes.getAttribute("open")) === null) {
+    await changes.locator("summary").first().click();
+  }
+  return changes;
+}
+
+/** The inspector's body scrolls to its end under the wheel, and neither the page nor the workspace scrolls with it (each region scrolls once). */
+export async function scrollsOnce(page: Page): Promise<void> {
+  const body = page.locator('.inspector-body[data-pane="inspector"]');
+  const box = await body.boundingBox();
+  expect(box).not.toBeNull();
+  await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2);
+  for (let step = 0; step < 12; step += 1) {
+    await page.mouse.wheel(0, 600);
+  }
+  await expect.poll(() => body.evaluate((element) => element.scrollHeight - element.clientHeight - element.scrollTop)).toBeLessThanOrEqual(1);
+  expect(await page.evaluate(() => document.scrollingElement?.scrollTop)).toBe(0);
+  expect(await page.locator(".ws-body").evaluate((element) => element.scrollTop)).toBe(0);
+}
+
 /** Resolves the conflict on `node` with `resolution`. */
 export async function resolve(page: Page, node: string, resolution: string): Promise<void> {
+  await pickNode(page, node);
   const item = reviewItem(page, "conflict", node);
   await item.locator(`[data-testid="resolution"][data-resolution="${resolution}"]`).check();
   await expect(item.getByTestId("unresolved")).toHaveCount(0);

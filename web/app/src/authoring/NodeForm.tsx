@@ -12,8 +12,9 @@ import { conditionProblem } from "./condition.ts";
 import { DateRuleEditor } from "./DateRuleEditor.tsx";
 import { partsOf, ruleProblem } from "./dates.ts";
 import { changesOf, draftOf, draftProblems, type FormField, type NodeDraft } from "./fields.ts";
+import { Section } from "../detail/parts.tsx";
 import type { GraphNode } from "./graph.ts";
-import { DecisionFields, FieldGroup, SharedFields, StageFields, WorkFields, has, type FieldsProps } from "./NodeFields.tsx";
+import { BasicsFields, CompletionFields, DecisionFields, StageFields, WeightFields, has, type FieldsProps } from "./NodeFields.tsx";
 import { FieldBox, FormViolations, StaleRejection, type FieldNotes } from "./parts.tsx";
 import { domainOf, type Authored } from "./target.ts";
 import { byPlace, type Place, type Violation } from "./violations.ts";
@@ -88,20 +89,46 @@ function Rules({ props }: { props: FieldsProps }) {
   );
 }
 
+/** A section's fields hold a violation or a problem: it opens so the author sees where. */
+function holds(props: FieldsProps, fields: readonly FormField[]): boolean {
+  return fields.some((field) => {
+    const notes = props.notes(field);
+    return notes.problem !== undefined || (notes.violations ?? []).length > 0;
+  });
+}
+
+/**
+ * A9, A8, F4, A16: the form's fields in sections that open by kind (design 4.9): Basics always,
+ * Question for a decision, and the rest folded under their names, each opening itself when one
+ * of its fields has a violation so it shows at its field (A15).
+ */
 function Fields({ props }: { props: FieldsProps & { authored: Authored } }) {
+  const completion = (["requires_artifact", "requires_note", "placeholder"] as const).filter((field) => has(props, field));
   return (
     <>
-      <FieldGroup title="What it is">
-        <SharedFields props={props} />
-        {props.kind === "decision" ? <DecisionFields props={props} /> : <WorkFields props={props} />}
-        {has(props, "opens_at") ? <StageFields props={props} /> : null}
-      </FieldGroup>
-      <FieldGroup title="When it applies">
+      <Section title="Basics" open testId="form-basics">
+        <BasicsFields props={props} />
+      </Section>
+      {props.kind === "decision" ? (
+        <Section title="Question" open testId="form-question">
+          <DecisionFields props={props} />
+        </Section>
+      ) : null}
+      <Section title="Relevance" open={holds(props, ["relevant_when"])} testId="form-relevance">
         <Relevance props={props} />
-      </FieldGroup>
-      <FieldGroup title="Dates">
+      </Section>
+      <Section title="Dates" open={holds(props, ["due_by", "not_before", "opens_at", "closes_at"])} testId="form-dates">
         <Rules props={props} />
-      </FieldGroup>
+        {has(props, "opens_at") ? <StageFields props={props} /> : null}
+      </Section>
+      {completion.length === 0 ? null : (
+        <Section title="Completion needs" testId="form-completion">
+          <CompletionFields props={props} />
+        </Section>
+      )}
+      <Section title="Weight and estimate" open={holds(props, ["weight", "estimate"])} testId="form-weight">
+        <WeightFields props={props} />
+      </Section>
     </>
   );
 }
@@ -144,17 +171,19 @@ export function NodeForm({ authored, node }: NodeFormProps) {
       <Fields props={props} />
       <FormViolations places={places} />
       {write.failed === undefined ? <Receipt receipt={write.receipt} /> : <StaleRejection rejection={write.failed.rejection} onRetry={() => void save(authored.revision)} onDismiss={discard} />}
-      <span className="row">
-        <Button type="submit" primary disabled={write.disabled || !sendable} data-testid="node-form-save">
-          Save {changes.length === 0 ? "" : `(${String(changes.length)} ${changes.length === 1 ? "change" : "changes"})`}
-        </Button>
-        <Button disabled={kept === undefined} onClick={discard}>
-          Discard changes
-        </Button>
-        {preview?.outcome === "accepted" ? <span className="muted small" data-testid="preview" data-status="accepted">The engine accepts this.</span> : null}
-        {preview?.outcome === "rejected" ? <span className="muted small" data-testid="preview" data-status="rejected">The engine would refuse this; see the fields.</span> : null}
-        {preview?.outcome === "unavailable" ? <span className="author-problem" data-testid="preview" data-status="unavailable">No preview: {preview.message}</span> : null}
-      </span>
+      {kept === undefined && changes.length === 0 ? null : (
+        <span className="row">
+          <Button type="submit" primary disabled={write.disabled || !sendable} data-testid="node-form-save">
+            Save {changes.length === 0 ? "" : `(${String(changes.length)} ${changes.length === 1 ? "change" : "changes"})`}
+          </Button>
+          <Button disabled={kept === undefined} onClick={discard}>
+            Discard changes
+          </Button>
+          {preview?.outcome === "accepted" ? <span className="muted small" data-testid="preview" data-status="accepted">The engine accepts this.</span> : null}
+          {preview?.outcome === "rejected" ? <span className="muted small" data-testid="preview" data-status="rejected">The engine would refuse this; see the fields.</span> : null}
+          {preview?.outcome === "unavailable" ? <span className="author-problem" data-testid="preview" data-status="unavailable">No preview: {preview.message}</span> : null}
+        </span>
+      )}
     </form>
   );
 }

@@ -1,8 +1,9 @@
 /* Authoring (5.6): the structure editors' fields, problems, and nested condition clauses,
    drawn with the design tokens so they read the same in light and dark. */
+/* Edit structure's band: a full-width tinted row under the header, not a box in the canvas. */
 .author-bar {
-  border: 1px dashed var(--color-border);
-  padding: var(--space-3);
+  background: var(--color-tint);
+  padding: var(--space-3) var(--space-4);
 }
 
 .author-group {
@@ -43,5 +44,14 @@
 
 /* A form's controls take the panel's width and wrap rather than push it wider (app.css). */
 .author-panel .author-field > input {
+  width: 100%;
+}
+
+/* The palette opens in a popover: its fields stack at the popover's width. */
+[data-testid="add-node"] {
+  width: min(22rem, 100%);
+}
+
+[data-testid="add-node"] > :is(select, input) {
   width: 100%;
 }

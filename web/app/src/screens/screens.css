@@ -230,6 +230,88 @@
   width: 100%;
 }
 
+/* A route in the frame (8.11): one line of header, the Graph and List switch, and the list's rows. */
+.route-header {
+  gap: var(--space-2);
+}
+
+.route-header > .row {
+  flex-wrap: nowrap;
+}
+
+.route-header h1 {
+  flex: 1 1 12rem;
+  min-width: 0;
+  overflow-wrap: break-word;
+}
+
+/* On a phone the chip and the buttons drop under the title rather than squeezing it to a letter a line. */
+@media (max-width: 719px) {
+  .route-header > .row {
+    flex-wrap: wrap;
+  }
+}
+
+.route-bar {
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.route-bar .journey-switcher {
+  margin-left: auto;
+}
+
+.route-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.route-list-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 64px;
+  padding-block: var(--space-2);
+  padding-inline-end: var(--space-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.route-list-row[aria-current="true"] {
+  background: var(--color-tint);
+}
+
+.route-list-row .node-kind {
+  flex: none;
+  width: 6.5rem;
+}
+
+.route-list-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+
+button.route-list-title {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+/* The file input is hidden behind its label, which is the button (a bare "Choose file" says nothing). */
+.import-button:has(:focus-visible) {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+.draft-card {
+  gap: var(--space-4);
+}
+
 /* Printing (the Summary page is the printable one, C18): the page flows on paper; ui/app.css
    already drops the frame's chrome and the toolbar. */
 @media print {

@@ -31,7 +31,7 @@ export function RouteActions({ route }: { route: Schema<"Route"> }) {
           <>
             <Badge tone="warn">Draft open</Badge>
             <span className="muted small">{draft.extends == null ? "A first version, not yet published" : `Extends version ${String(draft.extends)}`}</span>
-            <Link to={routeCanvasPath(id, undefined, DEFAULT_VIEW)}>Canvas</Link>
+            <Link to={routeCanvasPath(id, undefined, DEFAULT_VIEW)}>Open the draft</Link>
           </>
         )}
       </span>
@@ -43,13 +43,13 @@ export function RouteActions({ route }: { route: Schema<"Route"> }) {
         <Button disabled={write.disabled} onClick={() => { send(retireMutation(moves.retire)); }}>
           {moves.retire ? "Retire" : "Bring back"}
         </Button>
+        <ImportFile label="Import a file as a new draft" />
       </span>
       {write.rejected === undefined ? null : (
         <Refused rejection={write.rejected} onDismiss={write.dismiss}>
           {violates(write.rejected, "draft_exists") ? <Button onClick={() => { send({ op: "discard_draft" }); }}>Discard the open draft</Button> : null}
         </Refused>
       )}
-      <ImportFile label="Import a file as a new draft" />
     </section>
   );
 }

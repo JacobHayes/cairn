@@ -3,7 +3,7 @@
 // mutation, so one event, per node; a guard failure on any node rejects the whole patch, and
 // the rejection names which node failed (A15), with D4's bypass. A node whose kind or state
 // cannot take the action stops it before anything is sent, named.
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { titleOf, type Ready } from "../detail/model.ts";
 import { Menu } from "../screens/Menu.tsx";
@@ -77,8 +77,12 @@ function FormInput({ view, form, value, onChange }: { view: Ready; form: Form; v
   );
 }
 
-/** C9: the bulk actions over `selected`, of which `hidden` are not in the list shown; `onClear` drops the selection. */
-export function BulkBar({ view, selected, hidden, onLanded, onClear }: { view: Ready; selected: Facts[]; hidden: number; onLanded: () => void; onClear?: () => void }) {
+/**
+ * C9: the bulk actions over `selected`, of which `hidden` are not in the list shown; `onClear` drops the
+ * selection. While a journey's structure is edited, `structure` stands in for the actions: the bar offers
+ * what the edit mode does to a selection (Remove), not what a journey's work does.
+ */
+export function BulkBar({ view, selected, hidden, onLanded, onClear, structure }: { view: Ready; selected: Facts[]; hidden: number; onLanded: () => void; onClear?: () => void; structure?: ReactNode }) {
   const write = useNodeWrite(view, "bulk");
   const draft = useFormDraft<{ form: Form; value: string }>(write.journey, "selection", "bulk");
   const [unable, setUnable] = useState<string[]>([]);
@@ -92,7 +96,7 @@ export function BulkBar({ view, selected, hidden, onLanded, onClear }: { view: R
   };
   const open = draft.draft;
   // Only what some selected node can take is offered: the others would only be refused.
-  const offered = OFFERS.filter((offer) => selected.some((facts) => canTake(offer.asks, facts)));
+  const offered = structure === undefined ? OFFERS.filter((offer) => selected.some((facts) => canTake(offer.asks, facts))) : [];
   const pick = (offer: Offer) => {
     if (offer.form === undefined) {
       void act(offer.asks);
@@ -105,6 +109,7 @@ export function BulkBar({ view, selected, hidden, onLanded, onClear }: { view: R
       <div className="row">
         <strong>{selected.length} selected</strong>
         {hidden === 0 ? null : <span className="muted small" data-testid="selected-elsewhere">({hidden} not shown)</span>}
+        {structure}
         {offered.slice(0, INLINE_MAX).map((offer) => (
           <Button key={offer.words} disabled={write.disabled} onClick={() => { pick(offer); }}>{offer.words}</Button>
         ))}

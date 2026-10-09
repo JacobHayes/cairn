@@ -8,7 +8,10 @@ import {
   applyBlockers,
   attemptFor,
   DIFF_LABELS,
+  DIFF_NOTES,
   diffMarks,
+  filterOf,
+  reviewEntries,
   graphDiff,
   intervening,
   carryIds,
@@ -189,12 +192,28 @@ describe("diffMarks (C14)", () => {
       { item: "conflict", conflict: { about: "field", node: "n_c", journey: { title: "C" }, route: { title: "See" } } },
       { item: "orphan", node: "n_b", keep: true, removal: { node: "n_b" } },
     ]);
-    expect(Object.fromEntries(Object.entries(marks).map(([key, mark]) => [key, mark.label]))).toEqual({
-      n_a: DIFF_LABELS.changed,
-      n_b: DIFF_LABELS.orphan,
-      n_c: DIFF_LABELS.conflict,
-      n_d: DIFF_LABELS.added,
+    expect(Object.fromEntries(Object.entries(marks).map(([key, mark]) => [key, [mark.label, mark.note, filterOf(mark)]]))).toEqual({
+      n_a: [DIFF_LABELS.changed, undefined, "change"],
+      n_b: [DIFF_LABELS.changed, DIFF_NOTES.orphan, "change"],
+      n_c: [DIFF_LABELS.changed, DIFF_NOTES.conflict, "conflicts"],
+      n_d: [DIFF_LABELS.added, undefined, "add"],
     });
+  });
+});
+
+describe("reviewEntries (C14)", () => {
+  it("lists a removal that cascades from a removed container beneath it, and the rest by kind of change", () => {
+    const nodes = (keys: [string, string?][]) => ({ nodes: keys.map(([key, parent]) => ({ key, id: key, kind: "action" as const, title: key, ...(parent === undefined ? {} : { parent }) })) });
+    const was = nodes([["a"], ["b", "a"], ["c", "b"], ["d"], ["e"]]);
+    const now = nodes([["d"], ["e"], ["f"]]);
+    const diff = graphDiff(was, now);
+    const entries = reviewEntries(diff, diffMarks(diff, []), was);
+    expect(entries.map((entry) => [entry.key, entry.cause])).toEqual([
+      ["f", undefined],
+      ["a", undefined],
+      ["b", "a"],
+      ["c", "a"],
+    ]);
   });
 });
 

@@ -49,11 +49,6 @@ export async function toggle(page: Page, name: string, on: boolean): Promise<voi
   }
 }
 
-/** Shows or hides one kind with its toggle (C2). */
-export function showKind(page: Page, kind: string, shown: boolean): Promise<void> {
-  return toggle(page, kind, shown);
-}
-
 /** A card's line on the canvas, from `from` to `to`. */
 export function lineBetween(page: Page, from: string, to: string) {
   return page.locator(`[data-testid=edge-line][data-from="${from}"][data-to="${to}"]`);

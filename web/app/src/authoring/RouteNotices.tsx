@@ -1,7 +1,8 @@
 // A20: a route draft's notices while it is authored: work with no chain to or from the final
 // milestone, listed by the page's engine from the draft as it stands, so an edge drawn
 // elsewhere on the canvas clears its notice as soon as the draft is read again. Advisory:
-// nothing here blocks an edit or publishing. Each names its node with the path to open it by.
+// nothing here blocks an edit or publishing. They show on the card of each node (a hollow
+// chip), in the draft card, and in an import or publish result, always apart from violations.
 import type { Schema } from "@cairn/client";
 import { useEffect, useState } from "react";
 import { Link } from "react-router";
@@ -9,22 +10,31 @@ import { Link } from "react-router";
 import { useSession } from "../data/react.ts";
 import { Badge } from "../ui/kit.tsx";
 
-type Found = { status: "ready"; notices: Schema<"Notice">[] } | { status: "failed"; message: string };
+type Notice = Schema<"Notice">;
 
-export function RouteNotices({ graph, hrefOf }: { graph: Schema<"Graph">; hrefOf: (node: string) => string }) {
+interface Found {
+  notices: Notice[];
+  failed: string | undefined;
+}
+
+/** The draft's notices as the engine lists them now; none while they are being read, or when they cannot be. */
+export function useRouteNotices(graph: Schema<"Graph"> | undefined): Found {
   const { deriver } = useSession();
-  const [found, setFound] = useState<Found | undefined>(undefined);
+  const [found, setFound] = useState<(Found & { graph: Schema<"Graph"> }) | undefined>(undefined);
   useEffect(() => {
+    if (graph === undefined) {
+      return undefined;
+    }
     let live = true;
     deriver.routeNotices({ graph }).then(
       (notices) => {
         if (live) {
-          setFound({ status: "ready", notices });
+          setFound({ graph, notices, failed: undefined });
         }
       },
       (thrown: unknown) => {
         if (live) {
-          setFound({ status: "failed", message: thrown instanceof Error ? thrown.message : String(thrown) });
+          setFound({ graph, notices: [], failed: thrown instanceof Error ? thrown.message : String(thrown) });
         }
       },
     );
@@ -32,25 +42,30 @@ export function RouteNotices({ graph, hrefOf }: { graph: Schema<"Graph">; hrefOf
       live = false;
     };
   }, [deriver, graph]);
-  if (found === undefined || (found.status === "ready" && found.notices.length === 0)) {
+  return found !== undefined && found.graph === graph ? found : { notices: [], failed: undefined };
+}
+
+/** The notices under their own steel label, each with a way to open its node; nothing when there are none. */
+export function NoticeList({ notices, hrefOf, heading }: { notices: readonly Notice[]; hrefOf: ((node: string) => string) | undefined; heading?: string }) {
+  if (notices.length === 0) {
     return null;
   }
-  if (found.status === "failed") {
-    return <p className="muted small">The draft's notices could not be read: {found.message}</p>;
-  }
   return (
-    <section className="stack callout" aria-label="Notices" data-testid="route-notices">
+    <section className="stack" aria-label="Notices" data-testid="route-notices">
       <span className="row">
-        <Badge tone="warn">Notices {found.notices.length}</Badge>
+        <Badge tone="pending">{heading ?? "Notices"} {notices.length}</Badge>
         <span className="muted small">Advisory: publishing is not blocked.</span>
       </span>
       <ul className="stack">
-        {found.notices.map((notice) => (
+        {notices.map((notice) => (
           <li key={`${notice.code}:${notice.node}`} data-testid="route-notice" data-node={notice.node} data-code={notice.code}>
-            {notice.message}{" "}
-            <Link to={hrefOf(notice.node)} className="mono">
-              {notice.path}
-            </Link>
+            {notice.message}
+            {hrefOf === undefined ? null : (
+              <>
+                {" "}
+                <Link to={hrefOf(notice.node)}>Show</Link>
+              </>
+            )}
           </li>
         ))}
       </ul>

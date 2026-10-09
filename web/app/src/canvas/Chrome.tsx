@@ -113,7 +113,7 @@ export function TraceBar({ title, needs, unblocks, outside, onReveal, onClear }:
   );
 }
 
-/** The Select mode's band (5.9). */
+/** The Select mode's band (5.9). Editing structure has its own full-width band under the header (authoring/JourneyAuthoring.tsx). */
 export function SelectBand({ onDone }: { onDone: () => void }) {
   return (
     <div className="canvas-trace" data-testid="select-band">

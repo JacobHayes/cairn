@@ -2,7 +2,7 @@
 import { expect, test } from "vitest";
 
 import type { GraphNode } from "../detail/model.ts";
-import { collapsedAt, currentStages, leftOutAt, withStep } from "./ladder.ts";
+import { collapsedAt, currentStages, leftOutAt, routeStepDrawing, routeStepOf, withStep } from "./ladder.ts";
 
 const node = (key: string, kind: GraphNode["kind"], parent?: string): GraphNode => ({ key, id: key, kind, title: key, ...(parent === undefined ? {} : { parent }) });
 const nodes = [node("s1", "group"), node("s1g", "group", "s1"), node("s1a", "action", "s1g"), node("s2", "group"), node("s3", "group")];
@@ -18,4 +18,18 @@ test("at Stages the stage holding the frontier is open and the rest collapsed; t
   const mixed = [...nodes, node("d", "decision"), node("da", "action", "d"), node("m", "milestone"), node("sd", "decision", "s1")];
   expect([...leftOutAt("stages", mixed)].sort()).toEqual(["d", "da"]);
   expect(leftOutAt("work", mixed).size).toBe(0);
+});
+
+test("a route has no stage to open at, so a route with no groups opens at Decisions and has no Stages rung", () => {
+  expect(routeStepOf({ step: undefined, container: undefined }, nodes)).toBe("stages");
+  // Drilled into a stage, Stages would draw nothing of what is inside it.
+  expect(routeStepOf({ step: undefined, container: "s1" }, nodes)).toBe("work");
+  const flat = [node("d", "decision"), node("a", "action")];
+  expect(routeStepOf({ step: undefined, container: undefined }, flat)).toBe("decisions");
+  expect(routeStepOf({ step: "stages", container: undefined }, flat)).toBe("decisions");
+  expect(routeStepOf({ step: "work", container: undefined }, flat)).toBe("work");
+  // A node just added is shown at the first step that draws its kind.
+  expect(routeStepDrawing("stages", "group")).toBe("stages");
+  expect(routeStepDrawing("decisions", "deliverable")).toBe("work");
+  expect(routeStepDrawing("stages", "action")).toBe("all");
 });

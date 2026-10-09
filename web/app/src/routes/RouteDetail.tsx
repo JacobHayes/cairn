@@ -8,6 +8,7 @@ import { Link, useParams } from "react-router";
 
 import { routeRead, type RouteRead } from "../data/reads.ts";
 import { useLive } from "../data/react.ts";
+import { dateWords } from "../timeline/model.ts";
 import { newJourneyPath, overviewPath } from "../journeys/address.ts";
 import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
@@ -26,9 +27,9 @@ function Version({ read, row, latest }: { read: RouteRead; row: VersionRow; late
       <span className="row">
         <strong>Version {row.version}</strong>
         {row.version === latest ? <Badge tone="good">Latest</Badge> : null}
-        <span className="muted small">published {row.publishedAt}</span>
+        <span className="muted small">Published {dateWords(row.publishedAt.slice(0, 10), new Date().toISOString().slice(0, 10))}</span>
         <span className="spacer" />
-        <Link to={routeCanvasPath(id, row.version, DEFAULT_VIEW)}>Canvas</Link>
+        <Link to={routeCanvasPath(id, row.version, DEFAULT_VIEW)}>Open</Link>
         <Button onClick={() => void exportVersion(row.version)}>Export</Button>
         {startable ? <Link to={newJourneyPath(id, row.version)} data-testid="start-from-version">Start a journey</Link> : null}
       </span>
@@ -37,7 +38,6 @@ function Version({ read, row, latest }: { read: RouteRead; row: VersionRow; late
         {row.journeys.map((journey) => (
           <li key={journey.id} className="row" data-testid="version-journey" data-journey={journey.id} data-upgrade={journey.upgrade ? "available" : "none"}>
             <Link to={overviewPath(journey.id)}>{journey.name}</Link>
-            <Badge>{journey.status}</Badge>
             {journey.upgrade ? <Badge tone="warn" data-testid="upgrade" data-status="available">Upgrade available</Badge> : null}
           </li>
         ))}

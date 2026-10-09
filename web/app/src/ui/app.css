@@ -654,7 +654,7 @@ table.data {
   padding: var(--space-3) 0;
 }
 /* A control in a narrow column wraps rather than pushing it wider. */
-:is(.author-panel, .author-bar, .proposal-page, .detail-panel) :is(input, select, textarea) {
+:is(.author-panel, .author-bar, .detail-panel) :is(input, select, textarea) {
   max-width: 100%;
 }
 textarea {

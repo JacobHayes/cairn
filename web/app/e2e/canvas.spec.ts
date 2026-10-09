@@ -7,7 +7,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { LAYOUT_MOVED_FRACTION_MAX } from "../src/canvas/layout.ts";
 import { addNode, openEditing } from "./authoring.ts";
-import { cardKeys, containers, lineBetween, places, pointOn, showKind, toggle, viewportOf } from "./canvas.ts";
+import { cardKeys, containers, lineBetween, places, pointOn, toggle, viewportOf } from "./canvas.ts";
 import { menuItem, nodeCard, nodePanel, openFromCanvas, openJourney, renameOf, startRename } from "./shell.ts";
 
 /** The vendor evaluation at the end of its scenario, at the Work step: the level's node set, each node in its container. */
@@ -175,11 +175,12 @@ test("a route's canvas draws its graph with no journey state, by the same rules"
   await page.getByTestId("card-lineage").locator("summary").click();
   await page.getByTestId("lineage").click();
   await expect(page.getByTestId("route-graph")).toHaveAttribute("data-status", "1");
+  await page.getByTestId("ladder").getByText("All", { exact: true }).click();
   await expect(page.getByTestId("node-card")).toHaveCount(25);
   await expect(page.locator("[data-testid=node-card][data-relevance]")).toHaveCount(0);
   await expect(page.getByTestId("card-state")).toHaveCount(0);
   await expect(lineBetween(page, "n_partner_runs", "n_partner_led")).not.toHaveAttribute("data-dash", "solid");
-  await showKind(page, "action", false);
+  await page.getByTestId("ladder").getByText("Work", { exact: true }).click();
   await nodeCard(page, "n_setup").getByTestId("card-drill").click();
   await expect.poll(() => cardKeys(page)).toEqual(["n_access", "n_plan", "n_workload"]);
 });

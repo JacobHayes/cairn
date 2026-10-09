@@ -2,7 +2,7 @@
 // estimate and flags, a decision's prompt, answer type, choices, and what it fills or pins,
 // a milestone's flags, and a stage's bounds. Each field shows what stops it being sent and
 // what the engine said about it, at the field (A15).
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 
 import { Button, Field } from "../ui/kit.tsx";
 import { choiceId, choiceLabel, fieldsOf, type Choice, type FormField, type NodeDraft } from "./fields.ts";
@@ -72,28 +72,36 @@ function Flag({ props, field, label }: { props: FieldsProps; field: "requires_ar
   );
 }
 
-/** The fields every kind has (A1a): id, title, description, weight. */
-export function SharedFields({ props }: { props: FieldsProps }) {
+/** What every node is (A1a): title, id, description, and a milestone's own flags. */
+export function BasicsFields({ props }: { props: FieldsProps }) {
   return (
     <>
       <Text props={props} field="title" label="Title" />
       <Text props={props} field="id" label="Id" />
       <Text props={props} field="description" label="Description" area />
-      <Days props={props} field="weight" label="Weight" hint={props.kind === "group" ? "0 (a group's default)" : "1 (the default)"} />
+      {has(props, "final") ? <Flag props={props} field="final" label="The final milestone" /> : null}
+      {has(props, "auto_reach") ? <Flag props={props} field="auto_reach" label="Reached by itself on its date" /> : null}
     </>
   );
 }
 
-/** Work's own fields: an estimate, an artifact or a note required before done, and placeholder (A16). */
-export function WorkFields({ props }: { props: FieldsProps }) {
+/** Weight on every kind, and work's estimate (A9). */
+export function WeightFields({ props }: { props: FieldsProps }) {
   return (
     <>
+      <Days props={props} field="weight" label="Weight" hint={props.kind === "group" ? "0 (a group's default)" : "1 (the default)"} />
       {has(props, "estimate") ? <Days props={props} field="estimate" label="Estimate (days)" hint="none" /> : null}
+    </>
+  );
+}
+
+/** What work needs before it is done, and the placeholder mark (A16). */
+export function CompletionFields({ props }: { props: FieldsProps }) {
+  return (
+    <>
       {has(props, "requires_artifact") ? <Flag props={props} field="requires_artifact" label="Requires an artifact before done" /> : null}
       {has(props, "requires_note") ? <Flag props={props} field="requires_note" label="Requires a note before done" /> : null}
       {has(props, "placeholder") ? <Flag props={props} field="placeholder" label="Placeholder: each journey breaks it down" /> : null}
-      {has(props, "final") ? <Flag props={props} field="final" label="The final milestone" /> : null}
-      {has(props, "auto_reach") ? <Flag props={props} field="auto_reach" label="Reached by itself on its date" /> : null}
     </>
   );
 }
@@ -191,15 +199,5 @@ export function StageFields({ props }: { props: FieldsProps }) {
       notes={{ opens_at: props.notes("opens_at"), closes_at: props.notes("closes_at") }}
       onChange={(next) => { props.change(next); }}
     />
-  );
-}
-
-/** A labeled group of fields in the form. */
-export function FieldGroup({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <fieldset className="stack author-group">
-      <legend className="author-label">{title}</legend>
-      {children}
-    </fieldset>
   );
 }

@@ -328,6 +328,7 @@ function useFirstFit(props: FlowProps, fit: number, live: boolean): void {
   const flow = useReactFlow();
   const store = useStoreApi();
   const [initialized, sized] = [useNodesInitialized(), useStore((state) => state.width > 0 && state.height > 0)];
+  const sheet = useFrameState()?.inspector?.parentElement;
   const done = useRef(false);
   useEffect(() => {
     if (!initialized || !sized || done.current) {
@@ -335,9 +336,13 @@ function useFirstFit(props: FlowProps, fit: number, live: boolean): void {
     }
     done.current = true;
     const { width, height } = store.getState();
+    // On a tablet the inspector's sheet lies over the canvas's lower part: fit into what it leaves.
+    const covered = sheet !== null && sheet !== undefined && globalThis.matchMedia(SHEET).matches ? sheet.getBoundingClientRect().height : 0;
+    const padding = { ...FIT_PADDING, bottom: px(PAD.bottom + covered) };
+    const room = { width, height: height - covered };
     const groups = (live && fit < NEAR_ZOOM ? (props.focus ?? []) : []).map((keys) => props.model.cards.filter((card) => standsFor(card).some((key) => keys.includes(key))).map((card) => card.key)).filter((ids) => ids.length > 0);
-    const near = groups.find((ids) => fitZoom(flow.getNodesBounds(ids), { width, height }, PAD) >= NEAR_ZOOM) ?? groups.at(-1);
-    void flow.fitView(near === undefined ? { ...FIT, minZoom: minZoomOf(fit) } : { nodes: near.map((id) => ({ id })), padding: FIT_PADDING, minZoom: NEAR_ZOOM, maxZoom: 1 });
+    const near = groups.find((ids) => fitZoom(flow.getNodesBounds(ids), room, PAD) >= NEAR_ZOOM) ?? groups.at(-1);
+    void flow.fitView(near === undefined ? { ...FIT, padding, minZoom: minZoomOf(fit) } : { nodes: near.map((id) => ({ id })), padding, minZoom: NEAR_ZOOM, maxZoom: 1 });
   }, [initialized, sized, flow, store, fit, live, props.model, props.focus]);
 }
 

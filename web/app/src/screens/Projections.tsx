@@ -81,5 +81,5 @@ export function ProjectionBody({ ready, page, projection, selected, edge, author
   if (projection === "timeline") {
     return <ProjectedTimeline ready={ready} selected={selected} />;
   }
-  return <JourneyCanvas ready={ready} view={viewFrom(params)} selected={selected} edge={edge} decisions={params.get("decisions") === "1"} onPick={authored === undefined ? undefined : drawing.pick} />;
+  return <JourneyCanvas ready={ready} view={viewFrom(params)} selected={selected} edge={edge} decisions={params.get("decisions") === "1"} onPick={authored === undefined ? undefined : drawing.pick} authored={authored} />;
 }

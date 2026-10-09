@@ -1,26 +1,5 @@
-/* Proposal review: the diff canvas, its legend, and the lists beside it, drawn with the design
-   tokens so they read the same in light and dark. */
-.proposal-page {
-  max-width: 1224px;
-}
-
-.proposal-canvas .canvas {
-  height: 476px;
-}
-
-.proposal-legend {
-  font-size: 14px;
-  border: 1px solid var(--color-border);
-  padding: 0 var(--space-2);
-}
-
-.proposal-columns {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(374px, 100%), 1fr));
-  gap: var(--space-4);
-  align-items: start;
-}
-
+/* Proposal review: the review items and changes in the inspector, drawn with the design
+   tokens so they read the same in light and dark. The frame itself is screens.css. */
 .proposal-items,
 .proposal-changes {
   list-style: none;
@@ -38,21 +17,13 @@
   box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
-.proposal-page button.link {
-  background: none;
-  border: none;
-  padding: 0;
-  min-height: 0;
-  cursor: pointer;
-  font: inherit;
-  text-decoration: underline;
-}
-
-.proposal-columns > * {
-  min-width: 0;
-}
-
 .proposal-item,
 .proposal-change {
   overflow-wrap: anywhere;
+}
+
+/* The apply row closes the proposal card and the item editor: set off by a hairline, in the panel. */
+.panel-actions {
+  border-top: 1px solid var(--color-border);
+  padding-top: var(--space-4);
 }

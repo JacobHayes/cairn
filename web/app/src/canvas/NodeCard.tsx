@@ -95,6 +95,11 @@ function Head({ card, collapsible }: { card: Card; collapsible: boolean }) {
           {statusWord(journey.state, card.kind)}
         </span>
       )}
+      {card.route?.unanchored === true ? (
+        <span className="node-notice" data-testid="card-notice" title="No chain links this to the final milestone, so neither priority nor dates reach it. Advisory: publishing is not blocked.">
+          No path to final
+        </span>
+      ) : null}
       {card.drillable && actions?.drill !== undefined ? (
         <button
           type="button"
@@ -175,6 +180,15 @@ function Body({ body, card }: { body: CardBody; card: Card }) {
 
 function Foot({ card }: { card: Card }) {
   const journey = card.journey;
+  if (journey === undefined && card.route?.foot !== undefined) {
+    return (
+      <div className="node-foot">
+        <span className="node-date" data-testid="card-foot">
+          {card.route.foot}
+        </span>
+      </div>
+    );
+  }
   if (journey === undefined || (journey.foot === undefined && journey.owner === undefined)) {
     return null;
   }
@@ -243,7 +257,7 @@ function Hanging({ data }: { data: CardData }) {
         </span>
       )}
       {mark === undefined || mark.quiet === true ? null : (
-        <span className={`node-mark hang-tag top node-mark-${mark.tone}`} data-testid="card-mark" data-status={mark.label}>
+        <span className={`node-mark hang-tag top node-mark-${mark.tone}${overlay?.screenTags === true ? " node-mark-screen" : ""}`} data-testid="card-mark" data-status={mark.label} title={mark.note}>
           {mark.label}
         </span>
       )}

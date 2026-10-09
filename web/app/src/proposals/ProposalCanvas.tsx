@@ -1,8 +1,11 @@
-// C14: a proposal as a diff over the canvas. The graph after is drawn with every node the
-// proposal removes put back where it was, all kinds shown, laid out as any canvas is (C15);
-// the overlay (5.2's CanvasOverlay) marks what is added, changed, removed, in conflict,
-// orphaned, or left out of a saved route. It carries no state: what can be acted on after is
-// the frontier beside it. Opening a card picks its node in the lists.
+// C14: a proposal as a diff over the canvas, filling the frame's workspace like any graph. The
+// graph after is drawn with every node the proposal removes put back where it was (struck and
+// ghosted), all kinds shown, laid out as any canvas is (C15); the overlay (5.2's CanvasOverlay)
+// tags each card with the word for what is added, changed, removed, in conflict, orphaned, or
+// left out of a saved route, and fades the rest when a filter is on. It carries no state: what
+// can be acted on after is the frontier in the proposal card. Opening a card picks its node
+// for the inspector's item editor. The trace is off during review: the diff and a trace never
+// show at once.
 import { useEffect, useMemo, useState } from "react";
 
 import type { Graph } from "../authoring/graph.ts";
@@ -13,7 +16,7 @@ import type { CardActions } from "../canvas/NodeCard.tsx";
 import { marksOverlay } from "../canvas/overlay.ts";
 import type { Deployment } from "../data/host.ts";
 import { useSession } from "../data/react.ts";
-import { DIFF_LABELS, type DiffMark } from "./model.ts";
+import type { DiffMark } from "./model.ts";
 
 /** C2: the level of `graph` with every kind shown, or why there is none. */
 function useLevel(graph: Graph | undefined, deployment: Deployment, today: string): { level: Level; graph: Graph } | { error: string } | undefined {
@@ -49,13 +52,15 @@ export interface ProposalCanvasProps {
   /** What is drawn: the graph after with the removed nodes put back; the graph after alone when that does not hold together. */
   graphs: Graph[];
   marks: Record<string, DiffMark>;
+  /** A filter is on: the cards it does not keep fade. */
+  dim: boolean;
   deployment: Deployment;
   today: string;
   selected: string | undefined;
   onPick: (key: string) => void;
 }
 
-export function ProposalCanvas({ domain, graphs, marks, deployment, today, selected, onPick }: ProposalCanvasProps) {
+export function ProposalCanvas({ domain, graphs, marks, dim, deployment, today, selected, onPick }: ProposalCanvasProps) {
   // The first graph that the engine draws: a union can break an invariant a graph after holds.
   const [tried, setTried] = useState(0);
   useEffect(() => {
@@ -76,7 +81,12 @@ export function ProposalCanvas({ domain, graphs, marks, deployment, today, selec
     return { cards: cardsOf(answer.level, nodes), lines: linesOf(answer.level, nodes) };
   }, [answer]);
   const { laidOut, error } = useLaidOut(`proposal:${domain}`, "diff", model);
-  const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the proposal changes", marks, laidOut.model)), [laidOut, marks]);
+  const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the proposal changes", marks, laidOut.model, dim)), [laidOut, marks, dim]);
+  // The view opens on the changes (all of them when they fit at a readable zoom, else the first one), not fitted to a journey whose cards are too small to read.
+  const focus = useMemo(() => {
+    const changed = Object.keys(marks);
+    return changed.length === 0 ? undefined : [changed, changed.slice(0, 1)];
+  }, [marks]);
   const actions = useMemo<CardActions>(
     () => ({
       open: onPick,
@@ -97,16 +107,6 @@ export function ProposalCanvas({ domain, graphs, marks, deployment, today, selec
     return <p className="muted small">Laying out the diff...</p>;
   }
   return (
-    <div className="stack" data-testid="proposal-canvas">
-      <div className="row muted small" data-testid="diff-legend">
-        {Object.values(DIFF_LABELS).map((label) => (
-          <span key={label} className="proposal-legend">{label}</span>
-        ))}
-      </div>
-      <div className="proposal-canvas">
-        <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={overlay} lens={undefined} selected={selected} actions={actions} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" title="The proposal's diff" inScroller />
-      </div>
-      {overlay.outside.length === 0 ? null : <span className="muted small">Also changed, not drawn: {overlay.outside.join(", ")}</span>}
-    </div>
+    <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={overlay} lens={undefined} selected={selected} actions={actions} focus={focus} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" title="The proposal's diff" />
   );
 }

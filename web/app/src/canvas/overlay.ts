@@ -12,10 +12,14 @@ export interface OverlayMark {
   tone: MarkTone;
   /** The tag it hangs, and what tests read. */
   label: string;
+  /** More to say of the card, on the tag's hover (a diff's conflict or orphan). */
+  note?: string;
   /** A gravity contributor: a dot by its state chip (5.7). */
   contributor?: true;
   /** The tag is not drawn: the traced card itself, which the selection already shows. */
   quiet?: true;
+  /** The card is going away: kept where it was, struck and ghosted (a proposal's removal). */
+  ghost?: true;
 }
 
 /** How a line is lit: ink (upstream) or accent (downstream), faint when it is a finished upstream line, or lit for a diff. */
@@ -32,6 +36,8 @@ export interface CanvasOverlay {
   dim: boolean;
   /** Nodes it marks that have no card on this canvas (outside the view, or with no stand-in). */
   outside: string[];
+  /** Its tags keep their size on screen at any zoom (a diff's words must be readable from far out). */
+  screenTags?: true;
 }
 
 /** C7: the trace's labels: the node traced, what it needs, what it unblocks. */
@@ -100,10 +106,10 @@ export function traceOverlay(trace: Trace, model: CanvasModel, title: string): C
 /**
  * C14: marks by node drawn over a canvas (proposal review's diff): each card shows the mark of
  * the node it stands for, or of one rolled up into it; lines into or out of a marked card are
- * lit; nothing dims, so what a change leaves alone stays readable. A marked node with no card
- * is listed as outside.
+ * lit; nothing dims unless `dim` (a filter is on), so what a change leaves alone stays readable.
+ * A marked node with no card is listed as outside.
  */
-export function marksOverlay(title: string, marks: Record<string, OverlayMark>, model: CanvasModel): CanvasOverlay {
+export function marksOverlay(title: string, marks: Record<string, OverlayMark>, model: CanvasModel, dim = false): CanvasOverlay {
   const shown: Record<string, OverlayMark> = {};
   for (const card of model.cards) {
     const key = standsFor(card).find((each) => marks[each] !== undefined);
@@ -115,5 +121,5 @@ export function marksOverlay(title: string, marks: Record<string, OverlayMark>, 
   const lines = Object.fromEntries(model.lines.filter((line) => shown[line.from] !== undefined || shown[line.to] !== undefined).map((line) => [line.id, "lit" as const]));
   const drawn = new Set(model.cards.flatMap(standsFor));
   const outside = Object.keys(marks).filter((key) => !drawn.has(key)).sort();
-  return { title, marks: shown, lines, dim: false, outside };
+  return { title, marks: shown, lines, dim, outside, screenTags: true };
 }

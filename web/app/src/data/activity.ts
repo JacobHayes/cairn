@@ -21,13 +21,18 @@ export interface ConsequenceLine {
   unanswered?: string[];
 }
 
+/** A20: the advisory notices an applied patch answered with (an import or a publish); none for one already applied. */
+export function noticesOf(answer: PatchAnswer): Schema<"Notice">[] {
+  return answer.outcome === "applied" ? (answer.notices ?? []) : [];
+}
+
 /** D7: what an accepted patch newly caused, journey by journey, each kind that has any. */
 export function consequenceLines(answer: PatchAnswer): ConsequenceLine[] {
   if (answer.outcome !== "applied") {
     return [];
   }
   const lines = linesOf(answer.consequences ?? {});
-  const found = answer.notices ?? [];
+  const found = noticesOf(answer);
   return found.length === 0 ? lines : [...lines, { kind: "unanchored", journey: "", nodes: found.map((notice) => notice.path) }];
 }
 

@@ -7,7 +7,9 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { BulkBar } from "../acting/BulkBar.tsx";
-import { selectionOf } from "../acting/acts.ts";
+import type { Authored } from "../authoring/target.ts";
+import { RemoveSelected } from "../authoring/RemoveSelected.tsx";
+import { selectionOf, type Facts } from "../acting/acts.ts";
 import { recordOf, titleOf, type Ready } from "../detail/model.ts";
 import { typing } from "../ui/typing.ts";
 import { Panel } from "@xyflow/react";
@@ -134,6 +136,8 @@ export interface JourneyCanvasProps {
   decisions: boolean;
   /** In edit mode, a card picked while an edge is drawn ends the edge instead of opening (5.6); true when it took the pick. */
   onPick?: ((key: string) => boolean) | undefined;
+  /** In edit mode, the journey's structure as authored: what the selection bar's Remove works on (8.11). */
+  authored?: Authored | undefined;
 }
 
 /** What each filter fades: the kinds not kept at full strength, and with the decisions view every other kind. */
@@ -248,8 +252,29 @@ function outsideOf(trace: { upstream: string[]; downstream: string[] } | undefin
   return trace === undefined ? 0 : [...trace.upstream, ...trace.downstream].filter((key) => !drawnAs.has(key)).length;
 }
 
+/** The bar over the Select mode's picks: the journey's work on them, or (editing structure) Remove. */
+function SelectionBar({ ready, picks, authored, setPicked }: { ready: Ready; picks: Facts[]; authored: Authored | undefined; setPicked: (update: (held: ReadonlySet<string>) => ReadonlySet<string>) => void }) {
+  return (
+    <BulkBar
+      view={ready}
+      selected={picks}
+      hidden={0}
+      onLanded={() => { setPicked(() => new Set()); }}
+      structure={
+        authored === undefined ? undefined : (
+          <RemoveSelected
+            authored={authored}
+            keys={picks.map((facts) => facts.node.key)}
+            onRemoved={(key) => { setPicked((held) => new Set([...held].filter((each) => each !== key))); }}
+          />
+        )
+      }
+    />
+  );
+}
+
 /** The journey's canvas, laid out, with the selected node's trace. */
-export function JourneyCanvas({ ready, view, selected, edge, decisions, onPick }: JourneyCanvasProps) {
+export function JourneyCanvas({ ready, view, selected, edge, decisions, onPick, authored }: JourneyCanvasProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const journey = ready.journey.header.id;
@@ -301,12 +326,12 @@ export function JourneyCanvas({ ready, view, selected, edge, decisions, onPick }
               onClear={() => { go(view, undefined); }}
             />
           )}
-          {selecting ? <SelectBand onDone={() => { go({ ...view, select: false, edit: false }, selected); }} /> : null}
+          {view.select && !view.edit ? <SelectBand onDone={() => { go({ ...view, select: false, edit: false }, selected); }} /> : null}
         </Ladder>
         <ViewMenu lens={view.lens} origins={view.origins} onLens={(lens) => { go({ ...view, lens }, selected); }} onOrigins={(origins) => { go({ ...view, origins }, selected); }} />
         {selecting && picks.length > 0 ? (
           <Panel position="bottom-center" className="canvas-panel">
-            <BulkBar view={ready} selected={picks} hidden={0} onLanded={() => { setPicked(new Set()); }} />
+            <SelectionBar ready={ready} picks={picks} authored={authored} setPicked={setPicked} />
           </Panel>
         ) : null}
         <HiddenCount count={graph.hidden} onShow={() => { go({ ...view, notRelevant: true }, selected); }} />

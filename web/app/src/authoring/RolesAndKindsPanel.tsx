@@ -175,22 +175,13 @@ function DefaultOwner({ authored }: { authored: Authored }) {
 
 export function RolesAndKindsPanel({ authored }: { authored: Authored }) {
   return (
-    <details className="detail-section" data-testid="roles-and-kinds">
-      <summary>
-        <span className="detail-section-title">Roles and participation kinds</span>
-        <span className="muted small">
-          {" "}
-          {(authored.graph.roles ?? []).length} roles, {(authored.graph.participation_kinds ?? []).length} kinds beyond owner
-        </span>
-      </summary>
-      <div className="stack detail-section-body">
-        <strong>Roles</strong>
-        <SlotList authored={authored} kind={ROLES} slots={authored.graph.roles ?? []} />
-        <DefaultOwner authored={authored} />
-        <strong>Participation kinds</strong>
-        <span className="muted small">Owner is built in; these are informational (A7).</span>
-        <SlotList authored={authored} kind={KINDS} slots={authored.graph.participation_kinds ?? []} />
-      </div>
-    </details>
+    <div className="stack" data-testid="roles-and-kinds">
+      <strong>Roles</strong>
+      <SlotList authored={authored} kind={ROLES} slots={authored.graph.roles ?? []} />
+      <DefaultOwner authored={authored} />
+      <strong>Participation kinds</strong>
+      <span className="muted small">Owner is built in; these are informational (A7).</span>
+      <SlotList authored={authored} kind={KINDS} slots={authored.graph.participation_kinds ?? []} />
+    </div>
   );
 }

@@ -3,7 +3,7 @@
 import { childrenOfClause, decisionOf, operatorOf, valuesOf, type Clause } from "../authoring/condition.ts";
 import { ruleWords } from "../authoring/dates.ts";
 import type { Graph, Mutation } from "../authoring/graph.ts";
-import { DIFF_LABELS, removedChoices, type Conflict, type ResolutionKind, type ReviewItem } from "./model.ts";
+import { removedChoices, type Conflict, type ResolutionKind, type ReviewItem } from "./model.ts";
 
 /** Names by key over the graphs a review shows (before and after), falling back to the key. */
 export interface Names {
@@ -229,5 +229,3 @@ export function itemHeading(item: ReviewItem, names: Names): string {
   }
 }
 
-/** The words of a node's mark on the canvas, for the legend. */
-export const LEGEND: string[] = Object.values(DIFF_LABELS);

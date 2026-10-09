@@ -83,6 +83,29 @@ export function usePreviewer(authored: Authored): (mutations: Mutation[]) => Pro
   };
 }
 
+/**
+ * The preview of publishing a route's draft: what it would be refused for (A15). Unlike an edit, a
+ * publish reads the versions the route already has, so they are read first.
+ */
+export function usePublishPreview(authored: Authored): () => Promise<Preview> {
+  const { deriver, host } = useSession();
+  const { viewer } = useViewer();
+  return async () => {
+    const route = authored.route;
+    if (route === undefined || !("route" in authored.target)) {
+      return { outcome: "unavailable", message: "Only a route's draft is published." };
+    }
+    try {
+      const versions = await Promise.all((route.versions ?? []).map((version) => host.routeVersion(route.header.id, version)));
+      const patch = patchOf(authored, [{ op: "publish_draft" }]);
+      await deriver.applyRoute({ patch, at: new Date().toISOString(), actor: { user: viewer?.user ?? LOCAL_USER }, today: authored.today, deployment: authored.deployment, route, versions });
+      return { outcome: "accepted", consequences: undefined };
+    } catch (thrown) {
+      return failedPreview(thrown);
+    }
+  };
+}
+
 /** Authoring's write path for `authored`'s graph. */
 export function useAuthorWrite(authored: Authored): AuthorWrite {
   const session = useSession();

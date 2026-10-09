@@ -1,6 +1,6 @@
 // C14: proposal review, for every destination (a journey, a route, the deployment, or one the
-// proposal creates at revision 0): the proposal as a diff over the canvas and as lists (what
-// it changes, its review items, its mutations), editable item by item, previewed as edited,
+// proposal creates at revision 0), in the frame: the proposed graph as a diff (the Graph or the
+// List) beside an inspector that is the item editor, edited item by item, previewed as edited,
 // then saved, applied, or discarded (I6). A journey's preview is the engine's in the derive
 // worker over the edited draft, with the frontier after (ARCHITECTURE, Web UI: Previews);
 // any other destination's is the host's preview of the proposal as saved. A stale proposal
@@ -8,44 +8,50 @@
 // revision the reviewer confirmed reviewing, and is offered only when nothing blocks it.
 import type { Schema } from "@cairn/client";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { treeOf, type Graph, type Kind, type Role } from "../authoring/graph.ts";
-import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
 import { PREVIEW_SETTLE_MS } from "../authoring/write.ts";
 import type { Deployment, RouteVersion } from "../data/host.ts";
 import { useDraft } from "../data/drafts.ts";
 import type { ProposalReview } from "../data/proposals.ts";
 import { useDeployment, useJourney, useLive, useSession, useViewer } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
+import { Section } from "../detail/parts.tsx";
 import { ShortfallView } from "../detail/ShortfallView.tsx";
-import { overviewPath } from "../journeys/address.ts";
-import { routeDetailPath } from "../routes/address.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
+import { Inspector } from "../shell/frame.tsx";
+import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { Badge, Button, Panel } from "../ui/kit.tsx";
-import { Receipt } from "../ui/Receipt.tsx";
 import { Markdown } from "../ui/markdown.tsx";
+import { Receipt } from "../ui/Receipt.tsx";
 import { ChangeList } from "./Changes.tsx";
 import { ItemList } from "./Items.tsx";
 import {
   applyBlockers,
   diffMarks,
+  filterCounts,
+  filterOf,
   graphDiff,
   itemNode,
   reviewedAfter,
+  reviewEntries,
   unionGraph,
   unresolvedHere,
   withMutationsAdded,
-  type Blocker,
+  type DiffMark,
   type GraphDiff,
   type Proposal,
   type ProposalDraft,
   type ProposalPreview,
+  type ReviewEntry,
+  type ReviewFilter,
 } from "./model.ts";
 import { ProposalCanvas } from "./ProposalCanvas.tsx";
 import { proposalReview } from "./read.ts";
+import { BeforeAfter, BLOCKER_WORDS, FilterChips, ItemEditor, ProposalOrigin, ReviewHeader, ReviewList } from "./ReviewFrame.tsx";
 import { StalePanel } from "./Stale.tsx";
-import { fieldName, namesOf, type Names } from "./words.ts";
+import { itemHeading, mutationNode, namesOf, type Names } from "./words.ts";
 import { useProposalWrite, type ProposalWrite, type WriteProblem } from "./write.ts";
 import "./proposals.css";
 
@@ -56,17 +62,6 @@ interface Kept {
 }
 
 const NOTHING_COMPARED: GraphDiff = { added: [], removed: [], changed: {}, edgesAdded: [], edgesRemoved: [] };
-
-const BLOCKER_WORDS: Record<Blocker, string> = {
-  not_open: "It is no longer open.",
-  editing: "An edit has a problem: fix it or drop the change.",
-  unsaved: "Save or drop your edits first.",
-  stale: "Its destination moved: refresh it first.",
-  unresolved: "An item still needs a choice.",
-  invalid: "As it stands it breaks a rule; see the violations.",
-  unreviewed: "Confirm you have reviewed it as it stands now.",
-  no_preview: "Waiting for its preview.",
-};
 
 /** The route versions a journey proposal's mutations read: an upgrade's target and the journey's own, a re-link's new version. */
 function versionsRead(ready: Ready, draft: ProposalDraft): Schema<"Lineage">[] {
@@ -124,39 +119,6 @@ function useLocalPreview(ready: Ready | undefined, proposal: Proposal, draft: Pr
     // `asked` names the journey's derivation, the proposal's revision, and the draft.
   }, [asked]);
   return answered?.for === asked ? answered.preview : undefined;
-}
-
-/** C14: the diff as a list: nodes added, changed (with their fields), and removed, and edges. */
-function DiffList({ diff, names, selected, onPick }: { diff: GraphDiff; names: Names; selected: string | undefined; onPick: (key: string) => void }) {
-  const row = (key: string, words: string, status: string) => (
-    <li key={`${status}:${key}`} data-testid="diff-node" data-node={key} data-status={status} className={key === selected ? "proposal-picked" : undefined}>
-      <button type="button" className="link" onClick={() => { onPick(key); }}>
-        {names.node(key)}
-      </button>{" "}
-      <span className="muted small">{words}</span>
-    </li>
-  );
-  const changed = Object.entries(diff.changed);
-  if (diff.added.length + diff.removed.length + changed.length + diff.edgesAdded.length + diff.edgesRemoved.length === 0) {
-    return <p className="muted small" data-testid="diff-empty">As it stands, it changes nothing in the graph.</p>;
-  }
-  return (
-    <ul className="detail-list" data-testid="diff-list">
-      {diff.added.map((key) => row(key, "added", "added"))}
-      {changed.map(([key, fields]) => row(key, `changed: ${fields.map(fieldName).join(", ")}`, "changed"))}
-      {diff.removed.map((key) => row(key, "removed", "removed"))}
-      {diff.edgesAdded.map((edge) => (
-        <li key={`+${edge.node}>${edge.requires}`} data-testid="diff-edge" data-status="added">
-          {names.node(edge.node)} now requires {names.node(edge.requires)}
-        </li>
-      ))}
-      {diff.edgesRemoved.map((edge) => (
-        <li key={`-${edge.node}>${edge.requires}`} data-testid="diff-edge" data-status="removed">
-          {names.node(edge.node)} no longer requires {names.node(edge.requires)}
-        </li>
-      ))}
-    </ul>
-  );
 }
 
 /**
@@ -231,72 +193,6 @@ function Problem({ problem, onDismiss }: { problem: WriteProblem | undefined; on
     );
   }
   return <RejectionView rejection={problem.rejection} onRebase={onDismiss} />;
-}
-
-/** Where the proposal goes, as a link. */
-function DestinationLink({ proposal }: { proposal: Proposal }) {
-  const destination = proposal.destination;
-  if (destination === "deployment") {
-    return <span>the deployment</span>;
-  }
-  if ("journey" in destination) {
-    return proposal.draft.destination_revision === 0 ? <span>a new journey, {destination.journey}</span> : <Link to={overviewPath(destination.journey)}>the journey {destination.journey}</Link>;
-  }
-  return <Link to={routeDetailPath(destination.route)}>the route {destination.route}</Link>;
-}
-
-/** I6: the controls that save, confirm, apply, or discard it, with what blocks an apply. */
-function Footer({ proposal, kept, editing, blockers, reviewed, write, onSave, onDrop, onMark, onApply, onDiscard }: {
-  proposal: Proposal;
-  kept: Kept | undefined;
-  editing: boolean;
-  blockers: Blocker[];
-  reviewed: number | undefined;
-  write: ProposalWrite;
-  onSave: () => void;
-  onDrop: () => void;
-  onMark: (marked: boolean) => void;
-  onApply: () => void;
-  onDiscard: () => void;
-}) {
-  if (proposal.status !== "open") {
-    return null;
-  }
-  return (
-    <Panel aria-label="Apply or discard" data-testid="proposal-footer">
-      {kept === undefined ? null : (
-        <span className="row" data-testid="unsaved">
-          <strong>Your edits are not saved yet.</strong>
-          {kept.base === proposal.revision ? null : <span className="muted small">The proposal changed since you started editing.</span>}
-          <Button primary disabled={write.disabled || editing} onClick={onSave} data-testid="save-proposal">
-            Save the edits
-          </Button>
-          <Button onClick={onDrop}>Drop them</Button>
-        </span>
-      )}
-      <label className="row">
-        <input type="checkbox" disabled={kept !== undefined} checked={reviewed === proposal.revision} onChange={(event) => { onMark(event.target.checked); }} data-testid="reviewed" />
-        I have reviewed this proposal as it stands (revision {proposal.revision})
-      </label>
-      <span className="row">
-        <Button primary disabled={write.disabled || blockers.length > 0} onClick={onApply} data-testid="apply-proposal" data-blockers={blockers.join(" ")}>
-          Apply
-        </Button>
-        <Button disabled={write.disabled} onClick={onDiscard} data-testid="discard-proposal">
-          Discard the proposal
-        </Button>
-      </span>
-      {blockers.length === 0 ? null : (
-        <ul className="detail-list muted small" data-testid="blockers">
-          {blockers.map((blocker) => (
-            <li key={blocker} data-testid="blocker" data-blocker={blocker}>
-              {BLOCKER_WORDS[blocker]}
-            </li>
-          ))}
-        </ul>
-      )}
-    </Panel>
-  );
 }
 
 interface BodyProps {
@@ -395,79 +291,31 @@ function useReviewing(review: ProposalReview, refetch: () => void) {
   };
 }
 
-/** The proposal's title, status, destination, and author. */
-function Header({ proposal }: { proposal: Proposal }) {
-  const journey = proposal.destination !== "deployment" && "journey" in proposal.destination ? proposal.destination.journey : undefined;
-  return (
-    <section className="stack" aria-label={proposal.draft.title}>
-      <div className="row">
-        <h1 data-testid="proposal-title">{proposal.draft.title}</h1>
-        <Badge tone={proposal.status === "open" ? "plain" : proposal.status === "applied" ? "good" : "warn"} data-testid="proposal-status" data-status={proposal.status}>
-          {proposal.status}
-        </Badge>
-      </div>
-      <span className="muted small">
-        A proposal for <DestinationLink proposal={proposal} />, drafted by {proposal.created_by}
-        {proposal.proposing_agent == null ? "" : ` with the agent ${proposal.proposing_agent}`} at its revision {proposal.draft.destination_revision}; this is its revision {proposal.revision}.
-      </span>
-      {proposal.status === "applied" && journey !== undefined ? <Link to={canvasPath(journey, DEFAULT_VIEW)} data-testid="applied-journey">Open the journey</Link> : null}
-      {proposal.draft.description == null ? null : <Markdown text={proposal.draft.description} />}
-    </section>
-  );
-}
-
-/** What a review shows beside its canvas, and what its lists edit. */
-interface Shown {
+/** What a review shows, worked out from the proposal as edited and the graphs before and after it. */
+interface Model {
   draft: ProposalDraft;
   /** The graph after is known, so the diff and the frontier after can be shown. */
   known: boolean;
-  preview: ProposalPreview | undefined;
+  preview: ProposalPreview;
+  /** The preview is of the reviewer's edits (a journey's), or of the proposal as saved. */
+  previewOfEdits: boolean;
+  local: LocalPreview | undefined;
+  before: Graph | undefined;
+  after: Graph | undefined;
   diff: GraphDiff;
+  marks: Record<string, DiffMark>;
+  entries: ReviewEntry[];
+  counts: Record<ReviewFilter, number>;
+  graphs: Graph[];
   names: Names;
   tree: ReturnType<typeof treeOf>;
   structure: Graph;
   today: string;
   editable: boolean;
-  selected: string | undefined;
 }
 
-function Columns({ shown, current, ready, deployment, journey, edit, setInvalid, onPick }: { shown: Shown; current: boolean; setInvalid: (editor: string, invalid: boolean) => void; ready: Ready | undefined; deployment: Deployment; journey: string | undefined; edit: (next: ProposalDraft) => void; onPick: (key: string) => void }) {
-  const { draft, known, preview, diff, names, tree, structure, today, editable, selected } = shown;
-  const roles: readonly Role[] = structure.roles ?? [];
-  const kinds: readonly Kind[] = structure.participation_kinds ?? [];
-  const unresolved = current ? new Map((preview?.unresolved ?? []).map((item) => [item.item, item.reason])) : unresolvedHere(draft.items ?? []);
-  const placeholder = (draft.mutations ?? []).find((mutation) => mutation.op === "add_node")?.node.parent ?? undefined;
-  return (
-    <div className="proposal-columns">
-      <div className="stack">
-        <Panel aria-label="What it changes">
-          <strong>What it changes</strong>
-          {known ? <DiffList diff={diff} names={names} selected={selected} onPick={onPick} /> : <NoGraphAfter preview={preview} />}
-        </Panel>
-        {preview === undefined || journey === undefined || !known ? null : <FrontierAfter ready={ready} preview={preview} names={names} />}
-        {preview === undefined ? null : <Violations preview={preview} ready={ready} names={names} onMove={editable ? (move) => { edit(withMutationsAdded(draft, [move])); } : undefined} />}
-      </div>
-      <div className="stack">
-        <Panel aria-label="Review items">
-          <strong>To review</strong>
-          <ItemList context={{ draft, edit, names, roles, kinds, unresolved, editable, selected }} itemNode={itemNode} />
-        </Panel>
-        <Panel aria-label="Changes">
-          <strong>Its changes</strong>
-          <ChangeList context={{ draft, edit, names, tree, roles, deployment, today, ready, editable, selected, defaultParent: placeholder, setInvalid }} />
-        </Panel>
-      </div>
-    </div>
-  );
-}
-
-function ReviewBody({ review, refetch, ready, before, deployment }: BodyProps) {
+function useReviewModel({ review, ready, before, deployment }: BodyProps, draft: ProposalDraft, writing: boolean): Model {
   const proposal = review.proposal;
-  const reviewing = useReviewing(review, refetch);
-  const { kept } = reviewing;
-  const [selected, setSelected] = useState<string | undefined>();
-  const draft = kept?.draft ?? proposal.draft;
-  const editable = proposal.status === "open" && !reviewing.write.disabled;
   const local = useLocalPreview(ready, proposal, draft);
   // A journey's preview follows the edits; any other's is the host's, of the proposal as saved.
   const previewOfEdits = local !== undefined && "preview" in local;
@@ -477,39 +325,244 @@ function ReviewBody({ review, refetch, ready, before, deployment }: BodyProps) {
   const known = after !== undefined;
   const diff = useMemo(() => (known ? graphDiff(before, after) : NOTHING_COMPARED), [known, before, after]);
   const marks = useMemo(() => diffMarks(diff, draft.items ?? []), [diff, draft.items]);
-  const graphs = useMemo(() => (known ? [unionGraph(before, after), after, ...(before === undefined ? [] : [before])] : before === undefined ? [] : [before]), [known, before, after]);
-  const structure = useMemo<Graph>(() => after ?? before ?? { nodes: [] }, [after, before]);
-  const tree = useMemo(() => treeOf(structure), [structure]);
   const added = useMemo<Graph>(() => ({ nodes: (draft.mutations ?? []).flatMap((mutation) => (mutation.op === "add_node" ? [mutation.node] : [])) }), [draft.mutations]);
-  const names = useMemo(() => namesOf([added, before, after], deployment.entities ?? []), [added, before, after, deployment]);
-  const today = ready?.key.today ?? new Date().toISOString().slice(0, 10);
-  const journey = proposal.destination !== "deployment" && "journey" in proposal.destination ? proposal.destination.journey : undefined;
-  const shown: Shown = { draft, known, preview, diff, names, tree, structure, today, editable, selected };
+  const structure = useMemo<Graph>(() => after ?? before ?? { nodes: [] }, [after, before]);
+  return {
+    draft,
+    known,
+    preview,
+    previewOfEdits,
+    local,
+    before,
+    after,
+    diff,
+    marks,
+    entries: useMemo(() => reviewEntries(diff, marks, before), [diff, marks, before]),
+    counts: useMemo(() => filterCounts(marks, diff), [marks, diff]),
+    graphs: useMemo(() => (known ? [unionGraph(before, after), after, ...(before === undefined ? [] : [before])] : before === undefined ? [] : [before]), [known, before, after]),
+    names: useMemo(() => namesOf([added, before, after], deployment.entities ?? []), [added, before, after, deployment]),
+    tree: useMemo(() => treeOf(structure), [structure]),
+    structure,
+    today: ready?.key.today ?? new Date().toISOString().slice(0, 10),
+    editable: proposal.status === "open" && !writing,
+  };
+}
+
+/** What the head says when the preview is not the whole story: errors, edits not yet previewed, and a graph with no "after". */
+function PreviewNotes({ model, kept, ready }: { model: Model; kept: Kept | undefined; ready: Ready | undefined }) {
+  const { local, known, before, preview, previewOfEdits } = model;
   return (
-    <div className="stack proposal-page" data-testid="proposal" data-proposal={proposal.id} data-status={proposal.status} data-revision={proposal.revision}>
-      <Header proposal={proposal} />
-      <StalePanel review={review} disabled={!editable} onRefresh={reviewing.refresh} />
-      <Problem problem={reviewing.write.problem} onDismiss={reviewing.rebase} />
-      <Receipt receipt={reviewing.write.receipt} />
+    <>
       {local !== undefined && "error" in local ? <p className="callout callout-bad">No preview: {local.error}</p> : null}
       {kept !== undefined && !previewOfEdits ? <p className="muted small" data-testid="preview-of-saved">{ready === undefined ? "The preview shows the proposal as saved: save your edits to preview them." : "Previewing your edits..."}</p> : null}
       {known || before === undefined || (preview.violations ?? []).length === 0 ? null : <p className="muted small" data-testid="no-graph-after">As it stands it breaks a rule, so there is no graph after to compare: the canvas shows the graph as it is, with the items marked.</p>}
-      {graphs.length === 0 ? null : <ProposalCanvas domain={proposal.id} graphs={graphs} marks={marks} deployment={deployment} today={today} selected={selected} onPick={setSelected} />}
-      <Columns shown={shown} current={previewOfEdits || kept === undefined} ready={ready} deployment={deployment} journey={journey} edit={reviewing.edit} setInvalid={reviewing.setInvalid} onPick={setSelected} />
-      <Footer
-        proposal={proposal}
-        kept={kept}
-        editing={reviewing.editing}
-        blockers={reviewing.blockers}
-        reviewed={reviewing.reviewed}
-        write={reviewing.write}
-        onSave={reviewing.save}
-        onDrop={reviewing.drop}
-        onMark={reviewing.mark}
-        onApply={reviewing.apply}
-        onDiscard={reviewing.discard}
-      />
-    </div>
+    </>
+  );
+}
+
+/** I6: the reviewer's edits not yet saved: kept, and saved or dropped from the head, where they cannot be missed. */
+function Unsaved({ proposal, kept, editing, write, onSave, onDrop }: { proposal: Proposal; kept: Kept | undefined; editing: boolean; write: ProposalWrite; onSave: () => void; onDrop: () => void }) {
+  if (kept === undefined || proposal.status !== "open") {
+    return null;
+  }
+  return (
+    <span className="row callout" data-testid="unsaved">
+      <strong>Your edits are not saved yet.</strong>
+      {kept.base === proposal.revision ? null : <span className="muted small">The proposal changed since you started editing.</span>}
+      <Button primary disabled={write.disabled || editing} onClick={onSave} data-testid="save-proposal">
+        Save the edits
+      </Button>
+      <Button onClick={onDrop}>Drop them</Button>
+    </span>
+  );
+}
+
+type Reviewing = ReturnType<typeof useReviewing>;
+
+/** I6: confirming the review, and what still stops Apply, at the foot of the inspector whatever it shows. */
+function Confirm({ proposal, reviewing }: { proposal: Proposal; reviewing: Reviewing }) {
+  if (proposal.status !== "open") {
+    return null;
+  }
+  return (
+    <section className="stack panel-actions" aria-label="Apply" data-testid="proposal-footer">
+      <label className="row">
+        <input type="checkbox" disabled={reviewing.kept !== undefined} checked={reviewing.reviewed === proposal.revision} onChange={(event) => { reviewing.mark(event.target.checked); }} data-testid="reviewed" />
+        I have reviewed this proposal as it stands (revision {proposal.revision})
+      </label>
+      {reviewing.blockers.length === 0 ? null : (
+        <ul className="detail-list muted small" data-testid="blockers">
+          {reviewing.blockers.map((blocker) => (
+            <li key={blocker} data-testid="blocker" data-blocker={blocker}>
+              {BLOCKER_WORDS[blocker]}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+interface InspectorProps {
+  proposal: Proposal;
+  model: Model;
+  reviewing: Reviewing;
+  ready: Ready | undefined;
+  deployment: Deployment;
+  journey: string | undefined;
+  selected: string | undefined;
+  /** Opens a node's item editor. */
+  onPick: (key: string) => void;
+  /** Where "back to the proposal" goes. */
+  back: string;
+}
+
+/** The contexts the item and change lists read, over the proposal as edited. */
+function useContexts({ model, reviewing, ready, deployment, selected }: Pick<InspectorProps, "model" | "reviewing" | "ready" | "deployment" | "selected">) {
+  const { draft, preview, names, tree, structure, today, editable, previewOfEdits } = model;
+  const roles: readonly Role[] = structure.roles ?? [];
+  const kinds: readonly Kind[] = structure.participation_kinds ?? [];
+  const current = previewOfEdits || reviewing.kept === undefined;
+  const unresolved = current ? new Map((preview.unresolved ?? []).map((item) => [item.item, item.reason])) : unresolvedHere(draft.items ?? []);
+  const placeholder = (draft.mutations ?? []).find((mutation) => mutation.op === "add_node")?.node.parent ?? undefined;
+  const { edit, setInvalid } = reviewing;
+  return {
+    items: { draft, edit, names, roles, kinds, unresolved, editable, selected },
+    changes: { draft, edit, names, tree, roles, deployment, today, ready, editable, selected, defaultParent: placeholder, setInvalid },
+  };
+}
+
+/** C14: the node picked, as an item to edit: what changes in it, the choices it needs, and its own changes. */
+function NodeEditor(props: InspectorProps & { node: string }) {
+  const { model, node, back } = props;
+  const contexts = useContexts(props);
+  const own = (key: string | undefined) => key === node;
+  const items = (model.draft.items ?? []).some((item) => itemNode(item) === node);
+  const mark = model.marks[node];
+  const changes = (model.draft.mutations ?? []).some((mutation) => mutationNode(mutation) === node);
+  return (
+    <ItemEditor title={model.names.node(node)} mark={mark} back={back} footer={<Confirm proposal={props.proposal} reviewing={props.reviewing} />}>
+      <Section title="What changes" open testId="item-before-after">
+        <BeforeAfter node={node} mark={mark} before={model.before} after={model.after} names={model.names} />
+      </Section>
+      {items ? (
+        <Section title="To decide" open testId="item-decide">
+          <ItemList context={contexts.items} itemNode={itemNode} only={own} />
+        </Section>
+      ) : null}
+      <Section title="Its changes" open={changes} testId="item-changes">
+        <ChangeList context={contexts.changes} only={own} />
+      </Section>
+    </ItemEditor>
+  );
+}
+
+/** What the inspector holds while no node is picked: the proposal's description, what still needs a choice, violations, what can be acted on after, and every change. */
+function ProposalCard(props: InspectorProps) {
+  const { proposal, model, ready, journey, onPick } = props;
+  const contexts = useContexts(props);
+  const { draft } = model;
+  const waiting = (draft.items ?? []).flatMap((item, index) => (contexts.items.unresolved.has(index) ? [{ item, index }] : []));
+  const loose = (key: string | undefined) => key === undefined;
+  return (
+    <aside className="detail-panel panel stack" aria-label="The proposal" data-testid="proposal-card">
+      <h2>The proposal</h2>
+      <ProposalOrigin proposal={proposal} journeyTitle={ready?.journey.header.name} names={model.names} />
+      {proposal.draft.description == null ? null : <Markdown text={proposal.draft.description} />}
+      {waiting.length === 0 ? null : (
+        <section className="stack" aria-label="Still to decide" data-testid="to-decide">
+          <span>
+            <Badge tone="warn">Still to decide {waiting.length}</Badge>
+          </span>
+          <ul className="route-list">
+            {waiting.map(({ item, index }) => {
+              const node = itemNode(item);
+              return (
+                <li key={index} className="route-list-row" data-testid="to-decide-item">
+                  <span className="route-list-title">
+                    <strong>{node === undefined ? itemHeading(item, model.names) : model.names.node(node)}</strong> <span className="muted small">{node === undefined ? "" : itemHeading(item, model.names)}</span>
+                  </span>
+                  {node === undefined ? null : (
+                    <Button onClick={() => { onPick(node); }}>Open</Button>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </section>
+      )}
+      <ItemList context={contexts.items} itemNode={itemNode} only={loose} />
+      <Violations preview={model.preview} ready={ready} names={model.names} onMove={model.editable ? (move) => { contexts.changes.edit(withMutationsAdded(draft, [move])); } : undefined} />
+      {model.preview.frontier === undefined || journey === undefined || !model.known ? null : (
+        <Section title="What can be acted on after" testId="frontier-section">
+          <FrontierAfter ready={ready} preview={model.preview} names={model.names} />
+        </Section>
+      )}
+      <Section title="All its changes" testId="all-changes">
+        <ChangeList context={contexts.changes} />
+      </Section>
+      <Confirm proposal={proposal} reviewing={props.reviewing} />
+    </aside>
+  );
+}
+
+/** The workspace: the diff as the Graph or the List, kept to the filter. */
+function Workspace({ model, filter, listed, selected, domain, deployment, onPick }: { model: Model; filter: ReviewFilter; listed: boolean; selected: string | undefined; domain: string; deployment: Deployment; onPick: (key: string) => void }) {
+  const kept = useMemo(() => (filter === "all" ? model.marks : Object.fromEntries(Object.entries(model.marks).filter(([, mark]) => filterOf(mark) === filter))), [model.marks, filter]);
+  if (listed) {
+    return model.known ? <ReviewList entries={model.entries} diff={model.diff} names={model.names} filter={filter} selected={selected} onPick={onPick} /> : <NoGraphAfter preview={model.preview} />;
+  }
+  return model.graphs.length === 0 ? <NoGraphAfter preview={model.preview} /> : <ProposalCanvas domain={domain} graphs={model.graphs} marks={kept} dim={filter !== "all"} deployment={deployment} today={model.today} selected={selected} onPick={onPick} />;
+}
+
+function ReviewBody(props: BodyProps) {
+  const { review, ready } = props;
+  const proposal = review.proposal;
+  const reviewing = useReviewing(review, props.refetch);
+  const { kept } = reviewing;
+  const { key: selected } = useParams();
+  const { search } = useLocation();
+  const navigate = useNavigate();
+  const [filter, setFilter] = useState<ReviewFilter>("all");
+  const listed = new URLSearchParams(search).get("view") === "list";
+  const model = useReviewModel(props, kept?.draft ?? proposal.draft, reviewing.write.disabled);
+  const journey = proposal.destination !== "deployment" && "journey" in proposal.destination ? proposal.destination.journey : undefined;
+  const base = `/proposals/${proposal.id}`;
+  useEscapeTo(selected === undefined ? undefined : `${base}${search}`);
+  const onPick = (key: string) => void navigate(`${base}/nodes/${key}${search}`);
+  const inspector = { proposal, model, reviewing, ready, deployment: props.deployment, journey, selected, onPick, back: `${base}${search}` };
+  const here = (view: "graph" | "list") => `${selected === undefined ? base : `${base}/nodes/${selected}`}${view === "list" ? "?view=list" : ""}`;
+  return (
+    <>
+      <div className="ws-fill journey-frame route-frame" data-testid="proposal" data-proposal={proposal.id} data-status={proposal.status} data-revision={proposal.revision}>
+        <div className="ws-head stack journey-head">
+          <ReviewHeader proposal={proposal} itemCount={model.counts.all} conflictCount={(model.draft.items ?? []).filter((item) => item.item === "conflict").length} blockers={reviewing.blockers} disabled={reviewing.write.disabled} onApply={reviewing.apply} onDiscard={reviewing.discard} />
+          <StalePanel review={review} disabled={!model.editable} onRefresh={reviewing.refresh} />
+          <Problem problem={reviewing.write.problem} onDismiss={reviewing.rebase} />
+          <Receipt receipt={reviewing.write.receipt} />
+          <PreviewNotes model={model} kept={kept} ready={ready} />
+          <Unsaved proposal={proposal} kept={kept} editing={reviewing.editing} write={reviewing.write} onSave={reviewing.save} onDrop={reviewing.drop} />
+          <div className="row route-bar">
+            <FilterChips filter={filter} counts={model.counts} onPick={setFilter} />
+            <nav className="journey-switcher" aria-label="Projection" data-testid="projection-switcher">
+              {(["graph", "list"] as const).map((each) => (
+                <Link key={each} className="journey-switch" aria-current={(each === "list") === listed ? "page" : undefined} data-testid={`projection-${each}`} to={here(each)}>
+                  {each === "graph" ? "Graph" : "List"}
+                </Link>
+              ))}
+            </nav>
+          </div>
+        </div>
+        <div className={listed ? "journey-body journey-scroll stack" : "ws-canvas journey-body"}>
+          <Workspace model={model} filter={filter} listed={listed} selected={selected} domain={proposal.id} deployment={props.deployment} onPick={onPick} />
+        </div>
+      </div>
+      <Inspector focus={`${proposal.id}:${selected ?? ""}`} reveal={selected !== undefined}>
+        <div className="stack">
+          {selected === undefined ? <ProposalCard {...inspector} /> : <NodeEditor {...inspector} node={selected} />}
+        </div>
+      </Inspector>
+    </>
   );
 }
 

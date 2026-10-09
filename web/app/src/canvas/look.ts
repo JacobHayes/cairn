@@ -66,6 +66,9 @@ export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | und
   const mark = overlay?.marks[card.key];
   if (mark !== undefined) {
     classes.push("node-marked", `node-marked-${mark.tone}`);
+    if (mark.ghost === true) {
+      classes.push("node-ghost");
+    }
   } else if (overlay?.dim === true || (overlay === undefined && faded)) {
     classes.push("node-faded");
   }

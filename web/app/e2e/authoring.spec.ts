@@ -8,7 +8,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { savedText } from "./around.ts";
-import { addNode, addRole, formField, newRoute, nodeForm, openEditing, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";
+import { addNode, addRole, formField, newRoute, nodeForm, openEditing, openForm, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";
 import { menuItem, nodeCard, open, openFromCanvas, syncChip } from "./shell.ts";
 
 /** The fields the open node's form offers. */
@@ -32,14 +32,20 @@ async function authorRoute(page: Page): Promise<Record<string, string>> {
   await pickByTitle(formField(page, "fills_role").getByLabel("Fills the role"), "Lead");
   await saveForm(page);
   keys["Include training"] = await addNode(page, "decision", "Include training");
+  // A decision's form opens on its question and folds the rest (design 4.9).
+  await expect(nodeForm(page).getByTestId("form-question")).toHaveAttribute("open", "");
+  await expect(nodeForm(page).getByTestId("form-relevance")).not.toHaveAttribute("open");
   keys["Setup"] = await addNode(page, "group", "Setup");
+  await openForm(page, "dates");
   await pickByTitle(formField(page, "opens_at").getByLabel("Opens at"), "Kickoff");
   await saveForm(page);
   keys["Training plan"] = await addNode(page, "deliverable", "Training plan", "Setup");
+  await openForm(page, "relevance");
   await formField(page, "relevant_when").getByRole("button", { name: "Add a condition" }).click();
   await pickByTitle(formField(page, "relevant_when").getByLabel("Decision"), "Include training");
   await saveForm(page);
   keys["Handbook"] = await addNode(page, "deliverable", "Handbook", "Setup");
+  await openForm(page, "dates");
   await formField(page, "due_by").getByRole("button", { name: "Add a rule" }).click();
   await pickByTitle(formField(page, "due_by").getByLabel("Also measure from"), "Kickoff");
   await formField(page, "due_by").getByRole("button", { name: /^Stop measuring from When the journey started/ }).click();
@@ -93,7 +99,7 @@ test("A3: a requirement drawn on the canvas lands; one on its own container is r
   await expect(edges.getByRole("button", { name: "Add the requirement" })).toBeDisabled();
 });
 
-test("A20, A15: a deliverable no chain links to the final milestone is noticed, and an edge from it to the final report clears the notice without a reload", async ({ page }) => {
+test("A20, A15: a deliverable no chain links to the final milestone carries a notice, and an edge from it to the final report clears the notice without a reload", async ({ page }) => {
   await newRoute(page, "browser", routeName("Notices"));
   const report = await addNode(page, "deliverable", "Final report");
   await addNode(page, "milestone", "Launch");
@@ -103,13 +109,12 @@ test("A20, A15: a deliverable no chain links to the final milestone is noticed, 
   await pickByTitle(edges.getByLabel("Require"), "Final report");
   await edges.getByRole("button", { name: "Add the requirement" }).click();
   const handbook = await addNode(page, "deliverable", "Handbook");
-  const notices = page.getByTestId("route-notices");
-  await expect(notices.getByTestId("route-notice")).toHaveCount(1);
-  await expect(notices.getByTestId("route-notice")).toHaveAttribute("data-node", handbook);
+  await expect(nodeCard(page, handbook).getByTestId("card-notice")).toBeVisible();
+  await expect(nodeCard(page, report).getByTestId("card-notice")).toHaveCount(0);
   await openNode(page, report);
   await pickByTitle((await section(page, "author-edges")).getByLabel("Require"), "Handbook");
   await (await section(page, "author-edges")).getByRole("button", { name: "Add the requirement" }).click();
-  await expect(notices).toHaveCount(0);
+  await expect(page.getByTestId("card-notice")).toHaveCount(0);
 });
 
 test("A15: a stage's id and both bounds, each wrong, are three violations at three fields", async ({ page }) => {
@@ -118,6 +123,7 @@ test("A15: a stage's id and both bounds, each wrong, are three violations at thr
   const stage = await addNode(page, "group", "Stage");
   await addNode(page, "milestone", "Inside", "Stage");
   await openNode(page, stage);
+  await openForm(page, "dates");
   await formField(page, "id").getByRole("textbox").fill("taken");
   await pickByTitle(formField(page, "opens_at").getByLabel("Opens at"), "Inside");
   await pickByTitle(formField(page, "closes_at").getByLabel("Closes at"), "Inside");
@@ -160,6 +166,7 @@ test("A18, B4: a decision a condition names removed with its cascade, then resto
   await dialog.getByRole("button", { name: "Confirm" }).click();
   await expect(nodeCard(page, "n_comparison_set")).toHaveCount(0);
   await openFromCanvas(page, "n_baseline");
+  await openForm(page, "relevance");
   await expect(formField(page, "relevant_when").getByRole("button", { name: "Add a condition" })).toBeVisible();
   const stones = page.getByTestId("tombstones");
   await stones.locator("summary").click();
@@ -176,6 +183,7 @@ test("Identity and references: renaming a decision a condition names leaves the 
   await formField(page, "id").getByRole("textbox").fill("benchmark-set");
   await saveForm(page);
   await openFromCanvas(page, "n_baseline");
+  await openForm(page, "relevance");
   await expect(nodeForm(page).getByTestId("condition-words")).toContainText("Benchmark set");
   await expect(formField(page, "relevant_when").getByLabel("Decision")).toHaveValue("n_comparison_set");
 });

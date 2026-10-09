@@ -50,7 +50,7 @@ export function cardRows(card: Card): CardRows {
     head: true,
     title: linesFor(card.title.length, TITLE_LINE_CHARS, TITLE_LINES_MAX),
     body: journey?.body !== undefined,
-    foot: journey !== undefined && (journey.foot !== undefined || journey.owner !== undefined),
+    foot: (journey !== undefined && (journey.foot !== undefined || journey.owner !== undefined)) || card.route?.foot !== undefined,
     marker: card.hiddenPrerequisites.length > 0,
   };
 }

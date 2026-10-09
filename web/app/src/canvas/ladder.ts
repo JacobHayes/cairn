@@ -50,6 +50,33 @@ export function leftOutAt(step: Step, nodes: readonly GraphNode[]): Set<string> 
   return out;
 }
 
+/**
+ * A route's ladder (8.11): a route has no current stage and no collapsed containers, so each
+ * step is the kinds it draws and what the engine rolls up from the rest. Stages draws the
+ * groups and milestones only.
+ */
+export function routeKindsAt(step: Step): NodeKind[] {
+  return step === "stages" ? ["group", "milestone"] : KINDS_AT[step];
+}
+
+/**
+ * The step a route's canvas is at: the one picked, else Stages, or Decisions when the route has no
+ * groups, or Work inside a container drilled into; a draft opens as a version does.
+ */
+export function routeStepOf(view: Pick<CanvasSettings, "step" | "container">, nodes: readonly GraphNode[]): Step {
+  // Drilled into a stage, its work is what there is to see: Stages draws only groups and milestones.
+  const picked = view.step ?? (view.container === undefined ? undefined : "work");
+  if (picked !== undefined && (picked !== "stages" || hasStages(nodes))) {
+    return picked;
+  }
+  return hasStages(nodes) ? "stages" : "decisions";
+}
+
+/** `step` when it draws `kind`, else the first step that does: where a node just added is on screen. */
+export function routeStepDrawing(step: Step, kind: NodeKind): Step {
+  return [step, ...STEPS].find((each) => routeKindsAt(each).includes(kind)) ?? "all";
+}
+
 /** The ladder's rungs for a journey: Stages is left out when it has no top-level groups. */
 export function stepsFor(nodes: readonly GraphNode[]): Step[] {
   return hasStages(nodes) ? [...STEPS] : STEPS.filter((step) => step !== "stages");

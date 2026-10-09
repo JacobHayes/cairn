@@ -1,7 +1,5 @@
-// The canvas's switches. A route's canvas has no ladder, so `KindToggles` shows or hides each
-// kind independently (C2), all shown by default. A journey's graph picks out kinds with
-// `GraphFilters`, in the toolbar's filter: the kinds left unchecked fade rather than vanish, and
-// conditional and not-relevant nodes each have a switch (C1).
+// The canvas's switches. A journey's graph picks out kinds with `GraphFilters`, in the toolbar's
+// filter: the kinds left unchecked fade rather than vanish, and conditional and not-relevant nodes each have a switch (C1).
 import type { NodeKind } from "../detail/model.ts";
 import { KINDS } from "./model.ts";
 import { withKind, type CanvasView } from "./settings.ts";
@@ -44,15 +42,6 @@ function Kinds({ view, onChange }: { view: CanvasView; onChange: (view: CanvasVi
         />
       ))}
     </span>
-  );
-}
-
-/** C2: the kinds a route's canvas draws. */
-export function KindToggles({ view, onChange }: { view: CanvasView; onChange: (view: CanvasView) => void }) {
-  return (
-    <div className="toggles" role="group" aria-label="What the canvas shows">
-      <Kinds view={view} onChange={onChange} />
-    </div>
   );
 }
 

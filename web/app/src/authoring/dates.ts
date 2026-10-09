@@ -4,7 +4,7 @@
 // are several constraints. F4: a stage's bounds are milestones outside it. The editors offer
 // only what a rule may measure from, so a source of the wrong kind cannot be entered.
 import type { DateRule } from "./fields.ts";
-import { descendantsOf, nodesByPath, pathOf, type GraphNode, type Tree } from "./graph.ts";
+import { descendantsOf, nodesByPath, pathOf, titleIn, type GraphNode, type Tree } from "./graph.ts";
 import { OFFSET_DAYS_MAX, outOfRange } from "./limits.ts";
 
 /** The journey's creation, a source every graph has (A8). */
@@ -64,6 +64,21 @@ export function ruleWords(rule: DateRule, label: (source: string) => string): st
   const sources = parts.sources.map(label).join(", ");
   const days = parts.offset === 1 ? "1 day" : `${String(parts.offset)} days`;
   return parts.offset === 0 ? `${parts.direction === "before" ? "by" : "from"} ${sources}` : `${days} ${parts.direction} ${sources}`;
+}
+
+/**
+ * What a route card's foot says of the node's date rule, in words: "Due 14 days before Decision
+ * meeting", or "Starts 3 days after Kickoff" when it has only a not-before. None without a rule.
+ */
+export function ruleFoot(node: GraphNode, tree: Tree): string | undefined {
+  const [rule, lead] = node.due_by != null ? ([node.due_by, "Due"] as const) : node.not_before != null ? ([node.not_before, "Starts"] as const) : [undefined, ""];
+  if (rule === undefined) {
+    return undefined;
+  }
+  const { direction, sources, offset } = partsOf(rule);
+  const named = sources.map((source) => (source === CREATED_AT ? "the journey's start" : titleIn(tree, source))).join(" and ");
+  const days = offset === 1 ? "1 day" : `${String(offset)} days`;
+  return offset === 0 ? `${lead} at ${named}` : `${lead} ${days} ${direction} ${named}`;
 }
 
 /**

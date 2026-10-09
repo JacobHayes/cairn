@@ -25,7 +25,7 @@ import { Identity } from "./people/Identity.tsx";
 import { RouteDetailPage } from "./routes/RouteDetail.tsx";
 import { Library } from "./routes/Library.tsx";
 import { BarePageRoute, JourneyDeepLink, JourneyLanding, JourneyPageRoute, LegacyRoute, SummaryRoute } from "./screens/JourneyRoutes.tsx";
-import { RouteCanvasPage } from "./screens/RouteCanvasPage.tsx";
+import { RouteCanvasPage, RouteNodeRedirect } from "./screens/RouteCanvasPage.tsx";
 import { Shell } from "./shell/Shell.tsx";
 
 function App({ session, layouts }: { session: Session; layouts: Layouts }) {
@@ -56,11 +56,14 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route path="library" element={<Library />} />
               <Route path="routes" element={<LegacyRoute />} />
               <Route path="routes/:id" element={<RouteCanvasPage />} />
-              <Route path="routes/:id/nodes/:key" element={<RouteCanvasPage />} />
+              <Route path="routes/:id/draft" element={<RouteCanvasPage />} />
+              <Route path="routes/:id/draft/nodes/:key" element={<RouteCanvasPage />} />
+              <Route path="routes/:id/nodes/:key" element={<RouteNodeRedirect />} />
               <Route path="routes/:id/versions" element={<RouteDetailPage />} />
               <Route path="entities" element={<Entities />} />
               <Route path="me" element={<Identity />} />
               <Route path="proposals/:id" element={<ProposalScreen />} />
+              <Route path="proposals/:id/nodes/:key" element={<ProposalScreen />} />
             </Route>
           </Routes>
         </BrowserRouter>

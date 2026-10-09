@@ -12,12 +12,13 @@ import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, draftProblems, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
 import { KINDS, canHoldChildren, childrenOf, edgeRefusal, moveTargets, nodesByPath, pathOf, type GraphNode, type Mutation, type NodeField, type NodeKind, type Role, type Tree } from "../authoring/graph.ts";
 import { mintKey, slugOf, uniqueId } from "../authoring/keys.ts";
-import { ChoicesEditor, DecisionFields, FieldGroup, SharedFields, StageFields, WorkFields, has } from "../authoring/NodeFields.tsx";
+import { BasicsFields, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
 import { problemsOf } from "../authoring/NodeForm.tsx";
 import { FieldBox, Picker } from "../authoring/parts.tsx";
 import type { Deployment } from "../data/host.ts";
 import { Input as AnswerInput } from "../detail/AnswerEditor.tsx";
 import type { Ready } from "../detail/model.ts";
+import { Section } from "../detail/parts.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { carryIds, withFieldValue, withMutation, withMutationsAdded, withoutMutation, type ProposalDraft } from "./model.ts";
 import { fieldName, mutationNode, mutationWords, type Names } from "./words.ts";
@@ -99,17 +100,25 @@ function AddedNode({ editor, node, onChange, context }: { editor: string; node: 
   };
   return (
     <div className="stack" data-testid="added-node-form">
-      <FieldGroup title="What it is">
-        <SharedFields props={props} />
-        {node.kind === "decision" ? <DecisionFields props={props} /> : <WorkFields props={props} />}
-        {has(props, "opens_at") ? <StageFields props={props} /> : null}
-      </FieldGroup>
-      <FieldGroup title="When it applies and its dates">
+      <Section title="Basics" open testId="added-basics">
+        <BasicsFields props={props} />
+      </Section>
+      {node.kind === "decision" ? (
+        <Section title="Question" open testId="added-question">
+          <DecisionFields props={props} />
+        </Section>
+      ) : null}
+      <Section title="Relevance and dates" testId="added-dates">
         <ConditionEditor value={draft.relevant_when} onChange={(next) => { change({ relevant_when: next }); }} tree={context.tree} node={node.key} entities={context.deployment.entities ?? []} today={context.today} />
         {(["due_by", "not_before"] as const).map((which) => (
           <DateRuleEditor key={which} which={which} value={draft[which]} onChange={(next) => { change({ [which]: next }); }} tree={context.tree} node={node.key} />
         ))}
-      </FieldGroup>
+        {has(props, "opens_at") ? <StageFields props={props} /> : null}
+      </Section>
+      <Section title="Completion needs, weight and estimate" testId="added-weight">
+        <CompletionFields props={props} />
+        <WeightFields props={props} />
+      </Section>
     </div>
   );
 }
@@ -317,19 +326,23 @@ function useCarriedIds(mutations: readonly Mutation[]): string[] {
   return held.current.ids;
 }
 
-/** C14: the proposal's changes, each editable, and what a reviewer can add. */
-export function ChangeList({ context }: { context: ChangesContext }) {
+/** C14: the proposal's changes, each editable, and what a reviewer can add; with `only`, just the changes whose node it keeps (and no additions). */
+export function ChangeList({ context, only }: { context: ChangesContext; only?: (node: string | undefined) => boolean }) {
   const mutations = context.draft.mutations ?? [];
   const ids = useCarriedIds(mutations);
+  const kept = mutations.filter((mutation) => only === undefined || only(mutationNode(mutation)));
+  if (only !== undefined && kept.length === 0) {
+    return null;
+  }
   return (
     <div className="stack">
       {mutations.length === 0 ? <p className="muted small">No changes yet.</p> : null}
       <ol className="stack proposal-changes" data-testid="changes">
-        {mutations.map((mutation, index) => (
-          <MutationRow key={ids[index]} editor={ids[index] ?? String(index)} index={index} mutation={mutation} context={context} />
-        ))}
+        {mutations.map((mutation, index) =>
+          only !== undefined && !only(mutationNode(mutation)) ? null : <MutationRow key={ids[index]} editor={ids[index] ?? String(index)} index={index} mutation={mutation} context={context} />,
+        )}
       </ol>
-      {context.editable ? (
+      {context.editable && only === undefined ? (
         <div className="stack" data-testid="proposal-additions">
           <AddNode context={context} />
           <RemoveNode context={context} />
