@@ -6,21 +6,17 @@ import { nodeOf, type Ready } from "../detail/model.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
+import { typing } from "../ui/typing.ts";
 import { factsOf } from "./acts.ts";
 import { Acts } from "./Acts.tsx";
 import { Crumb, DetailLink, Flags, Why } from "./Parts.tsx";
 import type { NodeRow } from "./why.ts";
 
-/** Whether a key press belongs to a field being typed in, not to the card. */
-function typing(target: EventTarget | null): boolean {
-  return target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName));
-}
-
-/** The card's keyboard: P passes, unless a field has the keys or a modifier is held. */
+/** The card's keyboard: P passes, unless a field has the keys, a modifier is held, or the key sheet is open. */
 function usePassKey(onPass: () => void): void {
   useEffect(() => {
     const heard = (event: KeyboardEvent) => {
-      if (event.key.toLowerCase() === "p" && !event.ctrlKey && !event.metaKey && !event.altKey && !typing(event.target)) {
+      if (event.key.toLowerCase() === "p" && !event.ctrlKey && !event.metaKey && !event.altKey && !typing(event.target) && document.querySelector('[data-testid="key-sheet"]') === null) {
         event.preventDefault();
         onPass();
       }
@@ -32,7 +28,7 @@ function usePassKey(onPass: () => void): void {
   }, [onPass]);
 }
 
-export function TriageCard({ view, row, position, total, onPass }: { view: Ready; row: NodeRow; position: number; total: number; onPass: () => void }) {
+export function TriageCard({ view, row, position, total, onPass, inspected }: { view: Ready; row: NodeRow; position: number; total: number; onPass: () => void; inspected: boolean }) {
   usePassKey(onPass);
   const node = nodeOf(view, row.key);
   const facts = factsOf(view, row.key);
@@ -64,7 +60,7 @@ export function TriageCard({ view, row, position, total, onPass }: { view: Ready
         {row.slack_days == null ? "" : `; slack ${String(row.slack_days)} days`}
       </span>
       <Why view={view} row={row} sort="rank" />
-      <Acts view={view} facts={facts} onPass={onPass} />
+      <Acts view={view} facts={facts} onPass={onPass} inspected={inspected} />
     </article>
   );
 }

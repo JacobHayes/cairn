@@ -1,0 +1,222 @@
+/* The journey's pages: the head (the header, the toolbar with the tabs, the chips and the
+   switcher, the active filters) over the projection, with the inspector column beside it. The
+   workspace (.ws-body) and the inspector are the only scrollers, so the window itself never
+   scrolls and nothing sits below the fold (2.1); the graph fills what the head leaves and the
+   other projections scroll with the head. Below 720px the frame is one column the document
+   scrolls (ui/app.css), and the page flows: head, projection, then the inspector's content. */
+.journey-frame > .journey-head {
+  min-width: 0;
+  container-type: inline-size;
+}
+
+.journey-body {
+  min-width: 0;
+}
+
+.journey-scroll {
+  padding: var(--space-5);
+}
+
+/* The sheet covers the workspace's lower part: the projection ends above it, so its last row can be reached. */
+@media (min-width: 720px) and (max-width: 1099px) {
+  .frame[data-inspector="on"] .journey-scroll {
+    padding-bottom: calc(var(--sheet-h, var(--sheet-half)) + var(--space-5));
+  }
+}
+
+@media (max-width: 719px) {
+  .journey-scroll {
+    padding: 0;
+  }
+}
+
+.journey-header {
+  gap: var(--space-2);
+}
+
+/* One row when it fits: the tabs, the chips, and the switcher at the right end. When the
+   head is narrow it is two rows on purpose: the tabs and the switcher, then the chips. */
+.journey-toolbar {
+  gap: var(--space-2) var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.journey-chips {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+@container (min-width: 48rem) {
+  .journey-toolbar {
+    flex-wrap: nowrap;
+  }
+}
+
+@container (max-width: 47.99rem) {
+  .journey-switcher {
+    order: 1;
+  }
+
+  .journey-chips {
+    order: 2;
+    flex: 1 1 100%;
+  }
+
+  .toolbar-search {
+    flex: 1 1 auto;
+  }
+}
+
+.journey-tabs {
+  gap: var(--space-4);
+}
+
+.journey-tab,
+.journey-switch {
+  font-size: 14px;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+/* The current page: an ink underline (a marker, not a state). */
+.journey-tab[aria-current="page"] {
+  border-bottom: 2px solid var(--color-text);
+  font-weight: 600;
+}
+
+.journey-tab-count,
+.chip-count {
+  margin-left: var(--space-1);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
+/* The switcher is always the last item of the row, so its right edge does not move. */
+.journey-switcher {
+  display: inline-flex;
+  margin-left: auto;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.journey-switch {
+  padding: var(--space-1) var(--space-3);
+}
+
+.journey-switch[aria-current="page"] {
+  background: var(--color-tint);
+  border-bottom: 2px solid var(--color-text);
+  font-weight: 600;
+}
+
+.chip {
+  font: inherit;
+  font-size: 12px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.chip[aria-pressed="true"],
+.chip-on {
+  background: var(--color-tint);
+  box-shadow: inset 0 -2px 0 var(--color-text);
+}
+
+.active-filters {
+  gap: var(--space-2);
+}
+
+.toolbar-search {
+  flex: 0 1 11rem;
+  min-width: 6rem;
+}
+
+.toolbar-search input {
+  width: 100%;
+  min-width: 0;
+}
+
+/* The wrapper of a button and the popover it opens (screens/Menu.tsx). */
+.dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.dropdown-button {
+  font-size: 12px;
+}
+
+.dropdown-popover {
+  top: calc(100% + var(--space-1));
+  min-width: 14rem;
+  max-width: min(36rem, calc(100vw - 2 * var(--space-4)));
+}
+
+.dropdown-popover .popover-body {
+  max-height: none;
+  gap: var(--space-1);
+}
+
+.dropdown-start .dropdown-popover {
+  left: 0;
+}
+
+.dropdown-end .dropdown-popover {
+  right: 0;
+}
+
+.menu-item {
+  display: block;
+  font: inherit;
+  padding: var(--space-1) var(--space-2);
+  border: none;
+  background: none;
+  color: var(--color-text);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.menu-item:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+
+.menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.key-sheet {
+  position: fixed;
+  z-index: 60;
+  top: 20vh;
+  left: 50%;
+  width: min(28rem, 92vw);
+  transform: translateX(-50%);
+}
+
+.journey-card progress {
+  width: 100%;
+}
+
+/* Printing (the Summary page is the printable one, C18): the page flows on paper; ui/app.css
+   already drops the frame's chrome and the toolbar. */
+@media print {
+  .ws-body:has(> .journey-frame),
+  .ws-fill.journey-frame,
+  .journey-scroll {
+    display: block;
+    height: auto;
+    overflow: visible;
+    padding: 0;
+  }
+}

@@ -2,7 +2,7 @@
    on a narrow screen and on paper. */
 .summary-figures {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(136px, 1fr));
+  grid-template-columns: repeat(2, minmax(6rem, 10rem));
   gap: var(--space-2);
 }
 

@@ -5,14 +5,16 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { JourneyRow } from "./JourneyIndex.tsx";
+import { JourneyCells } from "./JourneyIndex.tsx";
 
 function row(summary: Schema<"JourneySummary">): string {
   return renderToStaticMarkup(
     <MemoryRouter>
       <table>
         <tbody>
-          <JourneyRow summary={summary} routes={[]} />
+          <tr>
+            <JourneyCells summary={summary} routes={[]} />
+          </tr>
         </tbody>
       </table>
     </MemoryRouter>,

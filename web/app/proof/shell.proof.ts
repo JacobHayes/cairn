@@ -18,7 +18,7 @@ test("the journey index and a journey derived in the worker, on the in-browser h
   await expect(page.getByTestId("journey-row")).toHaveCount(4);
   await shot(page, "1-index-in-browser");
   await page.getByRole("link", { name: "Launch the reporting release" }).click();
-  await expect(page.getByTestId("derivation")).toBeVisible();
+  await expect(page.getByTestId("derivation")).toBeAttached();
   await shot(page, "2-journey-derived-in-worker");
 });
 
@@ -78,7 +78,7 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   await open(page, "server");
   await beat(page);
   await page.getByRole("link", { name: "Hire a platform engineer" }).click();
-  await expect(page.getByTestId("derivation")).toBeVisible();
+  await expect(page.getByTestId("derivation")).toBeAttached();
   await beat(page);
   await startRename(page, "n_offer", "Offer letter, signed");
   await beat(page);

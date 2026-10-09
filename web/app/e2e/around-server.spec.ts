@@ -35,7 +35,7 @@ async function journeyOwnedBy(request: APIRequestContext, owner: string): Promis
 
 test("H6: a journey started in one page appears in another page's index", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
-  await open(two, "server", "/");
+  await open(two, "server", "/journeys");
   await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
   await expect(two.getByTestId("journey-row").first()).toBeVisible();
   const name = journeyName("Seen elsewhere");

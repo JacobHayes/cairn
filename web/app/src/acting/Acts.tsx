@@ -123,8 +123,34 @@ function ActButton({ view, write, facts, act, onSkip }: { view: Ready; write: No
   }
 }
 
-/** C11: node `facts`' actions for its kind, assign owner when unassigned, and pass when `onPass` is given. */
-export function Acts({ view, facts, onPass }: { view: Ready; facts: Facts; onPass?: (() => void) | undefined }) {
+function PassButton({ onPass }: { onPass: () => void }) {
+  return (
+    <Button onClick={onPass} data-testid="pass" title="Pass (P): later in this pass; nothing is saved">
+      Pass
+    </Button>
+  );
+}
+
+/**
+ * C11: node `facts`' actions for its kind, assign owner when unassigned, and pass when `onPass`
+ * is given. While the node is open in the inspector (`inspected`) its actions and forms are the
+ * inspector's alone, so a draft has one editor (the inline one is unmounted, not hidden); the
+ * card keeps its pass.
+ */
+export function Acts({ view, facts, onPass, inspected = false }: { view: Ready; facts: Facts; onPass?: (() => void) | undefined; inspected?: boolean }) {
+  if (inspected) {
+    return onPass === undefined ? null : (
+      <div className="stack acts" data-testid="acts" data-node={facts.node.key} data-acts="">
+        <div className="row">
+          <PassButton onPass={onPass} />
+        </div>
+      </div>
+    );
+  }
+  return <InlineActs view={view} facts={facts} onPass={onPass} />;
+}
+
+function InlineActs({ view, facts, onPass }: { view: Ready; facts: Facts; onPass: (() => void) | undefined }) {
   const write = useNodeWrite(view, `acts:${facts.node.key}`);
   const skip = useFormDraft<string>(write.journey, facts.node.key, "skip");
   const detail = nodeDetail(view, facts.node.key);
@@ -138,11 +164,7 @@ export function Acts({ view, facts, onPass }: { view: Ready; facts: Facts; onPas
         {acts.map((act) => (
           <ActButton key={act} view={view} write={write} facts={facts} act={act} onSkip={() => { skip.open("", write.seen); }} />
         ))}
-        {onPass === undefined ? null : (
-          <Button onClick={onPass} data-testid="pass" title="Pass (P): later in this pass; nothing is saved">
-            Pass
-          </Button>
-        )}
+        {onPass === undefined ? null : <PassButton onPass={onPass} />}
       </div>
       {acts.some((act) => FINISHING.includes(act)) ? <MayNotApply view={view} node={facts.node.key} /> : null}
       {skip.draft === undefined ? null : <SkipForm write={write} node={facts.node.key} form={skip} />}

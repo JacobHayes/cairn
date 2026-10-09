@@ -10,25 +10,21 @@ import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
 
-import { ListScreen } from "./acting/ListScreen.tsx";
-import { NextScreen } from "./acting/NextScreen.tsx";
-import { TriageScreen } from "./acting/TriageScreen.tsx";
 import { boot } from "./boot.ts";
 import { LayoutsContext } from "./canvas/hooks.ts";
 import { Layouts, LayoutWorker } from "./canvas/layouts.ts";
 import { SessionContext } from "./data/react.ts";
 import type { Session } from "./data/session.ts";
+import { Home } from "./journeys/Home.tsx";
 import { JourneyIndex } from "./journeys/JourneyIndex.tsx";
 import { MineScreen } from "./journeys/MineScreen.tsx";
 import { NewJourney } from "./journeys/NewJourney.tsx";
-import { Overview } from "./journeys/Overview.tsx";
 import { Entities } from "./people/Entities.tsx";
 import { ProposalScreen } from "./proposals/ProposalScreen.tsx";
 import { Identity } from "./people/Identity.tsx";
 import { RouteDetailPage } from "./routes/RouteDetail.tsx";
-import { RouteIndex } from "./routes/RouteIndex.tsx";
-import { JourneyPage } from "./screens/JourneyPage.tsx";
-import { DecisionViewPage, SummaryPage, TimelinePage } from "./screens/JourneyViews.tsx";
+import { Library } from "./routes/Library.tsx";
+import { BarePageRoute, JourneyDeepLink, JourneyLanding, JourneyPageRoute, LegacyRoute, SummaryRoute } from "./screens/JourneyRoutes.tsx";
 import { RouteCanvasPage } from "./screens/RouteCanvasPage.tsx";
 import { Shell } from "./shell/Shell.tsx";
 
@@ -39,22 +35,23 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
         <BrowserRouter>
           <Routes>
             <Route element={<Shell />}>
-              <Route index element={<JourneyIndex />} />
+              <Route index element={<Home />} />
+              <Route path="journeys" element={<JourneyIndex />} />
               <Route path="mine" element={<MineScreen />} />
               <Route path="new" element={<NewJourney />} />
-              <Route path="journeys/:id/overview" element={<Overview />} />
-              <Route path="journeys/:id" element={<JourneyPage />} />
-              <Route path="journeys/:id/nodes/:key" element={<JourneyPage />} />
-              <Route path="journeys/:id/next" element={<NextScreen />} />
-              <Route path="journeys/:id/list" element={<ListScreen />} />
-              <Route path="journeys/:id/triage" element={<TriageScreen />} />
-              <Route path="journeys/:id/decisions" element={<DecisionViewPage />} />
-              <Route path="journeys/:id/decisions/nodes/:key" element={<DecisionViewPage />} />
-              <Route path="journeys/:id/timeline" element={<TimelinePage />} />
-              <Route path="journeys/:id/timeline/nodes/:key" element={<TimelinePage />} />
-              <Route path="journeys/:id/summary" element={<SummaryPage />} />
-              <Route path="journeys/:id/summary/nodes/:key" element={<SummaryPage />} />
-              <Route path="routes" element={<RouteIndex />} />
+              <Route path="journeys/:id" element={<JourneyLanding />} />
+              <Route path="journeys/:id/nodes/:key" element={<JourneyDeepLink />} />
+              <Route path="journeys/:id/next/:projection" element={<JourneyPageRoute page="next" />} />
+              <Route path="journeys/:id/next/:projection/nodes/:key" element={<JourneyPageRoute page="next" />} />
+              <Route path="journeys/:id/plan" element={<BarePageRoute page="plan" />} />
+              <Route path="journeys/:id/plan/:projection" element={<JourneyPageRoute page="plan" />} />
+              <Route path="journeys/:id/plan/:projection/nodes/:key" element={<JourneyPageRoute page="plan" />} />
+              <Route path="journeys/:id/summary" element={<SummaryRoute />} />
+              <Route path="journeys/:id/summary/nodes/:key" element={<SummaryRoute />} />
+              <Route path="journeys/:id/:old" element={<LegacyRoute />} />
+              <Route path="journeys/:id/:old/nodes/:key" element={<LegacyRoute />} />
+              <Route path="library" element={<Library />} />
+              <Route path="routes" element={<LegacyRoute />} />
               <Route path="routes/:id" element={<RouteCanvasPage />} />
               <Route path="routes/:id/nodes/:key" element={<RouteCanvasPage />} />
               <Route path="routes/:id/versions" element={<RouteDetailPage />} />

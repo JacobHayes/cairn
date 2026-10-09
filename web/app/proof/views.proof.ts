@@ -1,4 +1,4 @@
-// The proof's media for the decision view, the timeline, and the status summary
+// The proof's media for the decision view, the timeline, and the Summary page
 // (briefs/proof/5.4/prove.sh): a screenshot of each acceptance state and a short video of the
 // main flow, written to CAIRN_PROOF_OUT. Each step asserts what its picture is meant to show,
 // so a picture of the wrong state fails the run. Everything runs on the in-browser host,
@@ -8,8 +8,8 @@ import { join } from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
 import { pin } from "../e2e/detail.ts";
-import { nodePanel, openJourney } from "../e2e/shell.ts";
-import { FIXED_TODAY, openScreen, showDecisionTable } from "../e2e/views.ts";
+import { goTo, nodePanel, openAt, openJourney } from "../e2e/shell.ts";
+import { FIXED_TODAY } from "../e2e/views.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${name}.png`), fullPage: true });
@@ -17,8 +17,9 @@ const beat = (page: Page) => page.waitForTimeout(800);
 
 test.use({ viewport: { width: 1400, height: 900 } });
 
-const affected = (page: Page, decision: string) =>
-  page.locator(`[data-testid="decision-row"][data-node="${decision}"] [data-testid="affected"]`);
+const affected = (page: Page, decision: string) => nodePanel(page, decision).getByTestId("decision-affects").getByTestId("affected");
+
+const fixed = { fixedToday: FIXED_TODAY };
 
 /** Revises the partner decision's answer to yes from its detail beside the decision view. */
 async function partnerRunsTesting(page: Page): Promise<void> {
@@ -30,27 +31,25 @@ async function partnerRunsTesting(page: Page): Promise<void> {
 }
 
 test("the decision view, and an answer revised", async ({ page }) => {
-  await openScreen(page, "browser", "j_vendor_eval", "decisions");
-  await showDecisionTable(page);
+  await openAt(page, "browser", "j_vendor_eval", "plan/graph?decisions=1", { node: "n_partner_runs", ...fixed });
   await expect(affected(page, "n_partner_runs")).toHaveCount(3);
   await expect(affected(page, "n_partner_runs").first()).toHaveAttribute("data-relevance", "not_relevant");
   await shot(page, "1-decision-view");
-  await page.locator('[data-testid="decision-row"][data-node="n_partner_runs"] [data-testid="decision-title"] a').click();
   await partnerRunsTesting(page);
   await shot(page, "2-partner-decision-revised");
 });
 
 test("the timeline: the final anchor, a shortfall and why, no final milestone", async ({ page }) => {
-  await openScreen(page, "browser", "j_vendor_eval", "timeline");
+  await openAt(page, "browser", "j_vendor_eval", "plan/timeline", fixed);
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-end", "n_decision_meeting");
   await shot(page, "3-timeline-final-anchor");
-  await openScreen(page, "browser", "j_launch", "timeline");
+  await openAt(page, "browser", "j_launch", "plan/timeline", fixed);
   const freeze = page.locator('[data-testid="timeline-entry"][data-node="n_code_freeze"]');
   await expect(freeze).toHaveAttribute("data-shortfall", "2");
   await freeze.getByRole("button", { name: "Why" }).click();
   await expect(freeze.getByTestId("shortfall")).toBeVisible();
   await shot(page, "4-timeline-shortfall-and-why");
-  await openScreen(page, "browser", "j_hiring", "timeline", "n_offer");
+  await openAt(page, "browser", "j_hiring", "plan/timeline", { node: "n_offer", ...fixed });
   await pin(nodePanel(page, "n_offer"), "2026-10-20");
   await expect(page.locator('[data-testid="timeline-entry"][data-node="n_offer"]')).toBeVisible();
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-end", "");
@@ -58,13 +57,13 @@ test("the timeline: the final anchor, a shortfall and why, no final milestone", 
 });
 
 test("the status summary, on screen and in print", async ({ page }) => {
-  await openScreen(page, "browser", "j_launch", "summary");
-  await expect(page.getByTestId("summary-shortfall-count")).toHaveAttribute("data-count", "2");
+  await openAt(page, "browser", "j_launch", "summary", fixed);
+  await expect(page.getByTestId("card-flag-shortfall")).toContainText("2 short of days");
   await shot(page, "6-summary");
-  await openScreen(page, "browser", "j_bakeoff", "summary", "n_winner");
+  await openAt(page, "browser", "j_bakeoff", "summary", { node: "n_winner", ...fixed });
   await expect(nodePanel(page, "n_winner")).toBeVisible();
   await page.emulateMedia({ media: "print" });
-  await expect(page.getByTestId("journey-nav")).toBeHidden();
+  await expect(page.getByTestId("journey-toolbar")).toBeHidden();
   await shot(page, "7-summary-printed");
 });
 
@@ -79,21 +78,21 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   await page.clock.setFixedTime(new Date(`${FIXED_TODAY}T12:00:00Z`));
   await openJourney(page, "browser", "j_vendor_eval");
   await beat(page);
-  const tab = (screen: string) => page.getByTestId(`nav-${screen}`);
-  await tab("decisions").click();
-  await showDecisionTable(page);
+  await goTo(page, "plan", "graph");
+  await page.getByTestId("chip-decisions").click();
+  await expect(page.getByTestId("decision-view")).toBeVisible();
   await beat(page);
-  await page.locator('[data-testid="decision-row"][data-node="n_partner_runs"] [data-testid="decision-title"] a').click();
+  await page.locator('[data-testid="decision-view"] [data-testid="node-card"][data-node="n_partner_runs"]').getByTestId("card-open").click();
   await beat(page);
   await partnerRunsTesting(page);
   await beat(page);
-  await tab("timeline").click();
+  await goTo(page, "plan", "timeline");
   const opens = page.locator('[data-testid="timeline-entry"][data-node="n_review_opens"]');
   await opens.getByRole("button", { name: "Why" }).click();
   await expect(opens.getByTestId("timeline-why")).toBeVisible();
   await beat(page);
   await beat(page);
-  await tab("summary").click();
+  await page.getByTestId("card-expand").click();
   await expect(page.getByTestId("summary")).toBeVisible();
   await beat(page);
   await beat(page);

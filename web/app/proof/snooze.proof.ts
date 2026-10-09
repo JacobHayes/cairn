@@ -23,7 +23,7 @@ async function shot(shown: Page | Locator, name: string): Promise<void> {
 test.use({ viewport: { width: 1200, height: 800 } });
 
 test("a container snoozed from its detail, and unsnoozed from a descendant's", async ({ page }) => {
-  await openActing(page, "browser", "j_launch", "next");
+  await openActing(page, "browser", "j_launch", "next/list");
   const before = await nextKeys(page);
   const today = (await page.getByTestId("derivation").getAttribute("data-today")) ?? "";
   const until = daysAfter(today, 14);

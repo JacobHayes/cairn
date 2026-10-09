@@ -92,7 +92,7 @@ describe("C1, C2: the relevance toggles are the level request's display set", ()
     ["undecided hidden leaves conditional out", { undecided: false }, ["relevant", "not_relevant"]],
     ["not relevant hidden leaves it out", { notRelevant: false }, ["relevant", "conditional"]],
   ])("%s", (_, toggles, display) => {
-    const asked = levelRequest({ ...DEFAULT_SETTINGS, trace: false, edit: false, map: false, ...toggles });
+    const asked = levelRequest({ ...DEFAULT_SETTINGS, trace: false, edit: false, map: false, rest: [], ...toggles });
     expect(asked.display).toEqual(display);
   });
 });

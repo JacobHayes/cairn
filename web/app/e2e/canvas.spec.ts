@@ -15,7 +15,7 @@ import { derivedRevision, fresh, nodeCard, nodePanel, openFromCanvas, openJourne
 const COMBINATIONS: { name: string; query: string; nodes: Record<string, string> }[] = [
   {
     name: "actions hidden",
-    query: "?hide=action",
+    query: "?kind=group,decision,deliverable,milestone",
     nodes: {
       n_decision_meeting: "top", n_kickoff: "top", n_meeting_date: "top", n_partner_runs: "top", n_purpose: "top",
       n_reporting: "top", n_final_review: "n_reporting", n_final_report: "n_final_review", n_findings: "n_reporting",
@@ -27,12 +27,12 @@ const COMBINATIONS: { name: string; query: string; nodes: Record<string, string>
   },
   {
     name: "groups only",
-    query: "?hide=decision,deliverable,action,milestone",
+    query: "?kind=group",
     nodes: { n_reporting: "top", n_final_review: "n_reporting", n_setup: "top", n_testing: "top", n_partner_led: "n_testing" },
   },
   {
     name: "drilled into Setup, every kind",
-    query: "?in=n_setup",
+    query: "?open=n_setup",
     nodes: {
       n_access: "top", n_plan: "top", n_plan_draft: "n_plan", n_plan_review: "n_plan", n_workload: "top",
       n_workload_ingest: "n_workload", n_workload_query: "n_workload",
@@ -40,7 +40,7 @@ const COMBINATIONS: { name: string; query: string; nodes: Record<string, string>
   },
   {
     name: "groups and milestones hidden",
-    query: "?hide=group,milestone",
+    query: "?kind=decision,deliverable,action",
     nodes: {
       n_meeting_date: "top", n_partner_runs: "top", n_purpose: "top", n_final_report: "top", n_findings: "top",
       n_findings_reviewer: "top", n_access: "top", n_plan: "top", n_plan_draft: "n_plan", n_plan_review: "n_plan",
@@ -59,7 +59,7 @@ for (const combination of COMBINATIONS) {
 }
 
 test("C2, C4: hidden actions are their deliverable's checklist, and a hidden prerequisite is marked", async ({ page }) => {
-  await openJourney(page, "browser", "j_vendor_eval", "?hide=action");
+  await openJourney(page, "browser", "j_vendor_eval", "?kind=group,decision,deliverable,milestone");
   const checklist = nodeCard(page, "n_plan").getByTestId("card-checklist").locator("li");
   await expect(checklist).toHaveText(["Draft the plan", "Review the plan"]);
   await showKind(page, "group", false);
@@ -194,7 +194,7 @@ test("C15: a view toggled to lays out as it does when opened directly", async ({
   await openJourney(toggled, "browser", "j_vendor_eval");
   await showKind(toggled, "group", false);
   await expect(nodeCard(toggled, "n_setup")).toHaveCount(0);
-  await openJourney(direct, "browser", "j_vendor_eval", "?hide=group");
+  await openJourney(direct, "browser", "j_vendor_eval", "?kind=decision,deliverable,action,milestone");
   await expect.poll(() => places(toggled)).toEqual(await places(direct));
 });
 
@@ -240,6 +240,7 @@ test("C15: adding one node to the fixture moves fewer than the stated fraction o
 
 test("a route's canvas draws its graph with no journey state, by the same rules", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval");
+  await page.getByTestId("card-lineage").locator("summary").click();
   await page.getByTestId("lineage").click();
   await expect(page.getByTestId("route-graph")).toHaveAttribute("data-status", "1");
   await expect(page.getByTestId("node-card")).toHaveCount(25);

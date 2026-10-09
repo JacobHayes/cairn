@@ -1,0 +1,17 @@
+/* The journey card's expand control: a square hairline link, not a bare glyph. */
+.icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-h);
+  height: var(--control-h);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.icon-button:hover {
+  border-color: var(--color-secondary);
+}

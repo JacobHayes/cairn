@@ -1,7 +1,12 @@
-/* C12: the table page keeps the workspace's padding, and a wide table scrolls within itself rather than widening the page. */
-.decision-page {
-  padding: var(--space-5);
+/* C12: the decision graph fills the workspace under the head, as the canvas does (canvas.css); its
+   wrapper only names it for the browser tests, so it takes no box of its own. */
+.decision-view {
+  display: contents;
 }
-.decision-table {
-  overflow-x: auto;
+
+.ws-canvas > .decision-view > .canvas {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
+  border-width: 1px 0 0;
 }

@@ -2,7 +2,9 @@
 // filtered list, a re-sorted next list, or a triage mode is shareable, survives a reload, and
 // follows the back button. Every setting at its default leaves the address bare. Each screen
 // turns its settings into the engine's query (C9 `ListQuery`, C10 `NextQuery`), which the
-// derive worker answers over the journey's local derivation.
+// derive worker answers over the journey's local derivation. The toolbar's chips are shared
+// by every projection: `decisions=1`, `mine=1` and `q=<text>`; the list, the next list and
+// the cards live at `/journeys/<id>/plan/list`, `/next/list` and `/next/cards`.
 import type { Schema } from "@cairn/client";
 import type { ListQuery, NextQuery } from "@cairn/wasm";
 
@@ -49,6 +51,8 @@ export interface ListSettings {
   sort: SortBy;
   /** Grouping by container. */
   grouped: boolean;
+  /** The DECISIONS chip: the decisions only (C12). */
+  decisions: boolean;
 }
 
 /** C10: what the next list shows. */
@@ -58,6 +62,10 @@ export interface NextSettings {
   kinds: NodeKind[];
   /** Prioritize for me: rank with the owner factor relative to the viewer (Priority). */
   forMe: boolean;
+  /** The DECISIONS chip: the actionable decisions only (C10). */
+  decisions: boolean;
+  /** The search: rows whose title or place contains it. */
+  text: string;
 }
 
 /** C11: what triage shows; `decisions` is the decision walkthrough. */
@@ -65,6 +73,8 @@ export interface TriageSettings {
   decisions: boolean;
   mine: boolean;
   kinds: NodeKind[];
+  /** The search: cards whose title contains it. */
+  text: string;
 }
 
 /** The values of `name` (comma-separated) that are among `known`, in `known`'s order. */
@@ -96,8 +106,12 @@ function searchOf(params: URLSearchParams): string {
 }
 
 export function listFrom(params: URLSearchParams): ListSettings {
+  const flags = new Set(listed(params, "flag", LIST_FLAGS));
+  if (params.get("mine") === "1") {
+    flags.add("mine");
+  }
   return {
-    flags: listed(params, "flag", LIST_FLAGS),
+    flags: LIST_FLAGS.filter((flag) => flags.has(flag)),
     within: params.get("in") ?? undefined,
     owner: params.get("owner") ?? undefined,
     states: listed(params, "state", STATES),
@@ -105,12 +119,15 @@ export function listFrom(params: URLSearchParams): ListSettings {
     text: params.get("q") ?? "",
     sort: sortFrom(params),
     grouped: params.get("group") === "container",
+    decisions: params.get("decisions") === "1",
   };
 }
 
 export function listParams(settings: ListSettings): URLSearchParams {
   const params = new URLSearchParams();
-  setList(params, "flag", settings.flags);
+  setFlag(params, "decisions", settings.decisions);
+  setFlag(params, "mine", settings.flags.includes("mine"));
+  setList(params, "flag", settings.flags.filter((flag) => flag !== "mine"));
   if (settings.within !== undefined) {
     params.set("in", settings.within);
   }
@@ -133,7 +150,7 @@ export function listParams(settings: ListSettings): URLSearchParams {
 
 /** C9: the engine's query for `settings`, from `cursor` when paging. */
 export function listQueryOf(settings: ListSettings, cursor?: number): ListQuery {
-  const query: ListQuery = { flags: settings.flags, states: settings.states, kinds: settings.kinds, sort: settings.sort };
+  const query: ListQuery = { flags: settings.flags, states: settings.states, kinds: settings.decisions ? ["decision"] : settings.kinds, sort: settings.sort };
   if (settings.within !== undefined) {
     query.within = settings.within;
   }
@@ -155,41 +172,49 @@ export function nextFrom(params: URLSearchParams): NextSettings {
     mine: params.get("mine") === "1",
     kinds: listed(params, "kind", ACTING_KINDS),
     forMe: params.get("me") === "1",
+    decisions: params.get("decisions") === "1",
+    text: params.get("q") ?? "",
   };
 }
 
 export function nextParams(settings: NextSettings): URLSearchParams {
   const params = new URLSearchParams();
+  setFlag(params, "decisions", settings.decisions);
   if (settings.sort !== "rank") {
     params.set("sort", settings.sort);
   }
   setFlag(params, "mine", settings.mine);
   setList(params, "kind", settings.kinds);
   setFlag(params, "me", settings.forMe);
+  if (settings.text !== "") {
+    params.set("q", settings.text);
+  }
   return params;
 }
 
 /** C10: the engine's query for `settings`. */
 export function nextQueryOf(settings: NextSettings): NextQuery {
-  return { sort: settings.sort, mine: settings.mine, kinds: settings.kinds, for_viewer: settings.forMe };
+  return { sort: settings.sort, mine: settings.mine, kinds: settings.decisions ? ["decision"] : settings.kinds, for_viewer: settings.forMe };
 }
 
 export function triageFrom(params: URLSearchParams): TriageSettings {
   return {
-    decisions: params.get("mode") === "decisions",
+    decisions: params.get("decisions") === "1",
     mine: params.get("mine") === "1",
     kinds: listed(params, "kind", ACTING_KINDS),
+    text: params.get("q") ?? "",
   };
 }
 
 export function triageParams(settings: TriageSettings): URLSearchParams {
   const params = new URLSearchParams();
-  if (settings.decisions) {
-    params.set("mode", "decisions");
-  }
+  setFlag(params, "decisions", settings.decisions);
   setFlag(params, "mine", settings.mine);
   if (!settings.decisions) {
     setList(params, "kind", settings.kinds);
+  }
+  if (settings.text !== "") {
+    params.set("q", settings.text);
   }
   return params;
 }
@@ -203,22 +228,27 @@ export const DEFAULT_LIST: ListSettings = listFrom(new URLSearchParams());
 export const DEFAULT_NEXT: NextSettings = nextFrom(new URLSearchParams());
 export const DEFAULT_TRIAGE: TriageSettings = triageFrom(new URLSearchParams());
 
-export function listPath(journey: string, settings: ListSettings = DEFAULT_LIST): string {
-  return `/journeys/${journey}/list${searchOf(listParams(settings))}`;
+/** A node's detail on a screen at `path`: its `/nodes/<key>` is added before the query. */
+function withNode(path: string, node: string | undefined): string {
+  return node === undefined ? path : `${path}/nodes/${node}`;
 }
 
-export function nextPath(journey: string, settings: NextSettings = DEFAULT_NEXT): string {
-  return `/journeys/${journey}/next${searchOf(nextParams(settings))}`;
+export function listPath(journey: string, settings: ListSettings = DEFAULT_LIST, node?: string): string {
+  return `${withNode(`/journeys/${journey}/plan/list`, node)}${searchOf(listParams(settings))}`;
 }
 
-export function triagePath(journey: string, settings: TriageSettings = DEFAULT_TRIAGE): string {
-  return `/journeys/${journey}/triage${searchOf(triageParams(settings))}`;
+export function nextPath(journey: string, settings: NextSettings = DEFAULT_NEXT, node?: string): string {
+  return `${withNode(`/journeys/${journey}/next/list`, node)}${searchOf(nextParams(settings))}`;
+}
+
+export function triagePath(journey: string, settings: TriageSettings = DEFAULT_TRIAGE, node?: string): string {
+  return `${withNode(`/journeys/${journey}/next/cards`, node)}${searchOf(triageParams(settings))}`;
 }
 
 /**
- * C11: the decision walkthrough of `journey`. Starting a journey opens it here (the creation
- * flow, 5.5, navigates to this address once the journey exists), and it can be launched any
- * time from the journey's screens.
+ * C11: the decision walkthrough of `journey`, the cards with DECISIONS on. Starting a journey
+ * opens it here (the creation flow, 5.5, navigates to this address once the journey exists),
+ * and it can be launched any time from the journey's pages.
  */
 export function walkthroughPath(journey: string): string {
   return triagePath(journey, { ...DEFAULT_TRIAGE, decisions: true });

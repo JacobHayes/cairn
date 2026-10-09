@@ -71,7 +71,7 @@ export function useMineCounts(items: readonly { id: string }[]) {
   }, []);
   const settled = items.every((item) => counts[item.id] !== undefined);
   const total = items.reduce((sum, item) => sum + (counts[item.id] ?? 0), 0);
-  return { report, none: settled && total === 0 };
+  return { report, settled, total, none: settled && total === 0 };
 }
 
 /**

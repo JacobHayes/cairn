@@ -12,7 +12,7 @@ import { expect, test, type Page } from "@playwright/test";
 import { startVendorJourney } from "../e2e/acting.ts";
 import { ask, openPanel, patchId, script } from "../e2e/assistant.ts";
 import { dismissNotices } from "../e2e/authoring.ts";
-import { openOverview } from "../e2e/around.ts";
+import { openJourneyCard } from "../e2e/around.ts";
 import { state } from "../e2e/detail.ts";
 import { confirmAndApply, reviewOpen } from "../e2e/proposals.ts";
 import { nodePanel, open, openJourney } from "../e2e/shell.ts";
@@ -97,10 +97,10 @@ test("I5, I7: a direct change and a proposal, reviewed and applied", async ({ pa
   const journey = await startVendorJourney(page);
   await converse(page, journey, true);
   await reviewAndApply(page, true);
-  await openOverview(page, "server", journey);
+  await openJourneyCard(page, "server", journey);
   await page.reload();
   await expect(page.getByTestId("assistant-panel").getByTestId("assistant-said")).toHaveCount(2);
-  await shot(page, "7-overview-reads-it-back");
+  await shot(page, "7-journey-page-reads-it-back");
 });
 
 test("a route's draft has its own conversation", async ({ page }) => {

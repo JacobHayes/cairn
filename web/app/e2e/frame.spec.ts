@@ -4,29 +4,24 @@
 // where they pan; and the theme the viewer chose survives a reload. On the in-browser host.
 import { expect, test, type Page } from "@playwright/test";
 
-import { nodeCard, nodePanel, open, openJourney } from "./shell.ts";
-import { openScreen, showDecisionTable } from "./views.ts";
+import { nodeCard, nodePanel, open, openAt, openJourney } from "./shell.ts";
 
 const SCREENS = [
-  { name: "canvas", segment: undefined },
-  { name: "decisions", segment: "decisions" },
-  { name: "timeline", segment: "timeline" },
-  { name: "summary", segment: "summary" },
+  { name: "canvas", address: "plan/graph" },
+  { name: "decisions", address: "plan/graph?decisions=1" },
+  { name: "timeline", address: "plan/timeline" },
+  { name: "summary", address: "summary" },
 ];
 const WINDOWS = [
   { width: 1440, height: 768 },
   { width: 1024, height: 700 },
 ];
 
-for (const { name, segment } of SCREENS) {
+for (const { name, address } of SCREENS) {
   for (const window of WINDOWS) {
     test(`the ${name} screen's inspector scrolls to the end of History at ${String(window.width)}px`, async ({ page }) => {
       await page.setViewportSize(window);
-      if (segment === undefined) {
-        await open(page, "browser", "/journeys/j_vendor_eval/nodes/n_plan");
-      } else {
-        await openScreen(page, "browser", "j_vendor_eval", segment, "n_plan");
-      }
+      await openAt(page, "browser", "j_vendor_eval", address, { node: "n_plan" });
       const panel = nodePanel(page, "n_plan");
       const history = panel.getByTestId("history");
       await history.locator("summary").click();
@@ -48,11 +43,9 @@ for (const { name, segment } of SCREENS) {
   }
 }
 
-test("the decision view is the graph or the table, so its canvas never competes with a scroller for the wheel", async ({ page }) => {
+test("the decision graph takes the wheel to zoom, and the page behind it does not scroll", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
-  // A phone's `map=1` (carried over a rotation) must not outlive the graph: the table has no map to close.
-  await open(page, "browser", "/journeys/j_vendor_eval/decisions?map=1");
-  await expect(page.getByTestId("screen-decisions")).toBeVisible();
+  await openAt(page, "browser", "j_vendor_eval", "plan/graph?decisions=1");
   const canvas = page.getByTestId("canvas");
   const viewport = canvas.locator(".react-flow__viewport");
   const before = await viewport.evaluate((element) => (element as HTMLElement).style.transform);
@@ -62,21 +55,17 @@ test("the decision view is the graph or the table, so its canvas never competes 
   await expect.poll(() => viewport.evaluate((element) => (element as HTMLElement).style.transform)).not.toBe(before);
   const region = page.locator(".ws-body");
   expect(await region.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1);
-  await showDecisionTable(page);
-  await expect(canvas).toHaveCount(0);
-  await expect(page).not.toHaveURL(/map=1/);
 });
 
 test("on a tablet a scrolling screen's end is above the sheet", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 700 });
-  await openScreen(page, "browser", "j_vendor_eval", "summary", "n_plan");
+  await openAt(page, "browser", "j_vendor_eval", "summary", { node: "n_plan" });
   await expect(nodePanel(page, "n_plan")).toBeVisible();
-  const region = page.locator(".ws-body");
-  await region.evaluate((element) => {
+  await page.locator(".ws-body").evaluate((element) => {
     element.scrollTop = element.scrollHeight;
   });
   const sheet = await page.locator(".inspector").boundingBox();
-  const last = await region.locator(":scope > *").last().boundingBox();
+  const last = await page.locator(".journey-scroll > *").last().boundingBox();
   expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual((sheet?.y ?? 0) + 1);
 });
 
@@ -138,21 +127,21 @@ test.describe("a phone's map", () => {
   });
 
   test("keeps the map open when a decision's card is tapped", async ({ page }) => {
-    await open(page, "browser", "/journeys/j_hiring/decisions?map=1");
-    await page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").click();
+    await openAt(page, "browser", "j_hiring", "plan/graph?decisions=1&map=1");
+    await page.locator('[data-testid="decision-view"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").click();
     await expect(nodePanel(page, "n_make_offer")).toBeVisible();
-    await expect(page).toHaveURL(/\/decisions\/nodes\/n_make_offer\?map=1$/);
+    await expect(page).toHaveURL(/\/plan\/graph\/nodes\/n_make_offer\?decisions=1&map=1$/);
     await expect(page.getByTestId("map-full")).toBeVisible();
   });
 });
 
 test("on a tablet Esc closes the sheet and leaves the screen as it was", async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 700 });
-  await open(page, "browser", "/journeys/j_vendor_eval/nodes/n_plan?hide=action");
+  await openAt(page, "browser", "j_vendor_eval", "plan/graph?kind=group", { node: "n_plan" });
   await expect(nodePanel(page, "n_plan")).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(nodePanel(page, "n_plan")).toHaveCount(0);
-  await expect(page).toHaveURL(/\/journeys\/j_vendor_eval\?hide=action$/);
+  await expect(page).toHaveURL(/\/journeys\/j_vendor_eval\/plan\/graph\?kind=group$/);
 });
 
 test("the theme the viewer chose is kept across a reload", async ({ page }) => {

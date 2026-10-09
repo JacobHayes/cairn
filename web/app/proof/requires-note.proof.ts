@@ -17,7 +17,7 @@ test.use({ viewport: { width: 1280, height: 800 } });
 
 test("done asks for the note, completes with it, and goes stale when the note is removed", async ({ page }) => {
   const journey = await startJourney(page, "browser", journeyName("Screening"), { route: "hiring-loop", version: 1 });
-  await openActing(page, "browser", journey, "next");
+  await openActing(page, "browser", journey, "next/list");
   const item = nextItem(page, "n_screen");
   await item.getByRole("button", { name: "Done", exact: true }).click();
   await item.getByLabel("Note").fill("Covered the role, the timeline and the pay band.");

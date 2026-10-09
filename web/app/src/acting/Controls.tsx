@@ -48,6 +48,7 @@ export function Checks<T extends string>({
   words,
   onChange,
   testId,
+  stacked = false,
 }: {
   legend: string;
   options: readonly T[];
@@ -55,9 +56,11 @@ export function Checks<T extends string>({
   words: (option: T) => string;
   onChange: (chosen: T[]) => void;
   testId: string;
+  /** One option to a line, under its legend. */
+  stacked?: boolean;
 }) {
   return (
-    <fieldset className="checks row" data-testid={testId}>
+    <fieldset className={stacked ? "checks checks-stacked stack" : "checks row"} data-testid={testId}>
       <legend className="muted small">{legend}</legend>
       {options.map((option) => (
         <Check

@@ -7,7 +7,7 @@
 //
 // Outside the shell (a component rendered alone in a test) there is no slot, and both render
 // their children where they stand.
-import { createContext, useContext, useEffect, useLayoutEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useLayoutEffect, useSyncExternalStore, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router";
 
@@ -17,8 +17,25 @@ export type InspectorTab = "inspector" | "assistant";
 
 /** The window widths that make the inspector a bottom sheet (design 3.3). */
 export const SHEET = "(min-width: 720px) and (max-width: 1099px)";
+
+/** The widths that give the inspector a column of its own (design 3.3); narrower, it is a sheet or stacked. */
+export const COLUMN = "(min-width: 1100px)";
 /** A phone's width: the inspector stacks under the page. */
-const PHONE = "(max-width: 719px)";
+export const PHONE_WIDTH = "(max-width: 719px)";
+
+/** Whether the window matches `query` now, and as it changes. */
+export function useMedia(query: string): boolean {
+  return useSyncExternalStore(
+    (notify) => {
+      const list = globalThis.matchMedia(query);
+      list.addEventListener("change", notify);
+      return () => {
+        list.removeEventListener("change", notify);
+      };
+    },
+    () => globalThis.matchMedia(query).matches,
+  );
+}
 
 /** What the shell shows of itself: the slot elements, once mounted, and the tab in view. */
 export interface FrameState {
@@ -61,9 +78,11 @@ export function useFrameActions(): FrameActions | undefined {
 /**
  * The inspector's content, rendered in the shell's inspector column. `focus` names what it is
  * about (the open node): when it changes, the inspector tab comes into view. Closing sends
- * the sheet's Esc to the screen the node is open on, keeping what that screen shows.
+ * the sheet's Esc to the screen the node is open on, keeping what that screen shows. With
+ * `reveal` off (the journey card, which is there without being asked for) it leaves the tab
+ * in view alone and a phone does not scroll to it.
  */
-export function Inspector({ focus, children }: { focus: string; children: ReactNode }) {
+export function Inspector({ focus, reveal = true, children }: { focus: string; reveal?: boolean; children: ReactNode }) {
   const actions = useFrameActions();
   const state = useFrameState();
   const { pathname, search } = useLocation();
@@ -72,13 +91,15 @@ export function Inspector({ focus, children }: { focus: string; children: ReactN
   // render after paint could land in a ResizeObserver delivery and make the canvas resize twice.
   useLayoutEffect(() => actions?.mount("inspector"), [actions]);
   useLayoutEffect(() => {
-    actions?.show("inspector");
-  }, [actions, focus]);
+    if (reveal) {
+      actions?.show("inspector");
+    }
+  }, [actions, focus, reveal]);
   // On a phone the inspector stacks under the whole page: bring it into view, or opening a node looks like nothing happened.
   const mapOpen = new URLSearchParams(search).get("map") === "1";
   const column = state?.inspector?.parentElement;
   useEffect(() => {
-    if (column === null || column === undefined || mapOpen || !globalThis.matchMedia(PHONE).matches) {
+    if (!reveal || column === null || column === undefined || mapOpen || !globalThis.matchMedia(PHONE_WIDTH).matches) {
       return undefined;
     }
     // After the commit that shows the column, which is hidden until a screen fills it.
@@ -90,7 +111,7 @@ export function Inspector({ focus, children }: { focus: string; children: ReactN
       cancelAnimationFrame(frame);
     };
     // Picking another node brings it into view; the map opening or closing does not.
-  }, [focus, column]);
+  }, [focus, column, reveal]);
   useEffect(() => {
     actions?.closeTo(close);
     return () => {

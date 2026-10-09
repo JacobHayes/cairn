@@ -1,4 +1,4 @@
-// The route index: every route with its latest version, whether a draft is open, and whether
+// The Library: the route index, every route with its latest version, whether a draft is open, and whether
 // it is retired (A19: hidden from new-journey creation, its journeys still upgrading), each
 // linking to its detail (C17); a route file imported as a new route or draft (A13); and a new
 // route started empty, to author by hand (A12). Kept current (H6).
@@ -33,11 +33,12 @@ function RouteRow({ route }: { route: RouteSummary }) {
   );
 }
 
-export function RouteIndex() {
+export function Library() {
   const { view } = useLive("routes", routeIndex);
   return (
-    <section className="stack" aria-label="Routes">
-      <h1>Routes</h1>
+    <section className="stack" aria-label="Library" data-testid="library">
+      <h1>Library</h1>
+      <h2 data-testid="library-routes">Routes</h2>
       <NewRoute />
       <ImportFile />
       {view.status === "loading" ? <p className="muted small">Loading the routes...</p> : null}

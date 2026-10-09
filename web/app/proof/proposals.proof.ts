@@ -11,7 +11,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { card, openActing } from "../e2e/acting.ts";
 import { dismissNotices } from "../e2e/authoring.ts";
-import { openOverview, openRouteDetail, routeAction, startJourney } from "../e2e/around.ts";
+import { chooseFromMenu, openJourneyCard, openRouteDetail, routeAction, startJourney } from "../e2e/around.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits } from "../e2e/proposals.ts";
 import { state } from "../e2e/detail.ts";
 import { goWithin, openFromCanvas, openJourney, rename } from "../e2e/shell.ts";
@@ -31,7 +31,8 @@ test.describe.configure({ mode: "serial" });
 async function proposeUpgrade(page: Page, pictures: boolean): Promise<void> {
   await editWhereVersionTwoChanges(page, "browser");
   await publishVersionTwo(page, "browser");
-  await openOverview(page, "browser", "j_vendor_eval");
+  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await chooseFromMenu(page, "journey-menu", "menu-upgrade");
   await expect(page.getByTestId("upgrade-flow").getByLabel("Upgrade to version")).toHaveValue("2");
   if (pictures) {
     await page.getByTestId("journey-flows").scrollIntoViewIfNeeded();
@@ -59,7 +60,8 @@ test("B7, C14: the upgrade to version 2, its conflicts resolved, applied", async
 
 test("I6: a stale proposal, refreshed and reviewed again", async ({ page }) => {
   await publishVersionTwo(page, "browser");
-  await openOverview(page, "browser", "j_vendor_eval");
+  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await chooseFromMenu(page, "journey-menu", "menu-upgrade");
   await page.getByTestId("upgrade-flow").getByRole("button", { name: "Propose the upgrade" }).click();
   await reviewOpen(page);
   const address = page.url();
@@ -76,7 +78,8 @@ test("I6: a stale proposal, refreshed and reviewed again", async ({ page }) => {
 });
 
 test("B8, B9: the routeless journey saved as a route, and re-linked", async ({ page }) => {
-  await openOverview(page, "browser", "j_bakeoff");
+  await openJourneyCard(page, "browser", "j_bakeoff");
+  await chooseFromMenu(page, "journey-menu", "menu-save");
   const save = page.getByTestId("save-as-route-flow");
   await save.getByLabel("Route id").fill("bake-off-route");
   await save.getByLabel("Route name").fill("Bake-off");
@@ -95,12 +98,13 @@ test("B8, B9: the routeless journey saved as a route, and re-linked", async ({ p
   await confirmAndApply(page);
   await openRouteDetail(page, "browser", "bake-off-route");
   await routeAction(page, "Publish the draft");
-  await openOverview(page, "browser", "j_bakeoff");
+  await openJourneyCard(page, "browser", "j_bakeoff");
+  await chooseFromMenu(page, "journey-menu", "menu-relink");
   await page.getByTestId("relink-flow").getByLabel("Re-link to route").selectOption("bake-off-route");
   await page.getByTestId("relink-flow").getByRole("button", { name: "Propose the re-link" }).click();
   await reviewOpen(page);
   await confirmAndApply(page);
-  await openOverview(page, "browser", "j_bakeoff");
+  await openJourneyCard(page, "browser", "j_bakeoff");
   await expect(page.getByTestId("overview-lineage")).toContainText("Bake-off, version 1");
   await shot(page, "8-relinked");
 });
@@ -111,7 +115,7 @@ test("B10: a placeholder broken down from triage through a proposal", async ({ p
   const kickoff = await openFromCanvas(page, "n_kickoff");
   await kickoff.getByRole("button", { name: "Mark reached" }).click();
   await expect(state(kickoff)).toHaveAttribute("data-status", "done");
-  await openActing(page, "browser", journey, "triage?kind=deliverable");
+  await openActing(page, "browser", journey, "next/cards?kind=deliverable");
   for (let pass = 0; pass < 4 && (await card(page).getAttribute("data-node")) !== "n_workload"; pass += 1) {
     await card(page).getByTestId("pass").click();
   }

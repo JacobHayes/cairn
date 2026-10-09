@@ -17,7 +17,7 @@ test.use({ viewport: { width: 1280, height: 800 } });
 
 test("an answer with a reason, read back, then revised with none", async ({ page }) => {
   const journey = await startJourney(page, "browser", journeyName("Rationale"), { route: "vendor-evaluation", version: 1 });
-  await openActing(page, "browser", journey, "triage?mode=decisions");
+  await openActing(page, "browser", journey, "next/cards?decisions=1");
   await expect(card(page)).toHaveAttribute("data-node", "n_partner_runs");
   await card(page).getByRole("button", { name: "Answer", exact: true }).click();
   await card(page).getByLabel("Answer").selectOption("yes");
@@ -26,7 +26,7 @@ test("an answer with a reason, read back, then revised with none", async ({ page
   await card(page).getByRole("button", { name: "Save the answer" }).click();
   await expect(card(page)).not.toHaveAttribute("data-node", "n_partner_runs");
 
-  await openActing(page, "browser", journey, "decisions/nodes/n_partner_runs");
+  await openActing(page, "browser", journey, "plan/graph/nodes/n_partner_runs?decisions=1");
   const panel = nodePanel(page, "n_partner_runs");
   await expect(panel.getByTestId("rationale").locator("li")).toHaveCount(2);
   await dismissNotices(page);

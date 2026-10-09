@@ -29,7 +29,7 @@ test("the whole journey, kinds hidden, drilled in", async ({ page }) => {
   }
   await expect(page.getByTestId("node-card")).toHaveCount(5);
   await shot(page, "3-groups-only");
-  await openJourney(page, "browser", "j_vendor_eval", "?hide=group,milestone");
+  await openJourney(page, "browser", "j_vendor_eval", "?kind=decision,deliverable,action");
   await expect(nodeCard(page, "n_final_report").getByTestId("hidden-prerequisites")).toBeVisible();
   await shot(page, "4-groups-and-milestones-hidden-marker");
   await openJourney(page, "browser", "j_vendor_eval");
@@ -44,7 +44,7 @@ test("the trace, the heat overlay, and relevance", async ({ page }) => {
   await page.getByTestId("trace-start").click();
   await expect.poll(async () => Object.keys(await marks(page)).length).toBe(15);
   await shot(page, "6-trace-of-the-test-plan");
-  await openJourney(page, "browser", "j_hiring", "?heat=on");
+  await openJourney(page, "browser", "j_hiring", "?lens=gravity");
   await expect(page.getByTestId("card-heat").first()).toBeVisible();
   await shot(page, "7-heat-overlay");
 });
@@ -78,6 +78,7 @@ test("the stalled surface", async ({ page }) => {
 
 test("a route's canvas", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval");
+  await page.getByTestId("card-lineage").locator("summary").click();
   await page.getByTestId("lineage").click();
   await expect(page.getByTestId("node-card")).toHaveCount(25);
   await shot(page, "10-route-canvas");

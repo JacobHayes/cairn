@@ -6,8 +6,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { pin } from "./detail.ts";
-import { nodePanel } from "./shell.ts";
-import { openScreen } from "./views.ts";
+import { nodePanel, openAt } from "./shell.ts";
+import { FIXED_TODAY } from "./views.ts";
 
 function entry(page: Page, node: string) {
   return page.locator(`[data-testid="timeline-entry"][data-node="${node}"]`);
@@ -21,7 +21,7 @@ function rows(page: Page): Promise<string[][]> {
 }
 
 test("C13: the vendor evaluation's timeline ends at the decision meeting, its final milestone", async ({ page }) => {
-  await openScreen(page, "browser", "j_vendor_eval", "timeline");
+  await openAt(page, "browser", "j_vendor_eval", "plan/timeline", { fixedToday: FIXED_TODAY });
   const timeline = page.getByTestId("timeline");
   await expect(timeline).toHaveAttribute("data-end", "n_decision_meeting");
   await expect(timeline).toHaveAttribute("data-end-date", "2026-11-20");
@@ -35,7 +35,7 @@ test("C13: the vendor evaluation's timeline ends at the decision meeting, its fi
 });
 
 test("C13, F6, F7: the late code freeze is marked short, and its row says why", async ({ page }) => {
-  await openScreen(page, "browser", "j_launch", "timeline");
+  await openAt(page, "browser", "j_launch", "plan/timeline", { fixedToday: FIXED_TODAY });
   const freeze = entry(page, "n_code_freeze");
   await expect(freeze).toHaveAttribute("data-origin", "actual");
   await expect(freeze).toHaveAttribute("data-shortfall", "2");
@@ -50,7 +50,7 @@ test("C13, F6, F7: the late code freeze is marked short, and its row says why", 
 });
 
 test("C13: with no final milestone there is no end anchor; a pin puts a node on the timeline", async ({ page }) => {
-  await openScreen(page, "browser", "j_hiring", "timeline", "n_offer");
+  await openAt(page, "browser", "j_hiring", "plan/timeline", { node: "n_offer", fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("timeline-empty")).toBeVisible();
   await pin(nodePanel(page, "n_offer"), "2026-10-20");
   await expect(entry(page, "n_offer")).toHaveAttribute("data-origin", "pin");

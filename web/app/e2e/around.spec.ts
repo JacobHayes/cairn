@@ -8,10 +8,11 @@ import { expect, test } from "@playwright/test";
 
 import {
   addEntity,
+  chooseFromMenu,
   fixtureRoute,
   journeyName,
   mergeEntities,
-  openOverview,
+  openJourneyCard,
   openRouteDetail,
   routeAction,
   routeRevision,
@@ -22,6 +23,7 @@ import {
 } from "./around.ts";
 import { nodeCard, nodePanel, open, openFromCanvas, openJourney } from "./shell.ts";
 import { section } from "./detail.ts";
+import { dismissNotices } from "./authoring.ts";
 
 test("B1: a journey started from the fixture route lands in its walkthrough, and the index lists it", async ({ page }) => {
   const name = journeyName("Evaluation");
@@ -33,26 +35,27 @@ test("B1: a journey started from the fixture route lands in its walkthrough, and
   await expect(row).toContainText(name);
   await expect(row.getByTestId("row-lineage")).toContainText("version 1");
   const empty = await startJourney(page, "browser", journeyName("Ad hoc"));
-  await openOverview(page, "browser", empty);
+  await openJourneyCard(page, "browser", empty);
   await expect(page.getByTestId("overview-lineage")).toContainText("Started empty");
 });
 
 test("B11, A19: completing leaves the active index and mine; archiving, then deleting behind the typed name", async ({ page }) => {
   await open(page, "browser", "/mine");
   await expect(page.locator('[data-testid="mine-journey"][data-journey="j_bakeoff"]')).toBeVisible();
-  await openOverview(page, "browser", "j_bakeoff");
+  await openJourneyCard(page, "browser", "j_bakeoff");
   await setStatus(page, "completed");
-  await open(page, "browser", "/");
+  await open(page, "browser", "/journeys");
   await expect(page.getByTestId("journey-row").first()).toBeVisible();
   await expect(page.locator('[data-testid="journey-row"][data-journey="j_bakeoff"]')).toHaveCount(0);
-  await open(page, "browser", "/?status=completed");
+  await open(page, "browser", "/journeys?status=completed");
   await expect(page.locator('[data-testid="journey-row"][data-journey="j_bakeoff"]')).toBeVisible();
   await open(page, "browser", "/mine");
   await expect(page.getByTestId("mine-journey").first()).toBeVisible();
   await expect(page.locator('[data-testid="mine-journey"][data-journey="j_bakeoff"]')).toHaveCount(0);
-  await openOverview(page, "browser", "j_bakeoff");
+  await openJourneyCard(page, "browser", "j_bakeoff");
   await setStatus(page, "archived");
   await expect(page.getByTestId("header-editor")).toHaveCount(0);
+  await chooseFromMenu(page, "lifecycle-chip", "status-delete");
   const remove = page.getByTestId("delete-journey");
   const confirm = remove.getByRole("button", { name: "Delete the journey" });
   await remove.getByRole("textbox").fill("Not its name");
@@ -60,7 +63,7 @@ test("B11, A19: completing leaves the active index and mine; archiving, then del
   const name = (await page.getByTestId("journey-name").textContent()) ?? "";
   await remove.getByRole("textbox").fill(name);
   await confirm.click();
-  await expect(page).toHaveURL(/\/\?status=any$/);
+  await expect(page).toHaveURL(/\/journeys\?status=any$/);
   await expect(page.getByTestId("journey-row").first()).toBeVisible();
   await expect(page.locator('[data-testid="journey-row"][data-journey="j_bakeoff"]')).toHaveCount(0);
 });
@@ -100,7 +103,7 @@ test("C17, A19: three versions with journeys on each; retired, the route still o
   await expect.poll(() => versionJourneys(page, 2)).toEqual({ [second]: "available" });
   await expect.poll(() => versionJourneys(page, 3)).toEqual({ [third]: "none" });
   await expect(page.getByTestId("start-from-version")).toHaveCount(0);
-  await open(page, "browser", "/?route=vendor-evaluation&upgrade=1");
+  await open(page, "browser", "/journeys?route=vendor-evaluation&upgrade=1");
   await expect(page.locator('[data-testid="journey-row"]')).toHaveCount(2);
   await expect(page.locator(`[data-testid="journey-row"][data-journey="${second}"] [data-testid="upgrade"]`)).toBeVisible();
   await open(page, "browser", "/new?route=vendor-evaluation");
@@ -127,6 +130,7 @@ test("E6: two entities merged, the journey reads the survivor and its history is
   await expect(page.locator('[data-testid="entity"][data-entity="e_lead"]')).toHaveCount(0);
   await openJourney(page, "browser", "j_vendor_eval");
   await expect(nodeCard(page, "n_plan").getByTestId("card-owner")).toContainText("Evaluation Director");
+  await dismissNotices(page);
   const after = await section(await openFromCanvas(page, "n_who_owns"), "history");
   await expect(after.getByTestId("history-patch")).toHaveCount(before);
 });
@@ -140,8 +144,8 @@ test("H3: the local user, its identity, and its entities, offered for merging; t
   await expect(page.getByTestId("link-identity")).toHaveCount(0);
   await page.getByTestId("merge-offer").getByRole("link", { name: "Merge them" }).click();
   await expect(page.getByTestId("merge-entities").getByLabel("Keep")).not.toHaveValue("");
-  await open(page, "browser", "/?mine=1");
-  await expect(page.locator('[data-testid="journey-row"][data-journey="j_vendor_eval"]')).toContainText("mine");
+  await open(page, "browser", "/journeys?mine=1");
+  await expect(page.locator('[data-testid="journey-row"][data-journey="j_vendor_eval"]').getByTestId("row-mine")).toContainText("ready");
 });
 
 test("B3: an entity answer names a new person, made in the same patch, who joins the deployment's entities", async ({ page }) => {

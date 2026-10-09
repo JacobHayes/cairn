@@ -8,8 +8,7 @@ import { join } from "node:path";
 import { expect, test, type Page } from "@playwright/test";
 
 import { openActing } from "../e2e/acting.ts";
-import { nodeCard, open, openFromCanvas, openJourney } from "../e2e/shell.ts";
-import { openScreen } from "../e2e/views.ts";
+import { nodeCard, open, openAt, openFromCanvas, openJourney } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${name}.png`) });
@@ -33,16 +32,16 @@ test("the canvas with the inspector open, light and dark", async ({ page }) => {
 
 test("the list and its dark twin", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
-  await openActing(page, "browser", "j_vendor_eval", "list");
+  await openActing(page, "browser", "j_vendor_eval", "plan/list");
   await expect(page.getByTestId("list-row").first()).toBeVisible();
   await shot(page, "list-light");
   await page.emulateMedia({ colorScheme: "dark", reducedMotion: "reduce" });
   await shot(page, "list-dark");
 });
 
-test("the decision view fills the workspace, with its table behind a toggle", async ({ page }) => {
+test("the decision graph fills the workspace", async ({ page }) => {
   await page.emulateMedia({ colorScheme: "light", reducedMotion: "reduce" });
-  await openScreen(page, "browser", "j_vendor_eval", "decisions");
+  await openAt(page, "browser", "j_vendor_eval", "plan/graph?decisions=1");
   await expect(page.getByTestId("canvas")).toBeVisible();
   await shot(page, "decisions-graph");
 });

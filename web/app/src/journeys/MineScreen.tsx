@@ -6,11 +6,10 @@
 // entity of the caller's counts). Kept current (H6).
 import { Link } from "react-router";
 
-import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
 import { indexKey, journeyIndex, type JourneySummary } from "../data/reads.ts";
 import { useLive, useViewer } from "../data/react.ts";
 import { kindTitle } from "../detail/sections.tsx";
-import { overviewPath, queryOf, DEFAULT_FILTERS } from "./address.ts";
+import { deepLinkPath, overviewPath, queryOf, DEFAULT_FILTERS } from "./address.ts";
 import { useMineCounts, useMineOf, useReportMine } from "./mine.ts";
 
 function JourneyMine({ summary, report }: { summary: JourneySummary; report: (id: string, count: number) => void }) {
@@ -37,7 +36,7 @@ function JourneyMine({ summary, report }: { summary: JourneySummary; report: (id
       <ul className="stack">
         {mine.entries.map((entry) => (
           <li key={entry.node} className="row" data-testid="mine-item" data-node={entry.node}>
-            <Link to={canvasPath(summary.id, DEFAULT_VIEW, entry.node)}>{nodes.get(entry.node)?.title ?? entry.node}</Link>
+            <Link to={deepLinkPath(summary.id, entry.node)}>{nodes.get(entry.node)?.title ?? entry.node}</Link>
             <span className="muted small">{nodes.get(entry.node)?.kind}</span>
             <span className="muted small">{entry.kinds.map((kind) => kindTitle(mine.view, kind)).join(", ")}</span>
           </li>

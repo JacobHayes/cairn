@@ -36,6 +36,13 @@ export type TickUnit = (typeof UNITS)[number]["unit"];
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
+/** A calendar date in words: `Oct 6`, with the year (`Oct 6, 2027`) when it is not in `today`'s. */
+export function dateWords(date: string, today: string): string {
+  const parsed = new Date(`${date}T00:00:00Z`);
+  const words = `${MONTHS[parsed.getUTCMonth()] ?? ""} ${String(parsed.getUTCDate())}`;
+  return date.slice(0, 4) === today.slice(0, 4) ? words : `${words}, ${String(parsed.getUTCFullYear())}`;
+}
+
 /** A calendar date (`YYYY-MM-DD`) as days since 1970-01-01. */
 export function dayOf(date: string): number {
   const parsed = Date.parse(`${date}T00:00:00Z`);
@@ -192,6 +199,22 @@ export interface TimelineRow {
   end: boolean;
   /** Where it falls along the axis. */
   at: number;
+}
+
+/** What the toolbar narrows the timeline to: DECISIONS, the kinds the filter holds, and the search text. */
+export interface TimelineNarrowing {
+  decisions: boolean;
+  kinds: readonly NodeKind[];
+  text: string;
+}
+
+/** Whether a node of `kind` and `title` stays on the timeline under `narrowing`. */
+export function timelineKeeps(narrowing: TimelineNarrowing, kind: NodeKind, title: string): boolean {
+  const wanted = narrowing.text.trim().toLowerCase();
+  return (
+    (narrowing.decisions ? kind === "decision" : narrowing.kinds.length === 0 || narrowing.kinds.includes(kind)) &&
+    (wanted === "" || title.toLowerCase().includes(wanted))
+  );
 }
 
 /** C13: the timeline's dates in its order (earliest first), placed on `axis`. */

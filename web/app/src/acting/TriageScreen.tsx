@@ -1,44 +1,38 @@
 // C11: triage, a card flow over the acting frontier, one focus card at a time in rank order,
 // for "act, or move on"; and its decisions-only mode, the decision walkthrough, which starting
-// a journey opens (address.ts, `walkthroughPath`). Triage always reads the current frontier
+// a journey opens (address.ts, `walkthroughPath`). It is NEXT, CARDS, with DECISIONS on for the
+// walkthrough: the journey page (screens/JourneyFrame.tsx) holds its toolbar and the filters
+// it opens (`TriageControls`). Triage always reads the current frontier
 // (the engine's `next` projection over the tab's derivation, kept current, H6), so an answer
 // that unblocks new nodes surfaces them in the same pass. Pass is client state for this pass
 // only (pass.ts): kept per tab in session storage, never sent.
 import { useCallback, useEffect, useMemo } from "react";
-import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
 import { useDraft } from "../data/drafts.ts";
-import type { Ready } from "../detail/model.ts";
+import { titleOf, type Ready } from "../detail/model.ts";
 import { Button } from "../ui/kit.tsx";
-import { ACTING_KINDS, triageFrom, triagePath, triageQueryOf, type TriageSettings } from "./address.ts";
+import { ACTING_KINDS, triageQueryOf, type TriageSettings } from "./address.ts";
 import { Check, Checks } from "./Controls.tsx";
-import { ActingFrame } from "./Frame.tsx";
 import { DetailLink } from "./Parts.tsx";
 import { begin, passedAll, passOn, passOrder, surfaced, type Pass } from "./pass.ts";
 import { StalledPanel } from "./Stalled.tsx";
 import { TriageCard } from "./TriageCard.tsx";
 import { WaitingDecisions } from "./Waiting.tsx";
 import { actingDecisions } from "./waiting.ts";
+import "./acting.css";
 
 /** How many cards after the focus the pass shows by title. */
 const UP_NEXT_SHOWN = 5;
 
-function TriageControls({ journey, settings, onNewPass }: { journey: string; settings: TriageSettings; onNewPass: () => void }) {
-  const navigate = useNavigate();
-  const go = (changed: TriageSettings) => void navigate(triagePath(journey, changed));
+/** C11: mine and kinds: what the filter holds on NEXT, CARDS. */
+export function TriageControls({ settings, onChange }: { settings: TriageSettings; onChange: (next: TriageSettings) => void }) {
   return (
-    <div className="row acting-controls" data-testid="triage-controls" data-mode={settings.decisions ? "decisions" : "all"}>
-      {settings.decisions ? (
-        <Link to={triagePath(journey, { ...settings, decisions: false })}>Every kind</Link>
-      ) : (
-        <Link to={triagePath(journey, { ...settings, decisions: true })}>Decisions only (the walkthrough)</Link>
-      )}
-      <Check label="Only mine" checked={settings.mine} testId="only-mine" onChange={(mine) => { go({ ...settings, mine }); }} />
+    <div className="stack acting-controls" data-testid="triage-controls" data-mode={settings.decisions ? "decisions" : "all"}>
+      <Check label="Only mine" checked={settings.mine} testId="only-mine" onChange={(mine) => { onChange({ ...settings, mine }); }} />
       {settings.decisions ? null : (
-        <Checks legend="Kinds" options={ACTING_KINDS} chosen={settings.kinds} words={(kind) => kind} testId="kind" onChange={(kinds) => { go({ ...settings, kinds }); }} />
+        <Checks legend="Kinds" options={ACTING_KINDS} chosen={settings.kinds} words={(kind) => kind} testId="kind" stacked onChange={(kinds) => { onChange({ ...settings, kinds }); }} />
       )}
-      <Button onClick={onNewPass}>Start a new pass</Button>
     </div>
   );
 }
@@ -97,12 +91,13 @@ function usePass(view: Ready): [Pass, (pass: Pass) => void] {
   return [pass, setStored];
 }
 
-function TriageBody({ view, settings }: { view: Ready; settings: TriageSettings }) {
-  const journey = view.journey.header.id;
+/** NEXT, CARDS: one focus card at a time, in the order of this pass. */
+export function TriageBody({ view, settings, selected }: { view: Ready; settings: TriageSettings; selected: string | undefined }) {
   const [pass, setPass] = usePass(view);
   const request = useMemo(() => ({ projection: "next" as const, query: triageQueryOf(settings) }), [settings]);
   const { value: next, error } = useProjected(view, request);
-  const rows = next?.items ?? [];
+  const wanted = settings.text.trim().toLowerCase();
+  const rows = (next?.items ?? []).filter((row) => wanted === "" || titleOf(view, row.key).toLowerCase().includes(wanted));
   const order = passOrder(rows.map((row) => row.key), pass);
   const focus = rows.find((row) => row.key === order[0]);
   const onPass = useCallback(() => {
@@ -114,8 +109,9 @@ function TriageBody({ view, settings }: { view: Ready; settings: TriageSettings 
   const passedCount = order.filter((key) => pass.passed.includes(key)).length;
   return (
     <section className="stack" aria-label={settings.decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
-      <h2>{settings.decisions ? "Decision walkthrough" : "Triage"}</h2>
-      <TriageControls journey={journey} settings={settings} onNewPass={() => { setPass(begin(view.derived.acting_frontier)); }} />
+      <span className="row acting-pass-controls">
+        <Button onClick={() => { setPass(begin(view.derived.acting_frontier)); }}>Start a new pass</Button>
+      </span>
       {error === undefined ? null : <p className="callout callout-bad">The frontier could not be read: {error}</p>}
       <Surfaced view={view} keys={surfaced(view.derived.acting_frontier, pass)} />
       {next === undefined ? <p className="muted small">Reading the frontier...</p> : null}
@@ -125,7 +121,7 @@ function TriageBody({ view, settings }: { view: Ready; settings: TriageSettings 
           Every card has been passed once in this pass; they come round again in the order you passed them.
         </p>
       ) : null}
-      {focus === undefined ? null : <TriageCard key={focus.key} view={view} row={focus} position={Math.min(passedCount + 1, order.length)} total={order.length} onPass={onPass} />}
+      {focus === undefined ? null : <TriageCard key={focus.key} view={view} row={focus} position={Math.min(passedCount + 1, order.length)} total={order.length} onPass={onPass} inspected={focus.key === selected} />}
       {order.length > 1 ? (
         <section className="stack" aria-label="Up next" data-testid="up-next">
           <span className="muted small">Up next in this pass:</span>
@@ -139,16 +135,5 @@ function TriageBody({ view, settings }: { view: Ready; settings: TriageSettings 
         </section>
       ) : null}
     </section>
-  );
-}
-
-export function TriageScreen() {
-  const { id = "" } = useParams();
-  const { search } = useLocation();
-  const settings = useMemo(() => triageFrom(new URLSearchParams(search)), [search]);
-  return (
-    <ActingFrame key={id} id={id} screen={settings.decisions ? "walkthrough" : "triage"}>
-      {(view) => <TriageBody view={view} settings={settings} />}
-    </ActingFrame>
   );
 }

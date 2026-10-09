@@ -1,5 +1,5 @@
 // What the browser tests of the screens around a journey share (brief 5.5): starting a
-// journey from the form, the overview's status buttons, route detail's versions and actions,
+// journey from the form, the lifecycle chip, route detail's versions and actions,
 // a file exported from it as the browser saves it, and the entities screen's merge.
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -23,24 +23,30 @@ export async function startJourney(page: Page, host: HostKind, name: string, fro
     await form.getByLabel("Start from").selectOption("");
   }
   await form.getByRole("button", { name: "Start the journey" }).click();
-  await expect(page).toHaveURL(/\/journeys\/j_[a-z0-9_-]+\/triage\?mode=decisions$/);
+  await expect(page).toHaveURL(/\/journeys\/j_[a-z0-9_-]+\/next\/cards\?decisions=1$/);
   return /\/journeys\/(j_[a-z0-9_-]+)\//.exec(page.url())?.[1] ?? "";
 }
 
 /** A fresh name for a journey this run starts. */
 export const journeyName = (stem: string) => fresh(stem);
 
-/** Journey `id`'s overview, once derived. */
-export async function openOverview(page: Page, host: HostKind, id: string): Promise<Locator> {
-  await open(page, host, `/journeys/${id}/overview`);
-  const overview = page.getByTestId("overview");
-  await expect(overview).toBeVisible();
-  return overview;
+/** Journey `id`'s landing, NEXT, LIST, with its journey card, once derived. */
+export async function openJourneyCard(page: Page, host: HostKind, id: string): Promise<Locator> {
+  await open(page, host, `/journeys/${id}/next/list`);
+  const card = page.getByTestId("journey-card");
+  await expect(card).toBeVisible();
+  return card;
 }
 
-/** Moves the overview's journey to `to` (B11), waiting for the status to show it. */
+/** Chooses `item` in the header's menu `menu` (`lifecycle-chip` or `journey-menu`). */
+export async function chooseFromMenu(page: Page, menu: "lifecycle-chip" | "journey-menu", item: string): Promise<void> {
+  await page.getByTestId(menu).click();
+  await page.getByTestId(item).click();
+}
+
+/** Moves the journey to `to` (B11) from its lifecycle chip, waiting for the status to show it. */
 export async function setStatus(page: Page, to: "active" | "completed" | "archived"): Promise<void> {
-  await page.getByTestId(`status-${to}`).click();
+  await chooseFromMenu(page, "lifecycle-chip", `status-${to}`);
   await expect(page.getByTestId("overview-status")).toHaveAttribute("data-status", to);
 }
 

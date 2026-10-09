@@ -107,8 +107,8 @@ function Notices() {
 function Rail({ pathname }: { pathname: string }) {
   const screens = [
     { to: "/mine", label: "Mine", on: pathname.startsWith("/mine") },
-    { to: "/", label: "Journeys", on: pathname === "/" || /^\/(journeys|new|proposals)(\/|$)/.test(pathname) },
-    { to: "/routes", label: "Routes", on: pathname.startsWith("/routes") },
+    { to: "/journeys", label: "Journeys", on: pathname === "/" || /^\/(journeys|new|proposals)(\/|$)/.test(pathname) },
+    { to: "/library", label: "Library", on: /^\/(library|routes)(\/|$)/.test(pathname) },
     { to: "/entities", label: "Entities", on: pathname.startsWith("/entities") },
   ];
   return (

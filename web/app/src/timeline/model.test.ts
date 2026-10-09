@@ -9,10 +9,12 @@ import {
   AXIS_MARGIN_DAYS,
   TICK_COUNT_MAX,
   dateOf,
+  dateWords,
   dayOf,
   endAnchor,
   positionOf,
   timelineAxis,
+  timelineKeeps,
   timelineRows,
   type Timeline,
   type TimelineEntry,
@@ -121,5 +123,24 @@ describe("F7: the rows", () => {
       ["n_meeting", "Meeting", "pin", false, 2],
       ["n_report", "Report", "pin", false, undefined],
     ]);
+  });
+});
+
+describe("the toolbar's narrowing", () => {
+  const none = { decisions: false, kinds: [], text: "" } as const;
+  it("keeps what DECISIONS, the kinds and the search all allow", () => {
+    expect(timelineKeeps(none, "action", "Draft the plan")).toBe(true);
+    expect(timelineKeeps({ ...none, decisions: true }, "action", "Draft the plan")).toBe(false);
+    expect(timelineKeeps({ ...none, decisions: true }, "decision", "Who runs testing?")).toBe(true);
+    expect(timelineKeeps({ ...none, kinds: ["milestone"] }, "deliverable", "Report")).toBe(false);
+    expect(timelineKeeps({ ...none, text: " PLAN " }, "action", "Draft the plan")).toBe(true);
+    expect(timelineKeeps({ ...none, text: "budget" }, "action", "Draft the plan")).toBe(false);
+  });
+});
+
+describe("dates in words", () => {
+  it("name the month and day, and the year only when it is not this one's", () => {
+    expect(dateWords("2026-10-30", today)).toBe("Oct 30");
+    expect(dateWords("2027-01-04", today)).toBe("Jan 4, 2027");
   });
 });

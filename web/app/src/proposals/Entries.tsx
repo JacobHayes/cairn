@@ -1,4 +1,4 @@
-// Where proposals start, on earlier screens. A journey's overview proposes its upgrade to a
+// Where proposals start, on earlier screens. A journey's `⋯` menu proposes its upgrade to a
 // newer version of its route (B7, C17: one journey at a time), saving its structure as a route
 // (B8), and re-linking it to a version of the route it was saved as (B9). A placeholder's
 // triage card and node detail break it down (B10): the pieces typed there open a proposal,
@@ -130,19 +130,29 @@ function Relink({ ready, routes }: { ready: Ready; routes: readonly Schema<"Rout
   );
 }
 
-/** B7, B8, B9: the overview's proposal flows. */
-export function JourneyFlows({ ready }: { ready: Ready }) {
+/** The journey `⋯` menu's proposal flows (B7, B8, B9). */
+export type JourneyFlowName = "upgrade" | "save" | "relink";
+
+/**
+ * B7, B8, B9: one of the journey's proposal flows, opened from its `⋯` menu: each opens a
+ * proposal to review, edit, and apply, and nothing changes until it is applied.
+ */
+export function JourneyFlow({ ready, flow, onClose }: { ready: Ready; flow: JourneyFlowName; onClose: () => void }) {
   const routes = useLive("routes", routeIndex).view;
   const list = routes.status === "ready" ? routes.value : [];
   const lineage = ready.journey.header.lineage ?? undefined;
   const latest = lineage === undefined ? undefined : (list.find((each) => each.header.id === lineage.route)?.latest_version ?? undefined);
   return (
     <Panel aria-label="Proposals" data-testid="journey-flows">
-      <strong>Change it by proposal</strong>
-      <span className="muted small">Each opens a proposal to review, edit, and apply; nothing changes until it is applied.</span>
-      <Upgrade ready={ready} latest={latest} />
-      <SaveAsRoute ready={ready} />
-      <Relink ready={ready} routes={list} />
+      <span className="row">
+        <strong>Change it by proposal</strong>
+        <span className="spacer" />
+        <Button onClick={onClose}>Close</Button>
+      </span>
+      <span className="muted small">It opens a proposal to review, edit, and apply; nothing changes until it is applied.</span>
+      {flow === "upgrade" ? <Upgrade ready={ready} latest={latest} /> : null}
+      {flow === "save" ? <SaveAsRoute ready={ready} /> : null}
+      {flow === "relink" ? <Relink ready={ready} routes={list} /> : null}
     </Panel>
   );
 }

@@ -7,10 +7,10 @@
 import { useMemo, useState } from "react";
 
 import { DatesSection } from "../detail/DatesSection.tsx";
-import { nodeDetail, titleOf, type Ready } from "../detail/model.ts";
+import { nodeDetail, nodeOf, titleOf, type Ready } from "../detail/model.ts";
 import { NodeLink } from "../detail/parts.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
-import { positionOf, timelineAxis, timelineRows, type Axis, type Timeline, type TimelineRow } from "./model.ts";
+import { positionOf, timelineAxis, timelineKeeps, timelineRows, type Axis, type Timeline, type TimelineNarrowing, type TimelineRow } from "./model.ts";
 import "./timeline.css";
 
 /** The height of one row's track, and of the axis above the rows (px). */
@@ -156,11 +156,17 @@ function Legend() {
   );
 }
 
-/** C13: the timeline of a projected journey. */
-export function TimelineChart({ ready, timeline, selected }: { ready: Ready; timeline: Timeline; selected: string | undefined }) {
+/** C13: the timeline of a projected journey, narrowed by the toolbar; the axis stays that of every date. */
+export function TimelineChart({ ready, timeline, narrowing, selected }: { ready: Ready; timeline: Timeline; narrowing: TimelineNarrowing; selected: string | undefined }) {
   const axis = useMemo(() => timelineAxis(timeline, ready.derived.today), [timeline, ready.derived.today]);
-  const rows = useMemo(() => timelineRows(ready, timeline, axis), [ready, timeline, axis]);
-  const undated = timeline.undated ?? [];
+  const rows = useMemo(
+    () => timelineRows(ready, timeline, axis).filter((row) => timelineKeeps(narrowing, row.kind, row.title)),
+    [ready, timeline, axis, narrowing],
+  );
+  const undated = (timeline.undated ?? []).filter((key) => {
+    const kind = nodeOf(ready, key)?.kind;
+    return kind !== undefined && timelineKeeps(narrowing, kind, titleOf(ready, key));
+  });
   return (
     <section className="stack" aria-label="Timeline" data-testid="timeline" data-end={axis.anchor?.node ?? ""} data-end-date={axis.anchor?.date ?? ""}>
       <div className="row">
@@ -176,7 +182,9 @@ export function TimelineChart({ ready, timeline, selected }: { ready: Ready; tim
       </div>
       <Legend />
       {rows.length === 0 ? (
-        <p className="muted small" data-testid="timeline-empty">Nothing in scope has a date yet: no milestone date, pin, or due date.</p>
+        <p className="muted small" data-testid="timeline-empty">
+          {timeline.entries.length > 0 ? "Nothing dated matches the toolbar." : "Nothing in scope has a date yet: no milestone date, pin, or due date."}
+        </p>
       ) : (
         <ol className="timeline-rows">
           <li className="timeline-row timeline-row-axis">

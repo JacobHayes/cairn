@@ -6,7 +6,7 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { testView } from "../detail/view.test-support.ts";
-import type { Timeline } from "./model.ts";
+import type { Timeline, TimelineNarrowing } from "./model.ts";
 import { TimelineChart } from "./TimelineView.tsx";
 
 const view = testView();
@@ -20,10 +20,10 @@ const timeline: Timeline = {
   end: "n_meeting",
 };
 
-function drawn(drawnTimeline: Timeline): string {
+function drawn(drawnTimeline: Timeline, narrowing: TimelineNarrowing = { decisions: false, kinds: [], text: "" }): string {
   return renderToStaticMarkup(
     <MemoryRouter>
-      <TimelineChart ready={view} timeline={drawnTimeline} selected={undefined} />
+      <TimelineChart ready={view} timeline={drawnTimeline} narrowing={narrowing} selected={undefined} />
     </MemoryRouter>,
   );
 }
@@ -48,6 +48,13 @@ describe("TimelineChart (C13)", () => {
     expect(markup).toContain('data-end="n_meeting" data-end-date="2026-11-20"');
     expect(count(markup, 'class="timeline-end"')).toBe(timeline.entries.length + 1);
     expect(count(markup, 'data-testid="timeline-end"')).toBe(1);
+  });
+
+  it("keeps the axis of every date while the toolbar narrows the rows", () => {
+    const markup = drawn(timeline, { decisions: false, kinds: ["milestone"], text: "" });
+    expect([...markup.matchAll(/data-testid="timeline-entry" data-node="([^"]+)"/g)].map((row) => row[1])).toEqual(["n_meeting"]);
+    expect(markup).toContain('data-testid="timeline-tick" data-date="2026-10-12"');
+    expect(drawn(timeline, { decisions: true, kinds: [], text: "" })).toContain('data-testid="timeline-empty"');
   });
 
   it("draws no end without a final milestone", () => {

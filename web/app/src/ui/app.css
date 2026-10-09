@@ -627,7 +627,7 @@ input[type="radio"] {
 }
 
 /* The selected node's row on a screen's lists: DESIGN's selection, a 2px accent line and the faint tint. */
-.journey-screen [data-selected="true"] {
+.journey-frame [data-selected="true"] {
   background: var(--color-tint);
   box-shadow: inset 2px 0 0 var(--color-accent);
 }
@@ -697,7 +697,8 @@ input[type="radio"] {
   .strip,
   .banner,
   .toasts,
-  .journey-nav,
+  .journey-toolbar,
+  .active-filters,
   .detail-panel,
   .no-print {
     display: none !important;
@@ -705,7 +706,7 @@ input[type="radio"] {
   .panel {
     break-inside: avoid;
   }
-  .journey-screen [data-selected="true"] {
+  .journey-frame [data-selected="true"] {
     background: none;
     box-shadow: none;
   }

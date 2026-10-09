@@ -3,12 +3,11 @@
 // from the vendor evaluation's route on the server host (the creation screen is 5.5's).
 import { expect, type Locator, type Page } from "@playwright/test";
 
-import { derivedRevision, fresh, open, type HostKind } from "./shell.ts";
+import { derivedRevision, fresh, openAt, openFilter, type HostKind } from "./shell.ts";
 
-/** Opens journey `journey`'s screen at `path` (`next`, `list`, `triage`, with a query) on `host`, once derived. */
+/** Opens journey `journey`'s projection at `path` (`next/list`, `plan/list`, `next/cards`, with a query) on `host`, once derived. */
 export async function openActing(page: Page, host: HostKind, journey: string, path: string): Promise<void> {
-  await open(page, host, `/journeys/${journey}/${path}`);
-  await expect(page.getByTestId("derivation")).toBeVisible();
+  await openAt(page, host, journey, path);
 }
 
 /** The keys of the rows or items `testId` marks, in the order shown, once there are some. */
@@ -46,10 +45,11 @@ export function card(page: Page): Locator {
 }
 
 /**
- * Turns the filter checkbox `testId` on: a filter changes the address, and the box follows it
- * once the screen reads the new address.
+ * Turns the filter checkbox `testId` on, in the toolbar's filter: a filter changes the address,
+ * and the box follows it once the screen reads the new address.
  */
 export async function turnOn(page: Page, testId: string): Promise<void> {
+  await openFilter(page);
   const control = page.getByTestId(testId);
   await control.locator("input").click();
   await expect(control).toHaveAttribute("data-status", "on");

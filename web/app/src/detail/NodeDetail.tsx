@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { TitleEditor } from "../screens/TitleEditor.tsx";
+import { DecisionAffects } from "../decisions/DecisionView.tsx";
 import { Actions } from "./Actions.tsx";
 import { AttachmentList } from "./Attachments.tsx";
 import { Checklist } from "./Checklist.tsx";
@@ -60,6 +61,7 @@ export function NodeDetailPanel({ view, nodeKey, extra }: { view: Ready; nodeKey
         <TitleEditor journey={journey} node={nodeKey} title={detail.node.title} revision={view.journey.revision} showTitle={false} />
       </div>
       <Actions view={view} detail={detail} />
+      {detail.node.kind === "decision" ? <DecisionAffects ready={view} node={nodeKey} /> : null}
       <About view={view} detail={detail} />
       <Checklist view={view} detail={detail} />
       <AttachmentList view={view} detail={detail} />

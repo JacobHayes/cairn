@@ -1,18 +1,19 @@
 // What a row or card on the acting surfaces shows besides its actions: a link to the node's
-// detail on the canvas, its breadcrumb (C10), its derived flags (D3), and why it ranks where
+// detail beside the screen, its breadcrumb (C10), its derived flags (D3), and why it ranks where
 // it does (C10).
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 
-import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
 import { nodeOf, startedEarly, titleOf, type Ready } from "../detail/model.ts";
+import { nodePath, screenPath } from "../detail/parts.tsx";
 import { Badge, type Tone } from "../ui/kit.tsx";
 import type { SortBy } from "./address.ts";
 import { whyWords, type NodeRow } from "./why.ts";
 
-/** Node `key`'s detail beside the journey's canvas (5.1, 5.2), at the canvas's defaults. */
+/** Node `key`'s detail in the inspector beside the screen it is on, keeping what the screen shows (5.1). */
 export function DetailLink({ view, node, className }: { view: Ready; node: string; className?: string }) {
+  const { pathname, search } = useLocation();
   return (
-    <Link to={canvasPath(view.journey.header.id, DEFAULT_VIEW, node)} data-node={node} {...(className === undefined ? {} : { className })}>
+    <Link to={{ pathname: nodePath(screenPath(pathname), node), search }} data-node={node} {...(className === undefined ? {} : { className })}>
       {titleOf(view, node)}
     </Link>
   );

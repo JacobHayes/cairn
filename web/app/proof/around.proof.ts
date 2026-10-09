@@ -13,7 +13,7 @@ import {
   addEntity,
   fixtureRoute,
   mergeEntities,
-  openOverview,
+  openJourneyCard,
   openRouteDetail,
   routeAction,
   savedText,
@@ -37,7 +37,7 @@ test.use({ viewport: { width: 1200, height: 900 } });
 test.describe.configure({ mode: "serial" });
 
 test("C17: a route with three versions, journeys on each, retired and still offering upgrades", async ({ page }) => {
-  await open(page, "browser", "/routes");
+  await open(page, "browser", "/library");
   await expect(page.getByTestId("route-row").first()).toBeVisible();
   await shot(page, "1-route-index");
   await openRouteDetail(page, "browser", "vendor-evaluation");
@@ -52,7 +52,7 @@ test("C17: a route with three versions, journeys on each, retired and still offe
   expect(Object.values(marks[3])).toEqual(["none"]);
   record("routeDetail", marks);
   await shot(page, "2-route-detail-three-versions-retired");
-  await open(page, "browser", "/?status=any&route=vendor-evaluation&upgrade=1");
+  await open(page, "browser", "/journeys?status=any&route=vendor-evaluation&upgrade=1");
   await expect(page.getByTestId("journey-row")).toHaveCount(2);
   await shot(page, "3-index-filtered-upgrade-available");
 });
@@ -73,7 +73,7 @@ test("A13, A11: the fixture's file imported and exported identically; a second i
 });
 
 test("C16: the index, mine across journeys, a new journey, and its overview", async ({ page }) => {
-  await open(page, "browser", "/?status=any");
+  await open(page, "browser", "/journeys?status=any");
   await expect(page.getByTestId("journey-row").first()).toBeVisible();
   await shot(page, "6-journey-index");
   await open(page, "browser", "/mine");
@@ -87,9 +87,9 @@ test("C16: the index, mine across journeys, a new journey, and its overview", as
   await expect(page.getByTestId("triage-card")).toBeVisible();
   await shot(page, "9-lands-in-the-walkthrough");
   const empty = await startJourney(page, "browser", "Plan the offsite");
-  await openOverview(page, "browser", empty);
+  await openJourneyCard(page, "browser", empty);
   await expect(page.getByTestId("completion-suggested")).toBeVisible();
-  await openOverview(page, "browser", "j_vendor_eval");
+  await openJourneyCard(page, "browser", "j_vendor_eval");
   await shot(page, "10-overview");
   await setStatus(page, "completed");
   await setStatus(page, "archived");
@@ -139,7 +139,7 @@ test("the dark theme and a narrow screen", async ({ browser, baseURL }) => {
   await shot(dark, "16-dark-theme");
   await dark.close();
   const narrow = await browser.newPage({ baseURL: baseURL ?? "", viewport: { width: 390, height: 844 } });
-  await open(narrow, "browser", "/?status=any");
+  await open(narrow, "browser", "/journeys?status=any");
   await expect(narrow.getByTestId("journey-row").first()).toBeVisible();
   expect(await narrow.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   await shot(narrow, "17-narrow-screen");
@@ -149,7 +149,7 @@ test("the dark theme and a narrow screen", async ({ browser, baseURL }) => {
 test("the main flow, on video", async ({ browser, baseURL }) => {
   const context = await browser.newContext({ baseURL: baseURL ?? "", viewport: { width: 1100, height: 680 }, recordVideo: { dir: join(out, "video"), size: { width: 1100, height: 680 } } });
   const page = await context.newPage();
-  await open(page, "browser", "/");
+  await open(page, "browser", "/journeys");
   await beat(page);
   await page.getByTestId("new-journey").click();
   await page.getByTestId("new-journey-form").getByLabel("Name").fill("Evaluate a second vendor");
@@ -158,8 +158,7 @@ test("the main flow, on video", async ({ browser, baseURL }) => {
   await page.getByRole("button", { name: "Start the journey" }).click();
   await expect(page.getByTestId("triage-card")).toBeVisible();
   await beat(page);
-  await page.getByTestId("nav-overview").click();
-  await expect(page.getByTestId("overview")).toBeVisible();
+  await expect(page.getByTestId("journey-card")).toBeVisible();
   await beat(page);
   await setStatus(page, "completed");
   await beat(page);

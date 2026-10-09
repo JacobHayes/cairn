@@ -29,15 +29,24 @@ const everything: ListSettings = {
   text: "plan",
   sort: "slack",
   grouped: true,
+  decisions: false,
 };
 
 describe("the list's address (C9)", () => {
   it("keeps every setting", () => {
     expect(listFrom(listParams(everything))).toEqual(everything);
+    expect(listFrom(listParams({ ...everything, decisions: true }))).toEqual({ ...everything, decisions: true });
   });
 
   it("is bare at the defaults", () => {
     expect(listParams(DEFAULT_LIST).toString()).toBe("");
+  });
+
+  it("writes the mine flag as the chip's own parameter, and reads either", () => {
+    const params = listParams({ ...DEFAULT_LIST, flags: ["mine", "overdue"] });
+    expect(params.toString()).toBe("mine=1&flag=overdue");
+    expect(listFrom(new URLSearchParams("flag=mine")).flags).toEqual(["mine"]);
+    expect(listFrom(new URLSearchParams("mine=1&flag=overdue")).flags).toEqual(["mine", "overdue"]);
   });
 
   it("drops filters, states, kinds, and sorts it does not know", () => {
@@ -64,11 +73,17 @@ describe("the list's address (C9)", () => {
 });
 
 describe("the next list's address (C10)", () => {
-  const settings = { sort: "leverage" as const, mine: true, kinds: ["decision" as const, "milestone" as const], forMe: true };
+  const settings = { sort: "leverage" as const, mine: true, kinds: ["decision" as const, "milestone" as const], forMe: true, decisions: false, text: "plan" };
 
   it("keeps every setting, and is bare at the defaults", () => {
     expect(nextFrom(nextParams(settings))).toEqual(settings);
     expect(nextParams(DEFAULT_NEXT).toString()).toBe("");
+  });
+
+  it("narrows to the decisions when DECISIONS is on, in the next list and the list alike", () => {
+    expect(nextQueryOf({ ...settings, decisions: true }).kinds).toEqual(["decision"]);
+    expect(listQueryOf({ ...everything, decisions: true }).kinds).toEqual(["decision"]);
+    expect(listQueryOf({ ...everything, decisions: false }).kinds).toEqual(["deliverable", "action"]);
   });
 
   it("asks for prioritize for me as the ranking for the viewer", () => {
@@ -82,19 +97,20 @@ describe("the next list's address (C10)", () => {
 
 describe("triage's address (C11)", () => {
   it("keeps the mode and filters, and is bare at the defaults", () => {
-    const settings = { decisions: false, mine: true, kinds: ["action" as const] };
+    const settings = { decisions: false, mine: true, kinds: ["action" as const], text: "" };
     expect(triageFrom(triageParams(settings))).toEqual(settings);
     expect(triageParams(DEFAULT_TRIAGE).toString()).toBe("");
   });
 
   it("reads the frontier in rank order, decisions only in the walkthrough", () => {
-    expect(triageQueryOf({ decisions: true, mine: false, kinds: ["action"] })).toEqual({ sort: "rank", mine: false, kinds: ["decision"] });
-    expect(triageQueryOf({ decisions: false, mine: true, kinds: [] })).toEqual({ sort: "rank", mine: true, kinds: [] });
+    expect(triageQueryOf({ decisions: true, mine: false, kinds: ["action"], text: "" })).toEqual({ sort: "rank", mine: false, kinds: ["decision"] });
+    expect(triageQueryOf({ decisions: false, mine: true, kinds: [], text: "" })).toEqual({ sort: "rank", mine: true, kinds: [] });
   });
 
-  it("opens the walkthrough at its own address", () => {
+  it("opens the walkthrough on the cards with DECISIONS on", () => {
     const [path = "", query = ""] = walkthroughPath("j_new").split("?");
-    expect(path).toBe("/journeys/j_new/triage");
+    expect(path).toBe("/journeys/j_new/next/cards");
+    expect(query).toBe("decisions=1");
     expect(triageFrom(new URLSearchParams(query)).decisions).toBe(true);
   });
 });

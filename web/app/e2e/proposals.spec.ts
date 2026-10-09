@@ -5,16 +5,18 @@
 // B9); and the placeholder broken down from triage through a proposal (B10).
 import { expect, test } from "@playwright/test";
 
-import { openRouteDetail, openOverview, routeAction, startJourney } from "./around.ts";
+import { chooseFromMenu, openRouteDetail, openJourneyCard, routeAction, startJourney } from "./around.ts";
 import { card, openActing, startVendorJourney } from "./acting.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits } from "./proposals.ts";
+import { dismissNotices } from "./authoring.ts";
 import { section, state } from "./detail.ts";
 import { goWithin, nodeCard, openFromCanvas, openJourney, rename } from "./shell.ts";
 
 test("B7, C14: the scenario journey upgraded to version 2, each conflict resolved, then applied", async ({ page }) => {
   await editWhereVersionTwoChanges(page, "browser");
   await publishVersionTwo(page, "browser");
-  await openOverview(page, "browser", "j_vendor_eval");
+  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await chooseFromMenu(page, "journey-menu", "menu-upgrade");
   const flow = page.getByTestId("upgrade-flow");
   await expect(flow.getByLabel("Upgrade to version")).toHaveValue("2");
   await flow.getByRole("button", { name: "Propose the upgrade" }).click();
@@ -52,7 +54,8 @@ test("B7, C14: the scenario journey upgraded to version 2, each conflict resolve
 
 test("I6: a stale proposal shows what moved, and applies only once refreshed and reviewed again", async ({ page }) => {
   await publishVersionTwo(page, "browser");
-  await openOverview(page, "browser", "j_vendor_eval");
+  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await chooseFromMenu(page, "journey-menu", "menu-upgrade");
   await page.getByTestId("upgrade-flow").getByRole("button", { name: "Propose the upgrade" }).click();
   await reviewOpen(page);
   const address = page.url();
@@ -60,6 +63,7 @@ test("I6: a stale proposal shows what moved, and applies only once refreshed and
   await expect.poll(() => blockers(page)).toEqual([]);
 
   await openJourney(page, "browser", "j_vendor_eval");
+  await dismissNotices(page);
   await rename(page, "n_findings", "Findings, drafted");
   await goWithin(page, address);
   const stale = page.getByTestId("stale");
@@ -75,7 +79,8 @@ test("I6: a stale proposal shows what moved, and applies only once refreshed and
 });
 
 test("B8, B9: the routeless journey saved as a route with a participation mapping, published, and re-linked to it", async ({ page }) => {
-  await openOverview(page, "browser", "j_bakeoff");
+  await openJourneyCard(page, "browser", "j_bakeoff");
+  await chooseFromMenu(page, "journey-menu", "menu-save");
   const save = page.getByTestId("save-as-route-flow");
   await save.getByLabel("Route id").fill("bake-off-route");
   await save.getByLabel("Route name").fill("Bake-off");
@@ -95,13 +100,14 @@ test("B8, B9: the routeless journey saved as a route with a participation mappin
 
   await openRouteDetail(page, "browser", "bake-off-route");
   await routeAction(page, "Publish the draft");
-  await openOverview(page, "browser", "j_bakeoff");
+  await openJourneyCard(page, "browser", "j_bakeoff");
+  await chooseFromMenu(page, "journey-menu", "menu-relink");
   const relink = page.getByTestId("relink-flow");
   await relink.getByLabel("Re-link to route").selectOption("bake-off-route");
   await relink.getByRole("button", { name: "Propose the re-link" }).click();
   await reviewOpen(page);
   await confirmAndApply(page);
-  await openOverview(page, "browser", "j_bakeoff");
+  await openJourneyCard(page, "browser", "j_bakeoff");
   await expect(page.getByTestId("overview-lineage")).toContainText("version 1");
 });
 
@@ -111,7 +117,7 @@ test("B10: the placeholder broken down from its triage card through a proposal",
   const kickoff = await openFromCanvas(page, "n_kickoff");
   await kickoff.getByRole("button", { name: "Mark reached" }).click();
   await expect(state(kickoff)).toHaveAttribute("data-status", "done");
-  await openActing(page, "browser", journey, "triage?kind=deliverable");
+  await openActing(page, "browser", journey, "next/cards?kind=deliverable");
   for (let pass = 0; pass < 4 && (await card(page).getAttribute("data-node")) !== "n_workload"; pass += 1) {
     await card(page).getByTestId("pass").click();
   }
@@ -122,6 +128,7 @@ test("B10: the placeholder broken down from its triage card through a proposal",
   await form.getByLabel("Piece title").fill("Ingest workload");
   await form.getByRole("button", { name: "Another piece" }).click();
   await form.getByLabel("Piece title").nth(1).fill("Query workload");
+  await dismissNotices(page);
   await form.getByTestId("propose-breakdown").click();
   await reviewOpen(page);
   await expect(page.locator('[data-testid="diff-node"][data-status="added"]')).toHaveCount(2);
@@ -170,6 +177,7 @@ test("C14: an editor follows its change when edits are dropped or another change
   await form.getByLabel("Piece title").fill("Ingest workload");
   await form.getByRole("button", { name: "Another piece" }).click();
   await form.getByLabel("Piece title").nth(1).fill("Query workload");
+  await dismissNotices(page);
   await form.getByTestId("propose-breakdown").click();
   await reviewOpen(page);
 
@@ -204,7 +212,8 @@ test("C14: an editor follows its change when edits are dropped or another change
 });
 
 test("I6: a stale route proposal lists each record that moved since it was drafted", async ({ page }) => {
-  await openOverview(page, "browser", "j_bakeoff");
+  await openJourneyCard(page, "browser", "j_bakeoff");
+  await chooseFromMenu(page, "journey-menu", "menu-save");
   const save = page.getByTestId("save-as-route-flow");
   await save.getByLabel("Route id").fill("hiring-loop");
   await save.getByRole("button", { name: "Propose saving it as a route" }).click();

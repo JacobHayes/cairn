@@ -26,16 +26,27 @@ export async function open(page: Page, host: HostKind, path = "/"): Promise<void
   await expect(demo).toHaveCount(host === "browser" ? 1 : 0);
 }
 
+/** Loads the screen at `path` afresh on `host`, as a bookmark or a posted link does, and returns once the shell is up. */
+export async function visit(page: Page, host: HostKind, path: string): Promise<void> {
+  await page.goto(host === "browser" ? `${DEMO}${path}` : path);
+  await expect(page.getByRole("navigation", { name: "Screens", exact: true })).toBeVisible();
+}
+
+/** Moves the tab to `path` as a link does, without loading the page again, and without waiting for where it lands. */
+export async function follow(page: Page, path: string): Promise<void> {
+  await page.evaluate((to) => {
+    history.pushState(null, "", to);
+    dispatchEvent(new PopStateEvent("popstate"));
+  }, path);
+}
+
 /**
  * Moves the tab to the screen at `path` without loading the page again, as the app's links do,
  * and returns once the router has rendered it (the shell's `data-screen`). Data the screen
  * derives may still be on its way; read it with a web-first assertion.
  */
 export async function goWithin(page: Page, path: string): Promise<void> {
-  await page.evaluate((to) => {
-    history.pushState(null, "", to);
-    dispatchEvent(new PopStateEvent("popstate"));
-  }, path);
+  await follow(page, path);
   const main = page.locator("main[data-screen]");
   await expect.poll(async () => screenOf((await main.getAttribute("data-screen")) ?? "")).toBe(screenOf(path));
 }
@@ -47,11 +58,55 @@ function screenOf(address: string): string {
   return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
-/** A journey's page, once derived and its canvas drawn. */
+/** A journey's page, PLAN, GRAPH, once derived and its canvas drawn. */
 export async function openJourney(page: Page, host: HostKind, journey: string, query = ""): Promise<void> {
-  await open(page, host, `/journeys/${journey}${query}`);
-  await expect(page.getByTestId("derivation")).toBeVisible();
+  await open(page, host, `/journeys/${journey}/plan/graph${query}`);
+  await expect(page.getByTestId("derivation")).toBeAttached();
   await expect(page.getByTestId("node-card").first()).toBeVisible();
+}
+
+/**
+ * Opens journey `journey`'s page at `address` (`next/list`, `plan/timeline`, `summary`, with a
+ * query), with node `node`'s detail beside it when given, once derived. On the browser host the
+ * page's clock is held at noon UTC on `fixedToday` first, so the host derives with that today.
+ */
+export async function openAt(page: Page, host: HostKind, journey: string, address: string, options: { node?: string; fixedToday?: string } = {}): Promise<void> {
+  if (host === "browser" && options.fixedToday !== undefined) {
+    await page.clock.setFixedTime(new Date(`${options.fixedToday}T12:00:00Z`));
+  }
+  const [path = "", query] = address.split("?");
+  await open(page, host, `/journeys/${journey}/${path}${options.node === undefined ? "" : `/nodes/${options.node}`}${query === undefined ? "" : `?${query}`}`);
+  await expect(page.getByTestId("journey-frame")).toBeVisible();
+  await expect(page.getByTestId("derivation")).toBeAttached();
+  if (host === "browser" && options.fixedToday !== undefined) {
+    await expect(page.getByTestId("derivation")).toHaveAttribute("data-today", options.fixedToday);
+  }
+}
+
+/** Opens the toolbar's filter, unless it is open. */
+export async function openFilter(page: Page): Promise<void> {
+  if (!(await page.getByTestId("filter-panel").isVisible())) {
+    await page.getByTestId("filter-button").click();
+  }
+  await expect(page.getByTestId("filter-panel")).toBeVisible();
+}
+
+/** Closes the toolbar's filter. */
+export async function closeFilter(page: Page): Promise<void> {
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("filter-panel")).toHaveCount(0);
+}
+
+/** Goes to `page`'s tab (`next` or `plan`) and its projection, as a person does. */
+export async function goTo(page: Page, tab: "next" | "plan", projection: string): Promise<void> {
+  await page.getByTestId(`tab-${tab}`).click();
+  // The switcher has a List on both pages: wait for the page, or the other page's is read.
+  await expect(page.getByTestId(`tab-${tab}`)).toHaveAttribute("aria-current", "page");
+  const switcher = page.getByTestId(`projection-${projection}`);
+  if ((await switcher.getAttribute("aria-current")) !== "page") {
+    await switcher.click();
+  }
+  await expect(switcher).toHaveAttribute("aria-current", "page");
 }
 
 /** Node `node`'s card on the journey's canvas. */

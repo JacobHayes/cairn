@@ -2,6 +2,8 @@
 // page shows them, the toggles, and where the layout put each card.
 import { expect, type Page } from "@playwright/test";
 
+import { closeFilter, openFilter } from "./shell.ts";
+
 /** The keys of the cards on the canvas, sorted. */
 export async function cardKeys(page: Page): Promise<string[]> {
   const keys = await page.getByTestId("node-card").evaluateAll((cards) => cards.map((card) => card.getAttribute("data-node") ?? ""));
@@ -40,11 +42,19 @@ export async function marks(page: Page): Promise<Record<string, string>> {
  * waits for it to hold: a toggle changes the address, and the box follows it.
  */
 export async function toggle(page: Page, name: string, on: boolean): Promise<void> {
+  // A journey's toggles are in the toolbar's filter; a route's are on its canvas page.
+  const filtered = (await page.getByTestId("filter-button").count()) > 0;
+  if (filtered) {
+    await openFilter(page);
+  }
   const control = page.getByTestId(`show-${name}`);
   if ((await control.getAttribute("data-status")) !== (on ? "on" : "off")) {
     await control.locator("input").click();
   }
   await expect(control).toHaveAttribute("data-status", on ? "on" : "off");
+  if (filtered) {
+    await closeFilter(page);
+  }
 }
 
 /** Shows or hides one kind with its toggle (C2). */

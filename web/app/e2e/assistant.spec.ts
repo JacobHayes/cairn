@@ -2,7 +2,7 @@
 // provider. A direct change is applied and reported with links to the node it wrote, and a
 // breakdown asked for comes back as a proposal that opens in proposal review and applies
 // (I5's two paths, I7: applying is the user's click); the conversation is the user's per
-// target, read back on the overview's panel and after a reload, on a route's draft too, with
+// target, read back on the journey page and after a reload, on a route's draft too, with
 // a message being typed kept to its target and a turn that outlives the panel closing; and
 // the in-browser host never shows the panel (capabilities gating). The tests on the server
 // host are tagged @server: the fixture server's scripted model is one for the whole server, so
@@ -11,7 +11,7 @@ import { expect, test } from "@playwright/test";
 
 import { startVendorJourney } from "./acting.ts";
 import { ask, openPanel, patchId, script } from "./assistant.ts";
-import { openOverview } from "./around.ts";
+import { openJourneyCard } from "./around.ts";
 import { state } from "./detail.ts";
 import { confirmAndApply, reviewOpen } from "./proposals.ts";
 import { goWithin, nodePanel, open, openJourney } from "./shell.ts";
@@ -63,9 +63,9 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
   await expect(page.getByTestId("assistant-panel").getByTestId("review-proposal")).toHaveCount(1);
 });
 
-test("I5: the conversation is kept per target, read back on the overview and after a reload, a route's draft its own", { tag: "@server" }, async ({ page }) => {
+test("I5: the conversation is kept per target, read back on the journey card page and after a reload, a route's draft its own", { tag: "@server" }, async ({ page }) => {
   const journey = await startVendorJourney(page);
-  await openOverview(page, "server", journey);
+  await openJourneyCard(page, "server", journey);
   const panel = await openPanel(page);
   await expect(panel).toHaveAttribute("data-target", `journey:${journey}`);
   await script(page, [{ say: "Nothing is overdue yet; the plan comes first." }]);
@@ -84,8 +84,7 @@ test("I5: the conversation is kept per target, read back on the overview and aft
 test("capabilities gating: the in-browser host never shows the panel", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval");
   await expect(page.getByTestId("assistant-toggle")).toHaveCount(0);
-  await openOverview(page, "browser", "j_vendor_eval");
-  await expect(page.getByTestId("overview")).toBeVisible();
+  await openJourneyCard(page, "browser", "j_vendor_eval");
   await expect(page.getByTestId("assistant-toggle")).toHaveCount(0);
   await openJourney(page, "server", "j_vendor_eval");
   await expect(page.getByTestId("assistant-toggle")).toHaveCount(1);
@@ -95,12 +94,12 @@ test("I5: a message typed about one journey stays with it, and a turn outlives t
   const first = await startVendorJourney(page);
   const second = await startVendorJourney(page);
   await openJourney(page, "server", second);
-  await goWithin(page, `/journeys/${first}`);
+  await goWithin(page, `/journeys/${first}/plan/graph`);
   await expect(page.getByTestId("journey-name")).toBeVisible();
   const panel = await openPanel(page);
   await panel.getByTestId("assistant-message").fill("About the first journey.");
   // Back to a journey the tab already holds, so the page does not pass through loading.
-  await goWithin(page, `/journeys/${second}`);
+  await goWithin(page, `/journeys/${second}/plan/graph`);
   await expect(page.getByTestId("assistant-panel")).toHaveAttribute("data-target", `journey:${second}`);
   await expect(page.getByTestId("assistant-message")).toHaveValue("");
 

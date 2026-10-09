@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 
 import { annotate, dateChain, flag, openNode, pin, section, state } from "./detail.ts";
-import { fresh, openFromCanvas } from "./shell.ts";
+import { fresh, nodePanel, openAt, openFromCanvas } from "./shell.ts";
 
 test("the final report's detail reads its due chain and what to edit (C8, F7)", async ({ page }) => {
   const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
@@ -155,6 +155,16 @@ test("a rejection and an unsent bypass reason survive a reload (D4)", async ({ p
   await panel.getByTestId("bypass").getByLabel("Why bypass the guard").fill(reason);
   await page.reload();
   await expect(page.getByTestId("node-detail").getByTestId("bypass").getByLabel("Why bypass the guard")).toHaveValue(reason);
+});
+
+test("on a narrow screen the panel follows the journey's header and toolbar, with nothing off the side", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 800 });
+  await openAt(page, "browser", "j_vendor_eval", "plan/graph", { node: "n_final_report" });
+  const panel = nodePanel(page, "n_final_report");
+  await expect(panel).toBeVisible();
+  const [panelBox, toolbarBox] = [await panel.boundingBox(), await page.getByTestId("journey-toolbar").boundingBox()];
+  expect((toolbarBox?.y ?? 0) < (panelBox?.y ?? 0)).toBe(true);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test("over the server, a resolution never overwrites a pin someone set meanwhile (F5, H5)", { tag: "@server" }, async ({ context }) => {

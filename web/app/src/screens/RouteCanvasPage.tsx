@@ -20,7 +20,7 @@ import { useLaidOut } from "../canvas/hooks.ts";
 import { KindToggles } from "../canvas/KindToggles.tsx";
 import { cardsOf, linesOf, type CanvasModel } from "../canvas/model.ts";
 import type { CardActions } from "../canvas/NodeCard.tsx";
-import { layoutViewOf, paramsOf, searchOf, viewFrom, type CanvasView } from "../canvas/settings.ts";
+import { graphQueryFromOld, layoutViewOf, paramsOf, searchOf, viewFrom, type CanvasView } from "../canvas/settings.ts";
 import type { Level, Route } from "../data/host.ts";
 import { useDeployment, useSession } from "../data/react.ts";
 import type { Schema } from "@cairn/client";
@@ -191,7 +191,9 @@ export function RouteCanvasPage() {
   const { search } = useLocation();
   const navigate = useNavigate();
   const params = useMemo(() => new URLSearchParams(search), [search]);
-  const view = useMemo(() => viewFrom(params), [params]);
+  // The route's own parameters (`version`) are not the canvas's: `routeCanvasPath` sets them. A
+  // saved address from before the canvas's parameters were renamed reads as it did.
+  const view = useMemo(() => ({ ...viewFrom(graphQueryFromOld(params)), rest: [] }), [params]);
   const asked = params.get("version");
   const version = asked === null ? undefined : Number(asked);
   const read = useRouteGraph(id, version);

@@ -1,7 +1,8 @@
-// C16: the journey index. Every journey the filters keep (status, lineage route and version,
-// "mine", "upgrade available"), each with its status, lineage, and whether an upgrade is
-// available, kept current (H6). "Upgrade available" is the host's field on each journey,
-// never worked out here. "Mine" keeps the journeys where the caller holds something.
+// C16: the journey index, a table: each journey with its route and version, status, progress,
+// next milestone, one flag, and what is the viewer's (Figures.tsx). It keeps every journey the
+// filters keep (status, lineage route and version, "mine", "upgrade available"), kept current
+// (H6). "Upgrade available" is the host's field on each journey, never worked out here.
+// "Mine" keeps the journeys where the caller holds something.
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { journeyIndex, indexKey, routeIndex, type JourneySummary, type RouteSummary } from "../data/reads.ts";
@@ -9,6 +10,7 @@ import { useLive, useViewer } from "../data/react.ts";
 import { Badge } from "../ui/kit.tsx";
 import { filtersFrom, indexPath, newJourneyPath, overviewPath, queryOf, type IndexFilters } from "./address.ts";
 import { IndexFilterBar } from "./IndexFilterBar.tsx";
+import { Figures } from "./Figures.tsx";
 import { useMineCounts, useMineOf, useReportMine } from "./mine.ts";
 import { routeDetailPath } from "../routes/address.ts";
 
@@ -35,20 +37,13 @@ export function LineageCell({ summary, routes }: { summary: JourneySummary; rout
   );
 }
 
-export function JourneyRow({ summary, routes, mine }: { summary: JourneySummary; routes: readonly RouteSummary[]; mine?: number }) {
+/** A journey's name, route and status: the cells that need nothing derived. */
+export function JourneyCells({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
   return (
-    <tr data-testid="journey-row" data-journey={summary.id} data-status={summary.status}>
+    <>
       <td>
-        <Link to={`/journeys/${summary.id}`}>{summary.name}</Link>
-        <div className="row">
-          <span className="muted mono">{summary.id}</span>
-          <Link to={overviewPath(summary.id)} className="muted small" data-testid="row-overview">
-            Overview
-          </Link>
-        </div>
-      </td>
-      <td>
-        <Badge>{summary.status}</Badge>
+        <Link to={overviewPath(summary.id)}>{summary.name}</Link>
+        <div className="muted mono">{summary.id}</div>
       </td>
       <td>
         <span className="stack">
@@ -56,7 +51,18 @@ export function JourneyRow({ summary, routes, mine }: { summary: JourneySummary;
           <UpgradeMark summary={summary} />
         </span>
       </td>
-      <td className="mono">{mine === undefined ? summary.revision : `${String(mine)} mine`}</td>
+      <td>
+        <Badge>{summary.status}</Badge>
+      </td>
+    </>
+  );
+}
+
+export function JourneyRow({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
+  return (
+    <tr data-testid="journey-row" data-journey={summary.id} data-status={summary.status} data-revision={summary.revision}>
+      <JourneyCells summary={summary} routes={routes} />
+      <Figures id={summary.id} />
     </tr>
   );
 }
@@ -68,7 +74,7 @@ function MineRow({ summary, routes, report }: { summary: JourneySummary; routes:
   if (mine.status === "failed") {
     return (
       <tr data-testid="journey-row-failed" data-journey={summary.id}>
-        <td colSpan={4} className="callout callout-bad">
+        <td colSpan={7} className="callout callout-bad">
           What is yours in {summary.name} could not be read: {mine.message}
         </td>
       </tr>
@@ -77,7 +83,7 @@ function MineRow({ summary, routes, report }: { summary: JourneySummary; routes:
   if (mine.status !== "ready" || mine.entries.length === 0) {
     return null;
   }
-  return <JourneyRow summary={summary} routes={routes} mine={mine.entries.length} />;
+  return <JourneyRow summary={summary} routes={routes} />;
 }
 
 function Rows({ filters, items, routes }: { filters: IndexFilters; items: JourneySummary[]; routes: RouteSummary[] }) {
@@ -95,9 +101,12 @@ function Rows({ filters, items, routes }: { filters: IndexFilters; items: Journe
           <thead>
             <tr>
               <th>Journey</th>
+              <th>Route</th>
               <th>Status</th>
-              <th>Lineage</th>
-              <th>{filters.mine ? "Yours" : "Revision"}</th>
+              <th>Progress</th>
+              <th>Next milestone</th>
+              <th>Flag</th>
+              <th>Mine</th>
             </tr>
           </thead>
         )}

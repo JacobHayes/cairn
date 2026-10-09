@@ -131,9 +131,22 @@ function Item({ annotation, write, onEdit }: { annotation: Annotation; write: No
 
 /**
  * G1: notes and links on `node`, or on the journey itself when `node` is null, with the form
- * that adds or edits one; `summary` heads the section.
+ * that adds or edits one; `summary` heads the section, unless a fold of the caller's own
+ * holds it (`bare`).
  */
-export function AnnotationList({ view, node, annotations, summary }: { view: Ready; node: string | null; annotations: Annotation[]; summary: string }) {
+export function AnnotationList({
+  view,
+  node,
+  annotations,
+  summary,
+  bare = false,
+}: {
+  view: Ready;
+  node: string | null;
+  annotations: Annotation[];
+  summary?: string;
+  bare?: boolean;
+}) {
   const write = useNodeWrite(view, `annotations:${node ?? "journey"}`);
   const form = useFormDraft<AnnotationDraft>(write.journey, node ?? "journey", "annotation");
   const types = node === null ? ANNOTATION_TYPES.filter((type) => type !== "artifact") : ANNOTATION_TYPES;
@@ -141,8 +154,8 @@ export function AnnotationList({ view, node, annotations, summary }: { view: Rea
     const { type, text } = contentOf(annotation.body);
     form.open({ key: annotation.body.key, adding: false, type, title: annotation.body.title ?? "", text }, write.seen);
   };
-  return (
-    <Section title="Notes and links" summary={summary} open testId="annotations">
+  const body = (
+    <>
       {annotations.length === 0 ? <span className="muted small">None yet.</span> : null}
       <ul className="checklist stack">
         {annotations.map((annotation) => (
@@ -159,6 +172,15 @@ export function AnnotationList({ view, node, annotations, summary }: { view: Rea
         <Editor write={write} node={node} form={form} types={types} />
       )}
       <Rejected view={view} write={write} onResolved={form.close} />
+    </>
+  );
+  return bare ? (
+    <div className="stack" data-testid="annotations">
+      {body}
+    </div>
+  ) : (
+    <Section title="Notes and links" summary={summary} open testId="annotations">
+      {body}
     </Section>
   );
 }

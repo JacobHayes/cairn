@@ -9,6 +9,7 @@ import {
   countDocumentFetches,
   derivedRevision,
   fresh,
+  goTo,
   goWithin,
   nodeCard,
   open,
@@ -78,6 +79,7 @@ test("a later page shows the edit", { tag: "@server" }, async ({ context }) => {
   await two.getByRole("link", { name: "Journeys" }).click();
   await expect(two.getByRole("link", { name: "Launch the reporting release" })).toBeVisible();
   await two.getByRole("link", { name: "Launch the reporting release" }).click();
+  await goTo(two, "plan", "graph");
   await expect(title(two, "n_docs")).toHaveText(renamed);
   await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
   const later = await context.newPage();
@@ -137,7 +139,7 @@ test("version skew stops the tab and asks for a reload, keeping unsent edits", {
   expect(await derivedRevision(two)).toBe(held);
   await two.unroute("**/api/journeys/j_vendor_eval/document");
   await two.getByRole("button", { name: "Reload" }).click();
-  await expect(two.getByTestId("derivation")).toBeVisible();
+  await expect(two.getByTestId("derivation")).toBeAttached();
   await expect(two.getByTestId("skew")).toHaveCount(0);
   await expect(renameOf(two, "n_criteria").getByRole("textbox")).toHaveValue(unsent);
   expect(await derivedRevision(two)).toBe(await derivedRevision(one));
@@ -150,6 +152,7 @@ test("an address that names no journey is shown missing, and the tab stays live"
   await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
   await two.getByRole("link", { name: "Journeys", exact: true }).click();
   await two.getByRole("link", { name: "Launch the reporting release" }).click();
+  await goTo(two, "plan", "graph");
   await openJourney(one, "server", "j_launch");
   const renamed = fresh("Announcement");
   await rename(one, "n_announcement", renamed);
@@ -193,14 +196,14 @@ test("a draft follows its journey, not the screen it was typed on", { tag: "@ser
   const copy = await journeyFromHiringRoute(page.request);
   await openJourney(page, "server", copy);
   await expect(nodeCard(page, "n_offer")).toBeVisible();
-  await open(page, "server", "/journeys/j_hiring");
-  await expect(page.getByTestId("derivation")).toBeVisible();
+  await open(page, "server", "/journeys/j_hiring/plan/graph");
+  await expect(page.getByTestId("derivation")).toBeAttached();
   const draft = fresh("Offer, j_hiring's draft");
   await startRename(page, "n_offer", draft);
-  await goWithin(page, `/journeys/${copy}/nodes/n_offer`);
+  await goWithin(page, `/journeys/${copy}/plan/graph/nodes/n_offer`);
   await expect(page.getByTestId("journey-name")).toContainText("Hiring copy");
   await expect(renameOf(page, "n_offer").getByRole("button", { name: /^Rename/ })).toBeVisible();
   await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveCount(0);
-  await goWithin(page, "/journeys/j_hiring/nodes/n_offer");
+  await goWithin(page, "/journeys/j_hiring/plan/graph/nodes/n_offer");
   await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveValue(draft);
 });

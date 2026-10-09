@@ -1,9 +1,9 @@
 // C9: the list. The journey flattened to a table with every filter, grouping by container,
 // sort by one signal, text search, and multi-select for bulk actions (BulkBar.tsx). The
 // engine's `list` projection answers it from the tab's derivation a page at a time; what it
-// shows lives in the address.
+// shows lives in the address. It is PLAN, LIST: the journey page (screens/JourneyFrame.tsx)
+// holds its toolbar and the filters it opens (ListFilters).
 import { Fragment, useMemo, useState } from "react";
-import { useLocation, useNavigate, useParams } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
 import type { Ready } from "../detail/model.ts";
@@ -11,13 +11,12 @@ import { entityName } from "../detail/sections.tsx";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { selectionOf } from "./acts.ts";
-import { listFrom, listPath, listQueryOf, type ListSettings } from "./address.ts";
+import { listQueryOf, type ListSettings } from "./address.ts";
 import { BulkBar } from "./BulkBar.tsx";
-import { ActingFrame } from "./Frame.tsx";
-import { ListFilters } from "./ListFilters.tsx";
 import { Crumb, DetailLink, Flags } from "./Parts.tsx";
 import { byContainer } from "./rows.ts";
 import type { NodeRow } from "./why.ts";
+import "./acting.css";
 
 const COLUMNS = ["Node", "Kind", "State", "Owner", "Due", "Slack", "Gravity", "Leverage", "Rank", "Flags"];
 
@@ -80,9 +79,8 @@ function Table({ view, rows, settings, chosen, onToggle }: { view: Ready; rows: 
   );
 }
 
-function ListBody({ view, settings }: { view: Ready; settings: ListSettings }) {
-  const navigate = useNavigate();
-  const journey = view.journey.header.id;
+/** PLAN, LIST: keyed by the address's query by its caller, so a new query starts from its first page with nothing selected. */
+export function ListBody({ view, settings }: { view: Ready; settings: ListSettings }) {
   const [cursors, setCursors] = useState<number[]>([]);
   const [chosen, setChosen] = useState<Set<string>>(new Set());
   const cursor = cursors.at(-1);
@@ -100,7 +98,6 @@ function ListBody({ view, settings }: { view: Ready; settings: ListSettings }) {
   };
   return (
     <section className="stack" aria-label="List" data-testid="list">
-      <ListFilters view={view} settings={settings} onChange={(changed) => void navigate(listPath(journey, changed))} />
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
       <div className="row">
         <span className="muted small" data-testid="list-total" data-total={page?.total ?? ""}>
@@ -114,17 +111,5 @@ function ListBody({ view, settings }: { view: Ready; settings: ListSettings }) {
       {selected.length === 0 ? null : <BulkBar view={view} selected={selected} hidden={selected.filter((facts) => !rows.some((row) => row.key === facts.node.key)).length} onLanded={() => { setChosen(new Set()); }} />}
       <Table view={view} rows={rows} settings={settings} chosen={chosen} onToggle={toggle} />
     </section>
-  );
-}
-
-export function ListScreen() {
-  const { id = "" } = useParams();
-  const { search } = useLocation();
-  const settings = useMemo(() => listFrom(new URLSearchParams(search)), [search]);
-  // A new query starts from its first page with nothing selected.
-  return (
-    <ActingFrame key={id} id={id} screen="list">
-      {(view) => <ListBody key={search} view={view} settings={settings} />}
-    </ActingFrame>
   );
 }
