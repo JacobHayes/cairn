@@ -14,7 +14,7 @@ import { Check, Checks } from "../acting/Controls.tsx";
 import { ListFilters } from "../acting/ListFilters.tsx";
 import { NextControls } from "../acting/NextScreen.tsx";
 import { TriageControls } from "../acting/TriageScreen.tsx";
-import { KindToggles } from "../canvas/KindToggles.tsx";
+import { GraphFilters } from "../canvas/KindToggles.tsx";
 import { canvasPath, viewFrom } from "../canvas/settings.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
 import {
@@ -74,10 +74,7 @@ function FilterBody({ ready, page, projection, node, search }: { ready: Ready; p
   if (projection === "list") {
     return <ListFilters view={ready} settings={listFrom(params)} onChange={(next) => void navigate(listPath(journey, next, node))} />;
   }
-  if (params.get("decisions") === "1") {
-    return <DecisionsOnly />;
-  }
-  return <KindToggles view={viewFrom(params)} journey onChange={(next) => void navigate(canvasPath(journey, next, node))} />;
+  return <GraphFilters view={viewFrom(params)} onChange={(next) => void navigate(canvasPath(journey, next, node))} />;
 }
 
 function Search({ text, onSearch }: { text: string; onSearch: (text: string) => void }) {

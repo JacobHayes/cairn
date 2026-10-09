@@ -6,7 +6,8 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
 import { addEntity, journeyName, mergeEntities, startJourney } from "./around.ts";
-import { fresh, live, nodeCard, open, openJourney } from "./shell.ts";
+import { section } from "./detail.ts";
+import { fresh, live, open, openFromCanvas, openJourney } from "./shell.ts";
 
 const patchId = () => `p_${crypto.randomUUID().replaceAll("-", "")}`;
 
@@ -52,9 +53,11 @@ test("H6, E6: an entity merge in one page changes the owner another page shows",
   await openJourney(two, "server", journey);
   await live(two);
   const survivor = (await one.locator(`[data-testid="entity"][data-entity="${second}"]`).getByTestId("entity-name").textContent()) ?? "";
-  await expect(nodeCard(two, "n_task").getByTestId("card-owner")).not.toContainText(survivor);
+  // The card names an owner only when it is the viewer or missing: the node's detail names this one.
+  const owners = await section(await openFromCanvas(two, "n_task"), "participations");
+  await expect(owners).not.toContainText(survivor);
   await mergeEntities(one, second, first);
-  await expect(nodeCard(two, "n_task").getByTestId("card-owner")).toContainText(survivor);
+  await expect(owners).toContainText(survivor);
 });
 
 test("H3: an identity signed in with the stub issuer links to the user, and its verified email names their entity", { tag: "@server" }, async ({ page }) => {

@@ -1,8 +1,8 @@
 // What each projection draws on the journey's pages, from the screens that already drew them
 // (the later tracks redesign each one): NEXT, LIST and CARDS; PLAN, GRAPH, LIST and TIMELINE.
-// The graph with DECISIONS on is the decision view (C12), and without it the canvas (C1 to
-// C7); its crumbs, stalled surface and, in edit mode, the structure's tools (5.6) are the
-// head's (CanvasBars).
+// The graph with DECISIONS on is the decision view (C12): the same canvas at least at the
+// Decisions step, with everything else faded; its stalled surface and, in edit mode, the
+// structure's tools (5.6) are the head's (CanvasBars).
 import { useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -16,8 +16,7 @@ import type { Authored } from "../authoring/target.ts";
 import { useProjected } from "../canvas/hooks.ts";
 import { JourneyCanvas } from "../canvas/JourneyCanvas.tsx";
 import { viewFrom } from "../canvas/settings.ts";
-import { Crumbs, StalledSurface } from "../canvas/Surfaces.tsx";
-import { DecisionCanvas } from "../decisions/DecisionView.tsx";
+import { StalledSurface } from "../canvas/Surfaces.tsx";
 import type { Ready } from "../detail/model.ts";
 import type { JourneyPage, Projection } from "../journeys/address.ts";
 import { TimelineChart, timelineFrom } from "../timeline/TimelineView.tsx";
@@ -46,25 +45,26 @@ export interface ProjectionProps {
   page: JourneyPage;
   projection: Projection;
   selected: string | undefined;
+  /** The edge whose card is open, as `<from>~<to>`. */
+  edge: string | undefined;
   /** In edit mode, the journey's structure as authored, and the edge being drawn (5.6). */
   authored: Authored | undefined;
   drawing: ReturnType<typeof useEdgeDrawing>;
 }
 
-/** The canvas's own bars, which stay with the head: the structure's tools (edit mode), the breadcrumbs and the stalled surface. */
+/** The canvas's own bars, which stay with the head: the structure's tools (edit mode) and the stalled surface. */
 export function CanvasBars({ ready, authored, drawing }: Pick<ProjectionProps, "ready" | "authored" | "drawing">) {
   const { search } = useLocation();
   const view = useMemo(() => viewFrom(new URLSearchParams(search)), [search]);
   return (
     <>
       {authored === undefined ? null : <JourneyAuthoringBar authored={authored} view={view} drawing={drawing} />}
-      <Crumbs ready={ready} view={view} />
       <StalledSurface ready={ready} view={view} />
     </>
   );
 }
 
-export function ProjectionBody({ ready, page, projection, selected, authored, drawing }: ProjectionProps) {
+export function ProjectionBody({ ready, page, projection, selected, edge, authored, drawing }: ProjectionProps) {
   const { search } = useLocation();
   const navigate = useNavigate();
   const params = useMemo(() => new URLSearchParams(search), [search]);
@@ -81,8 +81,5 @@ export function ProjectionBody({ ready, page, projection, selected, authored, dr
   if (projection === "timeline") {
     return <ProjectedTimeline ready={ready} selected={selected} />;
   }
-  if (params.get("decisions") === "1") {
-    return <DecisionCanvas ready={ready} selected={selected} />;
-  }
-  return <JourneyCanvas ready={ready} view={viewFrom(params)} selected={selected} onPick={authored === undefined ? undefined : drawing.pick} />;
+  return <JourneyCanvas ready={ready} view={viewFrom(params)} selected={selected} edge={edge} decisions={params.get("decisions") === "1"} onPick={authored === undefined ? undefined : drawing.pick} />;
 }

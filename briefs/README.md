@@ -67,14 +67,12 @@ The shape every brief follows.
 | 8.5 | Sync chip | `web/app` | 8.4 | landed |
 | 8.6 | Journey pages, navigation, and addresses | `web/app` | 8.4, 8.1 | landed |
 | 8.7 | Inspector | `web/app` | 8.4, 8.1 (second part: 8.2, 8.3) | landed |
-| 8.8 | Graph | `web/app` | 8.4, 8.1, 8.3 (subtree-gravity chip: 8.2) | planned |
+| 8.8 | Graph | `web/app` | 8.4, 8.1, 8.3 (subtree-gravity chip: 8.2) | landed |
 | 8.9 | Next page | `web/app` | 8.5, 8.6, 8.7 | landed |
 | 8.10 | Plan list and timeline | `crates/schema`, `crates/engine`, `crates/api`, `openapi/`, `web/client`, `web/wasm`, `web/app` | 8.6, 8.1 (Affects: 8.3) | landed |
 | 8.11 | Authoring and proposal review in the frame | `web/app` | 8.6, 8.7, 8.8 | planned |
 
 Rule for links between screens: a screen only links to screens that already exist. The brief that builds a screen adds the entry points into it from earlier screens (5.7 adds "break down" to triage and the upgrade, save-as-route, and re-link entries to the overview; 5.8 mounts its panel on earlier screens).
-
-Until 8.8 lands, the graph still filters per kind, drills into a container with `open=`, shows not-relevant nodes by default, sets a card's border from its gravity, and does not draw the layout's own edge sections. PRD C1, C2, C4 and C6 and ARCHITECTURE's Canvas section describe the state 8.8 delivers.
 
 ## Order
 

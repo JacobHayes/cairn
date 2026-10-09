@@ -128,7 +128,7 @@ test("E6: two entities merged, the journey reads the survivor and its history is
   await expect(page.locator(`[data-testid="entity"][data-entity="${director}"]`).getByTestId("entity-emails")).toContainText("lead@example.org");
   await expect(page.locator('[data-testid="entity"][data-entity="e_lead"]')).toHaveCount(0);
   await openJourney(page, "browser", "j_vendor_eval");
-  await expect(nodeCard(page, "n_plan").getByTestId("card-owner")).toContainText("Evaluation Director");
+  await expect(nodeCard(page, "n_plan").getByTestId("card-owner")).toHaveAttribute("title", /Evaluation Director/);
   const after = await section(await openFromCanvas(page, "n_who_owns"), "history");
   await expect(after.getByTestId("history-patch")).toHaveCount(before);
 });

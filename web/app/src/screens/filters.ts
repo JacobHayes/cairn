@@ -6,7 +6,7 @@
 // without a page.
 import { listFrom, listPath, nextFrom, nextPath, triageFrom, triagePath, type ListFlag } from "../acting/address.ts";
 import { KINDS } from "../canvas/model.ts";
-import { canvasPath, viewFrom, withKind } from "../canvas/settings.ts";
+import { canvasPath, viewFrom } from "../canvas/settings.ts";
 import { pagePath, withMineFlipped, withParam, type JourneyPage, type Projection } from "../journeys/address.ts";
 import { stateWord } from "../status/words.ts";
 
@@ -53,16 +53,12 @@ function timelineFilters(journey: string, page: JourneyPage, search: string, nod
   return filters;
 }
 
-/** The canvas's filters: each kind and relevance it leaves out. */
+/** The graph's filters: the kinds kept in focus (the rest fade), and conditional nodes turned off. */
 function graphFilters(journey: string, params: URLSearchParams, node: string | undefined): ActiveFilter[] {
   const view = viewFrom(params);
-  const filters: ActiveFilter[] = KINDS.filter((each) => !view.shown.includes(each)).map((kind) => ({
-    id: `hide-${kind}`,
-    label: `no ${kind}s`,
-    without: canvasPath(journey, withKind(view, kind, true), node),
-  }));
-  if (!view.notRelevant) {
-    filters.push({ id: "hide-not-relevant", label: "no not relevant", without: canvasPath(journey, { ...view, notRelevant: true }, node) });
+  const filters: ActiveFilter[] = [];
+  if (view.shown.length < KINDS.length) {
+    filters.push({ id: "kinds", label: `only ${view.shown.join(", ") || "no kinds"}`, without: canvasPath(journey, { ...view, shown: KINDS }, node) });
   }
   if (!view.undecided) {
     filters.push({ id: "hide-conditional", label: "no conditional", without: canvasPath(journey, { ...view, undecided: true }, node) });
@@ -134,7 +130,7 @@ export function activeFilters(journey: string, page: JourneyPage, projection: Pr
     }
   } else if (projection === "timeline") {
     filters.push(...timelineFilters(journey, page, search, node));
-  } else if (projection === "graph" && params.get("decisions") !== "1") {
+  } else if (projection === "graph") {
     filters.push(...graphFilters(journey, params, node));
   }
   return filters;

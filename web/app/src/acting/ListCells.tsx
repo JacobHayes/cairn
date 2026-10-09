@@ -3,6 +3,7 @@
 // say a signal in words beside its number. A row with nothing to say in a column leaves it blank.
 import { Link } from "react-router";
 
+import { ancestorsOf } from "../canvas/ladder.ts";
 import { DEFAULT_VIEW, canvasPath, revealing } from "../canvas/settings.ts";
 import type { DecisionRow } from "../decisions/model.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
@@ -86,7 +87,7 @@ function Affects({ context, node }: { context: CellContext; node: string }) {
       ? `Decides ${String(decision.affects.length)} ${decision.affects.length === 1 ? "item" : "items"}`
       : [brought > 0 ? `brings in ${String(brought)}` : "", out > 0 ? `drops ${String(out)}` : ""].filter(Boolean).join(", ");
   const kind = nodeOf(context.view, node);
-  const to = kind === undefined ? undefined : canvasPath(context.view.journey.header.id, revealing(DEFAULT_VIEW, kind, context.view.derived.nodes[node]?.display_state), node);
+  const to = kind === undefined ? undefined : canvasPath(context.view.journey.header.id, revealing(DEFAULT_VIEW, { kind: kind.kind, ancestors: ancestorsOf(context.view.journey.graph.nodes ?? [], node) }, context.view.derived.nodes[node]?.display_state), node);
   return to === undefined ? <>{words}</> : <Link to={to} data-testid="affects-link">{words}</Link>;
 }
 

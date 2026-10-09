@@ -1,7 +1,8 @@
-/* The canvas (5.2): nodes, lines, toggles, and the overlays, drawn with Graticule's tokens in light
-   and dark. Quiet by rule (C6): nothing animates or flashes. Node line heights match cards.ts,
-   which sized the layout, so sizes here are px. The canvas fills its region (`.ws-canvas`, which
-   does not scroll) or, where a screen has no such region, a fixed height. */
+/* The canvas (5.4 to 5.8): cards, lines, and what sits over them, drawn with Graticule's tokens in light
+   and dark. Quiet by rule (C6): nothing animates or flashes. A card's row heights match cards.ts, which
+   sized the layout, so sizes here are px. Zoom only switches what a card draws, by `data-lod` on the
+   canvas root (near, mid, far), so the boxes never change size. The canvas fills its region (`.ws-canvas`,
+   which does not scroll) or, where a screen has no such region, a fixed height. */
 
 .canvas {
   height: 420px;
@@ -18,6 +19,12 @@
   border-width: 1px 0 0;
 }
 
+.canvas-root {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
 .canvas .react-flow {
   --xy-background-color: transparent;
   --xy-edge-stroke: var(--color-secondary);
@@ -26,6 +33,159 @@
   --xy-controls-button-color: var(--color-text);
   --xy-controls-button-border-color: var(--color-border);
   background: transparent;
+}
+
+/* The controls as square hairline buttons (5.8). */
+.canvas .react-flow__controls {
+  box-shadow: none;
+  gap: 4px;
+  display: flex;
+  flex-direction: column;
+}
+
+.canvas .react-flow__controls-button {
+  width: 28px;
+  height: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: 0;
+  background: var(--color-surface);
+}
+
+.canvas .react-flow__panel {
+  margin: var(--space-3);
+}
+
+.canvas-panel {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  font-size: 14px;
+}
+
+.canvas-panel .segmented :is(label, button) {
+  font: 500 14px / 1.4 var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+  background: var(--color-surface);
+}
+
+.canvas-view {
+  gap: var(--space-2);
+}
+
+.canvas-lens-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  padding: 0 var(--space-2);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font: 500 12px / 24px var(--font-mono);
+}
+
+.canvas-lens-chip button {
+  min-height: 0;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: var(--color-secondary);
+}
+
+/* The trace bar and the Select band: one slim line at the top. */
+/* The ladder's row: the trace bar follows it and wraps under it, never over the View menu. */
+.canvas .canvas-top {
+  max-width: calc(100% - 220px);
+}
+
+/* The ladder keeps its own paper, so a card panned under it never reads through. */
+.canvas-top .segmented {
+  background: var(--color-surface);
+}
+
+/* On a phone the trace bar is a row of its own under the ladder, and a long title is cut short. */
+@media (max-width: 719px) {
+  .canvas .canvas-top {
+    max-width: 100%;
+  }
+
+  .canvas-top > .canvas-trace {
+    flex: 1 1 100%;
+  }
+}
+
+.canvas-trace {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  gap: var(--space-3);
+}
+
+.canvas-trace strong {
+  min-width: 0;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The counts are told apart by a dot, so "10 4" never reads as one number. */
+.canvas-trace > span + span::before {
+  content: "\00b7";
+  margin-right: var(--space-3);
+  color: var(--color-secondary);
+}
+
+.canvas-trace .link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-decoration: underline;
+}
+
+/* Beside the zoom controls, not over them. */
+.canvas .canvas-hidden {
+  margin-left: 62px;
+  padding: var(--space-1) var(--space-3);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  font-size: 14px;
+}
+
+.canvas-hidden .link {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--color-text);
+  font: inherit;
+  text-decoration: underline;
+}
+
+.canvas-key {
+  display: grid;
+  gap: var(--space-2);
+  margin: var(--space-2) 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 14px;
+}
+
+.canvas-key li {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.canvas-key svg {
+  flex: none;
+  color: var(--color-secondary);
 }
 
 .toggles {
@@ -50,73 +210,121 @@
   font-size: 14px;
 }
 
-/* Nodes: a paper card, square, with a hairline. A card's border width is its gravity (C6). */
+/* Edge hover (5.7): a chip at the pointer says what the line is. */
+.edge-hover {
+  position: absolute;
+  z-index: 10;
+  max-width: 320px;
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-primary);
+  color: var(--rail-ink);
+  font-size: 14px;
+  line-height: 1.4;
+  pointer-events: none;
+}
+
+/* ---- cards (5.5) ------------------------------------------------------------------------------ */
+
+/* Paper, a hairline, and DESIGN's four corner ticks (L-shaped, 8px, inset 3px). */
 .node {
+  --tick: linear-gradient(var(--color-tick), var(--color-tick));
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  border-style: solid;
-  border-color: var(--color-border);
+  border: 1px solid var(--color-border);
   border-radius: var(--radius-none);
-  background: var(--color-surface);
+  background:
+    var(--tick) left 3px top 3px / 8px 1px no-repeat,
+    var(--tick) left 3px top 3px / 1px 8px no-repeat,
+    var(--tick) right 3px top 3px / 8px 1px no-repeat,
+    var(--tick) right 3px top 3px / 1px 8px no-repeat,
+    var(--tick) left 3px bottom 3px / 8px 1px no-repeat,
+    var(--tick) left 3px bottom 3px / 1px 8px no-repeat,
+    var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
+    var(--tick) right 3px bottom 3px / 1px 8px no-repeat,
+    var(--color-surface);
   color: var(--color-text);
   font-size: 13px;
-  line-height: 18px;
+  line-height: 21px;
   box-shadow: var(--shadow-sm);
   position: relative;
 }
 
+/* An open container is a frame: its children sit on the paper below its head. */
 .node-container {
-  background: color-mix(in srgb, var(--color-surface) 55%, transparent);
+  background:
+    var(--tick) left 3px top 3px / 8px 1px no-repeat,
+    var(--tick) left 3px top 3px / 1px 8px no-repeat,
+    var(--tick) right 3px top 3px / 8px 1px no-repeat,
+    var(--tick) right 3px top 3px / 1px 8px no-repeat,
+    var(--tick) left 3px bottom 3px / 8px 1px no-repeat,
+    var(--tick) left 3px bottom 3px / 1px 8px no-repeat,
+    var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
+    var(--tick) right 3px bottom 3px / 1px 8px no-repeat,
+    color-mix(in srgb, var(--color-surface) 55%, transparent);
 }
 
-.node-body {
+.node-inner {
+  box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  gap: 4px;
   min-width: 0;
-}
-
-.node-line {
-  height: 18px;
-  overflow: hidden;
-  white-space: nowrap;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
-
-.node-line-wrap {
-  white-space: normal;
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
+  padding: 10px 12px;
 }
 
 .node-head {
   display: flex;
   gap: var(--space-2);
   align-items: center;
+  height: 24px;
 }
 
-.node-kind {
-  font: 500 11px / 18px var(--font-mono);
+.node-kind,
+.node-current {
+  font: 500 12px / 24px var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   color: var(--color-secondary);
 }
 
-.node-state {
-  font: 500 11px / 18px var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-  color: var(--color-muted);
+.node-current {
+  color: var(--color-text);
+}
+
+.node-current::before {
+  content: "\00b7\00a0";
+}
+
+.node .badge {
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.node-title-row {
+  display: flex;
+  gap: var(--space-2);
+  min-width: 0;
+  height: var(--title-h);
 }
 
 .node-title {
-  font-weight: 600;
-  font-size: 14px;
+  flex: 1 1 0;
+  min-width: 0;
+  font: 600 15px / 21px var(--font-body);
+}
+
+.node-title > *,
+.node-open {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  width: 100%;
 }
 
 .node-open,
-.node-drill,
+.node-control,
 .node-marker {
   font: inherit;
   color: inherit;
@@ -128,22 +336,115 @@
   text-align: left;
 }
 
-.node-open {
-  width: 100%;
-  overflow: hidden;
-}
-
 .node-open:hover,
 .node-open:focus-visible {
   text-decoration: underline;
 }
 
-.node-drill {
-  font: 500 11px / 18px var(--font-mono);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
+.node-control {
+  font: 500 12px / 24px var(--font-mono);
   color: var(--color-secondary);
   text-decoration: underline;
+}
+
+/* The plus and minus of expand in place: a small square hairline button. */
+.node-toggle {
+  width: 22px;
+  height: 22px;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  font: 500 15px / 20px var(--font-mono);
+  text-align: center;
+  text-decoration: none;
+}
+
+.node-toggle:hover {
+  border-color: var(--color-secondary);
+}
+
+.node-body-line {
+  height: 21px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font: 400 13px / 21px var(--font-body);
+}
+
+.node-answer strong {
+  font-weight: 600;
+}
+
+.node-why {
+  margin-left: var(--space-2);
+  color: var(--color-secondary);
+  cursor: help;
+}
+
+.node-progress {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+}
+
+.node-meter {
+  flex: none;
+  width: 36px;
+  height: 4px;
+  background: var(--color-border);
+}
+
+.node-meter > span {
+  display: block;
+  height: 100%;
+  background: var(--color-text);
+}
+
+.node-flag {
+  margin-left: auto;
+  color: var(--color-secondary);
+}
+
+.node-flag.warn {
+  color: var(--color-warning);
+}
+
+.node-flag.bad {
+  color: var(--color-error);
+}
+
+.node-flag.good {
+  color: var(--color-success);
+}
+
+.node-depends {
+  color: var(--color-secondary);
+}
+
+.node-foot {
+  display: flex;
+  gap: var(--space-2);
+  height: 22px;
+  font: 500 12.5px / 22px var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-secondary);
+}
+
+.node-date.warn {
+  color: var(--color-warning);
+}
+
+.node-date.bad {
+  color: var(--color-error);
+}
+
+.node-owner {
+  color: var(--color-text);
+  font-weight: 600;
+}
+
+.node-owner.warn {
+  color: var(--color-warning);
 }
 
 .node-marker {
@@ -151,61 +452,35 @@
   text-decoration: underline dotted;
 }
 
-.node-prompt {
-  font-style: italic;
-}
-
-.node-dates .badge,
-.node-badges .badge {
-  font-size: 10.5px;
-  line-height: 16px;
-  padding: 0 5px;
-}
-
-.node-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 2px 4px;
-  overflow: hidden;
-  align-content: flex-start;
-}
-
-.node-checklist {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-}
-
-.node-check {
-  display: inline-block;
-  width: 9px;
-  height: 9px;
-  margin-right: 6px;
-  border: 1px solid var(--color-secondary);
-  vertical-align: middle;
-}
-
-.node-check-done {
-  background: var(--color-success);
-  border-color: var(--color-success);
-}
-
 .node-handle {
   opacity: 0;
   pointer-events: none;
 }
 
-/* C1: not relevant fades to the ruling; undecided is dashed. */
+/* The state's glyph leads the title at far zoom; its shape says the state (5.4). */
+.node-glyph {
+  display: none;
+  flex: none;
+  font: 600 20px / 21px var(--font-mono);
+}
+
+/* Not relevant, when shown: hollow, the ruling shows through. Conditional: a ghost, dashed, in steel. */
 .node-not-relevant {
   opacity: 0.55;
   background: transparent;
+  box-shadow: none;
 }
 
-.node-undecided {
+.node-conditional {
   border-style: dashed;
-  opacity: 0.7;
   background: transparent;
+  box-shadow: none;
+  color: var(--color-secondary);
+}
+
+/* Finished work recedes to the ramp, so history reads as a path. */
+.node-finished {
+  color: var(--ramp-2);
 }
 
 /* C5: I am here, in ink (structure, not blue). */
@@ -213,19 +488,36 @@
   border-color: var(--color-text);
 }
 
-.node-mine {
-  border-left-color: var(--color-secondary);
-}
-
 /* DESIGN's selection: a 2px accent line on the left edge and the faint tint. */
-.node-selected {
+.node-selected,
+.node-picked {
   background: linear-gradient(var(--color-tint), var(--color-tint)), var(--color-surface);
   box-shadow:
     inset 2px 0 0 var(--color-accent),
     var(--shadow-sm);
 }
 
-/* Overlays (C7's trace; proposal review's diff): a hanging tag, and the card's border in the tone. */
+/* An edge being hovered ends here: both ends get an ink outline. */
+.node-edge-end {
+  outline: 1px solid var(--color-text);
+}
+
+/* Hanging tags (5.5): the rank tag at the top left, the trace's tag at the top right, the Signals chip at the bottom right. */
+.node .hang-tag {
+  font-size: 12px;
+  line-height: 20px;
+}
+
+.node-origin.hang-tag {
+  right: auto;
+  left: 8px;
+}
+
+.node-mark-ink {
+  color: var(--color-text);
+  border-color: var(--color-text);
+}
+
 .node-mark-accent {
   color: var(--color-accent);
   border-color: var(--color-accent);
@@ -246,8 +538,8 @@
   border-color: var(--color-error);
 }
 
-.node-marked {
-  border-color: currentColor;
+.node-marked-ink {
+  border-color: var(--color-text);
 }
 
 .node-marked-accent {
@@ -266,36 +558,199 @@
   border-color: var(--color-error);
 }
 
-.node-dim {
-  opacity: 0.25;
+/* The one fade level: filters, the decisions view, and what a trace does not reach all fade the same, and never multiply. */
+.node-faded {
+  opacity: 0.3;
 }
 
-/* Lines (C1): solid explicit, dotted implicit; a stage opening that only holds dates is lighter. */
-.line .react-flow__edge-path {
-  stroke: var(--color-secondary);
-  stroke-width: 1.5;
-}
-
-.line-dates-only .react-flow__edge-path {
-  stroke-opacity: 0.55;
-}
-
-.line-lit .react-flow__edge-path {
-  stroke: var(--color-accent);
-  stroke-width: 2;
-}
-
-.line-dim {
-  opacity: 0.2;
-}
-
-.edge-source {
-  position: absolute;
-  padding: 0 4px;
+/* The Signals chip is tinted on the neutral ramp by quartile of the range shown. */
+.lens-tier-0 {
   background: var(--color-surface);
-  color: var(--color-muted);
-  font: 400 11px / 16px var(--font-mono);
-  pointer-events: all;
+  color: var(--color-secondary);
+  border-color: var(--ramp-4);
+}
+
+.lens-tier-1 {
+  background: var(--color-surface);
+  color: var(--color-text);
+  border-color: var(--ramp-3);
+}
+
+.lens-tier-2 {
+  background: var(--color-band);
+  color: var(--color-text);
+  border-color: var(--ramp-2);
+}
+
+.lens-tier-3 {
+  background: var(--ink-fill);
+  color: var(--color-surface);
+  border-color: var(--ink-fill);
+}
+
+/* ---- zoom bands (5.4): what a card draws, never its size -------------------------------------- */
+
+/* Mid and far draw a glyph and the title, which takes the card's whole inner room: set to read at 14px on
+   screen (the zoom is `--z` on the root), as large as the card's own lines allow. Far draws no head at all. */
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node :is(.node-body-line, .node-foot) {
+  display: none;
+}
+
+.react-flow[data-lod="far"] .node-head {
+  display: none;
+}
+
+/* At mid only a card's controls stay (a container's plus or minus, a route's Open), in the corner, so a card can still be opened or folded. */
+.react-flow[data-lod="mid"] .node-head {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  height: auto;
+}
+
+.react-flow[data-lod="mid"] .node-head > :not(.node-control) {
+  display: none;
+}
+
+.react-flow[data-lod="mid"] .node-inner:has(.node-control) .node-title-row {
+  padding-right: 30px;
+}
+
+.react-flow[data-lod="mid"] .node-inner:has(.node-control:not(.node-toggle)) .node-title-row {
+  padding-right: 72px;
+}
+
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-glyph {
+  display: inline;
+}
+
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title-row {
+  flex: 1 1 0;
+  min-height: 0;
+  height: auto;
+  overflow: hidden;
+}
+
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title {
+  font-size: clamp(15px, calc(14px / var(--z, 1)), 30px);
+  line-height: 1.15;
+}
+
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title > * {
+  -webkit-line-clamp: var(--title-lines, 2);
+}
+
+/* Corner ticks are too small to see far out; the hairline stays, thickened so it is 1px on screen. */
+.react-flow[data-lod="far"] .node {
+  border-width: max(1px, calc(1px / var(--z, 1)));
+  background: var(--color-surface);
+}
+
+/* ---- lines (5.6) ------------------------------------------------------------------------------ */
+
+.line .react-flow__edge-path {
+  fill: none;
+  stroke: var(--color-secondary);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.line-satisfied .react-flow__edge-path {
+  stroke: var(--color-border);
+}
+
+.line-dates .react-flow__edge-path {
+  stroke-opacity: 0.5;
+}
+
+.line-marker {
+  fill: var(--color-secondary);
+  stroke: var(--color-secondary);
+  stroke-width: 1px;
+  vector-effect: non-scaling-stroke;
+}
+
+.line-condition .line-marker {
+  fill: var(--color-surface);
+}
+
+.line-stage_opening .line-marker {
+  fill: none;
+  stroke-width: 2px;
+}
+
+.line-satisfied .line-marker {
+  stroke: var(--color-border);
+}
+
+.line-satisfied.line-requires .line-marker {
+  fill: var(--color-border);
+}
+
+.line-count {
+  fill: var(--color-secondary);
+  font: 500 12px / 1 var(--font-mono);
+}
+
+/* Hovering a line thickens it to ink; selecting one marks it in the accent. */
+.react-flow__edge:hover .line .react-flow__edge-path {
+  stroke: var(--color-text);
+  stroke-width: 1.5px;
+}
+
+.react-flow__edge:hover .line .line-marker {
+  stroke: var(--color-text);
+}
+
+.react-flow__edge:hover .line-requires .line-marker {
+  fill: var(--color-text);
+}
+
+.line-selected .react-flow__edge-path,
+.line-selected .line-marker {
+  stroke: var(--color-accent);
+  stroke-width: 2px;
+}
+
+.line-selected.line-requires .line-marker {
+  fill: var(--color-accent);
+}
+
+/* A trace colours the lines it runs along: upstream in ink, downstream in the accent, a finished upstream line faint. */
+.line-lit-ink .react-flow__edge-path,
+.line-lit-ink .line-marker {
+  stroke: var(--color-text);
+  stroke-width: 1.5px;
+}
+
+.line-lit-ink.line-requires .line-marker {
+  fill: var(--color-text);
+}
+
+.line-lit-accent .react-flow__edge-path,
+.line-lit-accent .line-marker,
+.line-lit-lit .react-flow__edge-path,
+.line-lit-lit .line-marker {
+  stroke: var(--color-accent);
+  stroke-width: 1.5px;
+}
+
+.line-lit-accent.line-requires .line-marker,
+.line-lit-lit.line-requires .line-marker {
+  fill: var(--color-accent);
+}
+
+.line-lit-faint .react-flow__edge-path,
+.line-lit-faint .line-marker {
+  stroke: var(--color-border);
+}
+
+.line-lit-faint.line-requires .line-marker {
+  fill: var(--color-border);
+}
+
+.line-faded {
+  opacity: 0.3;
 }
 
 .stalled {

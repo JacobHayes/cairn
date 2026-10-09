@@ -93,6 +93,19 @@ function ThemeControl() {
   );
 }
 
+/** What the app is built with that asks to be credited (the canvas's library: decisions/2026-10-09-the-canvas-attribution-is-hidden-and-xyflow-credited.md). */
+function Licenses() {
+  return (
+    <details className="stack" data-testid="licenses">
+      <summary>Licenses</summary>
+      <p className="muted small">
+        The graph is drawn with <a href="https://reactflow.dev">React Flow</a> by xyflow, under the MIT license. Its attribution badge is hidden here; xyflow asks organizations that hide it in commercial use to
+        subscribe to <a href="https://reactflow.dev/pro">React Flow Pro</a> or <a href="https://github.com/sponsors/xyflow">sponsor the project</a>.
+      </p>
+    </details>
+  );
+}
+
 export function Identity() {
   const { viewer, failed } = useViewer();
   const { host } = useSession();
@@ -111,6 +124,7 @@ export function Identity() {
       <Identities viewer={viewer} />
       <YourEntities viewer={viewer} />
       <ThemeControl />
+      <Licenses />
       {providers.length === 0 ? null : (
         <span className="row" data-testid="link-identity">
           <span>Link another identity:</span>

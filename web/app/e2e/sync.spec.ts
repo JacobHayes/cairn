@@ -30,8 +30,10 @@ test("a rejected change waits under needs-you wherever you go; Go to it returns,
 
 test("a write in flight, a revision on its way, and one that cannot be fetched", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
-  await openJourney(one, "server", "j_hiring");
-  await openJourney(two, "server", "j_hiring");
+  // The node renamed is settled not relevant, which the graph hides unless asked.
+  const everything = "?detail=all&show=notrelevant%2Cconditional";
+  await openJourney(one, "server", "j_hiring", everything);
+  await openJourney(two, "server", "j_hiring", everything);
   await live(two);
   // SAVING: only once the write has been out a moment.
   const send = await hold(one, "**/api/journeys/j_hiring/patches");

@@ -159,6 +159,7 @@ function RouteCanvas({ shown, view, version, selected, onPick }: { shown: Shown;
             }
           : undefined,
       drill: (key) => void navigate(routeCanvasPath(id, version, { ...view, container: key })),
+      expand: undefined,
       trace: undefined,
       title: (key) => (shown.graph.nodes ?? []).find((node) => node.key === key)?.title ?? key,
     }),
@@ -171,7 +172,7 @@ function RouteCanvas({ shown, view, version, selected, onPick }: { shown: Shown;
     return <p className="muted small">Laying out the canvas...</p>;
   }
   return (
-    <GraphCanvas model={laidOut.model} placement={laidOut.placement} overlay={undefined} heat={false} selected={selected} actions={actions} viewKey={refitKey(laidOut, shown.of === "draft")} label={`${shown.route.header.name}: canvas`} title={shown.route.header.name} />
+    <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={undefined} lens={undefined} selected={selected} actions={actions} viewKey={refitKey(laidOut, shown.of === "draft")} label={`${shown.route.header.name}: canvas`} title={shown.route.header.name} />
   );
 }
 
@@ -193,7 +194,7 @@ export function RouteCanvasPage() {
   const params = useMemo(() => new URLSearchParams(search), [search]);
   // The route's own parameters (`version`) are not the canvas's: `routeCanvasPath` sets them. A
   // saved address from before the canvas's parameters were renamed reads as it did.
-  const view = useMemo(() => ({ ...viewFrom(graphQueryFromOld(params)), rest: [] }), [params]);
+  const view = useMemo(() => ({ ...viewFrom(graphQueryFromOld(params)), container: params.get("in") ?? params.get("open") ?? undefined, open: [], rest: [] }), [params]);
   const asked = params.get("version");
   const version = asked === null ? undefined : Number(asked);
   const read = useRouteGraph(id, version);
@@ -225,7 +226,7 @@ export function RouteCanvasPage() {
           {shown.of !== "draft" && shown.route.draft == null ? <OpenDraftOffer route={shown.route} /> : null}
           {authored === undefined ? null : <RouteAuthoringBar authored={authored} container={view.container} drawing={drawing} onAdded={(key) => void navigate(routeNodePath(id, view, key))} />}
           {authored === undefined ? null : <RouteNotices graph={authored.graph} hrefOf={(key) => routeNodePath(id, view, key)} />}
-          <KindToggles view={view} journey={false} onChange={(next) => void navigate(routeCanvasPath(id, version, next))} />
+          <KindToggles view={view} onChange={(next) => void navigate(routeCanvasPath(id, version, next))} />
           <nav className="crumbs" aria-label="Drilled into" data-testid="crumbs">
             {view.container === undefined ? <strong>Whole route</strong> : <Link to={routeCanvasPath(id, version, { ...view, container: undefined })}>Whole route</Link>}
           </nav>

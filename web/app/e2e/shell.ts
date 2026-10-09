@@ -87,11 +87,21 @@ function screenOf(address: string): string {
   return `${url.pathname}?${url.searchParams.toString()}`;
 }
 
-/** A journey's page, PLAN, GRAPH, once derived and its canvas drawn. */
-export async function openJourney(page: Page, host: HostKind, journey: string, query = ""): Promise<void> {
+/**
+ * A journey's page, PLAN, GRAPH, once derived and its canvas drawn. The graph opens at its All
+ * step unless `query` says otherwise, so every node has a card to reach (it opens at Stages, with
+ * most stages folded, for a person).
+ */
+export async function openJourney(page: Page, host: HostKind, journey: string, query = "?detail=all"): Promise<void> {
   await open(page, host, `/journeys/${journey}/plan/graph${query}`);
   await derived(page);
   await expect(page.getByTestId("node-card").first()).toBeVisible();
+  // A spec reaches any node, so it sees the whole graph; the real default opens on the current stage (the canvas flow test).
+  if (query !== "") {
+    // After the opening fit has moved the viewport off its start, so it cannot land after this one.
+    await page.waitForFunction(() => document.querySelector<HTMLElement>(".react-flow__viewport")?.style.transform !== "translate(0px, 0px) scale(1)");
+    await page.keyboard.press("f");
+  }
 }
 
 /**

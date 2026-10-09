@@ -10,6 +10,7 @@ import type { Schema } from "@cairn/client";
 
 import type { GraphNode, NodeKind } from "../detail/model.ts";
 import type { DisplayState } from "../status/words.ts";
+import { dependsWords } from "./words.ts";
 
 export type Level = Schema<"Level">;
 export type LevelNode = Schema<"LevelNode">;
@@ -22,35 +23,56 @@ export type Stalled = Schema<"Stalled">;
 /** C2: every kind, in the order the toggles list them; all shown by default. */
 export const KINDS: NodeKind[] = ["group", "decision", "deliverable", "action", "milestone"];
 
-/** C5: how many of the acting frontier's top-ranked items carry a numbered badge. */
-export const RANK_BADGE_COUNT = 5;
+/** C5: how many of the acting frontier's top-ranked items carry a rank tag on the canvas (the Signals lens shows the rest). */
+export const RANK_TAG_COUNT = 3;
 
 /** C6: a due date this many days away or fewer, and not yet late, is marked as coming up. */
 export const DUE_SOON_DAYS = 7;
 
-/** C6: the border weights gravity maps onto, lightest first (px). */
-export const BORDER_WEIGHTS_PX = [1, 2, 3, 4] as const;
+/** C1: the detail ladder's steps, coarsest first (5.1). */
+export const STEPS = ["stages", "decisions", "work", "all"] as const;
+export type Step = (typeof STEPS)[number];
 
-/** What the canvas shows (C1, C2, C4, C6): the toggles and the container drilled into. */
+/** C6: what the Signals lens puts on each card (8.2). */
+export const LENSES = ["rank", "gravity", "unblocks", "slack"] as const;
+export type Lens = (typeof LENSES)[number];
+
+/**
+ * What the canvas shows (C1, C2, C4, C6). On a journey: `step` is the detail ladder (none is its
+ * default), `open` and `shut` are the containers the viewer expanded and collapsed since, `shown`
+ * the kinds kept at full strength (the others fade), `notRelevant` and `undecided` whether settled
+ * not-relevant and conditional nodes are drawn, and `lens` the Signals lens. On a route's canvas,
+ * which has no ladder, `shown` is the kinds drawn and `container` the one drilled into.
+ */
 export interface CanvasSettings {
   shown: NodeKind[];
   container: string | undefined;
+  step: Step | undefined;
+  open: string[];
+  shut: string[];
   notRelevant: boolean;
   undecided: boolean;
-  heat: boolean;
+  lens: Lens | undefined;
+  /** View, Show origins (5.5): each card says where its node came from. */
+  origins: boolean;
 }
 
+/** Q3: conditional nodes are drawn ghosted; only the settled not-relevant ones are hidden. */
 export const DEFAULT_SETTINGS: CanvasSettings = {
   shown: KINDS,
   container: undefined,
-  notRelevant: true,
+  step: undefined,
+  open: [],
+  shut: [],
+  notRelevant: false,
   undecided: true,
-  heat: false,
+  lens: undefined,
+  origins: false,
 };
 
 export type Tone = "plain" | "good" | "warn" | "bad";
 
-/** A small badge on a card: a derived flag or a container's roll-up (C2). */
+/** A small badge on a card: a container's roll-up (C2). */
 export interface CardBadge {
   flag: string;
   tone: Tone;
@@ -80,10 +102,13 @@ export interface Card {
   title: string;
   /** The card it is drawn in; none at the top level. */
   parent: string | undefined;
-  /** It has children with a stand-in (it may be drilled into, C4). */
+  /** A top-level group: a stage. */
+  stage: boolean;
+  /** It has children (it can be expanded and collapsed, C4). */
   drillable: boolean;
-  /** A decision's prompt (C1). */
-  prompt: string | undefined;
+  /** Its subtree is rolled up into it: the level collapsed it (5.3). */
+  collapsed: boolean;
+  /** The hidden work that rolled up into it, as a peek on hover (C4). */
   checklist: ChecklistItem[];
   /** Every hidden node that rolled up into it, whatever hid it (C2); the trace marks the card for each. */
   rolledUp: string[];
@@ -92,36 +117,47 @@ export interface Card {
   journey: CardState | undefined;
 }
 
+/** The one secondary line a card may carry (5.5): a decided decision's answer, a container's progress, or what a conditional node depends on. */
+export type CardBody =
+  | { kind: "answer"; text: string; rationale: string | undefined }
+  | { kind: "progress"; done: number; total: number; badge: CardBadge | undefined }
+  | { kind: "depends"; text: string };
+
+/** What the Signals lens can put on a card (8.2): each is a number, or none when the card has no value. */
+export interface Signals {
+  rank: number | undefined;
+  gravity: number | undefined;
+  /** How many nodes finishing it frees (the acting frontier only), and the weighted value the tint follows. */
+  unblocks: { count: number; weighted: number } | undefined;
+  slackDays: number | undefined;
+}
+
 /** A journey card's state and derived values (C1, C5, C6, C2's roll-ups). */
 export interface CardState {
   /** The engine's display state (D8). */
   state: DisplayState;
   /** Done or skipped: nothing is left to do. */
   finished: boolean;
-  owner: string;
   relevance: Relevance;
-  due: { date: string; tone: Tone } | undefined;
-  latestStart: string | undefined;
-  slackDays: number | undefined;
-  answer: string | undefined;
-  /** C6: the border weight gravity gives it (px). */
-  borderPx: number;
-  /** A container's is the gravity of its whole area (Priority). */
-  gravity: number;
-  leverage: number;
+  /** The foot's one date, in words, with the tone it reads in. */
+  foot: { words: string; tone: Tone } | undefined;
+  /** The foot's owner: only when it is the viewer or missing. */
+  owner: { words: string; missing: boolean } | undefined;
+  /** Everyone who owns it, for the hover. */
+  owners: string;
+  body: CardBody | undefined;
   here: Here;
-  /** C5: its place in the acting frontier's rank order, for the top few. */
+  /** C5: its place in the acting frontier's rank order. */
   rank: number | undefined;
-  badges: CardBadge[];
-  /** C2: a container's children: the least slack, their owners. */
-  children: { slackDays: number | undefined; owners: string[] } | undefined;
+  signals: Signals;
+  /** C5: a stage holding the acting frontier or active work, which the Stages step opens (5.1). */
+  current: boolean;
+  /** Where the node came from (PRD glossary, Provenance). */
+  origin: "from_route" | "local" | "orphaned" | "from_segment";
 }
 
-/** An implicit edge's source: a condition gate or a stage opening, in words. */
-export interface LineSource {
-  origin: "condition" | "stage_opening";
-  words: string;
-}
+/** How an edge is drawn (5.6), strongest first: a requirement, a condition gate, a stage opening, or dates alone. */
+export type LineKind = "requires" | "condition" | "stage_opening" | "dates";
 
 /** One line on the canvas: an edge between two cards (C1). */
 export interface Line {
@@ -132,16 +168,24 @@ export interface Line {
   implicit: boolean;
   /** Some edge it stands for blocks. */
   gates: boolean;
-  /** Where each implicit edge it stands for comes from (Containment: named by its source). */
-  sources: LineSource[];
+  /** The strongest style among the edges it stands for. */
+  kind: LineKind;
+  /** How many edges it stands for. */
+  count: number;
+  /** Nothing it stands for still waits: every requirement behind it is finished. Set where journey state is known. */
+  satisfied?: boolean;
+  /** What hovering it says, in words. */
+  sentence: string;
 }
 
 /** What a journey's canvas reads besides its level: the rank order and the viewer's items. */
 export interface JourneyExtras {
   /** C5: the acting frontier in rank order (the next list). */
   ranked: string[];
-  /** C5: the viewer's own items. */
+  /** C5: the viewer's own items: every node they hold a participation on. */
   mine: string[];
+  /** The nodes they own, which a card says with "You". */
+  owned: string[];
 }
 
 /** A canvas's cards and lines. */
@@ -156,30 +200,53 @@ function nodesOf(graph: GraphNode[]): Nodes {
   return new Map(graph.map((node) => [node.key, node]));
 }
 
-/** C1: where an implicit edge comes from, in words. */
-function sourceOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes): LineSource | undefined {
+/** C1: what one edge says, in words: why the dependent waits on the requirement. */
+function sentenceOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes, graph: GraphNode[]): string {
   const title = (key: string) => nodes.get(key)?.title ?? key;
+  if (!edge.gates) {
+    return `Dated from ${title(edge.requirement)}; does not block`;
+  }
   switch (edge.origin) {
     case "explicit":
-      return undefined;
-    case "condition":
-      return { origin: "condition", words: `${title(edge.dependent)} is relevant by the answer to ${title(edge.requirement)}` };
+      return `${title(edge.dependent)} needs ${title(edge.requirement)}`;
+    case "condition": {
+      const dependent = nodes.get(edge.dependent);
+      const depends = dependent === undefined ? undefined : dependsWords(graph, dependent);
+      return depends === undefined ? `Applies only depending on ${title(edge.requirement)}` : `Applies only if ${depends}`;
+    }
     case "stage_opening":
-      return { origin: "stage_opening", words: `${title(edge.dependent)} opens at ${title(edge.requirement)}` };
+      return `${title(edge.dependent)} waits for ${title(edge.requirement)}, where it opens`;
   }
 }
 
-/** C1: the level's edges as lines, implicit ones named by their source. */
-export function linesOf(level: Level, graph: GraphNode[]): Line[] {
+/** Which line style wins where several edges stand in one line: solid over condition over stage opening over dates. */
+export const STRENGTH: Record<LineKind, number> = { requires: 3, condition: 2, stage_opening: 1, dates: 0 };
+
+function kindOf(edge: Schema<"UnderlyingEdge">): LineKind {
+  if (!edge.gates) {
+    return "dates";
+  }
+  return edge.origin === "explicit" ? "requires" : edge.origin;
+}
+
+/** C1: the level's edges as lines, each saying in words what it stands for. */
+export function linesOf(level: Level, graph: GraphNode[], finished?: (key: string) => boolean): Line[] {
   const nodes = nodesOf(graph);
-  return level.edges.map((edge) => ({
-    id: `${edge.from}->${edge.to}`,
-    from: edge.from,
-    to: edge.to,
-    implicit: edge.implicit === true,
-    gates: edge.gates,
-    sources: edge.underlying.flatMap((each) => sourceOf(each, nodes) ?? []),
-  }));
+  return level.edges.map((edge) => {
+    const kind = edge.underlying.map(kindOf).reduce<LineKind>((best, each) => (STRENGTH[each] > STRENGTH[best] ? each : best), "dates");
+    const strongest = edge.underlying.filter((each) => kindOf(each) === kind).map((each) => sentenceOf(each, nodes, graph));
+    return {
+      id: `${edge.from}->${edge.to}`,
+      from: edge.from,
+      to: edge.to,
+      implicit: edge.implicit === true,
+      gates: edge.gates,
+      kind,
+      count: edge.underlying.length,
+      ...(finished === undefined ? {} : { satisfied: edge.underlying.every((each) => !each.gates || finished(each.requirement)) }),
+      sentence: `${strongest.slice(0, 2).join("; ")}${strongest.length > 2 ? `; and ${String(strongest.length - 2)} more` : ""}`,
+    };
+  });
 }
 
 /** What a journey adds to each card: its state, and whether a checklist item is finished. */
@@ -203,8 +270,9 @@ export function cardsOf(level: Level, graph: GraphNode[], looks?: Looks): Card[]
         kind: node.kind,
         title: node.title,
         parent: at.parent ?? undefined,
+        stage: node.kind === "group" && node.parent == null,
         drillable: parents.has(node.key),
-        prompt: node.kind === "decision" ? node.prompt : undefined,
+        collapsed: level.collapsed?.includes(node.key) === true,
         // Work hidden by its kind is the card's checklist; a node of a shown kind that rolled up
         // was hidden for its relevance class or a collapsed container, not work to tick off.
         checklist: (at.rolled_up ?? []).flatMap((key) => {
@@ -230,13 +298,3 @@ export function dueTone(due: string, today: string, overdue: boolean, finished: 
   const days = Math.round((Date.parse(due) - Date.parse(today)) / 86_400_000);
   return days <= DUE_SOON_DAYS ? "warn" : "plain";
 }
-
-/** C6: the border weight for `gravity` against the largest open gravity in the journey. */
-export function borderFor(gravity: number, gravityMax: number, open: boolean): number {
-  if (!open || gravityMax <= 0) {
-    return BORDER_WEIGHTS_PX[0];
-  }
-  const step = Math.round((gravity / gravityMax) * (BORDER_WEIGHTS_PX.length - 1));
-  return BORDER_WEIGHTS_PX[Math.min(Math.max(step, 0), BORDER_WEIGHTS_PX.length - 1)] ?? BORDER_WEIGHTS_PX[0];
-}
-

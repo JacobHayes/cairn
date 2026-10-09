@@ -1,58 +1,73 @@
-// How cards and lines look, as data the components apply (C1, C5, C6, C7): explicit edges
-// solid and implicit gates dotted, not-relevant cards grayed and conditional ones ghosted,
-// "I am here" outlined, gravity as border weight, and an overlay's dimming. Quiet by rule:
-// nothing animates or flashes (C6). Pure, so the unit tests read the same decisions the
-// canvas draws.
-import type { Card, Line } from "./model.ts";
+// How cards and lines look, as data the components apply (C1, C5, C7): requirements solid with
+// an arrowhead, gates dotted with their own end marker, waiting lines in steel and satisfied
+// ones grey; not-relevant cards hollow and conditional ones ghosted, "I am here" outlined in ink,
+// finished work receding, and an overlay's tags and the one fade level. Quiet by rule: nothing
+// animates or flashes (C6). Pure, so the unit tests read the same decisions the canvas draws.
+import type { Card, Line, LineKind } from "./model.ts";
 import type { CanvasOverlay } from "./overlay.ts";
 
-/** C1: the dash pattern of an implicit edge (dotted). */
-export const DOTTED = "2 5";
+/** C1: the dash pattern of an implicit edge (dotted), and of a line that only holds dates. */
+export const DOTTED = "2 3";
+
+/** The marker at a line's target end, by what it stands for (5.6): only the end tells a condition from a stage opening. */
+export const MARKERS: Record<LineKind, "arrow" | "diamond" | "bar" | "none"> = {
+  requires: "arrow",
+  condition: "diamond",
+  stage_opening: "bar",
+  dates: "none",
+};
 
 /** How a line is drawn. */
 export interface LineLook {
   /** The dash pattern; none for a solid line. */
   dash: string | undefined;
+  marker: (typeof MARKERS)[LineKind];
   /** CSS classes for its color and fading. */
   classes: string[];
 }
 
-/** C1: a line solid when an explicit edge stands behind it, dotted when every one is implicit. */
-export function lineLook(line: Line, overlay?: CanvasOverlay): LineLook {
-  const classes = ["line"];
-  if (!line.gates) {
-    classes.push("line-dates-only");
+/**
+ * C1: a line solid when a requirement stands behind it and dotted otherwise (a condition gate,
+ * a stage opening, a link that holds dates only), steel while it waits and grey once satisfied,
+ * lit by an overlay in the colour of its direction, and faded to the one level when an overlay
+ * dims what it does not light (or when `faded`, a filter's).
+ */
+export function lineLook(line: Line, options: { overlay?: CanvasOverlay | undefined; satisfied?: boolean; faded?: boolean } = {}): LineLook {
+  const { overlay, satisfied = false, faded = false } = options;
+  const classes = ["line", `line-${line.kind}`, satisfied ? "line-satisfied" : "line-waiting"];
+  const lit = overlay?.lines[line.id];
+  if (lit !== undefined) {
+    classes.push(`line-lit-${lit}`);
+  } else if (overlay?.dim === true || (overlay === undefined && faded)) {
+    classes.push("line-faded");
   }
-  if (overlay !== undefined) {
-    classes.push(overlay.lines.includes(line.id) ? "line-lit" : overlay.dim ? "line-dim" : "");
-  }
-  return { dash: line.implicit ? DOTTED : undefined, classes: classes.filter(Boolean) };
+  return { dash: line.kind === "requires" ? undefined : DOTTED, marker: MARKERS[line.kind], classes };
 }
 
 /**
- * C1, C5, C7: a card's classes: its kind, its display state's look (not relevant, conditional), "I am here" (the frontier and
- * active work outlined; the viewer's own items marked more lightly, since a viewer may own
- * most of a journey), and an overlay's dimming.
+ * C1, C5, C7: a card's classes: its kind, its display state's look (hollow when not relevant,
+ * ghosted when conditional, receding when finished), "I am here" (the frontier and active work
+ * outlined in ink), the overlay's tone, and the one fade level.
  */
-export function nodeClasses(card: Card, overlay?: CanvasOverlay): string[] {
+export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | undefined; faded?: boolean } = {}): string[] {
+  const { overlay, faded = false } = options;
   const classes = ["node", `node-${card.kind}`];
   const journey = card.journey;
   if (journey?.state === "not_relevant") {
     classes.push("node-not-relevant");
   } else if (journey?.state === "conditional") {
-    classes.push("node-undecided");
+    classes.push("node-conditional");
+  } else if (journey?.finished === true) {
+    classes.push("node-finished");
   }
   if (journey !== undefined && (journey.here.frontier || journey.here.active)) {
     classes.push("node-here");
   }
-  if (journey?.here.mine === true) {
-    classes.push("node-mine");
-  }
   const mark = overlay?.marks[card.key];
   if (mark !== undefined) {
     classes.push("node-marked", `node-marked-${mark.tone}`);
-  } else if (overlay?.dim === true) {
-    classes.push("node-dim");
+  } else if (overlay?.dim === true || (overlay === undefined && faded)) {
+    classes.push("node-faded");
   }
   return classes;
 }

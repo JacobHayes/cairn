@@ -7,7 +7,7 @@ import { expect, test } from "@playwright/test";
 
 import { startJourney } from "./around.ts";
 import { annotate, dateChain, flag, openNode, pin, section, state } from "./detail.ts";
-import { fresh, menuItem, nodePanel, openAt, openFromCanvas, recentSaves, syncChip } from "./shell.ts";
+import { fresh, menuItem, nodePanel, openAt, openFromCanvas, openJourney, recentSaves, syncChip } from "./shell.ts";
 
 test("a decision is answered from its form: nothing preselected, Save waits for a pick, each choice says what it does (B2)", async ({ page }) => {
   const journey = await startJourney(page, "browser", fresh("Answering"), { route: "vendor-evaluation", version: 1 });
@@ -26,7 +26,9 @@ test("a decision is answered from its form: nothing preselected, Save waits for 
 });
 
 test("the final report's inspector reads its due chain, what blocks it, why it ranks, and its history (C8, F7, J4)", async ({ page }) => {
-  const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
+  // A settled not-relevant node is hidden unless asked for; the last step opens one.
+  await openJourney(page, "browser", "j_vendor_eval", "?detail=all&show=notrelevant%2Cconditional");
+  const panel = await openFromCanvas(page, "n_final_report");
   const due = await dateChain(panel, "Due");
   await expect(due).toHaveAttribute("data-origin", "pin");
   await expect(due.getByTestId("chain-fixed")).toHaveCount(1);

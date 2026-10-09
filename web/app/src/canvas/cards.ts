@@ -1,96 +1,64 @@
 // A card's size, worked out from what it shows before anything is drawn, so the layout (C15)
-// reads the same sizes the cards render at and lays out the same graph identically: every
-// line of a card has a fixed height, a title or prompt takes the lines its length needs (up
-// to a cap, the rest cut short), and NodeCard draws each line at exactly these heights. What
-// an overlay or the heat toggle adds hangs outside the card, so neither moves a node.
+// reads the same sizes the cards render at and lays out the same graph identically: a head, a
+// title of up to two lines, and at most a body line, a foot line and the hidden-prerequisites
+// line (5.5). NodeCard draws each row at exactly these heights. What an overlay or the Signals
+// lens adds hangs outside the card, so neither moves a node.
 import type { LayoutRequest } from "./layout.ts";
 import type { Card, CanvasModel } from "./model.ts";
 
-/** A card's width, and the height of one line of it (px). */
-export const CARD_WIDTH_PX = 248;
-export const LINE_PX = 18;
-/** Padding inside the border, and the heaviest border gravity gives (C6) (px). */
-export const CARD_PAD_PX = 8;
-export const BORDER_MAX_PX = 4;
-/** The room for text inside a card (px). */
-export const CARD_TEXT_PX = CARD_WIDTH_PX - 2 * (CARD_PAD_PX + BORDER_MAX_PX) - 4;
+/** A card's width (px): ten of the ruling's cells. */
+export const CARD_WIDTH_PX = 240;
+/** The padding inside the border, sides and top and bottom (px). */
+export const CARD_PAD_X_PX = 12;
+export const CARD_PAD_Y_PX = 10;
+/** Each row's height, and the gap between rows (px). */
+export const HEAD_PX = 24;
+export const TITLE_LINE_PX = 21;
+export const BODY_PX = 21;
+export const FOOT_PX = 22;
+export const ROW_GAP_PX = 4;
+/** The border's width on each side (px): the box is the border plus the padding plus the rows. */
+export const BORDER_PX = 1;
 
-/** Characters that surely fit one line of a title, and of a prompt, at the card's width. */
-export const TITLE_LINE_CHARS = 26;
-export const PROMPT_LINE_CHARS = 30;
-/** The most lines a title, and a prompt, take; the rest is cut short with an ellipsis. */
+/** Characters that surely fit one line of a title at the card's width. */
+export const TITLE_LINE_CHARS = 24;
+/** The most lines a title takes; the rest is cut short with an ellipsis. */
 export const TITLE_LINES_MAX = 2;
-export const PROMPT_LINES_MAX = 2;
-/** C4: the checklist items a card lists before "and N more". */
-export const CHECKLIST_SHOWN_MAX = 6;
-/** A badge's width per character, and its padding plus the gap after it (px). */
-export const BADGE_CHAR_PX = 6.4;
-export const BADGE_EXTRA_PX = 18;
-/** The most rows of badges a card shows. */
-export const BADGE_ROWS_MAX = 3;
 
 /** The lines a text of `length` characters takes at `perLine` characters a line, at most `max`. */
 export function linesFor(length: number, perLine: number, max: number): number {
   return Math.min(Math.max(1, Math.ceil(length / perLine)), max);
 }
 
-/** The rows a run of badges takes at the card's width, at most `BADGE_ROWS_MAX`. */
-export function badgeRows(flags: string[]): number {
-  let rows = 0;
-  let used = CARD_TEXT_PX;
-  for (const flag of flags) {
-    const width = flag.length * BADGE_CHAR_PX + BADGE_EXTRA_PX;
-    if (used + width > CARD_TEXT_PX) {
-      rows += 1;
-      used = 0;
-    }
-    used += width;
-  }
-  return Math.min(rows, BADGE_ROWS_MAX);
-}
-
-/** Each part of a card and the lines it takes, in the order NodeCard draws them. */
-export interface CardLines {
-  /** Kind and state, with the rank badge. */
-  head: number;
+/** Each row of a card, and whether it is drawn, in the order NodeCard draws them. */
+export interface CardRows {
+  /** Kind and state. */
+  head: true;
   title: number;
-  /** Owner (journeys). */
-  owner: number;
-  /** Due, latest start, and slack (journeys). */
-  dates: number;
-  prompt: number;
-  /** A decision's answer (journeys). */
-  answer: number;
-  badges: number;
-  /** A container's children: the least slack, the owners (C2). */
-  children: number;
-  checklist: number;
+  /** A decided decision's answer, a container's progress, or what a conditional node depends on. */
+  body: boolean;
+  /** The one date, and the owner when it is the viewer's or missing. */
+  foot: boolean;
   /** The hidden-prerequisites marker (C2). */
-  marker: number;
+  marker: boolean;
 }
 
-/** The lines each part of `card` takes. */
-export function cardLines(card: Card): CardLines {
+/** The rows `card` draws. */
+export function cardRows(card: Card): CardRows {
   const journey = card.journey;
-  const checklist = card.checklist.length;
   return {
-    head: 1,
+    head: true,
     title: linesFor(card.title.length, TITLE_LINE_CHARS, TITLE_LINES_MAX),
-    owner: journey === undefined ? 0 : 1,
-    dates: journey !== undefined && (journey.due !== undefined || journey.latestStart !== undefined) ? 1 : 0,
-    prompt: card.prompt === undefined ? 0 : linesFor(card.prompt.length, PROMPT_LINE_CHARS, PROMPT_LINES_MAX),
-    answer: card.kind === "decision" && journey !== undefined ? 1 : 0,
-    badges: journey === undefined ? 0 : badgeRows(journey.badges.map((badge) => badge.flag)),
-    children: journey?.children === undefined ? 0 : 1,
-    checklist: Math.min(checklist, CHECKLIST_SHOWN_MAX) + (checklist > CHECKLIST_SHOWN_MAX ? 1 : 0),
-    marker: card.hiddenPrerequisites.length === 0 ? 0 : 1,
+    body: journey?.body !== undefined,
+    foot: journey !== undefined && (journey.foot !== undefined || journey.owner !== undefined),
+    marker: card.hiddenPrerequisites.length > 0,
   };
 }
 
-/** A card's height for its lines: the lines, the padding, and room for the heaviest border. */
-export function cardHeight(lines: CardLines): number {
-  const count = (Object.values(lines) as number[]).reduce((sum, each) => sum + each, 0);
-  return count * LINE_PX + 2 * (CARD_PAD_PX + BORDER_MAX_PX);
+/** A card's height for its rows: the rows, the gaps between them, and the padding. */
+export function cardHeight(rows: CardRows): number {
+  const heights = [HEAD_PX, rows.title * TITLE_LINE_PX, ...(rows.body ? [BODY_PX] : []), ...(rows.foot ? [FOOT_PX] : []), ...(rows.marker ? [BODY_PX] : [])];
+  return heights.reduce((sum, each) => sum + each, 0) + (heights.length - 1) * ROW_GAP_PX + 2 * (CARD_PAD_Y_PX + BORDER_PX);
 }
 
 /**
@@ -101,7 +69,7 @@ export function layoutRequestOf(model: CanvasModel): Omit<LayoutRequest, "hints"
   const containers = new Set(model.cards.flatMap((card) => (card.parent === undefined ? [] : [card.parent])));
   return {
     nodes: model.cards.map((card) => {
-      const height = cardHeight(cardLines(card));
+      const height = cardHeight(cardRows(card));
       return {
         key: card.key,
         ...(card.parent === undefined ? {} : { parent: card.parent }),

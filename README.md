@@ -18,6 +18,10 @@ deployment at http://127.0.0.1:8080/.
 - [`briefs/`](briefs/README.md): the milestones that built Cairn, with their proofs.
 - [`decisions/`](decisions/README.md): judgment calls awaiting review, one file each.
 
+## Built with
+
+[React Flow](https://reactflow.dev) (xyflow, MIT) draws the graph, [ELK](https://eclipse.dev/elk/) lays it out, and the fonts are Space Grotesk and IBM Plex (SIL OFL 1.1). The graph's attribution badge is hidden, as React Flow's licence allows; xyflow asks organizations that hide it in commercial use to subscribe to [React Flow Pro](https://reactflow.dev/pro) or [sponsor the project](https://github.com/sponsors/xyflow), and a deployment that does is following its request.
+
 ## Develop
 
 Tools are pinned in `mise.toml`; tasks live in `mise-tasks/`.

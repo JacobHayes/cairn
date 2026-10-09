@@ -5,6 +5,8 @@
 import type { ReactNode } from "react";
 import { Navigate, useLocation, useParams } from "react-router";
 
+import { ancestorsOf } from "../canvas/ladder.ts";
+import { DEFAULT_VIEW, revealing } from "../canvas/settings.ts";
 import { nodeOf } from "../detail/model.ts";
 import { deepLinkTarget, landingPath, legacyRedirect, pagePath, projectionOf, type JourneyPage } from "../journeys/address.ts";
 import { recalledProjection } from "../journeys/memory.ts";
@@ -31,7 +33,7 @@ export function BarePageRoute({ page }: { page: JourneyPage }) {
 /** C18: the Summary page, the journey card at full width. */
 export function SummaryRoute() {
   const { id = "", key } = useParams();
-  return <JourneyFrame key={id} id={id} page="summary" projection={undefined} selected={key} />;
+  return <JourneyFrame key={id} id={id} page="summary" projection={undefined} selected={key} edge={undefined} />;
 }
 
 /** An address of the earlier screens, or the old canvas, resolved to its new place (2.4, Redirects). */
@@ -68,7 +70,7 @@ export function JourneyLanding() {
 
 /**
  * `/journeys/<id>/nodes/<key>`, the address agents post: the node on the acting frontier opens
- * on NEXT, LIST; any other on PLAN, GRAPH, traced and with its container open (2.4).
+ * on NEXT, LIST; any other on PLAN, GRAPH, selected and centred, with its containers open (2.4).
  */
 export function JourneyDeepLink() {
   const { id = "", key = "" } = useParams();
@@ -76,12 +78,12 @@ export function JourneyDeepLink() {
     <Resolved
       then={() => (
         <JourneyGate id={id}>
-          {(ready) => (
-            <Navigate
-              replace
-              to={deepLinkTarget(id, key, { onFrontier: ready.derived.acting_frontier.includes(key), parent: nodeOf(ready, key)?.parent ?? undefined })}
-            />
-          )}
+          {(ready) => {
+            const found = nodeOf(ready, key);
+            const onFrontier = ready.derived.acting_frontier.includes(key);
+            const reveal = found === undefined ? DEFAULT_VIEW : revealing(DEFAULT_VIEW, { kind: found.kind, ancestors: ancestorsOf(ready.journey.graph.nodes ?? [], key) }, ready.derived.nodes[key]?.display_state);
+            return <Navigate replace to={deepLinkTarget(id, key, { onFrontier, reveal })} state={onFrontier ? undefined : { reveal: { key, how: "centre" } }} />;
+          }}
         </JourneyGate>
       )}
     />

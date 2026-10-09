@@ -8,11 +8,11 @@
 // (decisions/2026-10-07-the-layout-is-hinted-by-the-views-last-positions-a-fresh.md).
 import ELK from "elkjs/lib/elk-api.js";
 
-import { hintsOf, layOut, signature, type Elk, type LayoutRequest, type Placement } from "./layout.ts";
+import { hintsOf, layOut, signature, type Elk, type Layout, type LayoutRequest } from "./layout.ts";
 
 /** What lays out a request: the layout worker, or ELK in-thread in the unit tests. */
 export interface Layouter {
-  layOut(request: LayoutRequest): Promise<Placement>;
+  layOut(request: LayoutRequest): Promise<Layout>;
 }
 
 /** C15: ELK in the layout worker (layout-worker.ts), through ELK's own API and messages. */
@@ -23,7 +23,7 @@ export class LayoutWorker implements Layouter {
     this.#elk = new ELK({ workerFactory: () => new Worker(new URL("./layout-worker.ts", import.meta.url), { type: "module" }) });
   }
 
-  layOut(request: LayoutRequest): Promise<Placement> {
+  layOut(request: LayoutRequest): Promise<Layout> {
     return layOut(this.#elk, request);
   }
 }
@@ -36,7 +36,7 @@ export const LAYOUT_PER_VIEW_COUNT_MAX = 4;
 
 interface Kept {
   signature: string;
-  placed: Promise<Placement>;
+  placed: Promise<Layout>;
 }
 
 /** C15: every view's layouts in this tab, by domain and view, newest first. */
@@ -52,7 +52,7 @@ export class Layouts {
    * The placement of `request` for `view` of `domain`: the one kept when nothing the layout
    * reads changed, else a new layout hinted by the view's latest.
    */
-  place(domain: string, view: string, request: Omit<LayoutRequest, "hints">): Promise<Placement> {
+  place(domain: string, view: string, request: Omit<LayoutRequest, "hints">): Promise<Layout> {
     const key = JSON.stringify([domain, view]);
     const kept = this.#views.get(key) ?? [];
     const text = signature(request);

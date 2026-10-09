@@ -13,6 +13,7 @@ import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
 import { journeyAuthored } from "../authoring/target.ts";
 import { useProjected } from "../canvas/hooks.ts";
+import { ancestorsOf } from "../canvas/ladder.ts";
 import { canvasPath, DEFAULT_VIEW, revealing, viewFrom } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
@@ -130,9 +131,8 @@ function ReadyFrame({ ready, page, projection, selected, edge }: { ready: Ready 
   const navigate = useNavigate();
   const journey = ready.journey.header.id;
   const params = useMemo(() => new URLSearchParams(search), [search]);
-  const decisions = params.get("decisions") === "1";
   const view = useMemo(() => viewFrom(params), [params]);
-  const planned = page === "plan" && projection === "graph" && !decisions;
+  const planned = page === "plan" && projection === "graph";
   const authored = useMemo(() => (planned && view.edit ? journeyAuthored(ready) : undefined), [ready, planned, view.edit]);
   const drawing = useEdgeDrawing(authored);
   const [sheetOpen, setSheetOpen] = useState(false);
@@ -150,7 +150,8 @@ function ReadyFrame({ ready, page, projection, selected, edge }: { ready: Ready 
     setMissing(text !== "" && key === undefined ? text : undefined);
     const found = key === undefined ? undefined : nodeOf(ready, key);
     if (key !== undefined && found !== undefined) {
-      void navigate(canvasPath(journey, revealing(view, found, ready.derived.nodes[key]?.display_state), key));
+      // The result is centred in the view once it is drawn (the canvas reads the request from the navigation).
+      void navigate(canvasPath(journey, revealing(view, { kind: found.kind, ancestors: ancestorsOf(ready.journey.graph.nodes ?? [], key) }, ready.derived.nodes[key]?.display_state), key), { state: { reveal: { key, how: "centre" } } });
     }
   };
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
@@ -182,7 +183,7 @@ function ReadyFrame({ ready, page, projection, selected, edge }: { ready: Ready 
           {page === "summary" ? (
             <JourneyCard ready={ready} page={page} selected={selected} full />
           ) : projection === undefined ? null : (
-            <ProjectionBody ready={ready} page={page} projection={projection} selected={selected} authored={authored} drawing={drawing} />
+            <ProjectionBody ready={ready} page={page} projection={projection} selected={selected} edge={edge} authored={authored} drawing={drawing} />
           )}
           {card === "inline" ? <JourneyCard ready={ready} page={page} selected={selected} /> : null}
         </div>

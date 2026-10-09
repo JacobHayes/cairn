@@ -119,7 +119,7 @@ describe("every old address resolves (2.4, Redirects)", () => {
 
 describe("the canvas's settings in the address", () => {
   it("round-trips every setting and leaves the toolbar's chips alone", () => {
-    const params = new URLSearchParams("decisions=1&kind=action,milestone&open=n_s&show=conditional&lens=gravity&trace=on&edit=on&q=x");
+    const params = new URLSearchParams("decisions=1&detail=work&open=n_s&shut=n_t&kind=action,milestone&show=notrelevant,conditional&lens=gravity&origins=1&edit=on&select=1&q=x");
     const view = viewFrom(params);
     expect(view.rest).toEqual([["decisions", "1"], ["q", "x"]]);
     expect(Object.fromEntries(paramsOf(view))).toEqual(Object.fromEntries(params));
@@ -129,10 +129,10 @@ describe("the canvas's settings in the address", () => {
 
   it("reveals a found node by showing what the view hides of it, and only that", () => {
     const view = viewFrom(new URLSearchParams("kind=group&show=conditional&decisions=1&q=x"));
-    const found = revealing(view, { kind: "action", parent: "n_plan" }, "not_relevant");
-    expect(Object.fromEntries(paramsOf(found))).toEqual({ kind: "group,action", open: "n_plan", trace: "on", q: "x" });
-    const decision = revealing(viewFrom(new URLSearchParams("show=notrelevant")), { kind: "decision" }, "conditional");
+    const found = revealing(view, { kind: "action", ancestors: ["n_plan", "n_stage"] }, "not_relevant");
+    expect(Object.fromEntries(paramsOf(found))).toEqual({ detail: "all", kind: "group,action", open: "n_plan,n_stage", show: "notrelevant,conditional", q: "x" });
+    const decision = revealing(viewFrom(new URLSearchParams("show=notrelevant")), { kind: "decision", ancestors: [] }, "conditional");
     expect([decision.notRelevant, decision.undecided]).toEqual([true, true]);
-    expect(revealing(viewFrom(new URLSearchParams("show=")), { kind: "group" }, "ready").notRelevant).toBe(false);
+    expect(revealing(viewFrom(new URLSearchParams("show=")), { kind: "group", ancestors: [] }, "ready").notRelevant).toBe(false);
   });
 });

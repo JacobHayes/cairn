@@ -19,9 +19,9 @@ describe("the active filters under the toolbar", () => {
     expect(chips[3]?.without).toBe("/journeys/j_a/next/list/nodes/n_x?sort=due&mine=1&kind=action%2Cmilestone&me=1&q=plan");
   });
 
-  it("makes a chip for each kind and relevance the canvas leaves out", () => {
+  it("makes a chip for the kinds the canvas keeps in focus and for conditional nodes it turns off", () => {
     const chips = activeFilters("j_a", "plan", "graph", "?kind=group,decision&show=notrelevant", undefined);
-    expect(chips.map((chip) => chip.label)).toEqual(["no deliverables", "no actions", "no milestones", "no conditional"]);
-    expect(chips[3]?.without).toBe("/journeys/j_a/plan/graph?kind=group%2Cdecision");
+    expect(chips.map((chip) => chip.label)).toEqual(["only group, decision", "no conditional"]);
+    expect(chips[1]?.without).toBe("/journeys/j_a/plan/graph?kind=group%2Cdecision&show=notrelevant%2Cconditional");
   });
 });

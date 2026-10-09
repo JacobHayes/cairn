@@ -1,10 +1,14 @@
 // C15: the layout is deterministic, reads left to right, holds each container's children
-// inside it, and with the previous positions as hints a small edit moves few nodes. ELK runs
-// in-thread here, as the worker runs it.
+// inside it, and with the previous positions as hints a small edit moves few nodes. Every edge
+// is routed in the gap the layout left for it, so its marker is never under a card (5.6), and
+// the whole graph fits the viewport at the PRD limit (C3). ELK runs in-thread here, as the
+// worker runs it.
 import ELK from "elkjs/lib/elk.bundled.js";
 import { describe, expect, test } from "vitest";
 
-import { LAYOUT_MOVED_FRACTION_MAX, hintsOf, layOut, movedNodes, type LayoutNode, type LayoutRequest, type Placement } from "./layout.ts";
+import { MARKER_LENGTH_PX } from "./EdgeLine.tsx";
+import { fitZoom, minZoomOf } from "./gestures.ts";
+import { LAYOUT_MOVED_FRACTION_MAX, edgeId, hintsOf, layOut, movedNodes, type LayoutNode, type LayoutRequest, type Placement } from "./layout.ts";
 
 const CARD = { width: 240, height: 96 };
 const HEADER = 64;
@@ -91,12 +95,12 @@ function absolute(request: LayoutRequest, placed: Placement): Record<string, { x
 describe("the layout (C15)", () => {
   test("the same graph lays out identically twice", async () => {
     const [once, twice] = [await layOut(elk(), fixture), await layOut(elk(), fixture)];
-    expect(Object.keys(once)).toHaveLength(TREE.length);
+    expect(Object.keys(once.nodes)).toHaveLength(TREE.length);
     expect(twice).toEqual(once);
   });
 
   test("an edge between siblings runs left to right", async () => {
-    const placed = await layOut(elk(), fixture);
+    const { nodes: placed } = await layOut(elk(), fixture);
     const parentOf = new Map(TREE.map(([key, parent]) => [key, parent]));
     const siblings = EDGES.filter(([from, to]) => parentOf.get(from) === parentOf.get(to));
     expect(siblings.length).toBeGreaterThan(0);
@@ -106,7 +110,7 @@ describe("the layout (C15)", () => {
   });
 
   test("a container holds its children below its header", async () => {
-    const placed = await layOut(elk(), fixture);
+    const { nodes: placed } = await layOut(elk(), fixture);
     for (const [key, parent] of TREE.filter(([, each]) => each !== undefined)) {
       const [child, box] = [placed[key], placed[parent ?? ""]];
       expect(child && box, key).toBeTruthy();
@@ -134,12 +138,12 @@ describe("the layout (C15)", () => {
   test.each(edits)("%s moves fewer than the stated fraction of nodes", async (_, edited) => {
     const before = await layOut(elk(), fixture);
     const after = await layOut(elk(), { ...edited, hints: hintsOf(before) });
-    const moved = movedNodes(before, after);
+    const moved = movedNodes(before.nodes, after.nodes);
     expect(moved.length / TREE.length, moved.join(" ")).toBeLessThan(LAYOUT_MOVED_FRACTION_MAX);
   });
 
   test("a container's contents move with it and count once", async () => {
-    const before = await layOut(elk(), fixture);
+    const { nodes: before } = await layOut(elk(), fixture);
     const shifted: Placement = { ...before };
     const setup = before["n_setup"];
     expect(setup).toBeDefined();
@@ -150,4 +154,49 @@ describe("the layout (C15)", () => {
     const [was, now] = [absolute(fixture, before), absolute(fixture, shifted)];
     expect((now["n_plan_draft"]?.y ?? 0) - (was["n_plan_draft"]?.y ?? 0)).toBe(100);
   });
+});
+
+describe("edges and the whole graph", () => {
+  test("every edge is routed with room for its marker: the stretch before its tip is long enough and clear of every card (5.6)", async () => {
+    const laid = await layOut(elk(), fixture);
+    const where = absolute(fixture, laid.nodes);
+    const parents = new Set(TREE.flatMap(([, parent]) => (parent === undefined ? [] : [parent])));
+    for (const [from, to] of EDGES) {
+      const [tip, before] = (laid.routes[edgeId({ from, to })] ?? []).slice(-2).reverse();
+      expect(tip && before, `${from} -> ${to} has a route`).toBeTruthy();
+      const length = Math.hypot((tip?.x ?? 0) - (before?.x ?? 0), (tip?.y ?? 0) - (before?.y ?? 0));
+      expect(length, `${from} -> ${to}: room for its marker`).toBeGreaterThanOrEqual(MARKER_LENGTH_PX);
+      // The stretch runs into a card's west side: where the marker begins must be in the gap, not under another card.
+      const back = { x: (tip?.x ?? 0) - ((tip?.x ?? 0) - (before?.x ?? 0)) * (MARKER_LENGTH_PX / length), y: (tip?.y ?? 0) - ((tip?.y ?? 0) - (before?.y ?? 0)) * (MARKER_LENGTH_PX / length) };
+      const under = TREE.filter(([key]) => !parents.has(key)).filter(([key]) => {
+        const [at, size] = [where[key], laid.nodes[key]];
+        return at !== undefined && size !== undefined && back.x > at.x + 0.5 && back.x < at.x + size.width - 0.5 && back.y > at.y + 0.5 && back.y < at.y + size.height - 0.5;
+      });
+      expect(under, `${from} -> ${to}: its marker begins under a card`).toEqual([]);
+    }
+  });
+
+  test("fit-all on 2,000 generated nodes keeps every card inside the viewport (C3); the layout time is reported", async () => {
+    const [layers, perLayer] = [40, 50];
+    const key = (layer: number, at: number) => `n_${String(layer)}_${String(at % perLayer)}`;
+    const nodes: LayoutNode[] = [];
+    const edges: { from: string; to: string }[] = [];
+    for (let layer = 0; layer < layers; layer += 1) {
+      for (let at = 0; at < perLayer; at += 1) {
+        nodes.push({ key: key(layer, at), width: 240, height: 90 });
+        if (layer > 0) {
+          edges.push({ from: key(layer - 1, at), to: key(layer, at) }, { from: key(layer - 1, at + 7), to: key(layer, at) });
+        }
+      }
+    }
+    const started = performance.now();
+    const laid = await layOut(elk(), { nodes, edges });
+    console.info(`layout of ${String(nodes.length)} nodes and ${String(edges.length)} edges: ${String(Math.round(performance.now() - started))} ms`);
+    const boxes = Object.values(laid.nodes);
+    const bounds = { width: Math.max(...boxes.map((box) => box.x + box.width)), height: Math.max(...boxes.map((box) => box.y + box.height)) };
+    const fit = fitZoom(bounds, { width: 840, height: 650 }, { top: 24, right: 24, bottom: 24, left: 24 });
+    // The canvas can zoom out as far as the whole graph needs (a fixed 0.1 could not: the fit is below it).
+    expect(fit).toBeLessThan(0.1);
+    expect(minZoomOf(fit)).toBeLessThanOrEqual(fit);
+  }, 60_000);
 });

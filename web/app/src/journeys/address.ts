@@ -15,7 +15,7 @@
 // Every address the earlier screens had still resolves (`legacyRedirect`).
 import type { Schema } from "@cairn/client";
 
-import { canvasPath, DEFAULT_VIEW, graphQueryFromOld, OLD_CANVAS_PARAMS } from "../canvas/settings.ts";
+import { canvasPath, graphQueryFromOld, OLD_CANVAS_PARAMS, type CanvasView } from "../canvas/settings.ts";
 import type { JourneyIndexQuery } from "../data/host.ts";
 
 export type JourneyStatus = Schema<"JourneyStatus">;
@@ -261,15 +261,15 @@ export function pageOfPath(pathname: string): { page: JourneyPage; projection: P
 
 /**
  * Where the address agents post for a node resolves (2.4, Deep link): a node on the acting
- * frontier opens on NEXT, LIST with its row selected; any other opens on PLAN, GRAPH,
- * traced, with its container opened, and shown even when it is not relevant. Either way the
- * inspector opens on it.
+ * frontier opens on NEXT, LIST with its row selected; any other opens on PLAN, GRAPH, selected
+ * (so traced), with its containers expanded, and shown even when it is not relevant (`reveal` is
+ * the canvas's view with that done). Either way the inspector opens on it.
  */
-export function deepLinkTarget(journey: string, node: string, where: { onFrontier: boolean; parent: string | undefined }): string {
+export function deepLinkTarget(journey: string, node: string, where: { onFrontier: boolean; reveal: CanvasView }): string {
   if (where.onFrontier) {
     return pagePath(journey, "next", "list", node);
   }
-  return canvasPath(journey, { ...DEFAULT_VIEW, container: where.parent, trace: true }, node);
+  return canvasPath(journey, where.reveal, node);
 }
 
 /**

@@ -45,6 +45,7 @@ test("B7, C14: the scenario journey upgraded to version 2, each conflict resolve
   await confirmAndApply(page);
 
   await page.getByTestId("applied-journey").click();
+  await page.getByTestId("ladder").getByText("All", { exact: true }).click();
   await expect(nodeCard(page, "n_signoff")).toBeVisible();
   await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Access to the environment");
   await expect(nodeCard(page, "n_workload")).toHaveCount(0);

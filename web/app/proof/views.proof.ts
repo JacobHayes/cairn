@@ -79,9 +79,9 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   await beat(page);
   await goTo(page, "plan", "graph");
   await page.getByTestId("chip-decisions").click();
-  await expect(page.getByTestId("decision-view")).toBeVisible();
+  await expect(page.getByTestId("canvas")).toBeVisible();
   await beat(page);
-  await page.locator('[data-testid="decision-view"] [data-testid="node-card"][data-node="n_partner_runs"]').getByTestId("card-open").click();
+  await page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_partner_runs"]').getByTestId("card-open").click();
   await beat(page);
   await partnerRunsTesting(page);
   await beat(page);

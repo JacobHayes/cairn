@@ -20,7 +20,7 @@ test("C11, C12: old addresses land on their new page, and the landing opens Mine
   await visit(page, "browser", "/journeys/j_hiring/walkthrough");
   await expect(page.getByTestId("chip-decisions")).toHaveAttribute("aria-pressed", "true");
   await visit(page, "browser", "/journeys/j_hiring/decisions");
-  await expect(page.getByTestId("decision-view")).toBeVisible();
+  await expect(page.getByTestId("canvas")).toBeVisible();
   await visit(page, "browser", "/");
   await expect(page).toHaveURL(/\/mine$/);
   await expect(page.getByTestId("mine-journey").first()).toBeVisible();
@@ -38,7 +38,7 @@ test("the address agents post for a node opens the page that shows it, with its 
   await expect(page).toHaveURL(/\/journeys\/j_hiring\/next\/list\/nodes\/n_offer$/);
   await expect(nodePanel(page, "n_offer")).toBeVisible();
   await visit(page, "browser", "/journeys/j_vendor_eval/nodes/n_final_report");
-  await expect(page).toHaveURL(/\/journeys\/j_vendor_eval\/plan\/graph\/nodes\/n_final_report\?open=n_final_review&trace=on$/);
+  await expect(page).toHaveURL(/\/journeys\/j_vendor_eval\/plan\/graph\/nodes\/n_final_report\?open=n_final_review%2Cn_reporting$/);
   await expect(nodePanel(page, "n_final_report")).toBeVisible();
   await expect(page.locator('[data-testid="node-card"][data-node="n_final_report"]')).toBeVisible();
 });

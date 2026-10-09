@@ -115,6 +115,11 @@ function JourneyMenu({ ready, view, selected, onPanel, onKeys }: { ready: Ready;
                 {view.edit ? "Done editing structure" : "Edit structure"}
               </Link>
             )}
+            {archived ? null : (
+              <Link role="menuitem" className="menu-item" data-testid="select-toggle" data-status={view.select ? "on" : "off"} to={canvasPath(header.id, { ...view, select: !view.select }, selected)} onClick={close}>
+                {view.select ? "Done selecting" : "Select nodes"}
+              </Link>
+            )}
             {item("menu-rename", "Edit name and description", "rename", archived)}
             {upgradeTo === undefined ? null : item("menu-upgrade", `Upgrade to v${String(upgradeTo)}...`, "upgrade")}
             {item("menu-save", "Save as route...", "save")}

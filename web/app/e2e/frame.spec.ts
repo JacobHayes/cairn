@@ -110,10 +110,10 @@ test.describe("a phone's map", () => {
 
   test("opens a tapped decision as a sheet over the map, with nothing off the side", async ({ page }) => {
     await openAt(page, "browser", "j_hiring", "plan/graph?decisions=1&map=1");
-    await page.locator('[data-testid="decision-view"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").click();
+    await page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").click();
     const panel = nodePanel(page, "n_make_offer");
     await expect(panel).toBeVisible();
-    await expect(page).toHaveURL(/\/plan\/graph\/nodes\/n_make_offer\?decisions=1&map=1$/);
+    await expect(page).toHaveURL(/\/plan\/graph\/nodes\/n_make_offer\?map=1&decisions=1$/);
     await expect(page.getByTestId("map-full")).toBeVisible();
     const sheet = (await page.locator(".inspector").boundingBox())?.y ?? 0;
     expect(sheet).toBeGreaterThan(300);

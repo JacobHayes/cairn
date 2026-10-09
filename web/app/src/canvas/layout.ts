@@ -48,6 +48,15 @@ export interface Placed extends Point {
 /** Each node's place, by key. */
 export type Placement = Record<string, Placed>;
 
+/** Where each edge runs, by `edgeId`: points on the canvas (not relative to a container) from its source to its target. */
+export type Routes = Record<string, Point[]>;
+
+/** What one layout answers: the nodes' places and the edges' routes. */
+export interface Layout {
+  nodes: Placement;
+  routes: Routes;
+}
+
 /**
  * C15's stated bound: adding one node (or one requirement) to the vendor evaluation's canvas,
  * laid out with the previous positions as hints, moves fewer than this fraction of its nodes
@@ -57,9 +66,9 @@ export type Placement = Record<string, Placed>;
 export const LAYOUT_MOVED_FRACTION_MAX = 0.25;
 
 /** The space between nodes, between layers, and inside a container (px). */
-export const NODE_GAP_PX = 28;
-export const LAYER_GAP_PX = 56;
-export const CONTAINER_PAD_PX = 14;
+export const NODE_GAP_PX = 24;
+export const LAYER_GAP_PX = 96;
+export const CONTAINER_PAD_PX = 20;
 
 /** C15: ELK's options for every layout; left to right, as the PRD's flowcharts read. */
 const ROOT_OPTIONS: LayoutOptions = {
@@ -70,8 +79,26 @@ const ROOT_OPTIONS: LayoutOptions = {
   "elk.spacing.nodeNode": String(NODE_GAP_PX),
   "elk.layered.spacing.nodeNodeBetweenLayers": String(LAYER_GAP_PX),
   "elk.spacing.componentComponent": String(LAYER_GAP_PX),
+  // Edges are routed in the gaps these leave, so an arrowhead is never under a card (5.6).
+  "elk.edgeRouting": "ORTHOGONAL",
+  "elk.layered.spacing.edgeNodeBetweenLayers": "24",
+  "elk.layered.spacing.edgeEdgeBetweenLayers": "12",
+  "elk.spacing.edgeNode": "16",
+  "elk.spacing.edgeEdge": "10",
+  // Brandes-Koepf balanced, not network simplex: on the vendor evaluation, one added requirement
+  // moved up to 12 of its 27 nodes with network simplex, past C15's bound; balanced keeps every
+  // edit within it (layout.test.ts holds the five edits).
+  "elk.layered.nodePlacement.strategy": "BRANDES_KOEPF",
+  "elk.layered.nodePlacement.bk.fixedAlignment": "BALANCED",
+  // Route points come back in the root's coordinates whatever container the edge crosses.
+  "org.eclipse.elk.json.edgeCoords": "ROOT",
   "elk.randomSeed": "1",
 };
+
+/** An edge's id in the layout and on the canvas: the ends it joins. */
+export function edgeId(edge: { from: string; to: string }): string {
+  return `${edge.from}->${edge.to}`;
+}
 
 /** The ELK graph for a request. */
 export function elkGraph(request: LayoutRequest): ElkNode {
@@ -107,7 +134,7 @@ export function elkGraph(request: LayoutRequest): ElkNode {
   }
   const edges: ElkExtendedEdge[] = request.edges
     .filter((edge) => shapes.has(edge.from) && shapes.has(edge.to))
-    .map((edge, index) => ({ id: `e${String(index)}`, sources: [edge.from], targets: [edge.to] }));
+    .map((edge) => ({ id: edgeId(edge), sources: [edge.from], targets: [edge.to] }));
   const layoutOptions: LayoutOptions = { ...ROOT_OPTIONS };
   if (hinted) {
     layoutOptions["elk.layered.crossingMinimization.semiInteractive"] = "true";
@@ -128,19 +155,32 @@ export function placement(graph: ElkNode): Placement {
   return placed;
 }
 
+/** Each laid-out edge's route (5.6): ELK's orthogonal sections, start to bends to end, in root coordinates. */
+export function routes(graph: ElkNode): Routes {
+  const routed: Routes = {};
+  for (const edge of graph.edges ?? []) {
+    const points = (edge.sections ?? []).flatMap((section) => [section.startPoint, ...(section.bendPoints ?? []), section.endPoint]);
+    if (points.length >= 2) {
+      routed[edge.id] = points.map(({ x, y }) => ({ x, y }));
+    }
+  }
+  return routed;
+}
+
 /** What lays out an ELK graph: ELK itself, in a worker or in-thread. */
 export interface Elk {
   layout(graph: ElkNode): Promise<ElkNode>;
 }
 
 /** C15: lays out a request with `elk`. */
-export async function layOut(elk: Elk, request: LayoutRequest): Promise<Placement> {
-  return placement(await elk.layout(elkGraph(request)));
+export async function layOut(elk: Elk, request: LayoutRequest): Promise<Layout> {
+  const laid = await elk.layout(elkGraph(request));
+  return { nodes: placement(laid), routes: routes(laid) };
 }
 
-/** A placement's positions, as hints for the next revision's layout of the same view. */
-export function hintsOf(placed: Placement): Record<string, Point> {
-  return Object.fromEntries(Object.entries(placed).map(([key, { x, y }]) => [key, { x, y }]));
+/** A layout's positions, as hints for the next revision's layout of the same view. */
+export function hintsOf(laid: Layout): Record<string, Point> {
+  return Object.fromEntries(Object.entries(laid.nodes).map(([key, { x, y }]) => [key, { x, y }]));
 }
 
 /**
