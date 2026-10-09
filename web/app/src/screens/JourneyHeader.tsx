@@ -4,7 +4,6 @@
 // page, copy its link, list the keys: the flows the overview held, B7 to B9, A19). Route, version
 // and progress, and what is the viewer's, are on the journey card. When completion is
 // suggested, a band under the header offers it.
-// The sentence about what the tab derived is gone from here: it belongs to the sync chip.
 import { useState } from "react";
 import { Link } from "react-router";
 
@@ -20,6 +19,7 @@ import { statusActions } from "../journeys/lifecycle.ts";
 import { useSuggested } from "../journeys/suggested.ts";
 import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
 import { Button } from "../ui/kit.tsx";
+import { Receipt } from "../ui/Receipt.tsx";
 import { Menu } from "./Menu.tsx";
 import { Refused } from "./Refused.tsx";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
@@ -141,7 +141,6 @@ export function JourneyHeader({ ready, view, selected, onKeys }: { ready: Ready;
   const write = useScreenWrite();
   const suggested = useSuggested(ready);
   const [panel, setPanel] = useState<Panel | undefined>(undefined);
-  const { key } = ready;
   return (
     <section className="stack journey-header" aria-label={header.name} data-testid="journey-header">
       <div className="row">
@@ -151,8 +150,6 @@ export function JourneyHeader({ ready, view, selected, onKeys }: { ready: Ready;
         <LifecycleMenu ready={ready} write={write} onDelete={() => { setPanel("delete"); }} />
         <JourneyMenu ready={ready} view={view} selected={selected} onPanel={setPanel} onKeys={onKeys} />
       </div>
-      {/* What the sync chip's popover will say; the browser tests read the revision and the day from it. */}
-      <span hidden data-testid="derivation" data-revision={key.revision} data-deployment={key.deployment_revision} data-today={key.today} />
       {header.status === "active" && suggested ? (
         <div className="callout row" data-testid="completion-suggested">
           <span>Everything in scope is done.</span>
@@ -167,7 +164,7 @@ export function JourneyHeader({ ready, view, selected, onKeys }: { ready: Ready;
         </div>
       ) : null}
       {header.status === "archived" ? <span className="muted small">Archived: it accepts only un-archiving or deletion.</span> : null}
-      {write.rejected === undefined ? null : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejected === undefined ? <Receipt receipt={write.receipt} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
       {panel === "rename" ? <HeaderEditor ready={ready} onClose={() => { setPanel(undefined); }} /> : null}
       {panel === "delete" ? <DeleteJourney ready={ready} onCancel={() => { setPanel(undefined); }} /> : null}
       {panel === "upgrade" || panel === "save" || panel === "relink" ? (

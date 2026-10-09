@@ -5,9 +5,10 @@
 import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
-import { useSession, useSkew } from "../data/react.ts";
+import { currentAddress, unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
 import type { Rejection } from "../data/writes.ts";
-import type { Mutation, Ready } from "./model.ts";
+import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
+import { titleOf, type Mutation, type Ready } from "./model.ts";
 
 /**
  * What an edit was drafted against: the journey revision its author saw (H5) and the
@@ -36,8 +37,10 @@ export interface NodeWrite {
   /** Version skew or a write in flight: no new write starts. */
   disabled: boolean;
   /** The last attempt's rejection, until dismissed or a later attempt. */
-  failed: { attempt: Attempt; rejection: Rejection } | undefined;
+  failed: { attempt: Attempt; rejection: Rejection; address?: string | undefined } | undefined;
   dismiss: () => void;
+  /** What the last landed write leaves under the control, for a few seconds. */
+  receipt: ReceiptState | undefined;
 }
 
 /** E6: whether a patch writes an entity reference, so it names the deployment revision it saw. */
@@ -53,9 +56,10 @@ export function writesEntities(mutations: Mutation[]): boolean {
 /**
  * A section's write path for the journey `view` shows. Its last rejection is kept as a draft
  * under `scope` (the section and its node), so it, and the resolution being chosen, survive
- * a reload as typed text does.
+ * a reload as typed text does. While it stands the sync chip counts it, named by `node`'s
+ * title (the one the section is about).
  */
-export function useNodeWrite(view: Ready, scope: string): NodeWrite {
+export function useNodeWrite(view: Ready, scope: string, node?: string): NodeWrite {
   const session = useSession();
   const skew = useSkew();
   const [pending, setPending] = useState(false);
@@ -64,8 +68,19 @@ export function useNodeWrite(view: Ready, scope: string): NodeWrite {
   const revision = view.journey.revision;
   const deployment = view.key.deployment_revision;
   const current: Seen = { base: revision, deployment };
+  const receipt = useReceipt();
+  const dismiss = () => {
+    setFailed(undefined);
+  };
+  const report = useProblem(`rejected:${journey}:${scope}`, failed === undefined ? undefined : unlandedOf(failed.rejection, failed.address), {
+    label: node === undefined ? view.journey.header.name : titleOf(view, node),
+    discard: dismiss,
+  });
   const run = async (mutations: Mutation[], seen: Seen = current): Promise<boolean> => {
     setPending(true);
+    receipt.clear();
+    // Where the edit was made, taken before the wait: the user may be elsewhere when the answer comes.
+    const address = currentAddress();
     const result = await session.write({
       target: { journey },
       baseRevision: seen.base,
@@ -74,7 +89,12 @@ export function useNodeWrite(view: Ready, scope: string): NodeWrite {
     });
     setPending(false);
     const attempt: Attempt = { mutations, base: seen.base, deployment: seen.deployment };
-    setFailed(result.outcome === "rejected" ? { attempt, rejection: result.rejection } : undefined);
+    setFailed(result.outcome === "rejected" ? { attempt, rejection: result.rejection, address } : undefined);
+    // The control may be gone by now (its draft is kept): the chip hears of the result either way.
+    report(result.outcome === "rejected" ? unlandedOf(result.rejection, address) : undefined);
+    if (result.outcome === "landed") {
+      receipt.show(result.warning);
+    }
     return result.outcome === "landed";
   };
   return {
@@ -85,9 +105,8 @@ export function useNodeWrite(view: Ready, scope: string): NodeWrite {
     pending,
     disabled: pending || skew !== undefined,
     failed,
-    dismiss: () => {
-      setFailed(undefined);
-    },
+    dismiss,
+    receipt: receipt.receipt,
   };
 }
 

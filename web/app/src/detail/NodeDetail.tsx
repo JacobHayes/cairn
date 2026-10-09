@@ -22,7 +22,7 @@ import { useNodeWrite } from "./write.ts";
 
 /** F7, E3: the dates with their pin editor; F6: a shortfall's move sent as one patch. */
 function Dates({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `dates:${detail.node.key}`);
+  const write = useNodeWrite(view, `dates:${detail.node.key}`, detail.node.key);
   return (
     <DatesSection
       view={view}

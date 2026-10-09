@@ -7,7 +7,6 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { card, openActing } from "../e2e/acting.ts";
 import { journeyName, startJourney } from "../e2e/around.ts";
-import { dismissNotices } from "../e2e/authoring.ts";
 import { nodePanel } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
@@ -29,7 +28,6 @@ test("an answer with a reason, read back, then revised with none", async ({ page
   await openActing(page, "browser", journey, "plan/graph/nodes/n_partner_runs?decisions=1");
   const panel = nodePanel(page, "n_partner_runs");
   await expect(panel.getByTestId("rationale").locator("li")).toHaveCount(2);
-  await dismissNotices(page);
   await page.getByTestId("decision-table").scrollIntoViewIfNeeded();
   await shot(page, "2-decision-view-and-detail");
 
@@ -40,7 +38,6 @@ test("an answer with a reason, read back, then revised with none", async ({ page
   await shot(page, "3-a-new-answer-starts-empty");
   await panel.getByRole("button", { name: "Save the answer" }).click();
   await expect(panel.getByTestId("rationale")).toHaveCount(0);
-  await dismissNotices(page);
   await panel.getByTestId("history").locator("summary").click();
   await expect(panel.getByTestId("history-answer")).toHaveCount(2);
   await panel.getByTestId("history").scrollIntoViewIfNeeded();

@@ -189,24 +189,57 @@ body {
   border-top: 0;
 }
 
-/* The status strip: graphite, 28px, with whether the view is live on its right. */
+/* The status strip: graphite, 28px, with the sync chip on its right. It does not clip: the chip's popover opens upward from it. */
 .frame > .strip {
   grid-area: strip;
   background: var(--chrome-bg);
   flex-wrap: nowrap;
   white-space: nowrap;
-  overflow: hidden;
-}
-.strip .badge {
-  background: transparent;
-  color: var(--rail-ink);
-  border-color: var(--rail-border);
-  max-width: 100%;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
 .strip kbd {
   background: transparent;
+}
+.sync-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.sync-popover {
+  right: 0;
+  bottom: calc(100% + var(--space-2));
+  width: 360px;
+  font: 400 14px / 1.5 var(--font-body);
+  letter-spacing: 0;
+  text-transform: none;
+  white-space: normal;
+}
+.sync-popover:focus {
+  outline: none;
+}
+.sync-popover p {
+  margin: 0;
+}
+.sync-section h3 {
+  margin: 0 0 var(--space-2);
+  font: 500 12px / 1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-secondary);
+}
+.sync-warning {
+  display: block;
+}
+.sync-section ul {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+@media (max-width: 719px) {
+  .sync-popover {
+    width: min(360px, calc(100vw - 2 * var(--space-3)));
+  }
 }
 
 /* ---- the inspector column --------------------------------------------------------------------- */
@@ -488,8 +521,8 @@ body {
   }
 }
 
-/* ---- toasts and callouts ---------------------------------------------------------------------- */
-/* What just happened rises at the workspace's bottom right, above the strip, so it never covers what the strip owns. */
+/* ---- the toast and callouts ------------------------------------------------------------------- */
+/* A confirmation that is not about syncing rises at the workspace's bottom right, above the strip, so it never covers the sync chip. */
 .toasts {
   position: absolute;
   right: var(--space-3);
@@ -522,26 +555,20 @@ body {
     bottom: calc(var(--sheet-full) + var(--space-3));
   }
 }
-.toast-card {
+/* The design's toast is fixed to the window; here the container places it, and the pointer pauses it. */
+.toasts > .toast {
+  position: static;
   pointer-events: auto;
-  padding: var(--space-2) 14px;
-  border: 1px solid var(--rail-border);
-  border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--rail-ink);
-  font: 400 13px / 1.5 var(--font-mono);
-  letter-spacing: 0;
-  box-shadow: var(--shadow-md);
 }
-.toast-card[data-problem="true"] {
+.toasts > .toast[data-tone="problem"] {
   border-color: var(--color-error);
 }
-.toast-card button {
-  min-height: 24px;
-  padding: 0 8px;
-  background: transparent;
-  color: var(--rail-ink);
-  border-color: var(--rail-border);
+.receipt {
+  color: var(--color-success);
+  font-size: 14px;
+}
+.receipt > .small {
+  color: var(--color-warning);
 }
 
 .callout {

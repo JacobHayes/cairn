@@ -12,7 +12,7 @@ import { Link } from "react-router";
 
 import { targetKey, type AssistantAction, type AssistantHost, type AssistantTarget } from "../data/assistant.ts";
 import { useDraft } from "../data/drafts.ts";
-import { linesOf, mayNotApply } from "../data/notices.ts";
+import { linesOf, mayNotApply } from "../data/activity.ts";
 import { useSession } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { AssistantSlot, useAssistantDock, useFrameActions, useFrameState } from "../shell/frame.tsx";

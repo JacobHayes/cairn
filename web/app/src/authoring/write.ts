@@ -7,9 +7,10 @@
 // would say before Save.
 import type { Schema } from "@cairn/client";
 import { HostFailure } from "@cairn/wasm";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 
-import { useSession, useSkew, useViewer } from "../data/react.ts";
+import { unlandedOf, useProblem, useSession, useSkew, useViewer } from "../data/react.ts";
+import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
 import { newPatchId, type Rejection } from "../data/writes.ts";
 import { writesEntities } from "../detail/write.ts";
 import type { Mutation } from "./graph.ts";
@@ -41,6 +42,8 @@ export interface AuthorWrite {
   /** The last attempt's rejection (the preview's or the host's), until dismissed or a later attempt. */
   failed: { sent: Sent; rejection: Rejection } | undefined;
   dismiss: () => void;
+  /** What the last landed write leaves under the form, for a few seconds. */
+  receipt: ReceiptState | undefined;
 }
 
 const LOCAL_USER = "u_local";
@@ -87,9 +90,17 @@ export function useAuthorWrite(authored: Authored): AuthorWrite {
   const preview = usePreviewer(authored);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState<AuthorWrite["failed"]>();
+  const receipt = useReceipt();
+  const key = `author:${useId()}`;
+  const dismiss = () => {
+    setFailed(undefined);
+  };
+  useProblem(key, failed === undefined ? undefined : unlandedOf(failed.rejection), { discard: dismiss });
+  useEffect(() => () => { session.sync.resolve(key); }, [session, key]);
   const run = async (mutations: Mutation[], places: Place[] = [], base = authored.revision): Promise<boolean> => {
     const sent = { mutations, places };
     setPending(true);
+    receipt.clear();
     const previewed = await preview(mutations);
     if (previewed.outcome === "rejected") {
       setPending(false);
@@ -105,9 +116,12 @@ export function useAuthorWrite(authored: Authored): AuthorWrite {
     });
     setPending(false);
     setFailed(result.outcome === "rejected" ? { sent, rejection: result.rejection } : undefined);
+    if (result.outcome === "landed") {
+      receipt.show(result.warning);
+    }
     return result.outcome === "landed";
   };
-  return { run, pending, disabled: pending || skew !== undefined, failed, dismiss: () => { setFailed(undefined); } };
+  return { run, pending, disabled: pending || skew !== undefined, failed, dismiss, receipt: receipt.receipt };
 }
 
 /** How long typing settles before a form's preview runs. */

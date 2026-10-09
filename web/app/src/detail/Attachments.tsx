@@ -147,7 +147,7 @@ export function AnnotationList({
   summary?: string;
   bare?: boolean;
 }) {
-  const write = useNodeWrite(view, `annotations:${node ?? "journey"}`);
+  const write = useNodeWrite(view, `annotations:${node ?? "journey"}`, node ?? undefined);
   const form = useFormDraft<AnnotationDraft>(write.journey, node ?? "journey", "annotation");
   const types = node === null ? ANNOTATION_TYPES.filter((type) => type !== "artifact") : ANNOTATION_TYPES;
   const edit = (annotation: Annotation) => {

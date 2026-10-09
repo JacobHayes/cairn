@@ -10,7 +10,7 @@ import { join } from "node:path";
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
 import { answerCard, card, daysAfter, listKeys, nextItem, nextKeys, openActing, passOrder, revisionAfter, select, startVendorJourney } from "../e2e/acting.ts";
-import { derivedRevision, goTo } from "../e2e/shell.ts";
+import { derivedRevision, goTo, syncChip } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${name}.png`) });
@@ -88,7 +88,7 @@ test("the next list ranked, re-sorted, and stalled", async ({ page }) => {
   record("nextBySlack", await nextRows(page));
   await shot(page, "7-next-re-sorted-by-slack");
   await openActing(page, "browser", "j_hiring", "next/list");
-  const today = (await page.getByTestId("derivation").getAttribute("data-today")) ?? "";
+  const today = (await syncChip(page).getAttribute("data-today")) ?? "";
   await nextItem(page, "n_offer").getByRole("button", { name: "Snooze until a date" }).click();
   await nextItem(page, "n_offer").getByLabel("Snooze until").fill(daysAfter(today, 7));
   await nextItem(page, "n_offer").getByTestId("snooze-date-form").getByRole("button", { name: "Save" }).click();

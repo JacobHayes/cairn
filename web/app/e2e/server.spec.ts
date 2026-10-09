@@ -7,17 +7,21 @@ import { expect, test, type APIRequestContext, type Page } from "@playwright/tes
 
 import {
   countDocumentFetches,
+  derived,
   derivedRevision,
   fresh,
   goTo,
   goWithin,
+  live,
   nodeCard,
   open,
   openJourney,
+  recentSaves,
   rename,
   renameOf,
   save,
   startRename,
+  syncChip,
 } from "./shell.ts";
 
 const title = (page: Page, node: string) => nodeCard(page, node).getByTestId("title");
@@ -26,10 +30,10 @@ test("an edit in one page appears in another", { tag: "@server" }, async ({ cont
   const [one, two] = [await context.newPage(), await context.newPage()];
   await openJourney(one, "server", "j_hiring");
   await openJourney(two, "server", "j_hiring");
-  await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
+  await live(two);
   const renamed = fresh("Close out");
   await rename(one, "n_close_out", renamed);
-  await expect(one.getByTestId("notice")).toHaveAttribute("data-tone", "saved");
+  await recentSaves(one);
   await expect(title(two, "n_close_out")).toHaveText(renamed);
   expect(await derivedRevision(two)).toBe(await derivedRevision(one));
 });
@@ -60,6 +64,7 @@ test("edits to one field surface a conflict", { tag: "@server" }, async ({ conte
   await rename(one, "n_onsite", theirs);
   await save(two, "n_onsite");
   await expect(two.getByTestId("conflict")).toContainText("n_onsite");
+  await expect(syncChip(two)).toHaveText("CONFLICT · 1");
   await expect(renameOf(two, "n_onsite").getByRole("textbox")).toHaveValue(mine);
   await expect(title(one, "n_onsite")).toHaveText(theirs);
   await two.getByRole("button", { name: "Keep my edit on the current version" }).click();
@@ -81,7 +86,7 @@ test("a later page shows the edit", { tag: "@server" }, async ({ context }) => {
   await two.getByRole("link", { name: "Launch the reporting release" }).click();
   await goTo(two, "plan", "graph");
   await expect(title(two, "n_docs")).toHaveText(renamed);
-  await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
+  await live(two);
   const later = await context.newPage();
   await openJourney(later, "server", "j_launch");
   await expect(title(later, "n_docs")).toHaveText(renamed);
@@ -112,11 +117,11 @@ test("a deployment tick refetches the deployment context and re-derives", { tag:
     }
   });
   await openJourney(page, "server", "j_bakeoff");
-  await expect(page.getByTestId("live")).toHaveAttribute("data-status", "live");
+  await live(page);
   const before = await derivedRevision(page);
   const fetchedBefore = deploymentFetches.length;
   const revision = await createEntity(page.request);
-  await expect(page.getByTestId("derivation")).toHaveAttribute("data-deployment", String(revision));
+  await expect(syncChip(page)).toHaveAttribute("data-deployment", String(revision));
   expect(await derivedRevision(page)).toBe(before);
   expect(deploymentFetches.length).toBe(fetchedBefore + 1);
 });
@@ -134,13 +139,13 @@ test("version skew stops the tab and asks for a reload, keeping unsent edits", {
     await route.fulfill({ response, json: { ...document, engine_version: "99.0.0" } });
   });
   await rename(one, "n_plan", fresh("Plan"));
-  await expect(two.getByTestId("skew")).toBeVisible();
+  await expect(syncChip(two)).toHaveAttribute("data-state", "new-version");
   await expect(renameOf(two, "n_criteria").getByRole("button", { name: "Save" })).toBeDisabled();
   expect(await derivedRevision(two)).toBe(held);
   await two.unroute("**/api/journeys/j_vendor_eval/document");
-  await two.getByRole("button", { name: "Reload" }).click();
-  await expect(two.getByTestId("derivation")).toBeAttached();
-  await expect(two.getByTestId("skew")).toHaveCount(0);
+  await syncChip(two).click();
+  await derived(two);
+  await expect(syncChip(two)).not.toHaveAttribute("data-state", "new-version");
   await expect(renameOf(two, "n_criteria").getByRole("textbox")).toHaveValue(unsent);
   expect(await derivedRevision(two)).toBe(await derivedRevision(one));
 });
@@ -149,7 +154,7 @@ test("an address that names no journey is shown missing, and the tab stays live"
   const [one, two] = [await context.newPage(), await context.newPage()];
   await open(two, "server", "/journeys/not-a-journey");
   await expect(two.getByTestId("journey-missing")).toBeVisible();
-  await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
+  await live(two);
   await two.getByRole("link", { name: "Journeys", exact: true }).click();
   await two.getByRole("link", { name: "Launch the reporting release" }).click();
   await goTo(two, "plan", "graph");
@@ -197,7 +202,7 @@ test("a draft follows its journey, not the screen it was typed on", { tag: "@ser
   await openJourney(page, "server", copy);
   await expect(nodeCard(page, "n_offer")).toBeVisible();
   await open(page, "server", "/journeys/j_hiring/plan/graph");
-  await expect(page.getByTestId("derivation")).toBeAttached();
+  await derived(page);
   const draft = fresh("Offer, j_hiring's draft");
   await startRename(page, "n_offer", draft);
   await goWithin(page, `/journeys/${copy}/plan/graph/nodes/n_offer`);

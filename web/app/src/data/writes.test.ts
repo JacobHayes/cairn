@@ -1,11 +1,13 @@
 // The shared write path: H5's safe retry through the host with a fresh patch id, D7's
-// consequences noticed, and nothing sent under version skew.
+// consequences recorded as a save with its warning, what the sync chip says about a write
+// that did not land, and nothing sent under version skew.
 import { describe, expect, it } from "vitest";
 
+import { Activity, consequenceLines, warningOf } from "./activity.ts";
 import { FakeHost } from "./fake.test-support.ts";
-import { Notices, consequenceLines } from "./notices.ts";
 import { SkewLatch } from "./skew.ts";
-import { newPatchId, patchOf, write, type WriteIntent } from "./writes.ts";
+import { SyncStatus } from "./sync.ts";
+import { newPatchId, patchOf, write, type WriteEnv, type WriteIntent } from "./writes.ts";
 
 const intent: WriteIntent = {
   target: { journey: "j_one" },
@@ -14,6 +16,13 @@ const intent: WriteIntent = {
 };
 
 const receipt = { patch_id: "p_x", domain: { journey: "j_one" }, content_hash: "h", revision: 4 };
+
+const titles: Record<string, string> = { n_a: "Draft the plan", n_b: "Kickoff" };
+
+function envOf(host: FakeHost, skew = new SkewLatch()): WriteEnv {
+  const timers = { set: () => 0, clear: () => undefined };
+  return { host, skew, activity: new Activity(), sync: new SyncStatus(timers, () => 0, false), titleOf: (_journey, node) => titles[node] ?? node };
+}
 
 describe("write", () => {
   it("sends a patch drafted against the revision its author saw, with a fresh id", () => {
@@ -26,35 +35,70 @@ describe("write", () => {
     expect(patchOf({ ...intent, deploymentRevision: 2 })).toMatchObject({ deployment_revision: 2 });
   });
 
-  it("retries a safe stale answer on the reported revision, lands, and notices what it caused", async () => {
+  it("retries a safe stale answer on the reported revision, lands, and records the save with its warning", async () => {
     const host = new FakeHost();
-    const notices = new Notices();
+    const env = envOf(host);
     const conflicts = [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 5 }];
     host.answers = [
       { outcome: "rejected", rejection: { rejection: "stale", conflicts, intervening: [] } },
       { outcome: "answered", answer: { outcome: "applied", receipt, consequences: { j_one: { overdue: ["n_b"] } } } },
     ];
-    const result = await write(host, new SkewLatch(), notices, intent);
-    expect(result).toMatchObject({ outcome: "landed", resubmitted: 1 });
+    const result = await write(env, intent);
+    expect(result).toMatchObject({ outcome: "landed", resubmitted: 1, warning: "Kickoff is now overdue." });
     expect(host.sent.map((patch) => patch.base_revision)).toEqual([3, 5]);
     expect(new Set(host.sent.map((patch) => patch.id)).size).toBe(1);
-    expect(notices.current.map((notice) => notice.lines)).toEqual([[{ kind: "overdue", journey: "j_one", nodes: ["n_b"] }]]);
+    expect(env.activity.saves.map(({ text, warning }) => ({ text, warning }))).toEqual([{ text: "Edited Draft the plan", warning: "Kickoff is now overdue." }]);
+    expect(env.sync.summary.state).toBe("saved");
   });
 
-  it("sends nothing once the tab is in version skew", async () => {
+  it("records a save with no warning when the write caused nothing to warn of", async () => {
+    const host = new FakeHost();
+    const env = envOf(host);
+    host.answers = [{ outcome: "answered", answer: { outcome: "applied", receipt, consequences: {} } }];
+    expect(await write(env, intent)).toMatchObject({ outcome: "landed", warning: undefined });
+  });
+
+  it("sends nothing once the tab is in version skew, and the chip says the edit was not sent", async () => {
     const host = new FakeHost();
     const skew = new SkewLatch();
     skew.latch({ document: "2.0.0", engine: "1.0.0" });
-    expect(await write(host, skew, new Notices(), intent)).toEqual({ outcome: "stopped" });
+    const env = envOf(host, skew);
+    expect(await write(env, intent)).toEqual({ outcome: "stopped" });
     expect(host.sent).toEqual([]);
+    expect(env.sync.summary.state).toBe("not-saved");
+    expect(env.sync.problems.map((each) => each.message)).toEqual([expect.stringContaining("Reload")]);
   });
 
-  it("notices a failure, and returns it", async () => {
+  it("keeps a write that got no answer on the chip until the next one to that target lands", async () => {
     const host = new FakeHost();
-    const notices = new Notices();
+    const env = envOf(host);
     host.answers = [{ outcome: "failed", error: { status: 503, message: "busy" } }];
-    expect(await write(host, new SkewLatch(), notices, intent)).toEqual({ outcome: "failed", failure: { status: 503, message: "busy" } });
-    expect(notices.current.map((notice) => notice.tone)).toEqual(["problem"]);
+    expect(await write(env, intent)).toEqual({ outcome: "failed", failure: { status: 503, message: "busy" } });
+    expect(env.sync.summary).toMatchObject({ state: "not-saved", tone: "act" });
+    expect(env.sync.problems.map((problem) => problem.message)).toEqual(["Could not confirm the save: busy"]);
+    host.answers = [{ outcome: "answered", answer: { outcome: "applied", receipt, consequences: {} } }];
+    await write(env, intent);
+    expect(env.sync.problems).toEqual([]);
+  });
+
+  it("drops a failed write from the chip when it is discarded", async () => {
+    const host = new FakeHost();
+    const env = envOf(host);
+    host.answers = [{ outcome: "failed", error: { status: 503, message: "busy" } }];
+    await write(env, intent);
+    env.sync.problems[0]?.discard();
+    expect(env.sync.problems).toEqual([]);
+  });
+});
+
+describe("warningOf (D7)", () => {
+  const titleOf = (_journey: string, node: string) => titles[node] ?? node;
+  it("says one sentence per kind of warning, and nothing when there is none", () => {
+    expect(warningOf([], titleOf)).toBeUndefined();
+    expect(warningOf([{ kind: "overdue", journey: "j_one", nodes: ["n_b"] }], titleOf)).toBe("Kickoff is now overdue.");
+    expect(warningOf([{ kind: "stale", journey: "j_one", nodes: ["n_a", "n_b", "n_c"] }], titleOf)).toBe("Draft the plan and 2 more are now stale.");
+    expect(warningOf([{ kind: "undecided", journey: "j_one", nodes: ["n_a"], unanswered: ["n_flag"] }], titleOf)).toBe("May not apply, since n_flag is unanswered.");
+    expect(warningOf([{ kind: "stalled", journey: "j_one", nodes: [] }], titleOf)).toBe("The journey is now stalled.");
   });
 });
 

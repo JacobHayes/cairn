@@ -6,7 +6,7 @@
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
 import { addEntity, journeyName, mergeEntities, startJourney } from "./around.ts";
-import { fresh, nodeCard, open, openJourney } from "./shell.ts";
+import { fresh, live, nodeCard, open, openJourney } from "./shell.ts";
 
 const patchId = () => `p_${crypto.randomUUID().replaceAll("-", "")}`;
 
@@ -36,7 +36,7 @@ async function journeyOwnedBy(request: APIRequestContext, owner: string): Promis
 test("H6: a journey started in one page appears in another page's index", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await open(two, "server", "/journeys");
-  await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
+  await live(two);
   await expect(two.getByTestId("journey-row").first()).toBeVisible();
   const name = journeyName("Seen elsewhere");
   const id = await startJourney(one, "server", name, { route: "product-launch" });
@@ -50,7 +50,7 @@ test("H6, E6: an entity merge in one page changes the owner another page shows",
   const second = await addEntity(one, fresh("Survivor"));
   const journey = await journeyOwnedBy(one.request, first);
   await openJourney(two, "server", journey);
-  await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
+  await live(two);
   const survivor = (await one.locator(`[data-testid="entity"][data-entity="${second}"]`).getByTestId("entity-name").textContent()) ?? "";
   await expect(nodeCard(two, "n_task").getByTestId("card-owner")).not.toContainText(survivor);
   await mergeEntities(one, second, first);

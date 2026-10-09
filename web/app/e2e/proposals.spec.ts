@@ -8,7 +8,6 @@ import { expect, test } from "@playwright/test";
 import { chooseFromMenu, openRouteDetail, openJourneyCard, routeAction, startJourney } from "./around.ts";
 import { card, openActing, startVendorJourney } from "./acting.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits } from "./proposals.ts";
-import { dismissNotices } from "./authoring.ts";
 import { section, state } from "./detail.ts";
 import { goWithin, nodeCard, openFromCanvas, openJourney, rename } from "./shell.ts";
 
@@ -63,7 +62,6 @@ test("I6: a stale proposal shows what moved, and applies only once refreshed and
   await expect.poll(() => blockers(page)).toEqual([]);
 
   await openJourney(page, "browser", "j_vendor_eval");
-  await dismissNotices(page);
   await rename(page, "n_findings", "Findings, drafted");
   await goWithin(page, address);
   const stale = page.getByTestId("stale");
@@ -128,7 +126,6 @@ test("B10: the placeholder broken down from its triage card through a proposal",
   await form.getByLabel("Piece title").fill("Ingest workload");
   await form.getByRole("button", { name: "Another piece" }).click();
   await form.getByLabel("Piece title").nth(1).fill("Query workload");
-  await dismissNotices(page);
   await form.getByTestId("propose-breakdown").click();
   await reviewOpen(page);
   await expect(page.locator('[data-testid="diff-node"][data-status="added"]')).toHaveCount(2);
@@ -177,7 +174,6 @@ test("C14: an editor follows its change when edits are dropped or another change
   await form.getByLabel("Piece title").fill("Ingest workload");
   await form.getByRole("button", { name: "Another piece" }).click();
   await form.getByLabel("Piece title").nth(1).fill("Query workload");
-  await dismissNotices(page);
   await form.getByTestId("propose-breakdown").click();
   await reviewOpen(page);
 

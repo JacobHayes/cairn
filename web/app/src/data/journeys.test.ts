@@ -1,6 +1,7 @@
 // H6 for a derived journey: refetched only for a tick newer than what is held, for a newer
 // deployment, and when the date passes; never shown older; skew stops it (ARCHITECTURE, Web
 // UI: data flow, version skew).
+import { REOPEN_DELAY_FIRST_MS } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
 import { ENGINE, FakeDeriver, FakeHost, manualTimers, settled } from "./fake.test-support.ts";
@@ -139,7 +140,7 @@ describe("a journey's faults", () => {
     edit(host, "j_one", 4);
     await settled();
     expect(revisionShown(session, "j_one")).toEqual([3, 1, TODAY]);
-    const retry = pending.find((timer) => timer.ms > 0 && timer.ms < 60_000);
+    const retry = pending.find((timer) => timer.ms === REOPEN_DELAY_FIRST_MS);
     retry?.callback();
     await settled();
     expect(revisionShown(session, "j_one")).toEqual([4, 1, TODAY]);
@@ -215,5 +216,27 @@ describe("review round 1", () => {
     expect(session.journeys.view("not-a-journey").status).toBe("missing");
     expect(host.streams.at(-1)?.watching).toEqual(["deployment", "journey:j_one"]);
     expect(host.fetches.has("not-a-journey")).toBe(false);
+  });
+});
+
+describe("the journeys behind", () => {
+  it("reports the failed refetch among journeys behind, not the one that has waited longest", async () => {
+    const { host, session } = await started({ j_one: 3, j_two: 3 });
+    session.journeys.mount("j_one");
+    session.journeys.mount("j_two");
+    await settled();
+    host.open();
+    await settled();
+    let release = () => {};
+    host.holdNext = new Promise((resolve) => {
+      release = resolve;
+    });
+    edit(host, "j_one", 4);
+    await settled();
+    host.failNext = true;
+    edit(host, "j_two", 4);
+    await settled();
+    expect(session.journeys.lag).toMatchObject({ journey: "j_two", failed: true });
+    release();
   });
 });

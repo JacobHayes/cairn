@@ -3,10 +3,10 @@
 // one `set_node_field` patch against that revision (H5). A change elsewhere since is retried
 // transparently; a change to the same node is shown, and the author saves again on the
 // current revision or abandons the edit. Version skew disables saving and keeps the draft.
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
-import { useSession, useSkew } from "../data/react.ts";
+import { unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
 import type { Rejection, WriteResult } from "../data/writes.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { RejectionView } from "./RejectionView.tsx";
@@ -50,6 +50,10 @@ export function TitleEditor({ journey, node, title, revision, showTitle = true }
   const [draft, setDraft] = useDraft<TitleDraft>(`title:${journey}:${node}`);
   const [rejection, setRejection] = useState<Rejection | undefined>();
   const [saving, setSaving] = useState(false);
+  // A rejected rename stays on the sync chip while it is shown here: a conflict, or NOT SAVED.
+  const key = `title:${journey}:${node}`;
+  useProblem(key, rejection === undefined ? undefined : unlandedOf(rejection), { label: title, discard: () => { setRejection(undefined); } });
+  useEffect(() => () => { session.sync.resolve(key); }, [session, key]);
   if (draft === undefined) {
     return (
       <span className="row">

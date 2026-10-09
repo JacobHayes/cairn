@@ -29,7 +29,7 @@ function Item({ view, child, write }: { view: Ready; child: Child; write: NodeWr
 }
 
 export function Checklist({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `checklist:${detail.node.key}`);
+  const write = useNodeWrite(view, `checklist:${detail.node.key}`, detail.node.key);
   const { children } = detail;
   if (children.length === 0) {
     return null;

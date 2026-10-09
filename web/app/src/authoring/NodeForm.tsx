@@ -6,6 +6,7 @@
 // route-copied fields carry their local-edit marker (B4).
 import { useDraft } from "../data/drafts.ts";
 import { Button } from "../ui/kit.tsx";
+import { Receipt } from "../ui/Receipt.tsx";
 import { ConditionEditor } from "./ConditionEditor.tsx";
 import { conditionProblem } from "./condition.ts";
 import { DateRuleEditor } from "./DateRuleEditor.tsx";
@@ -142,7 +143,7 @@ export function NodeForm({ authored, node }: NodeFormProps) {
     <form className="stack" data-testid="node-form" data-node={node.key} onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <Fields props={props} />
       <FormViolations places={places} />
-      {write.failed === undefined ? null : <StaleRejection rejection={write.failed.rejection} onRetry={() => void save(authored.revision)} onDismiss={discard} />}
+      {write.failed === undefined ? <Receipt receipt={write.receipt} /> : <StaleRejection rejection={write.failed.rejection} onRetry={() => void save(authored.revision)} onDismiss={discard} />}
       <span className="row">
         <Button type="submit" primary disabled={write.disabled || !sendable} data-testid="node-form-save">
           Save {changes.length === 0 ? "" : `(${String(changes.length)} ${changes.length === 1 ? "change" : "changes"})`}

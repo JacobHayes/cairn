@@ -151,7 +151,7 @@ export function Acts({ view, facts, onPass, inspected = false }: { view: Ready; 
 }
 
 function InlineActs({ view, facts, onPass }: { view: Ready; facts: Facts; onPass: (() => void) | undefined }) {
-  const write = useNodeWrite(view, `acts:${facts.node.key}`);
+  const write = useNodeWrite(view, `acts:${facts.node.key}`, facts.node.key);
   const skip = useFormDraft<string>(write.journey, facts.node.key, "skip");
   const detail = nodeDetail(view, facts.node.key);
   const acts = actsFor(facts);

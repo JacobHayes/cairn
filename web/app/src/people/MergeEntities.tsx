@@ -11,6 +11,7 @@ import { useSession } from "../data/react.ts";
 import { Refused } from "../screens/Refused.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button } from "../ui/kit.tsx";
+import { Receipt } from "../ui/Receipt.tsx";
 import { mergeMutation, type Entity } from "./model.ts";
 
 function EntitySelect({ label, value, entities, onChange }: { label: string; value: string; entities: readonly Entity[]; onChange: (key: string) => void }) {
@@ -30,7 +31,7 @@ function EntitySelect({ label, value, entities, onChange }: { label: string; val
 }
 
 export function MergeEntities({ deployment, entities, asked }: { deployment: Deployment; entities: readonly Entity[]; asked: string[] }) {
-  const { host, notices } = useSession();
+  const { host, activity } = useSession();
   const write = useScreenWrite();
   const [survivor, setSurvivor] = useState(asked[0] ?? "");
   const [merged, setMerged] = useState(asked[1] ?? "");
@@ -41,7 +42,7 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
     try {
       referencing = await allPages<JourneySummary, string>((after) => host.journeys({ referencing: [survivor, merged], ...(after === undefined ? {} : { after }) }));
     } catch (thrown) {
-      notices.add({ tone: "problem", title: `Not merged: ${thrown instanceof Error ? thrown.message : String(thrown)}`, lines: [] });
+      activity.confirm(`Not merged: ${thrown instanceof Error ? thrown.message : String(thrown)}`, "problem");
       return;
     } finally {
       setReading(false);
@@ -60,7 +61,7 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
         <EntitySelect label="Merge into it" value={merged} entities={entities} onChange={setMerged} />
         <Button primary disabled={!ready || reading || write.disabled} onClick={() => void merge()}>Merge</Button>
       </span>
-      {write.rejected === undefined ? null : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejected === undefined ? <Receipt receipt={write.receipt} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
     </section>
   );
 }

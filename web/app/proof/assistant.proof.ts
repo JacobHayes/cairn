@@ -11,16 +11,14 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { startVendorJourney } from "../e2e/acting.ts";
 import { ask, openPanel, patchId, script } from "../e2e/assistant.ts";
-import { dismissNotices } from "../e2e/authoring.ts";
 import { openJourneyCard } from "../e2e/around.ts";
 import { state } from "../e2e/detail.ts";
 import { confirmAndApply, reviewOpen } from "../e2e/proposals.ts";
 import { nodePanel, open, openJourney } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
-/** A picture of the window as a person sees it, without the saved notices. */
+/** A picture of the window as a person sees it. */
 async function shot(page: Page, name: string): Promise<void> {
-  await dismissNotices(page);
   await page.screenshot({ path: join(out, `${name}.png`) });
 }
 const beat = (page: Page) => page.waitForTimeout(700);

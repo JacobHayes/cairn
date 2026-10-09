@@ -1,14 +1,14 @@
 // The proof's media for brief 7.5 (briefs/proof/7.5/prove.sh): a screenshot of each state of
-// notices (the draft listing one, the same draft after an edge clears it, an import's saved
-// notice), written to CAIRN_PROOF_OUT. Each step asserts what its picture shows. The in-browser
+// notices (the draft listing one, the same draft after an edge clears it, an import's entry in the
+// sync chip's Recent), written to CAIRN_PROOF_OUT. Each step asserts what its picture shows. The in-browser
 // host, seeded on each load.
 import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
 import { savedText } from "../e2e/around.ts";
-import { addNode, dismissNotices, formField, newRoute, pickByTitle, routeName, saveForm, section, structure } from "../e2e/authoring.ts";
-import { nodeCard, open } from "../e2e/shell.ts";
+import { addNode, formField, newRoute, pickByTitle, routeName, saveForm, section, structure } from "../e2e/authoring.ts";
+import { nodeCard, open, syncChip } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${name}.png`) });
@@ -35,15 +35,15 @@ test("a draft lists work the final milestone cannot see, an edge clears it, and 
   await pickByTitle(requirements.getByLabel("Require"), "Handbook");
   await requirements.getByRole("button", { name: "Add the requirement" }).click();
   await expect(notices).toHaveCount(0);
-  await dismissNotices(page);
   await shot(page, "2-the-edge-clears-it");
 
   await open(page, "browser", "/routes/vendor-evaluation/versions");
   const version = page.locator('[data-testid="version"][data-version="1"]');
   const exported = await savedText(page, () => version.getByRole("button", { name: "Export" }).click());
   await page.getByTestId("route-actions").getByLabel("Import a file as a new draft").setInputFiles({ name: "vendor-evaluation.yaml", mimeType: "text/yaml", buffer: Buffer.from(exported) });
-  const saved = page.getByTestId("notice").filter({ hasText: "Imported" });
-  await expect(saved.getByTestId("consequence")).toHaveAttribute("data-kind", "unanchored");
+  await syncChip(page).click();
+  const saved = page.getByTestId("sync-recent").filter({ hasText: "Imported" });
+  await expect(saved).toContainText("No chain to the final milestone");
   await expect(saved).toContainText("purpose, setup/workload");
   await saved.screenshot({ path: join(out, "3-an-import-lists-its-notices.png") });
 });

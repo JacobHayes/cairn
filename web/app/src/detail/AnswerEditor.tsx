@@ -202,7 +202,7 @@ function Editing({ view, detail, write, form, why, named, onNamed, close }: {
 }
 
 export function AnswerEditor({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `answer:${detail.node.key}`);
+  const write = useNodeWrite(view, `answer:${detail.node.key}`, detail.node.key);
   // The new entity's name is part of the answer's draft: kept across a reload, gone with it.
   const [namedDraft, setNamed] = useDraft<string>(`answer-entity:${write.journey}:${detail.node.key}`);
   const { node, record, answer, rationale } = detail;
@@ -224,21 +224,24 @@ export function AnswerEditor({ view, detail }: { view: Ready; detail: NodeDetail
     return <Editing view={view} detail={detail} write={write} form={{ ...form, draft: form.draft }} why={why} named={namedDraft ?? ""} onNamed={setNamed} close={close} />;
   }
   return (
-    <span className="row">
-      {/* A new answer starts with no reason of its own (B2). */}
-      <Button primary disabled={write.disabled} onClick={() => { begin(""); }}>
-        {answer === undefined ? "Answer" : "Revise the answer"}
-      </Button>
-      {answer !== undefined && rationale !== undefined ? (
-        <Button disabled={write.disabled} onClick={() => { begin(rationale); }}>
-          Edit reason
+    <div className="stack">
+      <span className="row">
+        {/* A new answer starts with no reason of its own (B2). */}
+        <Button primary disabled={write.disabled} onClick={() => { begin(""); }}>
+          {answer === undefined ? "Answer" : "Revise the answer"}
         </Button>
-      ) : null}
-      {node.feeds_milestone === undefined ? null : (
-        <span className="muted small">
-          Its answer pins <NodeLink view={view} node={node.feeds_milestone} />.
-        </span>
-      )}
-    </span>
+        {answer !== undefined && rationale !== undefined ? (
+          <Button disabled={write.disabled} onClick={() => { begin(rationale); }}>
+            Edit reason
+          </Button>
+        ) : null}
+        {node.feeds_milestone === undefined ? null : (
+          <span className="muted small">
+            Its answer pins <NodeLink view={view} node={node.feeds_milestone} />.
+          </span>
+        )}
+      </span>
+      <Rejected view={view} write={write} />
+    </div>
   );
 }

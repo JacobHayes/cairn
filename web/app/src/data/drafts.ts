@@ -25,6 +25,23 @@ export function readDraft<T>(key: string): T | undefined {
   }
 }
 
+/** Every draft whose key starts with `prefix`, by key. */
+export function readDrafts<T>(prefix: string): [string, T][] {
+  const found: [string, T][] = [];
+  try {
+    const held = storage();
+    for (let at = 0; held !== undefined && at < held.length; at += 1) {
+      const key = held.key(at);
+      if (key?.startsWith(PREFIX + prefix) === true) {
+        found.push([key.slice(PREFIX.length), JSON.parse(held.getItem(key) ?? "null") as T]);
+      }
+    }
+  } catch {
+    // None are kept.
+  }
+  return found;
+}
+
 /** Keeps `value` under `key`, or forgets the draft when it is undefined (sent or abandoned). */
 export function writeDraft(key: string, value: unknown): void {
   try {

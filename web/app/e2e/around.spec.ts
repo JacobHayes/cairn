@@ -23,7 +23,6 @@ import {
 } from "./around.ts";
 import { nodeCard, nodePanel, open, openFromCanvas, openJourney } from "./shell.ts";
 import { section } from "./detail.ts";
-import { dismissNotices } from "./authoring.ts";
 
 test("B1: a journey started from the fixture route lands in its walkthrough, and the index lists it", async ({ page }) => {
   const name = journeyName("Evaluation");
@@ -130,7 +129,6 @@ test("E6: two entities merged, the journey reads the survivor and its history is
   await expect(page.locator('[data-testid="entity"][data-entity="e_lead"]')).toHaveCount(0);
   await openJourney(page, "browser", "j_vendor_eval");
   await expect(nodeCard(page, "n_plan").getByTestId("card-owner")).toContainText("Evaluation Director");
-  await dismissNotices(page);
   const after = await section(await openFromCanvas(page, "n_who_owns"), "history");
   await expect(after.getByTestId("history-patch")).toHaveCount(before);
 });

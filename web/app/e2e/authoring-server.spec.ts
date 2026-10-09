@@ -3,7 +3,7 @@
 // meantime is shown as a conflict rather than overwritten (H5).
 import { expect, test } from "@playwright/test";
 
-import { dismissNotices, openEditing, section } from "./authoring.ts";
+import { openEditing, section } from "./authoring.ts";
 import { fresh, openFromCanvas } from "./shell.ts";
 
 test("H5: a resource edited in another page meanwhile is reported, not overwritten, and kept on the current version when asked", { tag: "@server" }, async ({ context }) => {
@@ -23,7 +23,6 @@ test("H5: a resource edited in another page meanwhile is reported, not overwritt
   await second.getByRole("button", { name: "Save the resource" }).click();
   await expect(second.getByTestId("resource-form")).toHaveCount(0);
   await expect(first.locator('[data-testid="resource"][data-key="a_announcement_draft"]')).toContainText(theirs);
-  await dismissNotices(one);
   await first.getByRole("button", { name: "Save the resource" }).click();
   await expect(first.getByTestId("refused")).toBeVisible();
   await expect(first.locator('[data-testid="resource"][data-key="a_announcement_draft"]')).toContainText(theirs);

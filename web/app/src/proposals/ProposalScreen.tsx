@@ -23,6 +23,7 @@ import { overviewPath } from "../journeys/address.ts";
 import { routeDetailPath } from "../routes/address.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { Badge, Button, Panel } from "../ui/kit.tsx";
+import { Receipt } from "../ui/Receipt.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { ChangeList } from "./Changes.tsx";
 import { ItemList } from "./Items.tsx";
@@ -489,6 +490,7 @@ function ReviewBody({ review, refetch, ready, before, deployment }: BodyProps) {
       <Header proposal={proposal} />
       <StalePanel review={review} disabled={!editable} onRefresh={reviewing.refresh} />
       <Problem problem={reviewing.write.problem} onDismiss={reviewing.rebase} />
+      <Receipt receipt={reviewing.write.receipt} />
       {local !== undefined && "error" in local ? <p className="callout callout-bad">No preview: {local.error}</p> : null}
       {kept !== undefined && !previewOfEdits ? <p className="muted small" data-testid="preview-of-saved">{ready === undefined ? "The preview shows the proposal as saved: save your edits to preview them." : "Previewing your edits..."}</p> : null}
       {known || before === undefined || (preview.violations ?? []).length === 0 ? null : <p className="muted small" data-testid="no-graph-after">As it stands it breaks a rule, so there is no graph after to compare: the canvas shows the graph as it is, with the items marked.</p>}

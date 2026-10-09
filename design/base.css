@@ -687,6 +687,66 @@ svg.chart .datum-line {
   flex: 1;
 }
 
+/* Sync chip (the strip's right end): a 6px mark and a mono label in rail ink. The colour rule: green is nothing to do, a steel ring is working on it, amber is it will sort itself out or is safe to wait, red is your change is not landing until you act. A conflict's mark is a "!", the demo's a hollow dot: colour is never the only signal. */
+.sync {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 20px;
+  padding: 0 6px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--rail-ink);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+}
+.sync:hover {
+  border-color: var(--rail-border);
+}
+.sync::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--mark, var(--color-success));
+  flex: none;
+}
+.sync[data-tone="working"]::before {
+  background: transparent;
+  border: 1.5px solid var(--rail-muted);
+}
+.sync[data-tone="wait"] {
+  --mark: var(--color-warning);
+}
+.sync[data-tone="act"] {
+  --mark: var(--color-error);
+}
+.sync[data-tone="hollow"]::before {
+  background: transparent;
+  border: 1px solid var(--rail-muted);
+}
+.sync[data-state="conflict"]::before {
+  content: "!";
+  width: auto;
+  height: auto;
+  background: transparent;
+  color: var(--color-error);
+  font-weight: 700;
+}
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
 /* Segmented control: native radios (arrow keys pick) or tabs, with an ink underline on the choice. */
 .segmented {
   display: inline-flex;

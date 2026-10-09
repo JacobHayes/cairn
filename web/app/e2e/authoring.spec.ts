@@ -8,8 +8,8 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { savedText } from "./around.ts";
-import { addNode, addRole, dismissNotices, formField, newRoute, nodeForm, openEditing, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";
-import { nodeCard, open, openFromCanvas } from "./shell.ts";
+import { addNode, addRole, formField, newRoute, nodeForm, openEditing, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";
+import { nodeCard, open, openFromCanvas, syncChip } from "./shell.ts";
 
 /** The fields the open node's form offers. */
 async function offered(page: Page): Promise<string[]> {
@@ -129,8 +129,7 @@ test("A15: a stage's id and both bounds, each wrong, are three violations at thr
   }
   await page.getByTestId("node-form-save").click();
   await expect(formField(page, "id").getByTestId("violation")).toHaveCount(1);
-  await dismissNotices(page);
-  await expect(page.getByTestId("notice")).toHaveCount(0);
+  await expect(syncChip(page)).toHaveAttribute("data-state", "not-saved");
 });
 
 test("B4: on a fixture journey, a local node added, a route-copied title edited and reset to the route", async ({ page }) => {
@@ -191,7 +190,6 @@ test("B10: a deliverable broken down by hand into two pieces", async ({ page }) 
   await breakdown.getByLabel("Piece title").nth(1).fill("Review the findings");
   await breakdown.getByRole("button", { name: "Break it down" }).click();
   await expect(breakdown).toContainText("2 beneath it.");
-  await dismissNotices(page);
   await expect(page.getByTestId("node-card").filter({ hasText: "Review the findings" })).toHaveCount(1);
 });
 

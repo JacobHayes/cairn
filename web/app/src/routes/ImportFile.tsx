@@ -2,12 +2,12 @@
 // route extending its latest version. The file is read by the page's engine (YAML on disk,
 // JSON on the wire) and imported as one route patch under a fresh patch id (H5). A11: while
 // another draft is open the import is refused, with the option to discard that draft.
-import { useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { useNavigate } from "react-router";
 
 import type { RouteFile } from "../data/host.ts";
-import { consequenceLines } from "../data/notices.ts";
-import { useSession, useSkew } from "../data/react.ts";
+import { consequenceLines } from "../data/activity.ts";
+import { unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
 import { newPatchId, type Rejection } from "../data/writes.ts";
 import { Refused, violates } from "../screens/Refused.tsx";
 import { Button } from "../ui/kit.tsx";
@@ -20,22 +20,34 @@ function useImport() {
   const navigate = useNavigate();
   const [outcome, setOutcome] = useState<Outcome>({ status: "idle" });
   const [pending, setPending] = useState(false);
+  const dismiss = () => {
+    setOutcome({ status: "idle" });
+  };
+  const key = `import:${useId()}`;
+  const report = useProblem(
+    key,
+    outcome.status === "idle" ? undefined : outcome.status === "rejected" ? unlandedOf(outcome.rejection) : { kind: "failed", message: `The file could not be imported: ${outcome.message}` },
+    { discard: dismiss },
+  );
+  useEffect(() => () => { session.sync.resolve(key); }, [session, key]);
   const send = async (file: RouteFile) => {
     // ARCHITECTURE, Web UI: version skew. A file read while the tab latched skew is not sent.
     if (session.skew.latched) {
       return;
     }
     setPending(true);
-    const answered = await session.host.importRoute({ patch_id: newPatchId(), file });
+    const answered = await session.sync.track(session.host.importRoute({ patch_id: newPatchId(), file }));
     setPending(false);
     if (answered.outcome === "answered") {
       setOutcome({ status: "idle" });
-      session.notices.add({ tone: "saved", title: `Imported ${file.name} as a draft of ${file.route}`, lines: consequenceLines(answered.answer) });
+      session.recordSave(`Imported ${file.name} as a draft of ${file.route}`, consequenceLines(answered.answer));
       void navigate(routeDetailPath(file.route));
     } else if (answered.outcome === "rejected") {
       setOutcome({ status: "rejected", file, rejection: answered.rejection });
+      report(unlandedOf(answered.rejection));
     } else {
       setOutcome({ status: "unreadable", message: answered.error.message });
+      report({ kind: "failed", message: `The file could not be imported: ${answered.error.message}` });
     }
   };
   const choose = async (chosen: File) => {
@@ -56,7 +68,7 @@ function useImport() {
       await send(file);
     }
   };
-  return { outcome, pending, choose, discardAndImport, dismiss: () => { setOutcome({ status: "idle" }); } };
+  return { outcome, pending, choose, discardAndImport, dismiss };
 }
 
 export function ImportFile({ label = "Import a route file" }: { label?: string }) {

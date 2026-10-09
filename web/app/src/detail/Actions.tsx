@@ -5,7 +5,7 @@
 // role or pins a milestone says so: those values are edited by answering it (E3).
 import { Button, Field } from "../ui/kit.tsx";
 import { AnswerEditor } from "./AnswerEditor.tsx";
-import { mayNotApply } from "../data/notices.ts";
+import { mayNotApply } from "../data/activity.ts";
 import { movesFrom, startedEarly, titleOf, transition, unansweredOf, type Move, type NodeDetail, type Ready } from "./model.ts";
 import { Rejected } from "./Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
@@ -73,7 +73,7 @@ function LiftsSnooze({ view, node }: { view: Ready; node: string }) {
 }
 
 export function Actions({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `actions:${detail.node.key}`);
+  const write = useNodeWrite(view, `actions:${detail.node.key}`, detail.node.key);
   const { node, record } = detail;
   const skip = useFormDraft<string>(write.journey, node.key, "skip");
   const moves = movesFrom(node.kind, record.state);

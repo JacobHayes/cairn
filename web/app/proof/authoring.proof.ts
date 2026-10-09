@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { savedText } from "../e2e/around.ts";
-import { addNode, addRole, dismissNotices, formField, newRoute, nodeForm, openEditing, pickByTitle, saveForm, section, structure } from "../e2e/authoring.ts";
+import { addNode, addRole, formField, newRoute, nodeForm, openEditing, pickByTitle, saveForm, section, structure } from "../e2e/authoring.ts";
 import { nodeCard, open, openFromCanvas } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
@@ -127,7 +127,6 @@ test("B4, A18: a fixture journey's structure: a local node, a title reset to the
   await shot(page, "11-a-route-copied-title-edited-here");
   await edits.getByRole("button", { name: "Reset to route" }).click();
   await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Environment access");
-  await dismissNotices(page);
   await openFromCanvas(page, "n_comparison_set");
   await structure(page).getByTestId("remove-node").click();
   const dialog = page.getByTestId("cascade-dialog");
@@ -138,12 +137,10 @@ test("B4, A18: a fixture journey's structure: a local node, a title reset to the
   await shot(page, "12-a-removal-and-its-cascade");
   await dialog.getByRole("button", { name: "Confirm" }).click();
   await expect(nodeCard(page, "n_comparison_set")).toHaveCount(0);
-  await dismissNotices(page);
   const stones = page.getByTestId("tombstones");
   await stones.locator("summary").click();
   await stones.locator('[data-testid="tombstone"][data-node="n_comparison_set"]').getByRole("button", { name: "Restore as a local copy" }).click();
   await expect(stones.getByTestId("restored")).toBeVisible();
-  await dismissNotices(page);
   await shot(page, "14-restored-as-a-local-copy");
   record("journey", { local, rewrites, removed });
 });
@@ -157,7 +154,6 @@ test("B10: a deliverable broken down by hand", async ({ page }) => {
   await breakdown.getByLabel("Piece title").nth(1).fill("Review the findings");
   await breakdown.getByRole("button", { name: "Break it down" }).click();
   await expect(breakdown).toContainText("2 beneath it.");
-  await dismissNotices(page);
   await shot(page, "15-broken-down-by-hand");
 });
 

@@ -81,7 +81,7 @@ export function answerInEffect(view: Ready, decision: string): Schema<"AnswerVal
  * decision: setting its date answers the decision, and clearing it reopens the decision.
  */
 export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `pin:${detail.node.key}`);
+  const write = useNodeWrite(view, `pin:${detail.node.key}`, detail.node.key);
   const key = detail.node.key;
   const pinForm = useFormDraft<string>(write.journey, key, "pin");
   const fedBy = detail.fedBy;
@@ -143,7 +143,7 @@ function SnoozedThrough({ view, write, container, target }: { view: Ready; write
 
 /** B6: the node's snooze, until a date or until another node is done or out of scope; a container's holds over its subtree. */
 export function SnoozeEditor({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `snooze:${detail.node.key}`);
+  const write = useNodeWrite(view, `snooze:${detail.node.key}`, detail.node.key);
   const key = detail.node.key;
   const dateForm = useFormDraft<string>(write.journey, key, "snooze-date");
   const nodeForm = useFormDraft<string>(write.journey, key, "snooze-node");
@@ -207,7 +207,7 @@ export function SnoozeEditor({ view, detail }: { view: Ready; detail: NodeDetail
 
 /** B5, Gating: force include with its reason, or lifting it. */
 export function ForceInclude({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `force-include:${detail.node.key}`);
+  const write = useNodeWrite(view, `force-include:${detail.node.key}`, detail.node.key);
   const key = detail.node.key;
   const reasonForm = useFormDraft<string>(write.journey, key, "force-include");
   const forced = detail.overrides?.force_include;
@@ -240,7 +240,7 @@ export function ForceInclude({ view, detail }: { view: Ready; detail: NodeDetail
 
 /** B5: the node's weight in this journey; empty restores the kind's default. */
 export function WeightEditor({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `weight:${detail.node.key}`);
+  const write = useNodeWrite(view, `weight:${detail.node.key}`, detail.node.key);
   const key = detail.node.key;
   const weightForm = useFormDraft<string>(write.journey, key, "weight");
   const weight = detail.node.weight;
@@ -272,7 +272,7 @@ export function WeightEditor({ view, detail }: { view: Ready; detail: NodeDetail
 
 /** B5, E2: set a kind's participation to explicit entities on this node, or restore inheritance. */
 export function ParticipationEditor({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `participation:${detail.node.key}`);
+  const write = useNodeWrite(view, `participation:${detail.node.key}`, detail.node.key);
   const key = detail.node.key;
   const form = useFormDraft<{ kind: string; chosen: string[] }>(write.journey, key, "participation");
   const kinds = ["k_owner", ...(view.journey.graph.participation_kinds ?? []).map((each) => each.key)];

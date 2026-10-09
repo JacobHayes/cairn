@@ -20,7 +20,7 @@ import {
 } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
 import { openNode, section } from "./detail.ts";
-import { derivedRevision, goTo, nodePanel, openAt } from "./shell.ts";
+import { derivedRevision, goTo, nodePanel, openAt, syncChip } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
 /** Starts a fresh journey from version 1 of the vendor evaluation's route (B1); its id. */
@@ -132,7 +132,7 @@ test("B6: a node snoozed from its card leaves, and returns when its target compl
 test("B6: a container snoozed from its detail holds its subtree off the next list, and unsnoozes from a descendant's", async ({ page }) => {
   await openActing(page, "browser", "j_launch", "next/list");
   await expect(nextItem(page, "n_docs")).toBeVisible();
-  const today = (await page.getByTestId("derivation").getAttribute("data-today")) ?? "";
+  const today = (await syncChip(page).getAttribute("data-today")) ?? "";
   const group = await openNode(page, "browser", "j_launch", "n_materials");
   const blocking = await section(group, "blocking");
   await blocking.getByRole("button", { name: "Snooze until a date" }).click();
@@ -157,7 +157,7 @@ test("B6: a container snoozed from its detail holds its subtree off the next lis
 test("D5: an empty acting frontier shows the stalled panel, and unsnooze brings the node back", async ({ page }) => {
   await openActing(page, "browser", "j_hiring", "next/list");
   expect(await nextKeys(page)).toEqual(["n_offer"]);
-  const today = (await page.getByTestId("derivation").getAttribute("data-today")) ?? "";
+  const today = (await syncChip(page).getAttribute("data-today")) ?? "";
   await nextItem(page, "n_offer").getByRole("button", { name: "Snooze until a date" }).click();
   await nextItem(page, "n_offer").getByLabel("Snooze until").fill(daysAfter(today, 7));
   await nextItem(page, "n_offer").getByTestId("snooze-date-form").getByRole("button", { name: "Save" }).click();

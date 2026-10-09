@@ -29,6 +29,8 @@ export class FakeHost implements Host {
   /** The streams opened, the latest last. */
   readonly streams: { watching: string[]; handlers: TickHandlers }[] = [];
   failNext = false;
+  /** While set, the next document read waits for it (a slow refetch). */
+  holdNext: Promise<void> | undefined;
 
   overlaps = (): boolean => false;
 
@@ -98,22 +100,25 @@ export class FakeHost implements Host {
     text: (file: RouteFile): string => JSON.stringify(file),
   };
 
-  documentText(journey: string): Promise<string> {
+  async documentText(journey: string): Promise<string> {
     this.fetches.set(journey, (this.fetches.get(journey) ?? 0) + 1);
+    const hold = this.holdNext;
+    this.holdNext = undefined;
+    await hold;
     const held = this.journeysHeld.get(journey);
     if (this.failNext) {
       this.failNext = false;
-      return Promise.reject(new Error("the host is down"));
+      throw new Error("the host is down");
     }
     if (held === undefined) {
-      return Promise.reject(new Missing(journey));
+      throw new Missing(journey);
     }
     const document = {
       engine_version: held.engine,
       inputs: { deployment: { revision: held.deployment }, rank: {}, timezone: "UTC", today: held.today },
       journey: { header: { id: journey, name: journey, status: "active" }, revision: held.revision, graph: {} },
     };
-    return Promise.resolve(JSON.stringify(document));
+    return JSON.stringify(document);
   }
 
   send(patch: Patch): Promise<Answered<HttpFailure>> {

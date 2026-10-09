@@ -8,6 +8,7 @@ import { useDraft } from "../data/drafts.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { rebasedOnto } from "../screens/TitleEditor.tsx";
 import { Button, Field } from "../ui/kit.tsx";
+import { Receipt } from "../ui/Receipt.tsx";
 import { titleOf, type Mutation, type Ready } from "./model.ts";
 import { ShortfallView } from "./ShortfallView.tsx";
 import type { Attempt, NodeWrite, Seen } from "./write.ts";
@@ -144,11 +145,11 @@ function Invalid({ view, write, violations, onResolved }: Resolving & { violatio
   );
 }
 
-/** The section's rejected write, if any, with what can be done about it. */
+/** What the section's last write left under it: its rejection, with what can be done about it, or its receipt. */
 export function Rejected({ view, write, onResolved }: Resolving) {
   const { failed } = write;
   if (failed === undefined) {
-    return null;
+    return <Receipt receipt={write.receipt} />;
   }
   const { rejection, attempt } = failed;
   if (rejection.rejection === "invalid") {

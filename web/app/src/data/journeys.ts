@@ -68,6 +68,26 @@ interface Entry {
   used: number;
   retryDelay: number;
   retryTimer: unknown;
+  /** When (monotonic ms) a newer revision than the one held was first announced, while the view still shows the older. */
+  behindSince: number | undefined;
+  /** Whether the last fetch for it failed. */
+  failed: boolean;
+}
+
+/** A shown journey that is behind the revision the stream announced (the sync chip's UPDATING and BEHIND). */
+export interface Lag {
+  journey: string;
+  shown: number;
+  announced: number;
+  since: number;
+  failed: boolean;
+}
+
+/** What the most recently shown journey's view is derived from (the sync popover). */
+export interface Derivation {
+  revision: number;
+  deployment: number;
+  today: string;
 }
 
 export interface JourneyStoreParts {
@@ -102,6 +122,7 @@ export class JourneyStore extends Emitter {
   readonly #tracker = new Tracker();
   readonly #entries = new Map<string, Entry>();
   #uses = 0;
+  #derivation: Derivation | undefined;
 
   constructor(parts: JourneyStoreParts) {
     super();
@@ -114,6 +135,39 @@ export class JourneyStore extends Emitter {
         this.#heard(tick);
       },
     });
+  }
+
+  /** The mounted journey worst behind what the stream announced (a failed refetch first, then the longest wait), if any. */
+  get lag(): Lag | undefined {
+    let lag: Lag | undefined;
+    for (const entry of this.#entries.values()) {
+      if (entry.mounted > 0 && entry.held !== undefined && entry.behindSince !== undefined) {
+        const next = { journey: entry.id, shown: entry.held.revision, announced: entry.want.revision, since: entry.behindSince, failed: entry.failed };
+        // A failed refetch outranks one still out; among alike, the one that has waited longest.
+        if (lag === undefined || (next.failed && !lag.failed) || (next.failed === lag.failed && next.since < lag.since)) {
+          lag = next;
+        }
+      }
+    }
+    return lag;
+  }
+
+  /** What the most recently shown journey is at, if one is shown; the same object while it holds. */
+  get derivation(): Derivation | undefined {
+    let latest: Entry | undefined;
+    for (const entry of this.#entries.values()) {
+      if (entry.mounted > 0 && entry.held !== undefined && (latest === undefined || entry.used > latest.used)) {
+        latest = entry;
+      }
+    }
+    const held = latest?.held;
+    const previous = this.#derivation;
+    if (held === undefined) {
+      this.#derivation = undefined;
+    } else if (previous?.revision !== held.revision || previous.deployment !== held.deployment || previous.today !== held.today) {
+      this.#derivation = { revision: held.revision, deployment: held.deployment, today: held.today };
+    }
+    return this.#derivation;
   }
 
   /** What journey `id`'s view shows now. */
@@ -131,6 +185,7 @@ export class JourneyStore extends Emitter {
     const entry = this.#entry(id);
     entry.mounted += 1;
     entry.used = ++this.#uses;
+    this.emit();
     const unwatch = this.#parts.subscription.watch([`journey:${id}`]);
     if (entry.held === undefined) {
       this.#request(entry, {});
@@ -139,6 +194,7 @@ export class JourneyStore extends Emitter {
       unwatch();
       entry.mounted -= 1;
       this.#evict();
+      this.emit();
     };
   }
 
@@ -179,6 +235,8 @@ export class JourneyStore extends Emitter {
         used: 0,
         retryDelay: REOPEN_DELAY_FIRST_MS,
         retryTimer: undefined,
+        behindSince: undefined,
+        failed: false,
       };
       this.#entries.set(id, entry);
     }
@@ -219,6 +277,13 @@ export class JourneyStore extends Emitter {
       today: want.today ?? entry.want.today,
     };
     entry.dirty = true;
+    // What the sync chip reads: when the view first fell behind (a newer journey or deployment revision
+    // than it holds), and the newest announced since.
+    const held = entry.held;
+    if (held !== undefined && (entry.want.revision > held.revision || entry.want.deployment > held.deployment)) {
+      entry.behindSince ??= performance.now();
+      this.emit();
+    }
     if (!entry.running) {
       void this.#run(entry);
     }
@@ -269,6 +334,10 @@ export class JourneyStore extends Emitter {
     const derived = await deriver.derived(entry.id);
     const { today, timezone } = document.inputs;
     entry.held = { revision, deployment, today, timezone };
+    entry.failed = false;
+    if (revision >= entry.want.revision && deployment >= entry.want.deployment) {
+      entry.behindSince = undefined;
+    }
     this.#tracker.fetched(journeyOf(entry.id), revision);
     this.#show(entry, { status: "ready", journey: document.journey, inputs: document.inputs, key, derived });
   }
@@ -284,6 +353,8 @@ export class JourneyStore extends Emitter {
       return;
     }
     this.#tracker.refetchFailed(journeyOf(entry.id));
+    entry.failed = true;
+    this.emit();
     if (entry.view.status !== "ready") {
       this.#show(entry, { status: "failed", message: thrown instanceof Error ? thrown.message : String(thrown) });
     }
@@ -298,6 +369,8 @@ export class JourneyStore extends Emitter {
   /** The journey no longer exists: deleted, or never there. */
   #gone(entry: Entry): void {
     entry.held = undefined;
+    entry.behindSince = undefined;
+    entry.failed = false;
     this.#tracker.forget(journeyOf(entry.id));
     void this.#parts.deriver.release(entry.id).catch(() => undefined);
     this.#show(entry, { status: "missing" });

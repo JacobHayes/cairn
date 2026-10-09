@@ -1,6 +1,6 @@
 // What the app's browser tests share: opening a screen on a host, and reading and editing a
 // journey page the way a person does: a node's card on the canvas, its detail beside it.
-import { expect, type Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 export type HostKind = "server" | "browser";
 
@@ -11,11 +11,10 @@ const DEMO = `http://127.0.0.1:${process.env["CAIRN_DEMO_PORT"] ?? ""}`;
  * Opens the screen at `path` (`/`, `/journeys/<id>?view=...`) on `host`, once the shell is up:
  * within the page when it already runs on `host`, as a link would, so the in-browser host's
  * store (which lives only as long as the page) is kept; by loading the page otherwise. The
- * shell shows a Demo badge (its title says the data is a sample) on the in-browser host and none on the server.
+ * sync chip says which host it is on (`data-host`).
  */
 export async function open(page: Page, host: HostKind, path = "/"): Promise<void> {
   const nav = page.getByRole("navigation", { name: "Screens", exact: true });
-  const demo = page.getByTitle("Sample data in this tab", { exact: false });
   const onDemo = page.url().startsWith(`${DEMO}/`);
   if ((await nav.count()) === 1 && onDemo === (host === "browser")) {
     await goWithin(page, path);
@@ -23,7 +22,37 @@ export async function open(page: Page, host: HostKind, path = "/"): Promise<void
     await page.goto(host === "browser" ? `${DEMO}${path}` : path);
   }
   await expect(nav).toBeVisible();
-  await expect(demo).toHaveCount(host === "browser" ? 1 : 0);
+  await expect(syncChip(page)).toHaveAttribute("data-host", host);
+}
+
+/** The sync chip at the strip's right end. */
+export function syncChip(page: Page): Locator {
+  return page.getByTestId("sync");
+}
+
+/** Waits until the screen's journey is derived: its name is up, and the chip knows its revision. */
+export async function derived(page: Page): Promise<void> {
+  await expect(page.getByTestId("journey-name")).toBeVisible();
+  await expect(syncChip(page)).toHaveAttribute("data-revision", /^\d+$/);
+}
+
+/** Waits until the stream is live and nothing is pending: the chip says "In sync, live". */
+export async function live(page: Page): Promise<void> {
+  await expect(syncChip(page)).toHaveAttribute("title", /^In sync · live/);
+}
+
+/** The popover's Recent, newest first, once it lists a save; the popover is closed again. */
+export async function recentSaves(page: Page): Promise<string[]> {
+  const chip = syncChip(page);
+  if ((await chip.getAttribute("aria-expanded")) !== "true") {
+    await chip.click();
+  }
+  const recent = page.getByTestId("sync-popover").getByTestId("sync-recent");
+  await expect(recent.first()).toBeVisible();
+  const saves = await recent.allTextContents();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("sync-popover")).toHaveCount(0);
+  return saves;
 }
 
 /** Loads the screen at `path` afresh on `host`, as a bookmark or a posted link does, and returns once the shell is up. */
@@ -61,7 +90,7 @@ function screenOf(address: string): string {
 /** A journey's page, PLAN, GRAPH, once derived and its canvas drawn. */
 export async function openJourney(page: Page, host: HostKind, journey: string, query = ""): Promise<void> {
   await open(page, host, `/journeys/${journey}/plan/graph${query}`);
-  await expect(page.getByTestId("derivation")).toBeAttached();
+  await derived(page);
   await expect(page.getByTestId("node-card").first()).toBeVisible();
 }
 
@@ -77,9 +106,9 @@ export async function openAt(page: Page, host: HostKind, journey: string, addres
   const [path = "", query] = address.split("?");
   await open(page, host, `/journeys/${journey}/${path}${options.node === undefined ? "" : `/nodes/${options.node}`}${query === undefined ? "" : `?${query}`}`);
   await expect(page.getByTestId("journey-frame")).toBeVisible();
-  await expect(page.getByTestId("derivation")).toBeAttached();
+  await derived(page);
   if (host === "browser" && options.fixedToday !== undefined) {
-    await expect(page.getByTestId("derivation")).toHaveAttribute("data-today", options.fixedToday);
+    await expect(syncChip(page)).toHaveAttribute("data-today", options.fixedToday);
   }
 }
 
@@ -155,7 +184,7 @@ export async function rename(page: Page, node: string, text: string): Promise<vo
 
 /** The revision the page's derivation is at. */
 export async function derivedRevision(page: Page): Promise<number> {
-  return Number(await page.getByTestId("derivation").getAttribute("data-revision"));
+  return Number(await syncChip(page).getAttribute("data-revision"));
 }
 
 /** A title no earlier run used. */
@@ -172,4 +201,20 @@ export function countDocumentFetches(page: Page, journey: string): () => number 
     }
   });
   return () => count;
+}
+
+/** Holds every request matching `url` on `page` until `release` is called, then lets it through. */
+export async function hold(page: Page, url: string): Promise<() => Promise<void>> {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await page.route(url, async (route) => {
+    await held;
+    await route.continue().catch(() => undefined);
+  });
+  return async () => {
+    release();
+    await page.unroute(url);
+  };
 }

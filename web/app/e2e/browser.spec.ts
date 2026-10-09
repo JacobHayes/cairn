@@ -3,7 +3,7 @@
 // page's own service, and a draft that survives a reload.
 import { expect, test } from "@playwright/test";
 
-import { derivedRevision, fresh, goTo, open, openJourney, rename, renameOf, startRename } from "./shell.ts";
+import { derived, derivedRevision, fresh, goTo, open, openJourney, recentSaves, rename, renameOf, startRename } from "./shell.ts";
 
 test("the journey index lists every fixture's journey", async ({ page }) => {
   await open(page, "browser", "/journeys");
@@ -29,7 +29,7 @@ test("a patch applies through the page's service and the view follows", async ({
   await openJourney(page, "browser", "j_launch");
   const before = await derivedRevision(page);
   await rename(page, "n_docs", fresh("Docs"));
-  await expect(page.getByTestId("notice")).toHaveAttribute("data-tone", "saved");
+  expect(await recentSaves(page)).toEqual([expect.stringContaining("Edited")]);
   await expect.poll(() => derivedRevision(page)).toBe(before + 1);
 });
 
@@ -38,7 +38,7 @@ test("a draft survives a reload", async ({ page }) => {
   const draft = fresh("Unsent");
   await startRename(page, "n_summary", draft);
   await page.reload();
-  await expect(page.getByTestId("derivation")).toBeAttached();
+  await derived(page);
   await expect(renameOf(page, "n_summary").getByRole("textbox")).toHaveValue(draft);
 });
 

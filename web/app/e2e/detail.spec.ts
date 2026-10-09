@@ -6,7 +6,7 @@
 import { expect, test } from "@playwright/test";
 
 import { annotate, dateChain, flag, openNode, pin, section, state } from "./detail.ts";
-import { fresh, nodePanel, openAt, openFromCanvas } from "./shell.ts";
+import { fresh, live, nodePanel, openAt, openFromCanvas, recentSaves, syncChip } from "./shell.ts";
 
 test("the final report's detail reads its due chain and what to edit (C8, F7)", async ({ page }) => {
   const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
@@ -45,11 +45,13 @@ test("a later pin is rejected with its chain and resolved with a listed move (F5
   const conflict = panel.getByTestId("date-conflict");
   await expect(conflict).toBeVisible();
   await expect(conflict.getByTestId("chain")).toBeVisible();
+  await expect(syncChip(page)).toHaveAttribute("data-state", "not-saved");
   await expect(panel.getByTestId("pin-date")).toHaveText("2026-11-02");
   await conflict.locator('[data-testid="resolution"][data-op="shift_pin"]').getByRole("button").click();
   await expect(conflict).toHaveCount(0);
   await expect(panel.getByTestId("pin-date")).toHaveText("2026-11-20");
-  await expect(page.getByTestId("notice").last()).toHaveAttribute("data-tone", "saved");
+  await expect(panel.getByTestId("receipt").first()).toHaveText(/Saved/);
+  await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
 });
 
 test("a milestone's pin is edited through the decision that feeds it (E3)", async ({ page }) => {
@@ -185,7 +187,7 @@ test("over the server, a note added in one page appears in another's panel (H6)"
   const [one, two] = [await context.newPage(), await context.newPage()];
   const mine = await openNode(one, "server", "j_hiring", "n_close_out");
   const theirs = await openNode(two, "server", "j_hiring", "n_close_out");
-  await expect(two.getByTestId("live")).toHaveAttribute("data-status", "live");
+  await live(two);
   const text = fresh("Called the candidate");
   await annotate(mine, "note", text);
   await expect(theirs.getByTestId("annotations")).toContainText(text);
@@ -200,6 +202,9 @@ test("work whose relevance waits on an unanswered decision completes with a warn
   await expect(warning).toHaveAttribute("data-unanswered", "n_make_offer");
   await panel.getByTestId("actions").getByRole("button", { name: "Complete" }).click();
   await expect(state(panel)).toHaveAttribute("data-status", "done");
-  await expect(page.getByTestId("notice").last().locator('[data-testid="consequence"][data-kind="undecided"]')).toBeVisible();
+  await expect(panel.getByTestId("actions").getByTestId("receipt-warning")).toContainText("May not apply");
+  // The chip and Recent say it was saved; nothing pops up over the page.
+  expect((await recentSaves(page))[0]).toContain("May not apply");
+  await expect(page.getByTestId("toast")).toHaveCount(0);
   await expect((await section(panel, "relevance")).getByTestId("relevance-why")).toHaveAttribute("data-status", "undecided");
 });

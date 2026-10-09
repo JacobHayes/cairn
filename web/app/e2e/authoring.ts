@@ -19,14 +19,6 @@ export async function newRoute(page: Page, host: HostKind, name: string): Promis
   return id;
 }
 
-/** Dismisses the saved notices, which sit over the bottom of the node's panel. */
-export async function dismissNotices(page: Page): Promise<void> {
-  const notices = page.getByTestId("notice");
-  while ((await notices.count()) > 0) {
-    await notices.first().getByRole("button", { name: "Dismiss" }).click();
-  }
-}
-
 /** The open node's structure: a draft node's panel, or a journey node's in edit mode. */
 export function structure(page: Page): Locator {
   return page.getByTestId("authoring");
@@ -51,7 +43,6 @@ export async function addNode(page: Page, kind: string, title: string, inside?: 
   await palette.getByRole("button", { name: "Add" }).click();
   const panel = structure(page);
   await expect(panel.getByTestId("node-form").getByLabel("Title", { exact: true })).toHaveValue(title);
-  await dismissNotices(page);
   return (await panel.getAttribute("data-node")) ?? "";
 }
 
@@ -71,7 +62,6 @@ export async function saveForm(page: Page): Promise<void> {
   await expect(nodeForm(page).getByTestId("preview")).toHaveAttribute("data-status", "accepted");
   await save.click();
   await expect(save).toHaveText(/^Save\s*$/);
-  await dismissNotices(page);
 }
 
 /** Adds a role from the roles panel; waits for it to be listed. */

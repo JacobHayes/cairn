@@ -6,7 +6,7 @@ import { join } from "node:path";
 
 import { expect, test, type Browser, type Page } from "@playwright/test";
 
-import { nodeCard, open, openJourney, rename, renameOf, save, startRename } from "../e2e/shell.ts";
+import { derived, live, nodeCard, open, openJourney, recentSaves, rename, renameOf, save, startRename, syncChip } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${name}.png`) });
@@ -18,7 +18,7 @@ test("the journey index and a journey derived in the worker, on the in-browser h
   await expect(page.getByTestId("journey-row")).toHaveCount(4);
   await shot(page, "1-index-in-browser");
   await page.getByRole("link", { name: "Launch the reporting release" }).click();
-  await expect(page.getByTestId("derivation")).toBeAttached();
+  await derived(page);
   await shot(page, "2-journey-derived-in-worker");
 });
 
@@ -26,10 +26,10 @@ test("a live update after a patch in another tab, on the server host", async ({ 
   const [editor, other] = [await context.newPage(), await context.newPage()];
   await openJourney(editor, "server", "j_vendor_eval");
   await openJourney(other, "server", "j_vendor_eval");
-  await expect(other.getByTestId("live")).toHaveAttribute("data-status", "live");
+  await live(other);
   const renamed = "Findings writeup, revised";
   await rename(editor, "n_findings", renamed);
-  await expect(editor.getByTestId("notice")).toHaveAttribute("data-tone", "saved");
+  await recentSaves(editor);
   await shot(editor, "3a-patch-saved-with-consequences");
   await expect(nodeCard(other, "n_findings").getByTestId("title")).toHaveText(renamed);
   await shot(other, "3b-other-tab-updated-live");
@@ -58,10 +58,10 @@ test("version skew stops the tab and asks for a reload; the draft survives it", 
     await route.fulfill({ response, json: { ...document, engine_version: "99.0.0" } });
   });
   await rename(one, "n_comparison", "Side-by-side comparison, final");
-  await expect(two.getByTestId("skew")).toBeVisible();
+  await expect(syncChip(two)).toHaveAttribute("data-state", "new-version");
   await shot(two, "5-version-skew-banner");
   await two.unroute("**/api/journeys/j_bakeoff/document");
-  await two.getByRole("button", { name: "Reload" }).click();
+  await syncChip(two).click();
   await expect(renameOf(two, "n_summary").getByRole("textbox")).toHaveValue(unsent);
   await shot(two, "6-draft-survives-reload");
 });
@@ -78,12 +78,12 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   await open(page, "server");
   await beat(page);
   await page.getByRole("link", { name: "Hire a platform engineer" }).click();
-  await expect(page.getByTestId("derivation")).toBeAttached();
+  await derived(page);
   await beat(page);
   await startRename(page, "n_offer", "Offer letter, signed");
   await beat(page);
   await save(page, "n_offer");
-  await expect(page.getByTestId("notice")).toHaveAttribute("data-tone", "saved");
+  await recentSaves(page);
   await beat(page);
   await openJourney(other, "server", "j_hiring");
   const theirs = "Close out with the candidate, by phone";
