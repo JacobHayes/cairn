@@ -667,6 +667,7 @@ fn answer(conflict: &Conflict, resolution: &ConflictResolution) -> Vec<Mutation>
     let Conflict::Answer {
         decision,
         answer,
+        rationale,
         choices,
     } = conflict
     else {
@@ -689,9 +690,11 @@ fn answer(conflict: &Conflict, resolution: &ConflictResolution) -> Vec<Mutation>
         node: decision.clone(),
         transition: Transition::Reopen,
     };
+    // Mapping a removed choice revises the answer's value, not the reason it was given.
     let revised = |value| Mutation::Answer {
         decision: decision.clone(),
         value,
+        rationale: rationale.clone(),
     };
     let rewrite = |keep: &dyn Fn(&cairn_schema::Slug) -> Option<cairn_schema::Slug>| match answer {
         cairn_schema::AnswerValue::SingleChoice(choice) => {

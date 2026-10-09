@@ -40,6 +40,12 @@ export function namesOf(graphs: (Graph | null | undefined)[], entities: readonly
 
 const quoted = (text: string) => `"${text}"`;
 
+/** A reason's first line, cut to fit a sentence. */
+const briefly = (text: string) => {
+  const [line = ""] = text.split("\n");
+  return line.length > 80 ? `${line.slice(0, 80)}...` : line;
+};
+
 function valueWords(value: unknown): string {
   if (value === null || value === undefined) {
     return "nothing";
@@ -111,7 +117,7 @@ export function mutationWords(mutation: Mutation, names: Names): string {
     case "remove_edge":
       return `${node(mutation.edge.node)} no longer requires ${node(mutation.edge.requires)}`;
     case "answer":
-      return `Answer ${node(mutation.decision)}: ${valueWords(Object.values(mutation.value)[0])}`;
+      return `Answer ${node(mutation.decision)}: ${valueWords(Object.values(mutation.value)[0])}${mutation.rationale == null ? "" : `, because ${quoted(briefly(mutation.rationale))}`}`;
     case "set_pin":
       return `Pin ${node(mutation.node)} to ${mutation.date}`;
     case "shift_pin":

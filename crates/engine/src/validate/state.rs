@@ -84,7 +84,7 @@ fn state_without_node(check: &GraphCheck<'_>, key: &NodeKey) -> Violation {
 }
 
 /// Invariants: answers match their decision's answer type; D1: a decision is decided exactly
-/// when it holds an answer.
+/// when it holds an answer; B2: a rationale is held only beside its answer.
 fn answers(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
     let document = check.document;
     let state = &document.state;
@@ -108,6 +108,18 @@ fn answers(check: &GraphCheck<'_>, out: &mut Vec<Violation>) {
             ),
         };
         out.push(at_node(check.tree, key, code, message));
+    }
+    for key in state.rationales.keys() {
+        if document.nodes.get(key).is_none() {
+            out.push(state_without_node(check, key));
+        } else if !state.answers.contains_key(key) {
+            out.push(at_node(
+                check.tree,
+                key,
+                ViolationCode::StateNotOnKind,
+                "a rationale belongs to an answer, and this decision holds none (B2)",
+            ));
+        }
     }
     for node in document.nodes.values() {
         let decided = state

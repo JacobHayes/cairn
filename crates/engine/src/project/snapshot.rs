@@ -79,6 +79,10 @@ impl DerivedJourney<'_> {
                 .iter()
                 .filter_map(|key| Some(((*key).clone(), self.answer(key)?)))
                 .collect(),
+            rationales: in_scope
+                .iter()
+                .filter_map(|key| Some(((*key).clone(), self.rationale(key)?)))
+                .collect(),
             nodes: shown.iter().map(|key| self.snapshot_node(key)).collect(),
             next,
             acting_frontier: frontier.iter().take(limit).cloned().collect(),

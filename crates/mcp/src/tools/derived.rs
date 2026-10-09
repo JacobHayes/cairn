@@ -8,8 +8,9 @@ use std::collections::BTreeSet;
 use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Cursor, Date, DisplayState, ExplainedField,
     ExplanationPage, JourneyId, KeyRefs, Level, LevelDisplay, LevelEdge, LevelNode, LevelQuery,
-    ListFlag, ListQuery, LocalEdit, Next, NextQuery, Node, NodeDerived, NodeKey, NodeKind, NodeRow,
-    NodeState, Overrides, Path, Snapshot, SnapshotScope, SortBy, Stalled, StillWaiting,
+    ListFlag, ListQuery, LocalEdit, Markdown, Next, NextQuery, Node, NodeDerived, NodeKey,
+    NodeKind, NodeRow, NodeState, Overrides, Path, Snapshot, SnapshotScope, SortBy, Stalled,
+    StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use cairn_store::Store;
@@ -216,6 +217,9 @@ pub(crate) struct Detail {
     /// A decision's answer.
     #[serde(skip_serializing_if = "Option::is_none")]
     answer: Option<AnswerValue>,
+    /// The rationale the answer was given with, markdown (B2).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    rationale: Option<Markdown>,
     /// Its pin (F2).
     #[serde(skip_serializing_if = "Option::is_none")]
     pin: Option<Date>,
@@ -262,6 +266,7 @@ impl Detail {
             record,
             local_edits,
             answer,
+            rationale,
             pin,
             overrides,
             annotations,
@@ -293,6 +298,7 @@ impl Detail {
             record,
             local_edits,
             answer,
+            rationale,
             pin,
             overrides,
             annotations: page(annotations, annotations_cursor),

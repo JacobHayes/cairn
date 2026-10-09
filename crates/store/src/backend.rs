@@ -736,6 +736,7 @@ fn state_records(state: &JourneyState) -> Vec<GraphRecord> {
         nodes,
         local_edits,
         answers,
+        rationales,
         role_fills,
         pins,
         snoozes,
@@ -756,7 +757,12 @@ fn state_records(state: &JourneyState) -> Vec<GraphRecord> {
     }
     for (decision, value) in answers {
         let (decision, value) = (decision.clone(), value.clone());
-        records.push(GraphRecord::Answer { decision, value });
+        let rationale = rationales.get(&decision).cloned();
+        records.push(GraphRecord::Answer {
+            decision,
+            value,
+            rationale,
+        });
     }
     for (role, entities) in role_fills {
         let (role, entities) = (role.clone(), entities.clone());

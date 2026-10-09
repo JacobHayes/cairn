@@ -19,6 +19,7 @@ use crate::number::VersionNumber;
 use crate::proposal::Proposal;
 use crate::refs::KeyRefs;
 use crate::state::{AnswerValue, LocalEdit, NodeState, Overrides, SnoozeTarget};
+use crate::text::Markdown;
 use jiff::Timestamp;
 use jiff::civil::Date;
 
@@ -90,12 +91,15 @@ pub enum GraphRecord {
         /// The marker.
         edit: LocalEdit,
     },
-    /// An answer.
+    /// An answer, with the rationale it was given with (B2).
     Answer {
         /// The decision.
         decision: NodeKey,
         /// The answer.
         value: AnswerValue,
+        /// Why it was given; none when the answer gave no reason.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rationale: Option<Markdown>,
     },
     /// A direct role fill.
     RoleFill {

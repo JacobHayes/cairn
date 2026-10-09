@@ -356,3 +356,41 @@ fn a_participation_source_says_what_is_wrong() {
         );
     }
 }
+
+/// B2: an answer written before rationales existed (no `rationale`) still parses, as one
+/// with none, and writes back without the field; a blank rationale is refused, so "none"
+/// has one spelling.
+#[test]
+fn an_answer_without_a_rationale_still_parses_and_a_blank_one_does_not() {
+    use cairn_schema::{GraphRecord, JourneyState, Mutation};
+
+    let old = r#"{"op":"answer","decision":"n_a","value":{"boolean":true}}"#;
+    let mutation: Mutation = from_json(old).unwrap();
+    assert!(matches!(
+        &mutation,
+        Mutation::Answer {
+            rationale: None,
+            ..
+        }
+    ));
+    assert_eq!(to_json(&mutation).unwrap(), old);
+    let record = r#"{"answer":{"decision":"n_a","value":{"boolean":true}}}"#;
+    let parsed: GraphRecord = from_json(record).unwrap();
+    assert_eq!(to_json(&parsed).unwrap(), record);
+    let state: JourneyState = from_json(r#"{"answers":{"n_a":{"boolean":true}}}"#).unwrap();
+    assert!(state.rationales.is_empty());
+
+    let given =
+        r#"{"op":"answer","decision":"n_a","value":{"boolean":true},"rationale":"Because."}"#;
+    assert_eq!(
+        to_json(&from_json::<Mutation>(given).unwrap()).unwrap(),
+        given
+    );
+    for blank in ["", "  \n"] {
+        let blank = format!(
+            r#"{{"op":"answer","decision":"n_a","value":{{"boolean":true}},"rationale":"{}"}}"#,
+            blank.replace('\n', "\\n")
+        );
+        assert!(from_json::<Mutation>(&blank).is_err(), "{blank}");
+    }
+}

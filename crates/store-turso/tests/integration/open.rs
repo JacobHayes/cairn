@@ -43,6 +43,100 @@ mod open {
         std::fs::remove_dir_all(&root).unwrap();
     }
 
+    /// A patch revising the journey's one decision, with `rationale` when given.
+    fn revise(patch: &str, base: u32, yes: bool, rationale: Option<&str>) -> cairn_store::Commit {
+        use cairn_schema::{AnswerValue, EventType, GraphRecord, Subject};
+        use cairn_store::build::{id, journey_graph, journey_patch, put_in};
+
+        let record = GraphRecord::Answer {
+            decision: id("n_who"),
+            value: AnswerValue::Boolean(yes),
+            rationale: rationale.map(|text| text.parse().unwrap()),
+        };
+        journey_patch(patch, "j_one", base)
+            .event(
+                EventType::AnswerSet,
+                Subject::Node(id("n_who")),
+                vec![put_in(&journey_graph("j_one"), record)],
+            )
+            .commit()
+    }
+
+    /// The decision's answer and rationale as the store at `path` loads them.
+    async fn answer_at(path: &std::path::Path) -> (bool, Option<String>) {
+        let store = TursoStore::open(path).await.unwrap();
+        let loaded = store
+            .load(&LoadTarget::Journey(cairn_store::build::id("j_one")))
+            .await
+            .unwrap();
+        let Some(Document::Journey(journey)) = loaded else {
+            panic!("the journey loads: {loaded:?}");
+        };
+        let state = journey.graph.state;
+        let key = cairn_store::build::id("n_who");
+        let Some(cairn_schema::AnswerValue::Boolean(yes)) = state.answers.get(&key) else {
+            panic!("the answer loads: {:?}", state.answers);
+        };
+        (
+            *yes,
+            state
+                .rationales
+                .get(&key)
+                .map(|text| text.as_str().to_owned()),
+        )
+    }
+
+    /// An answer's rationale: a database from before the column existed keeps its answers,
+    /// which load with no rationale, and takes a rationale on a later revision; a revision
+    /// that gives none stores none (B2). The older database is the current one with the
+    /// column and its migration record taken away, so the migration runs over a stored answer.
+    #[test]
+    fn a_database_from_before_rationales_loads_and_takes_them() {
+        let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("rationale-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("store.db");
+        run(async {
+            let store = TursoStore::open(&path).await.unwrap();
+            let decision = cairn_store::build::node(serde_json::json!({
+                "key": "n_who", "id": "who", "kind": "decision", "title": "Who",
+                "prompt": "Who?", "answer_type": "boolean",
+            }));
+            let create = create_journey("p_one", "j_one", vec![decision]).commit();
+            store.commit(create).await.unwrap();
+            store.commit(revise("p_two", 1, true, None)).await.unwrap();
+            drop(store);
+
+            let database = turso::Builder::new_local(path.to_str().unwrap())
+                .build()
+                .await
+                .unwrap();
+            let connection = database.connect().unwrap();
+            for statement in [
+                "ALTER TABLE answers DROP COLUMN rationale",
+                "DELETE FROM schema_migrations WHERE version = 5",
+            ] {
+                connection.execute(statement, ()).await.unwrap();
+            }
+            drop(connection);
+            drop(database);
+
+            let store = TursoStore::open(&path).await.unwrap();
+            let reason = Some("A reason.\n\n- one");
+            store
+                .commit(revise("p_three", 2, false, reason))
+                .await
+                .unwrap();
+            drop(store);
+            assert_eq!(answer_at(&path).await, (false, reason.map(str::to_owned)));
+            let store = TursoStore::open(&path).await.unwrap();
+            store.commit(revise("p_four", 3, true, None)).await.unwrap();
+            drop(store);
+            assert_eq!(answer_at(&path).await, (true, None));
+        });
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
     /// A14: each stored concept of the PRD glossary and the tables, or `table.column`s, that
     /// hold it. Derived values (due, gravity, rank, frontier, stale, ...) are never stored.
     const GLOSSARY: &[(&str, &[&str])] = &[
@@ -80,7 +174,10 @@ mod open {
             ],
         ),
         ("Container, Parent / child", &["nodes.parent_key"]),
-        ("Answer", &["answers", "answer_entities"]),
+        (
+            "Answer, Rationale",
+            &["answers", "answer_entities", "answers.rationale"],
+        ),
         ("Edge", &["edges"]),
         ("Condition", &["nodes.relevant_when"]),
         ("Role", &["roles"]),

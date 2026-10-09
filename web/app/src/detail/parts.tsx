@@ -4,7 +4,18 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
+import { Markdown } from "../ui/markdown.tsx";
 import { titleOf, type Ready } from "./model.ts";
+
+/** B2: an answer's rationale as the journey records it, rendered as markdown. */
+export function Rationale({ text }: { text: string | undefined }) {
+  return text === undefined ? null : (
+    <div className="chain stack" data-testid="rationale">
+      <span className="muted">Why</span>
+      <Markdown text={text} />
+    </div>
+  );
+}
 
 /**
  * The address of the journey screen a node's detail is open on (the canvas, the timeline,

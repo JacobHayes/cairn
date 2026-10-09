@@ -186,8 +186,16 @@ fn arb_state_mutation() -> BoxedStrategy<Mutation> {
     prop_oneof![
         (arb_node_key(), arb_transition())
             .prop_map(|(node, transition)| Mutation::Transition { node, transition }),
-        (arb_node_key(), arb_answer_value())
-            .prop_map(|(decision, value)| Mutation::Answer { decision, value }),
+        (
+            arb_node_key(),
+            arb_answer_value(),
+            prop::option::of(arb_markdown())
+        )
+            .prop_map(|(decision, value, rationale)| Mutation::Answer {
+                decision,
+                value,
+                rationale
+            }),
         (
             arb_node_key(),
             prop::sample::select(vec![RecordedEnd::Start, RecordedEnd::Finish]),
@@ -344,13 +352,18 @@ pub fn arb_conflict() -> BoxedStrategy<Conflict> {
                 answered
             }
         ),
-        (arb_node_key(), arb_answer_value(), arb_choices()).prop_map(
-            |(decision, answer, choices)| Conflict::Answer {
+        (
+            arb_node_key(),
+            arb_answer_value(),
+            prop::option::of(arb_markdown()),
+            arb_choices()
+        )
+            .prop_map(|(decision, answer, rationale, choices)| Conflict::Answer {
                 decision,
                 answer,
+                rationale,
                 choices
-            }
-        ),
+            }),
         arb_graph_conflict(),
     ]
     .boxed()
@@ -606,8 +619,16 @@ fn arb_state_record() -> BoxedStrategy<GraphRecord> {
             .prop_map(|(node, state)| GraphRecord::NodeState { node, state }),
         (arb_node_key(), arb_local_edit())
             .prop_map(|(node, edit)| GraphRecord::LocalEdit { node, edit }),
-        (arb_node_key(), arb_answer_value())
-            .prop_map(|(decision, value)| GraphRecord::Answer { decision, value }),
+        (
+            arb_node_key(),
+            arb_answer_value(),
+            prop::option::of(arb_markdown())
+        )
+            .prop_map(|(decision, value, rationale)| GraphRecord::Answer {
+                decision,
+                value,
+                rationale
+            }),
         (arb_role_key(), arb_entity_set())
             .prop_map(|(role, entities)| GraphRecord::RoleFill { role, entities }),
         (arb_node_key(), arb_date()).prop_map(|(node, date)| GraphRecord::Pin { node, date }),

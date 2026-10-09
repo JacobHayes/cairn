@@ -299,10 +299,16 @@ impl Explain<'_> {
     fn seed_moves(&self, by: Mover, fix: Fix, days: i32, moves: &mut Vec<Mutation>) {
         let shifted = date(fix.day.saturating_add(days));
         match by {
-            Mover::Answer(decision) => moves.push(Mutation::Answer {
-                decision: self.key(decision),
-                value: AnswerValue::Date(shifted),
-            }),
+            Mover::Answer(decision) => {
+                let decision = self.key(decision);
+                // Moving the date revises the value; the reason it was given stays.
+                let rationale = self.document.state.rationales.get(&decision).cloned();
+                moves.push(Mutation::Answer {
+                    decision,
+                    value: AnswerValue::Date(shifted),
+                    rationale,
+                });
+            }
             Mover::Pin(node) => {
                 let node = self.key(node);
                 if let Ok(offset_days) = SignedDays::try_from(days) {

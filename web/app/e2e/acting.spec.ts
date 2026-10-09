@@ -19,7 +19,7 @@ import {
   turnOn,
 } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { derivedRevision } from "./shell.ts";
+import { derivedRevision, nodePanel } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
 /** Starts a fresh journey from version 1 of the vendor evaluation's route (B1); its id. */
@@ -175,6 +175,39 @@ test("C11: the walkthrough opens on the decisions at the start; answering the pa
   expect([...pass].sort()).toEqual(everyKind.sort());
   await page.getByTestId("nav-next").click();
   expect(await nextKeys(page)).toEqual(pass);
+});
+
+test("B2, C8, C12: a rationale given on a triage card shows in node detail and the decision view; a revision without one drops it, and history keeps both", async ({ page }) => {
+  const journey = await startVendorJourney(page);
+  await openActing(page, "browser", journey, "triage?mode=decisions");
+  await expect(card(page)).toHaveAttribute("data-node", "n_partner_runs");
+  await answerCard(page, "yes", "- a partner brings the **domain**\n- [their notes](https://example.org/notes)");
+  await openActing(page, "browser", journey, "decisions/nodes/n_partner_runs");
+  const decided = page.locator('[data-testid="decision-row"][data-node="n_partner_runs"]').getByTestId("rationale");
+  await expect(decided.locator("li")).toHaveCount(2);
+  await expect(decided.getByRole("link", { name: "their notes" })).toHaveAttribute("href", "https://example.org/notes");
+  const panel = nodePanel(page, "n_partner_runs");
+  await expect(panel.getByTestId("rationale").locator("li")).toHaveCount(2);
+  // Editing the reason keeps it; picking a different answer there starts a new answer without it.
+  await panel.getByRole("button", { name: "Edit reason" }).click();
+  const editor = panel.getByTestId("answer-editor");
+  await expect(editor.getByLabel("Why")).toHaveValue(/their notes/);
+  await editor.getByLabel("Answer").selectOption("no");
+  await expect(editor.getByLabel("Why")).toHaveValue("");
+  await editor.getByRole("button", { name: "Cancel" }).click();
+  await panel.getByRole("button", { name: "Revise the answer" }).click();
+  // A new answer starts with no reason: the old one is offered, never carried forward.
+  await expect(editor.getByLabel("Why")).toHaveValue("");
+  await expect(editor.getByTestId("answer-why")).toContainText("Previous reason");
+  await editor.getByLabel("Answer").selectOption("no");
+  await editor.getByRole("button", { name: "Save the answer" }).click();
+  await expect(panel.getByTestId("rationale")).toHaveCount(0);
+  await expect(page.locator('[data-testid="decision-row"][data-node="n_partner_runs"]').getByTestId("rationale")).toHaveCount(0);
+  await panel.getByTestId("history").locator("summary").click();
+  const answers = panel.getByTestId("history-answer");
+  await expect(answers).toHaveCount(2);
+  await expect(answers.nth(0).getByTestId("history-rationale").locator("li")).toHaveCount(2);
+  await expect(answers.nth(1)).toContainText("No reason given.");
 });
 
 test("C11, B10: a placeholder's card offers break down and mark atomic, and no done until it is atomic", async ({ page }) => {

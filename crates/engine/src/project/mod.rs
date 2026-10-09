@@ -27,8 +27,8 @@ use std::fmt;
 
 use cairn_schema::limits::NODE_COUNT_MAX;
 use cairn_schema::{
-    AnswerValue, DeriveInputs, DomainDocument, EngineVersion, EntitySet, Journey, KeyRefs, Node,
-    NodeKey, State,
+    AnswerValue, DeriveInputs, DomainDocument, EngineVersion, EntitySet, Journey, KeyRefs,
+    Markdown, Node, NodeKey, State,
 };
 
 use crate::derive::{Derived, stored_state};
@@ -159,6 +159,19 @@ impl<'a> DerivedJourney<'a> {
             }
             other => other.clone(),
         })
+    }
+
+    /// B2: the rationale of the decision's answer while that answer is in effect.
+    fn rationale(&self, decision: &NodeKey) -> Option<Markdown> {
+        self.derived
+            .relevance()
+            .answer_in_effect(self.graph.document(), decision)?;
+        self.graph
+            .document()
+            .state
+            .rationales
+            .get(decision)
+            .cloned()
     }
 
     /// The node's owners (E2).

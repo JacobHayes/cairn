@@ -67,10 +67,13 @@ export async function revisionAfter(page: Page, revision: number): Promise<numbe
 }
 
 /** Answers the focus card's decision with the select's `option`. */
-export async function answerCard(page: Page, option: string): Promise<void> {
+export async function answerCard(page: Page, option: string, why?: string): Promise<void> {
   const editor = card(page);
   await editor.getByRole("button", { name: "Answer", exact: true }).click();
   await editor.getByLabel("Answer").selectOption(option);
+  if (why !== undefined) {
+    await editor.getByLabel("Why").fill(why);
+  }
   await editor.getByRole("button", { name: "Save the answer" }).click();
 }
 

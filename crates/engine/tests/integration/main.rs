@@ -48,6 +48,7 @@ mod property_projections;
 mod property_upgrade;
 mod proposals;
 mod rank;
+mod rationale;
 mod relevance;
 mod save_relink;
 mod scenarios;

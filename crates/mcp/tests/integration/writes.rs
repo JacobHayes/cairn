@@ -177,6 +177,45 @@ async fn stale_and_resubmitted_writes_are_answered_as_the_service_answers() {
     );
 }
 
+/// B2: `answer_decision` takes a rationale; the node reads back only the current answer's,
+/// and a revision that gives none leaves none, as `get_snapshot` agrees.
+#[tokio::test]
+async fn an_answers_rationale_is_written_read_and_dropped_by_a_revision_without_one() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let rationale_of = |node: &serde_json::Value| node["detail"]["rationale"].clone();
+    let mut revision = 1;
+    for (patch, value, rationale) in [
+        (
+            "p_why_1",
+            "purchase",
+            Some("- buy it\n- [quote](https://example.org)"),
+        ),
+        ("p_why_2", "research-only", None),
+        ("p_why_3", "purchase", Some("Changed my mind.")),
+    ] {
+        let mut answer = json!({
+            "journey": "j_vendor_eval", "decision": "n_purpose",
+            "value": { "single_choice": value },
+            "patch_id": patch, "base_revision": revision,
+        });
+        if let Some(rationale) = rationale {
+            answer["rationale"] = json!(rationale);
+        }
+        let written = world.ok(&ann, "answer_decision", answer).await;
+        revision = written["receipt"]["revision"].as_u64().unwrap();
+        let node = json!({ "journey": "j_vendor_eval", "node": "n_purpose" });
+        let node = world.ok(&ann, "get_node", node).await;
+        assert_eq!(rationale_of(&node), json!(rationale));
+        let snapshot = world
+            .ok(&ann, "get_snapshot", json!({ "journey": "j_vendor_eval" }))
+            .await;
+        let shown = snapshot["snapshot"]["rationales"]["n_purpose"].clone();
+        assert_eq!(shown, json!(rationale));
+    }
+}
+
 /// I7: an agent's write records the agent and the user it acts for, with its note.
 #[tokio::test]
 async fn an_agent_write_records_the_agent_and_its_user() {

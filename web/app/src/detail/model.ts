@@ -41,6 +41,8 @@ export interface NodeDetail {
   record: NodeState;
   localEdits: Schema<"LocalEdit">[];
   answer: AnswerValue | undefined;
+  /** B2: the markdown reason its recorded answer was given with. */
+  rationale: string | undefined;
   /** Its direct pin (F2); a pin its feeding decision gives is `fedBy`'s answer (E3). */
   pin: string | undefined;
   overrides: Schema<"Overrides"> | undefined;
@@ -140,6 +142,7 @@ export function nodeDetail(view: Ready, key: string): NodeDetail | undefined {
     record: recordOf(view, node),
     localEdits: state?.local_edits?.[key] ?? [],
     answer: state?.answers?.[key],
+    rationale: state?.rationales?.[key],
     pin: state?.pins?.[key],
     overrides: state?.overrides?.[key],
     annotations: (state?.annotations ?? []).filter((annotation) => annotation.body.node === key),

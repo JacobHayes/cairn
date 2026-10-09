@@ -6,9 +6,9 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Annotation, AnswerEffects, AnswerValue, Date, DisplayState, KeyRefs, LocalEdit, MineEntry,
-    Node, NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, Revision, State,
-    StillWaiting, Title,
+    Annotation, AnswerEffects, AnswerValue, Date, DisplayState, KeyRefs, LocalEdit, Markdown,
+    MineEntry, Node, NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path,
+    Revision, State, StillWaiting, Title,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -84,6 +84,9 @@ pub struct NodeDetail {
     /// A decision's answer, as recorded.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub answer: Option<AnswerValue>,
+    /// The rationale the recorded answer was given with, markdown (B2).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub rationale: Option<Markdown>,
     /// Its pin (F2).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub pin: Option<Date>,
@@ -131,6 +134,7 @@ impl From<cairn_service::NodeDetail> for NodeDetail {
             record,
             local_edits,
             answer,
+            rationale,
             pin,
             overrides,
             annotations,
@@ -162,6 +166,7 @@ impl From<cairn_service::NodeDetail> for NodeDetail {
             record,
             local_edits,
             answer,
+            rationale,
             pin,
             overrides,
             annotations,

@@ -429,6 +429,20 @@ pub fn state(fill: Fill) -> JourneyState {
         nodes: nodes.collect(),
         local_edits: BTreeMap::from([(node_key(0), local_edits())]),
         answers: by_node(fill.rotate(answer_values())),
+        // Cleared drops every rationale: an overwrite must clear the stored column.
+        rationales: if fill.on() {
+            BTreeMap::from([
+                (
+                    node_key(0),
+                    "Because:\n\n- the quote was lowest\n- see [the notes](https://example.com)"
+                        .parse()
+                        .unwrap(),
+                ),
+                (node_key(1), "A second reason.".parse().unwrap()),
+            ])
+        } else {
+            BTreeMap::new()
+        },
         role_fills: fill
             .rotate(fills.to_vec())
             .into_iter()

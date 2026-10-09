@@ -10,7 +10,7 @@ import { answerWords, guardFailureText, namer, originText, viaText } from "./exp
 import { INITIAL_STATE, flagsOf, titleOf, type NodeDetail, type Ready } from "./model.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { useContributions } from "./contributions.ts";
-import { Contributions, NodeLink, Section } from "./parts.tsx";
+import { Contributions, NodeLink, Rationale, Section } from "./parts.tsx";
 import { BreakDown } from "../proposals/Entries.tsx";
 import { breakable } from "../proposals/model.ts";
 
@@ -70,7 +70,7 @@ export function Header({ view, detail }: { view: Ready; detail: NodeDetail }) {
 
 /** The description, and for a decision its prompt, help, and answer. */
 export function About({ view, detail, edit }: { view: Ready; detail: NodeDetail; edit?: ReactNode }) {
-  const { node, answer } = detail;
+  const { node, answer, rationale } = detail;
   const decision = node.kind === "decision";
   return (
     <Section title={decision ? "Decision" : "Description"} open={decision || (node.description ?? "") !== ""} testId="about">
@@ -87,6 +87,7 @@ export function About({ view, detail, edit }: { view: Ready; detail: NodeDetail;
           )}
         </span>
       ) : null}
+      {decision && answer !== undefined ? <Rationale text={rationale} /> : null}
       {node.description == null || node.description === "" ? (
         decision ? null : <span className="muted">No description.</span>
       ) : (

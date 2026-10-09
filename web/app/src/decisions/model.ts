@@ -95,6 +95,8 @@ export interface DecisionRow {
   relevance: Relevance;
   /** The answer in effect (decided and in scope, E3), as people read it. */
   answer: string | undefined;
+  /** B2: the markdown reason the answer in effect was given with. */
+  rationale: string | undefined;
   /** Its owners by name; empty when unassigned. */
   owners: string[];
   /** The nodes whose relevance its answer decides, their descendants included. */
@@ -127,6 +129,7 @@ function rowOf(ready: Ready, entry: DecisionEntry, node: GraphNode | undefined):
     displayState: entry.display_state,
     relevance: entry.relevance,
     answer: entry.answer == null ? undefined : answerText(ready, entry.answer, node),
+    rationale: entry.rationale ?? undefined,
     owners: (entry.owners ?? []).map((owner) => entityName(ready, owner)),
     affects: (entry.affects ?? []).map((key) => affectedOf(ready, key)),
     pins:

@@ -188,7 +188,12 @@ function MutationEditor({ editor, mutation, onChange, context }: { editor: strin
       return <Field type="date" aria-label="Pinned date" value={mutation.date} onChange={(event) => { onChange({ ...mutation, date: event.target.value }); }} />;
     case "answer": {
       const decision = context.tree.byKey.get(mutation.decision);
-      return context.ready === undefined || decision === undefined ? null : <AnswerInput view={context.ready} node={decision} value={mutation.value} onChange={(value) => { onChange({ ...mutation, value }); }} />;
+      return context.ready === undefined || decision === undefined ? null : (
+        <>
+          <AnswerInput view={context.ready} node={decision} value={mutation.value} onChange={(value) => { onChange({ ...mutation, value }); }} />
+          <textarea className="textarea" aria-label="Why" placeholder="Why (optional, markdown)" value={mutation.rationale ?? ""} onChange={(event) => { onChange({ ...mutation, rationale: event.target.value.trim() === "" ? null : event.target.value }); }} />
+        </>
+      );
     }
     default:
       return null;

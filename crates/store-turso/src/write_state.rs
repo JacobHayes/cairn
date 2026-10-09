@@ -1,7 +1,7 @@
 //! Puts of journey state records, and removals by address inside a graph.
 
 use cairn_schema::{
-    Annotation, AnnotationBody, AnswerValue, GraphKey, GraphRecord, NodeKey, NodeState, Overrides,
+    Annotation, AnnotationBody, GraphKey, GraphRecord, Markdown, NodeKey, NodeState, Overrides,
 };
 use cairn_store::{CommitError, StoreError};
 use turso::Value;
@@ -54,7 +54,7 @@ fn puts(id: &str, record: &GraphRecord) -> Result<Vec<Statement>, Abort> {
                 vec![graph, text(node), text(aspect), text(&target)],
             )]
         }
-        GraphRecord::Answer { decision, value } => answer_puts(id, decision, value)?,
+        GraphRecord::Answer { .. } => answer_puts(id, record)?,
         GraphRecord::RoleFill { role, entities } => {
             let params = || vec![text(id), text(role)];
             let mut statements = vec![
@@ -133,14 +133,27 @@ fn node_state_put(id: &str, node: &NodeKey, state: &NodeState) -> Result<Stateme
     ))
 }
 
-fn answer_puts(id: &str, decision: &NodeKey, value: &AnswerValue) -> Result<Vec<Statement>, Abort> {
+fn answer_puts(id: &str, answer: &GraphRecord) -> Result<Vec<Statement>, Abort> {
+    let GraphRecord::Answer {
+        decision,
+        value,
+        rationale,
+    } = answer
+    else {
+        unreachable!("an answer record")
+    };
     let params = || vec![text(id), text(decision)];
     let mut values = params();
-    values.extend([json_enum(&value.answer_type())?, json(value)?]);
+    // The whole row is replaced, so an answer without a rationale stores null (B2).
+    values.extend([
+        json_enum(&value.answer_type())?,
+        json(value)?,
+        opt_text(rationale.as_ref().map(Markdown::as_str)),
+    ]);
     let mut statements = vec![
         statement(
-            "INSERT OR REPLACE INTO answers (graph_id, decision, answer_type, value) \
-             VALUES (?1, ?2, ?3, ?4)",
+            "INSERT OR REPLACE INTO answers (graph_id, decision, answer_type, value, rationale) \
+             VALUES (?1, ?2, ?3, ?4, ?5)",
             values,
         ),
         statement(

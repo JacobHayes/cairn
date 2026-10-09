@@ -472,12 +472,16 @@ pub enum Mutation {
         /// The transition.
         transition: Transition,
     },
-    /// Answer or revise a decision (B2).
+    /// Answer or revise a decision (B2). The rationale belongs to this answer alone: a
+    /// revision that gives none leaves the decision without one.
     Answer {
         /// The decision.
         decision: NodeKey,
         /// The answer.
         value: AnswerValue,
+        /// Why it was given: markdown, free text under the body limit (B2).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rationale: Option<Markdown>,
     },
     /// Edit a recorded start or finish date (F1, F2).
     SetRecordedDate {

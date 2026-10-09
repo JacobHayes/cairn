@@ -436,6 +436,7 @@ fn answer_with(patch: &str, journey: &str, base: u32, entity_key: &str) -> Commi
                 GraphRecord::Answer {
                     decision: id("n_who"),
                     value: cairn_schema::AnswerValue::Entity(id(entity_key)),
+                    rationale: None,
                 },
             )],
         )

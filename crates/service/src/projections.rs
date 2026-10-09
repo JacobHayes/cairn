@@ -15,9 +15,9 @@ use cairn_engine::{DerivedJourney, ProjectionError};
 use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Cursor, Date, DecisionView, Deployment, DisplayState,
     Domain, EntityKey, ExplainedField, ExplanationPage, JourneyId, KeyRefs, KindKey, Level,
-    LevelQuery, ListPage, ListQuery, LocalEdit, MineEntry, Next, NextQuery, Node, NodeDerived,
-    NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId, Revision, Snapshot,
-    SnapshotScope, State, StatusSummary, StillWaiting, Timeline, Title, Trace,
+    LevelQuery, ListPage, ListQuery, LocalEdit, Markdown, MineEntry, Next, NextQuery, Node,
+    NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId, Revision,
+    Snapshot, SnapshotScope, State, StatusSummary, StillWaiting, Timeline, Title, Trace,
 };
 use cairn_store::{EventQuery, PageSize, Store};
 
@@ -97,6 +97,8 @@ pub struct NodeDetail {
     pub local_edits: BTreeSet<LocalEdit>,
     /// A decision's answer, as recorded.
     pub answer: Option<AnswerValue>,
+    /// The rationale the recorded answer was given with (B2).
+    pub rationale: Option<Markdown>,
     /// Its pin (F2).
     pub pin: Option<Date>,
     /// Its overrides (D4).
@@ -502,6 +504,7 @@ fn detail(
         record: stored(key, node.kind()),
         local_edits: state.local_edits.get(key).cloned().unwrap_or_default(),
         answer: state.answers.get(key).cloned(),
+        rationale: state.rationales.get(key).cloned(),
         pin: state.pins.get(key).copied(),
         overrides: state.overrides.get(key).cloned(),
         annotations,

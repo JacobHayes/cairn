@@ -198,7 +198,12 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
                 0..2,
             ),
         ),
-        prop::collection::btree_map(arb_node_key(), arb_answer_value(), 0..3),
+        // A rationale is held only beside its answer (B2).
+        prop::collection::btree_map(
+            arb_node_key(),
+            (arb_answer_value(), prop::option::of(arb_markdown())),
+            0..3,
+        ),
         prop::collection::btree_map(arb_role_key(), arb_entity_set(), 0..2),
         prop::collection::btree_map(arb_node_key(), arb_date(), 0..2),
         prop::collection::btree_map(arb_node_key(), arb_snooze_target(), 0..2),
@@ -209,7 +214,7 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
         .prop_map(
             |(
                 (nodes, local_edits),
-                answers,
+                answered,
                 role_fills,
                 pins,
                 snoozes,
@@ -217,10 +222,17 @@ pub fn arb_journey_state() -> impl Strategy<Value = JourneyState> {
                 tombstones,
                 annotations,
             )| {
+                let mut answers = std::collections::BTreeMap::new();
+                let mut rationales = std::collections::BTreeMap::new();
+                for (decision, (value, rationale)) in answered {
+                    rationales.extend(rationale.map(|text| (decision.clone(), text)));
+                    answers.insert(decision, value);
+                }
                 JourneyState {
                     nodes,
                     local_edits,
                     answers,
+                    rationales,
                     role_fills,
                     pins,
                     snoozes,

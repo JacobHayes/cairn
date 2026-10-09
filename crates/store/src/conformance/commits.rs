@@ -294,6 +294,7 @@ pub async fn a_commit_fails_whole_when_either_precondition_is_stale<B: Backend>(
                     GraphRecord::Answer {
                         decision: node_key("n_owner"),
                         value: cairn_schema::AnswerValue::Entity(id("e_a")),
+                        rationale: None,
                     },
                 )],
             )

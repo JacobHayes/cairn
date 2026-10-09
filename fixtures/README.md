@@ -176,7 +176,8 @@ filling decision and is filled directly. The interviews deliverable is a placeho
 `interviewer` participation on the panel role. An offer decision gates two branches by
 condition: the offer letter when it is yes, the close-out otherwise. The scenario fills the
 panel, skips the screen with a reason, has the assistant break the interviews into one
-interview per panelist with explicit participations, completes the onsite, and makes the offer.
+interview per panelist with explicit participations, completes the onsite, and makes the offer
+with a rationale, which the journey keeps with that answer.
 
 Projected at the end of the scenario (brief 2.6), read at 2026-10-06: the level with actions
 hidden, what rolls up, and the next list, which holds only the offer letter's decision.

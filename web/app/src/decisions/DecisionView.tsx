@@ -13,7 +13,7 @@ import { cardsOf, linesOf, type CanvasModel } from "../canvas/model.ts";
 import type { CardActions } from "../canvas/NodeCard.tsx";
 import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
 import { titleOf, type Ready } from "../detail/model.ts";
-import { NodeLink, nodePath, screenPath } from "../detail/parts.tsx";
+import { NodeLink, nodePath, Rationale, screenPath } from "../detail/parts.tsx";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import "./decisions.css";
@@ -74,7 +74,10 @@ function RowView({ ready, row, selected }: { ready: Ready; row: DecisionRow; sel
       <td>
         <Badge tone={statusTone(row.displayState)}>{statusWord(row.displayState, "decision")}</Badge>
       </td>
-      <td data-testid="decision-answer">{row.answer ?? <span className="muted">none in effect</span>}</td>
+      <td data-testid="decision-answer">
+        {row.answer ?? <span className="muted">none in effect</span>}
+        <Rationale text={row.rationale} />
+      </td>
       <td>{row.owners.length === 0 ? <span className="muted">unassigned</span> : row.owners.join(", ")}</td>
       <td>
         <div className="stack">

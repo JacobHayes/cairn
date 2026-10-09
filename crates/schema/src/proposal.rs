@@ -191,6 +191,10 @@ pub enum Conflict {
         decision: NodeKey,
         /// The journey's answer.
         answer: AnswerValue,
+        /// The rationale the journey's answer was given with, kept when the answer is
+        /// mapped onto the route's choices (B2).
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        rationale: Option<Markdown>,
         /// The route's choices.
         choices: Choices,
     },

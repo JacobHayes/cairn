@@ -13,7 +13,7 @@ use crate::field::NodeField;
 use crate::id::{AttachmentKey, EntityKey, KindKey, NodeKey, RoleKey, Slug};
 use crate::limits::{Limit, LimitExceeded};
 use crate::node::{AnswerType, EntitySet, NodeKind};
-use crate::text::Reason;
+use crate::text::{Markdown, Reason};
 use jiff::civil::Date;
 
 /// A node's stored state (D1). Each kind has its own machine; [`State::legal_for`] says
@@ -371,6 +371,15 @@ pub struct JourneyState {
     )]
     #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
     pub answers: BTreeMap<NodeKey, AnswerValue>,
+    /// The rationale each answer was given with, by decision (B2). A key here has an answer
+    /// beside it; an answer given without a reason has no entry, and reopening removes both.
+    #[serde(
+        default,
+        skip_serializing_if = "BTreeMap::is_empty",
+        deserialize_with = "crate::serde_util::unique_map_per_node"
+    )]
+    #[schemars(extend("maxProperties" = crate::limits::NODE_COUNT_MAX))]
+    pub rationales: BTreeMap<NodeKey, Markdown>,
     /// Direct role fills, for roles without a filling decision (E3). A role with a filling
     /// decision is filled from that decision's answer, which is derived, not stored here.
     #[serde(
@@ -465,6 +474,7 @@ impl JourneyState {
         self.nodes.is_empty()
             && self.local_edits.is_empty()
             && self.answers.is_empty()
+            && self.rationales.is_empty()
             && self.role_fills.is_empty()
             && self.pins.is_empty()
             && self.snoozes.is_empty()

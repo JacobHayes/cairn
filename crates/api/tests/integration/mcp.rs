@@ -539,9 +539,9 @@ mod mcp_in_process {
                 .as_slice()
                 .iter()
                 .filter_map(|mutation| match mutation {
-                    Mutation::Answer { decision, value } => {
-                        Some((decision.to_string(), serde_json::to_value(value).unwrap()))
-                    }
+                    Mutation::Answer {
+                        decision, value, ..
+                    } => Some((decision.to_string(), serde_json::to_value(value).unwrap())),
                     _ => None,
                 });
         answers.collect()

@@ -361,6 +361,10 @@ pub(crate) struct AnswerDecision {
     decision: NodeKey,
     /// The answer.
     value: AnswerValue,
+    /// Why it was given, markdown. It belongs to this answer alone: a revision that gives
+    /// none leaves the decision without one, so repeat the reason when it still holds.
+    #[serde(default)]
+    rationale: Option<Markdown>,
     /// The deployment revision the named entities were read at; needed when the answer
     /// names an entity.
     #[serde(default)]
@@ -382,6 +386,7 @@ impl AnswerDecision {
         let mutation = Mutation::Answer {
             decision: self.decision,
             value: self.value,
+            rationale: self.rationale,
         };
         journey_patch(
             self.journey,

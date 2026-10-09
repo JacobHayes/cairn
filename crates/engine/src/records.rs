@@ -376,8 +376,17 @@ fn put_state(graph: &mut Graph, record: &GraphRecord) {
                 .or_default()
                 .insert(edit.clone());
         }
-        GraphRecord::Answer { decision, value } => {
+        GraphRecord::Answer {
+            decision,
+            value,
+            rationale,
+        } => {
             state.answers.insert(decision.clone(), value.clone());
+            // The record is the whole answer: no rationale in it clears any earlier one.
+            match rationale {
+                Some(rationale) => state.rationales.insert(decision.clone(), rationale.clone()),
+                None => state.rationales.remove(decision),
+            };
         }
         GraphRecord::RoleFill { role, entities } => {
             state.role_fills.insert(role.clone(), entities.clone());
@@ -458,6 +467,7 @@ fn remove_state(graph: &mut Graph, key: &GraphKey) {
         }
         GraphKey::Answer(node) => {
             state.answers.remove(node);
+            state.rationales.remove(node);
         }
         GraphKey::RoleFill(role) => {
             state.role_fills.remove(role);
@@ -509,6 +519,7 @@ fn remove_node(graph: &mut Graph, key: &NodeKey) {
     state.nodes.remove(key);
     state.local_edits.remove(key);
     state.answers.remove(key);
+    state.rationales.remove(key);
     state.pins.remove(key);
     state.snoozes.remove(key);
     state.overrides.remove(key);

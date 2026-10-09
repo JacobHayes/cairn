@@ -9,9 +9,30 @@ import { useEffect, useRef, useState } from "react";
 import type { Host } from "../data/host.ts";
 import { useSession } from "../data/react.ts";
 import { Button } from "../ui/kit.tsx";
-import type { NodeDetail, Ready } from "./model.ts";
+import { Markdown } from "../ui/markdown.tsx";
+import type { AnswerValue, GraphNode, NodeDetail, Ready } from "./model.ts";
+import { answerText } from "./sections.tsx";
 
 type PatchEvents = Schema<"PatchEvents">;
+
+/** An answer an event wrote on a node, with the reason it was given with, if any (B2, J1). */
+export interface AnswerEntry {
+  value: AnswerValue;
+  rationale: string | undefined;
+}
+
+/** J1: the answers `patch`'s events wrote on `node`, each with its own rationale. */
+export function answersWritten(patch: PatchEvents, node: string): AnswerEntry[] {
+  return patch.events.flatMap((event) =>
+    event.delta.flatMap((write) => {
+      if (!("put" in write) || !("graph" in write.put)) {
+        return [];
+      }
+      const record = write.put.graph.record;
+      return "answer" in record && record.answer.decision === node ? [{ value: record.answer.value, rationale: record.answer.rationale ?? undefined }] : [];
+    }),
+  );
+}
 
 interface Loaded {
   patches: PatchEvents[];
@@ -69,11 +90,12 @@ function readPage(
   );
 }
 
-function PatchItem({ patch }: { patch: PatchEvents }) {
+function PatchItem({ view, decision, patch }: { view: Ready; decision: GraphNode; patch: PatchEvents }) {
   const [first] = patch.events;
   if (first === undefined) {
     return null;
   }
+  const answers = answersWritten(patch, decision.key);
   const note = patch.events.find((event) => event.note != null)?.note;
   return (
     <li data-testid="history-patch">
@@ -83,6 +105,14 @@ function PatchItem({ patch }: { patch: PatchEvents }) {
       </span>{" "}
       {[...new Set(patch.events.map((event) => event.event_type.replaceAll("_", " ")))].join(", ")}
       {note == null ? null : <span className="muted"> — {note}</span>}
+      {answers.map((answer, index) => (
+        <div key={index} className="stack" data-testid="history-answer">
+          <span>
+            Answer: <strong>{answerText(view, answer.value, decision)}</strong>
+          </span>
+          {answer.rationale === undefined ? <span className="muted">No reason given.</span> : <Markdown text={answer.rationale} data-testid="history-rationale" />}
+        </div>
+      ))}
     </li>
   );
 }
@@ -116,7 +146,7 @@ export function NodeHistory({ view, detail }: { view: Ready; detail: NodeDetail 
           <>
             <ol className="detail-list">
               {loaded.patches.map((patch) => (
-                <PatchItem key={patch.patch_id} patch={patch} />
+                <PatchItem key={patch.patch_id} view={view} decision={detail.node} patch={patch} />
               ))}
             </ol>
             {loaded.next === undefined ? null : (

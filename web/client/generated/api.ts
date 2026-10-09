@@ -1318,6 +1318,11 @@ export interface components {
             choices: components["schemas"]["Choices"];
             /** @description The decision. */
             decision: components["schemas"]["NodeKey"];
+            /**
+             * @description The rationale the journey's answer was given with, kept when the answer is
+             *     mapped onto the route's choices (B2).
+             */
+            rationale?: components["schemas"]["Markdown"] | null;
         } | {
             /** @constant */
             about: "role";
@@ -1549,6 +1554,8 @@ export interface components {
             owners?: components["schemas"]["EntityKey"][];
             /** @description The milestone its answer pins (E3, `feeds_milestone`). */
             pins?: components["schemas"]["NodeKey"] | null;
+            /** @description The rationale its answer was given with, while the answer is in effect (B2, C12). */
+            rationale?: components["schemas"]["Markdown"] | null;
             /** @description Its relevance. */
             relevance: components["schemas"]["Relevance"];
             /** @description Its stored state. */
@@ -2000,6 +2007,8 @@ export interface components {
             answer: {
                 /** @description The decision. */
                 decision: components["schemas"]["NodeKey"];
+                /** @description Why it was given; none when the answer gave no reason. */
+                rationale?: components["schemas"]["Markdown"] | null;
                 /** @description The answer. */
                 value: components["schemas"]["AnswerValue"];
             };
@@ -2196,6 +2205,13 @@ export interface components {
              */
             pins?: {
                 [key: string]: string;
+            };
+            /**
+             * @description The rationale each answer was given with, by decision (B2). A key here has an answer
+             *     beside it; an answer given without a reason has no entry, and reopening removes both.
+             */
+            rationales?: {
+                [key: string]: components["schemas"]["Markdown"];
             };
             /**
              * @description Direct role fills, for roles without a filling decision (E3). A role with a filling
@@ -2635,6 +2651,8 @@ export interface components {
             decision: components["schemas"]["NodeKey"];
             /** @constant */
             op: "answer";
+            /** @description Why it was given: markdown, free text under the body limit (B2). */
+            rationale?: components["schemas"]["Markdown"] | null;
             /** @description The answer. */
             value: components["schemas"]["AnswerValue"];
         } | {
@@ -3008,6 +3026,8 @@ export interface components {
              * @description Its pin (F2).
              */
             pin?: string | null;
+            /** @description The rationale the recorded answer was given with, markdown (B2). */
+            rationale?: components["schemas"]["Markdown"] | null;
             /** @description Its stored state, provenance, and actual dates. */
             record: components["schemas"]["NodeState"];
             /**
@@ -4289,6 +4309,10 @@ export interface components {
             nodes: components["schemas"]["SnapshotNode"][];
             /** @description Open, in-scope decisions, in rank order. */
             open_decisions?: components["schemas"]["NodeKey"][];
+            /** @description The rationales those answers were given with, for the answers that have one (B2). */
+            rationales?: {
+                [key: string]: components["schemas"]["Markdown"];
+            };
             /** @description What it covers. */
             scope: components["schemas"]["SnapshotScope"];
             /** @description Nodes whose plan can no longer be met. */

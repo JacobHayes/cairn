@@ -58,6 +58,7 @@ pub async fn aliases_resolve_to_their_entity<B: Backend>(backend: &B) {
             GraphRecord::Answer {
                 decision: node_key("n_who"),
                 value: cairn_schema::AnswerValue::Entity(id("e_old")),
+                rationale: None,
             },
         )],
     );

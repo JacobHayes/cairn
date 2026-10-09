@@ -3,9 +3,9 @@
 //! placeholders, notes and links, provenance, and local-edit markers.
 
 use cairn_schema::{
-    AnswerValue, GraphKey, GraphRecord, Limit, LocalEdit, Mutation, NodeKey, NodeKind, NodeState,
-    OverrideKind, Overrides, Payload, RecordedEnd, RoleKey, SignedDays, State, Subject, Transition,
-    ViolationCode, Write,
+    AnswerValue, GraphKey, GraphRecord, Limit, LocalEdit, Markdown, Mutation, NodeKey, NodeKind,
+    NodeState, OverrideKind, Overrides, Payload, RecordedEnd, RoleKey, SignedDays, State, Subject,
+    Transition, ViolationCode, Write,
 };
 
 use super::Session;
@@ -16,7 +16,11 @@ use crate::validate::state::{feeding_decisions, filling_decisions};
 pub(super) fn apply(session: &mut Session<'_>, mutation: &Mutation) -> Vec<Write> {
     match mutation {
         Mutation::Transition { node, transition } => move_node(session, node, transition),
-        Mutation::Answer { decision, value } => answer(session, decision, value),
+        Mutation::Answer {
+            decision,
+            value,
+            rationale,
+        } => answer(session, decision, value, rationale.as_ref()),
         Mutation::SetRecordedDate { node, end, date } => recorded_date(session, node, *end, *date),
         Mutation::FillRole { role, entities } => {
             if !direct_fill(session, role) {
@@ -152,6 +156,7 @@ fn move_node(session: &mut Session<'_>, node: &NodeKey, transition: &Transition)
         writes.push(session.remove(GraphKey::Snooze(node.clone())));
     }
     if step == Move::Reopen && answered {
+        // Reopening clears the answer and its rationale together (B2).
         writes.push(session.remove(GraphKey::Answer(node.clone())));
     }
     if step == Move::Reopen {
@@ -192,9 +197,15 @@ fn note_guarded(
 }
 
 /// B2, D1: answering an open decision decides it on today's date; revising a decided one
-/// keeps that date. The answer must match the decision's type (an invariant the state stage
+/// keeps that date. The answer's rationale replaces the previous one outright, so a
+/// revision that gives none leaves the decision with none. The answer must match the decision's type (an invariant the state stage
 /// checks on the graph the patch produces).
-fn answer(session: &mut Session<'_>, decision: &NodeKey, value: &AnswerValue) -> Vec<Write> {
+fn answer(
+    session: &mut Session<'_>,
+    decision: &NodeKey,
+    value: &AnswerValue,
+    rationale: Option<&Markdown>,
+) -> Vec<Write> {
     let Some(stored) = stored(session, decision) else {
         return Vec::new();
     };
@@ -223,6 +234,8 @@ fn answer(session: &mut Session<'_>, decision: &NodeKey, value: &AnswerValue) ->
     let mut writes = vec![session.put(GraphRecord::Answer {
         decision: decision.clone(),
         value: value.clone(),
+        // The rationale belongs to this answer alone: none given is none kept (B2).
+        rationale: rationale.cloned(),
     })];
     if stored.state != to {
         let next = NodeState {

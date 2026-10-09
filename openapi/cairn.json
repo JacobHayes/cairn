@@ -1633,6 +1633,17 @@
               "decision": {
                 "$ref": "#/components/schemas/NodeKey",
                 "description": "The decision."
+              },
+              "rationale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Markdown"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "The rationale the journey's answer was given with, kept when the answer is\nmapped onto the route's choices (B2)."
               }
             },
             "required": [
@@ -2472,6 +2483,17 @@
               }
             ],
             "description": "The milestone its answer pins (E3, `feeds_milestone`)."
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Markdown"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rationale its answer was given with, while the answer is in effect (B2, C12)."
           },
           "relevance": {
             "$ref": "#/components/schemas/Relevance",
@@ -4037,7 +4059,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "An answer.",
+            "description": "An answer, with the rationale it was given with (B2).",
             "properties": {
               "answer": {
                 "additionalProperties": false,
@@ -4045,6 +4067,17 @@
                   "decision": {
                     "$ref": "#/components/schemas/NodeKey",
                     "description": "The decision."
+                  },
+                  "rationale": {
+                    "anyOf": [
+                      {
+                        "$ref": "#/components/schemas/Markdown"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Why it was given; none when the answer gave no reason."
                   },
                   "value": {
                     "$ref": "#/components/schemas/AnswerValue",
@@ -4657,6 +4690,17 @@
               "^n_[a-z0-9][a-z0-9_-]*$": {
                 "format": "date",
                 "type": "string"
+              }
+            },
+            "type": "object"
+          },
+          "rationales": {
+            "additionalProperties": false,
+            "description": "The rationale each answer was given with, by decision (B2). A key here has an answer\nbeside it; an answer given without a reason has no entry, and reopening removes both.",
+            "maxProperties": 2000,
+            "patternProperties": {
+              "^n_[a-z0-9][a-z0-9_-]*$": {
+                "$ref": "#/components/schemas/Markdown"
               }
             },
             "type": "object"
@@ -6107,7 +6151,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "Answer or revise a decision (B2).",
+            "description": "Answer or revise a decision (B2). The rationale belongs to this answer alone: a\nrevision that gives none leaves the decision without one.",
             "properties": {
               "decision": {
                 "$ref": "#/components/schemas/NodeKey",
@@ -6116,6 +6160,17 @@
               "op": {
                 "const": "answer",
                 "type": "string"
+              },
+              "rationale": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/Markdown"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Why it was given: markdown, free text under the body limit (B2)."
               },
               "value": {
                 "$ref": "#/components/schemas/AnswerValue",
@@ -7885,6 +7940,17 @@
               "string",
               "null"
             ]
+          },
+          "rationale": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Markdown"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The rationale the recorded answer was given with, markdown (B2)."
           },
           "record": {
             "$ref": "#/components/schemas/NodeState",
@@ -12220,6 +12286,16 @@
               "$ref": "#/components/schemas/NodeKey"
             },
             "type": "array"
+          },
+          "rationales": {
+            "additionalProperties": false,
+            "description": "The rationales those answers were given with, for the answers that have one (B2).",
+            "patternProperties": {
+              "^n_[a-z0-9][a-z0-9_-]*$": {
+                "$ref": "#/components/schemas/Markdown"
+              }
+            },
+            "type": "object"
           },
           "scope": {
             "$ref": "#/components/schemas/SnapshotScope",

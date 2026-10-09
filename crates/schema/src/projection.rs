@@ -18,7 +18,7 @@ use crate::event::Event;
 use crate::id::{EntityKey, KindKey, NodeKey, PatchId, Path, RoleKey, Slug};
 use crate::node::NodeKind;
 use crate::state::{AnswerValue, SnoozeTarget, State};
-use crate::text::Title;
+use crate::text::{Markdown, Title};
 
 /// A position in a projection's order: where the next page starts (I3, J4). Valid for the
 /// same journey revision and derive inputs; a page read at another revision starts over.
@@ -694,6 +694,9 @@ pub struct Snapshot {
     /// The answers in effect in the subtree.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub answers: BTreeMap<NodeKey, AnswerValue>,
+    /// The rationales those answers were given with, for the answers that have one (B2).
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub rationales: BTreeMap<NodeKey, Markdown>,
     /// A page of in-scope nodes within the depth, in tree order.
     pub nodes: Vec<SnapshotNode>,
     /// Where the next page of nodes starts, when there is one.
@@ -798,6 +801,9 @@ pub struct DecisionEntry {
     /// Its answer, while in effect (decided and in scope, E3).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub answer: Option<AnswerValue>,
+    /// The rationale its answer was given with, while the answer is in effect (B2, C12).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub rationale: Option<Markdown>,
     /// Its owners.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub owners: BTreeSet<EntityKey>,

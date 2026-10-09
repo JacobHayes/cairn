@@ -347,6 +347,7 @@ impl Merger<'_> {
         (!removed_choices(answer, choices).is_empty()).then(|| Conflict::Answer {
             decision: key.clone(),
             answer: answer.clone(),
+            rationale: self.journey.state.rationales.get(key).cloned(),
             choices: choices.clone(),
         })
     }

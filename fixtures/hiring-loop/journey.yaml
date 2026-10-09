@@ -172,3 +172,4 @@ steps:
       decision: n_make_offer
       value:
         boolean: true
+      rationale: The scorecard was strong across the whole loop and the panel agreed.

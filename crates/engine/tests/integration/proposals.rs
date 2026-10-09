@@ -238,7 +238,8 @@ fn a_choice_mapped_onto_a_chosen_one_merges_into_it() {
         cairn_schema::from_yaml("multi_choice: [evaluate]").unwrap();
     assert!(mutations.contains(&Mutation::Answer {
         decision: support::key("n_purpose"),
-        value: answered
+        value: answered,
+        rationale: None,
     }));
     assert!(
         !mutations

@@ -30,6 +30,9 @@ pub(crate) async fn load(connection: &Connection, id: &str) -> Result<JourneySta
     .await?;
     let select = "SELECT decision, value FROM answers WHERE graph_id = ?1";
     let answers = keyed(connection, select, id, |row| row.json(1)).await?;
+    let select = "SELECT decision, rationale FROM answers \
+                  WHERE graph_id = ?1 AND rationale IS NOT NULL";
+    let rationales = keyed(connection, select, id, |row| row.parse(1)).await?;
     let select = "SELECT node, date FROM pins WHERE graph_id = ?1";
     let pins = keyed(connection, select, id, |row| row.parse(1)).await?;
     let select = "SELECT node, until_date, until_node FROM snoozes WHERE graph_id = ?1";
@@ -59,6 +62,7 @@ pub(crate) async fn load(connection: &Connection, id: &str) -> Result<JourneySta
         nodes,
         local_edits: local_edits(connection, id).await?,
         answers,
+        rationales,
         role_fills: role_fills(connection, id).await?,
         pins,
         snoozes,

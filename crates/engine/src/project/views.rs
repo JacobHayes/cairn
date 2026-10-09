@@ -63,6 +63,7 @@ impl DerivedJourney<'_> {
                     display_state: node.display_state,
                     relevance: self.derived.relevance().value(&key),
                     answer: self.answer(&key),
+                    rationale: self.rationale(&key),
                     owners: self.owners(&key).clone(),
                     affects: affects.remove(&key).into_iter().flatten().collect(),
                     pins,
