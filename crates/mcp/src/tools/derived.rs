@@ -428,16 +428,12 @@ impl<S: Store + 'static> ToolSet<S> {
         call: &Call,
         arguments: GetLevel,
     ) -> Result<At<LevelOutput>, ToolError> {
-        let shown = if arguments.kinds.is_empty() {
-            NodeKind::ALL.into_iter().collect()
-        } else {
-            arguments.kinds
-        };
-        let mut query = LevelQuery::of_kinds(shown, arguments.container);
-        query.collapsed = arguments.collapsed;
-        if !arguments.display.is_empty() {
-            query.display = arguments.display;
-        }
+        let query = LevelQuery::requested(
+            arguments.kinds,
+            arguments.container,
+            arguments.collapsed,
+            arguments.display,
+        );
         let projected = self.service.level(call, &arguments.journey, &query).await?;
         Ok(At::of(projected, |level| {
             let Level {

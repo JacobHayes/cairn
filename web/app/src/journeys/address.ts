@@ -147,8 +147,6 @@ export type JourneyPage = "next" | "plan";
 /** How a page is drawn. One global order, `GRAPH LIST TIMELINE CARDS`; a page shows its subset. */
 export type Projection = "graph" | "list" | "timeline" | "cards";
 
-export const PROJECTION_ORDER: readonly Projection[] = ["graph", "list", "timeline", "cards"];
-
 /** Each page's projections, in the global order. A projection that does not apply is left out. */
 export const PAGE_PROJECTIONS: Record<JourneyPage, readonly Projection[]> = {
   next: ["list", "cards"],

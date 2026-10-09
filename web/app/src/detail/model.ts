@@ -97,11 +97,6 @@ export function feedingDecision(view: Ready, milestone: string): GraphNode | und
   return (view.journey.graph.nodes ?? []).find((node) => node.feeds_milestone === milestone);
 }
 
-/** E3: the decision that fills `role`, if one does. */
-export function fillingDecision(view: Ready, role: string): GraphNode | undefined {
-  return (view.journey.graph.nodes ?? []).find((node) => node.fills_role === role);
-}
-
 function ancestorsOf(view: Ready, node: GraphNode): GraphNode[] {
   const ancestors: GraphNode[] = [];
   let parent = node.parent ?? undefined;

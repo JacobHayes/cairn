@@ -5,16 +5,8 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import type { SheetSnap } from "./InspectorColumn.tsx";
-import { useNarrow } from "../canvas/MapFrame.tsx";
-import { SHEET, type AssistantDock, type FrameActions, type FrameState, type InspectorTab } from "./frame.tsx";
-
-/** Whether the keystroke is for a field, which keys never fire in (design 3.4). */
-function typing(target: EventTarget | null): boolean {
-  if (!(target instanceof HTMLElement)) {
-    return false;
-  }
-  return target.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(target.tagName);
-}
+import { typing } from "../ui/typing.ts";
+import { PHONE_WIDTH, SHEET, useMedia, type AssistantDock, type FrameActions, type FrameState, type InspectorTab } from "./frame.tsx";
 
 export interface Frame {
   state: FrameState;
@@ -112,7 +104,7 @@ export function useFrame(): Frame {
   // A pane with nothing in it cannot be the tab in view.
   const shown: InspectorTab = counts.assistant > 0 && (counts.inspector === 0 || tab === "assistant") ? "assistant" : "inspector";
   const present = counts.inspector > 0 || counts.assistant > 0;
-  const narrow = useNarrow();
+  const narrow = useMedia(PHONE_WIDTH);
   const closable = useRef<Closable>({ tab: "inspector", dock: undefined });
   closable.current = { tab: shown, dock };
   const closeShown = useCloseShown(close, closable);

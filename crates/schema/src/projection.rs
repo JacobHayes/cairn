@@ -223,9 +223,7 @@ impl LevelDisplay {
         LevelDisplay::Conditional,
         LevelDisplay::NotRelevant,
     ];
-}
 
-impl LevelDisplay {
     /// Every class, as a set: what a level shows when none are asked for.
     #[must_use]
     pub fn every() -> BTreeSet<LevelDisplay> {
@@ -273,6 +271,28 @@ impl LevelQuery {
             collapsed: BTreeSet::new(),
             display: LevelDisplay::every(),
         }
+    }
+
+    /// What a request asks for: an empty `shown` is every kind and an empty `display` every
+    /// class.
+    #[must_use]
+    pub fn requested(
+        shown: BTreeSet<NodeKind>,
+        container: Option<NodeKey>,
+        collapsed: BTreeSet<NodeKey>,
+        display: BTreeSet<LevelDisplay>,
+    ) -> Self {
+        let shown = if shown.is_empty() {
+            NodeKind::ALL.into_iter().collect()
+        } else {
+            shown
+        };
+        let mut query = Self::of_kinds(shown, container);
+        query.collapsed = collapsed;
+        if !display.is_empty() {
+            query.display = display;
+        }
+        query
     }
 }
 

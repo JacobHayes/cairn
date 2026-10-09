@@ -9,12 +9,12 @@ import "./canvas.css";
 import { Controls, MarkerType, ReactFlow, ReactFlowProvider, useReactFlow } from "@xyflow/react";
 import { useEffect, useMemo } from "react";
 
-import { SHEET, useFrameState } from "../shell/frame.tsx";
+import { PHONE_WIDTH, SHEET, useFrameState } from "../shell/frame.tsx";
 import { useResolvedTheme } from "../ui/theme.ts";
 import { cardHeight, cardLines } from "./cards.ts";
 import { EdgeLine, type LineEdge } from "./EdgeLine.tsx";
 import type { Placement } from "./layout.ts";
-import { MapFrame, NARROW } from "./MapFrame.tsx";
+import { MapFrame } from "./MapFrame.tsx";
 import type { CanvasModel } from "./model.ts";
 import { CardActionsContext, NodeCard, type CardActions, type CardNode } from "./NodeCard.tsx";
 import type { CanvasOverlay } from "./overlay.ts";
@@ -109,7 +109,7 @@ function useCenterAboveSheet(selected: string | undefined, live: boolean): void 
   const flow = useReactFlow();
   const sheet = useFrameState()?.inspector?.parentElement;
   useEffect(() => {
-    if (!live || selected === undefined || sheet === null || sheet === undefined || !(globalThis.matchMedia(SHEET).matches || globalThis.matchMedia(NARROW).matches)) {
+    if (!live || selected === undefined || sheet === null || sheet === undefined || !(globalThis.matchMedia(SHEET).matches || globalThis.matchMedia(PHONE_WIDTH).matches)) {
       return undefined;
     }
     // After the commit that shows the sheet, so its height is there to read.

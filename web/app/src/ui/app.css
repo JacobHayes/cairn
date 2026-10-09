@@ -428,10 +428,10 @@ body {
     display: block;
   }
   /* The sheet covers the workspace's lower part: a scrolling screen's region ends above it, so its last row can be reached. */
-  .frame[data-inspector="on"] :is(.ws-body:not(:has(> .ws-fill)), .decision-page) {
+  .frame[data-inspector="on"] .ws-body:not(:has(> .ws-fill)) {
     padding-bottom: calc(var(--sheet-h, var(--sheet-half)) + var(--space-5));
   }
-  .frame[data-inspector="on"]:has(.inspector[data-snap="full"]) :is(.ws-body:not(:has(> .ws-fill)), .decision-page) {
+  .frame[data-inspector="on"]:has(.inspector[data-snap="full"]) .ws-body:not(:has(> .ws-fill)) {
     padding-bottom: calc(var(--sheet-h, var(--sheet-full)) + var(--space-5));
   }
 }

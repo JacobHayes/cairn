@@ -278,7 +278,7 @@ impl Derived {
     /// derived group completion and reached milestones cascade to, as leverage simulates it.
     /// `graph` is the one derived.
     #[must_use]
-    pub fn finished_by(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<NodeKey> {
+    pub(crate) fn finished_by(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<NodeKey> {
         let Some(index) = self.dependencies.node_index(key) else {
             return BTreeSet::new();
         };
@@ -300,7 +300,7 @@ impl Derived {
     /// `finished` (see [`Derived::finished_by`]) and without its children, which a container
     /// waits on whatever else holds it. Empty when `finished` is all that holds it back. Sorted.
     #[must_use]
-    pub fn held_besides(&self, key: &NodeKey, finished: &BTreeSet<NodeKey>) -> Vec<Blocker> {
+    pub(crate) fn held_besides(&self, key: &NodeKey, finished: &BTreeSet<NodeKey>) -> Vec<Blocker> {
         let mut held: Vec<Blocker> = self
             .unsatisfied(self.dependencies.of(key, EdgeSet::Pruned))
             .filter(|blocker| {

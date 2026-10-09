@@ -81,32 +81,22 @@ impl DerivedJourney<'_> {
         };
         let applies = self.answer_applies(key);
         let candidates = self.candidates(key, &decision.answer);
-        let choices = if applies && !candidates.is_empty() {
+        // Unless the answer applies there is nothing to compare, and every effect is empty.
+        let compared = (applies && !candidates.is_empty()).then(|| {
             let before = classify(self.graph, deployment);
             let affected = self.conditioned_by().remove(key).unwrap_or_default();
             // A decision under a skip stays closed whatever the answer makes relevant.
-            let skipped = skip::inherited(self.graph);
-            candidates
-                .into_iter()
-                .map(|candidate| {
-                    self.effect(key, deployment, &before, (&affected, &skipped), candidate)
-                })
-                .collect()
-        } else {
-            candidates
-                .into_iter()
-                .map(|candidate| ChoiceEffect {
-                    answer: candidate.answer,
-                    choice: candidate.choice,
-                    current: candidate.current,
-                    brings_in: AffectedNodes::default(),
-                    opens_decisions: AffectedNodes::default(),
-                    drops: AffectedNodes::default(),
-                    drops_with_progress: AffectedNodes::default(),
-                    decided_later: AffectedNodes::default(),
-                })
-                .collect()
-        };
+            (before, affected, skip::inherited(self.graph))
+        });
+        let choices = candidates
+            .into_iter()
+            .map(|candidate| {
+                let compared = compared
+                    .as_ref()
+                    .map(|(before, affected, skipped)| (before, affected, skipped));
+                self.effect(key, deployment, compared, candidate)
+            })
+            .collect();
         Ok(Some(AnswerEffects {
             decision: key.clone(),
             fills_role,
@@ -201,8 +191,7 @@ impl DerivedJourney<'_> {
         &self,
         key: &NodeKey,
         deployment: &Deployment,
-        before: &Relevances,
-        (affected, skipped): (&BTreeSet<NodeKey>, &BTreeMap<NodeKey, NodeKey>),
+        compared: Option<(&Relevances, &BTreeSet<NodeKey>, &BTreeMap<NodeKey, NodeKey>)>,
         candidate: Candidate,
     ) -> ChoiceEffect {
         let mut brings_in = Vec::new();
@@ -210,7 +199,7 @@ impl DerivedJourney<'_> {
         let mut drops = Vec::new();
         let mut drops_with_progress = Vec::new();
         let mut decided_later = Vec::new();
-        if !candidate.unchanged {
+        if let Some((before, affected, skipped)) = compared.filter(|_| !candidate.unchanged) {
             let after = classify_assuming(self.graph, deployment, key, &candidate.answer);
             for node in self.tree_order(None) {
                 let (was, now) = (before.class(node), after.class(node));

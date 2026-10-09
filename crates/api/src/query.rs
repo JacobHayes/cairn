@@ -422,17 +422,12 @@ pub fn snapshot(params: &Params) -> Result<SnapshotScope, ApiError> {
 ///
 /// A bad request for a parameter that does not parse.
 pub fn level(params: &Params) -> Result<LevelQuery, ApiError> {
-    let mut shown: BTreeSet<NodeKind> = params.all("kind")?.into_iter().collect();
-    if shown.is_empty() {
-        shown = NodeKind::ALL.into_iter().collect();
-    }
-    let mut query = LevelQuery::of_kinds(shown, params.one("container")?);
-    query.collapsed = params.all("collapsed")?.into_iter().collect();
-    let display: BTreeSet<LevelDisplay> = params.all("display")?.into_iter().collect();
-    if !display.is_empty() {
-        query.display = display;
-    }
-    Ok(query)
+    Ok(LevelQuery::requested(
+        params.all("kind")?.into_iter().collect(),
+        params.one("container")?,
+        params.all("collapsed")?.into_iter().collect(),
+        params.all("display")?.into_iter().collect(),
+    ))
 }
 
 /// C10: the next list's query.

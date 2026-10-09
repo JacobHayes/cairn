@@ -22,7 +22,7 @@ use cairn_schema::{
 };
 
 use crate::derive::dependencies::{Dependencies, EdgeSet, Instant, Point};
-use crate::graph::{Document, Graph};
+use crate::graph::{Document, Graph, Tree};
 
 /// Slots per node: the four instants, then the answer of a date decision; one more at the
 /// end for the journey's `created_at`, which rules may measure from.
@@ -44,7 +44,7 @@ pub fn notices(graph: &Graph) -> Vec<Notice> {
     let Some(last_at) = dependencies.node_index(&last.key) else {
         return Vec::new();
     };
-    let chains = Chains::build(document, &dependencies);
+    let chains = Chains::build(document, graph.tree(), &dependencies);
     let last_finish = slot(Instant::new(last_at, Point::Finish));
     let mut felt = chains.reached(last_finish, Way::After);
     for (at, reached) in chains
@@ -124,7 +124,7 @@ struct Chains {
 }
 
 impl Chains {
-    fn build(document: &Document, dependencies: &Dependencies) -> Self {
+    fn build(document: &Document, tree: &Tree, dependencies: &Dependencies) -> Self {
         let created_at = dependencies.node_count() * SLOTS;
         let mut links: Vec<(usize, usize)> = dependencies
             .edges(EdgeSet::Full)
@@ -159,7 +159,7 @@ impl Chains {
                     document.nodes.get(closes_at).map(Node::kind),
                     Some(NodeKind::Milestone)
                 )
-                && !is_inside(document, &node.key, closes_at)
+                && !tree.is_ancestor(&node.key, closes_at)
             {
                 links.push((
                     own(Point::Finish),
@@ -225,25 +225,4 @@ fn date_slot(document: &Document, dependencies: &Dependencies, source: &NodeKey)
             None
         }
     }
-}
-
-/// True when `ancestor` is a proper ancestor of `key`, by parent links.
-fn is_inside(document: &Document, ancestor: &NodeKey, key: &NodeKey) -> bool {
-    let mut current = document
-        .nodes
-        .get(key)
-        .and_then(|node| node.parent.as_ref());
-    for _ in 0..=cairn_schema::limits::CONTAINMENT_DEPTH_MAX {
-        let Some(parent) = current else {
-            return false;
-        };
-        if parent == ancestor {
-            return true;
-        }
-        current = document
-            .nodes
-            .get(parent)
-            .and_then(|node| node.parent.as_ref());
-    }
-    false
 }
