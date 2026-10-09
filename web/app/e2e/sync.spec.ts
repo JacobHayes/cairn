@@ -14,7 +14,7 @@ test("a rejected change waits under needs-you wherever you go; Go to it returns,
   await expect(panel.getByTestId("date-conflict")).toBeVisible();
   await expect(syncChip(page)).toHaveText("NOT SAVED · 1");
   // Away from the control, it is still counted, and Go to it comes back to it.
-  await goWithin(page, "/routes");
+  await goWithin(page, "/library?type=routes");
   await expect(syncChip(page)).toHaveText("NOT SAVED · 1");
   await syncChip(page).click();
   const needsYou = page.getByTestId("sync-popover").getByTestId("sync-problem");

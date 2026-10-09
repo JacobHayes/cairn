@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# The four servers the app's browser tests run against (web/app/playwright.config.ts), started
+# side by side where Playwright would start its webServer entries one after another: the
+# fixture server, the real binary over a seeded database (scripts/e2e-binary), and the app's
+# two Vite dev servers, one on the server host proxying to the fixture server and one on the
+# in-browser host. Each one's wait (the cargo no-op, the seeding, Vite's start) overlaps the
+# others'. Prints READY once all four answer, which is what Playwright waits for, and exits
+# non-zero when any of them stops. The ports are the config's, passed in the environment:
+# CAIRN_APP_PORT, CAIRN_SERVER_PORT, CAIRN_E2E_PORT, and CAIRN_DEMO_PORT.
+#
+# usage: scripts/e2e-servers
+set -euo pipefail
+cd "$(dirname "$0")/.."
+: "${CAIRN_APP_PORT:?}" "${CAIRN_SERVER_PORT:?}" "${CAIRN_E2E_PORT:?}" "${CAIRN_DEMO_PORT:?}"
+app=http://127.0.0.1:$CAIRN_APP_PORT
+server=http://127.0.0.1:$CAIRN_SERVER_PORT
+vite=$PWD/node_modules/vite/bin/vite.js
+
+pids=()
+scripts/built examples/fixture_server "$CAIRN_SERVER_PORT" "$app" >/dev/null &
+pids+=($!)
+scripts/e2e-binary "$CAIRN_E2E_PORT" >/dev/null &
+pids+=($!)
+(cd web/app && CAIRN_SERVER=$server exec node "$vite" --config vite.config.ts >/dev/null) &
+pids+=($!)
+# The in-browser host's server must not see a CAIRN_SERVER from the caller: it would proxy.
+(cd web/app && exec env -u CAIRN_SERVER CAIRN_APP_PORT="$CAIRN_DEMO_PORT" node "$vite" --config vite.config.ts >/dev/null) &
+pids+=($!)
+
+# Whether every server is still running. Only what macOS's Bash 3.2 has (no `wait -n`), since
+# a targeted Playwright run may find that bash first.
+all_running() {
+  local pid
+  for pid in "${pids[@]}"; do
+    kill -0 "$pid" 2>/dev/null || return 1
+  done
+}
+
+for url in "$server/api/capabilities" "http://127.0.0.1:$CAIRN_E2E_PORT/api/capabilities" "$app/" "http://127.0.0.1:$CAIRN_DEMO_PORT/"; do
+  until curl --silent --fail --output /dev/null "$url"; do
+    all_running || { echo "e2e-servers: a server stopped before $url answered" >&2; exit 1; }
+    sleep 0.1
+  done
+done
+echo READY
+while all_running; do
+  sleep 1
+done
+echo "e2e-servers: a server stopped" >&2
+exit 1

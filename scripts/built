@@ -5,13 +5,15 @@
 # second copy of each dependency whose features differ (Turso, tokio, axum, and everything
 # above them); built this way, a program is linked from the units the tests already compiled.
 # The examples named below are what make the build include dev-dependencies, as the tests do.
+# It builds in the test profile, which optimizes the computing crates (Cargo.toml), so the
+# programs are the units the tests link and run at the tests' speed.
 #
 # usage: scripts/built [PROGRAM [ARGUMENT...]]
 #   PROGRAM: a binary target's name (cairn, cairn-openapi), or examples/<name> for an
 #   example; with none, only builds them all.
 set -euo pipefail
 root="$(cd "$(dirname "$0")/.." && pwd)"
-cargo build --quiet --locked --manifest-path "$root/Cargo.toml" --workspace --all-features \
+cargo build --quiet --locked --profile test --manifest-path "$root/Cargo.toml" --workspace --all-features \
   --bins --example seed_fixtures --example fixture_server
 [ $# -gt 0 ] || exit 0
 program=$1

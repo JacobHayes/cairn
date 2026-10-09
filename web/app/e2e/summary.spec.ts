@@ -20,13 +20,20 @@ test("C18: the journey card opens the Summary page, a node opens beside it, and 
   await expect(page).toHaveURL(/\/journeys\/j_bakeoff\/summary\/nodes\/n_winner$/);
   await page.emulateMedia({ media: "print", colorScheme: "dark" });
   await expect(page.getByTestId("summary")).toBeVisible();
-  // Paper has no dark theme: a dark screen prints its panels in black on white.
-  const inked = await page.getByTestId("summary-open").evaluate((part) => {
-    const muted = part.querySelector(".muted");
-    const figure = document.querySelector("[data-testid=card-progress]");
-    return [part, muted, figure].map((each) => (each === null ? "missing" : `${getComputedStyle(each).backgroundColor} ${getComputedStyle(each).color}`));
+  // Paper has no dark theme: a dark screen prints its panels in black on white, and muted text in
+  // the print theme's muted token (resolved through an element, as the page resolves it).
+  const { painted, muted } = await page.getByTestId("summary-open").evaluate((part) => {
+    const probe = document.body.appendChild(document.createElement("span"));
+    probe.style.color = "var(--color-muted)";
+    const token = getComputedStyle(probe).color;
+    probe.remove();
+    const paint = (each: Element | null) => (each === null ? "missing" : `${getComputedStyle(each).backgroundColor} ${getComputedStyle(each).color}`);
+    return {
+      painted: [part, part.querySelector(".muted"), document.querySelector("[data-testid=card-progress]")].map(paint),
+      muted: token,
+    };
   });
-  expect(inked).toEqual(["rgb(255, 255, 255) rgb(0, 0, 0)", "rgba(0, 0, 0, 0) rgb(105, 105, 105)", "rgba(0, 0, 0, 0) rgb(0, 0, 0)"]);
+  expect(painted).toEqual(["rgb(255, 255, 255) rgb(0, 0, 0)", `rgba(0, 0, 0, 0) ${muted}`, "rgba(0, 0, 0, 0) rgb(0, 0, 0)"]);
   await expect(page.getByTestId("journey-toolbar")).toBeHidden();
   await expect(nodePanel(page, "n_winner")).toBeHidden();
   await expect(page.getByRole("button", { name: "Print" })).toBeHidden();

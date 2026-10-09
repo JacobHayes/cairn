@@ -1,0 +1,132 @@
+#!/usr/bin/env node
+// Builds the workspace's test binaries once and runs them side by side (PRACTICES, The
+// validation ladder). Rungs 2, 3, and 4 each pick tests by name out of the same binaries, so
+// the binaries are built in one `cargo test --no-run` and run by this script in parallel,
+// where `cargo test` runs them one after another: most of them finish in under a second and
+// only start-up and the slowest few add up.
+//
+// usage: scripts/ladder-tests --build LIST
+//        scripts/ladder-tests RESULTS [--test NAME] [-- TEST_ARGUMENT...]
+//   --build LIST: only build, and write the binaries to the file LIST. scripts/ladder does
+//     this once before rung 2 and passes LIST to rungs 2 to 4 in LADDER_TEST_LIST, so the
+//     full ladder builds once; without it (`mise run check:3`) a run builds for itself.
+//   RESULTS: a file this writes one "package<TAB>test<TAB>result" line to for every test it
+//     ran, which is how a rung counts its suites (scripts/ladder-lib.sh, ladder_cargo_test).
+//   --test NAME: run only the integration test binary NAME of each crate; by default every
+//     test binary runs, unit tests included.
+//   TEST_ARGUMENT: what `cargo test -- ...` passes each binary (name filters, `--skip`).
+// Prints each binary's result line, and the whole output of one that failed, in the order
+// they finish. Exits non-zero when the build or any binary fails. Doc tests are not run
+// (rung 4 runs them).
+import { spawn, spawnSync } from "node:child_process";
+import { readFileSync, statSync, writeFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
+import { basename, dirname } from "node:path";
+
+const argv = process.argv.slice(2);
+const usage = "usage: scripts/ladder-tests --build LIST | RESULTS [--test NAME] [-- TEST_ARGUMENT...]";
+const buildOnly = argv[0] === "--build";
+// The file this writes: the binaries with --build, the results otherwise.
+const target = argv[buildOnly ? 1 : 0];
+argv.splice(0, buildOnly ? 2 : 1);
+let only = null;
+if (!buildOnly && argv[0] === "--test") {
+  argv.shift();
+  only = argv.shift();
+}
+if (target === undefined || (argv.length > 0 && (buildOnly || argv[0] !== "--"))) {
+  console.error(usage);
+  process.exit(2);
+}
+const testArguments = argv.slice(1);
+
+// A package id is "path+file:///<dir>#<name>@<version>", or "...<dir>#<version>" when the
+// name is the directory's.
+function nameOf(id) {
+  const [location, fragment] = id.split("#");
+  return fragment.includes("@") ? fragment.split("@")[0] : basename(location);
+}
+
+// Cargo features resolve per invocation, so the build is the whole workspace with every
+// feature, as every other cargo command of the ladder is. Every test binary, with the name of
+// its integration test when it is one.
+function build() {
+  const built = spawnSync(
+    "cargo",
+    ["test", "--locked", "--workspace", "--all-features", "--tests", "--no-run", "--message-format=json-render-diagnostics"],
+    { encoding: "utf8", maxBuffer: 1 << 30, stdio: ["ignore", "pipe", "inherit"] },
+  );
+  const binaries = [];
+  for (const line of built.stdout.split("\n")) {
+    if (!line.startsWith('{"reason":')) continue;
+    const message = JSON.parse(line);
+    if (message.reason !== "compiler-artifact" || !message.profile.test || message.executable === null) continue;
+    const integration = message.target.kind.includes("test") ? message.target.name : null;
+    binaries.push({
+      executable: message.executable,
+      directory: dirname(message.manifest_path),
+      package: nameOf(message.package_id),
+      integration,
+      label: `${nameOf(message.package_id)} ${integration ?? "unit tests"} (${basename(message.target.src_path)})`,
+      size: statSync(message.executable).size,
+    });
+  }
+  if (built.status !== 0) {
+    console.error("ladder-tests: the test binaries did not build");
+    process.exit(1);
+  }
+  return binaries;
+}
+
+/** The binaries to run: those `--build` listed for this ladder run, or a build of its own. */
+function binariesToRun() {
+  const list = process.env["LADDER_TEST_LIST"];
+  const binaries = list === undefined || list === "" ? build() : JSON.parse(readFileSync(list, "utf8"));
+  return only === null ? binaries : binaries.filter((binary) => binary.integration === only);
+}
+
+function run(binary) {
+  return new Promise((resolve) => {
+    // Cargo runs a test binary from its package's directory.
+    const child = spawn(binary.executable, testArguments, { cwd: binary.directory, stdio: ["ignore", "pipe", "pipe"] });
+    let output = "";
+    child.stdout.on("data", (chunk) => (output += chunk));
+    child.stderr.on("data", (chunk) => (output += chunk));
+    child.on("error", (error) => resolve({ binary, output: `${error.message}\n`, status: 1 }));
+    child.on("close", (status) => resolve({ binary, output, status: status ?? 1 }));
+  });
+}
+
+if (buildOnly) {
+  writeFileSync(target, JSON.stringify(build()));
+  process.exit(0);
+}
+const binaries = binariesToRun();
+// The biggest binaries hold the slowest tests, so they start first.
+binaries.sort((left, right) => right.size - left.size);
+const limit = Math.max(2, Math.floor(availableParallelism() / 2));
+const lines = [];
+let failed = 0;
+let next = 0;
+async function worker() {
+  while (next < binaries.length) {
+    const { binary, output, status } = await run(binaries[next++]);
+    const summary = output.split("\n").find((line) => line.startsWith("test result:")) ?? "no test result";
+    console.log(`     Ran ${binary.label}: ${summary}`);
+    if (status !== 0) {
+      failed++;
+      console.log(output);
+    }
+    for (const line of output.split("\n")) {
+      const test = /^test (.+) \.\.\. (\S+)/.exec(line);
+      if (test) lines.push(`${binary.package}\t${test[1]}\t${test[2]}`);
+    }
+  }
+}
+await Promise.all(Array.from({ length: Math.min(limit, binaries.length) }, worker));
+writeFileSync(target, lines.map((line) => `${line}\n`).join(""));
+if (binaries.length === 0) {
+  console.error("ladder-tests: no test binary matched");
+  process.exit(1);
+}
+process.exit(failed === 0 ? 0 : 1);

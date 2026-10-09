@@ -25,7 +25,7 @@ export CARGO_TERM_COLOR=never
 # The tests rung 2 built, run by name (ladder_cargo_test): every module this rung owns, then
 # one suite each. A test the run picked that no suite counts fails the rung, so the filter
 # never runs more than the suites report.
-ladder_cargo_test --tests -- conformance:: in_process:: || ladder_fail "cargo test reported failures"
+ladder_cargo_test -- conformance:: in_process:: || ladder_fail "cargo test reported failures"
 # suite<TAB>crate<TAB>the test path it holds, as an awk regular expression
 suites=$'store conformance: memory\tcairn-store\t(^|::)conformance::
 store conformance: turso\tcairn-store-turso\t(^|::)conformance::
@@ -40,5 +40,16 @@ while IFS=$'\t' read -r suite crate pattern; do
 done <<<"$suites"
 ran=$(grep -c . <<<"$ladder_tests" || true)
 [ "$ran" -eq "$counted" ] || ladder_fail "ran $ran tests; the suites hold $counted"
+
+# The doc tests, here rather than in rung 2 because the pass costs seconds in the inner loop
+# and no crate has a doc test. They are a suite once one exists (a suite that ran none fails).
+doc_status=0
+doc_output=$(cargo test --locked --workspace --all-features --doc 2>&1) || doc_status=$?
+[ "$doc_status" -eq 0 ] || {
+  printf '%s\n' "$doc_output"
+  ladder_fail "the doc tests reported failures"
+}
+doc_tests=$(awk '/^test result: / { sum += $4 } END { print sum + 0 }' <<<"$doc_output")
+[ "$doc_tests" -eq 0 ] || ladder_suite "doc tests" "$doc_tests" tests
 
 ladder_rung_end

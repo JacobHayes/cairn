@@ -55,13 +55,26 @@ done
   || ladder_fail "the app's web build failed"
 [ -f web/app/dist/build/index.html ] || ladder_fail "the app's web build wrote no index.html"
 scripts/built || ladder_fail "the binary, the fixture server, or the seeding example did not build"
-# The server's answers the browser host's tests compare with: cairn-wasm-cases, just built in
-# the debug profile with the rest, walks the fixtures through the service. Unoptimized that
-# takes tens of seconds, so it runs beside the binary's and the app's tests, which do not read
-# its output, and only web/wasm's suite waits for it.
-scripts/built cairn-wasm-cases web/wasm/dist/cases &
-cases=$!
-trap 'kill "$cases" 2>/dev/null || true' EXIT
+# The server's answers the browser host's tests compare with: cairn-wasm-cases, just built with
+# the rest, walks the fixtures through the service. It runs beside the binary's and the app's
+# tests, which do not read its output, and only web/wasm's suite waits for it. Its output is a
+# function of the crates it links and the fixtures, so it is kept under web/wasm/dist/cases
+# with a hash of those inputs (cases.hash, written only after a complete run), and a run whose
+# inputs are unchanged, as in most changes to the app alone, reuses it. Any file under the
+# crates, the fixtures, or the workspace's manifests, lock file, and toolchain pin changes the hash.
+cases_inputs=(crates/engine crates/schema crates/service crates/store crates/wasm fixtures Cargo.toml Cargo.lock mise.toml)
+cases_hash=$(find "${cases_inputs[@]}" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+cases=
+if [ "$(cat web/wasm/dist/cases.hash 2>/dev/null || true)" = "$cases_hash" ] && [ -n "$(ls web/wasm/dist/cases 2>/dev/null)" ]; then
+  ladder_say "the server's agreement cases: inputs unchanged, reusing web/wasm/dist/cases"
+else
+  rm -f web/wasm/dist/cases.hash
+  {
+    scripts/built cairn-wasm-cases web/wasm/dist/cases && printf '%s\n' "$cases_hash" >web/wasm/dist/cases.hash
+  } &
+  cases=$!
+fi
+trap '[ -z "$cases" ] || kill "$cases" 2>/dev/null || true' EXIT
 
 ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
 ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
@@ -70,7 +83,7 @@ for config in web/*/playwright.config.ts; do
   package=$(dirname "$config")
   report="$PWD/$package/dist/playwright.json"
   if [ "$package" = web/wasm ]; then
-    wait "$cases" || ladder_fail "the server's agreement cases were not written"
+    [ -z "$cases" ] || wait "$cases" || ladder_fail "the server's agreement cases were not written"
   fi
   status=0
   (cd "$package" && PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \

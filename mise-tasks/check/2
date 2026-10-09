@@ -7,7 +7,8 @@
 # conformance suite in `mod conformance` (in `conformance.rs`), the in-process tests of the
 # API and the binary in `mod in_process`, and the binary's tests that need the web build
 # embedded in `mod binary` (in its `binary.rs`, so `binary::binary::`); all are skipped here
-# by name, and rungs 3, 4, and 6 run them.
+# by name, and rungs 3, 4, and 6 run them. Every rung's tests run through scripts/ladder-tests,
+# which runs the workspace's test binaries in parallel.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_RUNG=2
@@ -26,15 +27,10 @@ crates=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
     for (const item of JSON.parse(text).packages) console.log(item.name);
   });')
 skips=(--skip property:: --skip conformance:: --skip cost:: --skip in_process:: --skip binary::binary::)
-# Every workspace crate is a suite, whatever test binaries it builds: unit, integration, and
-# doc tests together, each test counted for the crate whose binary ran it. `--tests` builds
-# only the targets that hold tests: a plain `cargo test` also links every example, which
-# rung 1's clippy already compiles. Doc tests are a second run.
-ladder_cargo_test --tests -- "${skips[@]}" || ladder_fail "cargo test reported failures"
-tests=$ladder_tests
-ladder_cargo_test --doc -- "${skips[@]}" || ladder_fail "the doc tests reported failures"
-tests+=$'\n'"$ladder_tests"
-ladder_tests=$tests
+# Every workspace crate is a suite, whatever test binaries it builds, unit and integration
+# together, each test counted for the crate whose binary ran it. The doc tests are rung 4's:
+# no crate has one, and the pass that looks for them costs seconds.
+ladder_cargo_test -- "${skips[@]}" || ladder_fail "cargo test reported failures"
 while IFS= read -r crate; do
   [ -n "$crate" ] || continue
   ladder_suite "$crate tests" "$(ladder_tests_matching "$crate" "")" tests

@@ -36,10 +36,7 @@ process.env["CAIRN_SERVER_PORT"] ??= String(await freePort());
 process.env["CAIRN_E2E_PORT"] ??= String(await freePort());
 process.env["CAIRN_DEMO_PORT"] ??= String(await freePort());
 const appPort = process.env["CAIRN_APP_PORT"];
-const serverPort = process.env["CAIRN_SERVER_PORT"];
 const binaryPort = process.env["CAIRN_E2E_PORT"];
-const demoPort = process.env["CAIRN_DEMO_PORT"];
-const server = `http://127.0.0.1:${serverPort}`;
 const repo = fileURLToPath(new URL("../..", import.meta.url));
 
 export default defineConfig({
@@ -67,38 +64,15 @@ export default defineConfig({
     },
     { name: "chromium", grepInvert: /@server/, fullyParallel: true, use: { ...devices["Desktop Chrome"] } },
   ],
-  webServer: [
-    {
-      command: `scripts/built examples/fixture_server ${serverPort} http://127.0.0.1:${appPort}`,
-      cwd: repo,
-      url: `${server}/api/capabilities`,
-      timeout: 600_000,
-      reuseExistingServer: false,
-      stdout: "ignore",
-    },
-    {
-      command: `scripts/e2e-binary ${binaryPort}`,
-      cwd: repo,
-      url: `http://127.0.0.1:${binaryPort}/api/capabilities`,
-      timeout: 600_000,
-      reuseExistingServer: false,
-      stdout: "ignore",
-    },
-    {
-      command: "node ../../node_modules/vite/bin/vite.js --config vite.config.ts",
-      env: { CAIRN_SERVER: server, CAIRN_APP_PORT: appPort },
-      url: `http://127.0.0.1:${appPort}/`,
-      timeout: 120_000,
-      reuseExistingServer: false,
-      stdout: "ignore",
-    },
-    {
-      command: "node ../../node_modules/vite/bin/vite.js --config vite.config.ts",
-      env: { CAIRN_APP_PORT: demoPort },
-      url: `http://127.0.0.1:${demoPort}/`,
-      timeout: 120_000,
-      reuseExistingServer: false,
-      stdout: "ignore",
-    },
-  ],
+  // One entry, so Playwright does not start the four servers one after another:
+  // scripts/e2e-servers starts them side by side (the fixture server, the real binary, and the
+  // two Vite dev servers) and prints READY when all of them answer.
+  webServer: {
+    command: "scripts/e2e-servers",
+    cwd: repo,
+    wait: { stdout: /READY/ },
+    timeout: 600_000,
+    reuseExistingServer: false,
+    stdout: "ignore",
+  },
 });

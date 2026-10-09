@@ -29,7 +29,10 @@ ladder_require_tool node node --version
 # sources and generated types, and eslint with the type-aware rules over the hand-written
 # sources (generated code is not linted). Both come from the npm workspace: `npm ci`. They
 # need nothing cargo builds, so they run in the background while the Rust checks below do,
-# each writing its output and status under dist/ladder/, and are read at the end.
+# each writing its output and status under dist/ladder/, and are read at the end. eslint
+# caches each file's result (dist/ladder/eslint-cache, which a changed config or eslint
+# version discards): a file that did not change is not linted again, so a change to one file's
+# types is not re-linted in its callers until they change; CI starts with no cache.
 for tool in tsc eslint; do
   [ -x "node_modules/.bin/$tool" ] || ladder_fail "tool missing: $tool (run npm ci)"
 done
@@ -43,7 +46,8 @@ mkdir -p "$typescript"
 } &
 {
   status=0
-  node_modules/.bin/eslint --max-warnings 0 --format json . >"$typescript/eslint.json" \
+  node_modules/.bin/eslint --max-warnings 0 --cache --cache-location dist/ladder/eslint-cache \
+    --format json . >"$typescript/eslint.json" \
     2>"$typescript/eslint.err" || status=$?
   echo "$status" >"$typescript/eslint.status"
 } &

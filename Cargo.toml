@@ -127,6 +127,26 @@ debug = "line-tables-only"
 [profile.dev.package."*"]
 debug = false
 
+# The tests of the computing crates run optimized (the test profile only: the dev profile and
+# the wasm-dev profile that inherits it stay as they were, so the browser host's module and
+# its bindings do not change). Debug assertions and overflow checks stay on. The property and
+# cost tests of the engine, and the cases the browser tests compare with, took 5 to 50 s
+# unoptimized and take a fifth of that at opt-level 2.
+[profile.test.package.cairn-engine]
+opt-level = 2
+
+[profile.test.package.cairn-schema]
+opt-level = 2
+
+[profile.test.package.cairn-service]
+opt-level = 2
+
+[profile.test.package.cairn-store]
+opt-level = 2
+
+[profile.test.package.cairn-wasm]
+opt-level = 2
+
 # The browser host's build (brief 4.5): the release profile, its symbols stripped and linked
 # as one unit, so the module the page downloads is small. The wasm build task uses it for the
 # release build and in CI (CAIRN_WASM_PROFILE=wasm); the link takes most of a minute.
