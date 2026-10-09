@@ -80,21 +80,31 @@ pub fn arb_payload<R: ArbRefs>() -> impl Strategy<Value = Payload<R>> {
                 help,
                 answer
             })),
+        (
+            prop::option::of(arb_days()),
+            any::<bool>(),
+            any::<bool>(),
+            any::<bool>()
+        )
+            .prop_map(
+                |(estimate, placeholder, requires_artifact, requires_note)| {
+                    Payload::Deliverable(Deliverable {
+                        estimate,
+                        placeholder,
+                        requires_artifact,
+                        requires_note,
+                    })
+                }
+            ),
         (prop::option::of(arb_days()), any::<bool>(), any::<bool>()).prop_map(
-            |(estimate, placeholder, requires_artifact)| {
-                Payload::Deliverable(Deliverable {
+            |(estimate, placeholder, requires_note)| {
+                Payload::Action(Action {
                     estimate,
                     placeholder,
-                    requires_artifact,
+                    requires_note,
                 })
             }
         ),
-        (prop::option::of(arb_days()), any::<bool>()).prop_map(|(estimate, placeholder)| {
-            Payload::Action(Action {
-                estimate,
-                placeholder,
-            })
-        }),
         (any::<bool>(), any::<bool>()).prop_map(|(is_final, auto_reach)| Payload::Milestone(
             Milestone {
                 is_final,
@@ -198,6 +208,7 @@ pub fn arb_node_field_value<R: ArbRefs>() -> impl Strategy<Value = NodeFieldValu
         prop::option::of(arb_days()).prop_map(NodeFieldValue::Estimate),
         any::<bool>().prop_map(NodeFieldValue::Placeholder),
         any::<bool>().prop_map(NodeFieldValue::RequiresArtifact),
+        any::<bool>().prop_map(NodeFieldValue::RequiresNote),
         any::<bool>().prop_map(NodeFieldValue::Final),
         any::<bool>().prop_map(NodeFieldValue::AutoReach),
         optional_node().prop_map(NodeFieldValue::OpensAt),

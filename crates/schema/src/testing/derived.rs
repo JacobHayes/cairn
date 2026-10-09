@@ -162,6 +162,7 @@ pub fn arb_violation() -> BoxedStrategy<Violation> {
         prop::option::of(prop::sample::select(vec![
             Guard::DepsDone,
             Guard::HasArtifact,
+            Guard::HasNote,
             Guard::BrokenDown,
         ])),
         prop::collection::btree_set(arb_guard_failure(), 0..2),

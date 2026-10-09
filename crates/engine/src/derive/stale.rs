@@ -1,6 +1,6 @@
 //! `stale` (D4; ARCHITECTURE, Read path: derive, pass 7): a terminal node whose completing
 //! guards would now fail, checked against the transition it used: `done` was completed
-//! (`deps_done`, `has_artifact`, `broken_down`), `decided` answered and `reached` reached
+//! (`deps_done`, `has_artifact`, `has_note`, `broken_down`), `decided` answered and `reached` reached
 //! (`deps_done`), and a `skipped` node is never stale, since its skip required nothing. The
 //! failures a guard bypass recorded are accepted (D4: a bypass records the specific failures
 //! present), so only a later, distinct failure makes the node stale. Visible, never blocking.
@@ -10,7 +10,7 @@
 //! ([`reasons`]), since an open dependency inherited from an ancestor would otherwise be
 //! listed once per descendant (up to nodes x depth x 64 entries).
 //!
-//! Cost at `node_count_max`: the artifact links are indexed once, O(annotations log nodes); a
+//! Cost at `node_count_max`: the artifact links and notes are indexed once, O(annotations log nodes); a
 //! terminal node whose `deps_done` holds is then decided in O(log nodes); any other walks its entry chains once
 //! ([`super::dependencies::Dependencies::of`], at most about 1,300 edges), so at most
 //! 2,000 x 1,300 steps when every node is a stale terminal node.
@@ -42,7 +42,7 @@ impl Staleness {
         dependencies: &Dependencies,
         blocking: &Blocking,
     ) -> Self {
-        let artifacts = artifact_nodes(graph.document());
+        let annotated = annotated_nodes(graph.document());
         let nodes: BTreeSet<NodeKey> = graph
             .document()
             .nodes
@@ -53,7 +53,7 @@ impl Staleness {
                     relevance,
                     dependencies,
                     blocking,
-                    &artifacts,
+                    &annotated,
                     &node.key,
                 );
                 !found.is_empty()
@@ -72,15 +72,15 @@ impl Staleness {
 }
 
 /// D4: why the node is stale, empty when it is not: the failures of the guards its
-/// transition required, less those its bypass recorded. `artifacts` are the nodes with an
-/// artifact link ([`artifact_nodes`]).
+/// transition required, less those its bypass recorded. `annotated` are the nodes with an
+/// artifact link or a note ([`annotated_nodes`]).
 #[must_use]
 pub(crate) fn reasons(
     graph: &Graph,
     relevance: &Relevances,
     dependencies: &Dependencies,
     blocking: &Blocking,
-    artifacts: &BTreeSet<&NodeKey>,
+    annotated: &Annotated<'_>,
     key: &NodeKey,
 ) -> BTreeSet<GuardFailure> {
     let document = graph.document();
@@ -101,7 +101,7 @@ pub(crate) fn reasons(
         return BTreeSet::new();
     }
     let mut failures = if completed {
-        static_failures(document, graph.tree(), node, artifacts)
+        static_failures(document, graph.tree(), node, annotated)
     } else {
         BTreeSet::new()
     };
@@ -175,39 +175,59 @@ pub(crate) fn guard_open_dependencies(
     held
 }
 
-/// G2: the nodes with an artifact link, read once per pass so each completed node's guard is a
-/// lookup (at the limits, thousands of completed nodes and a hundred thousand notes).
-#[must_use]
-pub(crate) fn artifact_nodes(document: &Document) -> BTreeSet<&NodeKey> {
-    document
-        .state
-        .annotations
-        .values()
-        .filter(|annotation| annotation.is_artifact())
-        .filter_map(|annotation| annotation.body.node.as_ref())
-        .collect()
+/// The nodes with an artifact link (G2) and the nodes with a note (G4), read once per pass
+/// so each completed node's guard is a lookup (at the limits, thousands of completed nodes
+/// and a hundred thousand notes).
+#[derive(Debug, Default)]
+pub(crate) struct Annotated<'a> {
+    artifacts: BTreeSet<&'a NodeKey>,
+    notes: BTreeSet<&'a NodeKey>,
 }
 
-/// The guards that need no derived state (D4, A16, G2, B10), for a completed node: a
-/// deliverable that requires an artifact has an artifact link (among `artifacts`, from
-/// [`artifact_nodes`]), and a placeholder has children or is atomic.
+/// G2, G4: the nodes of `document` that carry an artifact link or a note of their own, a
+/// child's or the journey's not counting.
+#[must_use]
+pub(crate) fn annotated_nodes(document: &Document) -> Annotated<'_> {
+    let mut annotated = Annotated::default();
+    for annotation in document.state.annotations.values() {
+        let Some(node) = annotation.body.node.as_ref() else {
+            continue;
+        };
+        if annotation.is_artifact() {
+            annotated.artifacts.insert(node);
+        } else if annotation.is_note() {
+            annotated.notes.insert(node);
+        }
+    }
+    annotated
+}
+
+/// The guards that need no derived state (D4, A16, G2, G4, B10), for a completed node: a
+/// deliverable that requires an artifact has an artifact link, a deliverable or action that
+/// requires a note has a note (both among `annotated`, from [`annotated_nodes`]), and a
+/// placeholder has children or is atomic.
 #[must_use]
 pub(crate) fn static_failures(
     document: &Document,
     tree: &Tree,
     node: &Node<KeyRefs>,
-    artifacts: &BTreeSet<&NodeKey>,
+    annotated: &Annotated<'_>,
 ) -> BTreeSet<GuardFailure> {
     let mut found = BTreeSet::new();
-    let (placeholder, requires_artifact) = match &node.payload {
-        Payload::Deliverable(deliverable) => {
-            (deliverable.placeholder, deliverable.requires_artifact)
-        }
-        Payload::Action(action) => (action.placeholder, false),
-        Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => (false, false),
+    let (placeholder, requires_artifact, requires_note) = match &node.payload {
+        Payload::Deliverable(deliverable) => (
+            deliverable.placeholder,
+            deliverable.requires_artifact,
+            deliverable.requires_note,
+        ),
+        Payload::Action(action) => (action.placeholder, false, action.requires_note),
+        Payload::Decision(_) | Payload::Milestone(_) | Payload::Group(_) => (false, false, false),
     };
-    if requires_artifact && !artifacts.contains(&node.key) {
+    if requires_artifact && !annotated.artifacts.contains(&node.key) {
         found.insert(GuardFailure::MissingArtifact);
+    }
+    if requires_note && !annotated.notes.contains(&node.key) {
+        found.insert(GuardFailure::MissingNote);
     }
     let atomic = document
         .state
@@ -221,6 +241,6 @@ pub(crate) fn static_failures(
     assert!(
         found.is_empty() || matches!(node.payload, Payload::Deliverable(_) | Payload::Action(_))
     );
-    assert!(found.len() <= 2);
+    assert!(found.len() <= 3);
     found
 }

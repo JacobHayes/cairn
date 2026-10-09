@@ -41,6 +41,8 @@ pub enum NodeField {
     Placeholder,
     /// A deliverable's `requires_artifact` flag.
     RequiresArtifact,
+    /// A deliverable's or action's `requires_note` flag.
+    RequiresNote,
     /// A milestone's `final` flag.
     Final,
     /// A milestone's `auto_reach` flag.
@@ -67,7 +69,7 @@ pub enum NodeField {
 
 impl NodeField {
     /// Every field, in declaration order.
-    pub const ALL: [NodeField; 22] = [
+    pub const ALL: [NodeField; 23] = [
         NodeField::Id,
         NodeField::Parent,
         NodeField::Title,
@@ -79,6 +81,7 @@ impl NodeField {
         NodeField::Estimate,
         NodeField::Placeholder,
         NodeField::RequiresArtifact,
+        NodeField::RequiresNote,
         NodeField::Final,
         NodeField::AutoReach,
         NodeField::OpensAt,
@@ -122,6 +125,8 @@ pub enum NodeFieldValue<R: References> {
     Placeholder(bool),
     /// The `requires_artifact` flag.
     RequiresArtifact(bool),
+    /// The `requires_note` flag.
+    RequiresNote(bool),
     /// The `final` flag.
     Final(bool),
     /// The `auto_reach` flag.
@@ -162,6 +167,7 @@ impl<R: References> NodeFieldValue<R> {
             NodeFieldValue::Estimate(_) => NodeField::Estimate,
             NodeFieldValue::Placeholder(_) => NodeField::Placeholder,
             NodeFieldValue::RequiresArtifact(_) => NodeField::RequiresArtifact,
+            NodeFieldValue::RequiresNote(_) => NodeField::RequiresNote,
             NodeFieldValue::Final(_) => NodeField::Final,
             NodeFieldValue::AutoReach(_) => NodeField::AutoReach,
             NodeFieldValue::OpensAt(_) => NodeField::OpensAt,
@@ -191,6 +197,7 @@ impl<R: References> NodeFieldValue<R> {
             NodeField::Estimate
             | NodeField::Placeholder
             | NodeField::RequiresArtifact
+            | NodeField::RequiresNote
             | NodeField::Final
             | NodeField::AutoReach
             | NodeField::OpensAt
@@ -222,6 +229,12 @@ impl<R: References> NodeFieldValue<R> {
             }
             (NodeField::RequiresArtifact, Payload::Deliverable(work)) => {
                 Some(NodeFieldValue::RequiresArtifact(work.requires_artifact))
+            }
+            (NodeField::RequiresNote, Payload::Deliverable(work)) => {
+                Some(NodeFieldValue::RequiresNote(work.requires_note))
+            }
+            (NodeField::RequiresNote, Payload::Action(work)) => {
+                Some(NodeFieldValue::RequiresNote(work.requires_note))
             }
             (NodeField::Final, Payload::Milestone(milestone)) => {
                 Some(NodeFieldValue::Final(milestone.is_final))
@@ -297,6 +310,12 @@ impl<R: References> NodeFieldValue<R> {
             (NodeFieldValue::Placeholder(flag), Payload::Action(work)) => work.placeholder = flag,
             (NodeFieldValue::RequiresArtifact(flag), Payload::Deliverable(work)) => {
                 work.requires_artifact = flag;
+            }
+            (NodeFieldValue::RequiresNote(flag), Payload::Deliverable(work)) => {
+                work.requires_note = flag;
+            }
+            (NodeFieldValue::RequiresNote(flag), Payload::Action(work)) => {
+                work.requires_note = flag;
             }
             (NodeFieldValue::Final(flag), Payload::Milestone(milestone)) => {
                 milestone.is_final = flag;

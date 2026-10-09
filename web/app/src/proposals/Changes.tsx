@@ -121,13 +121,13 @@ function nodeOf(context: ChangesContext, key: string): GraphNode | undefined {
 }
 
 /** The fields a set field's editor offers here: every node field (A1a). */
-export const EDITABLE_FIELDS: ReadonlySet<string> = new Set(["id", "title", "description", "prompt", "help", "weight", "estimate", "placeholder", "requires_artifact", "final", "auto_reach", "gates", "closes", "parent", "opens_at", "closes_at", "feeds_milestone", "fills_role", "choices", "relevant_when", "due_by", "not_before"]);
+export const EDITABLE_FIELDS: ReadonlySet<string> = new Set(["id", "title", "description", "prompt", "help", "weight", "estimate", "placeholder", "requires_artifact", "requires_note", "final", "auto_reach", "gates", "closes", "parent", "opens_at", "closes_at", "feeds_milestone", "fills_role", "choices", "relevant_when", "due_by", "not_before"]);
 
 const LINE_FIELDS = ["id", "title"] as const;
 /** Markdown, which keeps its line breaks: a textarea. */
 const MARKDOWN_FIELDS = ["description", "prompt", "help"] as const;
 const NUMBER_FIELDS = ["weight", "estimate"] as const;
-const FLAG_FIELDS = ["placeholder", "requires_artifact", "final", "auto_reach", "gates", "closes"] as const;
+const FLAG_FIELDS = ["placeholder", "requires_artifact", "requires_note", "final", "auto_reach", "gates", "closes"] as const;
 const MILESTONE_FIELDS = ["opens_at", "closes_at", "feeds_milestone"] as const;
 const includes = <T extends string>(list: readonly T[], field: string): field is T => (list as readonly string[]).includes(field);
 

@@ -259,6 +259,8 @@ pub enum Guard {
     DepsDone,
     /// A `requires_artifact` deliverable has an artifact link.
     HasArtifact,
+    /// A `requires_note` deliverable or action has a note of its own (G4).
+    HasNote,
     /// A placeholder has children or is atomic.
     BrokenDown,
 }
@@ -274,6 +276,8 @@ pub enum GuardFailure {
     OpenDependency(NodeKey),
     /// No artifact link on a `requires_artifact` deliverable.
     MissingArtifact,
+    /// No note on a `requires_note` deliverable or action (G4).
+    MissingNote,
     /// A placeholder with no children that is not atomic.
     NotBrokenDown,
 }
@@ -285,6 +289,7 @@ impl GuardFailure {
         match self {
             GuardFailure::OpenDependency(_) => Guard::DepsDone,
             GuardFailure::MissingArtifact => Guard::HasArtifact,
+            GuardFailure::MissingNote => Guard::HasNote,
             GuardFailure::NotBrokenDown => Guard::BrokenDown,
         }
     }

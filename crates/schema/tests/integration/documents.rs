@@ -53,6 +53,7 @@ fn field_line(field: KindField) -> String {
         KindField::Estimate => "2",
         KindField::Placeholder
         | KindField::RequiresArtifact
+        | KindField::RequiresNote
         | KindField::Final
         | KindField::AutoReach
         | KindField::Gates

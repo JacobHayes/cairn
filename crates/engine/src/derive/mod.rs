@@ -173,13 +173,13 @@ impl Derived {
     /// When `graph` is not the one derived.
     #[must_use]
     pub fn stale(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<GuardFailure> {
-        let artifacts = stale::artifact_nodes(graph.document());
+        let annotated = stale::annotated_nodes(graph.document());
         let reasons = stale::reasons(
             graph,
             &self.relevance,
             &self.dependencies,
             &self.blocking,
-            &artifacts,
+            &annotated,
             key,
         );
         assert_eq!(reasons.is_empty(), !self.is_stale(key), "the graph derived");

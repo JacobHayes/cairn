@@ -36,6 +36,7 @@ nodes:
   kind: action
   title: Phone screen
   estimate: 1
+  requires_note: true
 - key: n_onsite
   id: onsite
   parent: loop

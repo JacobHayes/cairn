@@ -68,6 +68,7 @@ nodes:
   estimate: 3
   placeholder: true
   requires_artifact: true
+  requires_note: true
   requires:
   - kickoff
   relevant_when:
@@ -106,6 +107,7 @@ nodes:
   title: Steps
   estimate: 1
   placeholder: true
+  requires_note: true
   relevant_when:
     equals:
       decision: scope

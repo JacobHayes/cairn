@@ -30,6 +30,7 @@ export function actingView(): Ready {
           { key: "n_pick", id: "pick", kind: "decision", title: "Pick one", answer_type: "boolean" },
           { key: "n_work", id: "work", kind: "deliverable", title: "Write it", requires_artifact: true },
           { key: "n_hold", id: "hold", kind: "action", title: "Break me down", placeholder: true },
+          { key: "n_log", id: "log", kind: "action", title: "Write the log", requires_note: true },
           { key: "n_wait", id: "wait", kind: "decision", title: "Wait for it", answer_type: "boolean" },
           { key: "n_later", id: "later", kind: "decision", title: "Decide later", answer_type: "boolean", requires: ["n_meet"] },
           { key: "n_stage", id: "stage", kind: "group", title: "Stage", opens_at: "n_meet" },
@@ -54,6 +55,7 @@ export function actingView(): Ready {
         n_pick: { ...base, display_state: "ready", ...relevant, actionable: true, unassigned: true },
         n_work: { ...base, display_state: "ready", ...relevant, actionable: true },
         n_hold: { ...base, display_state: "ready", ...relevant, actionable: true, needs_breakdown: true },
+        n_log: { ...base, display_state: "ready", ...relevant },
         n_wait: { ...base, display_state: "snoozed", ...relevant, actionable: true, snoozed: { node: "n_work" }, dates: start("2026-10-06") },
         n_later: { ...base, display_state: "blocked", ...relevant, blocked_by: [{ node: "n_meet", via: "explicit" }], dates: start("2026-10-20") },
         n_stage: {

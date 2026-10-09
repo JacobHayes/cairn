@@ -506,7 +506,8 @@
               "gates": false,
               "opens_at": false,
               "placeholder": false,
-              "requires_artifact": false
+              "requires_artifact": false,
+              "requires_note": false
             }
           }
         },
@@ -583,7 +584,8 @@
               "opens_at": false,
               "placeholder": false,
               "prompt": false,
-              "requires_artifact": false
+              "requires_artifact": false,
+              "requires_note": false
             }
           }
         },
@@ -607,7 +609,8 @@
               "help": false,
               "placeholder": false,
               "prompt": false,
-              "requires_artifact": false
+              "requires_artifact": false,
+              "requires_note": false
             }
           }
         },
@@ -883,6 +886,9 @@
           "uniqueItems": true
         },
         "requires_artifact": {
+          "type": "boolean"
+        },
+        "requires_note": {
           "type": "boolean"
         },
         "resources": {

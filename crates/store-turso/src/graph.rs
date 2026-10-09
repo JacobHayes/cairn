@@ -25,7 +25,7 @@ use crate::sql::{
 /// The nodes table's columns after `graph_id`, in the order [`node_values`] writes them and
 /// [`node_from_row`] reads them (A1a): the fields every kind shares, then [`KindColumns`].
 /// A node's `requires`, `participations`, and `resources` are rows of their own tables.
-pub(crate) const NODE_COLUMNS: [&str; 25] = [
+pub(crate) const NODE_COLUMNS: [&str; 26] = [
     "key",
     "parent_key",
     "id",
@@ -39,6 +39,7 @@ pub(crate) const NODE_COLUMNS: [&str; 25] = [
     "estimate",
     "placeholder",
     "requires_artifact",
+    "requires_note",
     "is_final",
     "auto_reach",
     "opens_at",
@@ -98,6 +99,7 @@ struct KindColumns {
     estimate: Option<Days>,
     placeholder: Option<bool>,
     requires_artifact: Option<bool>,
+    requires_note: Option<bool>,
     is_final: Option<bool>,
     auto_reach: Option<bool>,
     opens_at: Option<NodeKey>,
@@ -117,6 +119,7 @@ impl KindColumns {
         estimate: None,
         placeholder: None,
         requires_artifact: None,
+        requires_note: None,
         is_final: None,
         auto_reach: None,
         opens_at: None,
@@ -163,18 +166,22 @@ impl KindColumns {
                 estimate,
                 placeholder,
                 requires_artifact,
+                requires_note,
             }) => Self {
                 estimate: *estimate,
                 placeholder: Some(*placeholder),
                 requires_artifact: Some(*requires_artifact),
+                requires_note: Some(*requires_note),
                 ..Self::NONE
             },
             Payload::Action(Action {
                 estimate,
                 placeholder,
+                requires_note,
             }) => Self {
                 estimate: *estimate,
                 placeholder: Some(*placeholder),
+                requires_note: Some(*requires_note),
                 ..Self::NONE
             },
             Payload::Milestone(Milestone {
@@ -206,6 +213,7 @@ impl KindColumns {
             estimate,
             placeholder,
             requires_artifact,
+            requires_note,
             is_final,
             auto_reach,
             opens_at,
@@ -224,6 +232,7 @@ impl KindColumns {
             opt_int(estimate.map(Days::get)),
             opt_flag(placeholder),
             opt_flag(requires_artifact),
+            opt_flag(requires_note),
             opt_flag(is_final),
             opt_flag(auto_reach),
             opt_text(opens_at),
@@ -246,21 +255,22 @@ impl KindColumns {
             estimate: row.opt_int(at(0))?.map(sql::number).transpose()?,
             placeholder: row.opt_flag(at(1))?,
             requires_artifact: row.opt_flag(at(2))?,
-            is_final: row.opt_flag(at(3))?,
-            auto_reach: row.opt_flag(at(4))?,
-            opens_at: row.opt_parse(at(5))?,
-            closes_at: row.opt_parse(at(6))?,
-            gates: row.opt_flag(at(7))?,
-            closes: row.opt_flag(at(8))?,
-            prompt: row.opt_parse(at(9))?,
+            requires_note: row.opt_flag(at(3))?,
+            is_final: row.opt_flag(at(4))?,
+            auto_reach: row.opt_flag(at(5))?,
+            opens_at: row.opt_parse(at(6))?,
+            closes_at: row.opt_parse(at(7))?,
+            gates: row.opt_flag(at(8))?,
+            closes: row.opt_flag(at(9))?,
+            prompt: row.opt_parse(at(10))?,
             answer_type: row
-                .opt_text(at(10))?
+                .opt_text(at(11))?
                 .map(|name| answer_type_from(&name))
                 .transpose()?,
-            choices: row.opt_json(at(11))?,
-            fills_role: row.opt_parse(at(12))?,
-            feeds_milestone: row.opt_parse(at(13))?,
-            help: row.opt_parse(at(14))?,
+            choices: row.opt_json(at(12))?,
+            fills_role: row.opt_parse(at(13))?,
+            feeds_milestone: row.opt_parse(at(14))?,
+            help: row.opt_parse(at(15))?,
         })
     }
 
@@ -273,6 +283,7 @@ impl KindColumns {
                 KindField::RequiresArtifact,
                 self.requires_artifact.is_some(),
             ),
+            (KindField::RequiresNote, self.requires_note.is_some()),
             (KindField::Final, self.is_final.is_some()),
             (KindField::AutoReach, self.auto_reach.is_some()),
             (KindField::OpensAt, self.opens_at.is_some()),
@@ -343,10 +354,12 @@ impl KindColumns {
                 estimate: self.estimate,
                 placeholder: self.placeholder.unwrap_or(false),
                 requires_artifact: self.requires_artifact.unwrap_or(false),
+                requires_note: self.requires_note.unwrap_or(false),
             }),
             NodeKind::Action => Payload::Action(Action {
                 estimate: self.estimate,
                 placeholder: self.placeholder.unwrap_or(false),
+                requires_note: self.requires_note.unwrap_or(false),
             }),
             NodeKind::Milestone => Payload::Milestone(Milestone {
                 is_final: self.is_final.unwrap_or(false),

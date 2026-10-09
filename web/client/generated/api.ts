@@ -2055,14 +2055,14 @@ export interface components {
          */
         GroupState: "not_relevant" | "skipped" | "done" | "waiting" | "active" | "not_started";
         /** @description A transition guard (D4). */
-        Guard: "deps_done" | "has_artifact" | "broken_down";
+        Guard: "deps_done" | "has_artifact" | "has_note" | "broken_down";
         /**
          * @description One specific guard failure (D4): what a bypass records, so a later distinct failure
          *     still produces `stale`, and what `stale` lists.
          */
         GuardFailure: {
             open_dependency: components["schemas"]["NodeKey"];
-        } | "missing_artifact" | "not_broken_down";
+        } | "missing_artifact" | "missing_note" | "not_broken_down";
         /**
          * @description `GET /healthz`: whether the server is serving. Answered 200 when it is, and 503 when its
          *     store has failed closed and answers nothing until the process is restarted.
@@ -2862,6 +2862,7 @@ export interface components {
             relevant_when?: components["schemas"]["ConditionResolved"] | null;
             requires?: components["schemas"]["NodeKey"][];
             requires_artifact?: boolean;
+            requires_note?: boolean;
             resources?: components["schemas"]["Resource"][];
             title: components["schemas"]["Title"];
             weight?: components["schemas"]["Weight"] | null;
@@ -2893,6 +2894,7 @@ export interface components {
             relevant_when?: components["schemas"]["Condition"] | null;
             requires?: components["schemas"]["Path"][];
             requires_artifact?: boolean;
+            requires_note?: boolean;
             resources?: components["schemas"]["Resource2"][];
             title: components["schemas"]["Title"];
             weight?: components["schemas"]["Weight"] | null;
@@ -3038,7 +3040,7 @@ export interface components {
             still_waiting: components["schemas"]["StillWaiting"];
         };
         /** @description A node field, by name. */
-        NodeField: "id" | "parent" | "title" | "description" | "weight" | "relevant_when" | "due_by" | "not_before" | "estimate" | "placeholder" | "requires_artifact" | "final" | "auto_reach" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "choices" | "fills_role" | "feeds_milestone";
+        NodeField: "id" | "parent" | "title" | "description" | "weight" | "relevant_when" | "due_by" | "not_before" | "estimate" | "placeholder" | "requires_artifact" | "requires_note" | "final" | "auto_reach" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "choices" | "fills_role" | "feeds_milestone";
         /** @description A new value for one node field. */
         NodeFieldValueResolved: {
             id: components["schemas"]["Slug"];
@@ -3062,6 +3064,8 @@ export interface components {
             placeholder: boolean;
         } | {
             requires_artifact: boolean;
+        } | {
+            requires_note: boolean;
         } | {
             final: boolean;
         } | {

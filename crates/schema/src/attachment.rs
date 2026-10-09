@@ -535,6 +535,13 @@ impl Annotation {
     pub fn is_artifact(&self) -> bool {
         matches!(self.body.content, AnnotationContent::Artifact(_))
     }
+
+    /// True for a note (G1), which a `requires_note` node's guard looks for on the node
+    /// itself.
+    #[must_use]
+    pub fn is_note(&self) -> bool {
+        matches!(self.body.content, AnnotationContent::Note(_))
+    }
 }
 
 impl crate::collections::HasKey for Annotation {

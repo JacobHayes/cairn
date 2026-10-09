@@ -210,6 +210,22 @@ test("B2, C8, C12: a rationale given on a triage card shows in node detail and t
   await expect(answers.nth(1)).toContainText("No reason given.");
 });
 
+test("G4, C11: done on an action that requires a note opens a note field and completes in one patch", async ({ page }) => {
+  const journey = await startJourney(page, "browser", journeyName("Screening"), { route: "hiring-loop", version: 1 });
+  await openActing(page, "browser", journey, "next");
+  const item = nextItem(page, "n_screen");
+  await item.getByRole("button", { name: "Done", exact: true }).click();
+  const save = item.getByRole("button", { name: "Add note and mark done" });
+  await expect(save).toBeDisabled();
+  const revision = await derivedRevision(page);
+  await item.getByLabel("Note").fill("Covered the role and the timeline.");
+  await save.click();
+  expect(await revisionAfter(page, revision)).toBe(revision + 1);
+  await expect(nextItem(page, "n_screen")).toHaveCount(0);
+  await openActing(page, "browser", journey, "list?state=done");
+  await expect(page.locator('[data-testid="list-row"][data-node="n_screen"]')).toBeVisible();
+});
+
 test("C11, B10: a placeholder's card offers break down and mark atomic, and no done until it is atomic", async ({ page }) => {
   const journey = await startVendorJourney(page);
   await openActing(page, "browser", journey, "triage");

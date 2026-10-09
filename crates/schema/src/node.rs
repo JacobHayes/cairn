@@ -318,6 +318,8 @@ pub struct Deliverable {
     pub placeholder: bool,
     /// An artifact link is required before `done` (G2).
     pub requires_artifact: bool,
+    /// A journey note on the node itself is required before `done` (G4).
+    pub requires_note: bool,
 }
 
 /// An action's own fields.
@@ -327,6 +329,8 @@ pub struct Action {
     pub estimate: Option<Days>,
     /// Each journey must break it down before it can be completed (B10).
     pub placeholder: bool,
+    /// A journey note on the node itself is required before `done` (G4).
+    pub requires_note: bool,
 }
 
 /// A milestone's own fields.
@@ -741,6 +745,8 @@ pub enum KindField {
     Placeholder,
     /// `requires_artifact`: deliverables.
     RequiresArtifact,
+    /// `requires_note`: deliverables and actions.
+    RequiresNote,
     /// `final`: milestones.
     Final,
     /// `auto_reach`: milestones.
@@ -769,10 +775,11 @@ pub enum KindField {
 
 impl KindField {
     /// Every kind-restricted field.
-    pub const ALL: [KindField; 15] = [
+    pub const ALL: [KindField; 16] = [
         KindField::Estimate,
         KindField::Placeholder,
         KindField::RequiresArtifact,
+        KindField::RequiresNote,
         KindField::Final,
         KindField::AutoReach,
         KindField::OpensAt,
@@ -794,6 +801,7 @@ impl KindField {
             KindField::Estimate => "estimate",
             KindField::Placeholder => "placeholder",
             KindField::RequiresArtifact => "requires_artifact",
+            KindField::RequiresNote => "requires_note",
             KindField::Final => "final",
             KindField::AutoReach => "auto_reach",
             KindField::OpensAt => "opens_at",
@@ -814,7 +822,7 @@ impl KindField {
     #[must_use]
     pub const fn allowed_on(self, kind: NodeKind) -> bool {
         match self {
-            KindField::Estimate | KindField::Placeholder => {
+            KindField::Estimate | KindField::Placeholder | KindField::RequiresNote => {
                 matches!(kind, NodeKind::Deliverable | NodeKind::Action)
             }
             KindField::RequiresArtifact => matches!(kind, NodeKind::Deliverable),
@@ -844,6 +852,7 @@ impl KindField {
             KindField::Estimate
             | KindField::Placeholder
             | KindField::RequiresArtifact
+            | KindField::RequiresNote
             | KindField::Final
             | KindField::AutoReach
             | KindField::OpensAt
@@ -999,6 +1008,13 @@ pub struct NodeWire<R: References> {
     #[schemars(with = "bool")]
     requires_artifact: Option<bool>,
     #[serde(
+        default,
+        deserialize_with = "crate::serde_util::present",
+        skip_serializing_if = "Option::is_none"
+    )]
+    #[schemars(with = "bool")]
+    requires_note: Option<bool>,
+    #[serde(
         rename = "final",
         default,
         deserialize_with = "crate::serde_util::present",
@@ -1078,6 +1094,7 @@ impl<R: References> NodeWire<R> {
                 KindField::RequiresArtifact,
                 self.requires_artifact.is_some(),
             ),
+            (KindField::RequiresNote, self.requires_note.is_some()),
             (KindField::Final, self.is_final.is_some()),
             (KindField::AutoReach, self.auto_reach.is_some()),
             (KindField::OpensAt, self.opens_at.is_some()),
@@ -1173,10 +1190,12 @@ impl<R: References> NodeWire<R> {
                 estimate: self.estimate,
                 placeholder: self.placeholder.unwrap_or(false),
                 requires_artifact: self.requires_artifact.unwrap_or(false),
+                requires_note: self.requires_note.unwrap_or(false),
             }),
             NodeKind::Action => Payload::Action(Action {
                 estimate: self.estimate,
                 placeholder: self.placeholder.unwrap_or(false),
+                requires_note: self.requires_note.unwrap_or(false),
             }),
             NodeKind::Milestone => Payload::Milestone(Milestone {
                 is_final: self.is_final.unwrap_or(false),
@@ -1215,10 +1234,12 @@ impl<R: References> NodeWire<R> {
                 self.estimate = deliverable.estimate;
                 self.placeholder = set(deliverable.placeholder, false);
                 self.requires_artifact = set(deliverable.requires_artifact, false);
+                self.requires_note = set(deliverable.requires_note, false);
             }
             Payload::Action(action) => {
                 self.estimate = action.estimate;
                 self.placeholder = set(action.placeholder, false);
+                self.requires_note = set(action.requires_note, false);
             }
             Payload::Milestone(milestone) => {
                 self.is_final = set(milestone.is_final, false);
@@ -1276,6 +1297,7 @@ impl<R: References> From<Node<R>> for NodeWire<R> {
             estimate: None,
             placeholder: None,
             requires_artifact: None,
+            requires_note: None,
             is_final: None,
             auto_reach: None,
             opens_at: None,

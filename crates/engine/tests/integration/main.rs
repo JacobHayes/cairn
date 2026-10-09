@@ -50,6 +50,7 @@ mod proposals;
 mod rank;
 mod rationale;
 mod relevance;
+mod requires_note;
 mod save_relink;
 mod scenarios;
 mod skip;

@@ -359,8 +359,13 @@ pub fn vendor_v2() -> cairn_schema::Graph {
 
 /// The records with `graph` published as the next version of the vendor evaluation route.
 pub fn publish_vendor(records: &Records, graph: cairn_schema::Graph) -> Records {
+    publish_version(records, "vendor-evaluation", graph)
+}
+
+/// The records with `graph` published as the next version of `route`.
+pub fn publish_version(records: &Records, route: &str, graph: cairn_schema::Graph) -> Records {
     let mut records = records.clone();
-    let route: cairn_schema::RouteId = "vendor-evaluation".parse().unwrap();
+    let route: cairn_schema::RouteId = route.parse().unwrap();
     let held = records.routes.get_mut(&route).unwrap();
     let version = held.versions.iter().next_back().unwrap().next();
     held.versions.insert(version);

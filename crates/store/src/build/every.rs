@@ -193,14 +193,16 @@ pub fn annotation_contents() -> Vec<AnnotationContent> {
 pub fn bypass() -> Bypass {
     let guards = chain(Guard::DepsDone, |guard| match guard {
         Guard::DepsDone => Some(Guard::HasArtifact),
-        Guard::HasArtifact => Some(Guard::BrokenDown),
+        Guard::HasArtifact => Some(Guard::HasNote),
+        Guard::HasNote => Some(Guard::BrokenDown),
         Guard::BrokenDown => None,
     });
     let failures = chain(
         GuardFailure::OpenDependency(node_key(1)),
         |failure| match failure {
             GuardFailure::OpenDependency(_) => Some(GuardFailure::MissingArtifact),
-            GuardFailure::MissingArtifact => Some(GuardFailure::NotBrokenDown),
+            GuardFailure::MissingArtifact => Some(GuardFailure::MissingNote),
+            GuardFailure::MissingNote => Some(GuardFailure::NotBrokenDown),
             GuardFailure::NotBrokenDown => None,
         },
     );
@@ -278,10 +280,12 @@ fn payloads(fill: Fill) -> Vec<Payload<KeyRefs>> {
                 estimate: fill.some(Days::try_from(3).unwrap()),
                 placeholder: fill.on(),
                 requires_artifact: fill.on(),
+                requires_note: fill.on(),
             })),
             NodeKind::Action => payloads.push(Payload::Action(Action {
                 estimate: fill.some(Days::try_from(2).unwrap()),
                 placeholder: fill.on(),
+                requires_note: fill.on(),
             })),
             NodeKind::Milestone => payloads.push(Payload::Milestone(Milestone {
                 is_final: fill.on(),

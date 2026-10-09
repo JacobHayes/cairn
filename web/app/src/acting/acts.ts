@@ -66,16 +66,47 @@ export function hasArtifact(view: Ready, key: string): boolean {
   return (view.journey.graph.state?.annotations ?? []).some((annotation) => annotation.body.node === key && "artifact" in annotation.body);
 }
 
+/** G4: whether a node has a note of its own: not a link, and not one on a child or the journey. */
+export function hasNote(view: Ready, key: string): boolean {
+  return (view.journey.graph.state?.annotations ?? []).some((annotation) => annotation.body.node === key && "note" in annotation.body);
+}
+
+/** What done needs added first: an artifact link (G2) and a note (G4), each only when the node requires it and has none. */
+export function missingEvidence(view: Ready, node: GraphNode): { artifact: boolean; note: boolean } {
+  return {
+    artifact: node.requires_artifact === true && !hasArtifact(view, node.key),
+    note: node.requires_note === true && !hasNote(view, node.key),
+  };
+}
+
+/** What done adds before completing: an artifact link and a note, each with its new key. */
+export interface Evidence {
+  artifact?: { key: string; url: string };
+  note?: { key: string; text: string };
+}
+
+/** The done form's fields, as typed. */
+export interface EvidenceDraft {
+  artifact: string;
+  note: string;
+}
+
+/** A saved done form: before notes it held the artifact address alone, as text. */
+export function evidenceDraft(saved: EvidenceDraft | string): EvidenceDraft {
+  return typeof saved === "string" ? { artifact: saved, note: "" } : saved;
+}
+
 /**
- * C11 done, with the inline artifact link a deliverable that requires one and has none needs
- * (G2): the link and the completion in one patch, so the guard sees the artifact.
+ * C11 done, with the inline artifact link (G2) and note (G4) a node that requires them and has
+ * none needs: each added, then the completion, in one patch so the guards see them.
  */
-export function doneMutations(key: string, artifact?: { key: string; url: string }): Mutation[] {
-  const done = transition(key, "complete");
-  if (artifact === undefined) {
-    return [done];
-  }
-  return [{ op: "add_annotation", annotation: { key: artifact.key, node: key, artifact: artifact.url } }, done];
+export function doneMutations(key: string, evidence: Evidence = {}): Mutation[] {
+  const { artifact, note } = evidence;
+  return [
+    ...(artifact === undefined ? [] : [{ op: "add_annotation" as const, annotation: { key: artifact.key, node: key, artifact: artifact.url } }]),
+    ...(note === undefined ? [] : [{ op: "add_annotation" as const, annotation: { key: note.key, node: key, note: note.text } }]),
+    transition(key, "complete"),
+  ];
 }
 
 /** D2, E2: make `entity` the owner of `key`, explicitly. */

@@ -89,7 +89,8 @@ mod open {
     /// An answer's rationale: a database from before the column existed keeps its answers,
     /// which load with no rationale, and takes a rationale on a later revision; a revision
     /// that gives none stores none (B2). The older database is the current one with the
-    /// column and its migration record taken away, so the migration runs over a stored answer.
+    /// column, the later migrations' columns, and their records taken away, so the migration
+    /// runs over a stored answer.
     #[test]
     fn a_database_from_before_rationales_loads_and_takes_them() {
         let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
@@ -113,8 +114,9 @@ mod open {
                 .unwrap();
             let connection = database.connect().unwrap();
             for statement in [
+                "ALTER TABLE nodes DROP COLUMN requires_note",
                 "ALTER TABLE answers DROP COLUMN rationale",
-                "DELETE FROM schema_migrations WHERE version = 5",
+                "DELETE FROM schema_migrations WHERE version >= 5",
             ] {
                 connection.execute(statement, ()).await.unwrap();
             }
@@ -133,6 +135,65 @@ mod open {
             store.commit(revise("p_four", 3, true, None)).await.unwrap();
             drop(store);
             assert_eq!(answer_at(&path).await, (true, None));
+        });
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
+    /// A node's `requires_note` flag: a database from before the column existed keeps its
+    /// nodes, which load with the flag off, and takes nodes that set it (G4). The older
+    /// database is the current one with the column and its migration record taken away.
+    #[test]
+    fn a_database_from_before_requires_note_loads_and_takes_it() {
+        let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("requires-note-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("store.db");
+        let flagged = |journey: &str| {
+            let node = cairn_store::build::node(serde_json::json!({
+                "key": "n_write", "id": "write", "kind": "action", "title": "Write",
+                "requires_note": true,
+            }));
+            create_journey("p_new", journey, vec![node]).commit()
+        };
+        let required = |loaded: Option<Document>, node: &str| {
+            let Some(Document::Journey(journey)) = loaded else {
+                panic!("the journey loads: {loaded:?}");
+            };
+            let node = journey
+                .graph
+                .nodes
+                .get(&cairn_store::build::id(node))
+                .unwrap();
+            matches!(&node.payload, cairn_schema::Payload::Action(action) if action.requires_note)
+        };
+        run(async {
+            let store = TursoStore::open(&path).await.unwrap();
+            let create = create_journey("p_old", "j_old", vec![action("n_a", "a", None)]).commit();
+            store.commit(create).await.unwrap();
+            drop(store);
+
+            let database = turso::Builder::new_local(path.to_str().unwrap())
+                .build()
+                .await
+                .unwrap();
+            let connection = database.connect().unwrap();
+            for statement in [
+                "ALTER TABLE nodes DROP COLUMN requires_note",
+                "DELETE FROM schema_migrations WHERE version = 6",
+            ] {
+                connection.execute(statement, ()).await.unwrap();
+            }
+            drop(connection);
+            drop(database);
+
+            let store = TursoStore::open(&path).await.unwrap();
+            store.commit(flagged("j_new")).await.unwrap();
+            let load = |journey: &str| LoadTarget::Journey(cairn_store::build::id(journey));
+            assert!(!required(store.load(&load("j_old")).await.unwrap(), "n_a"));
+            assert!(required(
+                store.load(&load("j_new")).await.unwrap(),
+                "n_write"
+            ));
         });
         std::fs::remove_dir_all(&root).unwrap();
     }
@@ -161,6 +222,10 @@ mod open {
         (
             "Deliverable, Artifact",
             &["nodes.requires_artifact", "annotations.type"],
+        ),
+        (
+            "Required note",
+            &["nodes.requires_note", "annotations.type"],
         ),
         ("Action", &["nodes.kind"]),
         ("Milestone", &["nodes.is_final", "nodes.auto_reach"]),

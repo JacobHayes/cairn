@@ -176,6 +176,9 @@ export function guardFailureText(failure: Schema<"GuardFailure">, name: Namer): 
   if (failure === "missing_artifact") {
     return "missing artifact";
   }
+  if (failure === "missing_note") {
+    return "missing note";
+  }
   if (failure === "not_broken_down") {
     return "not broken down";
   }

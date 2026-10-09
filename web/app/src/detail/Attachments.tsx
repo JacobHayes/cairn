@@ -167,6 +167,10 @@ export function AnnotationList({ view, node, annotations, summary }: { view: Rea
 export function AttachmentList({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { annotations } = detail;
   const artifacts = annotations.filter((annotation) => annotation.body.artifact !== undefined).length;
-  const summary = [String(annotations.length), detail.node.requires_artifact === true ? `artifact required, ${String(artifacts)} designated` : undefined];
+  const summary = [
+    String(annotations.length),
+    detail.node.requires_artifact === true ? `artifact required, ${String(artifacts)} designated` : undefined,
+    detail.node.requires_note === true ? "note required" : undefined,
+  ];
   return <AnnotationList view={view} node={detail.node.key} annotations={annotations} summary={summary.filter((part) => part !== undefined).join(", ")} />;
 }

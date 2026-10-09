@@ -61,7 +61,7 @@ function Days({ props, field, label, hint }: { props: FieldsProps; field: "weigh
   );
 }
 
-function Flag({ props, field, label }: { props: FieldsProps; field: "requires_artifact" | "placeholder" | "final" | "auto_reach"; label: string }) {
+function Flag({ props, field, label }: { props: FieldsProps; field: "requires_artifact" | "requires_note" | "placeholder" | "final" | "auto_reach"; label: string }) {
   return (
     <FieldBox label="" place={field} notes={props.notes(field)}>
       <label className="row">
@@ -84,12 +84,13 @@ export function SharedFields({ props }: { props: FieldsProps }) {
   );
 }
 
-/** Work's own fields: an estimate, an artifact required before done, and placeholder (A16). */
+/** Work's own fields: an estimate, an artifact or a note required before done, and placeholder (A16). */
 export function WorkFields({ props }: { props: FieldsProps }) {
   return (
     <>
       {has(props, "estimate") ? <Days props={props} field="estimate" label="Estimate (days)" hint="none" /> : null}
       {has(props, "requires_artifact") ? <Flag props={props} field="requires_artifact" label="Requires an artifact before done" /> : null}
+      {has(props, "requires_note") ? <Flag props={props} field="requires_note" label="Requires a note before done" /> : null}
       {has(props, "placeholder") ? <Flag props={props} field="placeholder" label="Placeholder: each journey breaks it down" /> : null}
       {has(props, "final") ? <Flag props={props} field="final" label="The final milestone" /> : null}
       {has(props, "auto_reach") ? <Flag props={props} field="auto_reach" label="Reached by itself on its date" /> : null}

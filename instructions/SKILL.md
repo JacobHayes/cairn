@@ -91,6 +91,13 @@ journey as a route, and re-linking are always proposals (`upgrade`, `save_as_rou
 `apply_patch` takes any patch to a journey, a route's draft, or the deployment, when no
 other tool fits.
 
+Work marked `requires_note` cannot be completed until it has a note of its own (a link,
+or a note on a child or the journey, does not count). Send the note and the completion as
+one `apply_patch` (`add_annotation` with the node and the text, then the `complete`
+transition); `transition_node` alone is refused with the `has_note` guard. Bypass it with
+`override` only when the person says no note is needed. Removing the last note later marks
+a finished node `stale` with "missing note".
+
 ## Ids and keys
 
 Every node, role, and participation kind has a `key` (`n_`, `r_`, and so on, with a slug)

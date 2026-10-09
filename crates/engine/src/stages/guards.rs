@@ -1,6 +1,7 @@
-//! Transition guards that need no derived state (D4, A16, G2, B10): a completed deliverable
-//! that requires an artifact has an artifact link, and a completed placeholder has children
-//! or is atomic, both on the graph the patch produces, so a guard is never satisfied only for
+//! Transition guards that need no derived state (D4, A16, G2, G4, B10): a completed deliverable
+//! that requires an artifact has an artifact link, a completed deliverable or action that
+//! requires a note has a note of its own, and a completed placeholder has children or is
+//! atomic, each on the graph the patch produces, so a guard is never satisfied only for
 //! a moment. A guard bypass applied in the same patch accepts the failures of the guards it
 //! names, and those specific failures are recorded on it; a bypass covers a guarded
 //! transition (complete, a first answer, reach) on its node in the same patch. Relevance and
@@ -11,7 +12,7 @@ use std::collections::BTreeSet;
 use cairn_schema::ViolationCode;
 
 use super::Check;
-use crate::derive::stale::{artifact_nodes, static_failures};
+use crate::derive::stale::{annotated_nodes, static_failures};
 use crate::graph::Tree;
 use crate::validate::at_node;
 
@@ -23,7 +24,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
     };
     let document = &journey.graph;
     let tree = Tree::build(document);
-    let artifacts = artifact_nodes(document);
+    let annotated = annotated_nodes(document);
     // Every completion the patch attempted, whatever the node's final state: a guard is
     // evaluated for the transition attempted, on the graph the patch produces (D4).
     for (key, ordinal) in &session.completed {
@@ -38,7 +39,7 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             .filter(|_| session.bypassed.contains_key(key))
             .map(|bypass| bypass.guards.clone())
             .unwrap_or_default();
-        for failure in static_failures(document, &tree, node, &artifacts) {
+        for failure in static_failures(document, &tree, node, &annotated) {
             if covered.contains(&failure.guard()) {
                 check
                     .bypassed

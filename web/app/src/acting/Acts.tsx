@@ -19,35 +19,55 @@ import { entityName } from "../detail/sections.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { BreakDown } from "../proposals/Entries.tsx";
-import { actsFor, assignOwner, doneMutations, hasArtifact, type Act, type Facts } from "./acts.ts";
+import { actsFor, assignOwner, doneMutations, evidenceDraft, missingEvidence, type Act, type Evidence, type EvidenceDraft, type Facts } from "./acts.ts";
 
 /** D4: the acts that finish a node, beside which undecided work says it may not apply. */
 const FINISHING: Act[] = ["done", "reach", "answer"];
 
-/** G2, C11: done for a deliverable that requires an artifact and has none: its link and the completion, one patch. */
-function DoneWithArtifact({ write, node }: { write: NodeWrite; node: string }) {
-  const form = useFormDraft<string>(write.journey, node, "done-artifact");
+/** The words on the button that adds what done needs and completes. */
+function sendLabel({ artifact, note }: { artifact: boolean; note: boolean }): string {
+  if (artifact && note) {
+    return "Add and mark done";
+  }
+  return artifact ? "Link and mark done" : "Add note and mark done";
+}
+
+/**
+ * G2, G4, C11: done for work that requires an artifact link or a note and has none: the
+ * Done button opens what it needs inline, and sending adds it and completes in one patch.
+ */
+function DoneWithEvidence({ write, node, needs }: { write: NodeWrite; node: string; needs: { artifact: boolean; note: boolean } }) {
+  // Kept under the key the artifact-only form used, so a draft saved before notes still loads.
+  const form = useFormDraft<EvidenceDraft | string>(write.journey, node, "done-artifact");
   if (form.draft === undefined) {
     return (
-      <Button primary disabled={write.disabled} onClick={() => { form.open("", write.seen); }}>
+      <Button primary disabled={write.disabled} onClick={() => { form.open({ artifact: "", note: "" }, write.seen); }}>
         Done
       </Button>
     );
   }
   const drafted = form.draft;
-  const { value } = drafted;
+  const { artifact, note } = evidenceDraft(drafted.value);
+  const complete = (!needs.artifact || artifact.trim() !== "") && (!needs.note || note.trim() !== "");
   const send = async () => {
-    if (await write.run(doneMutations(node, { key: newAttachmentKey(), url: value.trim() }), drafted)) {
+    const evidence: Evidence = {
+      ...(needs.artifact ? { artifact: { key: newAttachmentKey(), url: artifact.trim() } } : {}),
+      ...(needs.note ? { note: { key: newAttachmentKey(), text: note.trim() } } : {}),
+    };
+    if (await write.run(doneMutations(node, evidence), drafted)) {
       form.close();
     }
   };
   return (
-    <span className="row" data-testid="done-artifact">
-      <Field aria-label="Artifact address" placeholder="Its artifact's address" value={value} onChange={(event) => { form.change(event.target.value); }} />
-      <Button primary disabled={write.disabled || value.trim() === ""} onClick={() => void send()}>
-        Link and mark done
-      </Button>
-      <Button onClick={() => { form.close(); write.dismiss(); }}>Cancel</Button>
+    <span className="stack" data-testid="done-evidence">
+      {needs.artifact ? <Field aria-label="Artifact address" placeholder="Its artifact's address" value={artifact} onChange={(event) => { form.change({ artifact: event.target.value, note }); }} /> : null}
+      {needs.note ? <textarea className="textarea" aria-label="Note" placeholder="What was done, in a note" value={note} onChange={(event) => { form.change({ artifact, note: event.target.value }); }} /> : null}
+      <span className="row">
+        <Button primary disabled={write.disabled || !complete} onClick={() => void send()}>
+          {sendLabel(needs)}
+        </Button>
+        <Button onClick={() => { form.close(); write.dismiss(); }}>Cancel</Button>
+      </span>
     </span>
   );
 }
@@ -79,12 +99,14 @@ function ActButton({ view, write, facts, act, onSkip }: { view: Ready; write: No
   switch (act) {
     case "start":
       return <Button disabled={write.disabled} onClick={run([transition(key, "start")])}>Start</Button>;
-    case "done":
-      return facts.node.requires_artifact === true && !hasArtifact(view, key) ? (
-        <DoneWithArtifact write={write} node={key} />
+    case "done": {
+      const needs = missingEvidence(view, facts.node);
+      return needs.artifact || needs.note ? (
+        <DoneWithEvidence write={write} node={key} needs={needs} />
       ) : (
         <Button primary disabled={write.disabled} onClick={run(doneMutations(key))}>Done</Button>
       );
+    }
     case "reach":
       return <Button primary disabled={write.disabled} onClick={run([transition(key, "reach")])}>Mark reached</Button>;
     case "skip":

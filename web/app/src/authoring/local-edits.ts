@@ -39,6 +39,7 @@ export function editWords(edit: LocalEdit, tree: Tree): string {
 const FIELD_DEFAULTS: Partial<Record<NodeField, unknown>> = {
   placeholder: false,
   requires_artifact: false,
+  requires_note: false,
   final: false,
   auto_reach: false,
   gates: true,

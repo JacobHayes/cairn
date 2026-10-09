@@ -146,13 +146,19 @@ pub fn arb_guard_failure() -> impl Strategy<Value = GuardFailure> {
     prop_oneof![
         arb_node_key().prop_map(GuardFailure::OpenDependency),
         Just(GuardFailure::MissingArtifact),
+        Just(GuardFailure::MissingNote),
         Just(GuardFailure::NotBrokenDown),
     ]
 }
 
 /// A guard.
 pub fn arb_guard() -> impl Strategy<Value = Guard> {
-    prop::sample::select(vec![Guard::DepsDone, Guard::HasArtifact, Guard::BrokenDown])
+    prop::sample::select(vec![
+        Guard::DepsDone,
+        Guard::HasArtifact,
+        Guard::HasNote,
+        Guard::BrokenDown,
+    ])
 }
 
 /// A node's overrides.

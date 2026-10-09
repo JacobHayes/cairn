@@ -4291,6 +4291,11 @@
             "type": "string"
           },
           {
+            "const": "has_note",
+            "description": "A `requires_note` deliverable or action has a note of its own (G4).",
+            "type": "string"
+          },
+          {
             "const": "broken_down",
             "description": "A placeholder has children or is atomic.",
             "type": "string"
@@ -4316,6 +4321,11 @@
           {
             "const": "missing_artifact",
             "description": "No artifact link on a `requires_artifact` deliverable.",
+            "type": "string"
+          },
+          {
+            "const": "missing_note",
+            "description": "No note on a `requires_note` deliverable or action (G4).",
             "type": "string"
           },
           {
@@ -6802,7 +6812,8 @@
                 "gates": false,
                 "opens_at": false,
                 "placeholder": false,
-                "requires_artifact": false
+                "requires_artifact": false,
+                "requires_note": false
               }
             }
           },
@@ -6879,7 +6890,8 @@
                 "opens_at": false,
                 "placeholder": false,
                 "prompt": false,
-                "requires_artifact": false
+                "requires_artifact": false,
+                "requires_note": false
               }
             }
           },
@@ -6903,7 +6915,8 @@
                 "help": false,
                 "placeholder": false,
                 "prompt": false,
-                "requires_artifact": false
+                "requires_artifact": false,
+                "requires_note": false
               }
             }
           },
@@ -7174,6 +7187,9 @@
           "requires_artifact": {
             "type": "boolean"
           },
+          "requires_note": {
+            "type": "boolean"
+          },
           "resources": {
             "items": {
               "$ref": "#/components/schemas/Resource"
@@ -7224,7 +7240,8 @@
                 "gates": false,
                 "opens_at": false,
                 "placeholder": false,
-                "requires_artifact": false
+                "requires_artifact": false,
+                "requires_note": false
               }
             }
           },
@@ -7301,7 +7318,8 @@
                 "opens_at": false,
                 "placeholder": false,
                 "prompt": false,
-                "requires_artifact": false
+                "requires_artifact": false,
+                "requires_note": false
               }
             }
           },
@@ -7325,7 +7343,8 @@
                 "help": false,
                 "placeholder": false,
                 "prompt": false,
-                "requires_artifact": false
+                "requires_artifact": false,
+                "requires_note": false
               }
             }
           },
@@ -7601,6 +7620,9 @@
             "uniqueItems": true
           },
           "requires_artifact": {
+            "type": "boolean"
+          },
+          "requires_note": {
             "type": "boolean"
           },
           "resources": {
@@ -8029,6 +8051,11 @@
             "type": "string"
           },
           {
+            "const": "requires_note",
+            "description": "A deliverable's or action's `requires_note` flag.",
+            "type": "string"
+          },
+          {
             "const": "final",
             "description": "A milestone's `final` flag.",
             "type": "string"
@@ -8277,6 +8304,19 @@
             },
             "required": [
               "requires_artifact"
+            ],
+            "type": "object"
+          },
+          {
+            "additionalProperties": false,
+            "description": "The `requires_note` flag.",
+            "properties": {
+              "requires_note": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "requires_note"
             ],
             "type": "object"
           },

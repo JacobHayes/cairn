@@ -29,8 +29,8 @@ export type FormField = NodeField | "answer_type";
 const SHARED: readonly FormField[] = ["id", "title", "description", "weight", "relevant_when", "due_by", "not_before"];
 
 const OWN: Record<NodeKind, readonly FormField[]> = {
-  deliverable: ["estimate", "requires_artifact", "placeholder"],
-  action: ["estimate", "placeholder"],
+  deliverable: ["estimate", "requires_artifact", "requires_note", "placeholder"],
+  action: ["estimate", "requires_note", "placeholder"],
   decision: ["prompt", "help", "answer_type", "choices", "fills_role", "feeds_milestone"],
   milestone: ["final", "auto_reach"],
   group: ["opens_at", "closes_at", "gates", "closes"],
@@ -69,6 +69,7 @@ export interface NodeDraft {
   /** "" is none. */
   estimate: string;
   requires_artifact: boolean;
+  requires_note: boolean;
   placeholder: boolean;
   final: boolean;
   auto_reach: boolean;
@@ -96,6 +97,7 @@ export function draftOf(node: GraphNode): NodeDraft {
     weight: node.weight == null ? "" : String(node.weight),
     estimate: node.estimate === undefined ? "" : String(node.estimate),
     requires_artifact: node.requires_artifact ?? false,
+    requires_note: node.requires_note ?? false,
     placeholder: node.placeholder ?? false,
     final: node.final ?? false,
     auto_reach: node.auto_reach ?? false,
@@ -143,6 +145,7 @@ export function valueOf(field: NodeField, draft: NodeDraft): Schema<"NodeFieldVa
     estimate: number(draft.estimate),
     placeholder: draft.placeholder,
     requires_artifact: draft.requires_artifact,
+    requires_note: draft.requires_note,
     final: draft.final,
     auto_reach: draft.auto_reach,
     opens_at: key(draft.opens_at),
