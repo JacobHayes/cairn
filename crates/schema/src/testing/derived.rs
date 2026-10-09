@@ -15,7 +15,7 @@ use crate::chain::{
 use crate::derived::{
     Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DisplayState,
     DomainDocument, EffectiveDate, EffectiveParticipation, Explained, NodeDates, NodeDerived,
-    ParticipationOrigin, PeakGravity, RankConstants, Real, Relevance, RelevanceExplanation, Score,
+    ParticipationOrigin, RankConstants, Real, Relevance, RelevanceExplanation, Score,
     StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
@@ -376,9 +376,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         ),
         arb_scores(),
         arb_display_state(),
-        prop::option::of(
-            (arb_node_key(), arb_score()).prop_map(|(node, gravity)| PeakGravity { node, gravity }),
-        ),
+        prop::option::of(arb_score()),
     )
         .prop_map(
             |(
@@ -391,7 +389,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                 snoozed,
                 scores,
                 shown,
-                peak,
+                subtree,
             )| {
                 let (blocked_by, blocked_through) = blocking;
                 let (snoozed, snoozed_via) = snoozed;
@@ -418,7 +416,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     gravity,
                     gravity_from,
                     max_child_gravity,
-                    peak_gravity: peak,
+                    subtree_gravity: subtree,
                     leverage,
                     leverage_from,
                     rank,

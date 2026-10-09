@@ -229,7 +229,8 @@ export function Blocking({ view, detail, edit }: { view: Ready; detail: NodeDeta
 
 /** Gravity and leverage with the nodes that make them up, leverage split by owner (Priority). */
 export function Priority({ view, detail, edit }: { view: Ready; detail: NodeDetail; edit?: ReactNode }) {
-  const { gravity, leverage, rank, gravity_from: gravityFrom, leverage_from: leverageFrom } = detail.derived;
+  const { leverage, rank, subtree_gravity: area, gravity_from: gravityFrom, leverage_from: leverageFrom } = detail.derived;
+  const gravity = area ?? detail.derived.gravity;
   const key = detail.node.key;
   const gravityAll = useContributions(view, key, "gravity", gravityFrom);
   const leverageAll = useContributions(view, key, "leverage", leverageFrom);
@@ -239,9 +240,19 @@ export function Priority({ view, detail, edit }: { view: Ready; detail: NodeDeta
   return (
     <Section title="Priority" summary={`gravity ${gravity.toFixed(2)}, leverage ${leverage.toFixed(2)}`} testId="priority">
       <span>Rank: {rank == null ? "not ranked" : rank.toFixed(3)}</span>
-      <span>
-        Gravity <strong data-testid="gravity">{gravity.toFixed(2)}</strong>, from {gravityFrom.total} downstream:
-      </span>
+      {area === undefined ? (
+        <span>
+          Gravity <strong data-testid="gravity">{gravity.toFixed(2)}</strong>, from {gravityFrom.total} downstream:
+        </span>
+      ) : (
+        <>
+          <span>
+            Gravity <strong data-testid="gravity">{gravity.toFixed(2)}</strong>: its whole area, the container, its open work, and everything
+            downstream of any of it.
+          </span>
+          <span className="muted small">What follows the container itself ({detail.derived.gravity.toFixed(2)}, which orders it), from {gravityFrom.total}:</span>
+        </>
+      )}
       <Contributions view={view} entries={gravityAll.entries} testId="gravity-from" />
       <span>
         Leverage <strong>{leverage.toFixed(2)}</strong>: what completing it frees, for the same owner and for others:

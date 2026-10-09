@@ -106,14 +106,15 @@ export interface CardState {
   answer: string | undefined;
   /** C6: the border weight gravity gives it (px). */
   borderPx: number;
+  /** A container's is the gravity of its whole area (Priority). */
   gravity: number;
   leverage: number;
   here: Here;
   /** C5: its place in the acting frontier's rank order, for the top few. */
   rank: number | undefined;
   badges: CardBadge[];
-  /** C2: a container's children: the most gravity, the least slack, their owners. */
-  children: { gravity: number | undefined; slackDays: number | undefined; owners: string[] } | undefined;
+  /** C2: a container's children: the least slack, their owners. */
+  children: { slackDays: number | undefined; owners: string[] } | undefined;
 }
 
 /** An implicit edge's source: a condition gate or a stage opening, in words. */

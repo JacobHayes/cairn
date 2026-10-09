@@ -1,14 +1,13 @@
-//! Priority, Gravity and Leverage explained (C2, C8): a container's peak gravity at any depth
-//! naming its node, and the direct dependents completing a node would not yet free with what
-//! else each waits on, over the fixtures and small constructed journeys.
+//! Priority, Gravity and Leverage explained (C2, C8): a container's subtree gravity, and the
+//! direct dependents completing a node would not yet free with what else each waits on, over
+//! the fixtures and small constructed journeys.
 #![cfg(test)]
 
 use crate::support;
 
 use cairn_engine::{Derived, DerivedJourney, Records};
 use cairn_schema::{
-    Blocker, Cursor, DependencyVia, Deployment, ExplainedField, HeldDependent, LevelQuery,
-    PeakGravity, Score,
+    Blocker, Cursor, DependencyVia, Deployment, ExplainedField, HeldDependent, LevelQuery, Score,
 };
 use support::{add_nodes as add, key};
 
@@ -18,100 +17,59 @@ fn fixture(name: &str, steps: usize) -> (Records, String) {
     (support::after(name, steps), journey)
 }
 
-/// The container's peak as (node, gravity), off the engine's priority.
-fn peak<'a>(derived: &'a Derived, node: &str) -> Option<(&'a str, f64)> {
-    derived
-        .priority()
-        .peak_gravity(&key(node))
-        .map(|(found, gravity)| (found.as_str(), gravity.value()))
-}
-
 fn gravity(derived: &Derived, node: &str) -> f64 {
     derived.priority().gravity(&key(node)).value()
 }
 
-/// Priority, C2: a container's peak is the largest gravity among its open, in-scope
-/// descendants at any depth and names that node, while the container's own gravity stays what
-/// rides on the whole container. The hiring loop's debrief holds the scorecard two levels
-/// down, which the one-level `max_child_gravity` misses.
-#[test]
-fn a_peak_names_the_deepest_node_while_the_container_keeps_its_own_gravity() {
-    let (records, journey) = fixture("hiring-loop", 1);
-    let graph = support::journey_graph(&records, &journey);
-    let derived = support::derived(&records, &journey);
-    assert_eq!(gravity(&derived, "n_debrief"), 3.0, "its own, unchanged");
-    assert_eq!(
-        peak(&derived, "n_debrief"),
-        Some(("n_debrief_scorecard", 5.0))
-    );
-    assert_eq!(
-        derived.priority().max_child_gravity(&key("n_debrief")),
-        Some(derived.priority().gravity(&key("n_debrief_notes"))),
-        "the old figure stays one level down"
-    );
-    assert_eq!(gravity(&derived, "n_debrief_notes"), 4.0);
-    let projected = derived.to_schema(&graph);
-    let debrief = &projected.nodes[&key("n_debrief")];
-    assert_eq!(
-        debrief.peak_gravity,
-        Some(PeakGravity {
-            node: key("n_debrief_scorecard"),
-            gravity: Score::from_millionths(5_000_000),
-        })
-    );
-    assert_eq!(debrief.gravity.value(), 3.0);
-    let leaf = &projected.nodes[&key("n_debrief_scorecard")];
-    assert_eq!(
-        leaf.peak_gravity, None,
-        "a node with no descendants has no peak"
-    );
+fn area(derived: &Derived, node: &str) -> Option<f64> {
+    derived
+        .priority()
+        .subtree_gravity(&key(node))
+        .map(Score::value)
 }
 
-/// Priority: a closed descendant never names the peak, however much once rode on it: the
-/// hiring loop's skipped phone screen still carries 9, which the one-level figure reports,
-/// while the peak names the open interview that carries 7.
+/// Priority: a container's subtree gravity is the gravity of its whole area, the container and
+/// its open descendants and everything downstream of any of them, each once. Two children
+/// share a dependent, so it counts once (the sum of the children's gravities would count it
+/// twice), the number is at least every member's own gravity, and it drops as the children
+/// finish, to nothing when they all have.
 #[test]
-fn a_peak_skips_closed_and_out_of_scope_descendants() {
-    let (records, journey) = fixture("hiring-loop", 4);
-    let derived = support::derived(&records, &journey);
-    assert_eq!(gravity(&derived, "n_screen"), 9.0);
-    assert_eq!(
-        derived.priority().max_child_gravity(&key("n_loop")),
-        Some(derived.priority().gravity(&key("n_screen")))
-    );
-    assert_eq!(peak(&derived, "n_loop"), Some(("n_interview_one", 7.0)));
-    let (records, journey) = fixture("vendor-evaluation", 2);
-    let derived = support::derived(&records, &journey);
-    assert_eq!(
-        peak(&derived, "n_partner_led"),
-        None,
-        "a not relevant container has no in-scope descendant"
-    );
-}
-
-/// Priority: among equal gravities the first in tree order is named, and a stage whose work is
-/// all done has no peak.
-#[test]
-fn equal_peaks_name_the_first_and_finished_work_names_none() {
+fn a_container_shows_the_gravity_of_its_whole_area() {
     let records = support::journey(&add(&[
         "{key: n_stage, id: stage, kind: group, title: Stage}",
-        "{key: n_b, id: b, parent: n_stage, kind: action, title: B}",
         "{key: n_a, id: a, parent: n_stage, kind: action, title: A}",
+        "{key: n_b, id: b, parent: n_stage, kind: action, title: B}",
+        "{key: n_shared, id: shared, kind: action, title: Shared, weight: 5, requires: [n_a, n_b]}",
     ]));
     let derived = support::derived(&records, support::JOURNEY);
-    assert_eq!(peak(&derived, "n_stage"), Some(("n_a", 1.0)));
-    let done = support::accepted(
+    assert_eq!(gravity(&derived, "n_a"), 6.0);
+    assert_eq!(gravity(&derived, "n_b"), 6.0);
+    assert_eq!(area(&derived, "n_stage"), Some(7.0));
+    assert_eq!(area(&derived, "n_a"), None, "a node with no children");
+
+    let one_done = support::accepted(
         &records,
-        "- op: transition\n  node: n_a\n  transition: complete\n\
-         - op: transition\n  node: n_b\n  transition: complete\n",
+        "- op: transition\n  node: n_a\n  transition: complete\n",
     );
-    let derived = support::derived(&done, support::JOURNEY);
-    assert_eq!(peak(&derived, "n_stage"), None);
+    let derived = support::derived(&one_done, support::JOURNEY);
+    assert_eq!(
+        area(&derived, "n_stage"),
+        Some(6.0),
+        "B and what waits on it"
+    );
+
+    let all_done = support::accepted(
+        &one_done,
+        "- op: transition\n  node: n_b\n  transition: complete\n",
+    );
+    let derived = support::derived(&all_done, support::JOURNEY);
+    assert_eq!(area(&derived, "n_stage"), Some(0.0));
+    assert_eq!(gravity(&derived, "n_stage"), 0.0, "the stage is done too");
 }
 
-/// C2: the level's roll-up carries the same peak as the node's derived values.
+/// C2: the level's roll-up carries the container's subtree gravity.
 #[test]
-fn the_level_roll_up_carries_the_peak() {
+fn the_level_roll_up_carries_the_subtree_gravity() {
     let (records, journey) = fixture("hiring-loop", 1);
     let graph = support::journey_graph(&records, &journey);
     let derived = support::derived(&records, &journey);
@@ -129,17 +87,9 @@ fn the_level_roll_up_carries_the_peak() {
         .iter()
         .find(|node| node.key == key("n_debrief"))
         .unwrap();
-    let roll_up = debrief.roll_up.as_ref().unwrap();
     assert_eq!(
-        roll_up
-            .peak_gravity
-            .as_ref()
-            .map(|found| found.node.clone()),
-        Some(key("n_debrief_scorecard"))
-    );
-    assert_eq!(
-        roll_up.max_child_gravity,
-        derived.priority().max_child_gravity(&key("n_debrief"))
+        debrief.roll_up.as_ref().unwrap().subtree_gravity,
+        derived.priority().subtree_gravity(&key("n_debrief"))
     );
 }
 

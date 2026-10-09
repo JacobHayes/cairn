@@ -2,9 +2,10 @@
 //! validation ladder, rung 3: cost tests budgeted in operations, not wall-clock time). On
 //! `generated::date_limits` (`node_count_max` nodes at the depth limit) with every weight at
 //! `weight_max`: the gravity sweep is one word operation per word of a row for each pruned
-//! gate edge, and leverage's simulations together read each instant, each pruned edge, and
-//! each kept-work entry at most once, and once more for each overdue, gated `auto_reach`
-//! milestone; the largest gravity and leverage fit a score; the
+//! gate edge, the container areas at most three more per node, and leverage's simulations
+//! together read each instant, each pruned edge, and each kept-work entry at most once, and
+//! once more for each overdue, gated `auto_reach` milestone; the largest gravity and leverage
+//! fit a score; the
 //! schema's `Derived` keeps at most the response limit of explanation entries per list.
 
 #[cfg(test)]
@@ -84,7 +85,7 @@ mod cost {
         let words = nodes.div_ceil(64);
         let kept = nodes * u64::from(CONTAINMENT_DEPTH_MAX);
         let overdue = overdue_gated_milestones(graph, &derived);
-        let budget = words * edges + (1 + overdue) * (instants + edges + kept);
+        let budget = words * (edges + 3 * nodes) + (1 + overdue) * (instants + edges + kept);
         let operations = derived.priority().operation_count();
         let keys: Vec<&NodeKey> = graph.document().nodes.as_map().keys().collect();
         let gravity_max = keys.iter().map(|key| derived.priority().gravity(key)).max();

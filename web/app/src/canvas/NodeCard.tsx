@@ -106,8 +106,7 @@ function Rolled({ card, journey, lines }: { card: Card; journey: CardState | und
     <>
       {children === undefined ? null : (
         <Line lines={lines.children} className="muted small node-children" testId="card-children">
-          children:{children.gravity === undefined ? "" : ` gravity up to ${String(children.gravity)}`}
-          {children.slackDays === undefined ? "" : ` · least slack ${String(children.slackDays)}d`}
+          children:{children.slackDays === undefined ? "" : ` least slack ${String(children.slackDays)}d`}
           {children.owners.length === 0 ? "" : ` · ${children.owners.join(", ")}`}
         </Line>
       )}

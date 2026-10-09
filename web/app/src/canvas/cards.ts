@@ -62,7 +62,7 @@ export interface CardLines {
   /** A decision's answer (journeys). */
   answer: number;
   badges: number;
-  /** A container's children: the most gravity, the least slack, the owners (C2). */
+  /** A container's children: the least slack, the owners (C2). */
   children: number;
   checklist: number;
   /** The hidden-prerequisites marker (C2). */

@@ -511,16 +511,17 @@ pub struct NodeDerived {
     pub gravity_from: Explained<Contribution>,
     /// A container's largest child gravity, one level down.
     ///
-    /// Deprecated: read `peak_gravity`, which looks at every depth and names the node. Kept
-    /// so existing clients keep reading it.
+    /// Deprecated: read `subtree_gravity`, the gravity of the container's whole area. Kept so
+    /// existing clients keep reading it.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(extend("deprecated" = true))]
     pub max_child_gravity: Option<Score>,
-    /// A container's peak gravity (Priority): the largest gravity among its open, in-scope
-    /// descendants at any depth, naming that node. Never the container's own `gravity`, which
-    /// stays what rides on the whole container.
+    /// A container's subtree gravity (Priority): what rides on its whole area, the counted
+    /// weight of the container and its open descendants and everything downstream of any of
+    /// them, each once. Never less than any member's `gravity`; none for a node with no
+    /// children.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub peak_gravity: Option<PeakGravity>,
+    pub subtree_gravity: Option<Score>,
     /// Leverage (Priority).
     pub leverage: Score,
     /// The nodes completing this would unblock.
@@ -528,18 +529,6 @@ pub struct NodeDerived {
     /// Rank, for nodes in the normalization set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rank: Option<Real>,
-}
-
-/// A container's peak gravity (Priority): the largest gravity among its open, in-scope
-/// descendants at any depth, and the descendant that has it. Among equals a descendant beats
-/// its own ancestor, and otherwise the first in tree order wins.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
-#[serde(deny_unknown_fields)]
-pub struct PeakGravity {
-    /// The descendant with the largest gravity.
-    pub node: NodeKey,
-    /// Its gravity.
-    pub gravity: Score,
 }
 
 /// A dependent that completing a node would not yet free, and what else it waits on (C8,

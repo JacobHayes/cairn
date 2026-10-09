@@ -14,8 +14,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Contribution, EffectiveParticipation, Explained, KindKey, NodeDerived, NodeKey, PeakGravity,
-    Real, RelevanceExplanation,
+    Contribution, EffectiveParticipation, Explained, KindKey, NodeDerived, NodeKey, Real,
+    RelevanceExplanation,
 };
 
 use super::Derived;
@@ -85,12 +85,7 @@ impl Derived {
             gravity: priority.gravity(key),
             gravity_from: for_response(priority.gravity_from(key)),
             max_child_gravity: priority.max_child_gravity(key),
-            peak_gravity: priority
-                .peak_gravity(key)
-                .map(|(node, gravity)| PeakGravity {
-                    node: node.clone(),
-                    gravity,
-                }),
+            subtree_gravity: priority.subtree_gravity(key),
             leverage: priority.leverage(key),
             leverage_from: for_response(priority.leverage_from(key)),
             rank: self

@@ -2960,8 +2960,8 @@ export interface components {
              * @deprecated
              * @description A container's largest child gravity, one level down.
              *
-             *     Deprecated: read `peak_gravity`, which looks at every depth and names the node. Kept
-             *     so existing clients keep reading it.
+             *     Deprecated: read `subtree_gravity`, the gravity of the container's whole area. Kept so
+             *     existing clients keep reading it.
              */
             max_child_gravity?: components["schemas"]["Score"] | null;
             /** @description Its seeding entity left the role it was broken down by (B10). */
@@ -2974,12 +2974,6 @@ export interface components {
             participations?: {
                 [key: string]: components["schemas"]["EffectiveParticipation"];
             };
-            /**
-             * @description A container's peak gravity (Priority): the largest gravity among its open, in-scope
-             *     descendants at any depth, naming that node. Never the container's own `gravity`, which
-             *     stays what rides on the whole container.
-             */
-            peak_gravity?: components["schemas"]["PeakGravity"] | null;
             /** @description Rank, for nodes in the normalization set. */
             rank?: components["schemas"]["Real"] | null;
             /** @description Relevance and what produced it. */
@@ -2997,6 +2991,13 @@ export interface components {
             snoozed_via?: components["schemas"]["NodeKey"] | null;
             /** @description Why a terminal node's completing guards would now fail (D4). */
             stale?: components["schemas"]["GuardFailure"][];
+            /**
+             * @description A container's subtree gravity (Priority): what rides on its whole area, the counted
+             *     weight of the container and its open descendants and everything downstream of any of
+             *     them, each once. Never less than any member's `gravity`; none for a node with no
+             *     children.
+             */
+            subtree_gravity?: components["schemas"]["Score"] | null;
             /**
              * @description No owner (E1), for a non-group node that is in scope and unfinished; a not-relevant or
              *     finished node, or a group, never is.
@@ -3387,17 +3388,6 @@ export interface components {
         };
         /** @description A node path: slash-joined ids from the root, at most containment_depth_max (16) segments. */
         Path: string;
-        /**
-         * @description A container's peak gravity (Priority): the largest gravity among its open, in-scope
-         *     descendants at any depth, and the descendant that has it. Among equals a descendant beats
-         *     its own ancestor, and otherwise the first in tree order wins.
-         */
-        PeakGravity: {
-            /** @description Its gravity. */
-            gravity: components["schemas"]["Score"];
-            /** @description The descendant with the largest gravity. */
-            node: components["schemas"]["NodeKey"];
-        };
         /**
          * @description An error that is not a patch rejection: what went wrong, for a person to read, and the
          *     request id the server logged it under.
@@ -4105,7 +4095,7 @@ export interface components {
              * @deprecated
              * @description The largest in-scope child gravity (Priority), one level down.
              *
-             *     Deprecated: read `peak_gravity`, which looks at every depth and names the node.
+             *     Deprecated: read `subtree_gravity`, the gravity of the container's whole area.
              */
             max_child_gravity?: components["schemas"]["Score"] | null;
             /**
@@ -4118,15 +4108,15 @@ export interface components {
             /** @description The distinct owners of its children. */
             owners?: components["schemas"]["EntityKey"][];
             /**
-             * @description The largest gravity among its open, in-scope descendants at any depth, naming that
-             *     node (Priority).
-             */
-            peak_gravity?: components["schemas"]["PeakGravity"] | null;
-            /**
              * @description A deliverable or action whose children and other dependencies are satisfied but which
              *     is not terminal: "children complete, ready to finish".
              */
             ready_to_finish?: boolean;
+            /**
+             * @description The gravity of the container's whole area (Priority): its counted weight and its open
+             *     descendants', and everything downstream of any of them, each once.
+             */
+            subtree_gravity?: components["schemas"]["Score"] | null;
         };
         /**
          * @description A route domain: its fields, revision, published version numbers, and draft. Versions

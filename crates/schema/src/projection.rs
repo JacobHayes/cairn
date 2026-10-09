@@ -11,8 +11,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::derived::{
-    Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent, PeakGravity,
-    Real, Relevance, Score, Stalled,
+    Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent, Real, Relevance,
+    Score, Stalled,
 };
 use crate::event::Event;
 use crate::id::{EntityKey, KindKey, NodeKey, PatchId, Path, RoleKey, Slug};
@@ -149,14 +149,14 @@ pub struct RollUp {
     pub needs_breakdown: bool,
     /// The largest in-scope child gravity (Priority), one level down.
     ///
-    /// Deprecated: read `peak_gravity`, which looks at every depth and names the node.
+    /// Deprecated: read `subtree_gravity`, the gravity of the container's whole area.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schemars(extend("deprecated" = true))]
     pub max_child_gravity: Option<Score>,
-    /// The largest gravity among its open, in-scope descendants at any depth, naming that
-    /// node (Priority).
+    /// The gravity of the container's whole area (Priority): its counted weight and its open
+    /// descendants', and everything downstream of any of them, each once.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub peak_gravity: Option<PeakGravity>,
+    pub subtree_gravity: Option<Score>,
     /// The least slack among in-scope, open children; none when none has a deadline.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_child_slack_days: Option<i32>,

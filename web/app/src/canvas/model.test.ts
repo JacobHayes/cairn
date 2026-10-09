@@ -108,9 +108,10 @@ describe("C2, C4: roll-ups", () => {
     expect(card(hidden, "n_option").hiddenPrerequisites).toEqual(["n_choose"]);
   });
 
-  test("a container shows its children's badges, most gravity, least slack, and owners", () => {
+  test("a container shows its children's badges, least slack, and owners, and the gravity of its whole area", () => {
     expect(card(whole, "n_stage").journey?.badges.map((badge) => badge.flag)).toContain("children active");
-    expect(card(whole, "n_build").journey?.children).toEqual({ gravity: 5, slackDays: 40, owners: ["Person One"] });
+    expect(card(whole, "n_build").journey?.children).toEqual({ slackDays: 40, owners: ["Person One"] });
+    expect(card(whole, "n_build").journey?.gravity).toBe(9);
   });
 });
 

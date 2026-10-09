@@ -7787,7 +7787,7 @@
               }
             ],
             "deprecated": true,
-            "description": "A container's largest child gravity, one level down.\n\nDeprecated: read `peak_gravity`, which looks at every depth and names the node. Kept\nso existing clients keep reading it."
+            "description": "A container's largest child gravity, one level down.\n\nDeprecated: read `subtree_gravity`, the gravity of the container's whole area. Kept so\nexisting clients keep reading it."
           },
           "membership_lost": {
             "description": "Its seeding entity left the role it was broken down by (B10).",
@@ -7810,17 +7810,6 @@
               }
             },
             "type": "object"
-          },
-          "peak_gravity": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/PeakGravity"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "A container's peak gravity (Priority): the largest gravity among its open, in-scope\ndescendants at any depth, naming that node. Never the container's own `gravity`, which\nstays what rides on the whole container."
           },
           "rank": {
             "anyOf": [
@@ -7866,6 +7855,17 @@
             },
             "type": "array",
             "uniqueItems": true
+          },
+          "subtree_gravity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Score"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A container's subtree gravity (Priority): what rides on its whole area, the counted\nweight of the container and its open descendants and everything downstream of any of\nthem, each once. Never less than any member's `gravity`; none for a node with no\nchildren."
           },
           "unassigned": {
             "description": "No owner (E1), for a non-group node that is in scope and unfinished; a not-relevant or\nfinished node, or a group, never is.",
@@ -9442,25 +9442,6 @@
         "maxLength": 1039,
         "pattern": "^[a-z0-9][a-z0-9_-]{0,63}(/[a-z0-9][a-z0-9_-]{0,63}){0,15}$",
         "type": "string"
-      },
-      "PeakGravity": {
-        "additionalProperties": false,
-        "description": "A container's peak gravity (Priority): the largest gravity among its open, in-scope\ndescendants at any depth, and the descendant that has it. Among equals a descendant beats\nits own ancestor, and otherwise the first in tree order wins.",
-        "properties": {
-          "gravity": {
-            "$ref": "#/components/schemas/Score",
-            "description": "Its gravity."
-          },
-          "node": {
-            "$ref": "#/components/schemas/NodeKey",
-            "description": "The descendant with the largest gravity."
-          }
-        },
-        "required": [
-          "node",
-          "gravity"
-        ],
-        "type": "object"
       },
       "Problem": {
         "additionalProperties": false,
@@ -11728,7 +11709,7 @@
               }
             ],
             "deprecated": true,
-            "description": "The largest in-scope child gravity (Priority), one level down.\n\nDeprecated: read `peak_gravity`, which looks at every depth and names the node."
+            "description": "The largest in-scope child gravity (Priority), one level down.\n\nDeprecated: read `subtree_gravity`, the gravity of the container's whole area."
           },
           "min_child_slack_days": {
             "description": "The least slack among in-scope, open children; none when none has a deadline.",
@@ -11750,20 +11731,20 @@
             "type": "array",
             "uniqueItems": true
           },
-          "peak_gravity": {
+          "ready_to_finish": {
+            "description": "A deliverable or action whose children and other dependencies are satisfied but which\nis not terminal: \"children complete, ready to finish\".",
+            "type": "boolean"
+          },
+          "subtree_gravity": {
             "anyOf": [
               {
-                "$ref": "#/components/schemas/PeakGravity"
+                "$ref": "#/components/schemas/Score"
               },
               {
                 "type": "null"
               }
             ],
-            "description": "The largest gravity among its open, in-scope descendants at any depth, naming that\nnode (Priority)."
-          },
-          "ready_to_finish": {
-            "description": "A deliverable or action whose children and other dependencies are satisfied but which\nis not terminal: \"children complete, ready to finish\".",
-            "type": "boolean"
+            "description": "The gravity of the container's whole area (Priority): its counted weight and its open\ndescendants', and everything downstream of any of them, each once."
           }
         },
         "type": "object"

@@ -55,7 +55,8 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "One node in full: as written (a decision's prompt and choices), its \
             stored state, answer, pin, overrides, notes, a page of its children, and every \
             derived value with its explanation (display state, relevance, blocking, dates, \
-            gravity, leverage, rank), and the dependents finishing it would not yet free with \
+            gravity, leverage, rank; a container's `subtree_gravity` is the gravity of its whole \
+            area), and the dependents finishing it would not yet free with \
             what else each waits on (`still_waiting`). Say its status from `display_state`, not \
             the stored state. For a decision, `answer_effects`: per choice, the nodes it \
             brings in, drops, and leaves to be decided later, and what it pins or fills. \

@@ -108,7 +108,7 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
     slackDays: slackDays ?? undefined,
     answer: answer === undefined ? undefined : answerText(view, answer, node),
     borderPx: borderFor(derived.gravity, context.gravityMax, open(view, node)),
-    gravity: derived.gravity,
+    gravity: at.roll_up?.subtree_gravity ?? derived.gravity,
     leverage: derived.leverage,
     here: {
       frontier: context.frontier.has(node.key),
@@ -122,7 +122,6 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
       roll == null
         ? undefined
         : {
-            gravity: roll.peak_gravity?.gravity ?? undefined,
             slackDays: roll.min_child_slack_days ?? undefined,
             owners: (roll.owners ?? []).map((entity) => entityName(view, entity)),
           },

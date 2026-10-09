@@ -2,6 +2,11 @@
 //! the pruned gate edges of the effective dependency graph, with the undecided discount and
 //! the owner factor from the rank constants.
 //!
+//! Subtree gravity: a container's area is itself and its open descendants, and its subtree
+//! gravity sums the counted weight of the area and everything downstream of any of it, each
+//! node once, so it is at least every member's gravity and a node shared by two children
+//! counts once.
+//!
 //! Gravity: a node's downstream set is every node with an instant reachable from its finish
 //! along pruned gate edges: explicit requirements, inherited and condition gates, stage
 //! openings, and containment (a parent waits on each child, so a child's downstream holds its
@@ -28,8 +33,8 @@
 //! one bit per node for each instant, 8,000 x 32 words (2 MiB), filled in one reverse
 //! topological sweep that unions each edge's dependent into its requirement (110,000 x 32
 //! word operations); each node's finish row is kept (512 KiB) and summed once, 2,000 x 2,000
-//! bits; each container's peak gravity is one step per node and child (at most 4,000),
-//! uncounted. Leverage simulates every node in the normalization set. An instant a simulation
+//! bits; each container's area row is one union per node and child (at most 4,000 x 32 words),
+//! kept (512 KiB) and summed once. Leverage simulates every node in the normalization set. An instant a simulation
 //! satisfies has every unsatisfied wait behind it lead back to the completed node's finish, so
 //! the simulations of nodes that only completion satisfies never satisfy the same instant, and
 //! together they read each instant, each pruned edge, and each kept-work entry (at most
@@ -68,7 +73,7 @@ const _: () = assert!(
 );
 
 /// Pass 6's output: per node, its gravity with the downstream set it sums, its largest child
-/// gravity, and, for the normalization set, what completing it would unblock and its leverage.
+/// gravity, a container's subtree gravity, and, for the normalization set, what completing it would unblock and its leverage.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Priority {
     keys: Vec<NodeKey>,
@@ -88,9 +93,8 @@ pub struct Priority {
     downstream: Vec<u64>,
     gravity: Vec<Score>,
     max_child_gravity: Vec<Option<Score>>,
-    /// Per node: the largest gravity among its open, in-scope descendants at any depth, and
-    /// the position of the descendant that has it.
-    peak_gravity: Vec<Option<(usize, Score)>>,
+    /// Per container: the gravity of its whole area.
+    subtree_gravity: Vec<Option<Score>>,
     /// Per node: in scope and not closed.
     open: Vec<bool>,
     /// Per node: its owners (E2), which the owner factor compares.
@@ -127,7 +131,7 @@ impl Priority {
             downstream: Vec::new(),
             gravity: Vec::new(),
             max_child_gravity: Vec::new(),
-            peak_gravity: Vec::new(),
+            subtree_gravity: Vec::new(),
             open: Vec::new(),
             owners: Vec::new(),
             unblocks: Vec::new(),
@@ -254,16 +258,15 @@ impl Priority {
                 })
             })
             .collect();
-        self.peak_gravity = self.sweep_peaks(tree);
+        self.subtree_gravity = self.sweep_areas(tree);
     }
 
-    /// Each container's peak: the largest gravity among its open, in-scope descendants at any
-    /// depth; among equals a descendant beats its own ancestor, and otherwise the first in
-    /// tree order wins. Children before parents over the tree's own order, with an explicit
-    /// stack (PRACTICES, No recursion): a node's peak is the best of each child's peak and
-    /// the child itself, a child ahead of its own peak only when strictly larger (a child's
-    /// gravity holds its parent's, so equal reads deeper). One step per node and child.
-    fn sweep_peaks(&self, tree: &Tree) -> Vec<Option<(usize, Score)>> {
+    /// Each container's subtree gravity: the counted weight of its area, the open nodes of its
+    /// subtree, and everything downstream of any of them, each node once. Children before
+    /// parents over the tree's own order, with an explicit stack (PRACTICES, No recursion): a
+    /// node's area row is the union of its children's rows and, when it is open, itself and
+    /// its downstream set, so a node shared by two children is one bit.
+    fn sweep_areas(&mut self, tree: &Tree) -> Vec<Option<Score>> {
         let mut order: Vec<&NodeKey> = Vec::with_capacity(self.keys.len());
         let mut stack: Vec<&NodeKey> = tree.roots().iter().rev().collect();
         while let Some(key) = stack.pop() {
@@ -271,32 +274,39 @@ impl Priority {
             stack.extend(tree.children(key).iter().rev());
         }
         assert_eq!(order.len(), self.keys.len(), "the tree holds every node");
-        let mut peaks: Vec<Option<(usize, Score)>> = vec![None; self.keys.len()];
+        let mut areas = BitRows::new(self.keys.len(), self.words);
+        let mut sums: Vec<Option<Score>> = vec![None; self.keys.len()];
+        let words = u64::try_from(self.words).unwrap_or(u64::MAX);
+        let mut operations = 0_u64;
         for key in order.into_iter().rev() {
-            let mut best: Option<(usize, Score)> = None;
-            for child in tree.children(key) {
-                let Some(at) = self.position(child) else {
-                    continue;
-                };
-                let deeper = peaks.get(at).copied().flatten();
-                let own =
-                    (self.in_scope_at(at) && self.open_at(at)).then(|| (at, self.gravity_at(at)));
-                let found = match (deeper, own) {
-                    (Some(deeper), Some(own)) if own.1 > deeper.1 => Some(own),
-                    (Some(deeper), _) => Some(deeper),
-                    (None, own) => own,
-                };
-                if let Some(found) = found
-                    && best.is_none_or(|(_, gravity)| found.1 > gravity)
-                {
-                    best = Some(found);
+            let Some(at) = self.position(key) else {
+                continue;
+            };
+            if self.open_at(at) {
+                areas.set(at, at);
+                areas.union_words(at, self.downstream_row(at));
+                operations += words;
+            }
+            let children = tree.children(key);
+            for child in children {
+                if let Some(child_at) = self.position(child) {
+                    areas.union(at, child_at);
+                    operations += words;
                 }
             }
-            if let Some(slot) = self.position(key).and_then(|at| peaks.get_mut(at)) {
-                *slot = best;
+            if !children.is_empty() {
+                operations += words;
+                let total: u64 = ones(areas.row(at))
+                    .map(|other| self.counted_at(other))
+                    .sum();
+                assert!(total <= Score::MAX.millionths(), "within the limits");
+                if let Some(slot) = sums.get_mut(at) {
+                    *slot = Some(Score::from_millionths(total));
+                }
             }
         }
-        peaks
+        self.operations += operations;
+        sums
     }
 
     fn open_at(&self, at: usize) -> bool {
@@ -321,13 +331,12 @@ impl Priority {
 
     /// The nodes downstream of the node at `at`, in key order.
     fn downstream_of(&self, at: usize) -> impl Iterator<Item = usize> + '_ {
+        ones(self.downstream_row(at))
+    }
+
+    fn downstream_row(&self, at: usize) -> &[u64] {
         let from = at * self.words;
-        let row = self.downstream.get(from..from + self.words).unwrap_or(&[]);
-        row.iter().enumerate().flat_map(|(word_at, &word)| {
-            (0..64_usize)
-                .filter(move |bit| word & (1_u64 << bit) != 0)
-                .map(move |bit| word_at * 64 + bit)
-        })
+        self.downstream.get(from..from + self.words).unwrap_or(&[])
     }
 
     /// One unblocked target's term: its weight, discounted when undecided, times the owner
@@ -441,16 +450,12 @@ impl Priority {
             .and_then(|at| self.max_child_gravity.get(at).copied().flatten())
     }
 
-    /// Priority: a container's peak gravity: the largest gravity among its open, in-scope
-    /// descendants at any depth, with the descendant that has it (among equals a descendant
-    /// beats its own ancestor, otherwise the first in tree order); none for a node with no
-    /// such descendant.
+    /// Priority: a container's subtree gravity, the gravity of its whole area (Priority,
+    /// Gravity); none for a node with no children.
     #[must_use]
-    pub fn peak_gravity(&self, key: &NodeKey) -> Option<(&NodeKey, Score)> {
-        let (peak, gravity) = self
-            .at(key)
-            .and_then(|at| self.peak_gravity.get(at).copied().flatten())?;
-        Some((self.keys.get(peak)?, gravity))
+    pub fn subtree_gravity(&self, key: &NodeKey) -> Option<Score> {
+        self.at(key)
+            .and_then(|at| self.subtree_gravity.get(at).copied().flatten())
     }
 
     /// Priority: relevant or undecided, open, and not a group: the nodes rank normalizes over
@@ -495,6 +500,15 @@ impl Priority {
     }
 }
 
+/// The positions of the set bits of a row, in order.
+fn ones(row: &[u64]) -> impl Iterator<Item = usize> + '_ {
+    row.iter().enumerate().flat_map(|(word_at, &word)| {
+        (0..64_usize)
+            .filter(move |bit| word & (1_u64 << bit) != 0)
+            .map(move |bit| word_at * 64 + bit)
+    })
+}
+
 /// Rows of bits, one per instant, a bit per node.
 struct BitRows {
     words: usize,
@@ -517,6 +531,16 @@ impl BitRows {
     fn set(&mut self, row: usize, bit: usize) {
         if let Some(word) = self.bits.get_mut(row * self.words + bit / 64) {
             *word |= 1 << (bit % 64);
+        }
+    }
+
+    /// Row `row` takes every bit of `words`, a row's worth.
+    fn union_words(&mut self, row: usize, words: &[u64]) {
+        let from = row * self.words;
+        if let Some(target) = self.bits.get_mut(from..from + self.words) {
+            for (word, other) in target.iter_mut().zip(words) {
+                *word |= other;
+            }
         }
     }
 

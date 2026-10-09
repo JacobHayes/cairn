@@ -95,7 +95,7 @@ export function wholeLevel(): Level {
       node("n_kick"),
       node("n_choose"),
       node("n_stage", { group_state: "active", roll_up: { children_active: true } }),
-      node("n_build", { parent: "n_stage", roll_up: { owners: ["e_one"], peak_gravity: { node: "n_check", gravity: 5 }, min_child_slack_days: 40 } }),
+      node("n_build", { parent: "n_stage", roll_up: { owners: ["e_one"], subtree_gravity: 9, min_child_slack_days: 40 } }),
       node("n_check", { parent: "n_build" }),
       node("n_option"),
       node("n_old"),
