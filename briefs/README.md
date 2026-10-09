@@ -56,8 +56,10 @@ The shape every brief follows.
 | 7.3 | The `requires_note` guard | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `openapi/`, `web/client`, `web/app` | 5.6 (screens: 8.7, 8.9) | planned |
 | 7.4 | Snoozing a container | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.3 (screens: 8.7, 8.9) | planned |
 | 7.5 | Notices: work the final milestone cannot see | `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/app` | 5.6 (draft card: 8.11) | planned |
-| 7.6 | Segments: model, insertion, upgrade, save as segment | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `fixtures/` | 4.3 | planned |
-| 7.7 | Segment screens | `web/app` | 7.6, 5.7 | planned |
+| 7.6 | Segments: model and insert | `crates/schema`, `schema/`, `crates/engine`, `crates/store`, `crates/store-turso`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `fixtures/` | 4.3 | planned |
+| 7.7 | Segment screens | `web/app` | 7.6, 8.6, 8.11 | planned |
+| 7.8 | Insertion upgrade | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `web/app`, `fixtures/` | 7.6 (screens: 7.7) | planned |
+| 7.9 | Save as segment and link | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `instructions/`, `openapi/`, `web/client`, `web/app` | 7.6 (screens: 7.7) | planned |
 | 8.1 | Display state | `crates/schema`, `crates/engine`, `crates/mcp`, `instructions/`, `fixtures/`, `openapi/`, `web/client`, `web/app` | 2.6 | planned |
 | 8.2 | Priority explanations and consequences | `crates/schema`, `crates/engine`, `crates/service`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `fixtures/` | 8.1 | planned |
 | 8.3 | Level collapse and answer effects | `crates/schema`, `crates/engine`, `crates/wasm`, `crates/api`, `crates/mcp`, `openapi/`, `web/client`, `web/wasm`, `web/app` | 8.2 | planned |
@@ -106,10 +108,12 @@ flowchart LR
     s53 --> s74[7.4]
     s56 --> s75[7.5]
     s43 --> s76[7.6]
-    s76 & s57 --> s77[7.7]
+    s76 & s86 & s811 --> s77[7.7]
+    s76 --> s78[7.8]
+    s76 --> s79[7.9]
 ```
 
-Phase 8 redesigns the web app and adds what it needs from the engine. 8.1 to 8.3 (engine) and 8.4 (the frame) start side by side; 8.1, 8.2, and 8.3 all touch the derived schema and the generated paths, so they land in that order and regenerate on rebase. 8.5 to 8.8 follow the frame, and 8.9 to 8.11 follow them. Phases 7 and 8 are the exception to phases running in order: phase 7's briefs are independent of each other apart from 7.7 on 7.6, 7.1 waits for 8.2 and 8.9, and the model, API, and MCP parts of 7.2 to 7.5 can run beside phase 8 in separate jj workspaces while their screens land with or after the phase 8 briefs the table names. Dotted: the simulation track (1.3, 6.1, 6.2). It is exploratory and gates nothing (PRACTICES, Simulation): no other brief depends on it, it runs under `mise run sim`, never `mise run check`, and it can be picked up whenever its dependencies exist or skipped if the spike says the shim cannot carry it.
+Phase 8 redesigns the web app and adds what it needs from the engine. 8.1 to 8.3 (engine) and 8.4 (the frame) start side by side; 8.1, 8.2, and 8.3 all touch the derived schema and the generated paths, so they land in that order and regenerate on rebase. 8.5 to 8.8 follow the frame, and 8.9 to 8.11 follow them. Phases 7 and 8 are the exception to phases running in order: phase 7's briefs are independent of each other apart from 7.7 to 7.9 on 7.6 (and the screens of 7.8 and 7.9 on 7.7), 7.1 waits for 8.2 and 8.9, and the model, API, and MCP parts of 7.2 to 7.5 can run beside phase 8 in separate jj workspaces while their screens land with or after the phase 8 briefs the table names. Dotted: the simulation track (1.3, 6.1, 6.2). It is exploratory and gates nothing (PRACTICES, Simulation): no other brief depends on it, it runs under `mise run sim`, never `mise run check`, and it can be picked up whenever its dependencies exist or skipped if the spike says the shim cannot carry it.
 
 ## Coverage
 
@@ -132,16 +136,18 @@ Every PRD requirement id and named section, mapped to the brief that owns its ac
 | A11 | 4.1 | 2.1, 5.5 |
 | A12 | 5.6 | 4.1, 4.3, 4.4 |
 | A13 | 2.7 | 2.1 (fixtures load), 4.8, 4.9, 5.5, 7.6 (segment files) |
-| A15, A16, A17, A18 | 2.1 | 1.2, 4.1, 4.2, 7.3 (`requires_note`), 7.5 (notices), 7.6 (the segment domain) |
+| A15, A16, A17, A18 | 2.1 | 1.2, 4.1, 4.2, 7.3 (`requires_note`), 7.5 (notices), 7.6 (a segment is a route) |
 | A19 | 4.1 | 3.1, 5.5, 7.6 (retiring a segment) |
 | A20 | 7.5 | 8.11 (the draft card) |
 | A21 | 7.6 | 7.7 |
 | B1, B2, B3, B5, B10, B11 | 2.1 | 2.2, 4.1, 5.3, 5.5, 5.6, 7.2 (rationale) |
 | B4 | 2.1 | 5.6, 2.7 |
 | B6 | 2.4 (actionable nodes), 7.4 (containers) | 2.1, 5.3 |
-| B7, B8, B9 | 2.7 | 4.8, 4.9, 5.7 |
+| B7, B8, B9 | 2.7 | 4.8, 4.9, 5.7, 7.8 (the merge, reused), 7.9 (save as route drops insertions) |
 | B12 | none (reserved) | - |
-| B13, B14, B15 | 7.6 | 7.7 |
+| B13 | 7.6 | 7.7 |
+| B14 | 7.8 | 7.7 (upgrade available) |
+| B15 | 7.9 | - |
 | C1, C3, C4, C5, C6, C7, C15 | 5.2 | 2.6, 8.8 (the redesigned graph) |
 | C2 | 2.6 (roll-up rules) | 5.2, 8.3 (collapse and display states in the level), 8.8 (the ladder) |
 | C8 | 5.1 | 2.6, 7.2, 8.1 (pending cause), 8.2 (still waiting), 8.3 (answer effects), 8.7 (the inspector) |
@@ -149,7 +155,7 @@ Every PRD requirement id and named section, mapped to the brief that owns its ac
 | C12, C13, C18 | 5.4 | 2.6, 7.2 (C12), 8.6 (decisions filter, Summary page), 8.10 (decision list, timeline) |
 | C14 | 5.7 | 2.7, 4.8, 4.9, 8.11 |
 | C16, C17 | 5.5 | 3.1, 2.6, 8.6 (journey card, index), 8.9 (Mine), 8.11 (route detail) |
-| C19 | 7.7 | 7.6 |
+| C19 | 7.7 | 7.6 (route detail read), 7.8 (upgrade entries), 7.9 (save from a selection) |
 | D1, D1a | 2.1 | 2.2 |
 | D2, D4, D5, D7 | 2.4 | 2.1, 4.1, 4.6, 7.3 (`has_note`), 7.4 (D5), 8.2 (D7's informational half) |
 | D3, D6 | 2.2 (the `Derived` struct) | every engine brief; 4.8 (memoized reads); 8.1 (`display_state`) |
@@ -168,11 +174,11 @@ Every PRD requirement id and named section, mapped to the brief that owns its ac
 | H5 | 3.1 | 1.2, 2.1, 4.1, 4.2, 6.1 |
 | H6 | 4.6 | 4.1, 4.2, 4.5, 5.5, 6.1, 8.5 (the sync chip) |
 | I1 | 4.2 | 4.9 |
-| I2, I4, I7 | 4.3 | 3.2, 4.8 (I7), 7.6 (segment tools and instructions), 8.1 (instructions), 8.2 and 8.3 (node detail fields) |
+| I2, I4, I7 | 4.3 | 3.2, 4.8 (I7), 7.6 (segment kind and instructions), 7.8, 7.9 (segment tools), 8.1 (instructions), 8.2 and 8.3 (node detail fields) |
 | I3 | 2.6 | 4.8, 4.9, 4.3, 8.1 (`by_display_state`) |
 | I5 | 4.4 | 5.8 |
 | I6 | 4.8 | 2.7, 4.9, 5.7 |
-| J1, J2, J3 | 2.1 | 3.1, 6.1, 6.2, 7.2, 7.4, 7.6 |
+| J1, J2, J3 | 2.1 | 3.1, 6.1, 6.2, 7.2, 7.4, 7.6, 7.8, 7.9 |
 | J4 | 2.6 | 5.1 |
 | J5 | 3.1 | 4.2 |
 | Non-functional: Config-first | 5.6 | 4.4 |
