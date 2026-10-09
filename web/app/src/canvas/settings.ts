@@ -3,8 +3,10 @@
 // not-relevant and undecided nodes are hidden (C1), the heat overlay (C6), the trace of the
 // open node (C7), and on a journey whether its structure is being edited (5.6). Every setting
 // at its default leaves the address bare.
+import type { ProjectionRequest } from "@cairn/wasm";
+
 import type { NodeKind } from "../detail/model.ts";
-import { DEFAULT_SETTINGS, KINDS, type CanvasSettings } from "./model.ts";
+import { DEFAULT_SETTINGS, KINDS, type CanvasSettings, type LevelDisplay } from "./model.ts";
 
 /** The canvas's settings, whether the open node is traced, and whether the structure is edited. */
 export interface CanvasView extends CanvasSettings {
@@ -84,4 +86,19 @@ export function layoutViewOf(view: CanvasSettings): string {
 /** The path of a journey's canvas, or of a node's detail on it, keeping what the canvas shows. */
 export function canvasPath(journey: string, view: CanvasView, node?: string): string {
   return `/journeys/${journey}${node === undefined ? "" : `/nodes/${node}`}${searchOf(view)}`;
+}
+
+/**
+ * The level request for what the canvas shows (C2): the toggles name the relevance classes the
+ * engine hides, so what they hide rolls up and re-targets its edges there. The undecided toggle
+ * is the conditional class, which also holds the nodes waiting on an undecided decision.
+ */
+export function levelRequest(view: CanvasView): Extract<ProjectionRequest, { projection: "level" }> {
+  const display: LevelDisplay[] = ["relevant", ...(view.undecided ? (["conditional"] as const) : []), ...(view.notRelevant ? (["not_relevant"] as const) : [])];
+  return {
+    projection: "level",
+    shown: view.shown,
+    ...(view.container === undefined ? {} : { container: view.container }),
+    ...(display.length === 3 ? {} : { display }),
+  };
 }

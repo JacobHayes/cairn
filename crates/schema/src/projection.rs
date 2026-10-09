@@ -11,11 +11,11 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::derived::{
-    Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent, PeakGravity, Real,
-    Relevance, Score, Stalled,
+    Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent, PeakGravity,
+    Real, Relevance, Score, Stalled,
 };
 use crate::event::Event;
-use crate::id::{EntityKey, KindKey, NodeKey, PatchId, Path, RoleKey};
+use crate::id::{EntityKey, KindKey, NodeKey, PatchId, Path, RoleKey, Slug};
 use crate::node::NodeKind;
 use crate::state::{AnswerValue, SnoozeTarget, State};
 use crate::text::Title;
@@ -198,6 +198,84 @@ pub struct LevelNode {
     pub roll_up: Option<RollUp>,
 }
 
+/// C2: which nodes a level shows by how their relevance reads to a person. A node is
+/// `relevant` when it applies; `conditional` when it may apply (its relevance is undecided,
+/// or it is not relevant only because the decision it reads cannot be answered yet); and
+/// `not_relevant` when it is settled as not applying (ruled out by an answer, a skip, or a
+/// closed branch).
+#[derive(
+    Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
+)]
+#[serde(rename_all = "snake_case")]
+pub enum LevelDisplay {
+    /// Applies.
+    Relevant,
+    /// May apply: undecided, or waiting on a decision that cannot be answered yet.
+    Conditional,
+    /// Settled as not applying.
+    NotRelevant,
+}
+
+impl LevelDisplay {
+    /// Every class.
+    pub const ALL: [LevelDisplay; 3] = [
+        LevelDisplay::Relevant,
+        LevelDisplay::Conditional,
+        LevelDisplay::NotRelevant,
+    ];
+}
+
+impl LevelDisplay {
+    /// Every class, as a set: what a level shows when none are asked for.
+    #[must_use]
+    pub fn every() -> BTreeSet<LevelDisplay> {
+        LevelDisplay::ALL.into_iter().collect()
+    }
+
+    /// Whether the set is every class.
+    #[must_use]
+    pub fn is_every(display: &BTreeSet<LevelDisplay>) -> bool {
+        display.len() == LevelDisplay::ALL.len()
+    }
+}
+
+/// C2: what a level request asks for: the kinds shown, the container drilled into, the
+/// containers collapsed into their cards, and the relevance classes shown.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LevelQuery {
+    /// The kinds shown.
+    pub shown: BTreeSet<NodeKind>,
+    /// The container drilled into; the whole journey when none.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub container: Option<NodeKey>,
+    /// Containers rolled into their own cards, whatever their kinds' step: everything beneath
+    /// each is hidden and rolls up into it. A key outside the level, or at its root (the
+    /// drilled-in container), has no effect.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub collapsed: BTreeSet<NodeKey>,
+    /// The relevance classes shown; every class when none is given. A node of a class left
+    /// out is hidden like a node of a kind left out: it rolls up and its edges re-target.
+    #[serde(
+        default = "LevelDisplay::every",
+        skip_serializing_if = "LevelDisplay::is_every"
+    )]
+    pub display: BTreeSet<LevelDisplay>,
+}
+
+impl LevelQuery {
+    /// The kinds `shown` within `container`, nothing collapsed, every class shown.
+    #[must_use]
+    pub fn of_kinds(shown: BTreeSet<NodeKind>, container: Option<NodeKey>) -> Self {
+        Self {
+            shown,
+            container,
+            collapsed: BTreeSet::new(),
+            display: LevelDisplay::every(),
+        }
+    }
+}
+
 /// C2: one aggregation level of the canvas: the visible nodes for the shown kinds within the
 /// drilled-in container, the edges re-targeted to visible stand-ins with duplicates collapsed,
 /// and each container's roll-ups. Display only: stored state stays on each node.
@@ -209,10 +287,83 @@ pub struct Level {
     pub container: Option<NodeKey>,
     /// The kinds shown.
     pub shown: BTreeSet<NodeKind>,
+    /// The containers collapsed that took effect: those within the level.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub collapsed: BTreeSet<NodeKey>,
+    /// The relevance classes shown; every class when absent.
+    #[serde(
+        default = "LevelDisplay::every",
+        skip_serializing_if = "LevelDisplay::is_every"
+    )]
+    pub display: BTreeSet<LevelDisplay>,
     /// The visible nodes, in tree order.
     pub nodes: Vec<LevelNode>,
     /// The edges, sorted by their ends.
     pub edges: Vec<LevelEdge>,
+}
+
+/// Some nodes an answer's effect names: how many in all, and the first
+/// `explanation_entry_count_max` of them in tree order.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AffectedNodes {
+    /// How many nodes there are in all.
+    pub total: u32,
+    /// The first of them, in tree order, at most `explanation_entry_count_max`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub nodes: Vec<NodeKey>,
+}
+
+/// C12: what one answer to a decision does to the journey's scope, from a three-valued
+/// re-evaluation of relevance under that answer: never a full derive.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ChoiceEffect {
+    /// The whole answer evaluated: a boolean, a choice, or (for a multi choice) the current
+    /// answer with `choice` toggled.
+    pub answer: AnswerValue,
+    /// The choice id, for a single or multi choice.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub choice: Option<Slug>,
+    /// This is the recorded answer (for a multi choice: `choice` is in it, so the answer
+    /// evaluated removes it).
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub current: bool,
+    /// Nodes that become relevant.
+    pub brings_in: AffectedNodes,
+    /// Of those, the decisions that open: relevant and still to be answered.
+    pub opens_decisions: AffectedNodes,
+    /// Nodes the answer settles as not relevant. Nodes that would still hang on another
+    /// unanswered decision are `decided_later`, never here.
+    pub drops: AffectedNodes,
+    /// Of the drops, the nodes with recorded progress (started, done, decided, reached):
+    /// the answer does not undo it.
+    pub drops_with_progress: AffectedNodes,
+    /// Nodes that would stay undecided because they hang on another decision still to be
+    /// answered, which this answer opens or leaves open.
+    pub decided_later: AffectedNodes,
+}
+
+/// C12, E3: what answering a decision does, per choice, and the static lines every answer
+/// of a date or entity decision carries.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct AnswerEffects {
+    /// The decision.
+    pub decision: NodeKey,
+    /// The role its answer fills (E3), for an entity or entity-list decision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fills_role: Option<RoleKey>,
+    /// The milestone its answer pins (E3), for a date decision.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pins: Option<NodeKey>,
+    /// Whether the decision's answer is in effect: it is relevant, and not skipped. When not,
+    /// no answer changes any other node's relevance and every choice's effect is empty.
+    pub applies: bool,
+    /// One entry per choice of a boolean, single-choice, or multi-choice decision, in the
+    /// decision's order (`false` before `true`); none for the other answer types.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub choices: Vec<ChoiceEffect>,
 }
 
 /// C7: what a node depends on and what depends on it, across levels, over the full structural

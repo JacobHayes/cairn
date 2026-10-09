@@ -36,7 +36,7 @@ export const TRACE_LABELS = {
 
 /** What each card stands for: itself and the hidden nodes rolled up into it (C2). */
 function standsFor(card: Card): string[] {
-  return [card.key, ...card.checklist.map((item) => item.key)];
+  return [card.key, ...card.rolledUp];
 }
 
 function markOf(card: Card, trace: Trace, sets: { up: Set<string>; down: Set<string>; contributors: Set<string> }): OverlayMark | undefined {

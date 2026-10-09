@@ -872,6 +872,19 @@ export interface components {
             /** @description The user. */
             user: components["schemas"]["UserId"];
         };
+        /**
+         * @description Some nodes an answer's effect names: how many in all, and the first
+         *     `explanation_entry_count_max` of them in tree order.
+         */
+        AffectedNodes: {
+            /** @description The first of them, in tree order, at most `explanation_entry_count_max`. */
+            nodes?: components["schemas"]["NodeKey"][];
+            /**
+             * Format: uint32
+             * @description How many nodes there are in all.
+             */
+            total: number;
+        };
         /** @description Starts with "ag_"; at most id_bytes_max (64) bytes. */
         AgentId: string;
         /** @description An agent token as its user's list shows it: never the secret. */
@@ -921,6 +934,28 @@ export interface components {
             reference?: components["schemas"]["Url"];
             title?: components["schemas"]["Title"] | null;
         } & (unknown | unknown | unknown | unknown);
+        /**
+         * @description C12, E3: what answering a decision does, per choice, and the static lines every answer
+         *     of a date or entity decision carries.
+         */
+        AnswerEffects: {
+            /**
+             * @description Whether the decision's answer is in effect: it is relevant, and not skipped. When not,
+             *     no answer changes any other node's relevance and every choice's effect is empty.
+             */
+            applies: boolean;
+            /**
+             * @description One entry per choice of a boolean, single-choice, or multi-choice decision, in the
+             *     decision's order (`false` before `true`); none for the other answer types.
+             */
+            choices?: components["schemas"]["ChoiceEffect"][];
+            /** @description The decision. */
+            decision: components["schemas"]["NodeKey"];
+            /** @description The role its answer fills (E3), for an entity or entity-list decision. */
+            fills_role?: components["schemas"]["RoleKey"] | null;
+            /** @description The milestone its answer pins (E3), for a date decision. */
+            pins?: components["schemas"]["NodeKey"] | null;
+        };
         /**
          * @description A text answer: any text up to the body limit, empty included (an empty submission is an
          *     answer).
@@ -1066,6 +1101,43 @@ export interface components {
          *     and an optional label. Written as the bare id when it has no label.
          */
         Choice: components["schemas"]["Slug"] | components["schemas"]["LabeledChoice"];
+        /**
+         * @description C12: what one answer to a decision does to the journey's scope, from a three-valued
+         *     re-evaluation of relevance under that answer: never a full derive.
+         */
+        ChoiceEffect: {
+            /**
+             * @description The whole answer evaluated: a boolean, a choice, or (for a multi choice) the current
+             *     answer with `choice` toggled.
+             */
+            answer: components["schemas"]["AnswerValue"];
+            /** @description Nodes that become relevant. */
+            brings_in: components["schemas"]["AffectedNodes"];
+            /** @description The choice id, for a single or multi choice. */
+            choice?: components["schemas"]["Slug"] | null;
+            /**
+             * @description This is the recorded answer (for a multi choice: `choice` is in it, so the answer
+             *     evaluated removes it).
+             */
+            current?: boolean;
+            /**
+             * @description Nodes that would stay undecided because they hang on another decision still to be
+             *     answered, which this answer opens or leaves open.
+             */
+            decided_later: components["schemas"]["AffectedNodes"];
+            /**
+             * @description Nodes the answer settles as not relevant. Nodes that would still hang on another
+             *     unanswered decision are `decided_later`, never here.
+             */
+            drops: components["schemas"]["AffectedNodes"];
+            /**
+             * @description Of the drops, the nodes with recorded progress (started, done, decided, reached):
+             *     the answer does not undo it.
+             */
+            drops_with_progress: components["schemas"]["AffectedNodes"];
+            /** @description Of those, the decisions that open: relevant and still to be answered. */
+            opens_decisions: components["schemas"]["AffectedNodes"];
+        };
         Choices: components["schemas"]["Choice"][];
         /** @description A condition clause. The parser also holds the whole tree to 8 levels and 16 clauses, which JSON Schema cannot express. */
         Clause: {
@@ -2197,8 +2269,12 @@ export interface components {
          *     and each container's roll-ups. Display only: stored state stays on each node.
          */
         Level: {
+            /** @description The containers collapsed that took effect: those within the level. */
+            collapsed?: components["schemas"]["NodeKey"][];
             /** @description The drilled-in container; none for the whole journey. */
             container?: components["schemas"]["NodeKey"] | null;
+            /** @description The relevance classes shown; every class when absent. */
+            display?: components["schemas"]["LevelDisplay"][];
             /** @description The edges, sorted by their ends. */
             edges: components["schemas"]["LevelEdge"][];
             /** @description The visible nodes, in tree order. */
@@ -2206,6 +2282,14 @@ export interface components {
             /** @description The kinds shown. */
             shown: components["schemas"]["NodeKind"][];
         };
+        /**
+         * @description C2: which nodes a level shows by how their relevance reads to a person. A node is
+         *     `relevant` when it applies; `conditional` when it may apply (its relevance is undecided,
+         *     or it is not relevant only because the decision it reads cannot be answered yet); and
+         *     `not_relevant` when it is settled as not applying (ruled out by an answer, a skip, or a
+         *     closed branch).
+         */
+        LevelDisplay: "relevant" | "conditional" | "not_relevant";
         /**
          * @description C2: an edge drawn at a level, between the nearest visible stand-ins of its ends, with the
          *     edges it collapses.
@@ -2900,6 +2984,11 @@ export interface components {
             annotations?: components["schemas"]["Annotation"][];
             /** @description A decision's answer, as recorded. */
             answer?: components["schemas"]["AnswerValue"] | null;
+            /**
+             * @description A decision's effects per choice (C12): what each answer brings in, drops, and leaves
+             *     to be decided later, with the role it fills and the milestone it pins.
+             */
+            answer_effects?: components["schemas"]["AnswerEffects"] | null;
             /** @description Its children in key order, each with its state. */
             children?: components["schemas"]["ChildEntry"][];
             /** @description Every derived value (D3) with what explains it. */
@@ -5908,6 +5997,10 @@ export interface operations {
                 kind?: components["schemas"]["NodeKind"][];
                 /** @description The container drilled into; the top level when none. */
                 container?: components["schemas"]["NodeKey"];
+                /** @description Containers rolled into their own cards: everything beneath each is hidden and rolls up          into it, and its edges re-target to it. A key outside the level has no effect. */
+                collapsed?: components["schemas"]["NodeKey"][];
+                /** @description The relevance classes shown: `relevant`, `conditional` (undecided, or waiting on a          decision that cannot be answered yet), `not_relevant` (settled). Every class when none.          A node of a class left out rolls up like a hidden kind's. */
+                display?: components["schemas"]["LevelDisplay"][];
             };
             header?: never;
             path: {

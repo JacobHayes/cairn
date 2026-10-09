@@ -11,7 +11,8 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{DerivedJourney, Graph, derive};
 use cairn_schema::{
-    Date, Deployment, DeriveInputs, Graph as GraphDocument, Level, NodeKey, NodeKind, RankConstants,
+    Date, Deployment, DeriveInputs, Graph as GraphDocument, Level, LevelQuery, NodeKey, NodeKind,
+    RankConstants,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -55,8 +56,9 @@ pub fn route_level_of(request: &RouteLevelRequest) -> Result<Level, HostError> {
         deployment: request.deployment.clone(),
     };
     let derived = derive(&graph, None, &inputs);
+    let query = LevelQuery::of_kinds(request.shown.clone(), request.container.clone());
     DerivedJourney::new(&graph, &derived)
-        .level(&request.shown, request.container.as_ref())
+        .level(&query, &request.deployment)
         .map_err(|error| HostError::Missing {
             message: error.to_string(),
         })

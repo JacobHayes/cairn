@@ -18,7 +18,8 @@ mod cost {
     use cairn_engine::{DerivedJourney, derive};
     use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, NODE_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
     use cairn_schema::{
-        Cursor, Deployment, ExplainedField, ListQuery, NextQuery, NodeKey, NodeKind, SnapshotScope,
+        Cursor, Deployment, ExplainedField, LevelQuery, ListQuery, NextQuery, NodeKey, NodeKind,
+        SnapshotScope,
     };
 
     fn timed<T>(name: &str, run: impl FnOnce() -> T) -> T {
@@ -54,7 +55,9 @@ mod cost {
                 .filter(|kind| Some(*kind) != hidden)
                 .collect();
             let level = timed(&format!("level hiding {hidden:?}"), || {
-                journey.level(&shown, None).unwrap()
+                journey
+                    .level(&LevelQuery::of_kinds(shown, None), &Deployment::default())
+                    .unwrap()
             });
             assert!(level.nodes.len() <= nodes);
             let underlying: usize = level.edges.iter().map(|edge| edge.underlying.len()).sum();

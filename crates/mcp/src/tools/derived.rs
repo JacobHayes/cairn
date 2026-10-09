@@ -6,10 +6,10 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Annotation, AnswerValue, Cursor, Date, DisplayState, ExplainedField, ExplanationPage,
-    JourneyId, KeyRefs, Level, LevelEdge, LevelNode, ListFlag, ListQuery, LocalEdit, Next,
-    NextQuery, Node, NodeDerived, NodeKey, NodeKind, NodeRow, NodeState, Overrides, Path, Snapshot,
-    SnapshotScope, SortBy, Stalled, StillWaiting,
+    Annotation, AnswerEffects, AnswerValue, Cursor, Date, DisplayState, ExplainedField,
+    ExplanationPage, JourneyId, KeyRefs, Level, LevelDisplay, LevelEdge, LevelNode, LevelQuery,
+    ListFlag, ListQuery, LocalEdit, Next, NextQuery, Node, NodeDerived, NodeKey, NodeKind, NodeRow,
+    NodeState, Overrides, Path, Snapshot, SnapshotScope, SortBy, Stalled, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use cairn_store::Store;
@@ -56,8 +56,10 @@ pub(crate) const SPECS: &[Spec] = &[
             derived value with its explanation (display state, relevance, blocking, dates, \
             gravity, leverage, rank), and the dependents finishing it would not yet free with \
             what else each waits on (`still_waiting`). Say its status from `display_state`, not \
-            the stored state. Explanation lists hold their largest entries; pass \
-            `explanations` to page the rest.",
+            the stored state. For a decision, `answer_effects`: per choice, the nodes it \
+            brings in, drops, and leaves to be decided later, and what it pins or fills. \
+            Explanation lists hold their largest entries; pass `explanations` to page the \
+            rest.",
         writes: false,
         destructive: false,
         schema: schema::<GetNode>,
@@ -67,7 +69,9 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "get_level",
         description: "One aggregation level of the journey's graph (C2): the nodes of the \
             shown kinds at the top or inside a container, hidden work rolled up into them, \
-            and the edges between them. Nodes are paged; edges are those touching the page.",
+            and the edges between them. `collapsed` rolls containers into their own cards; \
+            `display` limits the relevance classes shown. Nodes are paged; edges are those \
+            touching the page.",
         writes: false,
         destructive: false,
         schema: schema::<GetLevel>,
@@ -114,6 +118,15 @@ pub(crate) struct GetLevel {
     /// The container drilled into; the top level when absent.
     #[serde(default)]
     container: Option<NodeKey>,
+    /// Containers rolled into their own cards: everything beneath each is hidden and rolls
+    /// up into it, and its edges re-target to it.
+    #[serde(default)]
+    collapsed: BTreeSet<NodeKey>,
+    /// The relevance classes shown: `relevant`, `conditional` (undecided, or waiting on a
+    /// decision that cannot be answered yet), `not_relevant` (settled); every class when
+    /// empty. A node of a class left out rolls up like a hidden kind's.
+    #[serde(default)]
+    display: BTreeSet<LevelDisplay>,
     /// Where the page of visible nodes starts.
     #[serde(default)]
     cursor: Cursor,
@@ -127,6 +140,12 @@ pub(crate) struct LevelOutput {
     container: Option<NodeKey>,
     /// The kinds shown.
     shown: BTreeSet<NodeKind>,
+    /// The containers collapsed that took effect.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    collapsed: BTreeSet<NodeKey>,
+    /// The relevance classes shown; every class when absent.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display: Option<BTreeSet<LevelDisplay>>,
     /// A page of the visible nodes, in tree order, with their roll-ups.
     nodes: Paged<LevelNode>,
     /// The level's edges with an end among this page's nodes.
@@ -213,6 +232,11 @@ pub(crate) struct Detail {
     /// on (C8, Priority: Leverage): the largest entries with the total; pass `explanations`
     /// with field `still_waiting` for the rest.
     still_waiting: StillWaiting,
+    /// A decision's effects per choice (C12): what each answer brings in, drops, and leaves
+    /// to be decided later, the role it fills, and the milestone it pins. Saying "answering
+    /// Partner brings in 6 and opens 2 more decisions" uses these numbers.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    answer_effects: Option<AnswerEffects>,
 }
 
 /// One child of a node.
@@ -243,6 +267,7 @@ impl Detail {
             annotations,
             derived,
             still_waiting,
+            answer_effects,
         } = detail;
         let children = children.into_iter().map(|child| {
             let ChildEntry {
@@ -273,6 +298,7 @@ impl Detail {
             annotations: page(annotations, annotations_cursor),
             derived,
             still_waiting,
+            answer_effects,
         }
     }
 }
@@ -400,18 +426,22 @@ impl<S: Store + 'static> ToolSet<S> {
         } else {
             arguments.kinds
         };
-        let container = arguments.container.as_ref();
-        let projected = self
-            .service
-            .level(call, &arguments.journey, &shown, container)
-            .await?;
+        let mut query = LevelQuery::of_kinds(shown, arguments.container);
+        query.collapsed = arguments.collapsed;
+        if !arguments.display.is_empty() {
+            query.display = arguments.display;
+        }
+        let projected = self.service.level(call, &arguments.journey, &query).await?;
         Ok(At::of(projected, |level| {
             let Level {
                 container,
                 shown,
+                collapsed,
+                display,
                 nodes,
                 edges,
             } = level;
+            let display = (display.len() < LevelDisplay::ALL.len()).then_some(display);
             let nodes = page(nodes, arguments.cursor);
             let on_page: BTreeSet<&NodeKey> = nodes.items.iter().map(|node| &node.key).collect();
             let edges = edges
@@ -421,6 +451,8 @@ impl<S: Store + 'static> ToolSet<S> {
             LevelOutput {
                 container,
                 shown,
+                collapsed,
+                display,
                 nodes,
                 edges,
             }

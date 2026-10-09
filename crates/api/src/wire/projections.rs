@@ -6,8 +6,9 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Annotation, AnswerValue, Date, DisplayState, KeyRefs, LocalEdit, MineEntry, Node, NodeDerived,
-    NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, Revision, State, StillWaiting, Title,
+    Annotation, AnswerEffects, AnswerValue, Date, DisplayState, KeyRefs, LocalEdit, MineEntry,
+    Node, NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, Revision, State,
+    StillWaiting, Title,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -98,6 +99,10 @@ pub struct NodeDetail {
     /// on (C8, Priority: Leverage): the largest entries with the total; page the rest with
     /// the explanations endpoint, field `still_waiting`.
     pub still_waiting: StillWaiting,
+    /// A decision's effects per choice (C12): what each answer brings in, drops, and leaves
+    /// to be decided later, with the role it fills and the milestone it pins.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub answer_effects: Option<AnswerEffects>,
 }
 
 /// One child in a node's detail.
@@ -131,6 +136,7 @@ impl From<cairn_service::NodeDetail> for NodeDetail {
             annotations,
             derived,
             still_waiting,
+            answer_effects,
         } = detail;
         let children = children.into_iter().map(|child| {
             let cairn_service::ChildEntry {
@@ -161,6 +167,7 @@ impl From<cairn_service::NodeDetail> for NodeDetail {
             annotations,
             derived,
             still_waiting,
+            answer_effects,
         }
     }
 }

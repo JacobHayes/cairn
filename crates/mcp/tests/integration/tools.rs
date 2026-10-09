@@ -194,6 +194,26 @@ async fn the_snapshot_and_its_lists_agree() {
     let node = json!({ "journey": "j_vendor_eval", "node": "n_purpose" });
     let node = world.ok(&ann, "get_node", node).await;
     assert_eq!(node["detail"]["node"]["answer_type"], "single_choice");
+    let choices = node["detail"]["answer_effects"]["choices"]
+        .as_array()
+        .unwrap();
+    assert_eq!(
+        choices.len(),
+        2,
+        "a choice per option, as the form shows them"
+    );
+    let level = json!({
+        "journey": "j_vendor_eval", "collapsed": ["n_setup"], "display": ["relevant", "conditional"],
+    });
+    let level = world.ok(&ann, "get_level", level).await;
+    assert_eq!(level["collapsed"], json!(["n_setup"]));
+    let setup = &level["nodes"]["items"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|node| node["key"] == "n_setup")
+        .unwrap();
+    assert_ne!(setup["rolled_up"].as_array().unwrap().len(), 0);
 }
 
 /// Creates `j_many`, an empty journey with `count` unrelated actions, all on its frontier.

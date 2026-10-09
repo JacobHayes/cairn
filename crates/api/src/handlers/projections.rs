@@ -73,12 +73,9 @@ pub async fn level<S: Store + 'static>(
 ) -> Projection<Level> {
     let id = journey(&id)?;
     let params = Params::parse(raw.as_deref(), query::LEVEL_PARAMS)?;
-    let (shown, container) = query::level(&params)?;
+    let query = query::level(&params)?;
     let call = api.call(actor);
-    let projected = api
-        .service
-        .level(&call, &id, &shown, container.as_ref())
-        .await?;
+    let projected = api.service.level(&call, &id, &query).await?;
     Ok(Json(Projected::from_service(projected)))
 }
 

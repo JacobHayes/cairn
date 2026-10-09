@@ -12,7 +12,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::derive::Producer;
 use cairn_engine::{Applied, DerivedJourney, Records};
-use cairn_schema::{EntityKey, KindKey, NextQuery, NodeKey, NodeKind, Path, Relevance};
+use cairn_schema::{
+    Deployment, EntityKey, KindKey, LevelQuery, NextQuery, NodeKey, NodeKind, Path, Relevance,
+};
 
 const VENDOR: &str = "vendor-evaluation";
 const VENDOR_JOURNEY: &str = "j_vendor_eval";
@@ -347,7 +349,9 @@ fn the_projection_lines_are_what_the_engine_projects() {
             .into_iter()
             .filter(|kind| *kind != NodeKind::Action)
             .collect();
-        let level = projected.level(&shown, None).unwrap();
+        let level = projected
+            .level(&LevelQuery::of_kinds(shown, None), &Deployment::default())
+            .unwrap();
         let value = match label {
             "visible with actions hidden" => {
                 let nodes = level.nodes.iter().map(|node| match &node.parent {

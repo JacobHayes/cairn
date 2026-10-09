@@ -265,7 +265,41 @@ async function bench(file: string, runs: number): Promise<Record<string, number>
   return result;
 }
 
-const harness = { runGroup, rootScenario, skew, abort, ordering, deadWorker, bench };
+/** The size budgets' calls over a generated journey, in the worker, timed from this page: medians of `runs` after one warm-up. */
+async function budgets(file: string, runs: number): Promise<{ levelMs: number; traceMs: number }> {
+  const group = await fetched<Group>(`/dist/cases/${file}`);
+  const worker = await DeriveWorker.start(wasm);
+  try {
+    const journey = (await worker.load(group.document ?? "")).journey;
+    const timed = async (call: Case["call"]): Promise<number> => {
+      if (call.kind !== "project") {
+        throw new Error("a budget call is a projection");
+      }
+      await worker.projectText(journey, call.request);
+      const times: number[] = [];
+      for (let run = 0; run < runs; run += 1) {
+        const started = performance.now();
+        await worker.projectText(journey, call.request);
+        times.push(performance.now() - started);
+      }
+      return median(times);
+    };
+    const levels = group.cases.filter((found) => found.call.kind === "project" && found.call.request.projection === "level");
+    const trace = group.cases.find((found) => found.call.kind === "project" && found.call.request.projection === "trace");
+    if (levels.length === 0 || trace === undefined) {
+      throw new Error("a budget group has levels and a trace");
+    }
+    const levelTimes: number[] = [];
+    for (const found of levels) {
+      levelTimes.push(await timed(found.call));
+    }
+    return { levelMs: Math.max(...levelTimes), traceMs: await timed(trace.call) };
+  } finally {
+    worker.terminate();
+  }
+}
+
+const harness = { runGroup, rootScenario, skew, abort, ordering, deadWorker, bench, budgets };
 
 declare global {
   interface Window {

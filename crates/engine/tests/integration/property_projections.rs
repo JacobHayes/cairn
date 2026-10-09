@@ -1,8 +1,10 @@
 //! Property tests (rung 3) for the projections (ARCHITECTURE, Engine > Projections). Over
-//! generated journeys: a level's visible set is exactly the shown kinds within the container,
-//! each node sits under its nearest visible ancestor, every drawn edge stands for at least one
+//! generated journeys: a level's visible set is exactly the nodes within the container whose
+//! kind and relevance class are shown and that no collapsed container above them hides, each
+//! node sits under its nearest visible ancestor, every drawn edge stands for at least one
 //! underlying edge between its ends' stand-ins and every edge with two distinct stand-ins is
-//! drawn, no edge is drawn twice or onto one node, the marker only sits on blocked nodes, and
+//! drawn, no edge is drawn twice or onto one node, the marker only sits on blocked nodes (or
+//! cards holding one), and
 //! showing more kinds never hides a node that was visible; a trace's sets are consistent with
 //! the graph: upstream and downstream mirror each other, are closed under the relation, and
 //! hold every direct dependency and every ancestor; the snapshot's pages never exceed their
@@ -15,13 +17,14 @@ mod property {
 
     use cairn_engine::derive::EdgeSet;
     use cairn_engine::derive::dependencies::{EdgeClass, EdgeSource};
+    use cairn_engine::derive::pending::{RelevanceClass, classify};
     use cairn_engine::testing::derive_inputs;
     use cairn_engine::testing::generated::arb_journey;
     use cairn_engine::{Derived, DerivedJourney, Graph, derive, history};
     use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
     use cairn_schema::{
-        Cursor, Deployment, Event, Level, NextQuery, NodeKey, NodeKind, PatchId, SnapshotScope,
-        Trace,
+        Cursor, Deployment, Event, Level, LevelDisplay, LevelQuery, NextQuery, NodeKey, NodeKind,
+        PatchId, SnapshotScope, Trace,
     };
     use patina_dst_proptest::prelude::*;
 
@@ -39,43 +42,104 @@ mod property {
             .collect()
     }
 
-    /// A node's stand-in by its definition: walking up from it within the container, the first
-    /// node whose kind is shown.
-    fn stand_in(
-        graph: &Graph,
-        shown: &BTreeSet<NodeKind>,
-        container: Option<&NodeKey>,
-        key: &NodeKey,
-    ) -> Option<NodeKey> {
-        let tree = graph.tree();
-        let within = |key: &NodeKey| container.is_none_or(|top| tree.is_ancestor(top, key));
-        let mut current = Some(key);
-        while let Some(node) = current.filter(|node| within(node)) {
-            if shown.contains(&graph.node(node).unwrap().kind()) {
-                return Some(node.clone());
-            }
-            current = tree.parent(node);
-        }
-        None
+    /// What a level request asks for, with each node's relevance class shown or not.
+    struct Rules {
+        shown: BTreeSet<NodeKind>,
+        container: Option<NodeKey>,
+        collapsed: BTreeSet<NodeKey>,
+        class_shown: BTreeMap<NodeKey, bool>,
     }
 
-    fn level_holds(graph: &Graph, derived: &Derived, level: &Level, container: Option<&NodeKey>) {
-        let shown = &level.shown;
+    impl Rules {
+        fn query(&self, display: &BTreeSet<LevelDisplay>) -> LevelQuery {
+            LevelQuery {
+                shown: self.shown.clone(),
+                container: self.container.clone(),
+                collapsed: self.collapsed.clone(),
+                display: display.clone(),
+            }
+        }
+
+        /// A node is visible by its definition: within the container, its kind and class
+        /// shown, and no collapsed container between it and the container above it.
+        fn visible(&self, graph: &Graph, key: &NodeKey) -> bool {
+            let tree = graph.tree();
+            let within = |key: &NodeKey| {
+                self.container
+                    .as_ref()
+                    .is_none_or(|top| tree.is_ancestor(top, key))
+            };
+            let mut above = tree.parent(key);
+            while let Some(node) = above.filter(|node| within(node)) {
+                if self.collapsed.contains(node) {
+                    return false;
+                }
+                above = tree.parent(node);
+            }
+            self.shown.contains(&graph.node(key).unwrap().kind()) && self.class_shown[key]
+        }
+
+        /// A node's stand-in by its definition: walking up from it within the container, the
+        /// first visible node.
+        fn stand_in(&self, graph: &Graph, key: &NodeKey) -> Option<NodeKey> {
+            let tree = graph.tree();
+            let mut current = Some(key);
+            while let Some(node) = current.filter(|node| {
+                self.container
+                    .as_ref()
+                    .is_none_or(|top| tree.is_ancestor(top, node))
+            }) {
+                if self.visible(graph, node) {
+                    return Some(node.clone());
+                }
+                current = tree.parent(node);
+            }
+            None
+        }
+    }
+
+    /// Which relevance classes a three-bit mask shows, and each node's class shown by it.
+    fn displays(graph: &Graph, mask: u8) -> (BTreeSet<LevelDisplay>, BTreeMap<NodeKey, bool>) {
+        let display: BTreeSet<LevelDisplay> = LevelDisplay::ALL
+            .into_iter()
+            .enumerate()
+            .filter(|(bit, _)| mask & (1 << bit) != 0)
+            .map(|(_, class)| class)
+            .collect();
+        let classes = classify(graph, &Deployment::default());
+        let shown = classes
+            .iter()
+            .map(|(key, class)| {
+                let class = match class {
+                    RelevanceClass::Relevant => LevelDisplay::Relevant,
+                    RelevanceClass::Undecided | RelevanceClass::Pending => {
+                        LevelDisplay::Conditional
+                    }
+                    RelevanceClass::Settled => LevelDisplay::NotRelevant,
+                };
+                (key.clone(), display.contains(&class))
+            })
+            .collect();
+        (display, shown)
+    }
+
+    fn level_holds(graph: &Graph, derived: &Derived, level: &Level, rules: &Rules) {
         let visible: BTreeSet<&NodeKey> = level.nodes.iter().map(|node| &node.key).collect();
         for key in graph.document().nodes.as_map().keys() {
-            let expected = stand_in(graph, shown, container, key).as_ref() == Some(key);
+            let expected = rules.stand_in(graph, key).as_ref() == Some(key);
             assert_eq!(visible.contains(key), expected, "{key} visible");
         }
         for node in &level.nodes {
             let parent = graph.tree().parent(&node.key);
-            let expected = parent.and_then(|parent| stand_in(graph, shown, container, parent));
+            let expected = parent.and_then(|parent| rules.stand_in(graph, parent));
             assert_eq!(
                 node.parent, expected,
                 "{} is drawn under its nearest",
                 node.key
             );
             if !node.hidden_prerequisites.is_empty() {
-                assert!(derived.blocking().blocked(&node.key));
+                let blocked = |key: &NodeKey| derived.blocking().blocked(key);
+                assert!(blocked(&node.key) || node.rolled_up.iter().any(blocked));
             }
         }
         let mut drawn: BTreeMap<(NodeKey, NodeKey), usize> = BTreeMap::new();
@@ -83,8 +147,8 @@ mod property {
             assert_ne!(edge.from, edge.to, "no edge onto one node");
             assert_ne!(edge.underlying.len(), 0);
             for underlying in &edge.underlying {
-                let from = stand_in(graph, shown, container, &underlying.requirement);
-                let to = stand_in(graph, shown, container, &underlying.dependent);
+                let from = rules.stand_in(graph, &underlying.requirement);
+                let to = rules.stand_in(graph, &underlying.dependent);
                 assert_eq!(
                     (from.as_ref(), to.as_ref()),
                     (Some(&edge.from), Some(&edge.to))
@@ -103,8 +167,8 @@ mod property {
             );
             let requirement = dependencies.key(edge.requirement.node).unwrap();
             let dependent = dependencies.key(edge.dependent.node).unwrap();
-            let from = stand_in(graph, shown, container, requirement);
-            let to = stand_in(graph, shown, container, dependent);
+            let from = rules.stand_in(graph, requirement);
+            let to = rules.stand_in(graph, dependent);
             if let (true, Some(from), Some(to)) = (canvas, from, to) {
                 assert!(
                     from == to || drawn.contains_key(&(from, to)),
@@ -229,17 +293,24 @@ mod property {
             mask in 0_u8..32,
             extra in 0_usize..5,
             drill in prop::option::of(0_usize..80),
+            collapse in prop::collection::vec(0_usize..80, 0..4),
+            class_mask in 1_u8..8,
         ) {
             let derived = derived(&graph);
             let journey = DerivedJourney::new(&graph, &derived);
             let keys: Vec<&NodeKey> = graph.document().nodes.as_map().keys().collect();
-            let container = drill.map(|at| keys[at % keys.len()].clone());
-            let shown = kinds(mask);
-            let level = journey.level(&shown, container.as_ref()).unwrap();
-            level_holds(&graph, &derived, &level, container.as_ref());
-            let mut more = shown.clone();
-            more.insert(NodeKind::ALL[extra]);
-            let wider = journey.level(&more, container.as_ref()).unwrap();
+            let (display, class_shown) = displays(&graph, class_mask);
+            let rules = Rules {
+                shown: kinds(mask),
+                container: drill.map(|at| keys[at % keys.len()].clone()),
+                collapsed: collapse.iter().map(|at| keys[at % keys.len()].clone()).collect(),
+                class_shown,
+            };
+            let level = journey.level(&rules.query(&display), &Deployment::default()).unwrap();
+            level_holds(&graph, &derived, &level, &rules);
+            let mut wider_rules = Rules { shown: rules.shown.clone(), ..rules };
+            wider_rules.shown.insert(NodeKind::ALL[extra]);
+            let wider = journey.level(&wider_rules.query(&display), &Deployment::default()).unwrap();
             let visible: BTreeSet<&NodeKey> = wider.nodes.iter().map(|node| &node.key).collect();
             prop_assert!(level.nodes.iter().all(|node| visible.contains(&node.key)));
         }

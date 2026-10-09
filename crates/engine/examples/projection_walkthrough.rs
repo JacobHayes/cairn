@@ -18,9 +18,9 @@ use cairn_engine::{
     ApplyInputs, Derived, DerivedJourney, DraftContext, Graph, Records, apply, from_file, history,
 };
 use cairn_schema::{
-    Cursor, Event, JourneyId, Level, Lineage, NextQuery, NodeKey, NodeKind, ResourceContent, Route,
-    RouteFile, RouteHeader, RouteVersion, Scenario, SequentialKeys, SnapshotScope, VersionNumber,
-    from_yaml,
+    Cursor, Deployment, Event, JourneyId, Level, LevelQuery, Lineage, NextQuery, NodeKey, NodeKind,
+    ResourceContent, Route, RouteFile, RouteHeader, RouteVersion, Scenario, SequentialKeys,
+    SnapshotScope, VersionNumber, from_yaml,
 };
 
 type Result<T> = std::result::Result<T, Box<dyn Error>>;
@@ -134,7 +134,7 @@ fn fixture_lines(name: &str, fixture: &Fixture, step: usize, out: &mut String) -
         .into_iter()
         .filter(|kind| *kind != NodeKind::Action)
         .collect();
-    let level = journey.level(&shown, None)?;
+    let level = journey.level(&LevelQuery::of_kinds(shown, None), &Deployment::default())?;
     let visible: Vec<String> = level
         .nodes
         .iter()
@@ -250,7 +250,10 @@ fn zooms(vendor: &Fixture, out: &mut String) -> Result<()> {
         "After step 3 (kickoff reached). Zoomed out, only groups shown; every other node rolls up into its group, and two edges into the final review collapse into one:\n"
     )?;
     level_table(
-        &journey.level(&BTreeSet::from([NodeKind::Group]), None)?,
+        &journey.level(
+            &LevelQuery::of_kinds(BTreeSet::from([NodeKind::Group]), None),
+            &Deployment::default(),
+        )?,
         out,
     )?;
     writeln!(
@@ -259,8 +262,11 @@ fn zooms(vendor: &Fixture, out: &mut String) -> Result<()> {
     )?;
     level_table(
         &journey.level(
-            &NodeKind::ALL.into_iter().collect(),
-            Some(&"n_setup".parse()?),
+            &LevelQuery::of_kinds(
+                NodeKind::ALL.into_iter().collect(),
+                Some("n_setup".parse()?),
+            ),
+            &Deployment::default(),
         )?,
         out,
     )?;
@@ -272,7 +278,7 @@ fn zooms(vendor: &Fixture, out: &mut String) -> Result<()> {
         out,
         "Before kickoff (step 1), with groups and milestones hidden, Setup (a root) is hidden and its contents hoist to the top level; each blocked node whose prerequisite no drawn edge stands for carries the hidden-prerequisites marker:\n"
     )?;
-    let level = before.level(&hoisted, None)?;
+    let level = before.level(&LevelQuery::of_kinds(hoisted, None), &Deployment::default())?;
     let marked: Vec<String> = level
         .nodes
         .iter()

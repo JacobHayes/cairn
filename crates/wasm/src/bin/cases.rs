@@ -13,7 +13,7 @@ use std::path::Path;
 use std::time::{Duration, Instant};
 
 use cairn_wasm::Derivation;
-use cairn_wasm::cases::{Group, limits_group, server_groups};
+use cairn_wasm::cases::{Group, budget_group, limits_group, server_groups};
 
 /// Timed runs per measure; the median is reported.
 const RUNS: usize = 5;
@@ -67,6 +67,7 @@ fn main() {
     let out = Path::new(&out);
     std::fs::create_dir_all(out).unwrap_or_else(|error| panic!("{}: {error}", out.display()));
     let mut groups: Vec<Group> = server_groups();
+    groups.extend([500, 2_000].map(budget_group));
     groups.push(limits_group());
     let mut index = Vec::new();
     for (number, group) in groups.iter().enumerate() {

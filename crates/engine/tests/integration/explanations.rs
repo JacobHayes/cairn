@@ -7,7 +7,8 @@ use crate::support;
 
 use cairn_engine::{Derived, DerivedJourney, Records};
 use cairn_schema::{
-    Blocker, Cursor, DependencyVia, ExplainedField, HeldDependent, PeakGravity, Score,
+    Blocker, Cursor, DependencyVia, Deployment, ExplainedField, HeldDependent, LevelQuery,
+    PeakGravity, Score,
 };
 use support::{add_nodes as add, key};
 
@@ -116,8 +117,11 @@ fn the_level_roll_up_carries_the_peak() {
     let derived = support::derived(&records, &journey);
     let level = DerivedJourney::new(&graph, &derived)
         .level(
-            &cairn_schema::NodeKind::ALL.into_iter().collect(),
-            Some(&key("n_onsite")),
+            &LevelQuery::of_kinds(
+                cairn_schema::NodeKind::ALL.into_iter().collect(),
+                Some(key("n_onsite")),
+            ),
+            &Deployment::default(),
         )
         .unwrap_or_else(|error| panic!("{error:?}"));
     let debrief = level

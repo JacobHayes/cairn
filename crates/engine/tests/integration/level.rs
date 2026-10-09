@@ -9,19 +9,39 @@ use crate::support;
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_engine::{DerivedJourney, ProjectionError, Records};
-use cairn_schema::{EdgeOrigin, GroupState, Level, LevelNode, NodeKind, Score};
+use cairn_schema::{
+    EdgeOrigin, GroupState, Level, LevelDisplay, LevelNode, LevelQuery, NodeKind, Score,
+};
 use support::{add_nodes as add, key};
 
 const VENDOR: &str = "j_vendor_eval";
 
 /// The level of a journey in the records for the shown kinds, drilled into `container`.
 fn level(records: &Records, journey: &str, shown: &[NodeKind], container: Option<&str>) -> Level {
+    let shown: BTreeSet<NodeKind> = shown.iter().copied().collect();
+    level_of(
+        records,
+        journey,
+        &LevelQuery::of_kinds(shown, container.map(key)),
+    )
+}
+
+/// The level of a journey in the records for a query.
+fn level_of(records: &Records, journey: &str, query: &LevelQuery) -> Level {
     let graph = support::journey_graph(records, journey);
     let derived = support::derived(records, journey);
-    let shown: BTreeSet<NodeKind> = shown.iter().copied().collect();
     DerivedJourney::new(&graph, &derived)
-        .level(&shown, container.map(key).as_ref())
+        .level(query, &records.deployment)
         .unwrap()
+}
+
+/// Every kind shown, the containers collapsed, and the relevance classes shown.
+fn query(collapsed: &[&str], display: &[LevelDisplay]) -> LevelQuery {
+    LevelQuery {
+        collapsed: collapsed.iter().map(|name| key(name)).collect(),
+        display: display.iter().copied().collect(),
+        ..LevelQuery::of_kinds(NodeKind::ALL.into_iter().collect(), None)
+    }
 }
 
 fn every_kind_but(hidden: NodeKind) -> Vec<NodeKind> {
@@ -271,7 +291,10 @@ fn drilling_in_shows_the_containers_contents() {
     let graph = support::journey_graph(&records, VENDOR);
     let derived = support::derived(&records, VENDOR);
     assert_eq!(
-        DerivedJourney::new(&graph, &derived).level(&BTreeSet::new(), Some(&key("n_nowhere"))),
+        DerivedJourney::new(&graph, &derived).level(
+            &LevelQuery::of_kinds(BTreeSet::new(), Some(key("n_nowhere"))),
+            &records.deployment
+        ),
         Err(ProjectionError::UnknownNode(key("n_nowhere")))
     );
 }
@@ -385,4 +408,141 @@ fn a_skipped_container_shows_kept_work_pending() {
     let kept_done = support::accepted(&skipped, &transition("n_draft", "complete"));
     let done = level(&kept_done, support::JOURNEY, &NodeKind::ALL, None);
     assert!(!node(&done, "n_plan").kept_work_pending);
+}
+
+/// C2: a collapsed stage rolls its subtree into its card; edges into it and out of it re-target
+/// to the card, two edges landing on the same pair of cards merge into one that stands for both,
+/// and edges inside the stage are not drawn.
+#[test]
+fn a_collapsed_stage_re_targets_its_edges_and_merges_duplicates() {
+    let records = support::vendor_patch(
+        &support::vendor_after(1),
+        &support::add_nodes(&[
+            "{key: n_extra, id: extra, parent: n_testing, kind: action, title: Extra, requires: [n_access]}",
+        ]),
+    )
+    .unwrap();
+    let level = level_of(
+        records.records(),
+        VENDOR,
+        &query(&["n_setup", "n_testing"], &LevelDisplay::ALL),
+    );
+    assert_eq!(
+        names(&node(&level, "n_setup").rolled_up),
+        [
+            "n_access",
+            "n_plan",
+            "n_plan_draft",
+            "n_plan_review",
+            "n_workload"
+        ]
+    );
+    assert!(
+        !level
+            .nodes
+            .iter()
+            .any(|node| node.key.as_str() == "n_criteria")
+    );
+    assert_eq!(
+        edges(&level)
+            .into_iter()
+            .filter(|(from, to, _)| ["n_setup", "n_testing"].contains(from)
+                || ["n_setup", "n_testing"].contains(to))
+            .collect::<Vec<_>>(),
+        [
+            // into the stage (a gate from outside, and a decision's condition),
+            ("n_kickoff", "n_setup", 1),
+            ("n_partner_runs", "n_testing", 1),
+            // between the stages, two edges merged (the plan, and access into Extra),
+            ("n_setup", "n_testing", 2),
+            // and out of a stage.
+            ("n_testing", "n_reporting", 1),
+        ]
+    );
+    assert_eq!(level.collapsed.len(), 2);
+}
+
+/// C2: a card still shows the hidden prerequisites of what rolled into it: drilled into Testing
+/// with the partner-led group collapsed, the decision that gates it is outside the level, so
+/// the collapsed card carries the marker for itself and for its actions.
+#[test]
+fn a_collapsed_card_keeps_the_hidden_prerequisite_marker() {
+    let mut collapsed = query(&["n_partner_led"], &LevelDisplay::ALL);
+    collapsed.container = Some(key("n_testing"));
+    let level = level_of(&support::vendor_after(1), VENDOR, &collapsed);
+    assert_eq!(
+        names(&node(&level, "n_partner_led").rolled_up),
+        ["n_criteria", "n_partner_results"]
+    );
+    assert_eq!(
+        names(&node(&level, "n_partner_led").hidden_prerequisites),
+        ["n_partner_runs"]
+    );
+}
+
+/// C2: nodes ruled out by an answer, hidden by the display set, roll up like any hidden node and
+/// leave no orphan line: an edge into one lands on its nearest visible ancestor, and a hidden
+/// top-level node's edge, having no stand-in, is not drawn.
+#[test]
+fn hidden_not_relevant_nodes_leave_no_orphan_lines() {
+    let ruled_out = support::vendor_patch(
+        &support::vendor_after(2),
+        &support::add_nodes(&[
+            "{key: n_side, id: side, kind: action, title: Side, relevant_when: {equals: {decision: n_partner_runs, value: true}}}",
+        ]),
+    )
+    .unwrap();
+    let records = ruled_out.records();
+    let shown = level_of(records, VENDOR, &query(&[], &LevelDisplay::ALL));
+    assert!(edges(&shown).contains(&("n_partner_runs", "n_side", 1)));
+    let hidden = level_of(
+        records,
+        VENDOR,
+        &query(&[], &[LevelDisplay::Relevant, LevelDisplay::Conditional]),
+    );
+    let drawn: BTreeSet<&str> = hidden.nodes.iter().map(|node| node.key.as_str()).collect();
+    assert!(!drawn.contains("n_side") && !drawn.contains("n_partner_led"));
+    assert_eq!(
+        names(&node(&hidden, "n_testing").rolled_up),
+        ["n_partner_led", "n_criteria", "n_partner_results"]
+    );
+    for (from, to, _) in edges(&hidden) {
+        assert!(drawn.contains(from) && drawn.contains(to), "{from} to {to}");
+    }
+    assert!(edges(&hidden).contains(&("n_partner_runs", "n_testing", 1)));
+    assert!(!edges(&hidden).iter().any(|(_, to, _)| *to == "n_side"));
+}
+
+/// C2: a node that is not relevant only until a decision upstream of it is answered shows with
+/// the conditional ones, and is not counted among the settled ones: leaving conditional out
+/// hides it with the undecided, and leaving not relevant out does not.
+#[test]
+fn pending_nodes_travel_with_the_conditional_ones() {
+    use LevelDisplay::{Conditional, NotRelevant, Relevant};
+    let chain = support::journey(&support::add_nodes(&[
+        "{key: n_d1, id: d1, kind: decision, title: D1, prompt: D1?, answer_type: boolean}",
+        "{key: n_d2, id: d2, kind: decision, title: D2, prompt: D2?, answer_type: boolean, relevant_when: {equals: {decision: n_d1, value: true}}}",
+        "{key: n_x, id: x, kind: action, title: X, relevant_when: {equals: {decision: n_d2, value: true}}}",
+    ]));
+    let visible = |records: &Records, display: &[LevelDisplay]| -> Vec<String> {
+        level_of(records, support::JOURNEY, &query(&[], display))
+            .nodes
+            .iter()
+            .map(|node| node.key.to_string())
+            .collect()
+    };
+    assert_eq!(visible(&chain, &[Relevant, NotRelevant]), ["n_d1"]);
+    assert_eq!(
+        visible(&chain, &[Relevant, Conditional]),
+        ["n_d1", "n_d2", "n_x"]
+    );
+    let no = support::accepted(
+        &chain,
+        "- op: answer\n  decision: n_d1\n  value: {boolean: false}\n",
+    );
+    assert_eq!(visible(&no, &[Relevant, Conditional]), ["n_d1"]);
+    assert_eq!(
+        visible(&no, &[Relevant, NotRelevant]),
+        ["n_d1", "n_d2", "n_x"]
+    );
 }

@@ -13,8 +13,8 @@ use cairn_engine::{
     Derived, DerivedJourney, DraftContext, Graph, ProjectionError, derive, engine_version,
 };
 use cairn_schema::{
-    AttachmentKey, Cursor, DomainDocument, EngineVersion, ExplainedField, KindKey, ListQuery,
-    NextQuery, NodeKey, NodeKind, RenderedDraft, ResourceContent, SnapshotScope, Url,
+    AttachmentKey, Cursor, DomainDocument, EngineVersion, ExplainedField, KindKey, LevelQuery,
+    ListQuery, NextQuery, NodeKey, NodeKind, RenderedDraft, ResourceContent, SnapshotScope, Url,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -63,14 +63,10 @@ pub fn engine_version_text() -> String {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "projection", rename_all = "snake_case", deny_unknown_fields)]
 pub enum Projection {
-    /// C2: one canvas level, the kinds shown, at the top or drilled into `container`.
-    Level {
-        /// The kinds shown.
-        shown: BTreeSet<NodeKind>,
-        /// The container drilled into; the top level when none.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        container: Option<NodeKey>,
-    },
+    /// C2: one canvas level: the kinds shown, at the top or drilled into a container, with
+    /// containers collapsed and the relevance classes shown (the request's fields beside the
+    /// tag).
+    Level(LevelQuery),
     /// C7: upstream and downstream of a node.
     Trace {
         /// The node.
@@ -106,6 +102,12 @@ pub enum Projection {
         #[serde(default)]
         scope: SnapshotScope,
     },
+    /// C12: what each answer to a decision does to the journey's scope: brings in, drops,
+    /// decided later, what it pins and fills.
+    AnswerEffects {
+        /// The decision.
+        key: NodeKey,
+    },
     /// C8: one page of a node's explanation list.
     Explanations {
         /// The node.
@@ -116,6 +118,15 @@ pub enum Projection {
         #[serde(default)]
         cursor: Cursor,
     },
+}
+
+impl Projection {
+    /// C2: the level of the kinds `shown` within `container`, nothing collapsed and every
+    /// relevance class shown.
+    #[must_use]
+    pub fn level(shown: BTreeSet<NodeKind>, container: Option<NodeKey>) -> Self {
+        Projection::Level(LevelQuery::of_kinds(shown, container))
+    }
 }
 
 /// A10, G3: a node's message draft to render with the journey's context. The server has no
@@ -183,8 +194,18 @@ impl Derivation {
             message: error.to_string(),
         };
         Ok(match request {
-            Projection::Level { shown, container } => {
-                json(&journey.level(shown, container.as_ref()).map_err(missing)?)
+            Projection::Level(query) => json(
+                &journey
+                    .level(query, &self.document.inputs.deployment)
+                    .map_err(missing)?,
+            ),
+            Projection::AnswerEffects { key } => {
+                // None (JSON null) for a node that is not a decision, as the server's read.
+                json(
+                    &journey
+                        .answer_effects(key, &self.document.inputs.deployment)
+                        .map_err(missing)?,
+                )
             }
             Projection::Trace { key } => json(&journey.trace(key).map_err(missing)?),
             Projection::DecisionView => json(&journey.decision_view()),

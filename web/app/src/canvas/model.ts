@@ -15,6 +15,7 @@ export type Level = Schema<"Level">;
 export type LevelNode = Schema<"LevelNode">;
 export type LevelEdge = Schema<"LevelEdge">;
 export type Relevance = Schema<"Relevance">;
+export type LevelDisplay = Schema<"LevelDisplay">;
 export type Trace = Schema<"Trace">;
 export type Stalled = Schema<"Stalled">;
 
@@ -84,6 +85,8 @@ export interface Card {
   /** A decision's prompt (C1). */
   prompt: string | undefined;
   checklist: ChecklistItem[];
+  /** Every hidden node that rolled up into it, whatever hid it (C2); the trace marks the card for each. */
+  rolledUp: string[];
   /** C2: hidden, unsatisfied prerequisites no drawn edge stands for. */
   hiddenPrerequisites: string[];
   journey: CardState | undefined;
@@ -201,10 +204,13 @@ export function cardsOf(level: Level, graph: GraphNode[], looks?: Looks): Card[]
         parent: at.parent ?? undefined,
         drillable: parents.has(node.key),
         prompt: node.kind === "decision" ? node.prompt : undefined,
+        // Work hidden by its kind is the card's checklist; a node of a shown kind that rolled up
+        // was hidden for its relevance class or a collapsed container, not work to tick off.
         checklist: (at.rolled_up ?? []).flatMap((key) => {
           const item = nodes.get(key);
-          return item === undefined ? [] : [{ key, title: item.title, kind: item.kind, done: looks?.finished(key) ?? false }];
+          return item === undefined || level.shown.includes(item.kind) ? [] : [{ key, title: item.title, kind: item.kind, done: looks?.finished(key) ?? false }];
         }),
+        rolledUp: at.rolled_up ?? [],
         hiddenPrerequisites: at.hidden_prerequisites ?? [],
         journey: looks?.card(node, at),
       },

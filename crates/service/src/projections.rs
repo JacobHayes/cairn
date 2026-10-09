@@ -13,11 +13,11 @@ use std::sync::Arc;
 
 use cairn_engine::{DerivedJourney, ProjectionError};
 use cairn_schema::{
-    Annotation, AnswerValue, Cursor, Date, DecisionView, DisplayState, Domain, EntityKey,
-    ExplainedField, ExplanationPage, JourneyId, KeyRefs, KindKey, Level, ListPage, ListQuery,
-    LocalEdit, MineEntry, Next, NextQuery, Node, NodeDerived, NodeKey, NodeKind, NodeState,
-    Overrides, PatchEvents, Path, ProposalId, Revision, Snapshot, SnapshotScope, State,
-    StatusSummary, StillWaiting, Timeline, Title, Trace,
+    Annotation, AnswerEffects, AnswerValue, Cursor, Date, DecisionView, Deployment, DisplayState,
+    Domain, EntityKey, ExplainedField, ExplanationPage, JourneyId, KeyRefs, KindKey, Level,
+    LevelQuery, ListPage, ListQuery, LocalEdit, MineEntry, Next, NextQuery, Node, NodeDerived,
+    NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId, Revision, Snapshot,
+    SnapshotScope, State, StatusSummary, StillWaiting, Timeline, Title, Trace,
 };
 use cairn_store::{EventQuery, PageSize, Store};
 
@@ -109,6 +109,9 @@ pub struct NodeDetail {
     /// on (C8, Priority: Leverage): the largest entries up to `explanation_entry_count_max`
     /// with the total; the rest page through [`Service::explanations`].
     pub still_waiting: StillWaiting,
+    /// A decision's per-choice effects (C12): what each answer brings in, drops, and leaves
+    /// to be decided later; none for another kind of node.
+    pub answer_effects: Option<AnswerEffects>,
 }
 
 /// One child in a node's detail.
@@ -170,20 +173,23 @@ impl<S: Store> Service<S> {
         .await
     }
 
-    /// C2: one canvas level: the kinds shown, at the top or drilled into `container`.
+    /// C2: one canvas level: the kinds shown, at the top or drilled into a container, with
+    /// containers collapsed and the relevance classes shown the query names.
     ///
     /// # Errors
     ///
-    /// When the journey or the container does not exist, or the store fails.
+    /// When the journey, the container, or a collapsed container does not exist, or the
+    /// store fails.
     pub async fn level(
         &self,
         call: &Call,
         id: &JourneyId,
-        shown: &BTreeSet<NodeKind>,
-        container: Option<&NodeKey>,
+        query: &LevelQuery,
     ) -> Result<Projected<Level>, ReadError> {
-        self.project(call, id, |journey, _| journey.level(shown, container))
-            .await
+        self.project_in(call, id, |journey, deployment| {
+            journey.level(query, deployment)
+        })
+        .await
     }
 
     /// C7: what is upstream and downstream of a node, with gravity contributors marked.
@@ -300,8 +306,10 @@ impl<S: Store> Service<S> {
         id: &JourneyId,
         key: &NodeKey,
     ) -> Result<Projected<NodeDetail>, ReadError> {
-        self.project(call, id, |journey, _| detail(journey, key))
-            .await
+        self.project_in(call, id, |journey, deployment| {
+            detail(journey, key, deployment)
+        })
+        .await
     }
 
     /// C8; ARCHITECTURE, Read path: a page of a node's explanation list for `field`, largest
@@ -363,6 +371,28 @@ impl<S: Store> Service<S> {
         })
     }
 
+    /// Runs `projection` over the journey derived for `call` and the deployment it was
+    /// derived over.
+    async fn project_in<T>(
+        &self,
+        call: &Call,
+        id: &JourneyId,
+        projection: impl FnOnce(&DerivedJourney<'_>, &Deployment) -> Result<T, ProjectionError>,
+    ) -> Result<Projected<T>, ReadError> {
+        let derivation = self.derivation(call, id).await?;
+        let value = engine(&Domain::Journey(id.clone()), || {
+            let journey = DerivedJourney::new(&derivation.graph, &derivation.derived);
+            projection(&journey, &derivation.deployment)
+        })?
+        .map_err(ReadError::Projection)?;
+        Ok(Projected {
+            revision: derivation.key.revision,
+            deployment_revision: derivation.key.deployment,
+            today: derivation.key.today,
+            value,
+        })
+    }
+
     /// Runs `projection` over the journey derived for `call`.
     async fn project<T>(
         &self,
@@ -418,8 +448,13 @@ impl<S: Store> Service<S> {
     }
 }
 
-/// C8: one node's detail from its derived journey.
-fn detail(journey: &DerivedJourney<'_>, key: &NodeKey) -> Result<NodeDetail, ProjectionError> {
+/// C8: one node's detail from its derived journey; `deployment` is the one it was derived
+/// over.
+fn detail(
+    journey: &DerivedJourney<'_>,
+    key: &NodeKey,
+    deployment: &Deployment,
+) -> Result<NodeDetail, ProjectionError> {
     let graph = journey.graph();
     let node = graph
         .node(key)
@@ -472,5 +507,6 @@ fn detail(journey: &DerivedJourney<'_>, key: &NodeKey) -> Result<NodeDetail, Pro
         annotations,
         derived: journey.derived().node_derived(graph, key),
         still_waiting: StillWaiting::for_response(journey.still_waiting(key)?),
+        answer_effects: journey.answer_effects(key, deployment)?,
     })
 }

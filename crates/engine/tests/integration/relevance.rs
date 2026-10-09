@@ -233,3 +233,61 @@ fn answers_are_in_effect_while_decided_and_relevant() {
         "a decision that leaves scope no longer fills its role"
     );
 }
+
+/// Gating, C2: a node gated on a decision that is itself undecided reads `not_relevant` (the
+/// decision is unanswered) yet is pending on it; once that decision is ruled out the node is
+/// settled, and a node ruled out by an answer was never pending.
+#[test]
+fn a_node_behind_an_undecided_decision_is_pending_on_it() {
+    use cairn_engine::derive::pending::{RelevanceClass, classify};
+    let journey = support::journey(&support::add_nodes(&[
+        "{key: n_d1, id: d1, kind: decision, title: D1, prompt: D1?, answer_type: boolean}",
+        "{key: n_d2, id: d2, kind: decision, title: D2, prompt: D2?, answer_type: boolean, relevant_when: {equals: {decision: n_d1, value: true}}}",
+        "{key: n_x, id: x, kind: action, title: X, relevant_when: {equals: {decision: n_d2, value: true}}}",
+        "{key: n_y, id: y, kind: action, title: Y, relevant_when: {equals: {decision: n_d1, value: false}}}",
+    ]));
+    let classes = |records: &cairn_engine::Records| {
+        let graph = support::journey_graph(records, support::JOURNEY);
+        classify(&graph, &records.deployment)
+    };
+    let open = classes(&journey);
+    assert_eq!(open.class(&key("n_x")), RelevanceClass::Pending);
+    assert_eq!(open.pending_on(&key("n_x")), &[key("n_d2")].into());
+    assert_eq!(open.class(&key("n_d2")), RelevanceClass::Undecided);
+    let no = support::accepted(
+        &journey,
+        "- op: answer\n  decision: n_d1\n  value: {boolean: false}\n",
+    );
+    let ruled_out = classes(&no);
+    assert_eq!(ruled_out.class(&key("n_x")), RelevanceClass::Settled);
+    assert_eq!(ruled_out.class(&key("n_d2")), RelevanceClass::Settled);
+    assert_eq!(ruled_out.class(&key("n_y")), RelevanceClass::Relevant);
+}
+
+/// C2: a node can be pending on a decision that is relevant right now: C reads `not (B = yes)`,
+/// so while B is undecided C holds, and its recorded answer stands, but reading B as unknown C
+/// is undecided too, so what reads C's answer may yet change.
+#[test]
+fn a_pending_node_can_wait_on_a_decision_that_is_relevant_now() {
+    use cairn_engine::derive::pending::{RelevanceClass, classify};
+    let journey = support::journey(&support::add_nodes(&[
+        "{key: n_a, id: a, kind: decision, title: A, prompt: A?, answer_type: boolean}",
+        "{key: n_b, id: b, kind: decision, title: B, prompt: B?, answer_type: boolean, relevant_when: {equals: {decision: n_a, value: true}}}",
+        "{key: n_c, id: c, kind: decision, title: C, prompt: C?, answer_type: boolean, relevant_when: {not: {equals: {decision: n_b, value: true}}}}",
+        "{key: n_x, id: x, kind: action, title: X, relevant_when: {equals: {decision: n_c, value: false}}}",
+    ]));
+    // Answer A no (B is ruled out, C holds), answer C, then reopen A.
+    let mut answered = journey;
+    for step in [
+        "- op: answer\n  decision: n_a\n  value: {boolean: false}\n",
+        "- op: answer\n  decision: n_c\n  value: {boolean: true}\n",
+        "- op: transition\n  node: n_a\n  transition: reopen\n",
+    ] {
+        answered = support::accepted(&answered, step);
+    }
+    let graph = support::journey_graph(&answered, support::JOURNEY);
+    let classes = classify(&graph, &answered.deployment);
+    assert_eq!(classes.class(&key("n_c")), RelevanceClass::Relevant);
+    assert_eq!(classes.class(&key("n_x")), RelevanceClass::Pending);
+    assert_eq!(classes.pending_on(&key("n_x")), &[key("n_c")].into());
+}

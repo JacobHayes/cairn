@@ -9,9 +9,9 @@ use std::fmt;
 use std::str::FromStr;
 
 use cairn_schema::{
-    Cursor, Domain, EntityKey, EventType, JourneyId, JourneyStatus, KindKey, ListFlag, ListQuery,
-    NextQuery, NodeKey, NodeKind, PatchId, ProposalId, Revision, RevisionOf, RouteId,
-    SnapshotScope, SortBy, State, Timestamp, Title, UserId, VersionNumber,
+    Cursor, Domain, EntityKey, EventType, JourneyId, JourneyStatus, KindKey, LevelDisplay,
+    LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, PatchId, ProposalId, Revision,
+    RevisionOf, RouteId, SnapshotScope, SortBy, State, Timestamp, Title, UserId, VersionNumber,
 };
 use cairn_store::{EventQuery, JourneyQuery, PageSize, SearchQuery, Watch};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
@@ -169,6 +169,14 @@ pub const LEVEL_PARAMS: &[ParamSpec] = &[
     ParamSpec::one::<NodeKey>(
         "container",
         "The container drilled into; the top level when none.",
+    ),
+    ParamSpec::many::<NodeKey>(
+        "collapsed",
+        "Containers rolled into their own cards: everything beneath each is hidden and rolls up          into it, and its edges re-target to it. A key outside the level has no effect.",
+    ),
+    ParamSpec::many::<LevelDisplay>(
+        "display",
+        "The relevance classes shown: `relevant`, `conditional` (undecided, or waiting on a          decision that cannot be answered yet), `not_relevant` (settled). Every class when none.          A node of a class left out rolls up like a hidden kind's.",
     ),
 ];
 
@@ -406,17 +414,25 @@ pub fn snapshot(params: &Params) -> Result<SnapshotScope, ApiError> {
     })
 }
 
-/// C2: the kinds a level shows (every kind when none is given) and the container drilled into.
+/// C2: a level's query: the kinds shown (every kind when none is given), the container
+/// drilled into, the containers collapsed, and the relevance classes shown (every class when
+/// none is given).
 ///
 /// # Errors
 ///
 /// A bad request for a parameter that does not parse.
-pub fn level(params: &Params) -> Result<(BTreeSet<NodeKind>, Option<NodeKey>), ApiError> {
+pub fn level(params: &Params) -> Result<LevelQuery, ApiError> {
     let mut shown: BTreeSet<NodeKind> = params.all("kind")?.into_iter().collect();
     if shown.is_empty() {
         shown = NodeKind::ALL.into_iter().collect();
     }
-    Ok((shown, params.one("container")?))
+    let mut query = LevelQuery::of_kinds(shown, params.one("container")?);
+    query.collapsed = params.all("collapsed")?.into_iter().collect();
+    let display: BTreeSet<LevelDisplay> = params.all("display")?.into_iter().collect();
+    if !display.is_empty() {
+        query.display = display;
+    }
+    Ok(query)
 }
 
 /// C10: the next list's query.

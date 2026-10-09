@@ -175,6 +175,20 @@ fn order(document: &Document) -> Vec<&NodeKey> {
     ordered
 }
 
+/// How a relevance pass reads decisions beyond the stored state: the what-if reads
+/// ([`super::pending`], answer effects) re-run the pass with one of these; the derive's own
+/// pass uses none.
+#[derive(Clone, Copy, Debug, Default)]
+pub(crate) struct Lens<'a> {
+    /// A decision read as decided with this answer, while it is relevant and open or decided
+    /// (E3): the answer a person is about to give.
+    pub assume: Option<(&'a NodeKey, &'a AnswerValue)>,
+    /// A decision that is itself undecided is read as unknown, not unanswered: Kleene's logic
+    /// through a chain of decisions, to tell a node that is not relevant for good from one
+    /// that is not relevant only until an upstream decision is answered.
+    pub pending: bool,
+}
+
 /// Pass 1: every node's relevance. `inherited_skips` names, for each node under a skip it is
 /// not kept from, the skipped ancestor (D1a): an open decision there is effectively skipped,
 /// so a condition reads it as unanswered.
@@ -184,13 +198,31 @@ pub(crate) fn pass(
     deployment: &Deployment,
     inherited_skips: &BTreeMap<NodeKey, NodeKey>,
 ) -> Relevances {
+    pass_with(graph, deployment, inherited_skips, Lens::default())
+}
+
+/// Pass 1 read through a [`Lens`].
+#[must_use]
+pub(crate) fn pass_with(
+    graph: &Graph,
+    deployment: &Deployment,
+    inherited_skips: &BTreeMap<NodeKey, NodeKey>,
+    lens: Lens<'_>,
+) -> Relevances {
     let document = graph.document();
     let mut relevances = Relevances::default();
     for key in order(document) {
         let Some(node) = document.nodes.get(key) else {
             continue;
         };
-        let found = evaluate(document, node, &relevances, deployment, inherited_skips);
+        let found = evaluate(
+            document,
+            node,
+            &relevances,
+            deployment,
+            inherited_skips,
+            lens,
+        );
         relevances.nodes.insert(key.clone(), found);
     }
     assert_eq!(relevances.nodes.len(), document.nodes.len());
@@ -204,6 +236,7 @@ fn evaluate(
     done: &Relevances,
     deployment: &Deployment,
     inherited_skips: &BTreeMap<NodeKey, NodeKey>,
+    lens: Lens<'_>,
 ) -> NodeRelevance {
     if forced(document, &node.key) {
         return NodeRelevance {
@@ -236,9 +269,10 @@ fn evaluate(
     let Some(condition) = &node.relevant_when else {
         return inherited;
     };
-    let term = |decision: &NodeKey| term(document, done, inherited_skips, decision);
+    let term = |decision: &NodeKey| term(document, done, inherited_skips, lens, decision);
     let own = relevance_of(condition::evaluate(condition, term, deployment));
-    let hopeful = |decision: &NodeKey| hopeful_term(document, done, inherited_skips, decision);
+    let hopeful =
+        |decision: &NodeKey| hopeful_term(document, done, inherited_skips, lens, decision);
     let own_optimistic = relevance_of(condition::evaluate(condition, hopeful, deployment));
     let value = dominant(inherited.value, own);
     let optimistic = dominant(inherited.optimistic, own_optimistic);
@@ -299,11 +333,15 @@ fn dominant(first: Relevance, second: Relevance) -> Relevance {
 
 /// What a decision contributes to a condition (Gating): its answer when decided and
 /// relevant; unknown when open, relevant, and not under a skip; unanswered otherwise
-/// (skipped, effectively skipped, not relevant, or itself undecided).
+/// (skipped, effectively skipped, not relevant, or itself undecided). A [`Lens`] changes two
+/// readings: an assumed answer stands in for the decision's own while it is relevant and open
+/// or decided, and with `pending` an undecided decision that is open or decided reads as
+/// unknown.
 fn term<'g>(
     document: &'g Document,
     done: &Relevances,
     inherited_skips: &BTreeMap<NodeKey, NodeKey>,
+    lens: Lens<'g>,
     decision: &NodeKey,
 ) -> Term<'g> {
     let found = done.get(decision);
@@ -311,17 +349,30 @@ fn term<'g>(
         found.is_some(),
         "a decision is evaluated before the conditions reading it"
     );
-    if found.map(|found| found.value) != Some(Relevance::Relevant) {
-        return Term::Unanswered;
-    }
+    let value = found.map(|found| found.value);
     let Some(node) = document.nodes.get(decision) else {
         return Term::Unanswered;
     };
-    match stored_state(document, node) {
+    let state = stored_state(document, node);
+    let under_skip = inherited_skips.contains_key(decision);
+    let open = state == State::Open && !under_skip;
+    if value == Some(Relevance::Undecided) && lens.pending && (open || state == State::Decided) {
+        return Term::Unknown;
+    }
+    if value != Some(Relevance::Relevant) {
+        return Term::Unanswered;
+    }
+    if let Some((assumed, answer)) = lens.assume
+        && assumed == decision
+        && (open || state == State::Decided)
+    {
+        return Term::Answered(answer);
+    }
+    match state {
         State::Decided => done
             .answer_in_effect(document, decision)
             .map_or(Term::Unanswered, Term::Answered),
-        State::Open if !inherited_skips.contains_key(decision) => Term::Unknown,
+        State::Open if !under_skip => Term::Unknown,
         State::Open
         | State::Skipped
         | State::Todo
@@ -341,6 +392,7 @@ fn hopeful_term<'g>(
     document: &'g Document,
     done: &Relevances,
     inherited_skips: &BTreeMap<NodeKey, NodeKey>,
+    lens: Lens<'g>,
     decision: &NodeKey,
 ) -> Term<'g> {
     let found = done.get(decision);
@@ -352,7 +404,7 @@ fn hopeful_term<'g>(
         return Term::Unanswered;
     };
     if found.value == Relevance::Relevant || found.optimistic == Relevance::NotRelevant {
-        return term(document, done, inherited_skips, decision);
+        return term(document, done, inherited_skips, lens, decision);
     }
     let Some(node) = document.nodes.get(decision) else {
         return Term::Unanswered;

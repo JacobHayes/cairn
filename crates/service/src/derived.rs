@@ -49,6 +49,9 @@ pub(crate) struct Derivation {
     pub graph: Graph,
     /// Its derive.
     pub derived: Derived,
+    /// The deployment it was derived over: what a three-valued re-evaluation of its
+    /// conditions (a level's relevance classes, an answer's effects) reads entity aliases from.
+    pub deployment: Deployment,
 }
 
 impl Derivation {
@@ -81,6 +84,7 @@ impl Derivation {
             key,
             graph,
             derived,
+            deployment: deployment.clone(),
         }
     }
 }

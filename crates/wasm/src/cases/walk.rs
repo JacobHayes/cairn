@@ -10,8 +10,9 @@ use std::sync::Arc;
 use cairn_engine::{ApplyInputs, Graph, Records, consequences, derive};
 use cairn_schema::{
     Actor, Consequences, Cursor, Domain, DomainDocument, ExplainedField, JourneyId, KeyRefs,
-    ListQuery, NextQuery, Node, NodeKind, Patch, PatchId, ProposalDraft, RankConstants, RouteFile,
-    SnapshotScope, State, Timestamp, VersionNumber, from_yaml, to_yaml,
+    LevelDisplay, LevelQuery, ListQuery, NextQuery, Node, NodeKey, NodeKind, Patch, PatchId,
+    ProposalDraft, RankConstants, RouteFile, SnapshotScope, State, Timestamp, VersionNumber,
+    from_yaml, to_yaml,
 };
 use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, Written};
 use cairn_store::{InProcessNotifier, MemoryStore};
@@ -90,13 +91,20 @@ fn server_projection(
     let call = reader();
     let read = |what: &str| format!("{what} of {id}");
     match request {
-        Projection::Level { shown, container } => json(
-            &served(
-                now_or_never(service.level(&call, id, shown, container.as_ref())),
+        Projection::Level(query) => {
+            let level = served(
+                now_or_never(service.level(&call, id, query)),
                 &read("level"),
-            )
-            .value,
-        ),
+            );
+            json(&level.value)
+        }
+        Projection::AnswerEffects { key } => {
+            let detail = served(
+                now_or_never(service.node_detail(&call, id, key)),
+                &read("answer effects"),
+            );
+            json(&detail.value.answer_effects)
+        }
         Projection::Trace { key } => {
             json(&served(now_or_never(service.trace(&call, id, key)), &read("trace")).value)
         }
@@ -148,19 +156,32 @@ fn server_projection(
 fn projections(document: &DomainDocument) -> Vec<Projection> {
     let nodes: Vec<&Node<KeyRefs>> = document.journey.graph.nodes.values().collect();
     let shown: BTreeSet<NodeKind> = NodeKind::ALL.into_iter().collect();
-    let mut requests = vec![Projection::Level {
-        shown: shown.clone(),
-        container: None,
-    }];
+    let mut requests = vec![Projection::level(shown.clone(), None)];
     requests.extend(
         nodes
             .iter()
             .filter(|node| node.kind() == NodeKind::Group)
-            .map(|node| Projection::Level {
-                shown: shown.clone(),
-                container: Some(node.key.clone()),
-            }),
+            .map(|node| Projection::level(shown.clone(), Some(node.key.clone()))),
     );
+    // Collapsed groups and each relevance class left out, one at a time, over the whole graph.
+    let groups: BTreeSet<NodeKey> = nodes
+        .iter()
+        .filter(|node| node.kind() == NodeKind::Group)
+        .map(|node| node.key.clone())
+        .collect();
+    requests.push(Projection::Level(LevelQuery {
+        collapsed: groups,
+        ..LevelQuery::of_kinds(shown.clone(), None)
+    }));
+    for left_out in LevelDisplay::ALL {
+        requests.push(Projection::Level(LevelQuery {
+            display: LevelDisplay::ALL
+                .into_iter()
+                .filter(|class| *class != left_out)
+                .collect(),
+            ..LevelQuery::of_kinds(shown.clone(), None)
+        }));
+    }
     requests.extend([
         Projection::DecisionView,
         Projection::Timeline,
@@ -179,6 +200,11 @@ fn projections(document: &DomainDocument) -> Vec<Projection> {
         },
     ]);
     for node in nodes {
+        if node.kind() == NodeKind::Decision {
+            requests.push(Projection::AnswerEffects {
+                key: node.key.clone(),
+            });
+        }
         requests.push(Projection::Trace {
             key: node.key.clone(),
         });
@@ -445,10 +471,7 @@ fn after_group(
 ) -> Group {
     let derived = served(now_or_never(service.derived(&reader(), id)), "derive");
     let requests = [
-        Projection::Level {
-            shown: NodeKind::ALL.into_iter().collect(),
-            container: None,
-        },
+        Projection::level(NodeKind::ALL.into_iter().collect(), None),
         Projection::Next {
             query: NextQuery::default(),
         },

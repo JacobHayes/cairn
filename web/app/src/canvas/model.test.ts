@@ -8,7 +8,7 @@ import { journeyLooks } from "./journey.ts";
 import { DOTTED, cardClasses, hereWords, lineLook } from "./look.ts";
 import { DEFAULT_SETTINGS, borderFor, cardsOf, dueTone, linesOf, type CanvasModel, type Card, type Level } from "./model.ts";
 import { TRACE_LABELS, traceOverlay } from "./overlay.ts";
-import { withRelevanceShown } from "./relevance.ts";
+import { levelRequest } from "./settings.ts";
 
 const view = canvasView();
 const graph = view.journey.graph.nodes ?? [];
@@ -81,24 +81,19 @@ describe("C1: cards and lines", () => {
   test.each([
     ["n_old", "card-not-relevant"],
     ["n_option", "card-undecided"],
-  ])("%s is drawn with %s and not hidden by default", (key, look) => {
+  ])("%s is drawn with %s", (key, look) => {
     expect(cardClasses(card(whole, key))).toContain(look);
-    expect(withRelevanceShown(view, whole, DEFAULT_SETTINGS).cards.map((each) => each.key)).toContain(key);
   });
 });
 
-describe("C1, C2: hiding by relevance never makes blocked work look free", () => {
-  test("hiding undecided nodes marks the work they block", () => {
-    const shown = withRelevanceShown(view, whole, { ...DEFAULT_SETTINGS, undecided: false });
-    expect(shown.cards.map((each) => each.key)).not.toContain("n_option");
-    expect(card(shown, "n_build").hiddenPrerequisites).toEqual(["n_option"]);
-    expect(shown.lines.map((line) => line.id)).toEqual(["n_kick->n_stage"]);
-  });
-
-  test("hiding not-relevant nodes marks nothing, since they block nothing", () => {
-    const shown = withRelevanceShown(view, whole, { ...DEFAULT_SETTINGS, notRelevant: false });
-    expect(shown.cards.map((each) => each.key)).not.toContain("n_old");
-    expect(shown.cards.flatMap((each) => each.hiddenPrerequisites)).toEqual([]);
+describe("C1, C2: the relevance toggles are the level request's display set", () => {
+  test.each([
+    ["every class shown asks for the default", {}, undefined],
+    ["undecided hidden leaves conditional out", { undecided: false }, ["relevant", "not_relevant"]],
+    ["not relevant hidden leaves it out", { notRelevant: false }, ["relevant", "conditional"]],
+  ])("%s", (_, toggles, display) => {
+    const asked = levelRequest({ ...DEFAULT_SETTINGS, trace: false, edit: false, ...toggles });
+    expect(asked.display).toEqual(display);
   });
 });
 
@@ -179,6 +174,13 @@ describe("C7: the trace", () => {
     expect(overlay.marks["n_build"]?.label).toBe(TRACE_LABELS.traced);
     expect(overlay.outside).toEqual(["n_choose"]);
   });
+
+  test("a node rolled up into a card for its relevance class, not its kind, still marks that card", () => {
+    const level = actionsAndDecisionsHidden();
+    level.shown = [...level.shown, "action"];
+    const overlay = traceOverlay({ ...trace, node: "n_check", upstream: [], downstream: [] }, model(level), "Check the build");
+    expect(overlay.marks["n_build"]?.label).toBe(TRACE_LABELS.traced);
+  });
 });
 
 /** The canvas journey with `change` made to its derive. */
@@ -218,30 +220,9 @@ describe("C1, C2: what the canvas shows as finished, and markers through roll-up
     expect(card(modelOf(view, wholeLevel()), "n_stage").journey?.due?.tone).toBe("plain");
   });
 
-  test("hiding undecided nodes marks a container whose rolled-up child they block", () => {
-    const view = changed((each) => {
-      derivedOf(each, "n_build").blocked_by = [];
-      derivedOf(each, "n_check").blocked_by = [{ node: "n_option", via: "explicit" }];
-    });
-    const shown = withRelevanceShown(view, modelOf(view, actionsAndDecisionsHidden()), { ...DEFAULT_SETTINGS, undecided: false });
-    expect(card(shown, "n_build").hiddenPrerequisites).toEqual(["n_option"]);
-  });
-
-  test("hiding an undecided container marks what its shown child inherits from it", () => {
-    const view = changed((each) => {
-      derivedOf(each, "n_stage").relevance = { value: "undecided", decisions: ["n_choose"] };
-      derivedOf(each, "n_stage").display_state = "conditional";
-      derivedOf(each, "n_stage").blocked_by = [{ node: "n_kick", via: { stage_opening: { group: "n_stage" } } }];
-      derivedOf(each, "n_build").blocked_by = [];
-      derivedOf(each, "n_build").blocked_through = ["n_stage"];
-      const kick = each.journey.graph.state?.nodes?.["n_kick"];
-      if (kick !== undefined) {
-        kick.state = "pending";
-      }
-    });
-    const shown = withRelevanceShown(view, modelOf(view, wholeLevel()), { ...DEFAULT_SETTINGS, undecided: false });
-    expect(shown.cards.map((each) => each.key)).not.toContain("n_stage");
-    expect(card(shown, "n_build").parent).toBeUndefined();
-    expect(card(shown, "n_build").hiddenPrerequisites).toEqual(["n_kick"]);
+  test("a node of a shown kind that rolled up is not a checklist item", () => {
+    const level = actionsAndDecisionsHidden();
+    level.shown = [...level.shown, "action"];
+    expect(card(model(level), "n_build").checklist).toEqual([]);
   });
 });

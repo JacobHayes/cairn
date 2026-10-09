@@ -14,7 +14,8 @@ use DisplayState::{
 };
 use cairn_engine::{Derived, DerivedJourney, Graph, Records};
 use cairn_schema::{
-    DisplayState, NextQuery, NodeKind, Relevance, SnapshotScope, State, StatusSummary,
+    Deployment, DisplayState, LevelQuery, NextQuery, NodeKind, Relevance, SnapshotScope, State,
+    StatusSummary,
 };
 use support::{add_nodes as add, key};
 
@@ -633,7 +634,10 @@ fn the_level_carries_display_state_and_keeps_group_state() {
     ];
     let level = seen
         .journey()
-        .level(&all.into_iter().collect(), None)
+        .level(
+            &LevelQuery::of_kinds(all.into_iter().collect(), None),
+            &Deployment::default(),
+        )
         .unwrap();
     for node in &level.nodes {
         assert_eq!(

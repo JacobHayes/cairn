@@ -6,7 +6,8 @@ use crate::support;
 
 use cairn_engine::{Derived, DerivedJourney, DraftContext, Graph, Records};
 use cairn_schema::{
-    AnswerValue, DateOrigin, Journey, KeyRefs, MessageTemplate, NodeKey, ResourceContent, State,
+    AnswerEffects, AnswerValue, DateOrigin, Journey, KeyRefs, MessageTemplate, NodeKey,
+    ResourceContent, State,
 };
 use support::key;
 
@@ -406,4 +407,173 @@ fn a_merged_entity_answer_names_the_survivor_in_snapshot_and_decision_view() {
         .snapshot(&cairn_schema::SnapshotScope::default())
         .unwrap();
     assert_eq!(snapshot.answers.get(&who).cloned(), survivor);
+}
+
+/// A decision `n_d1` that, answered yes, brings in a second decision `n_d2`, a third `n_d3`,
+/// and an action `n_y`, with an action `n_x` that hangs on the second.
+fn chain() -> Records {
+    support::journey(&support::add_nodes(&[
+        "{key: n_d1, id: d1, kind: decision, title: D1, prompt: D1?, answer_type: boolean}",
+        "{key: n_d2, id: d2, kind: decision, title: D2, prompt: D2?, answer_type: boolean, relevant_when: {equals: {decision: n_d1, value: true}}}",
+        "{key: n_d3, id: d3, kind: decision, title: D3, prompt: D3?, answer_type: boolean, relevant_when: {equals: {decision: n_d1, value: true}}}",
+        "{key: n_y, id: y, kind: action, title: Y, relevant_when: {equals: {decision: n_d1, value: true}}}",
+        "{key: n_x, id: x, kind: action, title: X, relevant_when: {equals: {decision: n_d2, value: true}}}",
+    ]))
+}
+
+fn effects_of(records: Records, decision: &str) -> AnswerEffects {
+    let derive = Derive::of(records, support::JOURNEY);
+    derive
+        .journey()
+        .answer_effects(&key(decision), &derive.records.deployment)
+        .unwrap()
+        .unwrap()
+}
+
+/// C12: answering a decision brings in what it makes relevant, drops what it rules out, and
+/// reports a node that would still hang on another unanswered decision as decided later, never
+/// as a drop.
+#[test]
+fn answer_effects_report_the_second_order_branch_as_decided_later() {
+    let effects = effects_of(chain(), "n_d1");
+    assert!(effects.applies);
+    let [no, yes] = effects.choices.as_slice() else {
+        panic!("a boolean has two choices");
+    };
+    assert_eq!(no.answer, AnswerValue::Boolean(false));
+    // No rules out everything gated on a yes, the second-order action included.
+    assert_eq!(names(&no.drops.nodes), ["n_d2", "n_d3", "n_x", "n_y"]);
+    assert_eq!((no.brings_in.total, no.decided_later.total), (0, 0));
+    // Yes brings in three nodes, two of them decisions to answer; the action behind the
+    // second decision is decided later and is not dropped.
+    assert_eq!(names(&yes.brings_in.nodes), ["n_d2", "n_d3", "n_y"]);
+    assert_eq!(names(&yes.opens_decisions.nodes), ["n_d2", "n_d3"]);
+    assert_eq!(names(&yes.decided_later.nodes), ["n_x"]);
+    assert_eq!(yes.drops.total, 0);
+}
+
+/// C12: revising a recorded answer counts the progress it would leave behind among the drops,
+/// the recorded choice has no effect, and a decision that is ruled out answers to nothing.
+#[test]
+fn answer_effects_of_a_revision_count_progress_and_a_ruled_out_decision_has_none() {
+    let decided = support::accepted(
+        &chain(),
+        "- op: answer\n  decision: n_d1\n  value: {boolean: true}\n- op: transition\n  node: n_y\n  transition: start\n",
+    );
+    let effects = effects_of(decided, "n_d1");
+    let [no, yes] = effects.choices.as_slice() else {
+        panic!("a boolean has two choices");
+    };
+    assert!(yes.current);
+    assert_eq!(
+        yes.brings_in.total + yes.drops.total + yes.decided_later.total,
+        0
+    );
+    assert_eq!(names(&no.drops.nodes), ["n_d2", "n_d3", "n_x", "n_y"]);
+    assert_eq!(names(&no.drops_with_progress.nodes), ["n_y"]);
+    let ruled_out = support::accepted(
+        &chain(),
+        "- op: answer\n  decision: n_d1\n  value: {boolean: false}\n",
+    );
+    let blocked = effects_of(ruled_out, "n_d2");
+    assert!(!blocked.applies);
+    let moved: u32 = blocked
+        .choices
+        .iter()
+        .map(|choice| choice.brings_in.total + choice.drops.total)
+        .sum();
+    assert_eq!(moved, 0);
+}
+
+/// C12: a decision brought in under a skipped container is relevant but stays closed, so the
+/// answer does not report it as one it opens.
+#[test]
+fn answer_effects_do_not_open_a_decision_under_a_skip() {
+    let records = support::journey(&support::add_nodes(&[
+        "{key: n_d1, id: d1, kind: decision, title: D1, prompt: D1?, answer_type: boolean}",
+        "{key: n_g, id: g, kind: group, title: G, relevant_when: {equals: {decision: n_d1, value: true}}}",
+        "{key: n_inner, id: inner, parent: n_g, kind: decision, title: Inner, prompt: Inner?, answer_type: boolean}",
+    ]));
+    let skipped = support::accepted(
+        &records,
+        "- op: transition\n  node: n_g\n  transition: {skip: {reason: Not needed.}}\n",
+    );
+    let effects = effects_of(skipped, "n_d1");
+    let [_, yes] = effects.choices.as_slice() else {
+        panic!("a boolean has two choices");
+    };
+    assert_eq!(names(&yes.brings_in.nodes), ["n_g", "n_inner"]);
+    assert_eq!(yes.opens_decisions.total, 0);
+}
+
+/// C12, E3: a multi-choice decision's choices are each the answer with that choice toggled, so
+/// one already chosen shows what removing it does; a date or entity decision has no choices,
+/// only the milestone it pins or the role it fills.
+#[test]
+fn answer_effects_toggle_multi_choices_and_name_what_a_date_or_entity_answer_pins_or_fills() {
+    let records = support::journey(&support::add_nodes(&[
+        "{key: n_m, id: m, kind: decision, title: M, prompt: M?, answer_type: multi_choice, choices: [a, b]}",
+        "{key: n_for_a, id: for-a, kind: action, title: For a, relevant_when: {contains: {decision: n_m, value: a}}}",
+    ]));
+    let effects = effects_of(records.clone(), "n_m");
+    let [a, b] = effects.choices.as_slice() else {
+        panic!("two choices");
+    };
+    assert_eq!(names(&a.brings_in.nodes), ["n_for_a"]);
+    assert_eq!(names(&b.drops.nodes), ["n_for_a"]);
+    let chosen = support::accepted(
+        &records,
+        "- op: answer\n  decision: n_m\n  value: {multi_choice: [a]}\n",
+    );
+    let effects = effects_of(chosen, "n_m");
+    let [a, b] = effects.choices.as_slice() else {
+        panic!("two choices");
+    };
+    assert!(a.current && !b.current);
+    assert_eq!(names(&a.drops.nodes), ["n_for_a"], "removing a");
+    assert_eq!(b.brings_in.total + b.drops.total, 0, "adding b keeps a");
+    let vendor = Derive::vendor(1);
+    let journey = vendor.journey();
+    let deployment = &vendor.records.deployment;
+    let owner = journey
+        .answer_effects(&key("n_who_owns"), deployment)
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        (
+            owner.fills_role.map(|role| role.to_string()),
+            owner.choices.len()
+        ),
+        (Some("r_eval_owner".to_owned()), 0)
+    );
+    let meeting = journey
+        .answer_effects(&key("n_meeting_date"), deployment)
+        .unwrap()
+        .unwrap();
+    assert_eq!(meeting.pins, Some(key("n_decision_meeting")));
+    assert_eq!(
+        journey
+            .answer_effects(&key("n_kickoff"), deployment)
+            .unwrap(),
+        None
+    );
+}
+
+/// C12: on the vendor evaluation before the partner decision is answered, a yes brings in the
+/// partner-led group and its two actions, and a no drops the same three.
+#[test]
+fn answer_effects_of_the_vendor_partner_decision() {
+    let vendor = Derive::vendor(1);
+    let effects = vendor
+        .journey()
+        .answer_effects(&key("n_partner_runs"), &vendor.records.deployment)
+        .unwrap()
+        .unwrap();
+    let [no, yes] = effects.choices.as_slice() else {
+        panic!("a boolean has two choices");
+    };
+    let partner = ["n_partner_led", "n_criteria", "n_partner_results"];
+    assert_eq!(names(&yes.brings_in.nodes), partner);
+    assert_eq!(names(&no.drops.nodes), partner);
+    assert_eq!(yes.drops.total + no.brings_in.total, 0);
 }

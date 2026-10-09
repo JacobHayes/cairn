@@ -192,6 +192,30 @@ pub fn limit_seeds() -> Vec<NodeSeed> {
         .collect()
 }
 
+/// A journey of `nodes` nodes (at most `node_count_max`) shaped like a real route rather than
+/// the limits' worst case: the limits' containment, kinds, stored states, and stage openings,
+/// but three requirements per node, conditions on one node in six, and no date rules. It is
+/// the size benchmarks' input (design: a 500-node and a 2,000-node journey).
+///
+/// # Panics
+///
+/// When `nodes` is past the limit or the graph breaks an invariant: a bug in this generator.
+#[must_use]
+pub fn route_like(nodes: usize) -> Graph {
+    assert!(nodes <= NODE_COUNT_MAX as usize);
+    let seeds: Vec<NodeSeed> = limit_seeds()
+        .into_iter()
+        .take(nodes)
+        .enumerate()
+        .map(|(at, seed)| NodeSeed {
+            requires: seed.requires.into_iter().take(3).collect(),
+            condition: (at % 6 == 0).then_some(seed.condition).flatten(),
+            ..seed
+        })
+        .collect();
+    build(&seeds)
+}
+
 /// The date network at the limits: [`limit_seeds`]' graph, without conditions so every node
 /// is in scope, with both date rules on every node,
 /// each with `edge_count_per_node_max` milestone sources, a stage close on every group, and

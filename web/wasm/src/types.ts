@@ -9,7 +9,7 @@ export type NodeKey = Schema<"NodeKey">;
 
 /** `crates/wasm` `Projection`: one projection of a derived journey, as the API's queries. */
 export type ProjectionRequest =
-  | { projection: "level"; shown: Schema<"NodeKind">[]; container?: NodeKey }
+  | { projection: "level"; shown: Schema<"NodeKind">[]; container?: NodeKey; collapsed?: NodeKey[]; display?: Schema<"LevelDisplay">[] }
   | { projection: "trace"; key: NodeKey }
   | { projection: "decision_view" }
   | { projection: "timeline" }
@@ -18,6 +18,7 @@ export type ProjectionRequest =
   | { projection: "list"; query?: ListQuery }
   | { projection: "mine"; kinds?: Schema<"KindKey">[] }
   | { projection: "snapshot"; scope?: Schema<"SnapshotScope"> }
+  | { projection: "answer_effects"; key: NodeKey }
   | {
       projection: "explanations";
       key: NodeKey;
@@ -37,6 +38,8 @@ export interface ProjectionAnswers {
   mine: Schema<"MineEntry">[];
   snapshot: Schema<"Snapshot">;
   explanations: Schema<"ExplanationPage">;
+  /** C12: what each answer to a decision does to the journey's scope; null for a node that is not a decision. */
+  answer_effects: Schema<"AnswerEffects"> | null;
 }
 
 /** The answer to a projection request. */

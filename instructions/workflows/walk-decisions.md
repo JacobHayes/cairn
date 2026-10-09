@@ -11,8 +11,10 @@ undecided. Walking them in rank order unblocks the most first.
    `filters` `["decisions_needed"]` gives the actionable ones with their breadcrumbs.
 2. **Take one at a time.** For each, `get_node` shows its prompt, its answer type, its
    choices, who owns it, and what its answer affects (the nodes whose relevance it
-   decides, a role it fills, a milestone it pins). Ask the person the question in plain
-   words, offering the choices.
+   decides, a role it fills, a milestone it pins). Its `answer_effects` say, per choice, how
+   many nodes the answer brings in, drops (and how many of those have progress), and leaves
+   to be decided later, so you can say "answering yes brings in 6 and opens 2 more
+   decisions". Ask the person the question in plain words, offering the choices.
 3. **Record the answer** with `answer_decision` (see record-answers), then read what it
    changed: the answer may make work relevant or not, fill a role, pin a date, or open a
    new decision that was undecided before.

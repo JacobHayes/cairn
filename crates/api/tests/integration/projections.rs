@@ -14,8 +14,8 @@ mod in_process {
     use cairn_api::wire::{History, Mine, NodeDetail, Problem, ProblemCode, Projected, Viewer};
     use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
     use cairn_schema::{
-        Actor, ExplainedField, ExplanationPage, ListFlag, ListPage, ListQuery, NextQuery, NodeKey,
-        NodeKind, Snapshot, SnapshotScope, SortBy,
+        Actor, ExplainedField, ExplanationPage, LevelDisplay, LevelQuery, ListFlag, ListPage,
+        ListQuery, NextQuery, NodeKey, NodeKind, Snapshot, SnapshotScope, SortBy,
     };
     use cairn_service::Call;
 
@@ -88,7 +88,7 @@ mod in_process {
             sort: SortBy::Gravity,
             ..ListQuery::default()
         };
-        let every_kind = NodeKind::ALL.into_iter().collect();
+        let every_kind = LevelQuery::of_kinds(NodeKind::ALL.into_iter().collect(), None);
         let detail = service.node_detail(call, id, kickoff).await.unwrap();
         let mine = service.mine(call, id, &BTreeSet::new()).await.unwrap();
         assert_ne!(mine.value.len(), 0, "ann is the evaluation's lead");
@@ -109,7 +109,7 @@ mod in_process {
             ),
             (
                 "level",
-                same(service.level(call, id, &every_kind, None).await.unwrap()),
+                same(service.level(call, id, &every_kind).await.unwrap()),
             ),
             (
                 "trace/n_kickoff",
@@ -142,6 +142,47 @@ mod in_process {
         let expected = service.history(id, Some(kickoff), None).await.unwrap();
         assert_ne!(expected.patches.len(), 0);
         assert_eq!(history, History::from(expected));
+    }
+
+    /// I1, C2, C12: a level collapsed and filtered by relevance class over HTTP is the
+    /// service's, and a decision's node detail carries its answer effects.
+    #[tokio::test]
+    async fn a_collapsed_level_and_a_decisions_effects_answer_what_the_service_derives() {
+        let world = World::start().await;
+        let ann = world.vendor_after(3).await;
+        world.clock.set(NOW);
+        let call = &call_of(&ann).await;
+        let id = &"j_vendor_eval".parse().unwrap();
+        let query = LevelQuery {
+            collapsed: ["n_setup".parse().unwrap()].into(),
+            display: [LevelDisplay::Relevant, LevelDisplay::Conditional].into(),
+            ..LevelQuery::of_kinds(NodeKind::ALL.into_iter().collect(), None)
+        };
+        let expected = same(world.service.level(call, id, &query).await.unwrap());
+        let target =
+            format!("{JOURNEY}/level?collapsed=n_setup&display=relevant&display=conditional");
+        let answered: serde_json::Value = get(&ann, &target).await;
+        assert_eq!(answered, expected);
+        let setup = answered["value"]["nodes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|node| node["key"] == "n_setup");
+        assert_ne!(setup.unwrap()["rolled_up"].as_array().unwrap().len(), 0);
+
+        let partner: &NodeKey = &"n_partner_runs".parse().unwrap();
+        let detail = world.service.node_detail(call, id, partner).await.unwrap();
+        let expected = serde_json::to_value(Projected::<NodeDetail>::from_service(detail)).unwrap();
+        let answered: serde_json::Value =
+            get(&ann, &format!("{JOURNEY}/nodes/n_partner_runs")).await;
+        assert_eq!(answered, expected);
+        assert_eq!(
+            answered["value"]["answer_effects"]["choices"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
     }
 
     /// I3, C9: the snapshot's node list and the list each page at `page_item_count_max`, their

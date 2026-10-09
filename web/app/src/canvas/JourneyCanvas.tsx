@@ -1,9 +1,8 @@
-// The journey canvas (C1 to C7, C15): the journey's level for the kinds shown and the
-// container drilled into, read from its local derivation with the next list (rank badges) and
-// "mine", turned into cards and lines, filtered by the relevance toggles, laid out in the
+// The journey canvas (C1 to C7, C15): the journey's level for the kinds shown, the relevance
+// classes the toggles show, and the container drilled into, read from its local derivation
+// with the next list (rank badges) and "mine", turned into cards and lines, laid out in the
 // layout worker, and drawn; the trace of the open node as an overlay; the stalled surface
 // when nothing can be acted on. A card opens the node's detail (5.1) beside the canvas.
-import type { ProjectionRequest } from "@cairn/wasm";
 import { useMemo } from "react";
 import { useNavigate } from "react-router";
 
@@ -14,21 +13,14 @@ import { journeyLooks } from "./journey.ts";
 import { cardsOf, linesOf, type CanvasModel, type Level } from "./model.ts";
 import type { CardActions } from "./NodeCard.tsx";
 import { traceOverlay } from "./overlay.ts";
-import { withRelevanceShown } from "./relevance.ts";
-import { canvasPath, layoutViewOf, type CanvasView } from "./settings.ts";
+import { canvasPath, layoutViewOf, levelRequest, type CanvasView } from "./settings.ts";
 import { TraceBar } from "./Surfaces.tsx";
 import { refitKey } from "./refit.ts";
 
-/** The level request for what the canvas shows (C2). */
-export function levelRequest(view: CanvasView): Extract<ProjectionRequest, { projection: "level" }> {
-  return { projection: "level", shown: view.shown, ...(view.container === undefined ? {} : { container: view.container }) };
-}
-
-/** C1, C2, C5, C6: the journey's canvas model for one level, filtered by the relevance toggles. */
-export function journeyModel(ready: Ready, level: Level, ranked: string[], mine: string[], view: CanvasView): CanvasModel {
+/** C1, C2, C5, C6: the journey's canvas model for one level. */
+export function journeyModel(ready: Ready, level: Level, ranked: string[], mine: string[]): CanvasModel {
   const graph = ready.journey.graph.nodes ?? [];
-  const model = { cards: cardsOf(level, graph, journeyLooks(ready, { ranked, mine })), lines: linesOf(level, graph) };
-  return withRelevanceShown(ready, model, view);
+  return { cards: cardsOf(level, graph, journeyLooks(ready, { ranked, mine })), lines: linesOf(level, graph) };
 }
 
 function useJourneyModel(ready: Ready, view: CanvasView): { model: CanvasModel | undefined; error: string | undefined } {
@@ -41,8 +33,8 @@ function useJourneyModel(ready: Ready, view: CanvasView): { model: CanvasModel |
     }
     const ranked = (next.value?.items ?? []).map((item) => item.key);
     const own = (mine.value ?? []).map((entry) => entry.node);
-    return journeyModel(ready, level.value, ranked, own, view);
-  }, [ready, level.value, next.value, mine.value, view]);
+    return journeyModel(ready, level.value, ranked, own);
+  }, [ready, level.value, next.value, mine.value]);
   return { model, error: level.error };
 }
 

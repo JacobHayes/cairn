@@ -122,6 +122,29 @@
         ],
         "type": "object"
       },
+      "AffectedNodes": {
+        "additionalProperties": false,
+        "description": "Some nodes an answer's effect names: how many in all, and the first\n`explanation_entry_count_max` of them in tree order.",
+        "properties": {
+          "nodes": {
+            "description": "The first of them, in tree order, at most `explanation_entry_count_max`.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "How many nodes there are in all.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "type": "object"
+      },
       "AgentId": {
         "description": "Starts with \"ag_\"; at most id_bytes_max (64) bytes.",
         "maxLength": 64,
@@ -259,6 +282,54 @@
         },
         "required": [
           "key"
+        ],
+        "type": "object"
+      },
+      "AnswerEffects": {
+        "additionalProperties": false,
+        "description": "C12, E3: what answering a decision does, per choice, and the static lines every answer\nof a date or entity decision carries.",
+        "properties": {
+          "applies": {
+            "description": "Whether the decision's answer is in effect: it is relevant, and not skipped. When not,\nno answer changes any other node's relevance and every choice's effect is empty.",
+            "type": "boolean"
+          },
+          "choices": {
+            "description": "One entry per choice of a boolean, single-choice, or multi-choice decision, in the\ndecision's order (`false` before `true`); none for the other answer types.",
+            "items": {
+              "$ref": "#/components/schemas/ChoiceEffect"
+            },
+            "type": "array"
+          },
+          "decision": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The decision."
+          },
+          "fills_role": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RoleKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The role its answer fills (E3), for an entity or entity-list decision."
+          },
+          "pins": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The milestone its answer pins (E3), for a date decision."
+          }
+        },
+        "required": [
+          "decision",
+          "applies"
         ],
         "type": "object"
       },
@@ -755,6 +826,60 @@
           }
         ],
         "description": "One choice of a single- or multi-choice decision: an id that answers and conditions use,\nand an optional label. Written as the bare id when it has no label."
+      },
+      "ChoiceEffect": {
+        "additionalProperties": false,
+        "description": "C12: what one answer to a decision does to the journey's scope, from a three-valued\nre-evaluation of relevance under that answer: never a full derive.",
+        "properties": {
+          "answer": {
+            "$ref": "#/components/schemas/AnswerValue",
+            "description": "The whole answer evaluated: a boolean, a choice, or (for a multi choice) the current\nanswer with `choice` toggled."
+          },
+          "brings_in": {
+            "$ref": "#/components/schemas/AffectedNodes",
+            "description": "Nodes that become relevant."
+          },
+          "choice": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Slug"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The choice id, for a single or multi choice."
+          },
+          "current": {
+            "description": "This is the recorded answer (for a multi choice: `choice` is in it, so the answer\nevaluated removes it).",
+            "type": "boolean"
+          },
+          "decided_later": {
+            "$ref": "#/components/schemas/AffectedNodes",
+            "description": "Nodes that would stay undecided because they hang on another decision still to be\nanswered, which this answer opens or leaves open."
+          },
+          "drops": {
+            "$ref": "#/components/schemas/AffectedNodes",
+            "description": "Nodes the answer settles as not relevant. Nodes that would still hang on another\nunanswered decision are `decided_later`, never here."
+          },
+          "drops_with_progress": {
+            "$ref": "#/components/schemas/AffectedNodes",
+            "description": "Of the drops, the nodes with recorded progress (started, done, decided, reached):\nthe answer does not undo it."
+          },
+          "opens_decisions": {
+            "$ref": "#/components/schemas/AffectedNodes",
+            "description": "Of those, the decisions that open: relevant and still to be answered."
+          }
+        },
+        "required": [
+          "answer",
+          "brings_in",
+          "opens_decisions",
+          "drops",
+          "drops_with_progress",
+          "decided_later"
+        ],
+        "type": "object"
       },
       "Choices": {
         "items": {
@@ -4750,6 +4875,14 @@
         "additionalProperties": false,
         "description": "C2: one aggregation level of the canvas: the visible nodes for the shown kinds within the\ndrilled-in container, the edges re-targeted to visible stand-ins with duplicates collapsed,\nand each container's roll-ups. Display only: stored state stays on each node.",
         "properties": {
+          "collapsed": {
+            "description": "The containers collapsed that took effect: those within the level.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array",
+            "uniqueItems": true
+          },
           "container": {
             "anyOf": [
               {
@@ -4760,6 +4893,14 @@
               }
             ],
             "description": "The drilled-in container; none for the whole journey."
+          },
+          "display": {
+            "description": "The relevance classes shown; every class when absent.",
+            "items": {
+              "$ref": "#/components/schemas/LevelDisplay"
+            },
+            "type": "array",
+            "uniqueItems": true
           },
           "edges": {
             "description": "The edges, sorted by their ends.",
@@ -4790,6 +4931,26 @@
           "edges"
         ],
         "type": "object"
+      },
+      "LevelDisplay": {
+        "description": "C2: which nodes a level shows by how their relevance reads to a person. A node is\n`relevant` when it applies; `conditional` when it may apply (its relevance is undecided,\nor it is not relevant only because the decision it reads cannot be answered yet); and\n`not_relevant` when it is settled as not applying (ruled out by an answer, a skip, or a\nclosed branch).",
+        "oneOf": [
+          {
+            "const": "relevant",
+            "description": "Applies.",
+            "type": "string"
+          },
+          {
+            "const": "conditional",
+            "description": "May apply: undecided, or waiting on a decision that cannot be answered yet.",
+            "type": "string"
+          },
+          {
+            "const": "not_relevant",
+            "description": "Settled as not applying.",
+            "type": "string"
+          }
+        ]
       },
       "LevelEdge": {
         "additionalProperties": false,
@@ -7656,6 +7817,17 @@
               }
             ],
             "description": "A decision's answer, as recorded."
+          },
+          "answer_effects": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AnswerEffects"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A decision's effects per choice (C12): what each answer brings in, drops, and leaves\nto be decided later, with the role it fills and the milestone it pins."
           },
           "children": {
             "description": "Its children in key order, each with its state.",
@@ -15153,6 +15325,34 @@
             "required": false,
             "schema": {
               "$ref": "#/components/schemas/NodeKey"
+            },
+            "style": "form"
+          },
+          {
+            "description": "Containers rolled into their own cards: everything beneath each is hidden and rolls up          into it, and its edges re-target to it. A key outside the level has no effect.",
+            "explode": true,
+            "in": "query",
+            "name": "collapsed",
+            "required": false,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/NodeKey"
+              },
+              "type": "array"
+            },
+            "style": "form"
+          },
+          {
+            "description": "The relevance classes shown: `relevant`, `conditional` (undecided, or waiting on a          decision that cannot be answered yet), `not_relevant` (settled). Every class when none.          A node of a class left out rolls up like a hidden kind's.",
+            "explode": true,
+            "in": "query",
+            "name": "display",
+            "required": false,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/LevelDisplay"
+              },
+              "type": "array"
             },
             "style": "form"
           }

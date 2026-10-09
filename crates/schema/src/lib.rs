@@ -85,11 +85,12 @@ pub use patch::{
     RecordedEnd, Removal, Transition,
 };
 pub use projection::{
-    Cursor, DecisionEntry, DecisionView, EdgeOrigin, ExplainedField, ExplanationPage, GroupState,
-    HistoryPage, Level, LevelEdge, LevelNode, ListFlag, ListPage, ListQuery, MineEntry, Next,
-    NextQuery, NodeRow, OpenDecision, PatchEvents, RankTerms, RenderedDraft, RenderedSegment,
-    RollUp, Snapshot, SnapshotCounts, SnapshotNode, SnapshotScope, SortBy, StatusSummary, Timeline,
-    TimelineEntry, Trace, UnderlyingEdge, UpcomingMilestone,
+    AffectedNodes, AnswerEffects, ChoiceEffect, Cursor, DecisionEntry, DecisionView, EdgeOrigin,
+    ExplainedField, ExplanationPage, GroupState, HistoryPage, Level, LevelDisplay, LevelEdge,
+    LevelNode, LevelQuery, ListFlag, ListPage, ListQuery, MineEntry, Next, NextQuery, NodeRow,
+    OpenDecision, PatchEvents, RankTerms, RenderedDraft, RenderedSegment, RollUp, Snapshot,
+    SnapshotCounts, SnapshotNode, SnapshotScope, SortBy, StatusSummary, Timeline, TimelineEntry,
+    Trace, UnderlyingEdge, UpcomingMilestone,
 };
 pub use proposal::{
     Conflict, ConflictResolution, Kept, ParticipationMapping, Proposal, ProposalDraft,

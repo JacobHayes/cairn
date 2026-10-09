@@ -34,6 +34,7 @@ pub mod dates;
 pub mod dependencies;
 mod display;
 pub mod participation;
+pub mod pending;
 pub mod priority;
 mod project;
 pub mod rank;

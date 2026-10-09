@@ -16,8 +16,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AnswerSpec, Condition, DateOrigin, DecisionEntry, DecisionView, DisplayState, NodeKey,
-    NodeKind, OpenDecision, Payload, State, StatusSummary, Timeline, TimelineEntry,
+    AnswerSpec, Condition, DateOrigin, DecisionEntry, DecisionView, DisplayState, LevelQuery,
+    NodeKey, NodeKind, OpenDecision, Payload, State, StatusSummary, Timeline, TimelineEntry,
     UpcomingMilestone,
 };
 
@@ -33,9 +33,9 @@ impl DerivedJourney<'_> {
     /// Never: the level of the whole journey names no container.
     #[must_use]
     pub fn decision_view(&self) -> DecisionView {
-        let shown = BTreeSet::from([NodeKind::Decision]);
+        let query = LevelQuery::of_kinds(BTreeSet::from([NodeKind::Decision]), None);
         let level = self
-            .level(&shown, None)
+            .level_with(&query, None)
             .unwrap_or_else(|error| panic!("{error}"));
         let mut affects = self.conditioned_by();
         let decisions = level
@@ -82,7 +82,7 @@ impl DerivedJourney<'_> {
     /// own condition or an ancestor's reads it, up to the nearest force include, which drops
     /// its own and its ancestors' conditions (Gating); and, since a condition reads a decision
     /// that is not relevant as unanswered, everything the decisions it affects in turn affect.
-    fn conditioned_by(&self) -> BTreeMap<&NodeKey, BTreeSet<NodeKey>> {
+    pub(super) fn conditioned_by(&self) -> BTreeMap<&NodeKey, BTreeSet<NodeKey>> {
         let document = self.graph.document();
         let tree = self.graph.tree();
         let mut direct: BTreeMap<&NodeKey, BTreeSet<&NodeKey>> = BTreeMap::new();
