@@ -83,7 +83,7 @@ export function DateConflictResolver({ view, write, violations, onResolved }: Re
           onMove={(move) => { retry(write, withMove(failed.attempt, move), failed.attempt, onResolved); }}
         />
       ))}
-      {more ? <span className="muted">There are more chains than shown; resolve these first.</span> : null}
+      {more ? <span className="muted small">There are more chains than shown; resolve these first.</span> : null}
     </div>
   );
 }

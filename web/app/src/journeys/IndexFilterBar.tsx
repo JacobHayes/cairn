@@ -12,9 +12,8 @@ function RouteFilter({ filters, routes, onChange }: { filters: IndexFilters; rou
   return (
     <>
       <label className="row">
-        <span className="muted">Route</span>
+        <span className="muted small">Route</span>
         <select
-          className="select"
           aria-label="Route"
           value={filters.route ?? ""}
           onChange={(event) => { onChange({ ...filters, route: event.target.value === "" ? undefined : event.target.value, version: undefined }); }}
@@ -29,9 +28,8 @@ function RouteFilter({ filters, routes, onChange }: { filters: IndexFilters; rou
       </label>
       {filters.route === undefined ? null : (
         <label className="row">
-          <span className="muted">Version</span>
+          <span className="muted small">Version</span>
           <select
-            className="select"
             aria-label="Version"
             value={filters.version ?? ""}
             onChange={(event) => { onChange({ ...filters, version: event.target.value === "" ? undefined : Number(event.target.value) }); }}
@@ -53,9 +51,8 @@ export function IndexFilterBar({ filters, routes, onChange }: { filters: IndexFi
   return (
     <div className="row acting-controls" data-testid="index-filters">
       <label className="row">
-        <span className="muted">Status</span>
+        <span className="muted small">Status</span>
         <select
-          className="select"
           aria-label="Status"
           value={filters.status}
           onChange={(event) => { onChange({ ...filters, status: [...STATUSES, "any" as const].find((each) => each === event.target.value) ?? "active" }); }}

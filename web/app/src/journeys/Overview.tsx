@@ -21,7 +21,6 @@ import { UpgradeMark } from "./JourneyIndex.tsx";
 import { completionSuggested } from "./lifecycle.ts";
 import { HeaderEditor } from "./HeaderEditor.tsx";
 import { StatusPanel } from "./StatusPanel.tsx";
-import "./journeys.css";
 
 /** C16: the journey's row in the host's index, for the host's "upgrade available". */
 function Lineage({ ready }: { ready: Ready }) {
@@ -31,7 +30,7 @@ function Lineage({ ready }: { ready: Ready }) {
   const { view } = useLive(indexKey(query), journeyIndex(query));
   const routes = useLive("routes", routeIndex).view;
   if (lineage === undefined) {
-    return <span className="muted" data-testid="overview-lineage">Started empty: no route, so no upgrades.</span>;
+    return <span className="muted small" data-testid="overview-lineage">Started empty: no route, so no upgrades.</span>;
   }
   const summary = view.status === "ready" ? view.value.find((item) => item.id === header.id) : undefined;
   const route = routes.status === "ready" ? routes.value.find((each) => each.header.id === lineage.route) : undefined;
@@ -76,9 +75,9 @@ function OverviewBody({ ready }: { ready: Ready }) {
         <span className="row">
           <Badge data-testid="overview-status" data-status={header.status}>{header.status}</Badge>
           <Lineage ready={ready} />
-          <span className="muted">Started {header.created_on}</span>
+          <span className="muted small">Started {header.created_on}</span>
         </span>
-        {header.description == null ? <span className="muted">No description.</span> : <Markdown text={header.description} data-testid="overview-description" />}
+        {header.description == null ? <span className="muted small">No description.</span> : <Markdown text={header.description} data-testid="overview-description" />}
         <HeaderEditor ready={ready} />
       </Panel>
       <StatusPanel ready={ready} suggested={suggested} />

@@ -6,12 +6,11 @@ import { Link, useLocation, useNavigate } from "react-router";
 
 import { journeyIndex, indexKey, routeIndex, type JourneySummary, type RouteSummary } from "../data/reads.ts";
 import { useLive, useViewer } from "../data/react.ts";
-import { Badge, Panel } from "../ui/kit.tsx";
+import { Badge } from "../ui/kit.tsx";
 import { filtersFrom, indexPath, newJourneyPath, overviewPath, queryOf, type IndexFilters } from "./address.ts";
 import { IndexFilterBar } from "./IndexFilterBar.tsx";
 import { useMineCounts, useMineOf, useReportMine } from "./mine.ts";
 import { routeDetailPath } from "../routes/address.ts";
-import "./journeys.css";
 
 /** C16: the mark a journey's row carries when its route has a newer version: the host's field. */
 export function UpgradeMark({ summary }: { summary: JourneySummary }) {
@@ -26,7 +25,7 @@ export function UpgradeMark({ summary }: { summary: JourneySummary }) {
 export function LineageCell({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
   const lineage = summary.lineage;
   if (lineage == null) {
-    return <span className="muted">Started empty</span>;
+    return <span className="muted small">Started empty</span>;
   }
   const route = routes.find((each) => each.header.id === lineage.route);
   return (
@@ -43,7 +42,7 @@ export function JourneyRow({ summary, routes, mine }: { summary: JourneySummary;
         <Link to={`/journeys/${summary.id}`}>{summary.name}</Link>
         <div className="row">
           <span className="muted mono">{summary.id}</span>
-          <Link to={overviewPath(summary.id)} className="muted" data-testid="row-overview">
+          <Link to={overviewPath(summary.id)} className="muted small" data-testid="row-overview">
             Overview
           </Link>
         </div>
@@ -84,14 +83,14 @@ function MineRow({ summary, routes, report }: { summary: JourneySummary; routes:
 function Rows({ filters, items, routes }: { filters: IndexFilters; items: JourneySummary[]; routes: RouteSummary[] }) {
   const { report, none } = useMineCounts(filters.mine ? items : []);
   if (items.length === 0) {
-    return <p className="muted" data-testid="index-empty">No journeys match.</p>;
+    return <p className="muted small" data-testid="index-empty">No journeys match.</p>;
   }
   // With "mine", every candidate stays mounted (kept current) though its row may be empty.
   const empty = filters.mine && none;
   return (
-    <div className="scroll-x">
-      {empty ? <p className="muted" data-testid="index-empty">No journeys match: nothing in them is yours.</p> : null}
-      <table className="table">
+    <div className="table-wrap">
+      {empty ? <p className="muted small" data-testid="index-empty">No journeys match: nothing in them is yours.</p> : null}
+      <table className="data">
         {empty ? null : (
           <thead>
             <tr>
@@ -123,17 +122,17 @@ export function JourneyIndex() {
   const routes = useLive("routes", routeIndex).view;
   const known = routes.status === "ready" ? routes.value : [];
   return (
-    <Panel aria-label="Journeys">
+    <section className="stack" aria-label="Journeys">
       <div className="row">
-        <h1 className="title">Journeys</h1>
-        <span className="shell-spacer" />
+        <h1>Journeys</h1>
+        <span className="spacer" />
         <Link className="button" to={newJourneyPath()} data-testid="new-journey">New journey</Link>
       </div>
       <IndexFilterBar filters={filters} routes={known} onChange={(next) => void navigate(indexPath(next))} />
       {filters.mine && viewer === undefined && failed !== undefined ? <p className="callout callout-bad">Who you are could not be read, so neither can what is yours: {failed}</p> : null}
-      {view.status === "loading" || waiting ? <p className="muted">Loading the journeys...</p> : null}
+      {view.status === "loading" || waiting ? <p className="muted small">Loading the journeys...</p> : null}
       {view.status === "failed" ? <p className="callout callout-bad">The journeys could not be read: {view.message}</p> : null}
       {view.status === "ready" && !waiting ? <Rows filters={filters} items={view.value} routes={known} /> : null}
-    </Panel>
+    </section>
   );
 }

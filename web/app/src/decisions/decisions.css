@@ -1,9 +1,7 @@
-/* C12: the decision view's canvas is as tall as its cards need, within bounds (DecisionView). */
-.decision-canvas .canvas {
-  height: var(--decision-canvas-height, 24rem);
+/* C12: the table page keeps the workspace's padding, and a wide table scrolls within itself rather than widening the page. */
+.decision-page {
+  padding: var(--space-5);
 }
-
-/* On a narrow screen the table scrolls within its panel rather than widening the page. */
 .decision-table {
   overflow-x: auto;
 }

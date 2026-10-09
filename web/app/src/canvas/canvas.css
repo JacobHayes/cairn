@@ -1,58 +1,32 @@
-/* The canvas (5.2): cards, lines, toggles, and the overlays, drawn with the design system's
-   tokens in light and dark. Quiet by rule (C6): nothing animates or flashes. Card line heights
-   match cards.ts, which sized the layout. */
-
-.shell-main:has(.canvas-page) {
-  max-width: none;
-}
-
-.canvas-page {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr);
-  gap: var(--space-3);
-}
-
-.canvas-page.canvas-split {
-  grid-template-columns: minmax(0, 1fr) minmax(20rem, 28rem);
-  align-items: start;
-}
-
-.canvas-split > .detail-panel {
-  order: 2;
-  position: sticky;
-  top: var(--space-4);
-  max-height: calc(100vh - 2 * var(--space-4));
-  overflow-y: auto;
-}
-
-@media (max-width: 52rem) {
-  .canvas-page.canvas-split {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .canvas-split > .detail-panel {
-    order: 0;
-    position: static;
-    max-height: none;
-  }
-}
+/* The canvas (5.2): nodes, lines, toggles, and the overlays, drawn with Graticule's tokens in light
+   and dark. Quiet by rule (C6): nothing animates or flashes. Node line heights match cards.ts,
+   which sized the layout, so sizes here are px. The canvas fills its region (`.ws-canvas`, which
+   does not scroll) or, where a screen has no such region, a fixed height. */
 
 .canvas {
-  height: max(28rem, calc(100vh - 16rem));
+  height: 420px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-canvas);
+  background: var(--color-surface);
   overflow: hidden;
 }
 
+.ws-canvas > .canvas,
+.map-canvas > .canvas {
+  flex: 1 1 0;
+  height: auto;
+  min-height: 0;
+  border-width: 1px 0 0;
+}
+
 .canvas .react-flow {
-  --xy-background-color: var(--color-canvas);
+  --xy-background-color: var(--color-surface);
   --xy-background-pattern-color: var(--color-border);
-  --xy-edge-stroke: var(--color-muted);
+  --xy-edge-stroke: var(--color-secondary);
   --xy-controls-button-background-color: var(--color-surface);
+  --xy-controls-button-background-color-hover: var(--color-band);
   --xy-controls-button-color: var(--color-text);
   --xy-controls-button-border-color: var(--color-border);
-  background: var(--color-canvas);
+  background: var(--color-surface);
 }
 
 .toggles {
@@ -66,7 +40,7 @@
   display: inline-flex;
   gap: var(--space-1);
   align-items: center;
-  font-size: var(--text-small);
+  font-size: 14px;
 }
 
 .crumbs {
@@ -74,40 +48,36 @@
   flex-wrap: wrap;
   gap: var(--space-1);
   align-items: center;
-  font-size: var(--text-small);
+  font-size: 14px;
 }
 
-/* Cards. */
-
-.card {
+/* Nodes: a paper card, square, with a hairline. A card's border width is its gravity (C6). */
+.node {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
   border-style: solid;
   border-color: var(--color-border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-none);
   background: var(--color-surface);
   color: var(--color-text);
-  font-size: var(--text-small);
+  font-size: 13px;
   line-height: 18px;
+  box-shadow: var(--shadow-sm);
   position: relative;
 }
 
-.card-container {
+.node-container {
   background: color-mix(in srgb, var(--color-surface) 55%, transparent);
 }
 
-.card-group {
-  border-style: solid;
-}
-
-.card-body {
+.node-body {
   display: flex;
   flex-direction: column;
   min-width: 0;
 }
 
-.card-line {
+.node-line {
   height: 18px;
   overflow: hidden;
   white-space: nowrap;
@@ -115,79 +85,85 @@
   min-width: 0;
 }
 
-.card-line-wrap {
+.node-line-wrap {
   white-space: normal;
   display: -webkit-box;
   -webkit-box-orient: vertical;
 }
 
-.card-head {
+.node-head {
   display: flex;
   gap: var(--space-2);
   align-items: center;
 }
 
-.card-kind {
+.node-kind {
+  font: 500 11px / 18px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-secondary);
+}
+
+.node-state {
+  font: 500 11px / 18px var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.04em;
-  font-size: 0.6875rem;
   color: var(--color-muted);
 }
 
-.card-state {
-  font-size: 0.6875rem;
-  color: var(--color-muted);
-}
-
-.card-title {
+.node-title {
   font-weight: 600;
-  font-size: 0.875rem;
+  font-size: 14px;
 }
 
-.card-open,
-.card-drill,
-.card-marker {
+.node-open,
+.node-drill,
+.node-marker {
   font: inherit;
   color: inherit;
   background: none;
   border: none;
   padding: 0;
+  min-height: 0;
   cursor: pointer;
   text-align: left;
 }
 
-.card-open {
+.node-open {
   width: 100%;
   overflow: hidden;
 }
 
-.card-open:hover,
-.card-open:focus-visible {
+.node-open:hover,
+.node-open:focus-visible {
   text-decoration: underline;
 }
 
-.card-drill {
-  color: var(--color-accent);
-  font-size: 0.6875rem;
+.node-drill {
+  font: 500 11px / 18px var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-secondary);
+  text-decoration: underline;
 }
 
-.card-marker {
-  color: var(--color-warn);
+.node-marker {
+  color: var(--color-warning);
   text-decoration: underline dotted;
 }
 
-.card-prompt {
+.node-prompt {
   font-style: italic;
 }
 
-.card-dates .badge,
-.card-badges .badge {
-  font-size: 0.6875rem;
+.node-dates .badge,
+.node-badges .badge {
+  font-size: 10.5px;
   line-height: 16px;
-  padding: 0 6px;
+  padding: 0 5px;
 }
 
-.card-badges {
+.node-badges {
   display: flex;
   flex-wrap: wrap;
   gap: 2px 4px;
@@ -195,145 +171,109 @@
   align-content: flex-start;
 }
 
-.card-checklist {
+.node-checklist {
   list-style: none;
   margin: 0;
   padding: 0;
   overflow: hidden;
 }
 
-.card-check {
+.node-check {
   display: inline-block;
   width: 9px;
   height: 9px;
   margin-right: 6px;
-  border: 1px solid var(--color-muted);
-  border-radius: 2px;
+  border: 1px solid var(--color-secondary);
   vertical-align: middle;
 }
 
-.card-check-done {
-  background: var(--color-good);
-  border-color: var(--color-good);
+.node-check-done {
+  background: var(--color-success);
+  border-color: var(--color-success);
 }
 
-.card-handle {
+.node-handle {
   opacity: 0;
   pointer-events: none;
 }
 
-/* C1: not relevant grays out; undecided ghosts. */
-.card-not-relevant {
-  filter: grayscale(1);
+/* C1: not relevant fades to the ruling; undecided is dashed. */
+.node-not-relevant {
   opacity: 0.55;
-  background: var(--color-canvas);
+  background: transparent;
 }
 
-.card-undecided {
+.node-undecided {
   border-style: dashed;
   opacity: 0.7;
   background: transparent;
 }
 
-/* C5: I am here. */
-.card-here {
-  border-color: var(--color-accent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--color-accent) 22%, transparent);
+/* C5: I am here, in ink (structure, not blue). */
+.node-here {
+  border-color: var(--color-text);
 }
 
-.card-mine {
-  border-left-color: var(--color-accent);
+.node-mine {
+  border-left-color: var(--color-secondary);
 }
 
-.card-selected {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 3px;
+/* DESIGN's selection: a 2px accent line on the left edge and the faint tint. */
+.node-selected {
+  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--color-surface);
+  box-shadow:
+    inset 2px 0 0 var(--color-accent),
+    var(--shadow-sm);
 }
 
-.card-rank {
-  position: absolute;
-  top: -10px;
-  right: -10px;
-  min-width: 20px;
-  height: 20px;
-  border-radius: 10px;
-  padding: 0 5px;
-  background: var(--color-accent);
-  color: var(--color-accent-text);
-  font-size: 0.75rem;
-  font-weight: 700;
-  line-height: 20px;
-  text-align: center;
-}
-
-/* C6: heat numbers hang on the card's top edge, right of an overlay's mark. */
-.card-heat {
-  position: absolute;
-  top: -11px;
-  right: 22px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: var(--color-warn-surface);
-  color: var(--color-warn);
-  border: 1px solid currentColor;
-  font-size: 0.6875rem;
-  line-height: 18px;
-  white-space: nowrap;
-}
-
-/* Overlays (C7's trace; proposal review's diff). */
-.card-mark {
-  position: absolute;
-  top: -11px;
-  left: 10px;
-  padding: 0 6px;
-  border-radius: 999px;
-  border: 1px solid currentColor;
-  background: var(--color-surface);
-  font-size: 0.6875rem;
-  line-height: 18px;
-  white-space: nowrap;
-}
-
-.card-mark-accent {
+/* Overlays (C7's trace; proposal review's diff): a hanging tag, and the card's border in the tone. */
+.node-mark-accent {
   color: var(--color-accent);
+  border-color: var(--color-accent);
 }
 
-.card-mark-good {
-  color: var(--color-good);
+.node-mark-good {
+  color: var(--color-success);
+  border-color: var(--color-success);
 }
 
-.card-mark-warn {
-  color: var(--color-warn);
+.node-mark-warn {
+  color: var(--color-warning);
+  border-color: var(--color-warning);
 }
 
-.card-mark-bad {
-  color: var(--color-bad);
+.node-mark-bad {
+  color: var(--color-error);
+  border-color: var(--color-error);
 }
 
-.card-marked {
+.node-marked {
   border-color: currentColor;
 }
 
-.card-marked-accent {
+.node-marked-accent {
   border-color: var(--color-accent);
 }
 
-.card-marked-good {
-  border-color: var(--color-good);
+.node-marked-good {
+  border-color: var(--color-success);
 }
 
-.card-marked-warn {
-  border-color: var(--color-warn);
+.node-marked-warn {
+  border-color: var(--color-warning);
 }
 
-.card-dim {
+.node-marked-bad {
+  border-color: var(--color-error);
+}
+
+.node-dim {
   opacity: 0.25;
 }
 
 /* Lines (C1): solid explicit, dotted implicit; a stage opening that only holds dates is lighter. */
 .line .react-flow__edge-path {
-  stroke: var(--color-muted);
+  stroke: var(--color-secondary);
   stroke-width: 1.5;
 }
 
@@ -343,7 +283,7 @@
 
 .line-lit .react-flow__edge-path {
   stroke: var(--color-accent);
-  stroke-width: 2.5;
+  stroke-width: 2;
 }
 
 .line-dim {
@@ -353,13 +293,12 @@
 .edge-source {
   position: absolute;
   padding: 0 4px;
-  border-radius: 4px;
-  background: var(--color-canvas);
+  background: var(--color-surface);
   color: var(--color-muted);
-  font-size: 0.6875rem;
+  font: 400 11px / 16px var(--font-mono);
   pointer-events: all;
 }
 
 .stalled {
-  border-left: 3px solid var(--color-warn);
+  border-color: var(--color-warning);
 }

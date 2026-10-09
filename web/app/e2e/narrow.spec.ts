@@ -6,7 +6,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { card, nextKeys, listKeys, openActing } from "./acting.ts";
 import { openJourney } from "./shell.ts";
-import { openScreen } from "./views.ts";
+import { openScreen, showDecisionTable } from "./views.ts";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -43,6 +43,10 @@ const VIEWS = [
 for (const { id, segment, part } of VIEWS) {
   test(`${id}: the ${segment} screen fits a narrow window`, async ({ page }) => {
     await openScreen(page, "browser", "j_vendor_eval", segment);
+    if (segment === "decisions") {
+      // The wide part of this screen is its table; the graph is the map preview (frame.spec).
+      await showDecisionTable(page);
+    }
     await expect(page.getByTestId(part)).toBeVisible();
     expect(await fits(page)).toBe(true);
   });

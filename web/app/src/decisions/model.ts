@@ -25,21 +25,6 @@ export function decisionLevel(view: DecisionView): Level {
   };
 }
 
-/** The decision canvas's height bounds and the room it keeps around its cards (px). */
-export const CANVAS_HEIGHT_MIN_PX = 240;
-export const CANVAS_HEIGHT_MAX_PX = 720;
-const CANVAS_PAD_PX = 64;
-
-/**
- * The canvas's height for its cards: decisions are seldom gated by one another, so their
- * layout is often one tall column, which a fixed height would shrink to unreadable; up to a
- * bound, the canvas grows to hold it at full size.
- */
-export function canvasHeightPx(placement: Placement): number {
-  const bottom = Math.max(0, ...Object.values(placement).map((placed) => placed.y + placed.height));
-  return Math.min(Math.max(bottom + CANVAS_PAD_PX, CANVAS_HEIGHT_MIN_PX), CANVAS_HEIGHT_MAX_PX);
-}
-
 /** The most columns the decision canvas sets ungated decisions in. */
 export const GRID_COLUMN_COUNT_MAX = 4;
 

@@ -99,18 +99,18 @@ function PatchItem({ view, decision, patch }: { view: Ready; decision: GraphNode
   const note = patch.events.find((event) => event.note != null)?.note;
   return (
     <li data-testid="history-patch">
-      <span className="muted">
+      <span className="muted small">
         {first.at} by {first.actor.user}
         {first.actor.agent == null ? "" : ` (agent ${first.actor.agent})`}
       </span>{" "}
       {[...new Set(patch.events.map((event) => event.event_type.replaceAll("_", " ")))].join(", ")}
-      {note == null ? null : <span className="muted"> — {note}</span>}
+      {note == null ? null : <span className="muted small"> — {note}</span>}
       {answers.map((answer, index) => (
         <div key={index} className="stack" data-testid="history-answer">
           <span>
             Answer: <strong>{answerText(view, answer.value, decision)}</strong>
           </span>
-          {answer.rationale === undefined ? <span className="muted">No reason given.</span> : <Markdown text={answer.rationale} data-testid="history-rationale" />}
+          {answer.rationale === undefined ? <span className="muted small">No reason given.</span> : <Markdown text={answer.rationale} data-testid="history-rationale" />}
         </div>
       ))}
     </li>
@@ -140,7 +140,7 @@ export function NodeHistory({ view, detail }: { view: Ready; detail: NodeDetail 
         <span className="detail-section-title">History</span>
       </summary>
       <div className="stack detail-section-body">
-        {loaded === undefined ? <span className="muted">Reading...</span> : null}
+        {loaded === undefined ? <span className="muted small">Reading...</span> : null}
         {loaded !== undefined && "failed" in loaded ? <span className="callout callout-bad">The history could not be read: {loaded.failed}</span> : null}
         {loaded !== undefined && "patches" in loaded ? (
           <>

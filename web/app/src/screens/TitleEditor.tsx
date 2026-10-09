@@ -87,7 +87,7 @@ export function TitleEditor({ journey, node, title, revision, showTitle = true }
         </Button>
         <Button onClick={() => { setDraft(undefined); setRejection(undefined); }}>Cancel</Button>
       </span>
-      {draft.base < revision ? <span className="muted">Editing as of revision {draft.base}; now {revision}.</span> : null}
+      {draft.base < revision ? <span className="muted small">Editing as of revision {draft.base}; now {revision}.</span> : null}
       {rejection === undefined ? null : (
         <RejectionView
           rejection={rejection}

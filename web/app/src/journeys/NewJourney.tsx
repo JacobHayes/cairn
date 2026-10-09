@@ -13,7 +13,6 @@ import { Refused } from "../screens/Refused.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field, Panel } from "../ui/kit.tsx";
 import { createMutation, newJourneyId, startableRoutes, type RouteSummary } from "./lifecycle.ts";
-import "./journeys.css";
 
 interface Form {
   name: string;
@@ -30,7 +29,7 @@ function StartFrom({ form, routes, onChange }: { form: Form; routes: RouteSummar
   return (
     <>
       <label htmlFor="new-route">Start from</label>
-      <select id="new-route" className="select" value={form.route} onChange={(event) => { onChange({ ...form, route: event.target.value, version: 0 }); }}>
+      <select id="new-route" value={form.route} onChange={(event) => { onChange({ ...form, route: event.target.value, version: 0 }); }}>
         <option value="">An empty journey</option>
         {form.route !== "" && chosen === undefined ? <option value={form.route}>{form.route} (not offered)</option> : null}
         {routes.map((route) => (
@@ -42,7 +41,7 @@ function StartFrom({ form, routes, onChange }: { form: Form; routes: RouteSummar
       {chosen === undefined ? null : (
         <>
           <label htmlFor="new-version">Version</label>
-          <select id="new-version" className="select" value={form.version === 0 ? latest : form.version} onChange={(event) => { onChange({ ...form, version: Number(event.target.value) }); }}>
+          <select id="new-version" value={form.version === 0 ? latest : form.version} onChange={(event) => { onChange({ ...form, version: Number(event.target.value) }); }}>
             {Array.from({ length: latest }, (_, at) => latest - at).map((version) => (
               <option key={version} value={version}>
                 {version === latest ? `${String(version)} (latest)` : version}
@@ -82,7 +81,7 @@ function NewJourneyForm({ routes, initial, asked }: { routes: RouteSummary[]; in
         <label htmlFor="new-name">Name</label>
         <Field id="new-name" required value={form.name} onChange={(event) => { setDraft({ ...form, name: event.target.value }); }} />
         <label htmlFor="new-description">Description</label>
-        <textarea id="new-description" className="textarea" value={form.description} onChange={(event) => { setDraft({ ...form, description: event.target.value }); }} />
+        <textarea id="new-description" value={form.description} onChange={(event) => { setDraft({ ...form, description: event.target.value }); }} />
         <StartFrom form={form} routes={routes} onChange={setDraft} />
       </div>
       {unavailable ? (
@@ -103,7 +102,7 @@ export function NewJourney() {
   const params = new URLSearchParams(search);
   const { view } = useLive("routes", routeIndex);
   if (view.status !== "ready") {
-    return <p className="muted">{view.status === "failed" ? `The routes could not be read: ${view.message}` : "Loading the routes..."}</p>;
+    return <p className="muted small">{view.status === "failed" ? `The routes could not be read: ${view.message}` : "Loading the routes..."}</p>;
   }
   const routes = startableRoutes(view.value);
   const asked = params.get("route") ?? "";
@@ -111,7 +110,7 @@ export function NewJourney() {
   const initial: Form = { name: "", description: "", route: asked, version: offered ? Number(params.get("version") ?? 0) || 0 : 0 };
   return (
     <Panel aria-label="New journey">
-      <h1 className="title">New journey</h1>
+      <h1>New journey</h1>
       <NewJourneyForm key={search} routes={routes} initial={initial} asked={search} />
     </Panel>
   );

@@ -44,7 +44,7 @@ function Removed({ authored, plan }: { authored: Authored; plan: RemovalPlan }) 
       <ul className="detail-list">
         {plan.nodes.map((node) => (
           <li key={node.key} data-testid="cascade-node" data-node={node.key}>
-            {node.title} <span className="muted">({node.kind})</span>
+            {node.title} <span className="muted small">({node.kind})</span>
           </li>
         ))}
       </ul>
@@ -57,7 +57,7 @@ function Removed({ authored, plan }: { authored: Authored; plan: RemovalPlan }) 
           ))}
         </ul>
       )}
-      {attached.length === 0 ? null : <span className="muted">With them: {attached.join(", ")}.</span>}
+      {attached.length === 0 ? null : <span className="muted small">With them: {attached.join(", ")}.</span>}
     </div>
   );
 }
@@ -65,10 +65,10 @@ function Removed({ authored, plan }: { authored: Authored; plan: RemovalPlan }) 
 /** What the preview says: accepted, with what it would newly cause, or every violation. */
 function PreviewLine({ preview }: { preview: Preview | undefined }) {
   if (preview === undefined) {
-    return <span className="muted">Checking with the engine...</span>;
+    return <span className="muted small">Checking with the engine...</span>;
   }
   if (preview.outcome === "unavailable") {
-    return <span className="muted">No preview: {preview.message}</span>;
+    return <span className="muted small">No preview: {preview.message}</span>;
   }
   if (preview.outcome === "rejected") {
     const violations = preview.rejection.rejection === "invalid" ? preview.rejection.violations : [];
@@ -87,7 +87,7 @@ function PreviewLine({ preview }: { preview: Preview | undefined }) {
     (part) => part !== undefined,
   );
   return (
-    <span className="muted" data-testid="cascade-preview" data-status="accepted">
+    <span className="muted small" data-testid="cascade-preview" data-status="accepted">
       The engine accepts this{newly.length === 0 ? "." : `; ${newly.join(", ")}.`}
     </span>
   );

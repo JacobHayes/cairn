@@ -1,17 +1,22 @@
 // What the canvas shows lives in its address, so a view is shareable, survives a reload, and
 // follows the back button: the kinds hidden (C2), the container drilled into (C4), whether
 // not-relevant and undecided nodes are hidden (C1), the heat overlay (C6), the trace of the
-// open node (C7), and on a journey whether its structure is being edited (5.6). Every setting
+// open node (C7), on a journey whether its structure is being edited (5.6), and on a phone
+// whether the full-screen map is open. Every setting
 // at its default leaves the address bare.
 import type { ProjectionRequest } from "@cairn/wasm";
 
 import type { NodeKind } from "../detail/model.ts";
 import { DEFAULT_SETTINGS, KINDS, type CanvasSettings, type LevelDisplay } from "./model.ts";
 
-/** The canvas's settings, whether the open node is traced, and whether the structure is edited. */
+/**
+ * The canvas's settings, whether the open node is traced, whether the structure is edited, and
+ * whether the full-screen map is open (below 720px, where the canvas is otherwise a preview).
+ */
 export interface CanvasView extends CanvasSettings {
   trace: boolean;
   edit: boolean;
+  map: boolean;
 }
 
 const HIDE = "hide";
@@ -21,6 +26,8 @@ const UNDECIDED = "undecided";
 const HEAT = "heat";
 const TRACE = "trace";
 const EDIT = "edit";
+/** The full-screen map's address parameter (MapFrame), so Back closes it. */
+export const MAP = "map";
 
 /** The canvas's settings in an address's query. */
 export function viewFrom(params: URLSearchParams): CanvasView {
@@ -33,6 +40,7 @@ export function viewFrom(params: URLSearchParams): CanvasView {
     heat: params.get(HEAT) === "on",
     trace: params.get(TRACE) === "on",
     edit: params.get(EDIT) === "on",
+    map: params.get(MAP) === "1",
   };
 }
 
@@ -61,6 +69,9 @@ export function paramsOf(view: CanvasView): URLSearchParams {
   if (view.edit) {
     params.set(EDIT, "on");
   }
+  if (view.map) {
+    params.set(MAP, "1");
+  }
   return params;
 }
 
@@ -76,7 +87,7 @@ export function withKind(view: CanvasView, kind: NodeKind, shown: boolean): Canv
 }
 
 /** The view a fresh canvas opens with. */
-export const DEFAULT_VIEW: CanvasView = { ...DEFAULT_SETTINGS, trace: false, edit: false };
+export const DEFAULT_VIEW: CanvasView = { ...DEFAULT_SETTINGS, trace: false, edit: false, map: false };
 
 /** What a layout depends on besides the graph: the kinds, the container, the relevance shown. */
 export function layoutViewOf(view: CanvasSettings): string {

@@ -105,7 +105,7 @@ test("a note is added, edited, and removed, attributed and timestamped (G1)", as
 test("a message draft renders with the journey's context and copies (A10, G3)", async ({ page, context }) => {
   await context.grantPermissions(["clipboard-read", "clipboard-write"]);
   const panel = await openNode(page, "browser", "j_vendor_eval", "n_access");
-  const name = await page.getByTestId("journey-name").innerText();
+  const name = (await page.getByTestId("journey-name").textContent()) ?? "";
   const draft = panel.getByTestId("draft-text");
   await expect(draft).toContainText(name);
   await expect(draft.getByTestId("draft-missing")).toHaveCount(0);
@@ -155,14 +155,6 @@ test("a rejection and an unsent bypass reason survive a reload (D4)", async ({ p
   await panel.getByTestId("bypass").getByLabel("Why bypass the guard").fill(reason);
   await page.reload();
   await expect(page.getByTestId("node-detail").getByTestId("bypass").getByLabel("Why bypass the guard")).toHaveValue(reason);
-});
-
-test("on a narrow screen the panel sits above the list with nothing off the side", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 800 });
-  const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
-  const [panelBox, listBox] = [await panel.boundingBox(), await page.getByTestId("journey-name").boundingBox()];
-  expect((panelBox?.y ?? 0) < (listBox?.y ?? 0)).toBe(true);
-  expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
 test("over the server, a resolution never overwrites a pin someone set meanwhile (F5, H5)", { tag: "@server" }, async ({ context }) => {

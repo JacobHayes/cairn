@@ -8,7 +8,7 @@ import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { createContext, useContext, type ReactNode } from "react";
 
 import { CARD_PAD_PX, BORDER_MAX_PX, CHECKLIST_SHOWN_MAX, LINE_PX, cardLines, type CardLines } from "./cards.ts";
-import { cardClasses, hereWords } from "./look.ts";
+import { nodeClasses, hereWords } from "./look.ts";
 import { statusWord } from "../status/words.ts";
 import type { Card, CardState } from "./model.ts";
 import type { CanvasOverlay } from "./overlay.ts";
@@ -47,7 +47,7 @@ function Line({ lines, children, className = "", testId }: { lines: number; chil
   }
   const style = { height: lines * LINE_PX, WebkitLineClamp: lines };
   return (
-    <div className={`card-line ${lines > 1 ? "card-line-wrap" : ""} ${className}`} style={style} data-testid={testId}>
+    <div className={`node-line ${lines > 1 ? "node-line-wrap" : ""} ${className}`} style={style} data-testid={testId}>
       {children}
     </div>
   );
@@ -57,18 +57,18 @@ function Head({ card, lines }: { card: Card; lines: CardLines }) {
   const actions = useContext(CardActionsContext);
   const drill = actions?.drill;
   return (
-    <Line lines={lines.head} className="card-head">
-      <span className="card-kind">{card.kind}</span>
+    <Line lines={lines.head} className="node-head">
+      <span className="node-kind">{card.kind}</span>
       {card.journey === undefined ? null : (
-        <span className="card-state" data-testid="card-state">
+        <span className="node-state" data-testid="card-state">
           {statusWord(card.journey.state, card.kind)}
         </span>
       )}
-      <span className="shell-spacer" />
+      <span className="spacer" />
       {card.drillable && drill !== undefined ? (
         <button
           type="button"
-          className="card-drill nodrag"
+          className="node-drill nodrag"
           aria-label={`Open ${card.title} as its own canvas`}
           data-testid="card-drill"
           onClick={(event) => {
@@ -88,13 +88,13 @@ function Dates({ journey, lines }: { journey: CardState; lines: CardLines }) {
   const slack = journey.slackDays === undefined || journey.finished ? undefined : `slack ${String(journey.slackDays)}d`;
   const start = journey.latestStart === undefined || journey.finished ? undefined : `start by ${journey.latestStart}`;
   return (
-    <Line lines={lines.dates} className="card-dates">
+    <Line lines={lines.dates} className="node-dates">
       {journey.due === undefined ? null : (
-        <span className={`badge badge-due ${journey.due.tone === "plain" ? "" : `badge-${journey.due.tone}`}`} data-testid="card-due" data-status={journey.due.tone}>
+        <span className={journey.due.tone === "plain" ? "badge" : `badge ${journey.due.tone}`} data-testid="card-due" data-status={journey.due.tone}>
           due {journey.due.date}
         </span>
       )}{" "}
-      <span className="muted">{[start, slack].filter(Boolean).join(" · ")}</span>
+      <span className="muted small">{[start, slack].filter(Boolean).join(" · ")}</span>
     </Line>
   );
 }
@@ -105,22 +105,22 @@ function Rolled({ card, journey, lines }: { card: Card; journey: CardState | und
   return (
     <>
       {children === undefined ? null : (
-        <Line lines={lines.children} className="muted card-children" testId="card-children">
+        <Line lines={lines.children} className="muted small node-children" testId="card-children">
           children:{children.gravity === undefined ? "" : ` gravity up to ${String(children.gravity)}`}
           {children.slackDays === undefined ? "" : ` · least slack ${String(children.slackDays)}d`}
           {children.owners.length === 0 ? "" : ` · ${children.owners.join(", ")}`}
         </Line>
       )}
       {lines.checklist === 0 ? null : (
-        <ul className="card-checklist" data-testid="card-checklist" style={{ height: lines.checklist * LINE_PX }}>
+        <ul className="node-checklist" data-testid="card-checklist" style={{ height: lines.checklist * LINE_PX }}>
           {shown.map((item) => (
-            <li key={item.key} className="card-line" data-node={item.key} data-status={item.done ? "done" : "open"}>
-              <span className={`card-check ${item.done ? "card-check-done" : ""}`} aria-label={item.done ? "finished" : "open"} />
+            <li key={item.key} className="node-line" data-node={item.key} data-status={item.done ? "done" : "open"}>
+              <span className={`node-check ${item.done ? "node-check-done" : ""}`} aria-label={item.done ? "finished" : "open"} />
               {item.title}
             </li>
           ))}
           {card.checklist.length > shown.length ? (
-            <li className="card-line muted">and {card.checklist.length - shown.length} more</li>
+            <li className="node-line muted small">and {card.checklist.length - shown.length} more</li>
           ) : null}
         </ul>
       )}
@@ -139,16 +139,16 @@ function Marker({ card }: { card: Card }) {
   const trace = actions?.trace;
   const marker = { "data-testid": "hidden-prerequisites", "data-nodes": card.hiddenPrerequisites.join(" "), title: `Waits on ${names}` };
   return (
-    <div className="card-line" style={{ height: LINE_PX }}>
+    <div className="node-line" style={{ height: LINE_PX }}>
       {trace === undefined ? (
         // A canvas with no trace (a route's) shows the marker as words, not a button that does nothing.
-        <span className="card-marker" {...marker}>
+        <span className="node-marker" {...marker}>
           {words}
         </span>
       ) : (
         <button
           type="button"
-          className="card-marker nodrag"
+          className="node-marker nodrag"
           {...marker}
           onClick={(event) => {
             event.stopPropagation();
@@ -168,7 +168,7 @@ function Body({ card, lines }: { card: Card; lines: CardLines }) {
   return (
     <>
       <Head card={card} lines={lines} />
-      <Line lines={lines.title} className="card-title">
+      <Line lines={lines.title} className="node-title">
         {actions?.open === undefined ? (
           <span data-testid="title" title={card.title}>
             {card.title}
@@ -176,7 +176,7 @@ function Body({ card, lines }: { card: Card; lines: CardLines }) {
         ) : (
           <button
             type="button"
-            className="card-open nodrag"
+            className="node-open nodrag"
             data-testid="card-open"
             title={card.title}
             onClick={(event) => {
@@ -189,23 +189,23 @@ function Body({ card, lines }: { card: Card; lines: CardLines }) {
         )}
       </Line>
       {journey === undefined ? null : (
-        <Line lines={lines.owner} className="muted" testId="card-owner">
+        <Line lines={lines.owner} className="muted small" testId="card-owner">
           {journey.owner}
         </Line>
       )}
       {journey === undefined ? null : <Dates journey={journey} lines={lines} />}
-      <Line lines={lines.prompt} className="card-prompt" testId="card-prompt">
+      <Line lines={lines.prompt} className="node-prompt" testId="card-prompt">
         {card.prompt}
       </Line>
       {journey === undefined || lines.answer === 0 ? null : (
         <Line lines={lines.answer} testId="card-answer">
-          {journey.answer === undefined ? <span className="muted">not answered</span> : <strong>{journey.answer}</strong>}
+          {journey.answer === undefined ? <span className="muted small">not answered</span> : <strong>{journey.answer}</strong>}
         </Line>
       )}
       {journey === undefined || lines.badges === 0 ? null : (
-        <div className="card-badges" style={{ height: lines.badges * LINE_PX }}>
+        <div className="node-badges" style={{ height: lines.badges * LINE_PX }}>
           {journey.badges.map((badge) => (
-            <span key={badge.flag} className={badge.tone === "plain" ? "badge" : `badge badge-${badge.tone}`} data-testid="card-badge" data-status={badge.flag}>
+            <span key={badge.flag} className={badge.tone === "plain" ? "badge" : `badge ${badge.tone}`} data-testid="card-badge" data-status={badge.flag}>
               {badge.flag}
             </span>
           ))}
@@ -225,17 +225,17 @@ function Hanging({ data }: { data: CardData }) {
   return (
     <>
       {journey?.rank === undefined ? null : (
-        <span className="card-rank" data-testid="card-rank" aria-label={`ranked ${String(journey.rank)}`}>
+        <span className="node-rank rank-tag" data-testid="card-rank" aria-label={`ranked ${String(journey.rank)}`}>
           {journey.rank}
         </span>
       )}
       {mark === undefined ? null : (
-        <span className={`card-mark card-mark-${mark.tone}`} data-testid="card-mark" data-status={mark.label}>
+        <span className={`node-mark hang-tag top node-mark-${mark.tone}`} data-testid="card-mark" data-status={mark.label}>
           {mark.label}
         </span>
       )}
       {heat && journey !== undefined ? (
-        <span className="card-heat" data-testid="card-heat">
+        <span className="node-heat hang-tag bottom steel" data-testid="card-heat">
           gravity {journey.gravity} · leverage {journey.leverage}
         </span>
       ) : null}
@@ -249,7 +249,7 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
   const lines = cardLines(card);
   const journey = card.journey;
   const border = journey?.borderPx ?? 1;
-  const classes = [...cardClasses(card, overlay), selected ? "card-selected" : "", header === undefined ? "" : "card-container"];
+  const classes = [...nodeClasses(card, overlay), selected ? "node-selected" : "", header === undefined ? "" : "node-container"];
   const here = hereWords(card);
   return (
     <div
@@ -267,12 +267,12 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
       data-y={data.place.y}
       title={here.length === 0 ? undefined : `I am here: ${here.join(", ")}`}
     >
-      <Handle type="target" position={Position.Left} isConnectable={false} className="card-handle" />
-      <div className="card-body" style={header === undefined ? undefined : { height: header - 2 * (CARD_PAD_PX + BORDER_MAX_PX) }}>
+      <Handle type="target" position={Position.Left} isConnectable={false} className="node-handle" />
+      <div className="node-body" style={header === undefined ? undefined : { height: header - 2 * (CARD_PAD_PX + BORDER_MAX_PX) }}>
         <Body card={card} lines={lines} />
       </div>
       <Hanging data={data} />
-      <Handle type="source" position={Position.Right} isConnectable={false} className="card-handle" />
+      <Handle type="source" position={Position.Right} isConnectable={false} className="node-handle" />
     </div>
   );
 }

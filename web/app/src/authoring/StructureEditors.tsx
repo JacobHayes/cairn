@@ -63,7 +63,7 @@ export function EdgesEditor({ authored, node }: NodeEditorProps) {
   const candidates = nodesByPath(authored.tree).filter((each) => each.key !== node.key && !requires.includes(each.key));
   return (
     <div className="stack" data-testid="edges-editor">
-      {requires.length === 0 ? <span className="muted">It requires nothing explicitly.</span> : null}
+      {requires.length === 0 ? <span className="muted small">It requires nothing explicitly.</span> : null}
       <ul className="detail-list">
         {requires.map((key) => (
           <li key={key} className="row" data-testid="requirement" data-node={key}>
@@ -177,7 +177,7 @@ export function Breakdown({ authored, node }: NodeEditorProps) {
   }
   return (
     <div className="stack" data-testid="breakdown">
-      <span className="muted">{children === 0 ? "Nothing beneath it yet." : `${String(children)} beneath it.`}</span>
+      <span className="muted small">{children === 0 ? "Nothing beneath it yet." : `${String(children)} beneath it.`}</span>
       {pieces.map((piece, at) => (
         <span key={at} className="row" data-testid="piece">
           <Picker aria-label="Kind of piece" value={piece.kind} options={[{ value: "action", label: "action" }, { value: "deliverable", label: "deliverable" }]} onChange={(event) => { setPieces(pieces.map((each, index) => (index === at ? { ...each, kind: event.target.value as NodeKind } : each))); }} />

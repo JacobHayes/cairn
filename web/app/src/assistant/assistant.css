@@ -1,40 +1,36 @@
-/* The assistant panel: docked at the window's right edge below the shell header, the screen
-   making room for it on a wide window and sliding under it on a narrow one; the notices move
-   left of it so neither hides the other. Drawn with the design tokens, light and dark. */
-:root {
-  --assistant-width: 26rem;
-}
-
+/* The assistant panel: the inspector column's ASSISTANT tab (shell/InspectorColumn.tsx). The
+   transcript is the one scroller (`.inspector-body`) and the composer is pinned under it. Drawn
+   with Graticule's tokens, light and dark; the column is graphite, so the panel sits on a paper card. */
 .assistant-panel {
-  position: fixed;
-  top: 4rem;
-  right: var(--space-4);
-  bottom: var(--space-4);
-  width: min(var(--assistant-width), calc(100vw - 2 * var(--space-4)));
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
-  z-index: 20;
-  box-shadow: 0 4px 24px rgb(0 0 0 / 0.18);
+  margin: var(--space-3);
+  padding: 0;
+  background: var(--color-surface);
+  color: var(--color-text);
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
 }
 
-@media (min-width: 72rem) {
-  body:has(.assistant-panel) .shell-main {
-    margin-right: calc(var(--assistant-width) + 2 * var(--space-4));
-  }
-}
-
-body:has(.assistant-panel) .notices {
-  right: calc(var(--assistant-width) + 3 * var(--space-4));
+.assistant-head {
+  flex: none;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-band);
+  border-bottom: 1px solid var(--color-border);
 }
 
 .assistant-scroll {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.assistant-panel > form,
+.assistant-panel > p {
+  flex: none;
+  margin: 0;
+  padding: var(--space-3);
+  border-top: 1px solid var(--color-border);
 }
 
 .assistant-transcript {
@@ -46,16 +42,25 @@ body:has(.assistant-panel) .notices {
   gap: var(--space-2);
 }
 
+/* What you said: a band-coloured block under a mono label (the accent is for state, not decoration). */
 .assistant-said {
   align-self: flex-end;
   max-width: 85%;
   margin-left: auto;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius);
-  background: var(--color-accent);
-  color: var(--color-accent-text);
+  background: var(--color-band);
+  border: 1px solid var(--color-border);
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+.assistant-said::before {
+  content: "You";
+  display: block;
+  font: 500 11px / 1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-secondary);
 }
 
 .assistant-reply {
@@ -64,7 +69,7 @@ body:has(.assistant-panel) .notices {
 }
 
 .assistant-report {
-  font-size: var(--text-small);
+  font-size: 14px;
   overflow-wrap: anywhere;
 }
 
@@ -75,28 +80,18 @@ body:has(.assistant-panel) .notices {
   gap: var(--space-1);
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
-  background: var(--color-canvas);
+  background: var(--color-band);
 }
 
 .assistant-nodes {
   overflow-wrap: anywhere;
 }
 
-.assistant-panel .textarea {
-  min-height: 4rem;
+.assistant-panel textarea {
+  min-height: 64px;
   resize: vertical;
 }
 
-.assistant-write a.button {
-  text-decoration: none;
-}
-
-.assistant-write a.button-primary {
-  color: var(--color-accent-text);
-}
-
 .assistant-toggle[aria-pressed="true"] {
-  border-color: var(--color-accent);
-  color: var(--color-accent);
+  border-color: var(--color-text);
 }

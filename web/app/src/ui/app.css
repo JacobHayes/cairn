@@ -1,0 +1,716 @@
+/* The app's frame and the parts every screen shares, drawn with Graticule (design/tokens.css and
+   design/base.css, imported before this file by main.tsx). The frame is one 100dvh grid with one
+   scroller per region (the rail, `.ws-body`, `.inspector-body`; the sheet's and the popover's
+   bodies when they come): nothing else scrolls, and the document never does at 720px and wider.
+   `mise run lint:css` holds the line (web/app/src/lint/css.ts). Rem units are the design's 17px, so
+   sizes here are px. */
+
+:root {
+  --rail-w: 200px;
+  --inspector-w: 400px;
+  --strip-h: 28px;
+  /* The sheet's two heights. The tall one leaves room above it for a notice: a window's worth, less the strip and a notice. */
+  --sheet-half: 40dvh;
+  --sheet-full: min(85dvh, calc(100dvh - 160px));
+  /* The inspector, the sheet and the strip are graphite; in dark paper is graphite too, so they step down to the ground. */
+  --chrome-bg: var(--color-primary);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --chrome-bg: var(--color-background);
+  }
+}
+:root[data-theme="dark"] {
+  --chrome-bg: var(--color-background);
+}
+
+/* ---- utilities -------------------------------------------------------------------------------- */
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+}
+.row > :is(h1, h2, h3),
+.panel > :is(h1, h2):first-child {
+  margin: 0;
+}
+.spacer {
+  flex: 1;
+}
+.small {
+  font-size: 14px;
+}
+.mono.small {
+  font-size: 13px;
+}
+.rail nav .spacer {
+  min-height: var(--space-4);
+}
+.plain-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+a.button {
+  display: inline-flex;
+  align-items: center;
+  text-decoration: none;
+}
+a.button.primary {
+  background: var(--ink-fill);
+  border-color: var(--ink-fill);
+  color: var(--color-surface);
+}
+a.button.primary:hover {
+  background: var(--ink-hover);
+  border-color: var(--ink-hover);
+}
+button.ghost.strip-button {
+  min-height: 20px;
+  padding: 0 6px;
+  border-color: transparent;
+  color: var(--rail-muted);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+button.ghost.strip-button:hover {
+  color: var(--rail-ink);
+  border-color: var(--rail-border);
+}
+
+/* ---- the frame -------------------------------------------------------------------------------- */
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  overflow: hidden;
+}
+.frame {
+  display: grid;
+  height: 100dvh;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--inspector-w);
+  grid-template-rows: minmax(0, 1fr) var(--strip-h);
+  grid-template-areas:
+    "rail work insp"
+    "rail strip strip";
+}
+.frame[data-inspector="off"] {
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  grid-template-areas:
+    "rail work"
+    "rail strip";
+}
+.frame [hidden] {
+  display: none !important;
+}
+
+.frame > .rail {
+  grid-area: rail;
+  background: var(--chrome-bg);
+  position: static;
+  height: auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* The workspace is the paper itself, edge to edge; the screen inside owns its scroller. */
+.frame > .workspace {
+  grid-area: work;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+}
+.banner {
+  flex: none;
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-band);
+  border-bottom: 1px solid var(--color-border);
+}
+.ws-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+/* A screen with a gesture surface (the canvas): a head that stays, and the surface fills what is left. The
+   surface keeps a minimum height, so a head taller than the window (edit mode's palette) scrolls the region
+   rather than squeezing the canvas to nothing. */
+.ws-body:has(> .ws-fill) {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+.ws-fill {
+  flex: 1 0 auto;
+  display: flex;
+  flex-direction: column;
+}
+.ws-head {
+  flex: none;
+  padding: var(--space-3) var(--space-5);
+  border-bottom: 1px solid var(--color-border);
+}
+.ws-head > section.stack,
+.ws-head > .stack {
+  gap: var(--space-2);
+}
+.ws-canvas {
+  flex: 1 1 0;
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+}
+.ws-canvas > :is(p, .callout) {
+  margin: var(--space-3) var(--space-5);
+}
+/* The trace bar sits on the surface's top edge. */
+.ws-canvas > .row {
+  flex: none;
+  padding: var(--space-2) var(--space-5);
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  font-size: 14px;
+}
+/* The head's own rule is the canvas's top edge; the bar under it does not draw a second. */
+.ws-head + .ws-canvas > .row:first-child {
+  border-top: 0;
+}
+
+/* The status strip: graphite, 28px, with whether the view is live on its right. */
+.frame > .strip {
+  grid-area: strip;
+  background: var(--chrome-bg);
+  flex-wrap: nowrap;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.strip .badge {
+  background: transparent;
+  color: var(--rail-ink);
+  border-color: var(--rail-border);
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.strip kbd {
+  background: transparent;
+}
+
+/* ---- the inspector column --------------------------------------------------------------------- */
+.frame > .inspector {
+  grid-area: insp;
+  position: static;
+  display: flex;
+  flex-direction: column;
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  overflow: hidden;
+  background: var(--chrome-bg);
+  border-left: 1px solid var(--rail-border);
+}
+.inspector-head {
+  position: relative;
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0 var(--space-3);
+  border-bottom: 1px solid var(--rail-border);
+}
+.inspector-head .label {
+  color: var(--rail-muted);
+}
+.inspector-head button.ghost {
+  min-height: 28px;
+  min-width: 28px;
+  padding: 0 6px;
+  border-color: transparent;
+  color: var(--rail-muted);
+  font-size: 16px;
+  line-height: 1;
+}
+.inspector-head button.ghost:hover {
+  color: var(--rail-ink);
+  border-color: var(--rail-border);
+}
+/* Collapsing is the column's; the sheet and the phone's stack have only close. */
+.inspector-head .collapse {
+  display: none;
+}
+@media (min-width: 1100px) {
+  .inspector-head .collapse {
+    display: block;
+  }
+}
+/* The sheet's grip sits in the middle of the head, behind its controls. */
+.inspector-head .sheet-handle {
+  display: none;
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: 64px;
+  height: auto;
+  min-height: 0;
+  margin-left: -32px;
+}
+.inspector-head .sheet-handle::before {
+  top: calc(50% - 2px);
+}
+.inspector-head > :not(.sheet-handle) {
+  position: relative;
+  z-index: 1;
+}
+.inspector-body {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.assistant-pane {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Cards in the inspector are paper on the column's graphite. */
+.inspector-body > .panel,
+.inspector-body > .detail-panel {
+  flex: none;
+}
+
+/* ---- the map on a phone, and the sheet on a tablet ---------------------------------------------- */
+.map-preview {
+  position: relative;
+  height: 40dvh;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.map-inert {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+}
+.map-inert .canvas {
+  flex: 1 1 0;
+  min-height: 0;
+  border: 0;
+}
+.map-inert * {
+  pointer-events: none !important;
+}
+.map-open {
+  position: absolute;
+  right: var(--space-2);
+  bottom: var(--space-2);
+  z-index: 3;
+}
+.map-full {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface);
+}
+.map-bar {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border-bottom: 1px solid var(--color-border);
+}
+.map-bar .label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.map-canvas {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.map-canvas .canvas {
+  flex: 1 1 0;
+  min-height: 0;
+  border: 0;
+}
+
+/* 720 to 1099px: the inspector is a bottom sheet over the workspace instead of a column, so the
+   canvas keeps its own region and nothing falls below it into the page. */
+@media (min-width: 720px) and (max-width: 1099px) {
+  .frame,
+  .frame[data-inspector="off"] {
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+    grid-template-areas:
+      "rail work"
+      "rail strip";
+  }
+  .frame > .inspector {
+    position: fixed;
+    z-index: 20;
+    top: auto;
+    left: var(--rail-w);
+    right: 0;
+    bottom: var(--strip-h);
+    height: var(--sheet-h, var(--sheet-half));
+    border-left: 0;
+    border-top: 1px solid var(--rail-border);
+    box-shadow: var(--shadow-lg);
+  }
+  .frame > .inspector[data-snap="full"] {
+    height: var(--sheet-h, var(--sheet-full));
+  }
+  .inspector-head .sheet-handle {
+    display: block;
+  }
+  /* The sheet covers the workspace's lower part: a scrolling screen's region ends above it, so its last row can be reached. */
+  .frame[data-inspector="on"] :is(.ws-body:not(:has(> .ws-fill)), .decision-page) {
+    padding-bottom: calc(var(--sheet-h, var(--sheet-half)) + var(--space-5));
+  }
+  .frame[data-inspector="on"]:has(.inspector[data-snap="full"]) :is(.ws-body:not(:has(> .ws-fill)), .decision-page) {
+    padding-bottom: calc(var(--sheet-h, var(--sheet-full)) + var(--space-5));
+  }
+}
+
+/* Below 720px: one column the document scrolls. The rail is a top bar, the inspector stacks under the
+   workspace, the strip sticks to the bottom, and the map is a preview that opens full screen. */
+@media (max-width: 719px) {
+  html,
+  body,
+  #root {
+    height: auto;
+  }
+  body {
+    overflow: visible;
+  }
+  html:has(.frame[data-map="open"]) {
+    overflow: hidden;
+  }
+  .frame,
+  .frame[data-inspector="off"] {
+    display: block;
+    height: auto;
+    min-height: 100dvh;
+  }
+  .frame > .rail {
+    overflow-y: visible;
+  }
+  .frame > .workspace {
+    display: block;
+    overflow: visible;
+  }
+  .ws-body,
+  .ws-body:has(> .ws-fill) {
+    display: block;
+    flex: none;
+    overflow: visible;
+    padding: var(--space-4);
+  }
+  .ws-fill {
+    display: block;
+  }
+  .ws-head {
+    padding: 0 0 var(--space-3);
+    border-bottom: 0;
+    background: transparent;
+  }
+  .ws-canvas {
+    display: block;
+  }
+  .ws-canvas > :is(p, .callout) {
+    margin: var(--space-3) 0;
+  }
+  .ws-canvas > .row {
+    padding: var(--space-2) 0;
+    border-top: 0;
+    background: transparent;
+  }
+  .frame > .inspector {
+    display: block;
+    border-left: 0;
+    border-top: 1px solid var(--rail-border);
+  }
+  .inspector-body {
+    overflow: visible;
+  }
+  .frame > .strip {
+    position: sticky;
+    bottom: 0;
+    z-index: 10;
+  }
+  .frame[data-map="open"] > .inspector {
+    display: flex;
+    position: fixed;
+    z-index: 60;
+    top: auto;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    height: var(--sheet-h, var(--sheet-half));
+    box-shadow: var(--shadow-lg);
+  }
+  .frame[data-map="open"] > .inspector[data-snap="full"] {
+    height: var(--sheet-h, var(--sheet-full));
+  }
+  .frame[data-map="open"] .inspector-head .sheet-handle {
+    display: block;
+  }
+  /* A phone has no ] key, and the inspector is stacked under the page. */
+  button.ghost.strip-button {
+    display: none;
+  }
+  .frame[data-map="open"] .inspector-body {
+    overflow-y: auto;
+  }
+}
+
+/* ---- toasts and callouts ---------------------------------------------------------------------- */
+/* What just happened rises at the workspace's bottom right, above the strip, so it never covers what the strip owns. */
+.toasts {
+  position: absolute;
+  right: var(--space-3);
+  bottom: var(--space-3);
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  max-width: min(420px, calc(100% - 24px));
+  pointer-events: none;
+}
+/* Above an open sheet (either height), and above the full-screen map. */
+@media (min-width: 720px) and (max-width: 1099px) {
+  .frame[data-inspector="on"] .toasts {
+    bottom: calc(var(--sheet-half) + var(--space-3));
+  }
+  .frame[data-inspector="on"]:has(.inspector[data-snap="full"]) .toasts {
+    bottom: calc(var(--sheet-full) + var(--space-3));
+  }
+}
+@media (max-width: 719px) {
+  .frame[data-map="open"] .toasts {
+    position: fixed;
+    z-index: 70;
+  }
+  .frame[data-map="open"][data-inspector="on"] .toasts {
+    bottom: calc(var(--sheet-half) + var(--space-3));
+  }
+  .frame[data-map="open"][data-inspector="on"]:has(.inspector[data-snap="full"]) .toasts {
+    bottom: calc(var(--sheet-full) + var(--space-3));
+  }
+}
+.toast-card {
+  pointer-events: auto;
+  padding: var(--space-2) 14px;
+  border: 1px solid var(--rail-border);
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--rail-ink);
+  font: 400 13px / 1.5 var(--font-mono);
+  letter-spacing: 0;
+  box-shadow: var(--shadow-md);
+}
+.toast-card[data-problem="true"] {
+  border-color: var(--color-error);
+}
+.toast-card button {
+  min-height: 24px;
+  padding: 0 8px;
+  background: transparent;
+  color: var(--rail-ink);
+  border-color: var(--rail-border);
+}
+
+.callout {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.callout-bad {
+  border-color: var(--color-error);
+}
+/* The word comes with the colour: state is never colour alone. */
+.callout-bad::before {
+  content: "Error";
+  display: inline-block;
+  margin-right: var(--space-2);
+  font: 500 11.5px / 1.6 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-error);
+}
+
+/* ---- tables and forms ------------------------------------------------------------------------- */
+/* A table sits in the region's own scroller, so its sticky band header sticks to the right box. */
+.table-wrap {
+  overflow: visible;
+  max-height: none;
+}
+@media (max-width: 719px) {
+  .table-wrap,
+  table.data {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+  table.data {
+    display: block;
+  }
+}
+table.data {
+  font-size: 14.5px;
+}
+/* Dates and numbers stay whole rather than breaking mid-token. */
+table.data td.mono {
+  white-space: nowrap;
+}
+/* The region is padded, and a sticky header sticks inside the padding: pull it to the region's edge so rows never show above it. */
+@media (min-width: 720px) {
+  .ws-body table.data th {
+    top: calc(-1 * var(--space-5));
+  }
+}
+.form-grid {
+  display: grid;
+  grid-template-columns: minmax(136px, max-content) minmax(0, 1fr);
+  gap: var(--space-2) var(--space-3);
+  align-items: center;
+}
+@media (max-width: 719px) {
+  .form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.version-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.version-list > li {
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-3) 0;
+}
+/* A control in a narrow column wraps rather than pushing it wider. */
+:is(.author-panel, .author-bar, .proposal-page, .detail-panel) :is(input, select, textarea) {
+  max-width: 100%;
+}
+textarea {
+  width: 100%;
+  min-height: 85px;
+  resize: vertical;
+}
+input[type="checkbox"],
+input[type="radio"] {
+  vertical-align: -2px;
+}
+
+/* The selected node's row on a screen's lists: DESIGN's selection, a 2px accent line and the faint tint. */
+.journey-screen [data-selected="true"] {
+  background: var(--color-tint);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+/* ---- markdown --------------------------------------------------------------------------------- */
+.markdown > :first-child {
+  margin-top: 0;
+}
+.markdown > :last-child {
+  margin-bottom: 0;
+}
+.markdown-code {
+  background: var(--color-band);
+  border: 1px solid var(--color-border);
+  padding: var(--space-2);
+  overflow-x: auto;
+  white-space: pre-wrap;
+}
+.markdown blockquote {
+  margin: 0;
+  padding-left: var(--space-3);
+  border-left: 2px solid var(--color-border);
+  color: var(--color-muted);
+}
+
+/* ---- print: a screen alone, in black on white (the summary is the printable one) ---------------- */
+@media print {
+  /* Print sets its own colours (named, since paper is white and ink black whatever the screen's theme), so these are not tokens. */
+  /* More specific than the theme's own selectors (tokens.css), so paper prints light whatever the screen's scheme. */
+  html:root:not([data-print]) {
+    color-scheme: light;
+    --color-surface: white;
+    --color-background: white;
+    --color-text: black;
+    --color-muted: rgb(51 51 51);
+    --color-secondary: rgb(51 51 51);
+    --color-border: darkgray;
+    --color-band: white;
+    --color-rule: transparent;
+    --color-tick: transparent;
+    --color-accent: black;
+    --color-success: black;
+    --color-warning: black;
+    --color-error: black;
+  }
+  body {
+    overflow: visible;
+  }
+  html,
+  body,
+  #root,
+  .frame,
+  .frame[data-inspector],
+  .frame > .workspace,
+  .ws-body,
+  .ws-body:has(> .ws-fill) {
+    display: block;
+    height: auto;
+    overflow: visible;
+    padding: 0;
+  }
+  .frame > .workspace {
+    background: white;
+  }
+  .rail,
+  .inspector,
+  .strip,
+  .banner,
+  .toasts,
+  .journey-nav,
+  .detail-panel,
+  .no-print {
+    display: none !important;
+  }
+  .panel {
+    break-inside: avoid;
+  }
+  .journey-screen [data-selected="true"] {
+    background: none;
+    box-shadow: none;
+  }
+  a {
+    color: inherit;
+    text-decoration: none;
+  }
+}

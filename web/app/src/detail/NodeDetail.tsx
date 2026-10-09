@@ -2,7 +2,7 @@
 // reads only the journey's document and its local derive (ARCHITECTURE, Web UI: the browser
 // has every explanation), so it follows the journey live (H6) with nothing of its own to
 // fetch. Sections start folded where they explain rather than act (progressive disclosure).
-import { useEffect, useRef, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { TitleEditor } from "../screens/TitleEditor.tsx";
@@ -37,23 +37,13 @@ function Dates({ view, detail }: { view: Ready; detail: NodeDetail }) {
   );
 }
 
-/** The width below which the panel sits above the canvas (canvas/canvas.css, `.canvas-split`). */
-const NARROW = "(max-width: 52rem)";
-
 /** `extra` sits under the header: the node's structure, in a journey's edit mode (5.6). */
 export function NodeDetailPanel({ view, nodeKey, extra }: { view: Ready; nodeKey: string; extra?: ReactNode }) {
   const journey = view.journey.header.id;
   const detail = nodeDetail(view, nodeKey);
-  const panel = useRef<HTMLElement>(null);
   // Closing keeps the screen it is open on and what that screen shows (5.2).
   const { pathname, search } = useLocation();
   const close = { pathname: screenPath(pathname), search };
-  // On a narrow screen the panel opens above the canvas, so bring it into view.
-  useEffect(() => {
-    if (globalThis.matchMedia(NARROW).matches) {
-      panel.current?.scrollIntoView({ block: "start" });
-    }
-  }, [nodeKey]);
   if (detail === undefined) {
     return (
       <aside className="detail-panel panel" data-testid="node-detail-missing">
@@ -63,13 +53,7 @@ export function NodeDetailPanel({ view, nodeKey, extra }: { view: Ready; nodeKey
     );
   }
   return (
-    <aside ref={panel} className="detail-panel panel stack" aria-label={detail.node.title} data-testid="node-detail" data-node={nodeKey}>
-      <div className="row">
-        <span className="shell-spacer" />
-        <Link to={close} aria-label="Close the node detail">
-          Close
-        </Link>
-      </div>
+    <aside className="detail-panel panel stack" aria-label={detail.node.title} data-testid="node-detail" data-node={nodeKey}>
       <Header view={view} detail={detail} />
       {extra}
       <div data-testid="rename">

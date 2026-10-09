@@ -31,3 +31,9 @@ export async function openScreen(page: Page, host: HostKind, journey: string, se
     await expect(page.getByTestId("derivation")).toHaveAttribute("data-today", FIXED_TODAY);
   }
 }
+
+/** Switches the decision view to its table: the screen shows the graph or the table, never both. */
+export async function showDecisionTable(page: Page): Promise<void> {
+  await page.getByRole("radio", { name: "Table" }).click();
+  await expect(page.getByTestId("decision-table")).toBeVisible();
+}

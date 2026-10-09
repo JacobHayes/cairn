@@ -66,7 +66,7 @@ function Search({ text, onChange }: { text: string; onChange: (text: string) => 
 
 function Pick({ label, value, options, onChange }: { label: string; value: string | undefined; options: { key: string; text: string }[]; onChange: (value: string | undefined) => void }) {
   return (
-    <select className="select" aria-label={label} value={value ?? ""} onChange={(event) => { onChange(event.target.value === "" ? undefined : event.target.value); }}>
+    <select aria-label={label} value={value ?? ""} onChange={(event) => { onChange(event.target.value === "" ? undefined : event.target.value); }}>
       <option value="">{label}: any</option>
       {options.map((option) => (
         <option key={option.key} value={option.key}>
@@ -83,7 +83,7 @@ export function ListFilters({ view, settings, onChange }: { view: Ready; setting
   };
   const owners = (view.inputs.deployment.entities ?? []).map((entity) => ({ key: entity.key, text: entityName(view, entity.key) }));
   return (
-    <div className="panel stack acting-controls" data-testid="list-filters">
+    <div className="stack acting-controls" data-testid="list-filters">
       <div className="row">
         <Search key={settings.text} text={settings.text} onChange={(text) => { set({ text }); }} />
         <SortSelect sort={settings.sort} onChange={(sort) => { set({ sort }); }} />

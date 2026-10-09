@@ -2,6 +2,10 @@
 // screens under a path router: a screen's address is a real path, and the server answers
 // every path it does not keep for itself (`/api/`, `/.well-known/`, `/healthz`) with this
 // page, so a deep link or a reload opens its screen.
+import "@design/tokens.css";
+import "@design/base.css";
+import "./ui/app.css";
+
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
@@ -27,7 +31,6 @@ import { JourneyPage } from "./screens/JourneyPage.tsx";
 import { DecisionViewPage, SummaryPage, TimelinePage } from "./screens/JourneyViews.tsx";
 import { RouteCanvasPage } from "./screens/RouteCanvasPage.tsx";
 import { Shell } from "./shell/Shell.tsx";
-import "./ui/tokens.css";
 
 function App({ session, layouts }: { session: Session; layouts: Layouts }) {
   return (

@@ -132,12 +132,12 @@ function DiffList({ diff, names, selected, onPick }: { diff: GraphDiff; names: N
       <button type="button" className="link" onClick={() => { onPick(key); }}>
         {names.node(key)}
       </button>{" "}
-      <span className="muted">{words}</span>
+      <span className="muted small">{words}</span>
     </li>
   );
   const changed = Object.entries(diff.changed);
   if (diff.added.length + diff.removed.length + changed.length + diff.edgesAdded.length + diff.edgesRemoved.length === 0) {
-    return <p className="muted" data-testid="diff-empty">As it stands, it changes nothing in the graph.</p>;
+    return <p className="muted small" data-testid="diff-empty">As it stands, it changes nothing in the graph.</p>;
   }
   return (
     <ul className="detail-list" data-testid="diff-list">
@@ -164,9 +164,9 @@ function DiffList({ diff, names, selected, onPick }: { diff: GraphDiff; names: N
  */
 function NoGraphAfter({ preview }: { preview: ProposalPreview | undefined }) {
   return (preview?.violations ?? []).length > 0 ? (
-    <p className="muted" data-testid="diff-unknown">Not known until it no longer breaks a rule; see the violations.</p>
+    <p className="muted small" data-testid="diff-unknown">Not known until it no longer breaks a rule; see the violations.</p>
   ) : (
-    <p className="muted" data-testid="diff-graphless">It changes the deployment's entities, not a graph; its changes are listed beside.</p>
+    <p className="muted small" data-testid="diff-graphless">It changes the deployment's entities, not a graph; its changes are listed beside.</p>
   );
 }
 
@@ -178,7 +178,7 @@ function FrontierAfter({ ready, preview, names }: { ready: Ready | undefined; pr
   return (
     <Panel aria-label="The frontier after" data-testid="frontier-after">
       <strong>What can be acted on after it applies</strong>
-      {after.length === 0 ? <span className="muted">Nothing.</span> : null}
+      {after.length === 0 ? <span className="muted small">Nothing.</span> : null}
       <ol className="detail-list">
         {after.map((key) => (
           <li key={key} data-testid="frontier-node" data-node={key} data-status={before.has(key) ? "kept" : "new"}>
@@ -186,7 +186,7 @@ function FrontierAfter({ ready, preview, names }: { ready: Ready | undefined; pr
           </li>
         ))}
       </ol>
-      {leaving.length === 0 ? null : <span className="muted" data-testid="frontier-leaving">No longer on it: {leaving.map((key) => names.node(key)).join(", ")}</span>}
+      {leaving.length === 0 ? null : <span className="muted small" data-testid="frontier-leaving">No longer on it: {leaving.map((key) => names.node(key)).join(", ")}</span>}
     </Panel>
   );
 }
@@ -266,7 +266,7 @@ function Footer({ proposal, kept, editing, blockers, reviewed, write, onSave, on
       {kept === undefined ? null : (
         <span className="row" data-testid="unsaved">
           <strong>Your edits are not saved yet.</strong>
-          {kept.base === proposal.revision ? null : <span className="muted">The proposal changed since you started editing.</span>}
+          {kept.base === proposal.revision ? null : <span className="muted small">The proposal changed since you started editing.</span>}
           <Button primary disabled={write.disabled || editing} onClick={onSave} data-testid="save-proposal">
             Save the edits
           </Button>
@@ -286,7 +286,7 @@ function Footer({ proposal, kept, editing, blockers, reviewed, write, onSave, on
         </Button>
       </span>
       {blockers.length === 0 ? null : (
-        <ul className="detail-list muted" data-testid="blockers">
+        <ul className="detail-list muted small" data-testid="blockers">
           {blockers.map((blocker) => (
             <li key={blocker} data-testid="blocker" data-blocker={blocker}>
               {BLOCKER_WORDS[blocker]}
@@ -400,12 +400,12 @@ function Header({ proposal }: { proposal: Proposal }) {
   return (
     <section className="stack" aria-label={proposal.draft.title}>
       <div className="row">
-        <h1 className="title" data-testid="proposal-title">{proposal.draft.title}</h1>
+        <h1 data-testid="proposal-title">{proposal.draft.title}</h1>
         <Badge tone={proposal.status === "open" ? "plain" : proposal.status === "applied" ? "good" : "warn"} data-testid="proposal-status" data-status={proposal.status}>
           {proposal.status}
         </Badge>
       </div>
-      <span className="muted">
+      <span className="muted small">
         A proposal for <DestinationLink proposal={proposal} />, drafted by {proposal.created_by}
         {proposal.proposing_agent == null ? "" : ` with the agent ${proposal.proposing_agent}`} at its revision {proposal.draft.destination_revision}; this is its revision {proposal.revision}.
       </span>
@@ -490,8 +490,8 @@ function ReviewBody({ review, refetch, ready, before, deployment }: BodyProps) {
       <StalePanel review={review} disabled={!editable} onRefresh={reviewing.refresh} />
       <Problem problem={reviewing.write.problem} onDismiss={reviewing.rebase} />
       {local !== undefined && "error" in local ? <p className="callout callout-bad">No preview: {local.error}</p> : null}
-      {kept !== undefined && !previewOfEdits ? <p className="muted" data-testid="preview-of-saved">{ready === undefined ? "The preview shows the proposal as saved: save your edits to preview them." : "Previewing your edits..."}</p> : null}
-      {known || before === undefined || (preview.violations ?? []).length === 0 ? null : <p className="muted" data-testid="no-graph-after">As it stands it breaks a rule, so there is no graph after to compare: the canvas shows the graph as it is, with the items marked.</p>}
+      {kept !== undefined && !previewOfEdits ? <p className="muted small" data-testid="preview-of-saved">{ready === undefined ? "The preview shows the proposal as saved: save your edits to preview them." : "Previewing your edits..."}</p> : null}
+      {known || before === undefined || (preview.violations ?? []).length === 0 ? null : <p className="muted small" data-testid="no-graph-after">As it stands it breaks a rule, so there is no graph after to compare: the canvas shows the graph as it is, with the items marked.</p>}
       {graphs.length === 0 ? null : <ProposalCanvas domain={proposal.id} graphs={graphs} marks={marks} deployment={deployment} today={today} selected={selected} onPick={setSelected} />}
       <Columns shown={shown} current={previewOfEdits || kept === undefined} ready={ready} deployment={deployment} journey={journey} edit={reviewing.edit} setInvalid={reviewing.setInvalid} onPick={setSelected} />
       <Footer
@@ -527,7 +527,7 @@ function JourneyReview({ journey, ...props }: Omit<BodyProps, "ready" | "before"
   if (view.status === "skew") {
     return <p className="callout">This journey comes from a newer Cairn; reload to review the proposal.</p>;
   }
-  return <p className="muted">Deriving the journey...</p>;
+  return <p className="muted small">Deriving the journey...</p>;
 }
 
 /** A route proposal: the route's draft as it is, or its latest version, or nothing for a new route. */
@@ -562,7 +562,7 @@ function RouteReview({ route, ...props }: Omit<BodyProps, "ready" | "before"> & 
     };
   }, [host, route, revision]);
   if (before === undefined) {
-    return <p className="muted">Reading the route...</p>;
+    return <p className="muted small">Reading the route...</p>;
   }
   return <ReviewBody {...props} ready={undefined} before={before.graph} />;
 }
@@ -573,7 +573,7 @@ export function ProposalScreen() {
   const deployment = useDeployment();
   switch (view.status) {
     case "loading":
-      return <p className="muted">Reading the proposal...</p>;
+      return <p className="muted small">Reading the proposal...</p>;
     case "missing":
       return <p className="callout">This proposal does not exist. <Link to="/">All journeys</Link></p>;
     case "failed":
@@ -582,7 +582,7 @@ export function ProposalScreen() {
       break;
   }
   if (deployment === undefined) {
-    return <p className="muted">Reading the deployment...</p>;
+    return <p className="muted small">Reading the deployment...</p>;
   }
   const review = view.value;
   const destination = review.proposal.destination;

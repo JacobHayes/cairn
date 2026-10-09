@@ -7,8 +7,8 @@ import { Link } from "react-router";
 
 import type { Capabilities, Viewer } from "../data/host.ts";
 import { useCapabilities, useDeployment, useSession, useViewer } from "../data/react.ts";
-import "../journeys/journeys.css";
-import { Badge, Panel } from "../ui/kit.tsx";
+import { Segmented } from "../ui/kit.tsx";
+import { THEME_CHOICES, useThemeChoice, type ThemeChoice } from "../ui/theme.ts";
 import { byName, offeredMerge } from "./model.ts";
 
 /** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
@@ -23,8 +23,8 @@ export function linkable(capabilities: Capabilities): string[] {
 
 function Identities({ viewer }: { viewer: Viewer }) {
   return (
-    <div className="scroll-x">
-      <table className="table">
+    <div className="table-wrap">
+      <table className="data">
         <thead>
           <tr>
             <th>Provider</th>
@@ -38,8 +38,8 @@ function Identities({ viewer }: { viewer: Viewer }) {
             <tr key={`${identity.provider}:${identity.subject}`} data-testid="identity" data-provider={identity.provider}>
               <td>{identity.provider}</td>
               <td className="mono">{identity.subject}</td>
-              <td data-testid="identity-emails">{identity.verified_emails.join(", ") || <span className="muted">None</span>}</td>
-              <td className="muted">{identity.linked_at}</td>
+              <td data-testid="identity-emails">{identity.verified_emails.join(", ") || <span className="muted small">None</span>}</td>
+              <td className="muted small">{identity.linked_at}</td>
             </tr>
           ))}
         </tbody>
@@ -55,7 +55,7 @@ function YourEntities({ viewer }: { viewer: Viewer }) {
   return (
     <section className="stack" aria-label="Your entities" data-testid="your-entities">
       <strong>You are</strong>
-      {entities.length === 0 ? <span className="muted" data-testid="no-entity">No entity holds a verified email of yours yet: add one to an entity on the entities screen, or link an identity whose email one holds.</span> : null}
+      {entities.length === 0 ? <span className="muted small" data-testid="no-entity">No entity holds a verified email of yours yet: add one to an entity on the entities screen, or link an identity whose email one holds.</span> : null}
       <ul className="row plain-list">
         {entities.map((entity) => (
           <li key={entity.key} className="badge" data-testid="your-entity" data-entity={entity.key}>
@@ -73,23 +73,44 @@ function YourEntities({ viewer }: { viewer: Viewer }) {
   );
 }
 
+const THEME_WORDS: Record<ThemeChoice, string> = { system: "System", light: "Light", dark: "Dark" };
+
+/** The theme: System follows the device, and the choice stays in this browser (ui/theme.ts). */
+function ThemeControl() {
+  const [choice, setChoice] = useThemeChoice();
+  return (
+    <section className="stack" aria-label="Theme" data-testid="theme">
+      <span className="label">Theme</span>
+      <Segmented
+        label="Theme"
+        value={choice}
+        options={THEME_CHOICES.map((value) => ({ value, label: THEME_WORDS[value] }))}
+        onChange={setChoice}
+        data-testid="theme-control"
+      />
+      <span className="muted small">System follows your device. The choice is kept in this browser only.</span>
+    </section>
+  );
+}
+
 export function Identity() {
   const { viewer, failed } = useViewer();
   const { host } = useSession();
   const capabilities = useCapabilities();
   if (viewer === undefined) {
-    return <p className={failed === undefined ? "muted" : "callout callout-bad"}>{failed === undefined ? "Reading who you are..." : `Who you are could not be read: ${failed}`}</p>;
+    return <p className={failed === undefined ? "muted small" : "callout callout-bad"}>{failed === undefined ? "Reading who you are..." : `Who you are could not be read: ${failed}`}</p>;
   }
   const providers = linkable(capabilities);
   return (
-    <Panel aria-label="You" data-testid="identity-screen">
+    <section className="stack" aria-label="You" data-testid="identity-screen">
       <span className="row">
-        <h1 className="title">You</h1>
-        <Badge data-testid="user">{viewer.user}</Badge>
-        {host.kind === "browser" ? <span className="muted">The demo's one local identity.</span> : null}
+        <h1>You</h1>
+        <code className="mono small" data-testid="user">{viewer.user}</code>
+        {host.kind === "browser" ? <span className="muted small">The demo's one local identity.</span> : null}
       </span>
       <Identities viewer={viewer} />
       <YourEntities viewer={viewer} />
+      <ThemeControl />
       {providers.length === 0 ? null : (
         <span className="row" data-testid="link-identity">
           <span>Link another identity:</span>
@@ -100,6 +121,6 @@ export function Identity() {
           ))}
         </span>
       )}
-    </Panel>
+    </section>
   );
 }

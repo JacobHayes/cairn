@@ -34,7 +34,7 @@ export function OpenDraftOffer({ route }: { route: Route }) {
   const write = useScreenWrite();
   return (
     <span className="row" data-testid="open-draft">
-      <span className="muted">Published versions never change; edits go to a draft.</span>
+      <span className="muted small">Published versions never change; edits go to a draft.</span>
       <Button disabled={write.disabled} onClick={() => void write.run({ target: { route: route.header.id }, baseRevision: route.revision, mutations: [openDraft()] })}>
         Open a draft to edit
       </Button>
@@ -56,12 +56,8 @@ export function RouteNodePanel({ authored, nodeKey, close, onRemoved }: { author
   return (
     <aside className="detail-panel panel stack" aria-label={node.title} data-testid="route-node" data-node={nodeKey}>
       <div className="row">
-        <h2 className="title" data-testid="detail-title">{node.title}</h2>
+        <h2 data-testid="detail-title">{node.title}</h2>
         <Badge>{node.kind}</Badge>
-        <span className="shell-spacer" />
-        <Link to={close} aria-label="Close the node">
-          Close
-        </Link>
       </div>
       <span className="muted mono">
         {ancestorsOf(authored.tree, nodeKey).length === 0 ? "" : "in "}

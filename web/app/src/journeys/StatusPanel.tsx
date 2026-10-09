@@ -46,9 +46,9 @@ export function StatusPanel({ ready, suggested }: { ready: Ready; suggested: boo
       <span className="row">
         <strong>Status: {header.status}</strong>
         {header.status === "active" && suggested ? (
-          <span className="badge badge-good" data-testid="completion-suggested">Everything in scope is finished: completion suggested</span>
+          <span className="badge good" data-testid="completion-suggested">Everything in scope is finished: completion suggested</span>
         ) : null}
-        {header.status === "archived" ? <span className="muted">Archived: it accepts only un-archiving or deletion.</span> : null}
+        {header.status === "archived" ? <span className="muted small">Archived: it accepts only un-archiving or deletion.</span> : null}
       </span>
       <span className="row">
         {actions.map((action) => (

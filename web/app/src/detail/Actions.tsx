@@ -29,7 +29,7 @@ export function MayNotApply({ view, node }: { view: Ready; node: string }) {
     return null;
   }
   return (
-    <span className="muted" data-testid="may-not-apply" data-unanswered={unanswered.join(" ")}>
+    <span className="muted small" data-testid="may-not-apply" data-unanswered={unanswered.join(" ")}>
       {mayNotApply(unanswered, (key) => titleOf(view, key))}.
     </span>
   );
@@ -66,7 +66,7 @@ function LiftsSnooze({ view, node }: { view: Ready; node: string }) {
     return null;
   }
   return (
-    <span className="muted" data-testid="lifts-snooze">
+    <span className="muted small" data-testid="lifts-snooze">
       Moving this on lifts its snooze, and the hold on the {held} open {held === 1 ? "item" : "items"} beneath it.
     </span>
   );
@@ -98,7 +98,7 @@ export function Actions({ view, detail }: { view: Ready; detail: NodeDetail }) {
             </Button>
           ),
         )}
-        {early ? <span className="muted">Started early: still blocked.</span> : null}
+        {early ? <span className="muted small">Started early: still blocked.</span> : null}
       </div>
       {moves.length > 0 ? <LiftsSnooze view={view} node={node.key} /> : null}
       {finishes ? <MayNotApply view={view} node={node.key} /> : null}

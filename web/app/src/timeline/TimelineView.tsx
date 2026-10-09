@@ -115,7 +115,7 @@ function Row({ ready, axis, row, selected }: { ready: Ready; axis: Axis; row: Ti
     >
       <div className="timeline-label">
         <NodeLink view={ready} node={row.node} />
-        <span className="muted">
+        <span className="muted small">
           {row.kind}, {row.date}
         </span>
         <Badge data-testid="timeline-origin">{ORIGIN_WORDS[row.origin]}</Badge>
@@ -146,7 +146,7 @@ function Legend() {
     </svg>
   );
   return (
-    <div className="row muted timeline-legend" aria-label="Legend">
+    <div className="row muted small timeline-legend" aria-label="Legend">
       <span>{swatch("timeline-marker-actual", true)} actual (reached)</span>
       <span>{swatch("timeline-marker-pin", false)} pinned</span>
       <span>{swatch("timeline-marker-due", false)} derived due date</span>
@@ -162,11 +162,11 @@ export function TimelineChart({ ready, timeline, selected }: { ready: Ready; tim
   const rows = useMemo(() => timelineRows(ready, timeline, axis), [ready, timeline, axis]);
   const undated = timeline.undated ?? [];
   return (
-    <section className="panel stack" aria-label="Timeline" data-testid="timeline" data-end={axis.anchor?.node ?? ""} data-end-date={axis.anchor?.date ?? ""}>
+    <section className="stack" aria-label="Timeline" data-testid="timeline" data-end={axis.anchor?.node ?? ""} data-end-date={axis.anchor?.date ?? ""}>
       <div className="row">
         <span data-testid="timeline-anchor">
           {axis.anchor === undefined ? (
-            <span className="muted">No final milestone with a date: the timeline ends after its latest date.</span>
+            <span className="muted small">No final milestone with a date: the timeline ends after its latest date.</span>
           ) : (
             <>
               Ends at <NodeLink view={ready} node={axis.anchor.node} /> on <strong>{axis.anchor.date}</strong>, the final milestone.
@@ -176,7 +176,7 @@ export function TimelineChart({ ready, timeline, selected }: { ready: Ready; tim
       </div>
       <Legend />
       {rows.length === 0 ? (
-        <p className="muted" data-testid="timeline-empty">Nothing in scope has a date yet: no milestone date, pin, or due date.</p>
+        <p className="muted small" data-testid="timeline-empty">Nothing in scope has a date yet: no milestone date, pin, or due date.</p>
       ) : (
         <ol className="timeline-rows">
           <li className="timeline-row timeline-row-axis">

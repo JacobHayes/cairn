@@ -1,23 +1,22 @@
 /* Proposal review: the diff canvas, its legend, and the lists beside it, drawn with the design
    tokens so they read the same in light and dark. */
 .proposal-page {
-  max-width: var(--measure);
+  max-width: 1224px;
 }
 
 .proposal-canvas .canvas {
-  height: 28rem;
+  height: 476px;
 }
 
 .proposal-legend {
-  font-size: var(--text-small);
+  font-size: 14px;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius);
   padding: 0 var(--space-2);
 }
 
 .proposal-columns {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(22rem, 100%), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(374px, 100%), 1fr));
   gap: var(--space-4);
   align-items: start;
 }
@@ -35,15 +34,15 @@
 }
 
 .proposal-picked {
-  outline: 2px solid var(--color-accent);
-  outline-offset: 2px;
+  background: var(--color-tint);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .proposal-page button.link {
   background: none;
   border: none;
   padding: 0;
-  color: var(--color-accent);
+  min-height: 0;
   cursor: pointer;
   font: inherit;
   text-decoration: underline;
@@ -51,11 +50,6 @@
 
 .proposal-columns > * {
   min-width: 0;
-}
-
-.proposal-page .field,
-.proposal-page .select {
-  max-width: 100%;
 }
 
 .proposal-item,

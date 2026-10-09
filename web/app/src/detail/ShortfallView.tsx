@@ -26,10 +26,10 @@ export function ShortfallView({
       <strong>{short.shortfall_days} days short</strong>
       <ChainView view={view} chain={short.chain} />
       {moves.length === 0 ? (
-        <span className="muted">No single move resolves it; restructure the work.</span>
+        <span className="muted small">No single move resolves it; restructure the work.</span>
       ) : (
         <div className="stack">
-          <span className="muted">Each of these resolves it on its own:</span>
+          <span className="muted small">Each of these resolves it on its own:</span>
           {moves.map((move, at) => (
             <span key={at} className="row" data-testid="resolution" data-op={move.op}>
               <span>{moveText(move, name)}</span>

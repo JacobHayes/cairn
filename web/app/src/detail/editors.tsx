@@ -95,7 +95,7 @@ export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail })
       <span>
         Pin: <strong data-testid="pin-date">{current ?? "none"}</strong>
         {fedBy === undefined ? null : (
-          <span className="muted" data-testid="pin-through">
+          <span className="muted small" data-testid="pin-through">
             {" "}
             set by answering <NodeLink view={view} node={fedBy.key} />: editing it here answers that decision
           </span>
@@ -185,7 +185,7 @@ export function SnoozeEditor({ view, detail }: { view: Ready; detail: NodeDetail
             start=""
             label="Snooze until a node"
             input={(value, change) => (
-              <select className="select" aria-label="Snooze until node" value={value} onChange={(event) => { change(event.target.value); }}>
+              <select aria-label="Snooze until node" value={value} onChange={(event) => { change(event.target.value); }}>
                 <option value="">Choose</option>
                 {(view.journey.graph.nodes ?? [])
                   .filter((node) => node.key !== key)
@@ -288,7 +288,6 @@ export function ParticipationEditor({ view, detail }: { view: Ready; detail: Nod
     <div className="stack" data-testid="participation-editor">
       <span className="row">
         <select
-          className="select"
           aria-label="Participation kind"
           value={draft?.value.kind ?? ""}
           onChange={(event) => { form.open({ kind: event.target.value, chosen: [] }, draft ?? write.seen); }}

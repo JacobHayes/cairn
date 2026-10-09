@@ -5,10 +5,7 @@ import { describe, expect, it } from "vitest";
 import type { Ready } from "../detail/model.ts";
 import { testView } from "../detail/view.test-support.ts";
 import {
-  CANVAS_HEIGHT_MAX_PX,
-  CANVAS_HEIGHT_MIN_PX,
   GRID_COLUMN_COUNT_MAX,
-  canvasHeightPx,
   decisionLevel,
   decisionPlacement,
   decisionRows,
@@ -109,13 +106,5 @@ describe("the decision canvas's layout and height (C12, C15)", () => {
   it("keeps the layered layout when a decision gates another", () => {
     const layered = column(3);
     expect(decisionPlacement(keysOf(3), layered, 1)).toBe(layered);
-  });
-
-  it("grows with a column of decisions, within its bounds", () => {
-    const heights = [0, 1, 3, 5, 7, 40].map((count) => canvasHeightPx(column(count)));
-    expect([...heights].sort((a, b) => a - b)).toEqual(heights);
-    expect(heights[0]).toBe(CANVAS_HEIGHT_MIN_PX);
-    expect(heights.at(-1)).toBe(CANVAS_HEIGHT_MAX_PX);
-    expect(canvasHeightPx(column(3))).toBeGreaterThan(280);
   });
 });

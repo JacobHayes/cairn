@@ -150,8 +150,8 @@ export function NodeForm({ authored, node }: NodeFormProps) {
         <Button disabled={kept === undefined} onClick={discard}>
           Discard changes
         </Button>
-        {preview?.outcome === "accepted" ? <span className="muted" data-testid="preview" data-status="accepted">The engine accepts this.</span> : null}
-        {preview?.outcome === "rejected" ? <span className="muted" data-testid="preview" data-status="rejected">The engine would refuse this; see the fields.</span> : null}
+        {preview?.outcome === "accepted" ? <span className="muted small" data-testid="preview" data-status="accepted">The engine accepts this.</span> : null}
+        {preview?.outcome === "rejected" ? <span className="muted small" data-testid="preview" data-status="rejected">The engine would refuse this; see the fields.</span> : null}
         {preview?.outcome === "unavailable" ? <span className="author-problem" data-testid="preview" data-status="unavailable">No preview: {preview.message}</span> : null}
       </span>
     </form>

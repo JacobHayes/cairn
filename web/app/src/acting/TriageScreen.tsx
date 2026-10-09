@@ -114,11 +114,11 @@ function TriageBody({ view, settings }: { view: Ready; settings: TriageSettings 
   const passedCount = order.filter((key) => pass.passed.includes(key)).length;
   return (
     <section className="stack" aria-label={settings.decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
-      <h2 className="title">{settings.decisions ? "Decision walkthrough" : "Triage"}</h2>
+      <h2>{settings.decisions ? "Decision walkthrough" : "Triage"}</h2>
       <TriageControls journey={journey} settings={settings} onNewPass={() => { setPass(begin(view.derived.acting_frontier)); }} />
       {error === undefined ? null : <p className="callout callout-bad">The frontier could not be read: {error}</p>}
       <Surfaced view={view} keys={surfaced(view.derived.acting_frontier, pass)} />
-      {next === undefined ? <p className="muted">Reading the frontier...</p> : null}
+      {next === undefined ? <p className="muted small">Reading the frontier...</p> : null}
       {next !== undefined && rows.length === 0 ? <Empty view={view} settings={settings} stalled={next.stalled != null} /> : null}
       {done ? (
         <p className="callout" data-testid="pass-done">
@@ -128,7 +128,7 @@ function TriageBody({ view, settings }: { view: Ready; settings: TriageSettings 
       {focus === undefined ? null : <TriageCard key={focus.key} view={view} row={focus} position={Math.min(passedCount + 1, order.length)} total={order.length} onPass={onPass} />}
       {order.length > 1 ? (
         <section className="stack" aria-label="Up next" data-testid="up-next">
-          <span className="muted">Up next in this pass:</span>
+          <span className="muted small">Up next in this pass:</span>
           <ol className="detail-list">
             {order.slice(1, 1 + UP_NEXT_SHOWN).map((key) => (
               <li key={key} data-node={key}>

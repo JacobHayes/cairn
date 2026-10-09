@@ -19,6 +19,13 @@ test("B7, C14: the scenario journey upgraded to version 2, each conflict resolve
   await expect(flow.getByLabel("Upgrade to version")).toHaveValue("2");
   await flow.getByRole("button", { name: "Propose the upgrade" }).click();
   await reviewOpen(page);
+  // The diff canvas sits in the page: the wheel over it scrolls the page and leaves the view where it is.
+  const view = page.locator('[data-testid="proposal-canvas"] .react-flow__viewport');
+  const placed = await view.evaluate((element) => (element as HTMLElement).style.transform);
+  await page.locator(".proposal-canvas").hover();
+  await page.mouse.wheel(0, 300);
+  await expect.poll(() => page.locator(".ws-body").evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+  expect(await view.evaluate((element) => (element as HTMLElement).style.transform)).toBe(placed);
 
   await expect(reviewItem(page, "conflict", "n_access")).toHaveAttribute("data-about", "field");
   await expect(reviewItem(page, "conflict", "n_baseline")).toHaveAttribute("data-about", "field");

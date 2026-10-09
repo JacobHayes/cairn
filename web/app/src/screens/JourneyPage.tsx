@@ -21,6 +21,7 @@ import { Crumbs, StalledSurface } from "../canvas/Surfaces.tsx";
 import type { JourneyView } from "../data/journeys.ts";
 import { useJourney } from "../data/react.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
+import { Inspector } from "../shell/frame.tsx";
 import { Badge } from "../ui/kit.tsx";
 import { JourneyNav } from "./JourneyNav.tsx";
 
@@ -33,14 +34,14 @@ function Header({ ready, view, selected, bar }: { ready: Ready; view: CanvasView
   return (
     <section className="stack" aria-label={header.name}>
       <div className="row">
-        <h1 className="title" data-testid="journey-name">{header.name}</h1>
+        <h1 data-testid="journey-name">{header.name}</h1>
         <Badge>{header.status}</Badge>
         {header.lineage == null ? null : (
           <Link to={`/routes/${header.lineage.route}?version=${String(header.lineage.version)}`} data-testid="lineage">
             Route {header.lineage.route}, version {header.lineage.version}
           </Link>
         )}
-        <span className="muted" data-testid="derivation" data-revision={key.revision} data-deployment={key.deployment_revision}>
+        <span className="muted small" data-testid="derivation" data-revision={key.revision} data-deployment={key.deployment_revision}>
           Derived in this tab at revision {key.revision}, deployment revision {key.deployment_revision}, for {key.today};{" "}
           {ready.derived.frontier.length} on the frontier.
         </span>
@@ -81,7 +82,7 @@ function JourneyScreen({ id, selected }: { id: string; selected: string | undefi
   const drawing = useEdgeDrawing(authored);
   switch (journey.status) {
     case "loading":
-      return <p className="muted">Deriving the journey...</p>;
+      return <p className="muted small">Deriving the journey...</p>;
     case "missing":
       return <p className="callout" data-testid="journey-missing">This journey does not exist. <Link to="/">All journeys</Link></p>;
     case "failed":
@@ -95,11 +96,17 @@ function JourneyScreen({ id, selected }: { id: string; selected: string | undefi
   const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(canvasPath(id, view))} />;
   return (
     <ConnectContext value={authored === undefined ? undefined : drawing.connecting}>
-      <div className={selected === undefined ? "canvas-page" : "canvas-page canvas-split"}>
+      <div className="ws-fill">
         {/* Keyed by journey and node, so every form and rejection in it is that node's. */}
-        {selected === undefined ? null : <NodeDetailPanel key={`${id}:${selected}`} view={journey} nodeKey={selected} extra={structure} />}
-        <div className="stack">
+        {selected === undefined ? null : (
+          <Inspector focus={`${id}:${selected}`}>
+            <NodeDetailPanel key={`${id}:${selected}`} view={journey} nodeKey={selected} extra={structure} />
+          </Inspector>
+        )}
+        <div className="ws-head">
           <Header ready={journey} view={view} selected={selected} bar={authored === undefined ? null : <JourneyAuthoringBar authored={authored} view={view} drawing={drawing} />} />
+        </div>
+        <div className="ws-canvas">
           <JourneyCanvas ready={journey} view={view} selected={selected} onPick={authored === undefined ? undefined : drawing.pick} />
         </div>
       </div>

@@ -2,8 +2,15 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <title>Cairn</title>
+    <script>
+      // The chosen theme, before first paint, so the page never flashes the wrong one (ui/theme.ts).
+      try {
+        var theme = localStorage.getItem("cairn:theme");
+        if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+      } catch (_) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

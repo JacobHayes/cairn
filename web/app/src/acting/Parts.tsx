@@ -22,10 +22,10 @@ export function DetailLink({ view, node, className }: { view: Ready; node: strin
 export function Crumb({ view, row }: { view: Ready; row: NodeRow }) {
   const ancestors = row.ancestors ?? [];
   if (ancestors.length === 0) {
-    return <span className="muted crumb" data-testid="breadcrumb">Top of the journey</span>;
+    return <span className="muted small crumb" data-testid="breadcrumb">Top of the journey</span>;
   }
   return (
-    <span className="muted crumb" data-testid="breadcrumb">
+    <span className="muted small crumb" data-testid="breadcrumb">
       {ancestors.map((key, at) => (
         <span key={key}>
           {at === 0 ? "" : " / "}
@@ -64,7 +64,7 @@ export function Flags({ view, row }: { view: Ready; row: NodeRow }) {
 export function Why({ view, row, sort }: { view: Ready; row: NodeRow; sort: SortBy }) {
   const estimate = nodeOf(view, row.key)?.estimate ?? undefined;
   return (
-    <span className="muted" data-testid="why" data-rank={row.rank?.rank}>
+    <span className="muted small" data-testid="why" data-rank={row.rank?.rank}>
       Why here: {whyWords(row, view.inputs.rank, sort, estimate)}
     </span>
   );

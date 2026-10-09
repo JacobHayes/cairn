@@ -54,7 +54,7 @@ test("hiding decisions marks the work they block; the marker opens the trace", a
   const panel = await openFromCanvas(page, "n_make_offer");
   await panel.getByTestId("actions").getByRole("button", { name: "Reopen" }).click();
   await expect(nodeCard(page, "n_offer")).toHaveAttribute("data-relevance", "undecided");
-  await page.getByRole("link", { name: "Close the node detail" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await shot(page, "8a-undecided-ghosted");
   await showKind(page, "decision", false);
   await expect(nodeCard(page, "n_close_out").getByTestId("hidden-prerequisites")).toBeVisible();
@@ -72,7 +72,7 @@ test("the stalled surface", async ({ page }) => {
   await blocking.getByLabel("Snooze until").fill(new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10));
   await blocking.getByTestId("snooze").getByRole("button", { name: "Save" }).click();
   await expect(page.getByTestId("stalled")).toBeVisible();
-  await page.getByRole("link", { name: "Close the node detail" }).click();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
   await shot(page, "9-stalled-surface");
 });
 

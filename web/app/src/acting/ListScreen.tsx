@@ -37,9 +37,9 @@ function Row({ view, row, grouped, chosen, onToggle }: { view: Ready; row: NodeR
       <td>
         <Badge tone={statusTone(row.display_state)}>{statusWord(row.display_state, row.kind)}</Badge>
       </td>
-      <td>{(row.owners ?? []).map((key) => entityName(view, key)).join(", ") || <span className="muted">none</span>}</td>
-      <td className="mono">{row.due ?? <span className="muted">none</span>}</td>
-      <td className="mono">{row.slack_days ?? <span className="muted">none</span>}</td>
+      <td>{(row.owners ?? []).map((key) => entityName(view, key)).join(", ") || <span className="muted small">none</span>}</td>
+      <td className="mono">{row.due ?? <span className="muted small">none</span>}</td>
+      <td className="mono">{row.slack_days ?? <span className="muted small">none</span>}</td>
       <td className="mono">{row.gravity.toFixed(1)}</td>
       <td className="mono">{row.leverage.toFixed(1)}</td>
       <td className="mono">{row.rank == null ? "" : row.rank.rank.toFixed(3)}</td>
@@ -53,7 +53,7 @@ function Row({ view, row, grouped, chosen, onToggle }: { view: Ready; row: NodeR
 function Table({ view, rows, settings, chosen, onToggle }: { view: Ready; rows: NodeRow[]; settings: ListSettings; chosen: Set<string>; onToggle: (key: string) => void }) {
   const groups = settings.grouped ? byContainer(rows) : [{ container: undefined, path: [], rows }];
   return (
-    <table className="table list-table" data-testid="list-table">
+    <table className="data list-table" data-testid="list-table">
       <thead>
         <tr>
           <th aria-label="Selected" />
@@ -103,7 +103,7 @@ function ListBody({ view, settings }: { view: Ready; settings: ListSettings }) {
       <ListFilters view={view} settings={settings} onChange={(changed) => void navigate(listPath(journey, changed))} />
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
       <div className="row">
-        <span className="muted" data-testid="list-total" data-total={page?.total ?? ""}>
+        <span className="muted small" data-testid="list-total" data-total={page?.total ?? ""}>
           {page === undefined ? "Reading the list..." : `${String(page.total)} nodes match; showing ${String(rows.length)}.`}
         </span>
         <Button onClick={() => { setChosen(new Set(rows.map((row) => row.key))); }}>Select all shown</Button>

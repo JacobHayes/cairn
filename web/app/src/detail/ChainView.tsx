@@ -14,8 +14,8 @@ export function ChainView({ view, chain }: { view: Ready; chain: Chain }) {
           {chain.constraints.map((constraint, at) => (
             <li key={at} data-testid="chain-link">
               {constraintText(constraint, name)}
-              <span className="muted"> ({sourceText(constraint.source, name)})</span>
-              {constraint.conditional === true ? <span className="badge badge-warn">conditional</span> : null}
+              <span className="muted small"> ({sourceText(constraint.source, name)})</span>
+              {constraint.conditional === true ? <span className="badge warn">conditional</span> : null}
             </li>
           ))}
         </ol>
@@ -27,7 +27,7 @@ export function ChainView({ view, chain }: { view: Ready; chain: Chain }) {
           </li>
         ))}
       </ul>
-      <span className="muted" data-testid="chain-edit">
+      <span className="muted small" data-testid="chain-edit">
         {targets.length === 0
           ? "Nothing here moves it: it rests on facts."
           : `To change it, edit ${targets.map((target) => targetText(target, name)).join("; ")}.`}

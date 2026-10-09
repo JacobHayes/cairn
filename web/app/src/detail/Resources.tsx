@@ -41,7 +41,7 @@ function MessageDraft({ view, node, resource }: { view: Ready; node: string; res
     };
   }, [deriver, journey, node, resource, derivation]);
   if (rendered === undefined) {
-    return <span className="muted">Rendering...</span>;
+    return <span className="muted small">Rendering...</span>;
   }
   if ("failed" in rendered) {
     return <span className="callout callout-bad">The draft could not be rendered: {rendered.failed}</span>;
@@ -64,7 +64,7 @@ function MessageDraft({ view, node, resource }: { view: Ready; node: string; res
       </blockquote>
       <span className="row">
         <Button onClick={copy}>Copy</Button>
-        {copied ? <span className="muted" data-testid="copied">Copied.</span> : null}
+        {copied ? <span className="muted small" data-testid="copied">Copied.</span> : null}
       </span>
     </div>
   );

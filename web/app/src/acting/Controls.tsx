@@ -16,9 +16,8 @@ const SORT_WORDS: Record<SortBy, string> = {
 export function SortSelect({ sort, onChange }: { sort: SortBy; onChange: (sort: SortBy) => void }) {
   return (
     <label className="row">
-      <span className="muted">Sort by</span>
+      <span className="muted small">Sort by</span>
       <select
-        className="select"
         aria-label="Sort by"
         value={sort}
         onChange={(event) => { onChange(SORTS.find((each) => each === event.target.value) ?? "rank"); }}
@@ -59,7 +58,7 @@ export function Checks<T extends string>({
 }) {
   return (
     <fieldset className="checks row" data-testid={testId}>
-      <legend className="muted">{legend}</legend>
+      <legend className="muted small">{legend}</legend>
       {options.map((option) => (
         <Check
           key={option}

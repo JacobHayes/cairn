@@ -11,7 +11,7 @@ function UnblockerLine({ view, unblocker }: { view: Ready; unblocker: Unblocker 
   return (
     <li data-testid="unblocker" data-node={unblocker.node} data-kind={unblocker.kind}>
       <Badge tone={unblocker.kind === "milestone" ? "warn" : "plain"}>{unblocker.kind}</Badge> <DetailLink view={view} node={unblocker.node} />{" "}
-      <span className="muted">
+      <span className="muted small">
         ({unblocker.via === "snooze" ? "it is snoozed until this is finished" : viaText(unblocker.via, name)}
         {unblocker.through === undefined ? "" : ` of ${titleOf(view, unblocker.through)}, which holds it`})
       </span>
@@ -37,7 +37,7 @@ export function WaitingDecisions({ view }: { view: Ready }) {
           <li key={each.decision} className="stack" data-testid="waiting-decision" data-node={each.decision}>
             <span>
               <DetailLink view={view} node={each.decision} />
-              <span className="muted">
+              <span className="muted small">
                 {each.earliest === undefined ? "" : `, can start ${each.earliest}`}
                 {each.snoozedUntil === undefined ? "" : `, snoozed until ${each.snoozedUntil}`}
               </span>
@@ -51,7 +51,7 @@ export function WaitingDecisions({ view }: { view: Ready }) {
         ))}
       </ul>
       {waiting.length > WAITING_SHOWN_MAX ? (
-        <span className="muted">
+        <span className="muted small">
           And {waiting.length - WAITING_SHOWN_MAX} more open decisions, after {titleOf(view, waiting[WAITING_SHOWN_MAX - 1]?.decision ?? "")}.
         </span>
       ) : null}

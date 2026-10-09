@@ -75,7 +75,7 @@ export function JourneyCanvas({ ready, view, selected, onPick }: JourneyCanvasPr
     return <p className="callout callout-bad">The canvas could not be drawn: {error ?? layoutError}</p>;
   }
   if (laidOut === undefined) {
-    return <p className="muted">Laying out the canvas...</p>;
+    return <p className="muted small">Laying out the canvas...</p>;
   }
   return (
     <>

@@ -68,7 +68,7 @@ function PatchLine({ patch }: { patch: PatchEvents }) {
   const kinds = [...new Set(patch.events.map((event) => event.event_type.replaceAll("_", " ")))];
   return (
     <li data-testid="intervening-patch">
-      <span className="muted">
+      <span className="muted small">
         {first.at} by {first.actor.user}
       </span>{" "}
       {kinds.join(", ")}
@@ -105,7 +105,7 @@ export function StalePanel({ review, disabled, onRefresh }: StaleProps) {
           ))}
         </ul>
       ) : patches === undefined ? (
-        <span className="muted">Reading what changed...</span>
+        <span className="muted small">Reading what changed...</span>
       ) : "failed" in patches ? (
         <span className="author-problem">What changed could not be read: {patches.failed}</span>
       ) : (

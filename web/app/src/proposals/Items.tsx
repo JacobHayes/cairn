@@ -134,7 +134,7 @@ function RemovalList({ removal, names }: { removal: Extract<ReviewItem, { item: 
         </li>
       ))}
       {attached === 0 ? null : <li>{attached} notes, links, resources, and participations on them</li>}
-      {descendants.length + edges.length + attached === 0 ? <li className="muted">Nothing else.</li> : null}
+      {descendants.length + edges.length + attached === 0 ? <li className="muted small">Nothing else.</li> : null}
     </ul>
   );
 }
@@ -190,7 +190,7 @@ function ItemBody({ index, item, context }: { index: number; item: ReviewItem; c
         </>
       );
     case "kept_local_edit":
-      return <span className="muted">{keptWords(item.kept, names)}: the route left it alone, so this journey's stays.</span>;
+      return <span className="muted small">{keptWords(item.kept, names)}: the route left it alone, so this journey's stays.</span>;
     case "orphan":
       return (
         <>
@@ -210,7 +210,7 @@ function ItemBody({ index, item, context }: { index: number; item: ReviewItem; c
     case "participation":
       return (
         <>
-          <span className="muted">On {item.uses.map((use) => `${names.node(use.node)} (${names.kind(use.kind)})`).join(", ")}</span>
+          <span className="muted small">On {item.uses.map((use) => `${names.node(use.node)} (${names.kind(use.kind)})`).join(", ")}</span>
           <MappingControls index={index} mapping={item.mapping} context={context} />
         </>
       );
@@ -244,7 +244,7 @@ function keptWords(kept: Extract<ReviewItem, { item: "kept_local_edit" }>["kept"
 export function ItemList({ context, itemNode }: { context: ItemsContext; itemNode: (item: ReviewItem) => string | undefined }) {
   const items = context.draft.items ?? [];
   if (items.length === 0) {
-    return <p className="muted">Nothing to resolve: every change applies as listed.</p>;
+    return <p className="muted small">Nothing to resolve: every change applies as listed.</p>;
   }
   return (
     <ol className="stack proposal-items" data-testid="review-items">

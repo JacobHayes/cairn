@@ -9,7 +9,6 @@ import { Link, useParams } from "react-router";
 import { routeRead, type RouteRead } from "../data/reads.ts";
 import { useLive } from "../data/react.ts";
 import { newJourneyPath, overviewPath } from "../journeys/address.ts";
-import "../journeys/journeys.css";
 import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
 import { Badge, Button, Panel } from "../ui/kit.tsx";
@@ -27,13 +26,13 @@ function Version({ read, row, latest }: { read: RouteRead; row: VersionRow; late
       <span className="row">
         <strong>Version {row.version}</strong>
         {row.version === latest ? <Badge tone="good">Latest</Badge> : null}
-        <span className="muted">published {row.publishedAt}</span>
-        <span className="shell-spacer" />
+        <span className="muted small">published {row.publishedAt}</span>
+        <span className="spacer" />
         <Link to={routeCanvasPath(id, row.version, DEFAULT_VIEW)}>Canvas</Link>
         <Button onClick={() => void exportVersion(row.version)}>Export</Button>
         {startable ? <Link to={newJourneyPath(id, row.version)} data-testid="start-from-version">Start a journey</Link> : null}
       </span>
-      {row.journeys.length === 0 ? <span className="muted">No journeys on this version.</span> : null}
+      {row.journeys.length === 0 ? <span className="muted small">No journeys on this version.</span> : null}
       <ul className="stack">
         {row.journeys.map((journey) => (
           <li key={journey.id} className="row" data-testid="version-journey" data-journey={journey.id} data-upgrade={journey.upgrade ? "available" : "none"}>
@@ -55,13 +54,13 @@ function Detail({ read }: { read: RouteRead }) {
   return (
     <Panel aria-label={header.name} data-testid="route-detail">
       <span className="row">
-        <h1 className="title" data-testid="route-detail-name">{header.name}</h1>
+        <h1 data-testid="route-detail-name">{header.name}</h1>
         {header.retired === true ? <Badge data-testid="retired">Retired: hidden from new journeys</Badge> : null}
-        <span className="shell-spacer" />
+        <span className="spacer" />
         <Link to={ROUTES_PATH}>All routes</Link>
       </span>
       {header.description == null ? null : <p>{header.description}</p>}
-      <span className="muted" data-testid="route-revision" data-revision={read.route.revision}>
+      <span className="muted small" data-testid="route-revision" data-revision={read.route.revision}>
         {rows.length} published {rows.length === 1 ? "version" : "versions"}; {waiting} {waiting === 1 ? "journey has" : "journeys have"} an upgrade available.
       </span>
       <RouteActions route={read.route} />
@@ -79,7 +78,7 @@ export function RouteDetailPage() {
   const { view } = useLive(`route:${id}`, routeRead(id));
   switch (view.status) {
     case "loading":
-      return <p className="muted">Reading the route...</p>;
+      return <p className="muted small">Reading the route...</p>;
     case "missing":
       return <p className="callout">This route does not exist. <Link to={ROUTES_PATH}>All routes</Link></p>;
     case "failed":

@@ -7,10 +7,30 @@
 // server runs the server host when it proxies to one and the in-browser host when it does
 // not; `vite build` makes the build the binary embeds, on the server host, and `vite build
 // --mode demo` the static demo site, on the in-browser host.
+import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import react from "@vitejs/plugin-react";
-import { defineConfig, type ProxyOptions } from "vite";
+import { defineConfig, type Plugin, type ProxyOptions } from "vite";
+
+/**
+ * The design language's tokens, base styles and fonts, imported from their one source with no
+ * copies (DESIGN.md): `import "@design/tokens.css"`.
+ */
+const DESIGN = fileURLToPath(new URL("../../design", import.meta.url));
+
+/**
+ * The fonts are SIL OFL 1.1, which asks that the license travel with them: the build carries
+ * it beside the page, at `/fonts-LICENSE.txt`.
+ */
+function fontLicense(): Plugin {
+  return {
+    name: "cairn:font-license",
+    generateBundle() {
+      this.emitFile({ type: "asset", fileName: "fonts-LICENSE.txt", source: readFileSync(`${DESIGN}/fonts/LICENSE.txt`, "utf8") });
+    },
+  };
+}
 
 /**
  * The paths the server keeps (crates/api/src/endpoints.rs, `PREFIX` and `RESERVED`, and the
@@ -31,7 +51,8 @@ export default defineConfig(({ command, mode }) => ({
     __CAIRN_HOST__: JSON.stringify(command === "serve" ? (server === undefined ? "browser" : "server") : mode === "demo" ? "browser" : "server"),
   },
   root: fileURLToPath(new URL(".", import.meta.url)),
-  plugins: [react()],
+  plugins: [react(), fontLicense()],
+  resolve: { alias: { "@design": DESIGN } },
   logLevel: "warn",
   // `mise run build:web` writes dist/build/, which the binary embeds (crates/cairn/src/assets.rs),
   // and `mise run build:demo` dist/demo/; beside them sit the browser tests' reports.

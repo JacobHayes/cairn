@@ -9,16 +9,15 @@ import { Link } from "react-router";
 import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
 import { indexKey, journeyIndex, type JourneySummary } from "../data/reads.ts";
 import { useLive, useViewer } from "../data/react.ts";
-import { Badge, Panel } from "../ui/kit.tsx";
+import { kindTitle } from "../detail/sections.tsx";
 import { overviewPath, queryOf, DEFAULT_FILTERS } from "./address.ts";
 import { useMineCounts, useMineOf, useReportMine } from "./mine.ts";
-import "./journeys.css";
 
 function JourneyMine({ summary, report }: { summary: JourneySummary; report: (id: string, count: number) => void }) {
   const mine = useMineOf(summary.id);
   useReportMine(summary.id, mine, report);
   if (mine.status === "loading") {
-    return <li className="muted">Deriving {summary.name}...</li>;
+    return <li className="muted small">Deriving {summary.name}...</li>;
   }
   if (mine.status === "failed") {
     return <li className="callout callout-bad" data-testid="mine-failed">What is yours in {summary.name} could not be read: {mine.message}</li>;
@@ -33,16 +32,14 @@ function JourneyMine({ summary, report }: { summary: JourneySummary; report: (id
         <Link to={overviewPath(summary.id)}>
           <strong>{summary.name}</strong>
         </Link>
-        <span className="muted">{mine.entries.length} yours</span>
+        <span className="muted small">{mine.entries.length} yours</span>
       </span>
       <ul className="stack">
         {mine.entries.map((entry) => (
           <li key={entry.node} className="row" data-testid="mine-item" data-node={entry.node}>
             <Link to={canvasPath(summary.id, DEFAULT_VIEW, entry.node)}>{nodes.get(entry.node)?.title ?? entry.node}</Link>
-            <span className="muted">{nodes.get(entry.node)?.kind}</span>
-            {entry.kinds.map((kind) => (
-              <Badge key={kind}>{kind}</Badge>
-            ))}
+            <span className="muted small">{nodes.get(entry.node)?.kind}</span>
+            <span className="muted small">{entry.kinds.map((kind) => kindTitle(mine.view, kind)).join(", ")}</span>
           </li>
         ))}
       </ul>
@@ -58,15 +55,15 @@ export function MineScreen() {
   const items = view.status === "ready" ? view.value : [];
   const { report, none } = useMineCounts(items);
   return (
-    <Panel aria-label="Mine" data-testid="mine">
-      <h1 className="title">Mine, across journeys</h1>
-      <span className="muted">
+    <section className="stack" aria-label="Mine" data-testid="mine">
+      <h1>Mine, across journeys</h1>
+      <span className="muted small">
         What you hold in each active journey, not ranked across journeys.{" "}
         {viewer !== undefined && entities.length === 0 ? "No entity holds a verified email of yours, so nothing is yours yet." : ""}
       </span>
       {failed === undefined ? null : <p className="callout callout-bad">Who you are could not be read: {failed}</p>}
-      {failed === undefined && (viewer === undefined || view.status === "loading") ? <p className="muted">Reading your journeys...</p> : null}
-      {view.status === "ready" && viewer !== undefined && none ? <p className="muted" data-testid="mine-empty">Nothing in any active journey is yours.</p> : null}
+      {failed === undefined && (viewer === undefined || view.status === "loading") ? <p className="muted small">Reading your journeys...</p> : null}
+      {view.status === "ready" && viewer !== undefined && none ? <p className="muted small" data-testid="mine-empty">Nothing in any active journey is yours.</p> : null}
       {view.status === "failed" ? <p className="callout callout-bad">The journeys could not be read: {view.message}</p> : null}
       {view.status === "ready" && viewer !== undefined ? (
         <ul className="version-list">
@@ -75,6 +72,6 @@ export function MineScreen() {
           ))}
         </ul>
       ) : null}
-    </Panel>
+    </section>
   );
 }

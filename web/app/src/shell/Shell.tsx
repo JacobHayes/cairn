@@ -1,10 +1,16 @@
-// The app shell every screen renders inside: the header (the screens, whether the view is
-// live, and a badge on the demo), the version-skew banner, the screen, and the notices.
+// The app frame every screen renders inside (design 3.1): a graphite rail with the screens,
+// the workspace (the screen the router shows, its one scroller `.ws-body`), the inspector
+// column on the right (INSPECTOR | ASSISTANT; a bottom sheet on a tablet), and the 28px
+// strip with whether the view is live. The frame is one `100dvh` grid with one scroller per
+// region (app.css); below 720px it is one scrolling column.
 import { Link, Outlet, useLocation } from "react-router";
 
 import { mayNotApply } from "../data/notices.ts";
 import { useNotices, useSession, useSkew, useStreamStatus } from "../data/react.ts";
 import { Badge, Button, Gate } from "../ui/kit.tsx";
+import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
+import { InspectorColumn } from "./InspectorColumn.tsx";
+import { useFrame, type Frame } from "./useFrame.ts";
 
 /** The demo is the in-browser host: say so, since nothing done there is saved. */
 function DemoBadge() {
@@ -12,7 +18,11 @@ function DemoBadge() {
   if (host.kind !== "browser") {
     return null;
   }
-  return <Badge tone="warn">Demo: sample data, nothing is saved</Badge>;
+  return (
+    <Badge tone="superseded" title="Sample data in this tab. Nothing persists after a reload.">
+      Demo
+    </Badge>
+  );
 }
 
 /** H6: live over the server's SSE stream (gated on its capability) or the in-browser notifier. */
@@ -37,7 +47,8 @@ function SkewBanner() {
     return null;
   }
   return (
-    <div className="banner banner-warn row" role="alert" data-testid="skew">
+    <div className="banner row" role="alert" data-testid="skew">
+      <Badge tone="warn">Reload needed</Badge>
       <span>
         Cairn was updated (engine {skew.document}; this tab runs {skew.engine}). This tab has stopped deriving and
         saving until you reload. Your unsent edits are kept.
@@ -54,16 +65,17 @@ function SkewBanner() {
   );
 }
 
+/** What just happened, rising at the workspace's bottom right above the strip (design 3.1). */
 function Notices() {
   const notices = useNotices();
   const { notices: store } = useSession();
   return (
-    <div className="notices" aria-live="polite">
+    <div className="toasts" aria-live="polite">
       {notices.map((notice) => (
-        <div key={notice.id} className={notice.tone === "problem" ? "panel callout-bad" : "panel"} data-testid="notice" data-tone={notice.tone}>
+        <div key={notice.id} className="toast-card stack" data-problem={notice.tone === "problem"} data-testid="notice" data-tone={notice.tone}>
           <div className="row">
             <strong>{notice.title}</strong>
-            <span className="shell-spacer" />
+            <span className="spacer" />
             <Button
               aria-label="Dismiss"
               onClick={() => {
@@ -73,11 +85,9 @@ function Notices() {
               ×
             </Button>
           </div>
-          {notice.tone === "saved" && notice.lines.length === 0 ? (
-            <span className="muted">Nothing became stale, short, overdue, or stalled.</span>
-          ) : null}
+          {notice.tone === "saved" && notice.lines.length === 0 ? <span className="small">Nothing became stale, short, overdue, or stalled.</span> : null}
           {notice.lines.map((line) => (
-            <span key={`${line.journey}:${line.kind}`} className="muted" data-testid="consequence" data-kind={line.kind}>
+            <span key={`${line.journey}:${line.kind}`} className="small" data-testid="consequence" data-kind={line.kind}>
               {line.kind === "stalled"
                 ? `${line.journey} is now stalled`
                 : line.kind === "undecided"
@@ -93,31 +103,82 @@ function Notices() {
   );
 }
 
+/** The screens, as links; the one the viewer is on is marked. */
+function Rail({ pathname }: { pathname: string }) {
+  const screens = [
+    { to: "/mine", label: "Mine", on: pathname.startsWith("/mine") },
+    { to: "/", label: "Journeys", on: pathname === "/" || /^\/(journeys|new|proposals)(\/|$)/.test(pathname) },
+    { to: "/routes", label: "Routes", on: pathname.startsWith("/routes") },
+    { to: "/entities", label: "Entities", on: pathname.startsWith("/entities") },
+  ];
+  return (
+    <aside className="rail">
+      <Link to="/" className="brand">
+        Cairn
+      </Link>
+      <nav aria-label="Screens">
+        {screens.map(({ to, label, on }) => (
+          <Link key={to} to={to} {...(on ? { "aria-current": "page" as const } : {})}>
+            {label}
+          </Link>
+        ))}
+        <span className="spacer" />
+        <Link to="/me" {...(pathname.startsWith("/me") ? { "aria-current": "page" as const } : {})}>
+          You
+        </Link>
+      </nav>
+    </aside>
+  );
+}
+
+/** The strip: the inspector's way back while it is collapsed on the left, whether the view is live on the right. */
+function Strip({ frame }: { frame: Frame }) {
+  return (
+    <footer className="strip">
+      {frame.present && frame.collapsed ? (
+        <button type="button" className="ghost strip-button" aria-expanded="false" onClick={frame.toggleCollapsed}>
+          <kbd>]</kbd> Inspector
+        </button>
+      ) : null}
+      <span className="spacer" />
+      <LiveStatus />
+      <DemoBadge />
+    </footer>
+  );
+}
+
 export function Shell() {
   // The screen the router shows, for the browser tests to wait on after an in-page navigation.
   const { pathname, search } = useLocation();
+  const frame = useFrame();
+  const mapOpen = new URLSearchParams(search).get("map") === "1";
   return (
-    <>
-      <header className="shell-header">
-        <Link to="/" className="shell-brand">
-          Cairn
-        </Link>
-        <nav className="row shell-nav" aria-label="Screens">
-          <Link to="/">Journeys</Link>
-          <Link to="/mine">Mine</Link>
-          <Link to="/routes">Routes</Link>
-          <Link to="/entities">Entities</Link>
-          <Link to="/me">You</Link>
-        </nav>
-        <span className="shell-spacer" />
-        <LiveStatus />
-        <DemoBadge />
-      </header>
-      <SkewBanner />
-      <main className="shell-main" data-screen={`${pathname}${search}`}>
-        <Outlet />
-      </main>
-      <Notices />
-    </>
+    <FrameActionsContext value={frame.actions}>
+      <FrameStateContext value={frame.state}>
+        <div className="frame" data-inspector={frame.open ? "on" : "off"} data-map={mapOpen ? "open" : "closed"}>
+          <Rail pathname={pathname} />
+          <main className="workspace" data-screen={`${pathname}${search}`}>
+            <SkewBanner />
+            <div className="ws-body">
+              <Outlet />
+            </div>
+            <Notices />
+          </main>
+          <InspectorColumn
+            open={frame.open}
+            tab={frame.state.tab}
+            snap={frame.snap}
+            assistantOffered={frame.dock !== undefined}
+            onTab={frame.choose}
+            onSnap={frame.setSnap}
+            onCollapse={frame.toggleCollapsed}
+            onClose={frame.close}
+            inspectorRef={frame.setInspector}
+            assistantRef={frame.setAssistant}
+          />
+          <Strip frame={frame} />
+        </div>
+      </FrameStateContext>
+    </FrameActionsContext>
   );
 }

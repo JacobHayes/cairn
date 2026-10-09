@@ -207,9 +207,9 @@ export function ConditionEditor(props: ConditionEditorProps) {
   if (props.value === null) {
     return (
       <div className="stack" data-testid="condition-editor">
-        <span className="muted">No condition: relevant whenever its ancestors are.</span>
+        <span className="muted small">No condition: relevant whenever its ancestors are.</span>
         {first === undefined ? (
-          <span className="muted">There is no decision outside this node to make it depend on.</span>
+          <span className="muted small">There is no decision outside this node to make it depend on.</span>
         ) : (
           <span className="row">
             <Button onClick={() => { props.onChange(newLeaf(first, props)); }}>Add a condition</Button>
@@ -221,7 +221,7 @@ export function ConditionEditor(props: ConditionEditorProps) {
   const context: Context = { ...props, decisions, root: props.value };
   return (
     <div className="stack" data-testid="condition-editor">
-      <span className="muted" data-testid="condition-words">
+      <span className="muted small" data-testid="condition-words">
         Relevant when {conditionWords(props.value, props.tree, valueName(props.tree, props.entities))}
       </span>
       <ClauseView context={context} clause={props.value} path={[]} />

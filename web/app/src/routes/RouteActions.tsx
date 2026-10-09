@@ -26,11 +26,11 @@ export function RouteActions({ route }: { route: Schema<"Route"> }) {
     <section className="stack" aria-label="The draft" data-testid="route-actions">
       <span className="row" data-testid="draft" data-status={draft === undefined ? "none" : "open"}>
         {draft === undefined ? (
-          <span className="muted">No draft is open.</span>
+          <span className="muted small">No draft is open.</span>
         ) : (
           <>
             <Badge tone="warn">Draft open</Badge>
-            <span className="muted">{draft.extends == null ? "A first version, not yet published" : `Extends version ${String(draft.extends)}`}</span>
+            <span className="muted small">{draft.extends == null ? "A first version, not yet published" : `Extends version ${String(draft.extends)}`}</span>
             <Link to={routeCanvasPath(id, undefined, DEFAULT_VIEW)}>Canvas</Link>
           </>
         )}

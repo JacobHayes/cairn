@@ -11,11 +11,11 @@ const DEMO = `http://127.0.0.1:${process.env["CAIRN_DEMO_PORT"] ?? ""}`;
  * Opens the screen at `path` (`/`, `/journeys/<id>?view=...`) on `host`, once the shell is up:
  * within the page when it already runs on `host`, as a link would, so the in-browser host's
  * store (which lives only as long as the page) is kept; by loading the page otherwise. The
- * shell shows a Demo badge on the in-browser host and none on the server.
+ * shell shows a Demo badge (its title says the data is a sample) on the in-browser host and none on the server.
  */
 export async function open(page: Page, host: HostKind, path = "/"): Promise<void> {
   const nav = page.getByRole("navigation", { name: "Screens", exact: true });
-  const demo = page.getByText("Demo: sample data", { exact: false });
+  const demo = page.getByTitle("Sample data in this tab", { exact: false });
   const onDemo = page.url().startsWith(`${DEMO}/`);
   if ((await nav.count()) === 1 && onDemo === (host === "browser")) {
     await goWithin(page, path);

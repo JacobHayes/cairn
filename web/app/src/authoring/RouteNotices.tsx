@@ -36,13 +36,13 @@ export function RouteNotices({ graph, hrefOf }: { graph: Schema<"Graph">; hrefOf
     return null;
   }
   if (found.status === "failed") {
-    return <p className="muted">The draft's notices could not be read: {found.message}</p>;
+    return <p className="muted small">The draft's notices could not be read: {found.message}</p>;
   }
   return (
     <section className="stack callout" aria-label="Notices" data-testid="route-notices">
       <span className="row">
         <Badge tone="warn">Notices {found.notices.length}</Badge>
-        <span className="muted">Advisory: publishing is not blocked.</span>
+        <span className="muted small">Advisory: publishing is not blocked.</span>
       </span>
       <ul className="stack">
         {found.notices.map((notice) => (

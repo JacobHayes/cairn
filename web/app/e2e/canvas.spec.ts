@@ -86,7 +86,7 @@ test("C1: explicit edges solid, implicit gates dotted with their source; not rel
   }
   const partnerLed = nodeCard(page, "n_partner_led");
   await expect(partnerLed).toHaveAttribute("data-relevance", "not_relevant");
-  await expect(partnerLed).toHaveClass(/card-not-relevant/);
+  await expect(partnerLed).toHaveClass(/node-not-relevant/);
   await toggle(page, "not-relevant", false);
   await expect(partnerLed).toHaveCount(0);
   await expect(nodeCard(page, "n_partner_results")).toHaveCount(0);
@@ -131,7 +131,7 @@ test("C7: the trace of the test plan marks its upstream, downstream, and gravity
     n_setup: "downstream",
     n_testing: "downstream",
   });
-  await expect(nodeCard(page, "n_purpose")).toHaveClass(/card-dim/);
+  await expect(nodeCard(page, "n_purpose")).toHaveClass(/node-dim/);
   await page.getByTestId("trace-stop").click();
   await expect.poll(() => marks(page)).toEqual({});
 });
@@ -146,7 +146,7 @@ async function reopenOffer(page: Page): Promise<void> {
 
 test("C1, C2: hiding decisions marks the work they block, and the marker opens the trace", async ({ page }) => {
   await reopenOffer(page);
-  await expect(nodeCard(page, "n_close_out")).toHaveClass(/card-undecided/);
+  await expect(nodeCard(page, "n_close_out")).toHaveClass(/node-undecided/);
   await showKind(page, "decision", false);
   for (const node of ["n_offer", "n_close_out"]) {
     await expect(nodeCard(page, node).getByTestId("hidden-prerequisites")).toHaveAttribute("data-nodes", "n_make_offer");

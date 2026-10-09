@@ -47,7 +47,7 @@ function FormInput({ view, form, value, onChange }: { view: Ready; form: Form; v
       ? (view.inputs.deployment.entities ?? []).map((entity) => ({ key: entity.key, text: entityName(view, entity.key) }))
       : (view.journey.graph.nodes ?? []).map((node) => ({ key: node.key, text: node.title }));
   return (
-    <select className="select" aria-label={form === "assign" ? "Owner for them" : "Snooze them until node"} value={value} onChange={(event) => { onChange(event.target.value); }}>
+    <select aria-label={form === "assign" ? "Owner for them" : "Snooze them until node"} value={value} onChange={(event) => { onChange(event.target.value); }}>
       <option value="">Choose</option>
       {options.map((option) => (
         <option key={option.key} value={option.key}>
@@ -76,7 +76,7 @@ export function BulkBar({ view, selected, hidden, onLanded }: { view: Ready; sel
     <div className="panel stack bulk-bar" data-testid="bulk-bar" data-count={selected.length}>
       <div className="row">
         <strong>{selected.length} selected</strong>
-        {hidden === 0 ? null : <span className="muted" data-testid="selected-elsewhere">({hidden} on other pages)</span>}
+        {hidden === 0 ? null : <span className="muted small" data-testid="selected-elsewhere">({hidden} on other pages)</span>}
         <Button disabled={write.disabled} onClick={() => void act({ act: "start" })}>Start</Button>
         <Button disabled={write.disabled} onClick={() => void act({ act: "done" })}>Done</Button>
         <Button disabled={write.disabled} onClick={() => void act({ act: "unsnooze" })}>Unsnooze</Button>

@@ -42,15 +42,15 @@ export function TriageCard({ view, row, position, total, onPass }: { view: Ready
   return (
     <article className="panel stack triage-card" aria-label={node.title} data-testid="triage-card" data-node={row.key} data-kind={row.kind}>
       <div className="row">
-        <span className="muted" data-testid="card-position">
+        <span className="muted small" data-testid="card-position">
           Card {position} of {total}
         </span>
-        <span className="shell-spacer" />
-        <span className="muted">P passes</span>
+        <span className="spacer" />
+        <span className="muted small">P passes</span>
       </div>
       <Crumb view={view} row={row} />
       <div className="row">
-        <h2 className="title">
+        <h2>
           <DetailLink view={view} node={row.key} />
         </h2>
         <Badge>{row.kind}</Badge>
@@ -59,7 +59,7 @@ export function TriageCard({ view, row, position, total, onPass }: { view: Ready
       </div>
       {node.kind === "decision" && node.prompt !== undefined ? <Markdown text={node.prompt} data-testid="prompt" /> : null}
       {node.description == null || node.description === "" ? null : <Markdown text={node.description} />}
-      <span className="muted">
+      <span className="muted small">
         {row.due == null ? "No deadline" : `Due ${row.due}`}
         {row.slack_days == null ? "" : `; slack ${String(row.slack_days)} days`}
       </span>

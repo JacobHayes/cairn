@@ -1,26 +1,35 @@
 // C12: the decision view. The journey's decisions on a canvas with the gating edges between
-// them (5.2's cards and lines, laid out by ELK), each with its answer, and below it what each
-// answer affected: the nodes whose relevance it decides, the milestone it pins, the role it
-// fills. A decision or an affected node opens its detail (5.1) beside the view; a decision's
-// hidden-prerequisites marker opens its trace on the canvas.
-import { useMemo, type CSSProperties } from "react";
-import { useLocation, useNavigate } from "react-router";
+// them (5.2's cards and lines, laid out by ELK), each with its answer, or, behind the page's
+// Graph | Table toggle, what each answer affected: the nodes whose relevance it decides, the
+// milestone it pins, the role it fills. The page holds one of them, never both, so the canvas
+// fills the workspace and its wheel never competes with a scroller. A decision or an affected
+// node opens its detail (5.1) beside the view; a decision's hidden-prerequisites marker opens
+// its trace on the canvas.
+import { useMemo } from "react";
+import { useLocation, useNavigate, useSearchParams } from "react-router";
 
 import { GraphCanvas } from "../canvas/GraphCanvas.tsx";
 import { useLaidOut, useProjected } from "../canvas/hooks.ts";
 import { journeyLooks } from "../canvas/journey.ts";
 import { cardsOf, linesOf, type CanvasModel } from "../canvas/model.ts";
 import type { CardActions } from "../canvas/NodeCard.tsx";
-import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
+import { canvasPath, DEFAULT_VIEW, MAP } from "../canvas/settings.ts";
 import { titleOf, type Ready } from "../detail/model.ts";
 import { NodeLink, nodePath, Rationale, screenPath } from "../detail/parts.tsx";
 import { statusTone, statusWord } from "../status/words.ts";
-import { Badge } from "../ui/kit.tsx";
+import { Badge, Segmented } from "../ui/kit.tsx";
 import "./decisions.css";
-import { canvasHeightPx, decisionLevel, decisionPlacement, decisionRows, type DecisionRow, type DecisionView as Projected } from "./model.ts";
+import { decisionLevel, decisionPlacement, decisionRows, type DecisionRow, type DecisionView as Projected } from "./model.ts";
 
 /** The layout cache's name for the decision view (Layouts: per domain and view). */
 const LAYOUT_VIEW = "decision-view";
+
+/** The page's projection, in the address (`?show=table`), so a node opened from it keeps it. */
+const SHOW = "show";
+const SHOWS = [
+  { value: "graph", label: "Graph" },
+  { value: "table", label: "Table" },
+] as const;
 
 function useDecisionCanvas(ready: Ready, projected: Projected | undefined): CanvasModel | undefined {
   const next = useProjected(ready, { projection: "next" });
@@ -39,7 +48,7 @@ function useDecisionCanvas(ready: Ready, projected: Projected | undefined): Canv
 
 function AffectsList({ ready, row }: { ready: Ready; row: DecisionRow }) {
   if (row.affects.length === 0) {
-    return <span className="muted">No node's relevance reads it.</span>;
+    return <span className="muted small">No node's relevance reads it.</span>;
   }
   return (
     <ul className="detail-list" data-testid="affects">
@@ -64,9 +73,9 @@ function RowView({ ready, row, selected }: { ready: Ready; row: DecisionRow; sel
         <span data-testid="decision-title">
           <NodeLink view={ready} node={row.key} />
         </span>
-        {row.prompt === undefined ? null : <div className="muted">{row.prompt}</div>}
+        {row.prompt === undefined ? null : <div className="muted small">{row.prompt}</div>}
         {row.waitsOn.length === 0 ? null : (
-          <div className="muted" data-testid="waits-on">
+          <div className="muted small" data-testid="waits-on">
             Waits on {row.waitsOn.map((each) => each.title).join(", ")}
           </div>
         )}
@@ -75,10 +84,10 @@ function RowView({ ready, row, selected }: { ready: Ready; row: DecisionRow; sel
         <Badge tone={statusTone(row.displayState)}>{statusWord(row.displayState, "decision")}</Badge>
       </td>
       <td data-testid="decision-answer">
-        {row.answer ?? <span className="muted">none in effect</span>}
+        {row.answer ?? <span className="muted small">none in effect</span>}
         <Rationale text={row.rationale} />
       </td>
-      <td>{row.owners.length === 0 ? <span className="muted">unassigned</span> : row.owners.join(", ")}</td>
+      <td>{row.owners.length === 0 ? <span className="muted small">unassigned</span> : row.owners.join(", ")}</td>
       <td>
         <div className="stack">
           <AffectsList ready={ready} row={row} />
@@ -97,10 +106,9 @@ function RowView({ ready, row, selected }: { ready: Ready; row: DecisionRow; sel
 
 function DecisionTable({ ready, rows, selected }: { ready: Ready; rows: DecisionRow[]; selected: string | undefined }) {
   return (
-    <section className="panel stack" aria-label="What each answer affects">
-      <h2 className="title">What each answer affects</h2>
+    <section className="stack decision-page" aria-label="What each answer affects">
       <div className="decision-table">
-        <table className="table" data-testid="decision-table">
+        <table className="data" data-testid="decision-table">
           <thead>
             <tr>
               <th>Decision</th>
@@ -121,10 +129,38 @@ function DecisionTable({ ready, rows, selected }: { ready: Ready; rows: Decision
   );
 }
 
+/** The Graph | Table toggle, in the address so a node opened from either keeps it. */
+function ShowToggle({ show }: { show: "graph" | "table" }) {
+  const [params, setParams] = useSearchParams();
+  return (
+    <div className="row">
+      <Segmented
+        label="Show the decisions as"
+        value={show}
+        options={SHOWS}
+        onChange={(next) => {
+          const query = new URLSearchParams(params);
+          if (next === "table") {
+            query.set(SHOW, next);
+            // The table has no map to be open (a phone's full-screen map locks the page).
+            query.delete(MAP);
+          } else {
+            query.delete(SHOW);
+          }
+          setParams(query, { replace: true });
+        }}
+      />
+    </div>
+  );
+}
+
 /** C12: the decisions and their gating edges on a canvas, and what each answer affected. */
 export function DecisionView({ ready, selected }: { ready: Ready; selected: string | undefined }) {
   const navigate = useNavigate();
-  const screen = screenPath(useLocation().pathname);
+  const { pathname, search } = useLocation();
+  const [params] = useSearchParams();
+  const show = params.get(SHOW) === "table" ? "table" : "graph";
+  const screen = screenPath(pathname);
   const journey = ready.journey.header.id;
   const projected = useProjected(ready, { projection: "decision_view" });
   const model = useDecisionCanvas(ready, projected.value);
@@ -136,12 +172,13 @@ export function DecisionView({ ready, selected }: { ready: Ready; selected: stri
   );
   const actions = useMemo<CardActions>(
     () => ({
-      open: (key) => void navigate(nodePath(screen, key)),
+      // Keeps the query, so a phone's map stays open under the node's sheet.
+      open: (key) => void navigate({ pathname: nodePath(screen, key), search }),
       drill: undefined,
       trace: (key) => void navigate(canvasPath(journey, { ...DEFAULT_VIEW, trace: true }, key)),
       title: (key) => titleOf(ready, key),
     }),
-    [navigate, screen, journey, ready],
+    [navigate, screen, search, journey, ready],
   );
   if (projected.error !== undefined || error !== undefined) {
     return <p className="callout callout-bad">The decision view could not be drawn: {projected.error ?? error}</p>;
@@ -150,11 +187,14 @@ export function DecisionView({ ready, selected }: { ready: Ready; selected: stri
     return <p className="callout" data-testid="no-decisions">This journey has no decisions.</p>;
   }
   if (rows === undefined || laidOut === undefined || placement === undefined) {
-    return <p className="muted">Laying out the decisions...</p>;
+    return <p className="muted small">Laying out the decisions...</p>;
   }
   return (
-    <div className="stack" data-testid="decision-view">
-      <div className="decision-canvas" style={{ "--decision-canvas-height": `${String(canvasHeightPx(placement))}px` } as CSSProperties}>
+    <>
+      <ShowToggle show={show} />
+      {show === "table" ? (
+        <DecisionTable ready={ready} rows={rows} selected={selected} />
+      ) : (
         <GraphCanvas
           model={laidOut.model}
           placement={placement}
@@ -165,8 +205,7 @@ export function DecisionView({ ready, selected }: { ready: Ready; selected: stri
           viewKey={LAYOUT_VIEW}
           label={`${ready.journey.header.name}: decisions`}
         />
-      </div>
-      <DecisionTable ready={ready} rows={rows} selected={selected} />
-    </div>
+      )}
+    </>
   );
 }

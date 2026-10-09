@@ -140,7 +140,7 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
   const problem = node === undefined || draft === undefined ? undefined : draftProblems(node.kind, draft)[field];
   useInvalid(context, editor, problem !== undefined);
   if (node === undefined || draft === undefined) {
-    return <span className="muted">Its node is not in the graph, so its value cannot be edited here.</span>;
+    return <span className="muted small">Its node is not in the graph, so its value cannot be edited here.</span>;
   }
   const change = (next: Partial<NodeDraft>) => {
     const merged = { ...draft, ...next };
@@ -156,7 +156,7 @@ function FieldValue({ editor, mutation, onChange, context }: { editor: string; m
   return (
     <FieldBox label={fieldName(field)} place={field} notes={{ problem }}>
       {includes(LINE_FIELDS, field) ? <Field aria-label={fieldName(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
-      {includes(MARKDOWN_FIELDS, field) ? <textarea className="textarea" aria-label={fieldName(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
+      {includes(MARKDOWN_FIELDS, field) ? <textarea aria-label={fieldName(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(NUMBER_FIELDS, field) ? <Field type="number" min={0} aria-label={fieldName(field)} value={draft[field]} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
       {includes(FLAG_FIELDS, field) ? <input type="checkbox" aria-label={fieldName(field)} checked={draft[field]} onChange={(event) => { change({ [field]: event.target.checked }); }} /> : null}
       {includes(MILESTONE_FIELDS, field) ? <Picker aria-label={fieldName(field)} value={draft[field]} none="None" options={milestones} onChange={(event) => { change({ [field]: event.target.value }); }} /> : null}
@@ -191,7 +191,7 @@ function MutationEditor({ editor, mutation, onChange, context }: { editor: strin
       return context.ready === undefined || decision === undefined ? null : (
         <>
           <AnswerInput view={context.ready} node={decision} value={mutation.value} onChange={(value) => { onChange({ ...mutation, value }); }} />
-          <textarea className="textarea" aria-label="Why" placeholder="Why (optional, markdown)" value={mutation.rationale ?? ""} onChange={(event) => { onChange({ ...mutation, rationale: event.target.value.trim() === "" ? null : event.target.value }); }} />
+          <textarea aria-label="Why" placeholder="Why (optional, markdown)" value={mutation.rationale ?? ""} onChange={(event) => { onChange({ ...mutation, rationale: event.target.value.trim() === "" ? null : event.target.value }); }} />
         </>
       );
     }
@@ -273,7 +273,7 @@ function RemoveNode({ context }: { context: ChangesContext }) {
       <Picker aria-label="Remove" value={key} none="Remove a node" options={nodesByPath(context.tree).map((node) => ({ value: node.key, label: `${node.title} (${pathOf(context.tree, node.key)})` }))} onChange={(event) => { setKey(event.target.value); }} />
       {plan === undefined ? null : (
         <>
-          <span className="muted">
+          <span className="muted small">
             {plan.nodes.length - 1 === 0 ? "Nothing beneath it" : `${String(plan.nodes.length - 1)} beneath it`}
             {plan.dangling.length === 0 ? "" : `; ${String(plan.dangling.length)} references rewritten`}
           </span>
@@ -323,7 +323,7 @@ export function ChangeList({ context }: { context: ChangesContext }) {
   const ids = useCarriedIds(mutations);
   return (
     <div className="stack">
-      {mutations.length === 0 ? <p className="muted">No changes yet.</p> : null}
+      {mutations.length === 0 ? <p className="muted small">No changes yet.</p> : null}
       <ol className="stack proposal-changes" data-testid="changes">
         {mutations.map((mutation, index) => (
           <MutationRow key={ids[index]} editor={ids[index] ?? String(index)} index={index} mutation={mutation} context={context} />

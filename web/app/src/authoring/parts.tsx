@@ -27,7 +27,7 @@ export function FieldBox({ label, place, notes = {}, children }: { label: string
       <span className="row">
         {label === "" ? null : <span className="author-label">{label}</span>}
         {notes.edited === true ? (
-          <span className="badge badge-warn" data-testid="edited-here">
+          <span className="badge warn" data-testid="edited-here">
             edited here
           </span>
         ) : null}
@@ -54,7 +54,7 @@ export function Picker({
   ...props
 }: Omit<SelectHTMLAttributes<HTMLSelectElement>, "children"> & { options: readonly { value: string; label: string }[]; none?: string }) {
   return (
-    <select className="select" {...props}>
+    <select {...props}>
       {none === undefined ? null : <option value="">{none}</option>}
       {options.map((option) => (
         <option key={option.value} value={option.value}>

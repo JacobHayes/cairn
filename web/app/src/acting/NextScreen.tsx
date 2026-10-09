@@ -42,7 +42,7 @@ function Item({ view, row, at, settings }: { view: Ready; row: NodeRow; at: numb
         <Badge>{row.kind}</Badge>
         <Badge tone={statusTone(row.display_state)}>{statusWord(row.display_state, row.kind)}</Badge>
         <Flags view={view} row={row} />
-        <span className="muted">
+        <span className="muted small">
           {row.due == null ? "no deadline" : `due ${row.due}`}
           {row.slack_days == null ? "" : `, slack ${String(row.slack_days)} days`}
         </span>
@@ -62,7 +62,7 @@ function NextBody({ view, settings }: { view: Ready; settings: NextSettings }) {
     <section className="stack" aria-label="Next" data-testid="next">
       <NextControls settings={settings} onChange={(changed) => void navigate(nextPath(journey, changed))} />
       {error === undefined ? null : <p className="callout callout-bad">The next list could not be read: {error}</p>}
-      {next === undefined ? <p className="muted">Ranking the frontier...</p> : null}
+      {next === undefined ? <p className="muted small">Ranking the frontier...</p> : null}
       {next !== undefined && next.items.length === 0 ? (
         next.stalled == null ? (
           <p className="callout" data-testid="next-empty">

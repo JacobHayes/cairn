@@ -12,7 +12,7 @@ import "./acting.css";
 function Derivation({ ready }: { ready: Ready }) {
   const { key } = ready;
   return (
-    <span className="muted" data-testid="derivation" data-revision={key.revision} data-deployment={key.deployment_revision} data-today={key.today}>
+    <span className="muted small" data-testid="derivation" data-revision={key.revision} data-deployment={key.deployment_revision} data-today={key.today}>
       Derived in this tab at revision {key.revision} for {key.today}; {ready.derived.acting_frontier.length} to act on now.
     </span>
   );
@@ -26,7 +26,7 @@ export function ActingFrame({ id, screen, children, header }: { id: string; scre
   const journey = useJourney(id);
   switch (journey.status) {
     case "loading":
-      return <p className="muted">Deriving the journey...</p>;
+      return <p className="muted small">Deriving the journey...</p>;
     case "missing":
       return <p className="callout">This journey does not exist. <Link to="/">All journeys</Link></p>;
     case "failed":
@@ -40,7 +40,7 @@ export function ActingFrame({ id, screen, children, header }: { id: string; scre
     <div className="stack acting-page">
       <section className="stack" aria-label={journey.journey.header.name}>
         <div className="row">
-          <h1 className="title" data-testid="journey-name">{journey.journey.header.name}</h1>
+          <h1 data-testid="journey-name">{journey.journey.header.name}</h1>
           <Derivation ready={journey} />
           {header?.(journey)}
         </div>

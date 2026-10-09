@@ -1,14 +1,16 @@
 /* The acting surfaces (C9 to C11): the list's table, the next list's items, the triage card,
-   drawn with the design system's tokens in light and dark. Quiet: nothing animates. */
+   drawn with Graticule's tokens in light and dark. Quiet: nothing animates. */
 
 .journey-nav {
   gap: var(--space-4);
   padding-bottom: var(--space-2);
   border-bottom: 1px solid var(--color-border);
+  font-size: 14px;
 }
 
+/* The current screen: an ink underline (a marker, not a state). */
 .journey-nav [aria-current="page"] {
-  border-bottom: 2px solid var(--color-accent);
+  border-bottom: 2px solid var(--color-text);
 }
 
 .acting-controls {
@@ -42,7 +44,7 @@
 }
 
 .next-position {
-  min-width: 1.5rem;
+  min-width: 24px;
   font-weight: 700;
   color: var(--color-muted);
 }
@@ -57,27 +59,20 @@
 }
 
 .list-group th {
-  background: var(--color-canvas);
+  background: var(--color-band);
   color: var(--color-text);
 }
 
-.bulk-bar {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  border-color: var(--color-accent);
-}
-
 .triage-card {
-  border-color: var(--color-accent);
-  max-width: 48rem;
+  border-color: var(--color-text);
+  max-width: 816px;
 }
 
 .acts .stack {
   gap: var(--space-2);
 }
 
-@media (max-width: 52rem) {
+@media (max-width: 832px) {
   .list-table th:nth-child(n + 6),
   .list-table td:nth-child(n + 6) {
     display: none;

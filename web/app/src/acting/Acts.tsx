@@ -61,7 +61,7 @@ function DoneWithEvidence({ write, node, needs }: { write: NodeWrite; node: stri
   return (
     <span className="stack" data-testid="done-evidence">
       {needs.artifact ? <Field aria-label="Artifact address" placeholder="Its artifact's address" value={artifact} onChange={(event) => { form.change({ artifact: event.target.value, note }); }} /> : null}
-      {needs.note ? <textarea className="textarea" aria-label="Note" placeholder="What was done, in a note" value={note} onChange={(event) => { form.change({ artifact, note: event.target.value }); }} /> : null}
+      {needs.note ? <textarea aria-label="Note" placeholder="What was done, in a note" value={note} onChange={(event) => { form.change({ artifact, note: event.target.value }); }} /> : null}
       <span className="row">
         <Button primary disabled={write.disabled || !complete} onClick={() => void send()}>
           {sendLabel(needs)}
@@ -77,7 +77,7 @@ export function AssignOwner({ view, write, node }: { view: Ready; write: NodeWri
   const [entity, setEntity] = useState("");
   return (
     <span className="row" data-testid="assign">
-      <select className="select" aria-label="Assign owner" value={entity} onChange={(event) => { setEntity(event.target.value); }}>
+      <select aria-label="Assign owner" value={entity} onChange={(event) => { setEntity(event.target.value); }}>
         <option value="">Assign owner</option>
         {(view.inputs.deployment.entities ?? []).map((each) => (
           <option key={each.key} value={each.key}>

@@ -45,7 +45,7 @@ function Text({ props, field, label, area = false }: { props: FieldsProps; field
   return (
     <FieldBox label={label} place={field} notes={props.notes(field)}>
       {area ? (
-        <textarea className="textarea" aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }} />
+        <textarea aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }} />
       ) : (
         <Field aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }} />
       )}

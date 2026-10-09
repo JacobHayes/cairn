@@ -77,7 +77,7 @@ function Upgrade({ ready, latest }: { ready: Ready; latest: number | undefined }
     return null;
   }
   if (newer.length === 0) {
-    return <span className="muted" data-testid="upgrade-none">On the latest version of its route: nothing to upgrade to.</span>;
+    return <span className="muted small" data-testid="upgrade-none">On the latest version of its route: nothing to upgrade to.</span>;
   }
   const chosen = to === "" ? newer.at(-1) : Number(to);
   return (
@@ -139,7 +139,7 @@ export function JourneyFlows({ ready }: { ready: Ready }) {
   return (
     <Panel aria-label="Proposals" data-testid="journey-flows">
       <strong>Change it by proposal</strong>
-      <span className="muted">Each opens a proposal to review, edit, and apply; nothing changes until it is applied.</span>
+      <span className="muted small">Each opens a proposal to review, edit, and apply; nothing changes until it is applied.</span>
       <Upgrade ready={ready} latest={latest} />
       <SaveAsRoute ready={ready} />
       <Relink ready={ready} routes={list} />

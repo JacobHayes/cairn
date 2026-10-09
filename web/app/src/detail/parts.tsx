@@ -4,6 +4,7 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
+import "./detail.css";
 import { Markdown } from "../ui/markdown.tsx";
 import { titleOf, type Ready } from "./model.ts";
 
@@ -11,7 +12,7 @@ import { titleOf, type Ready } from "./model.ts";
 export function Rationale({ text }: { text: string | undefined }) {
   return text === undefined ? null : (
     <div className="chain stack" data-testid="rationale">
-      <span className="muted">Why</span>
+      <span className="muted small">Why</span>
       <Markdown text={text} />
     </div>
   );
@@ -62,7 +63,7 @@ export function Section({
     <details className="detail-section" open={open} data-testid={testId}>
       <summary>
         <span className="detail-section-title">{title}</span>
-        {summary === undefined ? null : <span className="muted"> {summary}</span>}
+        {summary === undefined ? null : <span className="muted small"> {summary}</span>}
       </summary>
       <div className="stack detail-section-body">{children}</div>
     </details>
@@ -80,13 +81,13 @@ export function Contributions({
   testId: string;
 }) {
   if (entries.length === 0) {
-    return <span className="muted">None.</span>;
+    return <span className="muted small">None.</span>;
   }
   return (
     <ul className="detail-list" data-testid={testId}>
       {entries.map((entry) => (
         <li key={entry.node}>
-          <NodeLink view={view} node={entry.node} /> <span className="muted">+{entry.score.toFixed(2)}</span>
+          <NodeLink view={view} node={entry.node} /> <span className="muted small">+{entry.score.toFixed(2)}</span>
         </li>
       ))}
     </ul>

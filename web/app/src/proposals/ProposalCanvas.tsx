@@ -93,19 +93,19 @@ export function ProposalCanvas({ domain, graphs, marks, deployment, today, selec
     return <p className="callout callout-bad">The diff could not be laid out: {error}</p>;
   }
   if (laidOut === undefined || overlay === undefined) {
-    return <p className="muted">Laying out the diff...</p>;
+    return <p className="muted small">Laying out the diff...</p>;
   }
   return (
     <div className="stack" data-testid="proposal-canvas">
-      <div className="row muted" data-testid="diff-legend">
+      <div className="row muted small" data-testid="diff-legend">
         {Object.values(DIFF_LABELS).map((label) => (
           <span key={label} className="proposal-legend">{label}</span>
         ))}
       </div>
       <div className="proposal-canvas">
-        <GraphCanvas model={laidOut.model} placement={laidOut.placement} overlay={overlay} heat={false} selected={selected} actions={actions} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" />
+        <GraphCanvas model={laidOut.model} placement={laidOut.placement} overlay={overlay} heat={false} selected={selected} actions={actions} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" inScroller />
       </div>
-      {overlay.outside.length === 0 ? null : <span className="muted">Also changed, not drawn: {overlay.outside.join(", ")}</span>}
+      {overlay.outside.length === 0 ? null : <span className="muted small">Also changed, not drawn: {overlay.outside.join(", ")}</span>}
     </div>
   );
 }

@@ -25,6 +25,7 @@ import type { Level, Route } from "../data/host.ts";
 import { useDeployment, useSession } from "../data/react.ts";
 import type { Schema } from "@cairn/client";
 import { routeDetailPath } from "../routes/address.ts";
+import { Inspector } from "../shell/frame.tsx";
 
 /** The graph a route's canvas shows: its draft, or one published version. */
 interface Shown {
@@ -167,7 +168,7 @@ function RouteCanvas({ shown, view, version, selected, onPick }: { shown: Shown;
     return <p className="callout callout-bad">The canvas could not be drawn: {error ?? layoutError}</p>;
   }
   if (laidOut === undefined) {
-    return <p className="muted">Laying out the canvas...</p>;
+    return <p className="muted small">Laying out the canvas...</p>;
   }
   return (
     <GraphCanvas model={laidOut.model} placement={laidOut.placement} overlay={undefined} heat={false} selected={selected} actions={actions} viewKey={refitKey(laidOut, shown.of === "draft")} label={`${shown.route.header.name}: canvas`} />
@@ -197,7 +198,7 @@ export function RouteCanvasPage() {
   const authored = useDraftAuthored(read.status === "ready" ? read.shown : undefined);
   const drawing = useEdgeDrawing(authored);
   if (read.status === "loading") {
-    return <p className="muted">Reading the route...</p>;
+    return <p className="muted small">Reading the route...</p>;
   }
   if (read.status === "failed") {
     return <p className="callout callout-bad">The route could not be read: {read.message}</p>;
@@ -207,12 +208,12 @@ export function RouteCanvasPage() {
   const panel = authored === undefined || selected === undefined ? undefined : <RouteNodePanel authored={authored} nodeKey={selected} close={close} onRemoved={() => void navigate(close)} />;
   return (
     <ConnectContext value={authored === undefined ? undefined : drawing.connecting}>
-      <div className={panel === undefined ? "canvas-page" : "canvas-page canvas-split"}>
-        {panel}
-        <section className="stack" aria-label={shown.route.header.name}>
+      <div className="ws-fill">
+        {panel === undefined ? null : <Inspector focus={`${id}:${selected ?? ""}`}>{panel}</Inspector>}
+        <section className="ws-head stack" aria-label={shown.route.header.name}>
           <div className="row">
-            <h1 className="title" data-testid="route-name">{shown.route.header.name}</h1>
-            <span className="muted" data-testid="route-graph" data-status={String(shown.of)}>
+            <h1 data-testid="route-name">{shown.route.header.name}</h1>
+            <span className="muted small" data-testid="route-graph" data-status={String(shown.of)}>
               {shown.of === "draft" ? "The draft" : `Version ${String(shown.of)}`}
               {shown.of !== "draft" && shown.route.draft == null ? " (no draft is open)" : ""}; a route has no journey state.
             </span>
@@ -226,8 +227,10 @@ export function RouteCanvasPage() {
           <nav className="crumbs" aria-label="Drilled into" data-testid="crumbs">
             {view.container === undefined ? <strong>Whole route</strong> : <Link to={routeCanvasPath(id, version, { ...view, container: undefined })}>Whole route</Link>}
           </nav>
-          <RouteCanvas shown={shown} view={view} version={version} selected={selected} onPick={authored === undefined ? undefined : drawing.pick} />
         </section>
+        <div className="ws-canvas">
+          <RouteCanvas shown={shown} view={view} version={version} selected={selected} onPick={authored === undefined ? undefined : drawing.pick} />
+        </div>
       </div>
     </ConnectContext>
   );

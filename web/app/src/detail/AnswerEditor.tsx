@@ -81,7 +81,7 @@ export function Input({ view, node, value, onChange }: { view: Ready; node: Grap
   const choices: [string, string][] = (node.choices ?? []).map((choice) => [choiceId(choice), choiceTitle(choice)]);
   const entities: [string, string][] = (view.inputs.deployment.entities ?? []).map((entity) => [entity.key, entity.name]);
   const select = (options: [string, string][], chosen: string, wrap: (id: string) => AnswerValue) => (
-    <select className="select" aria-label="Answer" value={chosen} onChange={(event) => { onChange(wrap(event.target.value)); }}>
+    <select aria-label="Answer" value={chosen} onChange={(event) => { onChange(wrap(event.target.value)); }}>
       <option value="">Choose</option>
       {options.map(([id, title]) => (
         <option key={id} value={id}>
@@ -132,9 +132,9 @@ export function answerMutations(decision: string, value: AnswerValue, named: str
 function WhyField({ value, previous, onChange }: { value: string; previous: string | undefined; onChange: (text: string) => void }) {
   return (
     <div className="stack" data-testid="answer-why">
-      <textarea className="textarea" aria-label="Why" placeholder="Why (optional, markdown)" value={value} onChange={(event) => { onChange(event.target.value); }} />
+      <textarea aria-label="Why" placeholder="Why (optional, markdown)" value={value} onChange={(event) => { onChange(event.target.value); }} />
       {previous === undefined || previous === value ? null : (
-        <span className="muted row">
+        <span className="muted small row">
           Previous reason: &ldquo;{previous.length > 80 ? `${previous.slice(0, 80)}...` : previous}&rdquo;
           <Button onClick={() => { onChange(previous); }}>Reuse</Button>
         </span>
@@ -235,7 +235,7 @@ export function AnswerEditor({ view, detail }: { view: Ready; detail: NodeDetail
         </Button>
       ) : null}
       {node.feeds_milestone === undefined ? null : (
-        <span className="muted">
+        <span className="muted small">
           Its answer pins <NodeLink view={view} node={node.feeds_milestone} />.
         </span>
       )}

@@ -1,7 +1,7 @@
 // C18: the journey status summary, for observers and reporting: the key figures, the in-scope
 // nodes by state, what is overdue, short, or stale and why, the upcoming milestones with their
 // effective dates, and the open decisions with their owners. A printable page: printing it
-// leaves out the navigation, the controls, and the detail panel (screens.css). Each node
+// leaves out the navigation, the controls, and the inspector (ui/app.css). Each node
 // opens its detail (5.1) beside the summary.
 import type { ReactNode } from "react";
 
@@ -17,7 +17,7 @@ function Figure({ label, count, testId, tone = "plain" }: { label: string; count
   return (
     <div className={`summary-figure summary-figure-${count > 0 ? tone : "plain"}`} data-testid={testId} data-count={count}>
       <span className="summary-figure-count">{count}</span>
-      <span className="muted">{label}</span>
+      <span className="muted small">{label}</span>
     </div>
   );
 }
@@ -25,8 +25,8 @@ function Figure({ label, count, testId, tone = "plain" }: { label: string; count
 function Part({ title, testId, count, children }: { title: string; testId: string; count: number; children: ReactNode }) {
   return (
     <section className="panel stack summary-part" aria-label={title} data-testid={testId} data-count={count}>
-      <h2 className="title">{title}</h2>
-      {count === 0 ? <span className="muted">None.</span> : children}
+      <h2>{title}</h2>
+      {count === 0 ? <span className="muted small">None.</span> : children}
     </section>
   );
 }
@@ -47,7 +47,7 @@ function Figures({ model }: { model: SummaryModel }) {
 function ByState({ model }: { model: SummaryModel }) {
   return (
     <Part title="In scope, by state" testId="summary-by-state" count={model.inScope}>
-      <table className="table">
+      <table className="data">
         <tbody>
           {model.byState.map((each) => (
             <tr key={each.state} data-testid="summary-state" data-state={each.state} data-count={each.count}>
@@ -69,7 +69,7 @@ function Trouble({ ready, model, selected }: { ready: Ready; model: SummaryModel
           {model.overdue.map((each) => (
             <li key={each.key} data-testid="summary-item" data-node={each.key} data-selected={each.key === selected}>
               <NodeLink view={ready} node={each.key} />{" "}
-              <span className="muted">
+              <span className="muted small">
                 due {each.due ?? "?"}
                 {each.lateDays === undefined ? "" : `, ${String(each.lateDays)} days late`}
               </span>
@@ -90,7 +90,7 @@ function Trouble({ ready, model, selected }: { ready: Ready; model: SummaryModel
         <ul className="detail-list">
           {model.stale.map((each) => (
             <li key={each.key} data-testid="summary-item" data-node={each.key} data-selected={each.key === selected}>
-              <NodeLink view={ready} node={each.key} /> <span className="muted">{each.reasons.join("; ")}</span>
+              <NodeLink view={ready} node={each.key} /> <span className="muted small">{each.reasons.join("; ")}</span>
             </li>
           ))}
         </ul>
@@ -103,7 +103,7 @@ function Ahead({ ready, model, selected }: { ready: Ready; model: SummaryModel; 
   return (
     <>
       <Part title="Upcoming milestones" testId="summary-upcoming" count={model.upcoming.length}>
-        <table className="table">
+        <table className="data">
           <thead>
             <tr>
               <th>Milestone</th>
@@ -118,14 +118,14 @@ function Ahead({ ready, model, selected }: { ready: Ready; model: SummaryModel; 
                 <td><NodeLink view={ready} node={each.key} /></td>
                 <td className="summary-date">{each.date}</td>
                 <td><Badge>{ORIGIN_WORDS[each.origin]}</Badge></td>
-                <td>{each.owners.length === 0 ? <span className="muted">unassigned</span> : each.owners.join(", ")}</td>
+                <td>{each.owners.length === 0 ? <span className="muted small">unassigned</span> : each.owners.join(", ")}</td>
               </tr>
             ))}
           </tbody>
         </table>
       </Part>
       <Part title="Open decisions" testId="summary-open" count={model.openDecisions.length}>
-        <table className="table">
+        <table className="data">
           <thead>
             <tr>
               <th>Decision, by rank</th>
@@ -136,7 +136,7 @@ function Ahead({ ready, model, selected }: { ready: Ready; model: SummaryModel; 
             {model.openDecisions.map((each) => (
               <tr key={each.key} data-testid="summary-item" data-node={each.key} data-selected={each.key === selected}>
                 <td><NodeLink view={ready} node={each.key} /></td>
-                <td>{each.owners.length === 0 ? <span className="muted">unassigned</span> : each.owners.join(", ")}</td>
+                <td>{each.owners.length === 0 ? <span className="muted small">unassigned</span> : each.owners.join(", ")}</td>
               </tr>
             ))}
           </tbody>
@@ -151,9 +151,9 @@ export function StatusSummaryView({ ready, model, selected }: { ready: Ready; mo
   return (
     <div className="stack summary" data-testid="summary">
       <div className="row">
-        <h2 className="title">Status summary</h2>
-        <span className="muted">as of {ready.derived.today}</span>
-        <span className="shell-spacer" />
+        <h2>Status summary</h2>
+        <span className="muted small">as of {ready.derived.today}</span>
+        <span className="spacer" />
         <Button className="no-print" onClick={() => { globalThis.print(); }}>
           Print
         </Button>

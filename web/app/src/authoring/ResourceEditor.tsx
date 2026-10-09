@@ -84,7 +84,7 @@ function ResourceFields({ form, setForm, authored }: { form: ResourceForm; setFo
         <Field aria-label="Resource title" placeholder="Title" value={form.title} onChange={(event) => { setForm({ ...form, title: event.target.value }); }} />
       </span>
       {multiline ? (
-        <textarea className="textarea" aria-label={form.type === "tip" ? "Tip" : "Message draft"} value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
+        <textarea aria-label={form.type === "tip" ? "Tip" : "Message draft"} value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
       ) : (
         <Field aria-label="Address" placeholder="https://..." value={form.body} onChange={(event) => { setForm({ ...form, body: event.target.value }); }} />
       )}
@@ -154,12 +154,12 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
   const full = resources.length >= RESOURCE_COUNT_PER_NODE_MAX;
   return (
     <div className="stack" data-testid="resource-editor">
-      {resources.length === 0 ? <span className="muted">No resources.</span> : null}
+      {resources.length === 0 ? <span className="muted small">No resources.</span> : null}
       <ul className="detail-list">
         {resources.map((resource) => (
           <li key={resource.key} className="row" data-testid="resource" data-key={resource.key} data-type={typeOf(resource)}>
             <span>
-              {resource.title ?? TYPES.find((each) => each.value === typeOf(resource))?.label} <span className="muted">({typeOf(resource).replace("_", " ")})</span>
+              {resource.title ?? TYPES.find((each) => each.value === typeOf(resource))?.label} <span className="muted small">({typeOf(resource).replace("_", " ")})</span>
             </span>
             <Button onClick={() => { setEditing({ form: formOf(resource, authored), base: authored.revision }); }}>Edit</Button>
             <Button aria-label={`Remove the resource ${resource.title ?? resource.key}`} disabled={write.disabled} onClick={() => void write.run([{ op: "remove_resource", node: node.key, resource: resource.key }])}>
@@ -171,7 +171,7 @@ export function ResourceEditor({ authored, node }: NodeEditorProps) {
       {editing === undefined ? (
         <span className="row">
           <Button disabled={full} onClick={() => { setEditing({ form: { key: undefined, type: "tip", title: "", body: "" }, base: authored.revision }); }}>Add a resource</Button>
-          {full ? <span className="muted">A node holds at most {String(RESOURCE_COUNT_PER_NODE_MAX)} resources.</span> : null}
+          {full ? <span className="muted small">A node holds at most {String(RESOURCE_COUNT_PER_NODE_MAX)} resources.</span> : null}
         </span>
       ) : (
         <ResourceFormView authored={authored} node={node} editing={editing} setEditing={setEditing} />

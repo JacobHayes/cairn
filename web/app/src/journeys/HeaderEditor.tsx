@@ -37,7 +37,7 @@ export function HeaderEditor({ ready }: { ready: Ready }) {
   return (
     <div className="stack" data-testid="header-editor">
       <Field aria-label="Name" value={value.name} onChange={(event) => { form.change({ ...value, name: event.target.value }); }} />
-      <textarea className="textarea" aria-label="Description" value={value.description} onChange={(event) => { form.change({ ...value, description: event.target.value }); }} />
+      <textarea aria-label="Description" value={value.description} onChange={(event) => { form.change({ ...value, description: event.target.value }); }} />
       <span className="row">
         <Button primary disabled={write.disabled || value.name.trim() === ""} onClick={() => void save()}>Save</Button>
         <Button onClick={() => { form.close(); write.dismiss(); }}>Cancel</Button>

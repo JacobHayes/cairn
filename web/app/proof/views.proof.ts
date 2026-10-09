@@ -9,7 +9,7 @@ import { expect, test, type Browser, type Page } from "@playwright/test";
 
 import { pin } from "../e2e/detail.ts";
 import { nodePanel, openJourney } from "../e2e/shell.ts";
-import { FIXED_TODAY, openScreen } from "../e2e/views.ts";
+import { FIXED_TODAY, openScreen, showDecisionTable } from "../e2e/views.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${name}.png`), fullPage: true });
@@ -31,6 +31,7 @@ async function partnerRunsTesting(page: Page): Promise<void> {
 
 test("the decision view, and an answer revised", async ({ page }) => {
   await openScreen(page, "browser", "j_vendor_eval", "decisions");
+  await showDecisionTable(page);
   await expect(affected(page, "n_partner_runs")).toHaveCount(3);
   await expect(affected(page, "n_partner_runs").first()).toHaveAttribute("data-relevance", "not_relevant");
   await shot(page, "1-decision-view");
@@ -80,7 +81,7 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   await beat(page);
   const tab = (screen: string) => page.getByTestId(`nav-${screen}`);
   await tab("decisions").click();
-  await expect(page.getByTestId("decision-table")).toBeVisible();
+  await showDecisionTable(page);
   await beat(page);
   await page.locator('[data-testid="decision-row"][data-node="n_partner_runs"] [data-testid="decision-title"] a').click();
   await beat(page);

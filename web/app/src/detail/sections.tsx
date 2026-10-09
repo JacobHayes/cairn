@@ -39,11 +39,11 @@ export function Header({ view, detail }: { view: Ready; detail: NodeDetail }) {
   return (
     <div className="stack" data-testid="detail-header">
       <div className="row">
-        <h2 className="title" data-testid="detail-title">{node.title}</h2>
+        <h2 data-testid="detail-title">{node.title}</h2>
         <Badge>{node.kind}</Badge>
         <Badge tone={statusTone(shown)} data-testid="detail-state" data-status={shown}>{statusWord(shown, node.kind)}</Badge>
       </div>
-      {note === undefined ? null : <span className="muted" data-testid="detail-state-note">{note}</span>}
+      {note === undefined ? null : <span className="muted small" data-testid="detail-state-note">{note}</span>}
       <span className="muted mono">
         {detail.ancestors.map((ancestor) => (
           <span key={ancestor.key}>
@@ -59,11 +59,11 @@ export function Header({ view, detail }: { view: Ready; detail: NodeDetail }) {
           </Badge>
         ))}
       </div>
-      <span className="muted" data-testid="provenance" data-status={record.provenance}>
+      <span className="muted small" data-testid="provenance" data-status={record.provenance}>
         {record.provenance === "from_route" ? "From the route" : record.provenance === "orphaned" ? "Orphaned: its route version no longer has it" : "Local to this journey"}
         {localEdits.length === 0 ? "" : `; edited here: ${localEdits.map((edit) => (typeof edit === "string" ? edit : Object.values(edit)[0])).join(", ")}`}
       </span>
-      {record.skip_reason == null ? null : <span className="muted">Skipped: {record.skip_reason}</span>}
+      {record.skip_reason == null ? null : <span className="muted small">Skipped: {record.skip_reason}</span>}
     </div>
   );
 }
@@ -78,7 +78,7 @@ export function About({ view, detail, edit }: { view: Ready; detail: NodeDetail;
       {decision && node.help !== undefined ? <Markdown text={node.help} /> : null}
       {decision ? (
         <span data-testid="answer">
-          Answer: {answer === undefined ? <span className="muted">not answered</span> : <strong>{answerText(view, answer, node)}</strong>}
+          Answer: {answer === undefined ? <span className="muted small">not answered</span> : <strong>{answerText(view, answer, node)}</strong>}
           {node.fills_role === undefined ? "" : `; fills the role ${roleTitle(view, node.fills_role)}`}
           {node.feeds_milestone === undefined ? null : (
             <>
@@ -89,7 +89,7 @@ export function About({ view, detail, edit }: { view: Ready; detail: NodeDetail;
       ) : null}
       {decision && answer !== undefined ? <Rationale text={rationale} /> : null}
       {node.description == null || node.description === "" ? (
-        decision ? null : <span className="muted">No description.</span>
+        decision ? null : <span className="muted small">No description.</span>
       ) : (
         <Markdown text={node.description} data-testid="description" />
       )}
@@ -101,6 +101,11 @@ export function About({ view, detail, edit }: { view: Ready; detail: NodeDetail;
 /** A role by its title, or its key when it has none. */
 export function roleTitle(view: Ready, role: string): string {
   return (view.journey.graph.roles ?? []).find((each) => each.key === role)?.title ?? role;
+}
+
+/** A participation kind by its title (the built-in owner kind has none in the graph), or its key when it has none. */
+export function kindTitle(view: Ready, kind: string): string {
+  return kind === "k_owner" ? "Owner" : ((view.journey.graph.participation_kinds ?? []).find((each) => each.key === kind)?.title ?? kind);
 }
 
 /** E6: the entity a key names now, following the aliases a merge left behind. */
@@ -190,7 +195,7 @@ export function Blocking({ view, detail, edit }: { view: Ready; detail: NodeDeta
         <ul className="detail-list" data-testid="blocked-by">
           {blockedBy.map((blocker) => (
             <li key={`${blocker.node}:${JSON.stringify(blocker.via)}`}>
-              <NodeLink view={view} node={blocker.node} /> <span className="muted">({viaText(blocker.via, name)})</span>
+              <NodeLink view={view} node={blocker.node} /> <span className="muted small">({viaText(blocker.via, name)})</span>
             </li>
           ))}
         </ul>
@@ -241,11 +246,11 @@ export function Priority({ view, detail, edit }: { view: Ready; detail: NodeDeta
       <span>
         Leverage <strong>{leverage.toFixed(2)}</strong>: what completing it frees, for the same owner and for others:
       </span>
-      <span className="muted">Same owner</span>
+      <span className="muted small">Same owner</span>
       <Contributions view={view} entries={same} testId="leverage-same" />
-      <span className="muted">Other owners</span>
+      <span className="muted small">Other owners</span>
       <Contributions view={view} entries={others} testId="leverage-other" />
-      {reading ? <span className="muted">Reading the rest of the contributors...</span> : null}
+      {reading ? <span className="muted small">Reading the rest of the contributors...</span> : null}
       {edit}
     </Section>
   );
@@ -254,17 +259,15 @@ export function Priority({ view, detail, edit }: { view: Ready; detail: NodeDeta
 /** Each participation kind's entities and where they come from (E2). */
 export function Participations({ view, detail, edit }: { view: Ready; detail: NodeDetail; edit?: ReactNode }) {
   const kinds = Object.entries(detail.derived.participations ?? {});
-  const kindTitle = (kind: string) =>
-    kind === "k_owner" ? "Owner" : ((view.journey.graph.participation_kinds ?? []).find((each) => each.key === kind)?.title ?? kind);
   return (
     <Section title="Participations" summary={kinds.length === 0 ? "none" : `${String(kinds.length)} kinds`} testId="participations">
-      {kinds.length === 0 ? <span className="muted">No one participates.</span> : null}
+      {kinds.length === 0 ? <span className="muted small">No one participates.</span> : null}
       <ul className="detail-list">
         {kinds.map(([kind, participation]) => (
           <li key={kind} data-testid="participation" data-kind={kind}>
-            <strong>{kindTitle(kind)}</strong>:{" "}
+            <strong>{kindTitle(view, kind)}</strong>:{" "}
             {participation.entities.length === 0 ? "none" : participation.entities.map((key) => entityName(view, key)).join(", ")}{" "}
-            <span className="muted">({originText(participation.origin, view)})</span>
+            <span className="muted small">({originText(participation.origin, view)})</span>
           </li>
         ))}
       </ul>

@@ -13,7 +13,7 @@ import { TimelineChart } from "../timeline/TimelineView.tsx";
 import { JourneyScreen } from "./JourneyScreen.tsx";
 
 export function DecisionViewPage() {
-  return <JourneyScreen segment="decisions">{(ready, selected) => <DecisionView ready={ready} selected={selected} />}</JourneyScreen>;
+  return <JourneyScreen segment="decisions" fill>{(ready, selected) => <DecisionView ready={ready} selected={selected} />}</JourneyScreen>;
 }
 
 function ProjectedTimeline({ ready, selected }: { ready: Ready; selected: string | undefined }) {
@@ -22,7 +22,7 @@ function ProjectedTimeline({ ready, selected }: { ready: Ready; selected: string
     return <p className="callout callout-bad">The timeline could not be read: {timeline.error}</p>;
   }
   if (timeline.value === undefined) {
-    return <p className="muted">Placing the dates...</p>;
+    return <p className="muted small">Placing the dates...</p>;
   }
   return <TimelineChart ready={ready} timeline={timeline.value} selected={selected} />;
 }
@@ -38,7 +38,7 @@ function ProjectedSummary({ ready, selected }: { ready: Ready; selected: string 
     return <p className="callout callout-bad">The summary could not be read: {summary.error}</p>;
   }
   if (model === undefined) {
-    return <p className="muted">Summing up the journey...</p>;
+    return <p className="muted small">Summing up the journey...</p>;
   }
   return <StatusSummaryView ready={ready} model={model} selected={selected} />;
 }

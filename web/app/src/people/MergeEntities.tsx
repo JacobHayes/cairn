@@ -16,8 +16,8 @@ import { mergeMutation, type Entity } from "./model.ts";
 function EntitySelect({ label, value, entities, onChange }: { label: string; value: string; entities: readonly Entity[]; onChange: (key: string) => void }) {
   return (
     <label className="row">
-      <span className="muted">{label}</span>
-      <select className="select" aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }}>
+      <span className="muted small">{label}</span>
+      <select aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }}>
         <option value="">Choose an entity</option>
         {entities.map((entity) => (
           <option key={entity.key} value={entity.key}>
@@ -54,7 +54,7 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
   return (
     <section className="stack panel" aria-label="Merge two entities" data-testid="merge-entities">
       <strong>Merge two entities</strong>
-      <span className="muted">The second becomes an alias of the first: journeys and their history keep referring to it and now read the first.</span>
+      <span className="muted small">The second becomes an alias of the first: journeys and their history keep referring to it and now read the first.</span>
       <span className="row">
         <EntitySelect label="Keep" value={survivor} entities={entities} onChange={setSurvivor} />
         <EntitySelect label="Merge into it" value={merged} entities={entities} onChange={setMerged} />

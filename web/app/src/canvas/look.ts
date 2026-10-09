@@ -34,25 +34,25 @@ export function lineLook(line: Line, overlay?: CanvasOverlay): LineLook {
  * active work outlined; the viewer's own items marked more lightly, since a viewer may own
  * most of a journey), and an overlay's dimming.
  */
-export function cardClasses(card: Card, overlay?: CanvasOverlay): string[] {
-  const classes = ["card", `card-${card.kind}`];
+export function nodeClasses(card: Card, overlay?: CanvasOverlay): string[] {
+  const classes = ["node", `node-${card.kind}`];
   const journey = card.journey;
   if (journey?.state === "not_relevant") {
-    classes.push("card-not-relevant");
+    classes.push("node-not-relevant");
   } else if (journey?.state === "conditional") {
-    classes.push("card-undecided");
+    classes.push("node-undecided");
   }
   if (journey !== undefined && (journey.here.frontier || journey.here.active)) {
-    classes.push("card-here");
+    classes.push("node-here");
   }
   if (journey?.here.mine === true) {
-    classes.push("card-mine");
+    classes.push("node-mine");
   }
   const mark = overlay?.marks[card.key];
   if (mark !== undefined) {
-    classes.push("card-marked", `card-marked-${mark.tone}`);
+    classes.push("node-marked", `node-marked-${mark.tone}`);
   } else if (overlay?.dim === true) {
-    classes.push("card-dim");
+    classes.push("node-dim");
   }
   return classes;
 }

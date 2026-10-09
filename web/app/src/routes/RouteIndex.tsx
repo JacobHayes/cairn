@@ -7,8 +7,7 @@ import { Link } from "react-router";
 import { routeIndex, type RouteSummary } from "../data/reads.ts";
 import { useLive } from "../data/react.ts";
 import { newJourneyPath } from "../journeys/address.ts";
-import "../journeys/journeys.css";
-import { Badge, Panel } from "../ui/kit.tsx";
+import { Badge } from "../ui/kit.tsx";
 import { routeDetailPath } from "./address.ts";
 import { ImportFile } from "./ImportFile.tsx";
 import { NewRoute } from "./NewRoute.tsx";
@@ -22,7 +21,7 @@ function RouteRow({ route }: { route: RouteSummary }) {
         <Link to={routeDetailPath(header.id)}>{header.name}</Link>
         <div className="muted mono">{header.id}</div>
       </td>
-      <td>{latest === undefined ? <span className="muted">None published</span> : `Version ${String(latest)}`}</td>
+      <td>{latest === undefined ? <span className="muted small">None published</span> : `Version ${String(latest)}`}</td>
       <td>
         <span className="row">
           {route.draft_open ? <Badge tone="warn">Draft open</Badge> : null}
@@ -37,15 +36,15 @@ function RouteRow({ route }: { route: RouteSummary }) {
 export function RouteIndex() {
   const { view } = useLive("routes", routeIndex);
   return (
-    <Panel aria-label="Routes">
-      <h1 className="title">Routes</h1>
+    <section className="stack" aria-label="Routes">
+      <h1>Routes</h1>
       <NewRoute />
       <ImportFile />
-      {view.status === "loading" ? <p className="muted">Loading the routes...</p> : null}
+      {view.status === "loading" ? <p className="muted small">Loading the routes...</p> : null}
       {view.status === "failed" ? <p className="callout callout-bad">The routes could not be read: {view.message}</p> : null}
       {view.status === "ready" ? (
-        <div className="scroll-x">
-          <table className="table">
+        <div className="table-wrap">
+          <table className="data">
             <thead>
               <tr>
                 <th>Route</th>
@@ -62,6 +61,6 @@ export function RouteIndex() {
           </table>
         </div>
       ) : null}
-    </Panel>
+    </section>
   );
 }

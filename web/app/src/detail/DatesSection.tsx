@@ -32,7 +32,7 @@ function BoundRow({ view, node, label, bound }: { view: Ready; node: string; lab
   if (bound == null) {
     return (
       <div className="date-row" data-testid="date" data-label={label} data-origin="none">
-        <span className="date-label">{label}</span> <span className="muted">none: no date reaches it</span>
+        <span className="date-label">{label}</span> <span className="muted small">none: no date reaches it</span>
       </div>
     );
   }
@@ -41,7 +41,7 @@ function BoundRow({ view, node, label, bound }: { view: Ready; node: string; lab
     <div className="date-row" data-testid="date" data-label={label} data-origin={origin}>
       <span className="date-label">{label}</span> <strong>{bound.date}</strong> <span className="badge">{origin}</span>
       <details>
-        <summary className="muted">Why</summary>
+        <summary className="muted small">Why</summary>
         <ChainView view={view} chain={bound.chain} />
       </details>
     </div>

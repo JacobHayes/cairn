@@ -9,10 +9,9 @@ import type { Deployment } from "../data/host.ts";
 import { useDraft } from "../data/drafts.ts";
 import { useDeployment, useViewer } from "../data/react.ts";
 import type { Rejection } from "../data/writes.ts";
-import "../journeys/journeys.css";
 import { Refused } from "../screens/Refused.tsx";
 import { useScreenWrite, type ScreenWrite } from "../screens/write.ts";
-import { Badge, Button, Field, Panel } from "../ui/kit.tsx";
+import { Badge, Button, Field } from "../ui/kit.tsx";
 import { MergeEntities } from "./MergeEntities.tsx";
 import { aliasesOf, byName, entityOf, newEntityKey, type Entity } from "./model.ts";
 
@@ -74,13 +73,13 @@ function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: 
         <strong data-testid="entity-name">{entity.name}</strong>
         <span className="muted mono">{entity.key}</span>
         {yours ? <Badge tone="good" data-testid="yours">You</Badge> : null}
-        {aliases.length === 0 ? null : <span className="muted" data-testid="aliases">also {aliases.join(", ")}</span>}
-        <span className="shell-spacer" />
+        {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">also {aliases.join(", ")}</span>}
+        <span className="spacer" />
         {draft === undefined ? (
           <Button disabled={write.disabled} onClick={() => { setDraft({ name: entity.name, emails: (entity.emails ?? []).join(", "), base: deployment.revision }); }}>Edit</Button>
         ) : null}
       </span>
-      <span className="muted" data-testid="entity-emails">{(entity.emails ?? []).join(", ") || "No emails"}</span>
+      <span className="muted small" data-testid="entity-emails">{(entity.emails ?? []).join(", ") || "No emails"}</span>
       {draft === undefined ? null : <EntityEditor entity={entity} deployment={deployment} draft={draft} setDraft={setDraft} write={write} />}
     </li>
   );
@@ -112,14 +111,14 @@ export function Entities() {
   const { search } = useLocation();
   const asked = (new URLSearchParams(search).get("merge") ?? "").split(",").filter((key) => key !== "");
   if (deployment === undefined) {
-    return <p className="muted">Reading the entities...</p>;
+    return <p className="muted small">Reading the entities...</p>;
   }
   const yours = new Set(viewer?.entities ?? []);
   const entities = byName(deployment.entities ?? []);
   return (
-    <Panel aria-label="Entities" data-testid="entities" data-revision={deployment.revision}>
-      <h1 className="title">Entities</h1>
-      <span className="muted">People and teams journeys refer to, across every journey. They need not be users; an entity holding your verified email is you.</span>
+    <section className="stack" aria-label="Entities" data-testid="entities" data-revision={deployment.revision}>
+      <h1>Entities</h1>
+      <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an entity holding your verified email is you.</span>
       <CreateEntity deployment={deployment} />
       <MergeEntities key={asked.join(",")} deployment={deployment} entities={entities} asked={asked} />
       <ul className="version-list">
@@ -127,6 +126,6 @@ export function Entities() {
           <EntityRow key={entity.key} entity={entity} deployment={deployment} yours={yours.has(entity.key)} />
         ))}
       </ul>
-    </Panel>
+    </section>
   );
 }

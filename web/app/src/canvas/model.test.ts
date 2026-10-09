@@ -5,7 +5,7 @@ import { describe, expect, test } from "vitest";
 
 import { canvasView, actionsAndDecisionsHidden, wholeLevel } from "./canvas.test-support.ts";
 import { journeyLooks } from "./journey.ts";
-import { DOTTED, cardClasses, hereWords, lineLook } from "./look.ts";
+import { DOTTED, nodeClasses, hereWords, lineLook } from "./look.ts";
 import { DEFAULT_SETTINGS, borderFor, cardsOf, dueTone, linesOf, type CanvasModel, type Card, type Level } from "./model.ts";
 import { TRACE_LABELS, traceOverlay } from "./overlay.ts";
 import { levelRequest } from "./settings.ts";
@@ -79,10 +79,10 @@ describe("C1: cards and lines", () => {
   });
 
   test.each([
-    ["n_old", "card-not-relevant"],
-    ["n_option", "card-undecided"],
+    ["n_old", "node-not-relevant"],
+    ["n_option", "node-undecided"],
   ])("%s is drawn with %s", (key, look) => {
-    expect(cardClasses(card(whole, key))).toContain(look);
+    expect(nodeClasses(card(whole, key))).toContain(look);
   });
 });
 
@@ -92,7 +92,7 @@ describe("C1, C2: the relevance toggles are the level request's display set", ()
     ["undecided hidden leaves conditional out", { undecided: false }, ["relevant", "not_relevant"]],
     ["not relevant hidden leaves it out", { notRelevant: false }, ["relevant", "conditional"]],
   ])("%s", (_, toggles, display) => {
-    const asked = levelRequest({ ...DEFAULT_SETTINGS, trace: false, edit: false, ...toggles });
+    const asked = levelRequest({ ...DEFAULT_SETTINGS, trace: false, edit: false, map: false, ...toggles });
     expect(asked.display).toEqual(display);
   });
 });
@@ -121,9 +121,9 @@ describe("C5: I am here", () => {
     expect(hereWords(card(mine, "n_build"))).toEqual(["active, started early"]);
     expect(hereWords(card(mine, "n_option"))).toEqual(["yours"]);
     expect(hereWords(card(mine, "n_kick"))).toEqual([]);
-    expect(cardClasses(card(mine, "n_build"))).toContain("card-here");
-    expect(cardClasses(card(mine, "n_option"))).toEqual(expect.arrayContaining(["card-mine"]));
-    expect(cardClasses(card(mine, "n_option"))).not.toContain("card-here");
+    expect(nodeClasses(card(mine, "n_build"))).toContain("node-here");
+    expect(nodeClasses(card(mine, "n_option"))).toEqual(expect.arrayContaining(["node-mine"]));
+    expect(nodeClasses(card(mine, "n_option"))).not.toContain("node-here");
   });
 
   test("only the top-ranked few carry a numbered badge", () => {
@@ -164,7 +164,7 @@ describe("C7: the trace", () => {
       n_stage: TRACE_LABELS.downstream,
     });
     expect(overlay.lines).toEqual(["n_choose->n_option", "n_option->n_build"]);
-    expect(cardClasses(card(whole, "n_kick"), overlay)).toContain("card-dim");
+    expect(nodeClasses(card(whole, "n_kick"), overlay)).toContain("node-dim");
     expect(overlay.outside).toEqual([]);
   });
 

@@ -57,6 +57,37 @@
             </tbody>
           </table>
         </div>
+        <h2>Status shapes</h2>
+        <p class="toolbar">
+          <span class="badge ink">ready</span> <span class="badge ring">active</span> <span class="badge blocked">blocked</span>
+          <span class="badge conditional">conditional</span> <span class="badge scheduled">scheduled</span>
+          <span class="badge warn">snoozed</span> <span class="badge good">done</span> <span class="badge skipped">skipped</span>
+          <span class="badge superseded">not relevant</span>
+        </p>
+        <h2>Frame parts</h2>
+        <div class="toolbar">
+          <div class="segmented" role="radiogroup" aria-label="Theme">
+            <label><input type="radio" name="theme" checked /> System</label><label><input type="radio" name="theme" /> Light</label><label><input type="radio" name="theme" /> Dark</label>
+          </div>
+          <div class="popover" style="position: static">
+            <div class="popover-head">Menu</div>
+            <ul class="menu">
+              <li><button type="button">Snooze</button></li>
+              <li><button type="button" aria-checked="true">Skip</button></li>
+              <li role="separator"></li>
+              <li><button type="button">Reopen</button></li>
+            </ul>
+          </div>
+        </div>
+        <div class="toolbar" style="margin-top: 24px">
+          <div class="card" style="position: relative; width: 220px">
+            <span class="rank-tag">1</span><span class="hang-tag top accent">Unblocks</span><span class="hang-tag bottom steel">Gravity 12.5</span>
+            <div class="card-body">A node card</div>
+          </div>
+          <div class="selbar">3 selected <button type="button">Assign</button> <button type="button">Clear</button></div>
+        </div>
+        <div style="background: var(--color-primary); width: 240px; margin-top: 16px"><button class="sheet-handle" aria-label="Resize"></button></div>
+        <div class="strip" style="margin-top: 16px"><kbd>]</kbd> Inspector <span class="spacer"></span><span class="badge good">Live</span></div>
         <h3>Diff</h3>
         <pre class="diff"><span class="hunk">@@ -1,3 +1,3 @@</span><span class="del">-old line</span><span class="add">+new line</span></pre>
       </main>

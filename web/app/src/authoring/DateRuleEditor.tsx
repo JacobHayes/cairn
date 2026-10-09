@@ -60,7 +60,7 @@ export function DateRuleEditor({ which, value, onChange, tree, node }: DateRuleE
   if (value === null) {
     return (
       <span className="row" data-testid={`rule-${which}`}>
-        <span className="muted">No rule.</span>
+        <span className="muted small">No rule.</span>
         <Button onClick={() => { onChange(ruleOf({ direction: which === "due_by" ? "before" : "after", sources: [options[0]?.source ?? "journey.created_at"], offset: 0 })); }}>
           Add a rule
         </Button>
@@ -73,7 +73,7 @@ export function DateRuleEditor({ which, value, onChange, tree, node }: DateRuleE
   };
   return (
     <div className="stack" data-testid={`rule-${which}`}>
-      <span className="muted" data-testid="rule-words">
+      <span className="muted small" data-testid="rule-words">
         {WORDS[which]} {ruleWords(value, label)}
       </span>
       <span className="row">

@@ -73,7 +73,7 @@ function Editor({ write, node, form, types }: { write: NodeWrite; node: string |
   return (
     <div className="stack" data-testid="annotation-editor">
       <span className="row">
-        <select className="select" aria-label="Type" value={value.type} onChange={(event) => { form.change({ ...value, type: event.target.value as AnnotationType }); }}>
+        <select aria-label="Type" value={value.type} onChange={(event) => { form.change({ ...value, type: event.target.value as AnnotationType }); }}>
           {types.map((type) => (
             <option key={type} value={type}>
               {type === "note" ? "Note" : `${type[0]?.toUpperCase() ?? ""}${type.slice(1)} link`}
@@ -83,7 +83,7 @@ function Editor({ write, node, form, types }: { write: NodeWrite; node: string |
         <Field aria-label="Title" placeholder="Title (optional)" value={value.title} onChange={(event) => { form.change({ ...value, title: event.target.value }); }} />
       </span>
       {value.type === "note" ? (
-        <textarea className="textarea" aria-label="Note" value={value.text} onChange={(event) => { form.change({ ...value, text: event.target.value }); }} />
+        <textarea aria-label="Note" value={value.text} onChange={(event) => { form.change({ ...value, text: event.target.value }); }} />
       ) : (
         <Field type="url" aria-label="Address" placeholder="https://" value={value.text} onChange={(event) => { form.change({ ...value, text: event.target.value }); }} />
       )}
@@ -110,7 +110,7 @@ function Item({ annotation, write, onEdit }: { annotation: Annotation; write: No
         {link ? safeHref(text) ? <a href={text} target="_blank" rel="noreferrer noopener">{text}</a> : <span className="mono">{text}</span> : null}
       </span>
       {link ? null : <Markdown text={text} />}
-      <span className="muted">
+      <span className="muted small">
         Added by {annotation.created_by} at {annotation.created_at}
         {annotation.edited_at == null ? "" : `; edited at ${annotation.edited_at}`}
       </span>
@@ -143,7 +143,7 @@ export function AnnotationList({ view, node, annotations, summary }: { view: Rea
   };
   return (
     <Section title="Notes and links" summary={summary} open testId="annotations">
-      {annotations.length === 0 ? <span className="muted">None yet.</span> : null}
+      {annotations.length === 0 ? <span className="muted small">None yet.</span> : null}
       <ul className="checklist stack">
         {annotations.map((annotation) => (
           <Item key={annotation.body.key} annotation={annotation} write={write} onEdit={() => { edit(annotation); }} />

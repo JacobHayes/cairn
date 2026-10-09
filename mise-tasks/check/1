@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Rung 1: format, lint, typecheck (rustfmt, clippy, workspace lints, patina site labels, the wasm32 build of the runtime-free crates, the TypeScript typecheck, eslint)"
+#MISE description="Rung 1: format, lint, typecheck (rustfmt, clippy, workspace lints, patina site labels, the wasm32 build of the runtime-free crates, the TypeScript typecheck, eslint, the CSS lint)"
 # PRACTICES, The validation ladder, rung 1; Code conventions. Rung 1 runs tools, not tests:
 # it fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
 # eslint joined with the first TypeScript package, web/client
@@ -216,5 +216,10 @@ ladder_suite "TypeScript typecheck" "$typed" files
 # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
 linted=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).length);' "$typescript/eslint.json")
 ladder_suite eslint "$linted" files
+
+# DESIGN, Layout (the frame): one scroller per region, and tokens for colour and radius, in the app's
+# CSS (`mise run lint:css`; its rules are web/app/src/lint/css.ts). It prints the files it checked.
+css_files=$(mise-tasks/lint/css) || ladder_fail "the CSS lint reported violations (above)"
+ladder_suite "css lint" "$css_files" files
 
 ladder_rung_end
