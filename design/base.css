@@ -1,0 +1,708 @@
+/* Graticule base styles and shared components (DESIGN.md). Load after tokens.css. */
+@import url("fonts/fonts.css");
+
+/* ---- base ---------------------------------------------------------------------------------- */
+* {
+  box-sizing: border-box;
+}
+html {
+  font-size: var(--type-base-size);
+}
+body {
+  margin: 0;
+  background: var(--color-background);
+  color: var(--color-text);
+  font: 400 var(--type-base-size) / var(--type-line-height) var(--font-body);
+  letter-spacing: var(--type-letter-spacing);
+  -webkit-font-smoothing: antialiased;
+}
+a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--color-border);
+  text-underline-offset: 3px;
+  text-decoration-thickness: 1px;
+}
+a:hover {
+  text-decoration-color: currentColor;
+}
+code,
+pre,
+kbd,
+.mono {
+  font-family: var(--font-mono);
+  font-size: 13px;
+  letter-spacing: 0;
+  font-variant-numeric: tabular-nums;
+}
+h1,
+h2 {
+  font-family: var(--font-heading);
+  font-weight: var(--type-heading-weight);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+}
+h1 {
+  font-size: 1.563rem;
+  margin: 0 0 var(--space-4);
+}
+h2 {
+  font-size: 1.25rem;
+  margin: var(--space-5) 0 var(--space-2);
+}
+h3 {
+  font: 500 12.5px / 1.4 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-secondary);
+  margin: var(--space-4) 0 var(--space-2);
+}
+.muted {
+  color: var(--color-muted);
+}
+.num {
+  text-align: right;
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.label {
+  font: 500 12px / 1.4 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-secondary);
+}
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+::selection {
+  background: var(--color-tint);
+}
+
+/* ---- shell: graphite rail | paper workspace | graphite inspector ------------------------------ */
+.shell {
+  display: grid;
+  grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  min-height: 100vh;
+}
+.shell:has(> .inspector) {
+  grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--inspector-w);
+}
+.rail,
+.inspector {
+  position: sticky;
+  top: 0;
+  height: 100vh;
+  overflow: auto;
+  background: var(--color-primary);
+  color: var(--rail-ink);
+}
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-3);
+  border-right: 1px solid var(--rail-border);
+}
+.inspector {
+  padding: var(--space-3);
+  border-left: 1px solid var(--rail-border);
+}
+.inspector > .label {
+  color: var(--rail-muted);
+}
+.brand {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font: 700 15px / 1.2 var(--font-heading);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rail-ink);
+  text-decoration: none;
+}
+.rail nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+.rail nav a {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: var(--space-2);
+  padding: 5px 10px;
+  font: 500 12.5px / 1.4 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--rail-muted);
+  text-decoration: none;
+  border-left: 2px solid transparent;
+  transition: color var(--motion-duration) var(--motion-easing);
+}
+.rail nav a:hover {
+  color: var(--rail-ink);
+}
+.rail nav a[aria-current="page"] {
+  color: var(--rail-ink);
+  border-left-color: var(--rail-ink);
+  background: rgba(255, 255, 255, 0.04);
+}
+.rail button {
+  width: 100%;
+  color: var(--rail-ink);
+  background: transparent;
+  border-color: var(--rail-border);
+  font: 500 12px / 1.4 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+.rail button:hover {
+  border-color: var(--rail-muted);
+}
+.workspace {
+  min-width: 0;
+  padding: var(--space-5);
+}
+
+/* Paper: surface + 24px ruling + four corner ticks (L-shaped 1px strokes, 8px long, inset 3px). */
+.workspace,
+.panel,
+.card {
+  --tick: linear-gradient(var(--color-tick), var(--color-tick));
+  background:
+    var(--tick) left 3px top 3px / 8px 1px no-repeat,
+    var(--tick) left 3px top 3px / 1px 8px no-repeat,
+    var(--tick) right 3px top 3px / 8px 1px no-repeat,
+    var(--tick) right 3px top 3px / 1px 8px no-repeat,
+    var(--tick) left 3px bottom 3px / 8px 1px no-repeat,
+    var(--tick) left 3px bottom 3px / 1px 8px no-repeat,
+    var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
+    var(--tick) right 3px bottom 3px / 1px 8px no-repeat,
+    linear-gradient(90deg, var(--color-rule) 1px, transparent 1px) 0 0 / 24px 24px,
+    linear-gradient(0deg, var(--color-rule) 1px, transparent 1px) 0 0 / 24px 24px,
+    var(--color-surface);
+  color: var(--color-text); /* paper inside a graphite inspector */
+}
+
+/* ---- controls ------------------------------------------------------------------------------ */
+button,
+.button {
+  font: 500 14px / 1.4 var(--font-body);
+  letter-spacing: var(--type-letter-spacing);
+  min-height: var(--control-h);
+  padding: 5px 12px;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  transition:
+    border-color var(--motion-duration) var(--motion-easing),
+    background var(--motion-duration) var(--motion-easing);
+}
+button:hover,
+.button:hover {
+  border-color: var(--color-secondary);
+}
+/* Primary = graphite ink, never blue. */
+button.primary {
+  background: var(--ink-fill);
+  border-color: var(--ink-fill);
+  color: var(--color-surface);
+}
+button.primary:hover {
+  background: var(--ink-hover);
+  border-color: var(--ink-hover);
+}
+button.ghost {
+  background: transparent;
+}
+button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+input,
+select,
+textarea {
+  font: 400 14px / 1.4 var(--font-body);
+  padding: 4px 8px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+  color: var(--color-text);
+  min-height: var(--control-h);
+}
+input:hover,
+select:hover,
+textarea:hover {
+  border-color: var(--color-secondary);
+}
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline-offset: 0;
+  border-color: var(--color-accent);
+}
+/* One select style everywhere: square hairline box with a drawn steel chevron that follows the theme. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  height: var(--control-h);
+  padding: 0 28px 0 9px;
+  border-radius: 0;
+  line-height: calc(var(--control-h) - 2px);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+  max-width: 100%;
+  background:
+    linear-gradient(45deg, transparent 50%, var(--chev, var(--color-secondary)) 50%) calc(100% - 15px) 55% / 5px 5px
+      no-repeat,
+    linear-gradient(135deg, var(--chev, var(--color-secondary)) 50%, transparent 50%) calc(100% - 10px) 55% / 5px 5px
+      no-repeat,
+    var(--color-surface);
+  transition: border-color var(--motion-duration) var(--motion-easing);
+}
+select:hover {
+  --chev: var(--color-text);
+}
+select:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+select option {
+  color: var(--color-text);
+  background: var(--color-surface);
+}
+/* A labelled control: small uppercase mono label above the input or select. */
+.field {
+  display: inline-flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.field > .label {
+  font-size: 11px;
+  line-height: 1.2;
+}
+input[type="checkbox"],
+input[type="radio"],
+input[type="range"] {
+  accent-color: var(--color-text);
+  min-height: 0;
+}
+input[type="number"],
+input[type="date"],
+textarea {
+  font-family: var(--font-mono);
+  font-size: 13px;
+}
+::placeholder {
+  color: var(--color-muted);
+  opacity: 1;
+}
+label {
+  font-size: 14px;
+}
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  align-items: center;
+  margin-bottom: var(--space-3);
+  font-size: 14px;
+}
+.grid {
+  display: grid;
+  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+}
+
+/* Keyboard hints: mono, rail-muted on graphite. On a graphite (dark) panel, step down to the ground. */
+.keys,
+kbd {
+  display: inline-block;
+  font-family: var(--font-mono);
+  letter-spacing: 0;
+  background: var(--color-primary);
+  border: 1px solid var(--rail-border);
+  border-radius: var(--radius-md);
+}
+.keys {
+  padding: 2px 8px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--rail-muted);
+}
+kbd {
+  padding: 0 5px;
+  font-size: 11.5px;
+  color: var(--rail-ink);
+}
+:root[data-theme="dark"] :is(.keys, kbd) {
+  background: var(--color-background);
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) :is(.keys, kbd) {
+    background: var(--color-background);
+  }
+}
+
+/* ---- panels and cards ---------------------------------------------------------------------- */
+.panel {
+  position: relative;
+  border: 1px solid var(--color-border);
+  padding: var(--space-3) var(--space-4);
+  box-shadow: var(--shadow-sm);
+}
+.panel-head,
+.panel > .label:first-child {
+  margin: calc(-1 * var(--space-3)) calc(-1 * var(--space-4)) var(--space-3);
+  padding: 5px var(--space-4);
+  background: var(--color-band);
+  border-bottom: 1px solid var(--color-border);
+  font: 500 12px / 1.4 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--color-secondary);
+}
+.stat {
+  font: 600 1.563rem / 1.2 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  margin: 2px 0 6px;
+}
+.card {
+  border: 1px solid var(--color-border);
+  box-shadow: var(--shadow-sm);
+}
+.card-head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: baseline;
+  padding: var(--space-2) var(--space-4);
+  background: var(--color-band);
+  border-bottom: 1px solid var(--color-border);
+}
+.card-body {
+  padding: var(--space-3) var(--space-4);
+}
+.card-actions {
+  display: flex;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-top: 1px solid var(--color-border);
+  flex-wrap: wrap;
+}
+.kv {
+  border-collapse: collapse;
+  font-size: 14.5px;
+}
+.kv th {
+  text-align: left;
+  font: 500 12px / 1.6 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-secondary);
+  padding: 3px 14px 3px 0;
+  vertical-align: top;
+}
+.kv td {
+  padding: 2px 0;
+}
+
+/* Status: mono label + small dot, never colour alone. */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0 6px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  font: 500 11.5px / 1.6 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-secondary);
+  background: var(--color-surface);
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+.badge[hidden] {
+  display: none;
+}
+.badge:is(.good, .bad, .warn, .pending, .superseded)::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: var(--radius-full);
+  background: var(--dot, var(--color-secondary));
+  flex: none;
+}
+.badge.good {
+  --dot: var(--color-success);
+}
+.badge.bad {
+  --dot: var(--color-error);
+}
+.badge.warn {
+  --dot: var(--color-warning);
+}
+.badge.superseded {
+  --dot: transparent;
+}
+.badge.superseded::before {
+  border: 1px solid var(--color-muted);
+}
+
+/* ---- tables -------------------------------------------------------------------------------- */
+table.data {
+  border-collapse: separate;
+  border-spacing: 0;
+  width: 100%;
+  background: var(--color-surface);
+  font-size: 14.5px;
+}
+table.data th,
+table.data td {
+  padding: 4px 8px;
+  border-bottom: 1px solid var(--color-border);
+  vertical-align: top;
+}
+table.data th + th,
+table.data td + td {
+  border-left: 1px solid var(--color-border);
+}
+table.data th {
+  text-align: left;
+  font: 500 12px / 1.4 var(--font-mono);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--color-secondary);
+  vertical-align: bottom;
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--color-band);
+}
+table.data th[aria-sort] {
+  cursor: pointer;
+  user-select: none;
+}
+table.data th[aria-sort]:hover {
+  color: var(--color-text);
+}
+table.data th.num {
+  text-align: right;
+}
+table.data td.num {
+  font-size: 13px;
+}
+table.data .badge {
+  font-size: 10.5px;
+  letter-spacing: 0.04em;
+  padding: 0 4px;
+}
+table.data td .muted {
+  color: var(--color-secondary);
+}
+table.data tbody tr {
+  transition: background var(--motion-duration) var(--motion-easing);
+}
+table.data tbody tr:hover td {
+  background: var(--color-hover);
+}
+table.data td code,
+table.data td .mono {
+  font-size: 12.5px;
+}
+.table-wrap {
+  overflow: auto;
+  max-height: 70vh;
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+.table-wrap table.data tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Selection: 2px left accent line + faint blue tint. */
+table.data tr[aria-selected="true"] td,
+.selected,
+[role="option"][aria-selected="true"] {
+  background: var(--color-tint);
+}
+table.data tr[aria-selected="true"] > td:first-child,
+.selected,
+[role="option"][aria-selected="true"] {
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+/* ---- diff and log blocks ------------------------------------------------------------------- */
+pre.diff,
+pre.log {
+  margin: 0;
+  padding: var(--space-2);
+  overflow: auto;
+  border: 1px solid var(--color-border);
+}
+pre.diff {
+  background: var(--color-surface);
+}
+pre.diff :is(.add, .del, .hunk) {
+  display: block;
+}
+pre.diff .add {
+  background: var(--color-add);
+}
+pre.diff .del {
+  background: var(--color-del);
+}
+pre.diff .hunk {
+  color: var(--color-secondary);
+}
+pre.log {
+  max-height: 320px;
+  background: var(--color-band);
+}
+
+/* ---- charts: greys for structure, the accent for the selected or flagged mark ---------------- */
+svg.chart {
+  overflow: visible;
+}
+svg.chart text {
+  fill: var(--color-secondary);
+  font: 400 11px var(--font-mono);
+  letter-spacing: 0;
+}
+svg.chart .grid {
+  stroke: var(--chart-grid);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+svg.chart .axis {
+  stroke: var(--color-secondary);
+  stroke-width: 1;
+  shape-rendering: crispEdges;
+}
+svg.chart .bar {
+  fill: var(--chart-ink);
+}
+svg.chart .bar.alt {
+  fill: var(--chart-steel);
+}
+svg.chart .line {
+  stroke: var(--chart-ink);
+  fill: none;
+  stroke-width: 1.5;
+}
+svg.chart .line.alt {
+  stroke: var(--chart-steel);
+}
+svg.chart .datum {
+  fill: var(--color-accent);
+}
+svg.chart .datum-line {
+  stroke: var(--color-accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 3;
+  fill: none;
+}
+
+/* ---- toast, errors ------------------------------------------------------------------------- */
+.toast {
+  position: fixed;
+  bottom: var(--space-4);
+  right: var(--space-3);
+  z-index: 40;
+  max-width: min(560px, calc(100vw - 32px));
+  padding: 8px 14px;
+  border: 1px solid var(--rail-border);
+  border-radius: var(--radius-md);
+  background: var(--color-primary);
+  color: var(--rail-ink);
+  font: 400 13px / 1.5 var(--font-mono);
+  letter-spacing: 0;
+  box-shadow: var(--shadow-md);
+  opacity: 0;
+  transform: translateY(6px);
+  pointer-events: none;
+  transition:
+    opacity var(--motion-duration) var(--motion-easing),
+    transform var(--motion-duration) var(--motion-easing);
+}
+.toast.show {
+  opacity: 1;
+  transform: none;
+}
+.error {
+  color: var(--color-error);
+  white-space: pre-wrap;
+  font: 400 13px / 1.5 var(--font-mono);
+}
+
+/* ---- responsive: inspector drops below at 1100px, everything stacks below 720px ---------------- */
+@media (max-width: 1099px) {
+  .shell:has(> .inspector) {
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  }
+  .inspector {
+    grid-column: 2;
+    position: static;
+    height: auto;
+    border-left: 0;
+    border-top: 1px solid var(--rail-border);
+  }
+}
+@media (max-width: 719px) {
+  .shell,
+  .shell:has(> .inspector) {
+    display: block;
+  }
+  .rail {
+    position: sticky;
+    z-index: 5;
+    height: auto;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+    padding: var(--space-2) var(--space-4);
+    border-right: 0;
+    border-bottom: 1px solid var(--rail-border);
+  }
+  .rail nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    flex: 1 1 100%;
+    order: 3;
+  }
+  .rail nav a {
+    border-left: 0;
+    border-bottom: 2px solid transparent;
+    padding: 4px 8px;
+  }
+  .rail nav a[aria-current="page"] {
+    border-bottom-color: var(--rail-ink);
+  }
+  .rail button {
+    width: auto;
+  }
+  .workspace {
+    padding: var(--space-4);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}

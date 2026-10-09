@@ -1,0 +1,140 @@
+/* Graticule tokens (DESIGN.md). Light is canonical; dark follows the OS or data-theme="dark". */
+:root {
+  --color-primary: #20242b; /* graphite: rails, inspector, primary buttons */
+  --color-secondary: #5e6877; /* steel: labels, metadata */
+  --color-accent: #2f6fff; /* state: selection, focus, flagged datum */
+  --color-background: #171b22; /* drafting-table ground */
+  --color-surface: #f7f9fc; /* paper */
+  --color-text: #14181e; /* ink on paper */
+  --color-muted: #616b7a; /* AA (4.5:1) on the band */
+  --color-border: #c3ccd8; /* hairlines */
+  --color-error: #c53b32;
+  --color-success: #1f7a55;
+  --color-warning: #a66a12;
+  --color-info: #2f6fff;
+  --radius-none: 0;
+  --radius-sm: 0;
+  --radius-md: 2px;
+  --radius-lg: 4px;
+  --radius-full: 9999px;
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-7: 48px;
+  --space-8: 64px;
+  --shadow-sm: 0 1px 0 rgba(20, 24, 30, 0.06);
+  --shadow-md: 0 12px 30px rgba(20, 24, 30, 0.1);
+  --shadow-lg: 0 24px 60px rgba(20, 24, 30, 0.14);
+  --control-h: 32px; /* inputs, selects and buttons share one height */
+  --motion-duration: 180ms;
+  --motion-easing: cubic-bezier(0.2, 0.7, 0, 1);
+  --font-heading: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+  --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  --type-base-size: 17px;
+  --type-scale-ratio: 1.25;
+  --type-line-height: 1.5;
+  --type-letter-spacing: 0.01em;
+  --type-heading-weight: 700;
+
+  /* Derived */
+  --rail-ink: #e6ebf2;
+  --rail-muted: #97a1b0;
+  --rail-border: #343b46;
+  --rail-w: 184px;
+  --inspector-w: 360px;
+  --color-band: #e8ecf2; /* steel header band on paper */
+  --color-rule: rgba(20, 24, 30, 0.045); /* 24px ruling */
+  --color-tick: var(--color-secondary); /* corner registration ticks */
+  --color-hover: rgba(20, 24, 30, 0.045);
+  --color-tint: rgba(47, 111, 255, 0.08); /* behind a selected row */
+  --color-add: rgba(31, 122, 85, 0.12);
+  --color-del: rgba(197, 59, 50, 0.12);
+  --chart-ink: var(--color-primary);
+  --chart-steel: var(--color-secondary);
+  --chart-grid: var(--color-border);
+  --ink-fill: var(--color-primary); /* primary button */
+  --ink-hover: var(--rail-border);
+
+  /* Categorical (no hue in 200-240, so nothing reads as the accent) and neutral ramp, dark to pale. */
+  --cat-1: hsl(96 30% 38%);
+  --cat-2: hsl(28 40% 48%);
+  --cat-3: hsl(152 40% 34%);
+  --cat-4: hsl(352 40% 48%);
+  --cat-5: hsl(268 40% 54%);
+  --cat-6: hsl(46 40% 40%);
+  --cat-7: hsl(182 40% 34%);
+  --cat-8: hsl(320 40% 42%);
+  --ramp-1: #20242b;
+  --ramp-2: #5e6877;
+  --ramp-3: #97a1b0;
+  --ramp-4: #c3ccd8;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --color-surface: #20242b;
+    --color-text: #e6ebf2;
+    --color-muted: #97a1b0;
+    --color-border: #343b46;
+    --color-secondary: #a3acba; /* #5e6877 is 2.5:1 on graphite */
+    --color-band: #282d35;
+    --color-rule: rgba(255, 255, 255, 0.06);
+    --color-tick: #97a1b0;
+    --color-hover: rgba(255, 255, 255, 0.04);
+    --color-tint: rgba(47, 111, 255, 0.1);
+    --color-add: rgba(31, 122, 85, 0.28);
+    --color-del: rgba(197, 59, 50, 0.28);
+    --chart-ink: var(--color-text);
+    --chart-steel: var(--color-muted);
+    --ink-fill: var(--rail-ink);
+    --ink-hover: var(--rail-muted);
+    --cat-1: hsl(96 30% 56%);
+    --cat-2: hsl(28 40% 62%);
+    --cat-3: hsl(152 40% 52%);
+    --cat-4: hsl(352 40% 64%);
+    --cat-5: hsl(268 40% 70%);
+    --cat-6: hsl(46 40% 56%);
+    --cat-7: hsl(182 40% 50%);
+    --cat-8: hsl(320 40% 62%);
+    --ramp-1: #e6ebf2;
+    --ramp-2: #97a1b0;
+    --ramp-3: #6b7585;
+    --ramp-4: #454d59;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --color-surface: #20242b;
+  --color-text: #e6ebf2;
+  --color-muted: #97a1b0;
+  --color-border: #343b46;
+  --color-secondary: #a3acba;
+  --color-band: #282d35;
+  --color-rule: rgba(255, 255, 255, 0.06);
+  --color-tick: #97a1b0;
+  --color-hover: rgba(255, 255, 255, 0.04);
+  --color-tint: rgba(47, 111, 255, 0.1);
+  --color-add: rgba(31, 122, 85, 0.28);
+  --color-del: rgba(197, 59, 50, 0.28);
+  --chart-ink: var(--color-text);
+  --chart-steel: var(--color-muted);
+  --ink-fill: var(--rail-ink);
+  --ink-hover: var(--rail-muted);
+  --cat-1: hsl(96 30% 56%);
+  --cat-2: hsl(28 40% 62%);
+  --cat-3: hsl(152 40% 52%);
+  --cat-4: hsl(352 40% 64%);
+  --cat-5: hsl(268 40% 70%);
+  --cat-6: hsl(46 40% 56%);
+  --cat-7: hsl(182 40% 50%);
+  --cat-8: hsl(320 40% 62%);
+  --ramp-1: #e6ebf2;
+  --ramp-2: #97a1b0;
+  --ramp-3: #6b7585;
+  --ramp-4: #454d59;
+  color-scheme: dark;
+}

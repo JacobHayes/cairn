@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Graticule example</title>
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="base.css" />
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="rail">
+        <a class="brand" href="#">Graticule</a>
+        <nav>
+          <a href="#" aria-current="page">Queue <span>12</span></a>
+          <a href="#">Records <span>340</span></a>
+          <a href="#">Settings</a>
+        </nav>
+        <button type="button" onclick="document.documentElement.dataset.theme = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark'">Theme</button>
+      </aside>
+      <main class="workspace">
+        <h1>Records</h1>
+        <div class="toolbar">
+          <label class="field"><span class="label">Status</span><select><option>Any</option><option>Pending</option></select></label>
+          <label class="field"><span class="label">Search</span><input placeholder="name or id" /></label>
+          <button class="primary">Apply</button>
+          <button class="ghost">Reset</button>
+          <span class="keys">j/k move - enter open - ? help</span>
+        </div>
+        <div class="grid">
+          <section class="panel"><div class="label">Open items</div><div class="stat">1,284</div><span class="muted">of 2,010 (64%)</span></section>
+          <section class="panel">
+            <div class="label">Weekly volume</div>
+            <svg class="chart" width="260" height="90" viewBox="0 0 260 90">
+              <line class="grid" x1="0" x2="260" y1="10.5" y2="10.5" /><line class="grid" x1="0" x2="260" y1="45.5" y2="45.5" />
+              <line class="axis" x1="0" x2="260" y1="80.5" y2="80.5" />
+              <rect class="bar" x="10" y="40" width="22" height="40" /><rect class="bar" x="45" y="30" width="22" height="50" />
+              <rect class="bar alt" x="80" y="50" width="22" height="30" /><rect class="bar datum" x="115" y="12" width="22" height="68" />
+              <rect class="bar" x="150" y="35" width="22" height="45" /><line class="datum-line" x1="0" x2="260" y1="25" y2="25" />
+            </svg>
+          </section>
+          <section class="card">
+            <div class="card-head"><strong>Record 4f2a91c</strong><span class="badge pending">pending</span></div>
+            <div class="card-body"><table class="kv"><tr><th>Owner</th><td>Example person</td></tr><tr><th>Updated</th><td class="mono">2026-10-01</td></tr></table></div>
+            <div class="card-actions"><button class="primary">Approve</button><button>Defer</button></div>
+          </section>
+        </div>
+        <h2>All records</h2>
+        <div class="table-wrap">
+          <table class="data">
+            <thead><tr><th aria-sort="none">Name</th><th>Status</th><th class="num" aria-sort="descending">Count</th><th class="num">Share</th></tr></thead>
+            <tbody>
+              <tr><td>Alpha</td><td><span class="badge good">done</span></td><td class="num">1,204</td><td class="num">31.2% <span class="muted">#1</span></td></tr>
+              <tr aria-selected="true"><td>Beta</td><td><span class="badge warn">deferred</span></td><td class="num">880</td><td class="num">22.8% <span class="muted">#2</span></td></tr>
+              <tr><td>Gamma</td><td><span class="badge bad">failed</span></td><td class="num">412</td><td class="num">10.7% <span class="muted">#3</span></td></tr>
+              <tr><td>Delta</td><td><span class="badge superseded">superseded</span></td><td class="num">96</td><td class="num">2.5% <span class="muted">#4</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <h3>Diff</h3>
+        <pre class="diff"><span class="hunk">@@ -1,3 +1,3 @@</span><span class="del">-old line</span><span class="add">+new line</span></pre>
+      </main>
+      <aside class="inspector">
+        <div class="label">Inspector</div>
+        <section class="card"><div class="card-head"><strong>Beta</strong></div><div class="card-body">Detail for the selected row.</div></section>
+      </aside>
+    </div>
+  </body>
+</html>
