@@ -1306,6 +1306,13 @@ export interface components {
          *     reported with the result and never stored.
          */
         Consequences: {
+            /**
+             * @description Informational: nodes that were not relevant and are now relevant or undecided, in key
+             *     order.
+             */
+            into_scope?: components["schemas"]["NodeKey"][];
+            /** @description Informational: nodes that were in scope and are now not relevant, in key order. */
+            out_of_scope?: components["schemas"]["NodeKey"][];
             /** @description Newly overdue nodes. */
             overdue?: components["schemas"]["NodeKey"][];
             /** @description New or larger shortfalls. */
@@ -1316,6 +1323,11 @@ export interface components {
             stalled?: components["schemas"]["Stalled"] | null;
             /** @description Finished nodes newly undecided, which may not apply: a warning, never a rejection. */
             undecided?: components["schemas"]["UndecidedConsequence"][];
+            /**
+             * @description Informational, never a warning: nodes newly on the acting frontier, in key order. A
+             *     node the write adds is not unlocked by it.
+             */
+            unlocked?: components["schemas"]["NodeKey"][];
         };
         /**
          * @description One constraint: `after` is at least `offset_days` after `before` (offsets may be zero or
@@ -1722,16 +1734,21 @@ export interface components {
             total: number;
         };
         /** @description ARCHITECTURE, Read path: a derived value whose explanation list a server response pages. */
-        ExplainedField: "gravity" | "leverage";
+        ExplainedField: "gravity" | "leverage" | "still_waiting";
         /**
          * @description A page of one value's explanation list, largest first, `explanation_entry_count_max` at a
          *     time; the first page is what node detail carries.
          */
         ExplanationPage: {
-            /** @description The entries. */
+            /** @description The entries of a gravity or leverage list. */
             entries: components["schemas"]["Contribution"][];
             /** @description The value. */
             field: components["schemas"]["ExplainedField"];
+            /**
+             * @description The entries of a still-waiting list, which holds dependents rather than
+             *     contributions; empty for the other fields.
+             */
+            held?: components["schemas"]["HeldDependent"][];
             /** @description Where the next page starts, when there is one. */
             next?: components["schemas"]["Cursor"] | null;
             /** @description The node. */
@@ -1975,6 +1992,19 @@ export interface components {
         };
         /** @description Whether the server is serving. */
         HealthStatus: "ok" | "store_failed_closed";
+        /**
+         * @description A dependent that completing a node would not yet free, and what else it waits on (C8,
+         *     Priority: Leverage): one entry of node detail's `still_waiting`.
+         */
+        HeldDependent: {
+            /**
+             * @description What else it waits on, besides the node: its unsatisfied requirements, condition
+             *     gates, and stage openings, each with how it arose. Never empty.
+             */
+            also_waits_on: components["schemas"]["Blocker"][];
+            /** @description The direct dependent that stays held. */
+            node: components["schemas"]["NodeKey"];
+        };
         /** @description J4: a page of a journey's history, or of one node's, grouped by patch. */
         History: {
             /**
@@ -2822,7 +2852,13 @@ export interface components {
             leverage: components["schemas"]["Score"];
             /** @description The nodes completing this would unblock. */
             leverage_from: components["schemas"]["Explained"];
-            /** @description A container's largest child gravity. */
+            /**
+             * @deprecated
+             * @description A container's largest child gravity, one level down.
+             *
+             *     Deprecated: read `peak_gravity`, which looks at every depth and names the node. Kept
+             *     so existing clients keep reading it.
+             */
             max_child_gravity?: components["schemas"]["Score"] | null;
             /** @description Its seeding entity left the role it was broken down by (B10). */
             membership_lost?: boolean;
@@ -2834,6 +2870,12 @@ export interface components {
             participations?: {
                 [key: string]: components["schemas"]["EffectiveParticipation"];
             };
+            /**
+             * @description A container's peak gravity (Priority): the largest gravity among its open, in-scope
+             *     descendants at any depth, naming that node. Never the container's own `gravity`, which
+             *     stays what rides on the whole container.
+             */
+            peak_gravity?: components["schemas"]["PeakGravity"] | null;
             /** @description Rank, for nodes in the normalization set. */
             rank?: components["schemas"]["Real"] | null;
             /** @description Relevance and what produced it. */
@@ -2879,6 +2921,12 @@ export interface components {
             pin?: string | null;
             /** @description Its stored state, provenance, and actual dates. */
             record: components["schemas"]["NodeState"];
+            /**
+             * @description The direct dependents completing it would not yet free, each with what else it waits
+             *     on (C8, Priority: Leverage): the largest entries with the total; page the rest with
+             *     the explanations endpoint, field `still_waiting`.
+             */
+            still_waiting: components["schemas"]["StillWaiting"];
         };
         /** @description A node field, by name. */
         NodeField: "id" | "parent" | "title" | "description" | "weight" | "relevant_when" | "due_by" | "not_before" | "estimate" | "placeholder" | "requires_artifact" | "final" | "auto_reach" | "opens_at" | "closes_at" | "gates" | "closes" | "prompt" | "help" | "choices" | "fills_role" | "feeds_milestone";
@@ -3197,6 +3245,17 @@ export interface components {
         };
         /** @description A node path: slash-joined ids from the root, at most containment_depth_max (16) segments. */
         Path: string;
+        /**
+         * @description A container's peak gravity (Priority): the largest gravity among its open, in-scope
+         *     descendants at any depth, and the descendant that has it. Among equals a descendant beats
+         *     its own ancestor, and otherwise the first in tree order wins.
+         */
+        PeakGravity: {
+            /** @description Its gravity. */
+            gravity: components["schemas"]["Score"];
+            /** @description The descendant with the largest gravity. */
+            node: components["schemas"]["NodeKey"];
+        };
         /**
          * @description An error that is not a patch rejection: what went wrong, for a person to read, and the
          *     request id the server logged it under.
@@ -3895,7 +3954,12 @@ export interface components {
             children_active?: boolean;
             /** @description A child decision is actionable: "decision needed". */
             decision_needed?: boolean;
-            /** @description The largest in-scope child gravity (Priority). */
+            /**
+             * @deprecated
+             * @description The largest in-scope child gravity (Priority), one level down.
+             *
+             *     Deprecated: read `peak_gravity`, which looks at every depth and names the node.
+             */
             max_child_gravity?: components["schemas"]["Score"] | null;
             /**
              * Format: int32
@@ -3906,6 +3970,11 @@ export interface components {
             needs_breakdown?: boolean;
             /** @description The distinct owners of its children. */
             owners?: components["schemas"]["EntityKey"][];
+            /**
+             * @description The largest gravity among its open, in-scope descendants at any depth, naming that
+             *     node (Priority).
+             */
+            peak_gravity?: components["schemas"]["PeakGravity"] | null;
             /**
              * @description A deliverable or action whose children and other dependencies are satisfied but which
              *     is not terminal: "children complete, ready to finish".
@@ -4314,6 +4383,20 @@ export interface components {
             stale?: components["schemas"]["NodeKey"][];
             /** @description In-scope milestones not yet reached that have a date, earliest first. */
             upcoming_milestones?: components["schemas"]["UpcomingMilestone"][];
+        };
+        /**
+         * @description The dependents completing a node would not yet free (C8, Priority: Leverage): node
+         *     detail's `still_waiting`, its largest entries up to `explanation_entry_count_max` with the
+         *     total; the rest page through the explanations of `ExplainedField::StillWaiting`.
+         */
+        StillWaiting: {
+            /** @description The dependents, largest weight first. */
+            entries: components["schemas"]["HeldDependent"][];
+            /**
+             * Format: uint32
+             * @description How many there are in all.
+             */
+            total: number;
         };
         /** @description What an event is about: its subject key (J1). */
         Subject: {

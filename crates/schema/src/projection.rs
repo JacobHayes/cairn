@@ -11,7 +11,8 @@ use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
 use crate::derived::{
-    Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, Real, Relevance, Score, Stalled,
+    Blocker, Contribution, DateOrigin, DisplayState, EffectiveDate, HeldDependent, PeakGravity, Real,
+    Relevance, Score, Stalled,
 };
 use crate::event::Event;
 use crate::id::{EntityKey, KindKey, NodeKey, PatchId, Path, RoleKey};
@@ -146,9 +147,16 @@ pub struct RollUp {
     /// A child needs breakdown.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub needs_breakdown: bool,
-    /// The largest in-scope child gravity (Priority).
+    /// The largest in-scope child gravity (Priority), one level down.
+    ///
+    /// Deprecated: read `peak_gravity`, which looks at every depth and names the node.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("deprecated" = true))]
     pub max_child_gravity: Option<Score>,
+    /// The largest gravity among its open, in-scope descendants at any depth, naming that
+    /// node (Priority).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub peak_gravity: Option<PeakGravity>,
     /// The least slack among in-scope, open children; none when none has a deadline.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub min_child_slack_days: Option<i32>,
@@ -574,6 +582,8 @@ pub enum ExplainedField {
     Gravity,
     /// The nodes completing it would unblock.
     Leverage,
+    /// The direct dependents completing it would not yet free, with what else each waits on.
+    StillWaiting,
 }
 
 /// A page of one value's explanation list, largest first, `explanation_entry_count_max` at a
@@ -585,8 +595,12 @@ pub struct ExplanationPage {
     pub node: NodeKey,
     /// The value.
     pub field: ExplainedField,
-    /// The entries.
+    /// The entries of a gravity or leverage list.
     pub entries: Vec<Contribution>,
+    /// The entries of a still-waiting list, which holds dependents rather than
+    /// contributions; empty for the other fields.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub held: Vec<HeldDependent>,
     /// Where the next page starts, when there is one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub next: Option<Cursor>,

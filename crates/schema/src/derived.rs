@@ -503,9 +503,18 @@ pub struct NodeDerived {
     pub gravity: Score,
     /// The contributors to gravity.
     pub gravity_from: Explained<Contribution>,
-    /// A container's largest child gravity.
+    /// A container's largest child gravity, one level down.
+    ///
+    /// Deprecated: read `peak_gravity`, which looks at every depth and names the node. Kept
+    /// so existing clients keep reading it.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schemars(extend("deprecated" = true))]
     pub max_child_gravity: Option<Score>,
+    /// A container's peak gravity (Priority): the largest gravity among its open, in-scope
+    /// descendants at any depth, naming that node. Never the container's own `gravity`, which
+    /// stays what rides on the whole container.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub peak_gravity: Option<PeakGravity>,
     /// Leverage (Priority).
     pub leverage: Score,
     /// The nodes completing this would unblock.
@@ -513,6 +522,56 @@ pub struct NodeDerived {
     /// Rank, for nodes in the normalization set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rank: Option<Real>,
+}
+
+/// A container's peak gravity (Priority): the largest gravity among its open, in-scope
+/// descendants at any depth, and the descendant that has it. Among equals a descendant beats
+/// its own ancestor, and otherwise the first in tree order wins.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct PeakGravity {
+    /// The descendant with the largest gravity.
+    pub node: NodeKey,
+    /// Its gravity.
+    pub gravity: Score,
+}
+
+/// A dependent that completing a node would not yet free, and what else it waits on (C8,
+/// Priority: Leverage): one entry of node detail's `still_waiting`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct HeldDependent {
+    /// The direct dependent that stays held.
+    pub node: NodeKey,
+    /// What else it waits on, besides the node: its unsatisfied requirements, condition
+    /// gates, and stage openings, each with how it arose. Never empty.
+    pub also_waits_on: Vec<Blocker>,
+}
+
+/// The dependents completing a node would not yet free (C8, Priority: Leverage): node
+/// detail's `still_waiting`, its largest entries up to `explanation_entry_count_max` with the
+/// total; the rest page through the explanations of `ExplainedField::StillWaiting`.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StillWaiting {
+    /// The dependents, largest weight first.
+    pub entries: Vec<HeldDependent>,
+    /// How many there are in all.
+    pub total: u32,
+}
+
+impl StillWaiting {
+    /// The list a response carries for the complete `held`: the first
+    /// `explanation_entry_count_max` entries and the total.
+    #[must_use]
+    pub fn for_response(mut held: Vec<HeldDependent>) -> Self {
+        let total = u32::try_from(held.len()).unwrap_or(u32::MAX);
+        held.truncate(usize::try_from(EXPLANATION_ENTRY_COUNT_MAX).unwrap_or(usize::MAX));
+        Self {
+            entries: held,
+            total,
+        }
+    }
 }
 
 /// What a stalled journey waits on (D5).
@@ -617,6 +676,31 @@ pub struct Consequences {
     /// The journey became stalled.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub stalled: Option<Stalled>,
+    /// Informational, never a warning: nodes newly on the acting frontier, in key order. A
+    /// node the write adds is not unlocked by it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unlocked: Vec<NodeKey>,
+    /// Informational: nodes that were in scope and are now not relevant, in key order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub out_of_scope: Vec<NodeKey>,
+    /// Informational: nodes that were not relevant and are now relevant or undecided, in key
+    /// order.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub into_scope: Vec<NodeKey>,
+}
+
+impl Consequences {
+    /// The warning half (D7): whether anything went stale, short, overdue, undecided, or the
+    /// journey stalled. The informational half (`unlocked`, `out_of_scope`, `into_scope`)
+    /// never counts.
+    #[must_use]
+    pub fn has_warnings(&self) -> bool {
+        !(self.stale.is_empty()
+            && self.shortfalls.is_empty()
+            && self.overdue.is_empty()
+            && self.undecided.is_empty()
+            && self.stalled.is_none())
+    }
 }
 
 /// The rank constants (Priority: normative formulas, configurable constants, defaults

@@ -15,7 +15,7 @@ use crate::chain::{
 use crate::derived::{
     Blocker, Bound, Consequences, Contribution, DateOrigin, DeriveInputs, Derived, DisplayState,
     DomainDocument, EffectiveDate, EffectiveParticipation, Explained, NodeDates, NodeDerived,
-    ParticipationOrigin, RankConstants, Real, Relevance, RelevanceExplanation, Score,
+    ParticipationOrigin, PeakGravity, RankConstants, Real, Relevance, RelevanceExplanation, Score,
     StaleConsequence, StallCause, Stalled,
 };
 use crate::limits::Limit;
@@ -372,9 +372,23 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
         prop::option::of(arb_snooze_target()),
         arb_scores(),
         arb_display_state(),
+        prop::option::of(
+            (arb_node_key(), arb_score()).prop_map(|(node, gravity)| PeakGravity { node, gravity }),
+        ),
     )
         .prop_map(
-            |(relevance, flags, blocking, participations, stale, dates, snoozed, scores, shown)| {
+            |(
+                relevance,
+                flags,
+                blocking,
+                participations,
+                stale,
+                dates,
+                snoozed,
+                scores,
+                shown,
+                peak,
+            )| {
                 let (blocked_by, blocked_through) = blocking;
                 let flag = |index: usize| flags.get(index).copied().unwrap_or(false);
                 let (gravity, gravity_from, max_child_gravity, leverage, leverage_from, rank) =
@@ -398,6 +412,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     gravity,
                     gravity_from,
                     max_child_gravity,
+                    peak_gravity: peak,
                     leverage,
                     leverage_from,
                     rank,
@@ -463,14 +478,31 @@ pub fn arb_consequences() -> BoxedStrategy<Consequences> {
         prop::collection::vec(arb_node_key(), 0..2),
         prop::collection::vec(undecided, 0..2),
         prop::option::of(arb_stalled()),
+        (
+            prop::collection::vec(arb_node_key(), 0..2),
+            prop::collection::vec(arb_node_key(), 0..2),
+            prop::collection::vec(arb_node_key(), 0..2),
+        ),
     )
         .prop_map(
-            |(stale, shortfalls, overdue, undecided, stalled)| Consequences {
+            |(
                 stale,
                 shortfalls,
                 overdue,
                 undecided,
                 stalled,
+                (unlocked, out_of_scope, into_scope),
+            )| {
+                Consequences {
+                    stale,
+                    shortfalls,
+                    overdue,
+                    undecided,
+                    stalled,
+                    unlocked,
+                    out_of_scope,
+                    into_scope,
+                }
             },
         )
         .boxed()

@@ -150,6 +150,30 @@ async fn a_nodes_children_are_paged() {
     assert_eq!(rest.get("next"), None);
 }
 
+/// C8, Priority: `get_node` lists the dependents finishing the node would not yet free, with
+/// what else each waits on, and pages the same list under `still_waiting`.
+#[tokio::test]
+async fn a_node_lists_what_is_still_waiting() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let node = json!({ "journey": "j_vendor_eval", "node": "n_access" });
+    let node = world.ok(&ann, "get_node", node).await;
+    let waiting = &node["detail"]["still_waiting"];
+    assert_eq!(waiting["total"], 1);
+    assert_eq!(waiting["entries"][0]["node"], "n_plan");
+    assert_eq!(
+        waiting["entries"][0]["also_waits_on"][0]["node"],
+        "n_kickoff"
+    );
+    let page = json!({
+        "journey": "j_vendor_eval", "node": "n_access",
+        "explanations": { "field": "still_waiting", "cursor": 0 },
+    });
+    let page = world.ok(&ann, "get_node", page).await;
+    assert_eq!(page["explanations"]["held"], waiting["entries"]);
+}
+
 /// I3: the snapshot answers the revision a write names as its base, and with `filters` the
 /// frontier tool lists what they hold for, each an open decision the snapshot names.
 #[tokio::test]

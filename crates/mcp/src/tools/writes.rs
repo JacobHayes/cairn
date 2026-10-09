@@ -32,7 +32,8 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "Records a decision's answer (A8): a choice, choices, a boolean, text, a \
             date, an entity, or entities, matching the decision's answer type. Answering \
             changes what is relevant, fills roles, and pins dates; the result lists the \
-            consequences. Name the deployment revision when the answer names entities.",
+            consequences: warnings, and what the answer unlocked, took out of scope, or \
+            brought into scope. Name the deployment revision when the answer names entities.",
         writes: true,
         destructive: true,
         schema: schema::<AnswerDecision>,

@@ -1765,6 +1765,20 @@
         "additionalProperties": false,
         "description": "What an accepted patch or a proposal preview newly caused in derived state (D7),\nreported with the result and never stored.",
         "properties": {
+          "into_scope": {
+            "description": "Informational: nodes that were not relevant and are now relevant or undecided, in key\norder.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
+          "out_of_scope": {
+            "description": "Informational: nodes that were in scope and are now not relevant, in key order.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "type": "array"
+          },
           "overdue": {
             "description": "Newly overdue nodes.",
             "items": {
@@ -1801,6 +1815,13 @@
             "description": "Finished nodes newly undecided, which may not apply: a warning, never a rejection.",
             "items": {
               "$ref": "#/components/schemas/UndecidedConsequence"
+            },
+            "type": "array"
+          },
+          "unlocked": {
+            "description": "Informational, never a warning: nodes newly on the acting frontier, in key order. A\nnode the write adds is not unlocked by it.",
+            "items": {
+              "$ref": "#/components/schemas/NodeKey"
             },
             "type": "array"
           }
@@ -3128,6 +3149,11 @@
             "const": "leverage",
             "description": "The nodes completing it would unblock.",
             "type": "string"
+          },
+          {
+            "const": "still_waiting",
+            "description": "The direct dependents completing it would not yet free, with what else each waits on.",
+            "type": "string"
           }
         ]
       },
@@ -3136,7 +3162,7 @@
         "description": "A page of one value's explanation list, largest first, `explanation_entry_count_max` at a\ntime; the first page is what node detail carries.",
         "properties": {
           "entries": {
-            "description": "The entries.",
+            "description": "The entries of a gravity or leverage list.",
             "items": {
               "$ref": "#/components/schemas/Contribution"
             },
@@ -3145,6 +3171,13 @@
           "field": {
             "$ref": "#/components/schemas/ExplainedField",
             "description": "The value."
+          },
+          "held": {
+            "description": "The entries of a still-waiting list, which holds dependents rather than\ncontributions; empty for the other fields.",
+            "items": {
+              "$ref": "#/components/schemas/HeldDependent"
+            },
+            "type": "array"
           },
           "next": {
             "anyOf": [
@@ -4162,6 +4195,28 @@
             "type": "string"
           }
         ]
+      },
+      "HeldDependent": {
+        "additionalProperties": false,
+        "description": "A dependent that completing a node would not yet free, and what else it waits on (C8,\nPriority: Leverage): one entry of node detail's `still_waiting`.",
+        "properties": {
+          "also_waits_on": {
+            "description": "What else it waits on, besides the node: its unsatisfied requirements, condition\ngates, and stage openings, each with how it arose. Never empty.",
+            "items": {
+              "$ref": "#/components/schemas/Blocker"
+            },
+            "type": "array"
+          },
+          "node": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The direct dependent that stays held."
+          }
+        },
+        "required": [
+          "node",
+          "also_waits_on"
+        ],
+        "type": "object"
       },
       "History": {
         "additionalProperties": false,
@@ -7493,7 +7548,8 @@
                 "type": "null"
               }
             ],
-            "description": "A container's largest child gravity."
+            "deprecated": true,
+            "description": "A container's largest child gravity, one level down.\n\nDeprecated: read `peak_gravity`, which looks at every depth and names the node. Kept\nso existing clients keep reading it."
           },
           "membership_lost": {
             "description": "Its seeding entity left the role it was broken down by (B10).",
@@ -7516,6 +7572,17 @@
               }
             },
             "type": "object"
+          },
+          "peak_gravity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeakGravity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A container's peak gravity (Priority): the largest gravity among its open, in-scope\ndescendants at any depth, naming that node. Never the container's own `gravity`, which\nstays what rides on the whole container."
           },
           "rank": {
             "anyOf": [
@@ -7650,13 +7717,18 @@
           "record": {
             "$ref": "#/components/schemas/NodeState",
             "description": "Its stored state, provenance, and actual dates."
+          },
+          "still_waiting": {
+            "$ref": "#/components/schemas/StillWaiting",
+            "description": "The direct dependents completing it would not yet free, each with what else it waits\non (C8, Priority: Leverage): the largest entries with the total; page the rest with\nthe explanations endpoint, field `still_waiting`."
           }
         },
         "required": [
           "node",
           "path",
           "record",
-          "derived"
+          "derived",
+          "still_waiting"
         ],
         "type": "object"
       },
@@ -9024,6 +9096,25 @@
         "maxLength": 1039,
         "pattern": "^[a-z0-9][a-z0-9_-]{0,63}(/[a-z0-9][a-z0-9_-]{0,63}){0,15}$",
         "type": "string"
+      },
+      "PeakGravity": {
+        "additionalProperties": false,
+        "description": "A container's peak gravity (Priority): the largest gravity among its open, in-scope\ndescendants at any depth, and the descendant that has it. Among equals a descendant beats\nits own ancestor, and otherwise the first in tree order wins.",
+        "properties": {
+          "gravity": {
+            "$ref": "#/components/schemas/Score",
+            "description": "Its gravity."
+          },
+          "node": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The descendant with the largest gravity."
+          }
+        },
+        "required": [
+          "node",
+          "gravity"
+        ],
+        "type": "object"
       },
       "Problem": {
         "additionalProperties": false,
@@ -11283,7 +11374,8 @@
                 "type": "null"
               }
             ],
-            "description": "The largest in-scope child gravity (Priority)."
+            "deprecated": true,
+            "description": "The largest in-scope child gravity (Priority), one level down.\n\nDeprecated: read `peak_gravity`, which looks at every depth and names the node."
           },
           "min_child_slack_days": {
             "description": "The least slack among in-scope, open children; none when none has a deadline.",
@@ -11304,6 +11396,17 @@
             },
             "type": "array",
             "uniqueItems": true
+          },
+          "peak_gravity": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PeakGravity"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The largest gravity among its open, in-scope descendants at any depth, naming that\nnode (Priority)."
           },
           "ready_to_finish": {
             "description": "A deliverable or action whose children and other dependencies are satisfied but which\nis not terminal: \"children complete, ready to finish\".",
@@ -12474,6 +12577,30 @@
           "by_state",
           "by_display_state",
           "remaining"
+        ],
+        "type": "object"
+      },
+      "StillWaiting": {
+        "additionalProperties": false,
+        "description": "The dependents completing a node would not yet free (C8, Priority: Leverage): node\ndetail's `still_waiting`, its largest entries up to `explanation_entry_count_max` with the\ntotal; the rest page through the explanations of `ExplainedField::StillWaiting`.",
+        "properties": {
+          "entries": {
+            "description": "The dependents, largest weight first.",
+            "items": {
+              "$ref": "#/components/schemas/HeldDependent"
+            },
+            "type": "array"
+          },
+          "total": {
+            "description": "How many there are in all.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entries",
+          "total"
         ],
         "type": "object"
       },

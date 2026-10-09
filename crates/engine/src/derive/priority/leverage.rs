@@ -13,6 +13,7 @@ use cairn_schema::{NodeKind, State};
 use super::super::Early;
 use super::super::blocking::Blocking;
 use super::super::dependencies::{Dependencies, EdgeClass, EdgeSet, Instant, NodeIndex, Point};
+use super::super::skip::Skips;
 use super::super::stored_state;
 use crate::graph::Graph;
 
@@ -52,7 +53,7 @@ pub(super) fn simulate(
     blocking: &Blocking,
     normalized: &[bool],
 ) -> (Vec<Vec<NodeIndex>>, u64) {
-    let mut simulation = Simulation::new(graph, early, blocking);
+    let mut simulation = Simulation::new(graph, &early.dependencies, &early.skips, blocking);
     let unblocks: Vec<Vec<NodeIndex>> = normalized
         .iter()
         .enumerate()
@@ -61,9 +62,11 @@ pub(super) fn simulate(
                 return Vec::new();
             }
             let completed = NodeIndex::from_position(at);
-            let targets = simulation.complete(completed);
-            targets
+            simulation
+                .complete(completed)
                 .into_iter()
+                .filter(|instant| instant.point == Point::Start)
+                .map(|instant| instant.node)
                 .filter(|target| *target != completed)
                 .filter(|target| normalized.get(target.get()) == Some(&true))
                 .collect()
@@ -73,9 +76,25 @@ pub(super) fn simulate(
     (unblocks, simulation.operations)
 }
 
+/// Every instant that completing `completed` satisfies, itself and what derived group
+/// completion and reached milestones cascade to, holding current relevance and dates fixed.
+pub(in crate::derive) fn cascade(
+    graph: &Graph,
+    dependencies: &Dependencies,
+    skips: &Skips,
+    blocking: &Blocking,
+    completed: NodeIndex,
+) -> Vec<Instant> {
+    Simulation::new(graph, dependencies, skips, blocking).complete(completed)
+}
+
 impl<'a> Simulation<'a> {
-    fn new(graph: &Graph, early: &'a Early, blocking: &Blocking) -> Self {
-        let dependencies = &early.dependencies;
+    fn new(
+        graph: &Graph,
+        dependencies: &'a Dependencies,
+        skips: &Skips,
+        blocking: &Blocking,
+    ) -> Self {
         let slots = dependencies.node_count() * Point::ALL.len();
         let mut rules = vec![Rule::Satisfied; slots];
         let mut kept_by = vec![Vec::new(); dependencies.node_count()];
@@ -95,13 +114,13 @@ impl<'a> Simulation<'a> {
                 let skipped = graph
                     .node(key)
                     .is_some_and(|stored| stored_state(graph.document(), stored) == State::Skipped)
-                    || early.skips.skipped_by(key).is_some();
+                    || skips.skipped_by(key).is_some();
                 let group = graph
                     .node(key)
                     .is_some_and(|stored| stored.kind() == NodeKind::Group);
                 let rule = match point {
                     Point::Finish if skipped => {
-                        let kept = early.skips.kept_work(key);
+                        let kept = skips.kept_work(key);
                         let open_kept = kept
                             .iter()
                             .filter_map(|kept| dependencies.node_index(kept))
@@ -143,22 +162,20 @@ impl<'a> Simulation<'a> {
         }
     }
 
-    /// Completes `node` in a simulation: the nodes whose start it satisfies, in the order
+    /// Completes `node` in a simulation: the instants it satisfies, itself first, in the order
     /// reached; then puts the scratch space back.
-    fn complete(&mut self, node: NodeIndex) -> Vec<NodeIndex> {
+    fn complete(&mut self, node: NodeIndex) -> Vec<Instant> {
         let finish = Instant::new(node, Point::Finish);
         assert!(
             matches!(self.rule(finish), Rule::Completion | Rule::Waits(_)),
             "a node in the normalization set is open and not a group"
         );
-        let mut unblocked = Vec::new();
+        let mut reached = Vec::new();
         let mut queue = vec![finish];
         self.reach(finish);
         while let Some(instant) = queue.pop() {
             self.operations += 1;
-            if instant.point == Point::Start {
-                unblocked.push(instant.node);
-            }
+            reached.push(instant);
             let dependents: Vec<Instant> = self
                 .dependencies
                 .waited_by(instant, EdgeSet::Pruned)
@@ -199,7 +216,7 @@ impl<'a> Simulation<'a> {
                 *reached = false;
             }
         }
-        unblocked
+        reached
     }
 
     fn rule(&self, instant: Instant) -> Rule {

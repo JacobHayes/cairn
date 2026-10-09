@@ -17,7 +17,7 @@ use cairn_schema::{
     ExplainedField, ExplanationPage, JourneyId, KeyRefs, KindKey, Level, ListPage, ListQuery,
     LocalEdit, MineEntry, Next, NextQuery, Node, NodeDerived, NodeKey, NodeKind, NodeState,
     Overrides, PatchEvents, Path, ProposalId, Revision, Snapshot, SnapshotScope, State,
-    StatusSummary, Timeline, Title, Trace,
+    StatusSummary, StillWaiting, Timeline, Title, Trace,
 };
 use cairn_store::{EventQuery, PageSize, Store};
 
@@ -105,6 +105,10 @@ pub struct NodeDetail {
     pub annotations: Vec<Annotation>,
     /// Every derived value (D3) with what explains it.
     pub derived: NodeDerived,
+    /// The direct dependents completing it would not yet free, each with what else it waits
+    /// on (C8, Priority: Leverage): the largest entries up to `explanation_entry_count_max`
+    /// with the total; the rest page through [`Service::explanations`].
+    pub still_waiting: StillWaiting,
 }
 
 /// One child in a node's detail.
@@ -467,5 +471,6 @@ fn detail(journey: &DerivedJourney<'_>, key: &NodeKey) -> Result<NodeDetail, Pro
         overrides: state.overrides.get(key).cloned(),
         annotations,
         derived: journey.derived().node_derived(graph, key),
+        still_waiting: StillWaiting::for_response(journey.still_waiting(key)?),
     })
 }

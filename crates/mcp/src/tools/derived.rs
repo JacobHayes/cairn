@@ -9,7 +9,7 @@ use cairn_schema::{
     Annotation, AnswerValue, Cursor, Date, DisplayState, ExplainedField, ExplanationPage,
     JourneyId, KeyRefs, Level, LevelEdge, LevelNode, ListFlag, ListQuery, LocalEdit, Next,
     NextQuery, Node, NodeDerived, NodeKey, NodeKind, NodeRow, NodeState, Overrides, Path, Snapshot,
-    SnapshotScope, SortBy, Stalled,
+    SnapshotScope, SortBy, Stalled, StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
 use cairn_store::Store;
@@ -54,8 +54,9 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "One node in full: as written (a decision's prompt and choices), its \
             stored state, answer, pin, overrides, notes, a page of its children, and every \
             derived value with its explanation (display state, relevance, blocking, dates, \
-            gravity, leverage, rank). Say its status from `display_state`, not the stored \
-            state. Explanation lists hold their largest entries; pass \
+            gravity, leverage, rank), and the dependents finishing it would not yet free with \
+            what else each waits on (`still_waiting`). Say its status from `display_state`, not \
+            the stored state. Explanation lists hold their largest entries; pass \
             `explanations` to page the rest.",
         writes: false,
         destructive: false,
@@ -208,6 +209,10 @@ pub(crate) struct Detail {
     /// Every derived value (D3) with its explanation: relevance, blocking, dates, gravity,
     /// leverage, and rank.
     derived: NodeDerived,
+    /// The direct dependents completing it would not yet free, each with what else it waits
+    /// on (C8, Priority: Leverage): the largest entries with the total; pass `explanations`
+    /// with field `still_waiting` for the rest.
+    still_waiting: StillWaiting,
 }
 
 /// One child of a node.
@@ -237,6 +242,7 @@ impl Detail {
             overrides,
             annotations,
             derived,
+            still_waiting,
         } = detail;
         let children = children.into_iter().map(|child| {
             let ChildEntry {
@@ -266,6 +272,7 @@ impl Detail {
             overrides,
             annotations: page(annotations, annotations_cursor),
             derived,
+            still_waiting,
         }
     }
 }

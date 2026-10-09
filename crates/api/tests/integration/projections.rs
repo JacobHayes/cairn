@@ -188,6 +188,35 @@ mod in_process {
         assert_eq!((listed.len(), distinct.len()), (count + 1, count + 1));
     }
 
+    /// C8, Priority: node detail carries the dependents finishing the node would not yet free
+    /// with what else each waits on, and the explanations endpoint answers the same list
+    /// under `still_waiting`.
+    #[tokio::test]
+    async fn node_detail_lists_what_is_still_waiting() {
+        let world = World::start().await;
+        let ann = world.vendor_after(1).await;
+        let detail: Projected<NodeDetail> =
+            get(&ann, "/api/journeys/j_vendor_eval/nodes/n_access").await;
+        let waiting = &detail.value.still_waiting;
+        assert_eq!(waiting.total, 1);
+        let [held] = waiting.entries.as_slice() else {
+            panic!("one entry, not {waiting:#?}")
+        };
+        assert_eq!(held.node.as_str(), "n_plan");
+        let [blocker] = held.also_waits_on.as_slice() else {
+            panic!("one blocker, not {held:#?}")
+        };
+        assert_eq!(blocker.node.as_str(), "n_kickoff");
+        let page: Projected<ExplanationPage> = get(
+            &ann,
+            "/api/journeys/j_vendor_eval/nodes/n_access/explanations/still_waiting",
+        )
+        .await;
+        assert_eq!(page.value.field, ExplainedField::StillWaiting);
+        assert_eq!(page.value.held, waiting.entries.as_slice());
+        assert_eq!(page.value.entries, []);
+    }
+
     /// C8; ARCHITECTURE, HTTP API: Size budgets: node detail carries each explanation list's
     /// largest entries up to `explanation_entry_count_max` with its total, and the
     /// explanation pages continue it, every entry once.

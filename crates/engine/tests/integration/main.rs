@@ -25,6 +25,7 @@ mod dependencies;
 mod display_state;
 mod document;
 mod domains;
+mod explanations;
 mod fixture_readme;
 mod format;
 mod graph;

@@ -7,7 +7,7 @@ use std::collections::BTreeSet;
 
 use cairn_schema::{
     Annotation, AnswerValue, Date, DisplayState, KeyRefs, LocalEdit, MineEntry, Node, NodeDerived,
-    NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, Revision, State, Title,
+    NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, Revision, State, StillWaiting, Title,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -94,6 +94,10 @@ pub struct NodeDetail {
     pub annotations: Vec<Annotation>,
     /// Every derived value (D3) with what explains it.
     pub derived: NodeDerived,
+    /// The direct dependents completing it would not yet free, each with what else it waits
+    /// on (C8, Priority: Leverage): the largest entries with the total; page the rest with
+    /// the explanations endpoint, field `still_waiting`.
+    pub still_waiting: StillWaiting,
 }
 
 /// One child in a node's detail.
@@ -126,6 +130,7 @@ impl From<cairn_service::NodeDetail> for NodeDetail {
             overrides,
             annotations,
             derived,
+            still_waiting,
         } = detail;
         let children = children.into_iter().map(|child| {
             let cairn_service::ChildEntry {
@@ -155,6 +160,7 @@ impl From<cairn_service::NodeDetail> for NodeDetail {
             overrides,
             annotations,
             derived,
+            still_waiting,
         }
     }
 }

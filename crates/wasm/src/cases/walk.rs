@@ -182,7 +182,11 @@ fn projections(document: &DomainDocument) -> Vec<Projection> {
         requests.push(Projection::Trace {
             key: node.key.clone(),
         });
-        for field in [ExplainedField::Gravity, ExplainedField::Leverage] {
+        for field in [
+            ExplainedField::Gravity,
+            ExplainedField::Leverage,
+            ExplainedField::StillWaiting,
+        ] {
             requests.push(Projection::Explanations {
                 key: node.key.clone(),
                 field,

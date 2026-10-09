@@ -28,7 +28,8 @@
 //! one bit per node for each instant, 8,000 x 32 words (2 MiB), filled in one reverse
 //! topological sweep that unions each edge's dependent into its requirement (110,000 x 32
 //! word operations); each node's finish row is kept (512 KiB) and summed once, 2,000 x 2,000
-//! bits. Leverage simulates every node in the normalization set. An instant a simulation
+//! bits; each container's peak gravity is one step per node and child (at most 4,000),
+//! uncounted. Leverage simulates every node in the normalization set. An instant a simulation
 //! satisfies has every unsatisfied wait behind it lead back to the completed node's finish, so
 //! the simulations of nodes that only completion satisfies never satisfy the same instant, and
 //! together they read each instant, each pruned edge, and each kept-work entry (at most
@@ -40,7 +41,7 @@
 //! about 700 x 180,000 reads. Memory: two counters and a flag per instant, and the
 //! unblocked nodes, one entry per node per simulation that reaches it.
 
-mod leverage;
+pub(super) mod leverage;
 
 use std::collections::BTreeSet;
 
@@ -54,7 +55,7 @@ use super::Early;
 use super::blocking::Blocking;
 use super::dependencies::{EdgeClass, EdgeSet, Instant, NodeIndex, Point};
 use super::participation::Participation;
-use crate::graph::Graph;
+use crate::graph::{Graph, Tree};
 
 /// Thousandths in one: the unit the discount and the factor are counted in.
 const THOUSAND: u64 = 1_000;
@@ -87,6 +88,11 @@ pub struct Priority {
     downstream: Vec<u64>,
     gravity: Vec<Score>,
     max_child_gravity: Vec<Option<Score>>,
+    /// Per node: the largest gravity among its open, in-scope descendants at any depth, and
+    /// the position of the descendant that has it.
+    peak_gravity: Vec<Option<(usize, Score)>>,
+    /// Per node: in scope and not closed.
+    open: Vec<bool>,
     /// Per node: its owners (E2), which the owner factor compares.
     owners: Vec<BTreeSet<EntityKey>>,
     /// Per node in the normalization set: the nodes completing it would unblock.
@@ -121,6 +127,8 @@ impl Priority {
             downstream: Vec::new(),
             gravity: Vec::new(),
             max_child_gravity: Vec::new(),
+            peak_gravity: Vec::new(),
+            open: Vec::new(),
             owners: Vec::new(),
             unblocks: Vec::new(),
             leverage: Vec::new(),
@@ -161,6 +169,7 @@ impl Priority {
         let open = in_scope && !blocking.closed(key);
         let undecided = relevance == Relevance::Undecided;
         self.weights.push(weight);
+        self.open.push(open);
         self.in_scope.push(in_scope);
         self.undecided.push(undecided);
         self.normalized.push(open && !group);
@@ -245,6 +254,53 @@ impl Priority {
                 })
             })
             .collect();
+        self.peak_gravity = self.sweep_peaks(tree);
+    }
+
+    /// Each container's peak: the largest gravity among its open, in-scope descendants at any
+    /// depth; among equals a descendant beats its own ancestor, and otherwise the first in
+    /// tree order wins. Children before parents over the tree's own order, with an explicit
+    /// stack (PRACTICES, No recursion): a node's peak is the best of each child's peak and
+    /// the child itself, a child ahead of its own peak only when strictly larger (a child's
+    /// gravity holds its parent's, so equal reads deeper). One step per node and child.
+    fn sweep_peaks(&self, tree: &Tree) -> Vec<Option<(usize, Score)>> {
+        let mut order: Vec<&NodeKey> = Vec::with_capacity(self.keys.len());
+        let mut stack: Vec<&NodeKey> = tree.roots().iter().rev().collect();
+        while let Some(key) = stack.pop() {
+            order.push(key);
+            stack.extend(tree.children(key).iter().rev());
+        }
+        assert_eq!(order.len(), self.keys.len(), "the tree holds every node");
+        let mut peaks: Vec<Option<(usize, Score)>> = vec![None; self.keys.len()];
+        for key in order.into_iter().rev() {
+            let mut best: Option<(usize, Score)> = None;
+            for child in tree.children(key) {
+                let Some(at) = self.position(child) else {
+                    continue;
+                };
+                let deeper = peaks.get(at).copied().flatten();
+                let own =
+                    (self.in_scope_at(at) && self.open_at(at)).then(|| (at, self.gravity_at(at)));
+                let found = match (deeper, own) {
+                    (Some(deeper), Some(own)) if own.1 > deeper.1 => Some(own),
+                    (Some(deeper), _) => Some(deeper),
+                    (None, own) => own,
+                };
+                if let Some(found) = found
+                    && best.is_none_or(|(_, gravity)| found.1 > gravity)
+                {
+                    best = Some(found);
+                }
+            }
+            if let Some(slot) = self.position(key).and_then(|at| peaks.get_mut(at)) {
+                *slot = best;
+            }
+        }
+        peaks
+    }
+
+    fn open_at(&self, at: usize) -> bool {
+        self.open.get(at).copied().unwrap_or(false)
     }
 
     fn position(&self, key: &NodeKey) -> Option<usize> {
@@ -383,6 +439,18 @@ impl Priority {
     pub fn max_child_gravity(&self, key: &NodeKey) -> Option<Score> {
         self.at(key)
             .and_then(|at| self.max_child_gravity.get(at).copied().flatten())
+    }
+
+    /// Priority: a container's peak gravity: the largest gravity among its open, in-scope
+    /// descendants at any depth, with the descendant that has it (among equals a descendant
+    /// beats its own ancestor, otherwise the first in tree order); none for a node with no
+    /// such descendant.
+    #[must_use]
+    pub fn peak_gravity(&self, key: &NodeKey) -> Option<(&NodeKey, Score)> {
+        let (peak, gravity) = self
+            .at(key)
+            .and_then(|at| self.peak_gravity.get(at).copied().flatten())?;
+        Some((self.keys.get(peak)?, gravity))
     }
 
     /// Priority: relevant or undecided, open, and not a group: the nodes rank normalizes over

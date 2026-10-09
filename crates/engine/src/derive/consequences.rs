@@ -2,14 +2,18 @@
 //! `stale` or gained a stale reason, new or larger shortfalls, newly `overdue` nodes, finished
 //! nodes newly undecided (completed, answered, or reached while a decision their relevance
 //! reads is unanswered, so they may not apply; D4), and the journey becoming `stalled`, each
-//! with its explanation. A pure function of the two sides'
+//! with its explanation; and the informational half, never a warning: nodes newly on the
+//! acting frontier (`unlocked`), newly not relevant (`out_of_scope`), and newly relevant or
+//! undecided (`into_scope`), the nodes both sides hold, read at the same revision so another
+//! writer's concurrent change is never credited to the patch. A pure function of the two sides'
 //! graphs and derivations, which the caller derives with the same inputs (ARCHITECTURE, Write
 //! path), so the passing of midnight is never blamed on a patch. Computed for the response,
 //! never stored.
 //!
 //! Cost at `node_count_max`: one pass over the after side's nodes, O(nodes) lookups, plus the
 //! stale reasons of each stale node (at most about 1,300 edges walked each) and the chain of
-//! each new or larger shortfall (at most one step per instant slot).
+//! each new or larger shortfall (at most one step per instant slot); the informational half
+//! is one lookup per node in each side's acting frontier and relevance.
 
 use std::collections::BTreeSet;
 
@@ -40,7 +44,14 @@ pub fn consequences(
     );
     let mut found = Consequences::default();
     let existed = |key: &NodeKey| before_graph.node(key).is_some();
+    let acting = |side: &Derived| -> BTreeSet<NodeKey> {
+        side.blocking().acting_frontier().iter().cloned().collect()
+    };
+    let acting = (acting(before), acting(after));
     for key in after_graph.document().nodes.as_map().keys() {
+        if existed(key) {
+            informational(&mut found, (before, after), &acting, key);
+        }
         if after.is_stale(key) {
             let mut reasons = after.stale(after_graph, key);
             if existed(key) && before.is_stale(key) {
@@ -86,6 +97,28 @@ pub fn consequences(
         found.stalled = after.blocking().stalled().cloned();
     }
     found
+}
+
+/// The informational half for a node both sides hold: whether the patch put it on the acting
+/// frontier, took it out of scope, or brought it into scope. `acting` is each side's acting
+/// frontier.
+fn informational(
+    found: &mut Consequences,
+    (before, after): (&Derived, &Derived),
+    acting: &(BTreeSet<NodeKey>, BTreeSet<NodeKey>),
+    key: &NodeKey,
+) {
+    if acting.1.contains(key) && !acting.0.contains(key) {
+        found.unlocked.push(key.clone());
+    }
+    match (
+        before.relevance().in_scope(key),
+        after.relevance().in_scope(key),
+    ) {
+        (true, false) => found.out_of_scope.push(key.clone()),
+        (false, true) => found.into_scope.push(key.clone()),
+        (true, true) | (false, false) => {}
+    }
 }
 
 /// D4: the open decisions a finished node's relevance waits on: empty unless the node was

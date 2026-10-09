@@ -273,6 +273,44 @@ impl Derived {
             .collect()
     }
 
+    /// Priority, Leverage: the nodes whose finish completing `key` satisfies: itself, and what
+    /// derived group completion and reached milestones cascade to, as leverage simulates it.
+    /// `graph` is the one derived.
+    #[must_use]
+    pub fn finished_by(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<NodeKey> {
+        let Some(index) = self.dependencies.node_index(key) else {
+            return BTreeSet::new();
+        };
+        priority::leverage::cascade(
+            graph,
+            &self.dependencies,
+            &self.skips,
+            &self.blocking,
+            index,
+        )
+        .into_iter()
+        .filter(|instant| instant.point == dependencies::Point::Finish)
+        .filter_map(|instant| self.dependencies.key(instant.node).cloned())
+        .collect()
+    }
+
+    /// Priority, Leverage: what else holds the node once `finished` is: its unsatisfied gate
+    /// dependencies, its own and inherited (each with how it arose), without those in
+    /// `finished` (see [`Derived::finished_by`]) and without its children, which a container
+    /// waits on whatever else holds it. Empty when `finished` is all that holds it back. Sorted.
+    #[must_use]
+    pub fn held_besides(&self, key: &NodeKey, finished: &BTreeSet<NodeKey>) -> Vec<Blocker> {
+        let mut held: Vec<Blocker> = self
+            .unsatisfied(self.dependencies.of(key, EdgeSet::Pruned))
+            .filter(|blocker| {
+                !finished.contains(&blocker.node) && blocker.via != DependencyVia::Containment
+            })
+            .collect();
+        held.sort();
+        held.dedup();
+        held
+    }
+
     /// Gating, Blocked: the ancestors whose own unsatisfied requirements, openings, or
     /// conditions block the node through its entry chains, nearest first; each lists them in
     /// its own [`Derived::blocked_by`]. Empty when the node is not blocked. `graph` is the one

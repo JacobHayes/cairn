@@ -122,7 +122,7 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
       roll == null
         ? undefined
         : {
-            gravity: roll.max_child_gravity ?? undefined,
+            gravity: roll.peak_gravity?.gravity ?? undefined,
             slackDays: roll.min_child_slack_days ?? undefined,
             owners: (roll.owners ?? []).map((entity) => entityName(view, entity)),
           },

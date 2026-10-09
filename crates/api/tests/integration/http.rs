@@ -101,6 +101,36 @@ mod in_process {
         );
     }
 
+    /// Priority, D7: answering a decision is applied and answered with the informational half
+    /// of its consequences beside the warnings: the nodes the answer took out of scope, none
+    /// of them a warning.
+    #[tokio::test]
+    async fn answering_a_decision_reports_what_left_scope() {
+        let world = World::start().await;
+        let ann = world.vendor_after(1).await;
+        let answer = support::patch(
+            "p_no_partner",
+            "{journey: j_vendor_eval}",
+            1,
+            "- op: answer\n  decision: n_partner_runs\n  value: {boolean: false}\n",
+        );
+        let landed =
+            ok::<PatchAnswer>(&post(&ann, &format!("{JOURNEY}/patches"), &request(&answer)).await);
+        let PatchAnswer::Applied { consequences, .. } = &landed else {
+            panic!("applied, not {landed:#?}")
+        };
+        let caused = &consequences[&"j_vendor_eval".parse().unwrap()];
+        let names = |keys: &[cairn_schema::NodeKey]| -> Vec<String> {
+            keys.iter().map(ToString::to_string).collect()
+        };
+        assert_eq!(
+            names(&caused.out_of_scope),
+            ["n_criteria", "n_partner_led", "n_partner_results"]
+        );
+        assert!(caused.unlocked.is_empty() && caused.into_scope.is_empty());
+        assert!(!caused.has_warnings(), "{caused:#?}");
+    }
+
     /// A15: a patch with three independent violations is answered 422 with all three, by
     /// path, exactly as the engine reports them.
     #[tokio::test]

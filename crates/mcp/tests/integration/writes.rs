@@ -120,6 +120,27 @@ async fn completing_undecided_work_applies_with_a_warning() {
     );
 }
 
+/// Priority, D7, I5: answering a decision through the tool reports the informational half of
+/// its consequences: what left scope, never a warning.
+#[tokio::test]
+async fn answering_a_decision_reports_what_left_scope() {
+    let world = World::new();
+    let ann = user("u_ann");
+    world.vendor_journey(&ann).await;
+    let answer = json!({
+        "journey": "j_vendor_eval", "decision": "n_partner_runs",
+        "value": { "boolean": false }, "patch_id": "p_no_partner", "base_revision": 1,
+    });
+    let applied = world.ok(&ann, "answer_decision", answer).await;
+    assert_eq!(applied["status"], "applied");
+    let caused = &applied["consequences"]["j_vendor_eval"];
+    assert_eq!(
+        caused["out_of_scope"],
+        json!(["n_criteria", "n_partner_led", "n_partner_results"])
+    );
+    assert_eq!(caused.get("undecided"), None, "no warning came with it");
+}
+
 /// H5: a write against a revision that moved is refused as stale with what moved; the same
 /// patch id resubmitted after it landed is answered from its receipt.
 #[tokio::test]

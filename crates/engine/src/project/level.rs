@@ -28,8 +28,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    DependencyVia, EdgeOrigin, Level, LevelEdge, LevelNode, NodeKey, NodeKind, Relevance, RollUp,
-    State, UnderlyingEdge,
+    DependencyVia, EdgeOrigin, Level, LevelEdge, LevelNode, NodeKey, NodeKind, PeakGravity,
+    Relevance, RollUp, State, UnderlyingEdge,
 };
 
 use super::{DerivedJourney, ProjectionError};
@@ -233,6 +233,13 @@ impl<'a> DerivedJourney<'a> {
             }),
             needs_breakdown: children.iter().any(|child| blocking.needs_breakdown(child)),
             max_child_gravity: derived.priority().max_child_gravity(key),
+            peak_gravity: derived
+                .priority()
+                .peak_gravity(key)
+                .map(|(node, gravity)| PeakGravity {
+                    node: node.clone(),
+                    gravity,
+                }),
             min_child_slack_days: children
                 .iter()
                 .filter(open)
