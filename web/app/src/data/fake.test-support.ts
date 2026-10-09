@@ -191,6 +191,10 @@ export class FakeDeriver implements Deriver {
     return Promise.reject(new Error("no route levels in the fake"));
   }
 
+  routeNotices(): Promise<never> {
+    return Promise.reject(new Error("no route notices in the fake"));
+  }
+
   apply(): Promise<never> {
     return Promise.reject(new Error("no local applies in the fake"));
   }

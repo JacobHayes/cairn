@@ -6,15 +6,18 @@
 //! journey, the frontier after and the consequences (D7) come from one derive on each side.
 //!
 //! Cost: one apply (one clone of the loaded records, the mutations, one validation) and, for a
-//! journey, two derives and the consequences between them.
+//! journey, two derives and the consequences between them; for a route, one more validation
+//! and the notices pass (A20).
 
 use cairn_schema::{
-    DeriveInputs, Domain, Mutations, Patch, PatchTarget, ProposalDraft, ProposalPreview, Rejection,
+    Deployment, DeriveInputs, Domain, Mutations, Patch, PatchTarget, ProposalDraft,
+    ProposalPreview, Rejection,
 };
 
 use super::resolve_partial;
 use crate::derive::{consequences, derive};
 use crate::graph::Graph;
+use crate::notices::notices;
 use crate::pipeline::{ApplyInputs, apply};
 use crate::records::Records;
 
@@ -36,6 +39,7 @@ pub fn preview(
         graph: None,
         frontier: Vec::new(),
         consequences: None,
+        notices: Vec::new(),
     };
     let after = match Mutations::new(resolved.mutations) {
         // Nothing to apply: the destination as it stands.
@@ -75,6 +79,13 @@ pub fn preview(
                 .get(id)
                 .and_then(|route| route.draft.as_ref())
                 .map(|draft| draft.graph.clone());
+            // A20: a route has no answers, so no deployment changes what it means.
+            preview.notices = preview.graph.as_ref().map_or_else(Vec::new, |document| {
+                match Graph::new(document.clone(), &Deployment::default()) {
+                    Ok(graph) => notices(&graph),
+                    Err(_) => unreachable!("an applied route draft is valid"),
+                }
+            });
         }
         Domain::Deployment => {}
     }

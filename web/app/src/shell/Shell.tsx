@@ -82,7 +82,9 @@ function Notices() {
                 ? `${line.journey} is now stalled`
                 : line.kind === "undecided"
                   ? `${mayNotApply(line.unanswered ?? [])}: ${line.nodes.join(", ")}`
-                  : `Newly ${line.kind}: ${line.nodes.join(", ")}`}
+                  : line.kind === "unanchored"
+                    ? `No chain to the final milestone, so neither priority nor dates feel it (advisory): ${line.nodes.join(", ")}`
+                    : `Newly ${line.kind}: ${line.nodes.join(", ")}`}
             </span>
           ))}
         </div>

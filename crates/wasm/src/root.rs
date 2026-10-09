@@ -14,9 +14,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use cairn_schema::{
-    Actor, Consequences, Domain, JourneyId, JourneyStatus, Lineage, Markdown, NodeKey, Patch,
-    PatchEvents, PatchReceipt, ProposalId, RankConstants, Revision, RevisionOf, RouteId, Timestamp,
-    Title, VersionNumber,
+    Actor, Consequences, Domain, JourneyId, JourneyStatus, Lineage, Markdown, NodeKey, Notice,
+    Patch, PatchEvents, PatchReceipt, ProposalId, RankConstants, Revision, RevisionOf, RouteId,
+    Timestamp, Title, VersionNumber,
 };
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, WriteError, Written,
@@ -52,12 +52,32 @@ pub enum PatchAnswer {
         /// D7: what it newly caused, by journey.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         consequences: BTreeMap<JourneyId, Consequences>,
+        /// A20: advisory notices about the route graph an import or publish leaves.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        notices: Vec<Notice>,
     },
     /// The patch id was committed before with the same content (H5).
     AlreadyApplied {
         /// The original receipt.
         receipt: PatchReceipt,
     },
+}
+
+impl From<Written> for PatchAnswer {
+    fn from(written: Written) -> Self {
+        match written {
+            Written::Applied {
+                receipt,
+                consequences,
+                notices,
+            } => PatchAnswer::Applied {
+                receipt,
+                consequences,
+                notices,
+            },
+            Written::AlreadyApplied { receipt } => PatchAnswer::AlreadyApplied { receipt },
+        }
+    }
 }
 
 /// A journey in the index (C16), as the API's `JourneySummary`.
@@ -261,14 +281,7 @@ impl BrowserRoot {
         let submitted = DomainPatch::new(request.patch.clone(), request.note.clone())
             .map_err(|error| HostError::unreadable("patch", format!("{error:?}")))?;
         match now_or_never(self.service.patch(&call, &submitted)) {
-            Ok(Written::Applied {
-                receipt,
-                consequences,
-            }) => Ok(PatchAnswer::Applied {
-                receipt,
-                consequences,
-            }),
-            Ok(Written::AlreadyApplied { receipt }) => Ok(PatchAnswer::AlreadyApplied { receipt }),
+            Ok(written) => Ok(written.into()),
             Err(WriteError::Rejected(rejection)) => Err(HostError::Rejected { rejection }),
             Err(WriteError::Failed(error)) => Err(failed(error)),
         }

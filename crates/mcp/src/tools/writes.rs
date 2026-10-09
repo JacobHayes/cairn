@@ -141,7 +141,8 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "publish_draft",
         description: "Publishes a route's draft as its next version (A11); journeys on older \
-            versions can then upgrade.",
+            versions can then upgrade. The result lists notices (A20): work with no chain to or \
+            from the final milestone, advisory only.",
         writes: true,
         destructive: false,
         schema: schema::<PublishDraft>,
@@ -150,7 +151,8 @@ pub(crate) const SPECS: &[Spec] = &[
     Spec {
         name: "import_route",
         description: "Imports a route file (YAML) as a new route, or as a new draft of an \
-            existing one matched by key or path (A13). Every violation in the file is listed.",
+            existing one matched by key or path (A13). Every violation in the file is listed; the \
+            result lists notices (A20), advisory only.",
         writes: true,
         destructive: false,
         schema: schema::<ImportRoute>,

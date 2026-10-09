@@ -93,6 +93,26 @@ test("A3: a requirement drawn on the canvas lands; one on its own container is r
   await expect(edges.getByRole("button", { name: "Add the requirement" })).toBeDisabled();
 });
 
+test("A20, A15: a deliverable no chain links to the final milestone is noticed, and an edge from it to the final report clears the notice without a reload", async ({ page }) => {
+  await newRoute(page, "browser", routeName("Notices"));
+  const report = await addNode(page, "deliverable", "Final report");
+  await addNode(page, "milestone", "Launch");
+  await formField(page, "final").getByRole("checkbox").check();
+  await saveForm(page);
+  const edges = await section(page, "author-edges");
+  await pickByTitle(edges.getByLabel("Require"), "Final report");
+  await edges.getByRole("button", { name: "Add the requirement" }).click();
+  const handbook = await addNode(page, "deliverable", "Handbook");
+  const notices = page.getByTestId("route-notices");
+  await expect(notices.getByTestId("route-notice")).toHaveCount(1);
+  await expect(notices.getByTestId("route-notice")).toHaveAttribute("data-node", handbook);
+  await expect(notices).toContainText("publishing is not blocked");
+  await openNode(page, report);
+  await pickByTitle((await section(page, "author-edges")).getByLabel("Require"), "Handbook");
+  await (await section(page, "author-edges")).getByRole("button", { name: "Add the requirement" }).click();
+  await expect(notices).toHaveCount(0);
+});
+
 test("A15: a stage's id and both bounds, each wrong, are three violations at three fields", async ({ page }) => {
   await newRoute(page, "browser", routeName("Stages"));
   await addNode(page, "milestone", "Taken");

@@ -28,10 +28,15 @@ draft, the person reviews on the canvas, and publishing makes the next version.
    (`n_` and a slug) and an `id` (a slug unique among its siblings).
 4. **Check it.** `get_proposal` with `review` lists every violation the draft would cause
    (a cycle, an unknown reference, a date rule that contradicts another). Fix them with
-   `edit_proposal` and `replace`, against the proposal's editing revision.
+   `edit_proposal` and `replace`, against the proposal's editing revision. The review also
+   lists **notices**: work with no chain to or from the route's `final` milestone, which
+   neither its priority nor its dates feel (usually a missing edge or date rule; a decision
+   that fills a role is exempt). A notice never blocks anything: add the missing edge, or
+   tell the person it is intended.
 5. **Hand it over.** Tell the person what the proposal adds and ask them to review and
    apply it. When they are happy with the draft, `publish_draft` makes it the next
-   version; journeys on older versions can then upgrade.
+   version; journeys on older versions can then upgrade. `publish_draft` and `import_route`
+   list the same notices in their result.
 
 A route file can also be imported whole with `import_route` (YAML), and any version
 exported with `export_route`.

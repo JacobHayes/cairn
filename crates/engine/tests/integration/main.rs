@@ -36,6 +36,7 @@ mod level;
 mod limits;
 mod lists;
 mod matrix;
+mod notices;
 mod participation;
 mod plan;
 mod priority;

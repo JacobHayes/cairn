@@ -23,6 +23,7 @@ pub mod json_schema;
 pub mod limits;
 pub mod node;
 mod node_schema;
+pub mod notice;
 pub mod number;
 pub mod patch;
 pub mod projection;
@@ -79,6 +80,7 @@ pub use node::{
     Direction, EntitySet, Group, KindField, LabeledChoice, Milestone, Node, NodeKind,
     NodeShapeError, ParticipationSource, Participations, Payload,
 };
+pub use notice::{Notice, NoticeCode};
 pub use number::{Days, NumberError, Revision, SignedDays, VersionNumber, Weight};
 pub use patch::{
     ChangeClass, DraftSource, Mutation, Mutations, Override, ParticipationRef, Patch, PatchTarget,

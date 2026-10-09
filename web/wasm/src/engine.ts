@@ -13,6 +13,7 @@ import init, {
   readRouteFile,
   routeFileText,
   routeLevel,
+  routeNotices,
   touched,
   touchedOverlaps,
 } from "../generated/cairn_wasm.js";
@@ -36,6 +37,7 @@ import {
   type ProjectionRequest,
   type RouteApplyRequest,
   type RouteLevelRequest,
+  type RouteNoticesRequest,
 } from "./types.ts";
 
 /** Where the module's `.wasm` is, or its bytes. */
@@ -206,6 +208,16 @@ export class Engine {
   /** C2: a route graph's canvas level. */
   routeLevel(request: RouteLevelRequest): Schema<"Level"> {
     return parsed<Schema<"Level">>(this.routeLevelText(request));
+  }
+
+  /** A20: a route graph's notices, as the module wrote them. */
+  routeNoticesText(request: RouteNoticesRequest): string {
+    return hosted(() => routeNotices(JSON.stringify(request)));
+  }
+
+  /** A20: a route graph's notices, in path order. */
+  routeNotices(request: RouteNoticesRequest): Schema<"Notice">[] {
+    return parsed<Schema<"Notice">[]>(this.routeNoticesText(request));
   }
 
   /** The module's linear memory in bytes: the peak so far, since it never shrinks. */

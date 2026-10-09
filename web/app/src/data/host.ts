@@ -15,6 +15,7 @@ import type {
   RenderedDraft,
   RouteApplyRequest,
   RouteLevelRequest,
+  RouteNoticesRequest,
   PreviewRequest,
 } from "@cairn/wasm";
 
@@ -117,6 +118,8 @@ export interface Deriver {
   renderDraft(journey: string, request: DraftRequest): Promise<RenderedDraft>;
   /** C2: a route graph's canvas level (a route has no state to hold). */
   routeLevel(request: RouteLevelRequest): Promise<Level>;
+  /** A20: a route graph's notices, in path order. */
+  routeNotices(request: RouteNoticesRequest): Promise<Schema<"Notice">[]>;
   /** A draft patch applied to the held journey, committing nothing (ARCHITECTURE, Web UI: previews). */
   apply(journey: string, request: ApplyRequest): Promise<AppliedLocally>;
   /** C14: a proposal previewed against the held journey, committing nothing (ARCHITECTURE, Web UI: previews). */

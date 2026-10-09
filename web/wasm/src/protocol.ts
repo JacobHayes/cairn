@@ -5,7 +5,7 @@
 // and local applies over it as the module's JSON text, which the page parses. A route's graph,
 // which has no state, is answered its canvas level, or a draft patch applied to it, in
 // passing, holding nothing.
-import type { ApplyRequest, DraftRequest, HostError, PreviewRequest, ProjectionRequest, RouteApplyRequest, RouteLevelRequest } from "./types.ts";
+import type { ApplyRequest, DraftRequest, HostError, PreviewRequest, ProjectionRequest, RouteApplyRequest, RouteLevelRequest, RouteNoticesRequest } from "./types.ts";
 
 /** What the page asks the worker. */
 export type WorkerRequest =
@@ -18,6 +18,7 @@ export type WorkerRequest =
   | { op: "apply"; journey: string; request: ApplyRequest }
   | { op: "release"; journey: string }
   | { op: "route_level"; request: RouteLevelRequest }
+  | { op: "route_notices"; request: RouteNoticesRequest }
   | { op: "apply_route"; request: RouteApplyRequest }
   | { op: "memory" };
 

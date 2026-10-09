@@ -190,7 +190,15 @@ mod mcp_in_process {
             .await;
         let file = exported["file"].as_str().unwrap();
         let import = json!({ "patch_id": "p_import", "file": file });
-        agent.ok("import_route", import).await;
+        let imported = agent.ok("import_route", import).await;
+        // A20: advisory notices ride in the result of an import and a publish.
+        let notices = imported["notices"].as_array().unwrap();
+        let paths: Vec<&str> = notices
+            .iter()
+            .map(|n| n["path"].as_str().unwrap())
+            .collect();
+        assert_eq!(paths, ["purpose", "setup/workload"]);
+        assert_eq!(notices[0]["code"], "unanchored");
         let route = agent.ok("get_route", json!({ "route": ROUTE })).await;
         assert_eq!(
             route["graph"]["extends"], 1,

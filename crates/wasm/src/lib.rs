@@ -6,8 +6,9 @@
 //! projected ([`Projection`]), a draft patch applied locally to a journey ([`apply`]) or a
 //! route ([`apply_route`]), a proposal previewed ([`preview`]), a patch's touched set for the
 //! H5 safe retry ([`touched`]), route files exported and imported ([`export_route`],
-//! [`import_route`]), and a route graph's canvas level ([`route_level`]). Every input and
-//! output is the schema's JSON, so each value is the server's byte for byte.
+//! [`import_route`]), a route graph's canvas level ([`route_level`]), and its notices
+//! ([`route_notices`]). Every input and output is the schema's JSON, so each value is the
+//! server's byte for byte.
 //!
 //! For the in-browser host, its composition root ([`BrowserRoot`]): the service over the
 //! memory store seeded from the fixtures, the in-process notifier, and one local identity,
@@ -51,7 +52,10 @@ pub use root::{
     BrowserRoot, HistoryAnswer, JourneyPage, JourneySummary, PatchAnswer, PatchRequest,
     RootSubscription, Taken, Tick,
 };
-pub use route::{RouteLevelRequest, route_level, route_level_of};
+pub use route::{
+    RouteLevelRequest, RouteNoticesRequest, route_level, route_level_of, route_notices,
+    route_notices_of,
+};
 
 use std::future::Future;
 use std::pin::pin;

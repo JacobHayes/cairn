@@ -26,7 +26,7 @@ pub use users::{AgentToken, LinkedIdentity, MintedToken, TokenRequest, Viewer};
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    Consequences, JourneyId, Markdown, Patch, PatchReceipt, Revision, RevisionOf, Slug,
+    Consequences, JourneyId, Markdown, Notice, Patch, PatchReceipt, Revision, RevisionOf, Slug,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -54,6 +54,10 @@ pub enum PatchAnswer {
         /// D7: what it newly caused, by journey; a journey with nothing new is left out.
         #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
         consequences: BTreeMap<JourneyId, Consequences>,
+        /// A20: advisory notices about the route graph an import or publish leaves; never a
+        /// rejection, and absent for any other patch.
+        #[serde(default, skip_serializing_if = "Vec::is_empty")]
+        notices: Vec<Notice>,
     },
     /// The patch id was committed before with the same content (H5): its receipt, and no
     /// consequences, which are reported only the first time.
@@ -81,9 +85,11 @@ impl From<cairn_service::Written> for PatchAnswer {
             cairn_service::Written::Applied {
                 receipt,
                 consequences,
+                notices,
             } => PatchAnswer::Applied {
                 receipt,
                 consequences,
+                notices,
             },
             cairn_service::Written::AlreadyApplied { receipt } => {
                 PatchAnswer::AlreadyApplied { receipt }

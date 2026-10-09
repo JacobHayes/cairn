@@ -149,6 +149,18 @@ the 14-day horizon, so urgency is 0. The scenario matrix checks the ranks
 | 3 | `n_decision_meeting` | 10 | 0 | 45 | 0.1852 |
 | 3 | `n_workload` | 1 | 0 | none | 0.0185 |
 
+Notices (brief 7.5): the route file's own graph, with the decision meeting as its final
+milestone, lists two nodes, each checked by hand to have no chain to or from the meeting. Work
+inside the final-review stage is not listed (the stage closes at the meeting), nor are the
+decisions that fill roles, nor the partner-led subset (it sits inside Testing, which Reporting
+requires, and its condition counts as relevant). `crates/engine/tests/integration/fixture_readme.rs`
+checks the table.
+
+| Notice | Why it has no chain |
+|---|---|
+| `purpose` | Nothing requires it, no condition reads it, and no date rule names it. |
+| `setup/workload` | Setup waits on it, but nothing waits on Setup: the test plan alone feeds Testing. |
+
 Projected after kickoff (brief 2.6), read at 2026-10-06: the canvas level with actions hidden
 (each visible node, and the nearest visible ancestor it is drawn in; C2), the actions that roll
 up into a visible node as its checklist (C4), and the first three items of the next list (C10).

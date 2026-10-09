@@ -78,6 +78,12 @@ describe("consequenceLines (D7)", () => {
     expect(consequenceLines({ outcome: "already_applied", receipt })).toEqual([]);
   });
 
+  it("lists a route write's unanchored notices by path (A20)", () => {
+    const notice = { code: "unanchored" as const, node: "n_a", path: "setup/a", message: "a has no chain" };
+    const answer = { outcome: "applied" as const, receipt, consequences: {}, notices: [notice] };
+    expect(consequenceLines(answer)).toEqual([{ kind: "unanchored", journey: "", nodes: ["setup/a"] }]);
+  });
+
   it("lists finished work that may not apply with every decision it waits on, each once (D4)", () => {
     const answer = {
       outcome: "applied" as const,

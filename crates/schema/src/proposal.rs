@@ -18,6 +18,7 @@ use crate::id::{
     AgentId, AttachmentKey, EntityKey, KindKey, NodeKey, ProposalId, RoleKey, Slug, UserId,
 };
 use crate::node::{Choices, EntitySet, Node, ParticipationSource};
+use crate::notice::Notice;
 use crate::number::Revision;
 use crate::patch::{Mutation, ParticipationRef, Removal};
 use crate::refs::KeyRefs;
@@ -487,6 +488,10 @@ pub struct ProposalPreview {
     /// For a journey, what the change does to derived state (D7).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub consequences: Option<Consequences>,
+    /// For a route's draft, the advisory notices of the graph after (A20); they never make
+    /// the proposal invalid.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub notices: Vec<Notice>,
 }
 
 /// A proposal's content: what creating or editing it carries.

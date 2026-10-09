@@ -384,6 +384,16 @@ export function routeFileText(file: string): string;
 export function routeLevel(request: string): string;
 
 /**
+ * A20: a route graph's notices: `request` is the JSON of a [`RouteNoticesRequest`]; the
+ * answer is the JSON list of `Notice`s.
+ *
+ * # Errors
+ *
+ * The JSON of a [`HostError`]: an unreadable request or an invalid graph.
+ */
+export function routeNotices(request: string): string;
+
+/**
  * Runs when the module is instantiated: a panic's message goes to the console, since the
  * abort that follows says only that the module trapped.
  */
@@ -456,6 +466,7 @@ export interface InitOutput {
     readonly rootsubscription_take: (a: number, b: number, c: number) => void;
     readonly routeFileText: (a: number, b: number, c: number) => void;
     readonly routeLevel: (a: number, b: number, c: number) => void;
+    readonly routeNotices: (a: number, b: number, c: number) => void;
     readonly start: () => void;
     readonly touched: (a: number, b: number, c: number) => void;
     readonly touchedOverlaps: (a: number, b: number, c: number, d: number, e: number) => void;

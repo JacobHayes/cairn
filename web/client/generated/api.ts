@@ -3190,6 +3190,19 @@ export interface components {
             /** @description The machine state (D1). */
             state: components["schemas"]["State"];
         };
+        /** @description One advisory finding about a node of a route graph (A20). */
+        Notice: {
+            /** @description What it is about. */
+            code: components["schemas"]["NoticeCode"];
+            /** @description A sentence for people, generated for display. */
+            message: string;
+            /** @description The node it names. */
+            node: components["schemas"]["NodeKey"];
+            /** @description The node's path, to open it by. */
+            path: components["schemas"]["Path"];
+        };
+        /** @description What a notice is about. One exists today; each later advisory finding adds a code. */
+        NoticeCode: "unanchored";
         /** @description C18: an open decision and who owns it. */
         OpenDecision: {
             /** @description The decision. */
@@ -3311,6 +3324,11 @@ export interface components {
             consequences?: {
                 [key: string]: components["schemas"]["Consequences"];
             };
+            /**
+             * @description A20: advisory notices about the route graph an import or publish leaves; never a
+             *     rejection, and absent for any other patch.
+             */
+            notices?: components["schemas"]["Notice"][];
             /** @constant */
             outcome: "applied";
             /** @description The receipt: patch id, domain, content hash, and the revision produced. */
@@ -3670,6 +3688,11 @@ export interface components {
              *     candidate is invalid, or for the deployment.
              */
             graph?: components["schemas"]["Graph"] | null;
+            /**
+             * @description For a route's draft, the advisory notices of the graph after (A20); they never make
+             *     the proposal invalid.
+             */
+            notices?: components["schemas"]["Notice"][];
             /** @description Items that still need a choice; the preview leaves their effect out. */
             unresolved?: components["schemas"]["UnresolvedItem"][];
             /** @description Every violation of the candidate; empty when the resolved proposal would apply. */

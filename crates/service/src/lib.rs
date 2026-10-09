@@ -19,6 +19,7 @@ mod document;
 mod drafting;
 mod error;
 mod load;
+mod notices;
 mod observe;
 mod projections;
 mod proposals;

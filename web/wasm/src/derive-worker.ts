@@ -18,6 +18,7 @@ import {
   type RenderedDraft,
   type RouteApplyRequest,
   type RouteLevelRequest,
+  type RouteNoticesRequest,
 } from "./types.ts";
 
 type Pending = { resolve: (text: string) => void; reject: (failure: HostFailure) => void };
@@ -145,6 +146,11 @@ export class DeriveWorker {
   /** C2: a route graph's canvas level (a route has no state; nothing is held). */
   async routeLevel(request: RouteLevelRequest): Promise<Schema<"Level">> {
     return parsed<Schema<"Level">>(await this.#ask({ op: "route_level", request }));
+  }
+
+  /** A20: a route graph's notices (nothing is held). */
+  async routeNotices(request: RouteNoticesRequest): Promise<Schema<"Notice">[]> {
+    return parsed<Schema<"Notice">[]>(await this.#ask({ op: "route_notices", request }));
   }
 
   /** Drops the held journey. */

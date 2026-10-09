@@ -8,9 +8,13 @@ import { Emitter } from "./emitter.ts";
 export type Consequences = Schema<"Consequences">;
 export type PatchAnswer = Schema<"PatchAnswer">;
 
-/** One line of a notice: what kind of consequence, and the nodes it names. */
+/**
+ * One line of a notice: what kind of consequence, and the nodes it names. `unanchored` is a
+ * route's advisory notice (A20) rather than a journey's consequence: it has no journey, and
+ * names the paths of the work no chain links to the final milestone.
+ */
 export interface ConsequenceLine {
-  kind: "stale" | "shortfall" | "overdue" | "undecided" | "stalled";
+  kind: "stale" | "shortfall" | "overdue" | "undecided" | "stalled" | "unanchored";
   journey: string;
   nodes: string[];
   /** For `undecided`: the open decisions the finished nodes' relevance waits on (D4). */
@@ -26,7 +30,12 @@ export interface Notice {
 
 /** D7: what an accepted patch newly caused, journey by journey, each kind that has any. */
 export function consequenceLines(answer: PatchAnswer): ConsequenceLine[] {
-  return answer.outcome === "applied" ? linesOf(answer.consequences ?? {}) : [];
+  if (answer.outcome !== "applied") {
+    return [];
+  }
+  const lines = linesOf(answer.consequences ?? {});
+  const found = answer.notices ?? [];
+  return found.length === 0 ? lines : [...lines, { kind: "unanchored", journey: "", nodes: found.map((notice) => notice.path) }];
 }
 
 /** D7: what a write newly caused in each journey it changed, each kind that has any. */

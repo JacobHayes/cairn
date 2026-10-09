@@ -8,8 +8,8 @@ use std::collections::BTreeSet;
 
 use cairn_schema::{EdgeOrigin, Level, NodeKind, Rejection, Route, RouteVersion, ViolationCode};
 use cairn_wasm::{
-    BrowserRoot, HostError, RouteApplyRequest, RouteLevelRequest, apply_route_locally, route_level,
-    route_level_of,
+    BrowserRoot, HostError, RouteApplyRequest, RouteLevelRequest, RouteNoticesRequest,
+    apply_route_locally, route_level, route_level_of, route_notices,
 };
 
 fn version_one(root: &BrowserRoot) -> RouteVersion {
@@ -90,6 +90,21 @@ fn hidden_actions_roll_up_into_their_deliverable() {
         .unwrap();
     let rolled: Vec<String> = plan.rolled_up.iter().map(ToString::to_string).collect();
     assert_eq!(rolled, ["n_plan_draft", "n_plan_review"]);
+}
+
+/// A20: the notices of a route graph as the authoring view reads them.
+#[test]
+fn a_route_graph_lists_the_work_its_final_milestone_cannot_see() {
+    let request = RouteNoticesRequest {
+        graph: version_one(&BrowserRoot::seeded().unwrap()).graph,
+    };
+    let answer = route_notices(&serde_json::to_string(&request).unwrap()).unwrap();
+    let listed: Vec<cairn_schema::Notice> = serde_json::from_str(&answer).unwrap();
+    let paths: Vec<String> = listed
+        .iter()
+        .map(|notice| notice.path.to_string())
+        .collect();
+    assert_eq!(paths, ["purpose", "setup/workload"]);
 }
 
 #[test]

@@ -9,10 +9,10 @@
 
 use std::collections::BTreeSet;
 
-use cairn_engine::{DerivedJourney, Graph, derive};
+use cairn_engine::{DerivedJourney, Graph, derive, notices};
 use cairn_schema::{
     Date, Deployment, DeriveInputs, Graph as GraphDocument, Level, LevelQuery, NodeKey, NodeKind,
-    RankConstants,
+    Notice, RankConstants,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -75,6 +75,41 @@ pub fn route_level_of(request: &RouteLevelRequest) -> Result<Level, HostError> {
 pub fn route_level(request: &str) -> Result<String, String> {
     Ok(json(&route_level_of(&read(
         "route level request",
+        request,
+    )?)?))
+}
+
+/// A20: the notices of a route's graph, as the authoring view lists them while the draft
+/// changes.
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct RouteNoticesRequest {
+    /// The route's graph.
+    pub graph: GraphDocument,
+}
+
+/// A20: the notices of a route's graph, in path order.
+///
+/// # Errors
+///
+/// [`HostError::Invalid`] when the graph breaks an invariant, which a stored route never does.
+pub fn route_notices_of(request: &RouteNoticesRequest) -> Result<Vec<Notice>, HostError> {
+    // A route has no answers, so no deployment changes what it means.
+    let graph = Graph::new(request.graph.clone(), &Deployment::default())
+        .map_err(|violations| HostError::Invalid { violations })?;
+    Ok(notices(&graph))
+}
+
+/// A20: a route graph's notices: `request` is the JSON of a [`RouteNoticesRequest`]; the
+/// answer is the JSON list of `Notice`s.
+///
+/// # Errors
+///
+/// The JSON of a [`HostError`]: an unreadable request or an invalid graph.
+#[wasm_bindgen(js_name = routeNotices)]
+pub fn route_notices(request: &str) -> Result<String, String> {
+    Ok(json(&route_notices_of(&read(
+        "route notices request",
         request,
     )?)?))
 }

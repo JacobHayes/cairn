@@ -89,10 +89,12 @@ mod in_process {
         let import = json!({"patch_id": "p_import", "file": exported});
         let target = format!("{ROUTE}/import");
         let imported: PatchAnswer = ok(&post(&ann, &target, &import).await);
-        assert!(
-            matches!(imported, PatchAnswer::Applied { .. }),
-            "{imported:?}"
-        );
+        // A20: the import lists what the final milestone cannot see, and still applies.
+        let PatchAnswer::Applied { notices, .. } = &imported else {
+            panic!("expected an applied import, got {imported:?}");
+        };
+        let paths: Vec<String> = notices.iter().map(|n| n.path.to_string()).collect();
+        assert_eq!(paths, ["purpose", "setup/workload"]);
         let again: PatchAnswer = ok(&post(&ann, &target, &import).await);
         assert!(
             matches!(again, PatchAnswer::AlreadyApplied { .. }),

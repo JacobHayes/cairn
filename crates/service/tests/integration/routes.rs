@@ -185,6 +185,90 @@ async fn an_export_imported_back_is_a_new_draft_matching_by_path<S: Store>(store
     );
 }
 
+/// The paths a write's notices list.
+fn noticed(written: &Written) -> Vec<String> {
+    match written {
+        Written::Applied { notices, .. } => notices.iter().map(|n| n.path.to_string()).collect(),
+        Written::AlreadyApplied { .. } => panic!("expected a write applied now"),
+    }
+}
+
+/// A20, A15: publishing and importing list the notices of the graph they leave, a proposal's
+/// review lists those of the draft it would leave, and a draft edit lists none; every write is
+/// applied regardless, and a requirement added to the draft clears that node's notice from
+/// the publish that follows, applied from a proposal.
+#[test]
+fn an_import_and_a_publish_list_notices_and_a_draft_edit_lists_none() {
+    support::run(async {
+        let (service, _) = service_over(Arc::new(cairn_store::MemoryStore::new()));
+        let author = call("u_author", AT);
+        let seeded = service
+            .patch(&author, &domain(publish_fixture_route("vendor-evaluation")))
+            .await;
+        assert_eq!(noticed(&applied(seeded)), ["purpose", "setup/workload"]);
+        let route = vendor_route();
+        let file = service
+            .export_route(&route, Some(VersionNumber::FIRST))
+            .await
+            .unwrap()
+            .unwrap();
+        let imported = applied(
+            service
+                .import_route(&author, id("p_import"), &file, None)
+                .await,
+        );
+        assert_eq!(noticed(&imported), ["purpose", "setup/workload"]);
+        let held = service.route(&route).await.unwrap().unwrap();
+        let spare: ProposalDraft = from_yaml(&format!(
+            "title: Spare\ndestination_revision: {}\nmutations:\n- op: add_node\n  node: {{key: n_spare, id: spare, kind: action, title: Spare}}\n",
+            held.revision.get()
+        ))
+        .unwrap();
+        let destination = Domain::Route(route.clone());
+        let proposal: ProposalId = id("pr_spare");
+        service
+            .create_proposal(&author, id("p_spare"), &destination, &proposal, spare)
+            .await
+            .unwrap();
+        let review = service.preview_proposal(&author, &proposal).await.unwrap();
+        let reviewed: Vec<String> = review
+            .preview
+            .notices
+            .iter()
+            .map(|n| n.path.to_string())
+            .collect();
+        assert_eq!(reviewed, ["purpose", "setup/workload", "spare"]);
+        let edit = patch(
+            "p_edit",
+            "{route: vendor-evaluation}",
+            held.revision.get(),
+            "- op: add_edge\n  edge: {node: n_decision_meeting, requires: n_purpose}\n",
+        );
+        let edited = applied(service.patch(&author, &domain(edit)).await);
+        assert_eq!(noticed(&edited), Vec::<String>::new());
+        // Publishing from an applied proposal lists them too.
+        let held = service.route(&route).await.unwrap().unwrap();
+        let publish: ProposalDraft = from_yaml(&format!(
+            "title: Publish\ndestination_revision: {}\nmutations:\n- op: publish_draft\n",
+            held.revision.get()
+        ))
+        .unwrap();
+        let publishing: ProposalId = id("pr_publish");
+        service
+            .create_proposal(
+                &author,
+                id("p_publishing"),
+                &destination,
+                &publishing,
+                publish,
+            )
+            .await
+            .unwrap();
+        let published = apply(&service, &author, "p_publish", &destination, &publishing, 1).await;
+        assert_eq!(noticed(&applied(published)), ["setup/workload"]);
+    });
+}
+
 /// The upgrade proposal `pr_upgrade` to version 2 drafted by `author`, unchanged.
 async fn propose<S: Store>(service: &Service<S>, author: &Call) -> Proposal {
     saved(

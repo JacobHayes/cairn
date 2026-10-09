@@ -9,13 +9,13 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 
 use cairn_engine::{Applied, ApplyInputs, Records, apply};
 use cairn_schema::{
-    Consequences, Domain, EventType, JourneyId, Location, Markdown, Mutation, Patch, PatchReceipt,
-    PatchTarget, Record, Rejection, Revision, RevisionOf, Subject, Violation, ViolationCode,
-    Violations, Write,
+    Consequences, Domain, EventType, JourneyId, Location, Markdown, Mutation, Notice, Patch,
+    PatchReceipt, PatchTarget, Record, Rejection, Revision, RevisionOf, Subject, Violation,
+    ViolationCode, Violations, Write,
 };
 use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize, Store};
 
-use crate::{Call, Service, ServiceError, consequence, load};
+use crate::{Call, Service, ServiceError, consequence, load, notices};
 
 /// A patch to a journey, a route with its draft, or the deployment (A17), with the note its
 /// events carry (J1). A patch to a proposal goes through the proposal's own operations
@@ -68,6 +68,9 @@ pub enum Written {
         receipt: PatchReceipt,
         /// D7, by journey.
         consequences: BTreeMap<JourneyId, Consequences>,
+        /// A20: the notices of the graph a route import or publish leaves; none for any
+        /// other patch. Advisory: the patch was accepted.
+        notices: Vec<Notice>,
     },
     /// The patch id was committed before with the same content (H5): answered from its
     /// receipt, with no consequences, which are reported only the first time.
@@ -171,11 +174,15 @@ impl<S: Store> Service<S> {
                     today,
                     &self.settings,
                 );
-                (applied, caused)
+                let noticed = notices::of(patch, &loaded.records, &applied);
+                (applied, caused, noticed)
             })
         })?;
         match accepted {
-            Ok((applied, caused)) => self.commit(patch, &loaded, &applied, caused).await,
+            Ok((applied, caused, noticed)) => {
+                self.commit(patch, &loaded, &applied, (caused, noticed))
+                    .await
+            }
             Err(Rejection::Stale { conflicts, .. }) => {
                 // H5: the same patch may have committed since the receipt was looked up, and
                 // its own commit is what moved the revision; the receipt answers it then.
@@ -261,7 +268,7 @@ impl<S: Store> Service<S> {
         patch: &Patch,
         loaded: &load::Loaded,
         applied: &Applied,
-        caused: BTreeMap<JourneyId, Consequences>,
+        (caused, noticed): (BTreeMap<JourneyId, Consequences>, Vec<Notice>),
     ) -> Result<Written, WriteError> {
         let commit = Commit {
             target: patch.target.clone(),
@@ -281,6 +288,7 @@ impl<S: Store> Service<S> {
                 Ok(Written::Applied {
                     receipt,
                     consequences: caused,
+                    notices: noticed,
                 })
             }
             Ok(Committed::AlreadyApplied(receipt)) => {

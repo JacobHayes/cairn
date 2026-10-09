@@ -6,6 +6,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router";
 
 import type { RouteFile } from "../data/host.ts";
+import { consequenceLines } from "../data/notices.ts";
 import { useSession, useSkew } from "../data/react.ts";
 import { newPatchId, type Rejection } from "../data/writes.ts";
 import { Refused, violates } from "../screens/Refused.tsx";
@@ -29,7 +30,7 @@ function useImport() {
     setPending(false);
     if (answered.outcome === "answered") {
       setOutcome({ status: "idle" });
-      session.notices.add({ tone: "saved", title: `Imported ${file.name} as a draft of ${file.route}`, lines: [] });
+      session.notices.add({ tone: "saved", title: `Imported ${file.name} as a draft of ${file.route}`, lines: consequenceLines(answered.answer) });
       void navigate(routeDetailPath(file.route));
     } else if (answered.outcome === "rejected") {
       setOutcome({ status: "rejected", file, rejection: answered.rejection });

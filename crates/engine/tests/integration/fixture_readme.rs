@@ -403,3 +403,19 @@ fn projection_line(line: &str) -> Option<(&str, usize, &str)> {
     let (label, _) = rest.split_once(": ")?;
     Some((fixture, step.parse().ok()?, label))
 }
+
+/// The notices table: the nodes of the vendor evaluation's route graph that its final
+/// milestone cannot see (A20), in path order.
+#[test]
+fn the_notices_table_is_what_the_engine_lists() {
+    let rows = table("| Notice | Why it has no chain |");
+    let expected: Vec<String> = rows
+        .iter()
+        .map(|row| quoted(&row[0])[0].to_owned())
+        .collect();
+    let listed: Vec<String> = cairn_engine::notices(&support::route_graph(VENDOR))
+        .iter()
+        .map(|notice| notice.path.to_string())
+        .collect();
+    assert_eq!(listed, expected);
+}

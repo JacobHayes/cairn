@@ -13,7 +13,7 @@ use cairn_schema::{
     ProposalDraft, ProposalId, ProposalPreview, Revision, RevisionConflict, RouteId, Title,
     TouchedSet, VersionNumber,
 };
-use cairn_service::{ProposalWritten, ProposeError, ReadError, WriteError, Written};
+use cairn_service::{ProposalWritten, ProposeError, ReadError, WriteError};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -374,14 +374,7 @@ impl BrowserRoot {
             request.reviewed_revision,
             request.note.clone(),
         )) {
-            Ok(Written::Applied {
-                receipt,
-                consequences,
-            }) => Ok(PatchAnswer::Applied {
-                receipt,
-                consequences,
-            }),
-            Ok(Written::AlreadyApplied { receipt }) => Ok(PatchAnswer::AlreadyApplied { receipt }),
+            Ok(written) => Ok(written.into()),
             Err(error) => Err(write_failed(error)),
         }
     }

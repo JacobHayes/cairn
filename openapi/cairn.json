@@ -8753,6 +8753,45 @@
         ],
         "type": "object"
       },
+      "Notice": {
+        "additionalProperties": false,
+        "description": "One advisory finding about a node of a route graph (A20).",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/NoticeCode",
+            "description": "What it is about."
+          },
+          "message": {
+            "description": "A sentence for people, generated for display.",
+            "type": "string"
+          },
+          "node": {
+            "$ref": "#/components/schemas/NodeKey",
+            "description": "The node it names."
+          },
+          "path": {
+            "$ref": "#/components/schemas/Path",
+            "description": "The node's path, to open it by."
+          }
+        },
+        "required": [
+          "code",
+          "node",
+          "path",
+          "message"
+        ],
+        "type": "object"
+      },
+      "NoticeCode": {
+        "description": "What a notice is about. One exists today; each later advisory finding adds a code.",
+        "oneOf": [
+          {
+            "const": "unanchored",
+            "description": "A node with no chain to or from the graph's `final` milestone, so neither its priority\nnor its dates feel that milestone.",
+            "type": "string"
+          }
+        ]
+      },
       "OpenDecision": {
         "additionalProperties": false,
         "description": "C18: an open decision and who owns it.",
@@ -9207,6 +9246,13 @@
                   }
                 },
                 "type": "object"
+              },
+              "notices": {
+                "description": "A20: advisory notices about the route graph an import or publish leaves; never a\nrejection, and absent for any other patch.",
+                "items": {
+                  "$ref": "#/components/schemas/Notice"
+                },
+                "type": "array"
               },
               "outcome": {
                 "const": "applied",
@@ -10168,6 +10214,13 @@
               }
             ],
             "description": "The destination's graph after: a journey's, or a route's draft. None when the\ncandidate is invalid, or for the deployment."
+          },
+          "notices": {
+            "description": "For a route's draft, the advisory notices of the graph after (A20); they never make\nthe proposal invalid.",
+            "items": {
+              "$ref": "#/components/schemas/Notice"
+            },
+            "type": "array"
           },
           "unresolved": {
             "description": "Items that still need a choice; the preview leaves their effect out.",

@@ -5,7 +5,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     AttachmentKey, Consequences, Cursor, JourneyId, JourneyStatus, KeyRefs, Lineage, Node, NodeKey,
-    ParticipationKind, PatchEvents, Proposal, ProposalId, ProposalPreview, Revision,
+    Notice, ParticipationKind, PatchEvents, Proposal, ProposalId, ProposalPreview, Revision,
     RevisionConflict, Role, RoleKey, RouteHeader, RouteId, Title, TouchedSet, UnresolvedItem,
     VersionNumber, Violation, to_yaml,
 };
@@ -62,8 +62,9 @@ pub(crate) const SPECS: &[Spec] = &[
         name: "get_proposal",
         description: "A proposal by id: its destination, editing revision, status, and \
             content. With `review`, also what applying it now would do: unresolved items, \
-            every violation, the frontier after, consequences, and whether its destination \
-            moved since it was drafted (then refresh it with `edit_proposal`).",
+            every violation, the frontier after, consequences, a route draft's notices (A20), and \
+            whether its destination moved since it was drafted (then refresh it with \
+            `edit_proposal`).",
         writes: false,
         destructive: false,
         schema: schema::<GetProposal>,
@@ -302,6 +303,10 @@ struct Review {
     /// What it would cause, by journey (D7).
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     consequences: BTreeMap<JourneyId, Consequences>,
+    /// For a route's draft, advisory notices about the graph it would leave (A20): work with
+    /// no chain to or from the final milestone. They never block applying or publishing.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    notices: Vec<Notice>,
     /// When the destination moved since it was drafted: the revisions and what changed.
     /// Refresh it (`edit_proposal` with `refresh`) and review again.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -329,12 +334,14 @@ impl From<ProposalReview> for Review {
             graph: _,
             frontier,
             consequences: _,
+            notices,
         } = preview;
         Self {
             unresolved,
             violations,
             frontier: Cut::of(frontier),
             consequences,
+            notices,
             stale: stale.map(
                 |StaleBase {
                      conflict,

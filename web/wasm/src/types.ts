@@ -105,6 +105,11 @@ export interface RouteLevelRequest {
   container?: NodeKey;
 }
 
+/** `crates/wasm` `RouteNoticesRequest`: a route's graph, whose notices (A20) are asked for. */
+export interface RouteNoticesRequest {
+  graph: Schema<"Graph">;
+}
+
 /** `crates/wasm` `ApplyRequest`: a draft patch to apply locally. */
 export interface ApplyRequest {
   patch: Schema<"Patch">;

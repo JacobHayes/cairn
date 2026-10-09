@@ -9,7 +9,7 @@ mod writes;
 
 use std::collections::BTreeMap;
 
-use cairn_schema::{Consequences, Cursor, Date, JourneyId, PatchReceipt, Revision};
+use cairn_schema::{Consequences, Cursor, Date, JourneyId, Notice, PatchReceipt, Revision};
 use cairn_service::{Projected, Written};
 use schemars::JsonSchema;
 use serde::Serialize;
@@ -151,6 +151,11 @@ pub(crate) struct WriteOutput {
     /// changes, and the frontier's movement.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     consequences: BTreeMap<JourneyId, Consequences>,
+    /// Advisory notices about the route graph an import or publish leaves (A20): work with no
+    /// chain to or from the final milestone, which neither its priority nor its dates feel.
+    /// The write was accepted; add the missing edge or date rule, or leave it.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    notices: Vec<Notice>,
 }
 
 /// Whether a write was applied now or answered from its receipt.
@@ -167,15 +172,18 @@ impl From<Written> for WriteOutput {
             Written::Applied {
                 receipt,
                 consequences,
+                notices,
             } => Self {
                 status: WriteStatus::Applied,
                 receipt,
                 consequences,
+                notices,
             },
             Written::AlreadyApplied { receipt } => Self {
                 status: WriteStatus::AlreadyApplied,
                 receipt,
                 consequences: BTreeMap::new(),
+                notices: Vec::new(),
             },
         }
     }

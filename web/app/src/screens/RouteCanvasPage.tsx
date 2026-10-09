@@ -12,6 +12,7 @@ import { Link, useLocation, useNavigate, useParams } from "react-router";
 import { AssistantDock } from "../assistant/AssistantPanel.tsx";
 import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { OpenDraftOffer, RouteAuthoringBar, RouteNodePanel } from "../authoring/RouteAuthoring.tsx";
+import { RouteNotices } from "../authoring/RouteNotices.tsx";
 import { routeAuthored, type Authored } from "../authoring/target.ts";
 import { GraphCanvas } from "../canvas/GraphCanvas.tsx";
 import { refitKey } from "../canvas/refit.ts";
@@ -220,6 +221,7 @@ export function RouteCanvasPage() {
           </div>
           {shown.of !== "draft" && shown.route.draft == null ? <OpenDraftOffer route={shown.route} /> : null}
           {authored === undefined ? null : <RouteAuthoringBar authored={authored} container={view.container} drawing={drawing} onAdded={(key) => void navigate(routeNodePath(id, view, key))} />}
+          {authored === undefined ? null : <RouteNotices graph={authored.graph} hrefOf={(key) => routeNodePath(id, view, key)} />}
           <KindToggles view={view} journey={false} onChange={(next) => void navigate(routeCanvasPath(id, version, next))} />
           <nav className="crumbs" aria-label="Drilled into" data-testid="crumbs">
             {view.container === undefined ? <strong>Whole route</strong> : <Link to={routeCanvasPath(id, version, { ...view, container: undefined })}>Whole route</Link>}

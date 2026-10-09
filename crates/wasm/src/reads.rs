@@ -10,7 +10,7 @@ use cairn_schema::{
     AgentId, Email, EntityKey, JourneyId, JourneyStatus, Markdown, PatchId, Revision, RouteFile,
     RouteHeader, RouteId, Slug, Timestamp, Title, UserId, VersionNumber,
 };
-use cairn_service::{WriteError, Written};
+use cairn_service::WriteError;
 use cairn_store::{JourneyQuery, PageSize};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -275,14 +275,7 @@ impl BrowserRoot {
             request.note.clone(),
         ));
         match written {
-            Ok(Written::Applied {
-                receipt,
-                consequences,
-            }) => Ok(PatchAnswer::Applied {
-                receipt,
-                consequences,
-            }),
-            Ok(Written::AlreadyApplied { receipt }) => Ok(PatchAnswer::AlreadyApplied { receipt }),
+            Ok(written) => Ok(written.into()),
             Err(WriteError::Rejected(rejection)) => Err(HostError::Rejected { rejection }),
             Err(WriteError::Failed(error)) => Err(failed(error)),
         }
