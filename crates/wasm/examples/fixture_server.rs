@@ -18,7 +18,7 @@
 //!
 //! `cargo run -p cairn-wasm --example fixture_server -- <port> [<public origin>]`
 
-#[path = "../../auth/tests/integration/support/issuer.rs"]
+#[path = "../../tests/tests/integration/auth/support/issuer.rs"]
 #[allow(
     dead_code,
     clippy::unwrap_used,

@@ -110,7 +110,7 @@ that revision with nothing intervening even when the commit in flight touched wh
 did. Fixed (DECISIONS.md, the same entry): a Turso commit first takes its turn at every
 revision row it writes and at its patch id, so one beside a commit in flight on them waits
 for it and then meets its receipt or what it really touched; and the client never rebases a
-patch backward. `crates/service/tests/integration/in_flight.rs` holds both cases over both stores, and
+patch backward. `crates/tests/tests/integration/service/in_flight.rs` holds both cases over both stores, and
 the campaign tolerates no finding.
 
 ## Patina gap report

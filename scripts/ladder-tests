@@ -95,8 +95,10 @@ function run(binary) {
   return new Promise((resolve) => {
     // Cargo runs a test binary from its package's directory.
     // Each binary gets its share of the cores, so the parallel binaries together use about one thread
-    // per core instead of each starting one per core.
-    const env = { RUST_TEST_THREADS: String(threads), ...process.env };
+    // per core instead of each starting one per core; the biggest, which holds most of the tests
+    // (the library crates' one integration binary), gets half of them.
+    const count = binary === binaries[0] ? Math.max(1, Math.floor(availableParallelism() / 2)) : threads;
+    const env = { RUST_TEST_THREADS: String(count), ...process.env };
     const child = spawn(binary.executable, testArguments, { cwd: binary.directory, env, stdio: ["ignore", "pipe", "pipe"] });
     let output = "";
     child.stdout.on("data", (chunk) => (output += chunk));
@@ -132,7 +134,12 @@ async function worker() {
     }
     for (const line of output.split("\n")) {
       const test = /^test (.+) \.\.\. (\S+)/.exec(line);
-      if (test) lines.push(`${binary.package}\t${test[1]}\t${test[2]}`);
+      if (!test) continue;
+      // The library crates' integration tests are one binary (crates/tests) with a module per
+      // crate; each test counts for its crate, under the name it has there.
+      const [crate, ...path] = test[1].split("::");
+      const merged = binary.package === "cairn-tests";
+      lines.push(`${merged ? `cairn-${crate.replaceAll("_", "-")}` : binary.package}\t${merged ? path.join("::") : test[1]}\t${test[2]}`);
     }
   }
 }

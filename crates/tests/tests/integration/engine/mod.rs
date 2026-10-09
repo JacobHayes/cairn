@@ -1,0 +1,54 @@
+//! The tests of `cairn-engine`: one module per file beside this one.
+
+#[cfg(test)]
+mod support;
+
+mod apply;
+mod blocking;
+mod consequences;
+mod cost_blocking;
+mod cost_dates;
+mod cost_priority;
+mod cost_projections;
+mod cost_removal;
+mod cost_upgrade;
+mod dates;
+mod dependencies;
+mod display_state;
+mod document;
+mod domains;
+mod explanations;
+mod fixture_readme;
+mod format;
+mod graph;
+mod guards;
+mod history;
+mod level;
+mod limits;
+mod lists;
+mod matrix;
+mod notices;
+mod participation;
+mod plan;
+mod priority;
+mod property_apply;
+mod property_blocking;
+mod property_dates;
+mod property_dependencies;
+mod property_derive;
+mod property_priority;
+mod property_projections;
+mod property_upgrade;
+mod proposals;
+mod rank;
+mod rationale;
+mod relevance;
+mod requires_note;
+mod save_relink;
+mod scenarios;
+mod skip;
+mod snapshot;
+mod state_machines;
+mod trace;
+mod upgrade;
+mod views;

@@ -160,27 +160,22 @@ ladder_tests_matching() {
 # and a failure when the tree has a KIND test file that is not a suite, so one that stops
 # building or is not a module of its crate's test binary does not go unnoticed.
 ladder_file_suites() {
-  local kind=$1 suites=0 crate directory file count expected members
-  # Workspace members as "name<TAB>directory" lines, relative to the repository root.
-  # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
-  members=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
-    const path = require("path");
-    let text = "";
-    process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
-      for (const item of JSON.parse(text).packages)
-        console.log(`${item.name}\t${path.relative(process.cwd(), path.dirname(item.manifest_path))}`);
-    });')
-  while IFS=$'\t' read -r crate directory; do
+  local kind=$1 suites=0 crate file count expected
+  while IFS= read -r crate; do
     [ -n "$crate" ] || continue
     while IFS=$'\t' read -r file count; do
       [ -n "$file" ] || continue
-      ladder_suite "$directory/tests/integration/$file.rs" "$count" tests
+      ladder_suite "$crate $file" "$count" tests
       suites=$((suites + 1))
     done < <(awk -F'\t' -v crate="$crate" -v kind="$kind" '
       $1 == crate && match($2, "^[a-z0-9_]+::" kind "::") {
         split($2, path, "::"); count[path[1]]++ }
       END { for (file in count) print file "\t" count[file] }' <<<"$ladder_tests" | sort)
-  done <<<"$members"
-  expected=$(find crates -path "*/tests/integration/${kind}_*.rs" | wc -l)
+  done < <(cargo metadata --no-deps --format-version 1 --locked | node -e '
+    let text = "";
+    process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
+      for (const item of JSON.parse(text).packages) console.log(item.name);
+    });')
+  expected=$(find crates -path '*/tests/integration/*' -name "${kind}_*.rs" | wc -l)
   [ "$suites" -eq "$expected" ] || ladder_fail "ran $suites $kind test files; the tree has $expected"
 }

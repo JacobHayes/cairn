@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 #MISE description="Rung 4: the store conformance suite on every backend, one suite each, and the API's and the MCP endpoint's in-process tests"
 # PRACTICES, The validation ladder, rung 4; Testing > Shell: conformance and integration.
-# Each backend runs the suite from its crate's tests/integration/conformance.rs, inside `mod
-# conformance` (rung 2 skips the module by name; every crate's integration tests are one
-# binary and are picked by module path). The backends are listed here and each is
+# Each backend runs the suite from `conformance.rs` of its crate's tests (crates/tests/tests/
+# integration/<crate>), inside `mod conformance` (rung 2 skips the module by name; the
+# integration tests are picked by module path). The backends are listed here and each is
 # its own suite, so a backend whose suite stops building or running fails the rung rather
 # than hiding behind another's count. The API's tests run against a server on loopback
 # over the memory store, inside `mod in_process` (rung 2 skips the module by name). The MCP

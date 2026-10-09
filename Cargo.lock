@@ -689,6 +689,44 @@ dependencies = [
 ]
 
 [[package]]
+name = "cairn-tests"
+version = "0.1.0"
+dependencies = [
+ "axum",
+ "base64 0.22.1",
+ "cairn-api",
+ "cairn-assistant",
+ "cairn-auth",
+ "cairn-engine",
+ "cairn-mcp",
+ "cairn-schema",
+ "cairn-service",
+ "cairn-store",
+ "cairn-store-turso",
+ "cairn-wasm",
+ "chrono",
+ "cookie",
+ "ed25519-dalek",
+ "http-body-util",
+ "jiff",
+ "jsonschema",
+ "metrics",
+ "metrics-util",
+ "openidconnect",
+ "p256",
+ "patina-dst-proptest",
+ "proptest",
+ "rmcp",
+ "schemars 1.2.2",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tower",
+ "turso",
+ "url",
+]
+
+[[package]]
 name = "cairn-wasm"
 version = "0.1.0"
 dependencies = [

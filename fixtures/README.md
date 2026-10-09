@@ -19,7 +19,7 @@ fixture holds a `segment.yaml` (a route file of kind `segment`) and no scenario 
 the engine's matrix inserts it into another fixture's journey.
 
 The derived values below are read from this file by
-`crates/engine/tests/integration/fixture_readme.rs` and checked against the engine: its
+`crates/tests/tests/integration/engine/fixture_readme.rs` and checked against the engine: its
 tables, and each fixture's projection lines. A change that moves one of them fails that test
 until this file is updated with it.
 
@@ -42,7 +42,7 @@ finishes the workload and the baseline (which completes testing and opens report
 answers the reviewer with a person created in the same patch.
 
 Derived at each decision point (brief 2.2): the relevance and participations `derive` gives
-after steps 1, 2, 6, and 8. The scenario matrix (`crates/engine/tests/integration/matrix.rs`) checks these
+after steps 1, 2, 6, and 8. The scenario matrix (`crates/tests/tests/integration/engine/matrix.rs`) checks these
 values.
 
 | Node | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
@@ -134,7 +134,7 @@ plan, and everything after them, the undecided baseline at half); the partner de
 holds the partner-led subset at half while it is undecided; the four up-front decisions tie and
 fall back to key order; once kickoff is reached, environment access leads. Every slack is past
 the 14-day horizon, so urgency is 0. The scenario matrix checks the ranks
-(`crates/engine/tests/integration/matrix.rs`).
+(`crates/tests/tests/integration/engine/matrix.rs`).
 
 | After step | Node | Gravity | Leverage | Slack | Rank |
 |---|---|---|---|---|---|
@@ -155,7 +155,7 @@ Notices (brief 7.5): the route file's own graph, with the decision meeting as it
 milestone, lists two nodes, each checked by hand to have no chain to or from the meeting. Work
 inside the final-review stage is not listed (the stage closes at the meeting), nor are the
 decisions that fill roles, nor the partner-led subset (it sits inside Testing, which Reporting
-requires, and its condition counts as relevant). `crates/engine/tests/integration/fixture_readme.rs`
+requires, and its condition counts as relevant). `crates/tests/tests/integration/engine/fixture_readme.rs`
 checks the table.
 
 | Notice | Why it has no chain |
@@ -166,7 +166,7 @@ checks the table.
 Projected after kickoff (brief 2.6), read at 2026-10-06: the canvas level with actions hidden
 (each visible node, and the nearest visible ancestor it is drawn in; C2), the actions that roll
 up into a visible node as its checklist (C4), and the first three items of the next list (C10).
-`crates/engine/tests/integration/fixture_readme.rs` checks these lines.
+`crates/tests/tests/integration/engine/fixture_readme.rs` checks these lines.
 
 - `vendor-evaluation`, after step 3, visible with actions hidden: `n_decision_meeting`, `n_kickoff`, `n_meeting_date`, `n_partner_runs`, `n_purpose`, `n_reporting`, `n_final_review` (in `n_reporting`), `n_final_report` (in `n_final_review`), `n_findings` (in `n_reporting`), `n_findings_reviewer` (in `n_reporting`), `n_review_opens` (in `n_reporting`), `n_setup`, `n_access` (in `n_setup`), `n_plan` (in `n_setup`), `n_workload` (in `n_setup`), `n_testing`, `n_baseline` (in `n_testing`), `n_comparison_set` (in `n_testing`), `n_partner_led` (in `n_testing`), `n_who_informed`, `n_who_owns`.
 - `vendor-evaluation`, after step 3, actions rolled up: `n_plan` holds `n_plan_draft`, `n_plan_review`; `n_partner_led` holds `n_criteria`, `n_partner_results`.
@@ -179,7 +179,7 @@ the comparison set is the prior tool. Upgrading the finished scenario journey, w
 edits, to version 2 proposes the upgrade mutation and one item: the workload as an orphan, kept by
 default, whose removal would also remove its two journey-local children (`n_workload_ingest`,
 `n_workload_query`). There is no conflict and no kept edit; the rename, the condition, and the
-sign-off apply with the upgrade, and the workload stays done, orphaned. `crates/engine/tests/integration/upgrade.rs`
+sign-off apply with the upgrade, and the workload stays done, orphaned. `crates/tests/tests/integration/engine/upgrade.rs`
 checks these items.
 
 ## `hiring-loop/`
@@ -244,7 +244,7 @@ A segment: a group root holding *Data sensitivity* (a single choice: low, modera
 *Threat model* (a deliverable relevant unless the sensitivity is low, owned by the `reviewer`
 role), and *Who reviews?* (an entity decision that fills `reviewer`). It has no final milestone
 and no default owner (a segment declares neither). The matrix scenario "segment insertion twice
-into one graph" (`crates/engine/tests/integration/matrix.rs`) publishes it as version 1 and
+into one graph" (`crates/tests/tests/integration/engine/matrix.rs`) publishes it as version 1 and
 inserts it into the finished hiring-loop journey twice: first with the defaults, wired after the
 panel decision, then with *Who reviews?* left out (the first insertion's decision already fills
 `reviewer`, which the default mapping reuses by id), wired before the offer decision.
@@ -262,7 +262,7 @@ Each scenario's journey at its end, summarized for observers (brief 5.4, C18), r
 stored state), how many are left to finish, the overdue, short, and stale nodes, the milestones not yet
 reached with their effective dates, and the open decisions in rank order. Nothing is
 overdue on that day; the product launch's late code freeze leaves it and the launch short
-(F6). The engine's tests (`crates/engine/tests/integration/fixture_readme.rs`) check these lines.
+(F6). The engine's tests (`crates/tests/tests/integration/engine/fixture_readme.rs`) check these lines.
 
 - `vendor-evaluation`, status summary: active 1, ready 2, blocked 2, done 19; remaining 5; overdue none; short none; stale none; upcoming `n_review_opens` 2026-10-30, `n_decision_meeting` 2026-11-20; open decisions none.
 - `hiring-loop`, status summary: ready 1, done 11, skipped 1; remaining 1; overdue none; short none; stale none; upcoming none; open decisions none.

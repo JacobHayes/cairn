@@ -31,7 +31,7 @@ command -v cargo-patina >/dev/null || fail "cargo-patina is missing: run mise in
 # Product bugs this testbed found and DECISIONS.md records, by the label of the invariant a
 # run breaks first. Until each is fixed, a campaign generation failing on one of these is
 # reported, not fatal; any other failure is. When a fix lands, its label comes out of
-# this list and its ignored test in crates/service/tests/integration/in_flight.rs is un-ignored.
+# this list and its ignored test in crates/tests/tests/integration/service/in_flight.rs is un-ignored.
 known_findings=()
 
 # Coverage oracles in the binary that this testbed cannot reach, by label (DECISIONS.md,

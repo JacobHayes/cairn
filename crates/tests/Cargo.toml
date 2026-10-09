@@ -1,0 +1,50 @@
+[package]
+name = "cairn-tests"
+description = "The library crates' integration tests, one test binary (tests/integration), so the workspace's dependencies are linked once and a fresh executable is scanned once on its first run."
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+publish.workspace = true
+
+[features]
+# The server half of the browser host's agreement cases (crates/wasm).
+server = ["cairn-wasm/server"]
+
+[dev-dependencies]
+axum.workspace = true
+base64.workspace = true
+cairn-api.workspace = true
+cairn-assistant.workspace = true
+cairn-auth.workspace = true
+cairn-engine = { workspace = true, features = ["testing"] }
+cairn-mcp.workspace = true
+cairn-schema = { workspace = true, features = ["testing"] }
+cairn-service.workspace = true
+cairn-store = { workspace = true, features = ["conformance"] }
+cairn-store-turso = { workspace = true, features = ["io-seam"] }
+cairn-wasm.workspace = true
+chrono.workspace = true
+cookie.workspace = true
+ed25519-dalek.workspace = true
+http-body-util.workspace = true
+jiff.workspace = true
+jsonschema.workspace = true
+metrics.workspace = true
+metrics-util.workspace = true
+openidconnect.workspace = true
+p256.workspace = true
+patina-dst-proptest.workspace = true
+proptest.workspace = true
+rmcp = { workspace = true, features = ["client", "transport-streamable-http-client"] }
+schemars.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio = { workspace = true, features = ["macros", "net", "rt", "sync", "test-util", "time"] }
+tower.workspace = true
+turso.workspace = true
+url.workspace = true
+
+[lints]
+workspace = true

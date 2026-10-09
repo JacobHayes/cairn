@@ -131,7 +131,8 @@ debug = false
 # the wasm-dev profile that inherits it stay as they were, so the browser host's module and
 # its bindings do not change). Debug assertions and overflow checks stay on. The property and
 # cost tests of the engine, and the cases the browser tests compare with, took 5 to 50 s
-# unoptimized and take a fifth of that at opt-level 2.
+# unoptimized and take a fifth of that at opt-level 2. The library crates' integration tests
+# (cairn-tests) are built at the default level: they call these crates' optimized code.
 [profile.test.package.cairn-engine]
 opt-level = 2
 

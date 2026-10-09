@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 #MISE description="Rung 2: unit tests for every Rust crate (property tests: rung 3; store conformance and in-process API tests: rung 4; cost tests: rung 7)"
 # PRACTICES, The validation ladder, rung 2. One suite per crate, so a crate whose tests
-# vanish fails the rung. A crate's integration tests are modules of its one test binary,
-# tests/integration/main.rs, told apart by module path: property tests live in `mod
+# vanish fails the rung. The library crates' integration tests are modules of one test binary
+# (crates/tests/tests/integration, counted for their crates by scripts/ladder-tests; the
+# binary's and the schema's keep their own), told apart by module path: property tests live in `mod
 # property` (in `property_*.rs`), cost tests in `mod cost` (in `cost_*.rs`), the store
 # conformance suite in `mod conformance` (in `conformance.rs`), the in-process tests of the
 # API and the binary in `mod in_process`, and the binary's tests that need the web build
@@ -26,6 +27,9 @@ crates=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
   process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
     for (const item of JSON.parse(text).packages) console.log(item.name);
   });')
+# cairn-tests holds the library crates' integration tests, which count for those crates
+# (scripts/ladder-tests); it is no suite of its own.
+crates=$(grep -vx cairn-tests <<<"$crates")
 # Every workspace crate is a suite, whatever test binaries it builds, unit and integration
 # together, each test counted for the crate whose binary ran it. The doc tests are rung 4's:
 # no crate has one, and the pass that looks for them costs seconds.

@@ -80,7 +80,7 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
   Found at seed 31, `--fs-error-permille 5 --fs-crash-at write:40`. The store now answers
   nothing after such a failure until a barrier commit has synced the log past it, and fails
   closed until reopened when it cannot. Its deterministic tests are
-  `crates/store-turso/tests/integration/conformance/conformance/log_sync.rs`; leg 6 pins seed 12 at `sync:28`.
+  `crates/tests/tests/integration/store_turso/conformance/conformance/log_sync.rs`; leg 6 pins seed 12 at `sync:28`.
   Recorded in
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 - **Patina: a removed directory stops crash points.** Once the guest removes a directory
