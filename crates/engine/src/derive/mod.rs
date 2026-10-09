@@ -454,7 +454,7 @@ pub(crate) struct Early {
 pub(crate) fn early(journey: &Graph, deployment: &Deployment) -> Early {
     let document = journey.document();
     let inherited = skip::inherited(journey);
-    let relevance = relevance::pass(journey, deployment, &inherited);
+    let relevance = relevance::pass(journey, deployment, &inherited, None);
     let mut dependencies = Dependencies::build(document, journey.tree());
     dependencies.prune(document, &relevance);
     assert_eq!(dependencies.node_count(), document.nodes.len());

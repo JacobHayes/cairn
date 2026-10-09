@@ -109,8 +109,8 @@ mod property {
         let classes = classify(graph, &Deployment::default());
         let shown = classes
             .iter()
-            .map(|(key, class)| {
-                let class = match class {
+            .map(|(key, found)| {
+                let class = match found.class() {
                     RelevanceClass::Relevant => LevelDisplay::Relevant,
                     RelevanceClass::Undecided | RelevanceClass::Pending => {
                         LevelDisplay::Conditional

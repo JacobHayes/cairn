@@ -42,9 +42,10 @@ use cairn_schema::{
 };
 
 use super::{DerivedJourney, ProjectionError};
+use crate::derive::Relevances;
 use crate::derive::dependencies::{EdgeClass, EdgeSet, EdgeSource};
 use crate::derive::held_by;
-use crate::derive::pending::{Classes, RelevanceClass, classify};
+use crate::derive::pending::{RelevanceClass, classify};
 
 /// Each node within the level and its stand-in: itself when visible, else its nearest visible
 /// ancestor within the level.
@@ -89,7 +90,7 @@ impl<'a> DerivedJourney<'a> {
     pub(super) fn level_with(
         &self,
         query: &LevelQuery,
-        classes: Option<&Classes>,
+        classes: Option<&Relevances>,
     ) -> Result<Level, ProjectionError> {
         if let Some(key) = &query.container {
             self.known(key)?;
@@ -149,7 +150,7 @@ impl<'a> DerivedJourney<'a> {
     }
 
     /// Each node within the level and its stand-in, in one pass in tree order.
-    fn stand_ins(&self, query: &LevelQuery, classes: Option<&Classes>) -> StandIns<'a> {
+    fn stand_ins(&self, query: &LevelQuery, classes: Option<&Relevances>) -> StandIns<'a> {
         let within = self.tree_order(query.container.as_ref());
         let collapsed: BTreeSet<&NodeKey> = within
             .iter()

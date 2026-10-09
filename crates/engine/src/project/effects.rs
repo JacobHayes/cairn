@@ -34,7 +34,8 @@ use cairn_schema::{
 
 use super::rows::count;
 use super::{DerivedJourney, ProjectionError};
-use crate::derive::pending::{Classes, RelevanceClass, classify, classify_assuming};
+use crate::derive::Relevances;
+use crate::derive::pending::{RelevanceClass, classify, classify_assuming};
 use crate::derive::skip;
 
 /// One answer to evaluate: the whole answer, the choice it names, whether the choice is the
@@ -200,7 +201,7 @@ impl DerivedJourney<'_> {
         &self,
         key: &NodeKey,
         deployment: &Deployment,
-        before: &Classes,
+        before: &Relevances,
         (affected, skipped): (&BTreeSet<NodeKey>, &BTreeMap<NodeKey, NodeKey>),
         candidate: Candidate,
     ) -> ChoiceEffect {
