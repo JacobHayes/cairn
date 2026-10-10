@@ -41,6 +41,7 @@
 
 .timeline-tracks {
   overflow: hidden;
+  background: var(--ruling), var(--color-ground);
 }
 
 .timeline-labels {
@@ -52,6 +53,8 @@
 .timeline-label {
   display: flex;
   align-items: center;
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-edge);
   padding-inline-end: var(--space-3);
   font-size: 15px;
   line-height: 1.4;

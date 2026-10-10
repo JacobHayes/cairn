@@ -217,7 +217,7 @@ function Label({ ready, row, selected, onFold }: { ready: Ready; row: ChartRow; 
       data-selected={selected}
       style={{ height: ROW_PX }}
     >
-      <div className="timeline-title" style={{ paddingInlineStart: `calc(${String(row.depth)} * var(--space-4))` }}>
+      <div className="timeline-title" style={{ paddingInlineStart: `calc(${String(row.depth)} * var(--space-5))` }}>
         {row.foldable ? (
           <button type="button" className="timeline-fold" aria-expanded={row.open} aria-label={`${row.open ? "Fold" : "Open"} ${row.title}`} data-testid="timeline-fold" onClick={() => { onFold(row.key); }}>
             {row.open ? "▾" : "▸"}

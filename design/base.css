@@ -10,7 +10,7 @@ html {
 }
 body {
   margin: 0;
-  background: var(--color-background);
+  background: var(--color-ground);
   color: var(--color-text);
   font: 400 var(--type-base-size) / var(--type-line-height) var(--font-body);
   letter-spacing: var(--type-letter-spacing);
@@ -81,7 +81,7 @@ h3 {
   background: var(--color-tint);
 }
 
-/* ---- shell: graphite rail | paper workspace | graphite inspector ------------------------------ */
+/* ---- shell: chrome rail | ground workspace | chrome inspector ------------------------------ */
 .shell {
   display: grid;
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
@@ -96,22 +96,22 @@ h3 {
   top: 0;
   height: 100vh;
   overflow: auto;
-  background: var(--color-primary);
-  color: var(--rail-ink);
+  background: var(--chrome-bg);
+  color: var(--chrome-ink);
 }
 .rail {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
   padding: var(--space-4) var(--space-3);
-  border-right: 1px solid var(--rail-border);
+  border-right: 1px solid var(--chrome-border);
 }
 .inspector {
   padding: var(--space-3);
-  border-left: 1px solid var(--rail-border);
+  border-left: 1px solid var(--chrome-border);
 }
 .inspector > .label {
-  color: var(--rail-muted);
+  color: var(--chrome-muted);
 }
 .brand {
   display: flex;
@@ -120,7 +120,7 @@ h3 {
   font: 700 15px / 1.2 var(--font-heading);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--rail-ink);
+  color: var(--chrome-ink);
   text-decoration: none;
 }
 .rail nav {
@@ -138,38 +138,38 @@ h3 {
   font: 500 12.5px / 1.4 var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--rail-muted);
+  color: var(--chrome-muted);
   text-decoration: none;
   border-left: 2px solid transparent;
   transition: color var(--motion-duration) var(--motion-easing);
 }
 .rail nav a:hover {
-  color: var(--rail-ink);
+  color: var(--chrome-ink);
 }
 .rail nav a[aria-current="page"] {
-  color: var(--rail-ink);
-  border-left-color: var(--rail-ink);
-  background: rgba(255, 255, 255, 0.04);
+  color: var(--chrome-ink);
+  border-left-color: var(--chrome-ink);
+  background: var(--color-hover);
 }
 .rail button {
   width: 100%;
-  color: var(--rail-ink);
+  color: var(--chrome-ink);
   background: transparent;
-  border-color: var(--rail-border);
+  border-color: var(--chrome-border);
   font: 500 12px / 1.4 var(--font-mono);
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 .rail button:hover {
-  border-color: var(--rail-muted);
+  border-color: var(--chrome-muted);
 }
 .workspace {
   min-width: 0;
   padding: var(--space-5);
+  background: var(--color-ground);
 }
 
-/* Paper: surface + 24px ruling + four corner ticks (L-shaped 1px strokes, 8px long, inset 3px). */
-.workspace,
+/* Paper: surface + four corner ticks (L-shaped 1px strokes, 8px long, inset 3px). No ruling: that is for canvases. */
 .panel,
 .card {
   --tick: linear-gradient(var(--color-tick), var(--color-tick));
@@ -182,10 +182,13 @@ h3 {
     var(--tick) left 3px bottom 3px / 1px 8px no-repeat,
     var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
     var(--tick) right 3px bottom 3px / 1px 8px no-repeat,
-    linear-gradient(90deg, var(--color-rule) 1px, transparent 1px) 0 0 / 24px 24px,
-    linear-gradient(0deg, var(--color-rule) 1px, transparent 1px) 0 0 / 24px 24px,
     var(--color-surface);
-  color: var(--color-text); /* paper inside a graphite inspector */
+  color: var(--color-text);
+}
+
+/* A gesture canvas: the ground with the 24px ruling. Only a canvas is ruled. */
+.ruled {
+  background: var(--ruling), var(--color-ground);
 }
 
 /* ---- controls ------------------------------------------------------------------------------ */
@@ -322,34 +325,26 @@ label {
   grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
 }
 
-/* Keyboard hints: mono, rail-muted on graphite. On a graphite (dark) panel, step down to the ground. */
+/* Keyboard hints: mono, chrome ink on chrome. */
 .keys,
 kbd {
   display: inline-block;
   font-family: var(--font-mono);
   letter-spacing: 0;
-  background: var(--color-primary);
-  border: 1px solid var(--rail-border);
+  background: var(--chrome-bg);
+  border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
 }
 .keys {
   padding: 2px 8px;
   font-size: 12px;
   line-height: 1.5;
-  color: var(--rail-muted);
+  color: var(--chrome-muted);
 }
 kbd {
   padding: 0 5px;
   font-size: 11.5px;
-  color: var(--rail-ink);
-}
-:root[data-theme="dark"] :is(.keys, kbd) {
-  background: var(--color-background);
-}
-@media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) :is(.keys, kbd) {
-    background: var(--color-background);
-  }
+  color: var(--chrome-ink);
 }
 
 /* ---- panels and cards ---------------------------------------------------------------------- */
@@ -493,7 +488,7 @@ table.data {
 table.data th,
 table.data td {
   padding: 4px 8px;
-  border-bottom: 1px solid var(--color-border);
+  border-bottom: 1px solid var(--color-edge);
   vertical-align: top;
 }
 table.data th + th,
@@ -525,19 +520,27 @@ table.data th.num {
 table.data td.num {
   font-size: 13px;
 }
-table.data .badge {
-  font-size: 10.5px;
-  letter-spacing: 0.04em;
-  padding: 0 4px;
-}
 table.data td .muted {
   color: var(--color-secondary);
+}
+/* Tree rows: one 1px guide in --color-edge through each depth's indent gutter; a container row is a band with a heavier title. */
+table.data td.tree {
+  --depth: 0;
+  padding-inline-start: calc(8px + var(--depth) * 24px);
+  background-image: repeating-linear-gradient(90deg, transparent 0 11px, var(--color-edge) 11px 12px, transparent 12px 24px);
+  background-size: calc(var(--depth) * 24px) 100%;
+  background-repeat: no-repeat;
+  background-position: 8px 0;
+}
+table.data tr.container td {
+  background-color: var(--color-band);
+  font-weight: 600;
 }
 table.data tbody tr {
   transition: background var(--motion-duration) var(--motion-easing);
 }
 table.data tbody tr:hover td {
-  background: var(--color-hover);
+  background-color: var(--color-hover);
 }
 table.data td code,
 table.data td .mono {
@@ -546,7 +549,7 @@ table.data td .mono {
 .table-wrap {
   overflow: auto;
   max-height: 70vh;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-edge);
   background: var(--color-surface);
 }
 .table-wrap table.data tbody tr:last-child td {
@@ -557,7 +560,7 @@ table.data td .mono {
 table.data tr[aria-selected="true"] td,
 .selected,
 [role="option"][aria-selected="true"] {
-  background: var(--color-tint);
+  background-color: var(--color-tint);
 }
 table.data tr[aria-selected="true"] > td:first-child,
 .selected,
@@ -644,10 +647,10 @@ svg.chart .datum-line {
   z-index: 40;
   max-width: min(560px, calc(100vw - 32px));
   padding: 8px 14px;
-  border: 1px solid var(--rail-border);
+  border: 1px solid var(--chrome-border);
   border-radius: var(--radius-md);
-  background: var(--color-primary);
-  color: var(--rail-ink);
+  background: var(--chrome-bg);
+  color: var(--chrome-ink);
   font: 400 13px / 1.5 var(--font-mono);
   letter-spacing: 0;
   box-shadow: var(--shadow-md);
@@ -669,16 +672,16 @@ svg.chart .datum-line {
 }
 
 /* ---- app frame parts (DESIGN amendments 5 and 10) ------------------------------------------- */
-/* Graphite chrome (the strip and the sheet) steps down to the ground in dark: set --chrome-bg to change that. */
+/* Chrome (the strip and the sheet) follows the theme: --chrome-bg. */
 .strip {
   display: flex;
   align-items: center;
   gap: var(--space-3);
   min-height: 28px;
   padding: 0 var(--space-3);
-  background: var(--chrome-bg, var(--color-primary));
-  color: var(--rail-muted);
-  border-top: 1px solid var(--rail-border);
+  background: var(--chrome-bg);
+  color: var(--chrome-muted);
+  border-top: 1px solid var(--chrome-border);
   font: 500 12px / 1 var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -697,14 +700,14 @@ svg.chart .datum-line {
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
-  color: var(--rail-ink);
+  color: var(--chrome-ink);
   font: inherit;
   letter-spacing: inherit;
   text-transform: inherit;
   cursor: pointer;
 }
 .sync:hover {
-  border-color: var(--rail-border);
+  border-color: var(--chrome-border);
 }
 .sync::before {
   content: "";
@@ -716,7 +719,7 @@ svg.chart .datum-line {
 }
 .sync[data-tone="working"]::before {
   background: transparent;
-  border: 1.5px solid var(--rail-muted);
+  border: 1.5px solid var(--chrome-muted);
 }
 .sync[data-tone="wait"] {
   --mark: var(--color-warning);
@@ -726,7 +729,7 @@ svg.chart .datum-line {
 }
 .sync[data-tone="hollow"]::before {
   background: transparent;
-  border: 1px solid var(--rail-muted);
+  border: 1px solid var(--chrome-muted);
 }
 .sync[data-state="conflict"]::before {
   content: "!";
@@ -791,21 +794,21 @@ svg.chart .datum-line {
   outline: 2px solid var(--color-accent);
   outline-offset: -2px;
 }
-/* On graphite (the rail, the inspector, the sheet). */
-.segmented.on-graphite {
-  border-bottom-color: var(--rail-border);
+/* On chrome (the rail, the inspector, the sheet). */
+.segmented.on-chrome {
+  border-bottom-color: var(--chrome-border);
 }
-.segmented.on-graphite :is(label, button) {
-  color: var(--rail-muted);
+.segmented.on-chrome :is(label, button) {
+  color: var(--chrome-muted);
 }
-.segmented.on-graphite :is(label:has(input:checked), button[aria-selected="true"], button:hover) {
-  color: var(--rail-ink);
+.segmented.on-chrome :is(label:has(input:checked), button[aria-selected="true"], button:hover) {
+  color: var(--chrome-ink);
 }
-.segmented.on-graphite :is(label:has(input:checked), button[aria-selected="true"]) {
-  border-bottom-color: var(--rail-ink);
+.segmented.on-chrome :is(label:has(input:checked), button[aria-selected="true"]) {
+  border-bottom-color: var(--chrome-ink);
 }
 
-/* Popover and menu: a floating paper layer; the body is the one scroller, capped. */
+/* Popover and menu: a floating paper layer with a frame border; the body is the one scroller, capped. */
 .popover {
   position: absolute;
   z-index: 30;
@@ -813,8 +816,86 @@ svg.chart .datum-line {
   max-width: min(360px, calc(100vw - 24px));
   background: var(--color-surface);
   color: var(--color-text);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-frame);
   box-shadow: var(--shadow-md);
+}
+/* A menu of actions: items 4px 12px, a hairline between groups, an optional mono group label. */
+.popover[role="menu"] > .popover-body {
+  padding: var(--space-1) 0;
+  gap: 0;
+}
+.popover hr {
+  height: 0;
+  margin: var(--space-1) 0;
+  border: 0;
+  border-top: 1px solid var(--color-border);
+}
+.mlabel {
+  padding: 2px var(--space-3) 0;
+  font: 500 10.5px / 1.6 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-muted);
+}
+/* A menu item: the label left, an optional mono key hint right. */
+.menu-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: 4px var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+}
+.menu-item:hover:not(:disabled) {
+  background: var(--color-hover);
+}
+.menu-item:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.menu-item small {
+  font: 400 11px / 1.6 var(--font-mono);
+  color: var(--color-muted);
+}
+
+/* Option list: a bordered stack of choices with a hairline between; the chosen one is banded and ringed in ink, its effect right-aligned in mono steel. */
+.opts {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--color-edge);
+  background: var(--color-surface);
+}
+.opt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  min-height: var(--control-h);
+  padding: 6px 10px;
+  font-size: 14.5px;
+  cursor: pointer;
+}
+.opt + .opt {
+  border-top: 1px solid var(--color-border);
+}
+.opt:has(input:checked) {
+  background: var(--color-band);
+  box-shadow: inset 0 0 0 1px var(--color-text);
+}
+.eff {
+  font: 400 12px / 1.3 var(--font-mono);
+  color: var(--color-secondary);
+}
+.opt .eff {
+  margin-left: auto;
+  text-align: right;
 }
 .popover-head {
   padding: 5px var(--space-3);
@@ -830,38 +911,7 @@ svg.chart .datum-line {
   overflow-y: auto;
   padding: var(--space-3);
 }
-.menu {
-  list-style: none;
-  margin: 0;
-  padding: var(--space-1) 0;
-}
-.menu > li > :is(button, a) {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  min-height: var(--control-h);
-  padding: 4px var(--space-3);
-  border: 0;
-  border-radius: 0;
-  background: transparent;
-  text-align: left;
-  text-decoration: none;
-  color: var(--color-text);
-}
-.menu > li > :is(button, a):hover {
-  background: var(--color-hover);
-}
-.menu > li > :is(button, a)[aria-checked="true"] {
-  box-shadow: inset 2px 0 0 var(--color-accent);
-}
-.menu > li[role="separator"] {
-  height: 0;
-  margin: var(--space-1) 0;
-  border-top: 1px solid var(--color-border);
-}
-
-/* Bottom sheet handle: a 24px drag target with a short bar, on graphite. */
+/* Bottom sheet handle: a 24px drag target with a short bar, on chrome. */
 .sheet-handle {
   position: relative;
   display: block;
@@ -884,34 +934,57 @@ svg.chart .datum-line {
   width: 40px;
   height: 4px;
   margin-left: -20px;
-  background: var(--rail-muted);
+  background: var(--chrome-muted);
   opacity: 0.6;
 }
 
-/* Selection bar: a graphite bar that floats over the workspace while several nodes are picked. */
+/* Selection bar: a chrome bar that floats over the workspace while several nodes are picked. */
 .selbar {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  background: var(--color-primary);
-  color: var(--rail-ink);
-  border: 1px solid var(--rail-border);
+  background: var(--chrome-bg);
+  color: var(--chrome-ink);
+  border: 1px solid var(--chrome-border);
   box-shadow: var(--shadow-md);
   font: 500 12px / 1.4 var(--font-mono);
   letter-spacing: 0.04em;
   text-transform: uppercase;
 }
 .selbar button {
-  color: var(--rail-ink);
+  color: var(--chrome-ink);
   background: transparent;
-  border-color: var(--rail-border);
+  border-color: var(--chrome-border);
   font: inherit;
   text-transform: inherit;
 }
 .selbar button:hover {
-  border-color: var(--rail-muted);
+  border-color: var(--chrome-muted);
+}
+
+/* Group frame: a container drawn around its members. A header band (kind, title, progress, status) over a sunken body, so the paper cards inside stand out. */
+.group-frame {
+  border: 1px solid var(--color-frame);
+  background: var(--color-sunken);
+}
+.group-frame > header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-1) var(--space-3);
+  background: var(--color-band);
+  border-bottom: 1px solid var(--color-frame);
+}
+.group-frame > header > .grow {
+  flex: 1;
+  font-weight: 600;
+}
+.group-frame > .members {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
 }
 
 /* Rank tag: the primary button's ink pair on a square that hangs off a card's top-left corner. */
@@ -970,7 +1043,7 @@ svg.chart .datum-line {
     position: static;
     height: auto;
     border-left: 0;
-    border-top: 1px solid var(--rail-border);
+    border-top: 1px solid var(--chrome-border);
   }
 }
 @media (max-width: 719px) {
@@ -988,7 +1061,7 @@ svg.chart .datum-line {
     gap: 6px 12px;
     padding: var(--space-2) var(--space-4);
     border-right: 0;
-    border-bottom: 1px solid var(--rail-border);
+    border-bottom: 1px solid var(--chrome-border);
   }
   .rail nav {
     flex-direction: row;
@@ -1002,7 +1075,7 @@ svg.chart .datum-line {
     padding: 4px 8px;
   }
   .rail nav a[aria-current="page"] {
-    border-bottom-color: var(--rail-ink);
+    border-bottom-color: var(--chrome-ink);
   }
   .rail button {
     width: auto;

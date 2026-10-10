@@ -1,4 +1,4 @@
-// The app frame every screen renders inside (design 3.1): a graphite rail with the screens,
+// The app frame every screen renders inside (design 3.1): a chrome rail with the screens,
 // the workspace (the screen the router shows, its one scroller `.ws-body`), the inspector
 // column on the right (INSPECTOR | ASSISTANT; a bottom sheet on a tablet), and the 28px
 // strip with the sync chip. The frame is one `100dvh` grid with one scroller per

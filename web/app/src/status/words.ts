@@ -6,6 +6,7 @@
 import type { Schema } from "@cairn/client";
 
 import type { NodeKind } from "../detail/model.ts";
+import type { Tone } from "../ui/kit.tsx";
 
 export type DisplayState = Schema<"DisplayState">;
 
@@ -90,20 +91,26 @@ export function statusGlyph(state: DisplayState): string {
   return GLYPHS[state];
 }
 
-/** The badge tone a state reads in: finished is good, held back is a warning, the rest are plain. */
-export function statusTone(state: DisplayState): "plain" | "good" | "warn" {
+/** The badge tone each state takes: its dot's colour and shape, so no two states look alike (DESIGN, Status). */
+export function statusTone(state: DisplayState): Tone {
   switch (state) {
-    case "done":
-      return "good";
+    case "ready":
+      return "ink";
+    case "active":
+      return "ring";
     case "blocked":
+      return "blocked";
+    case "conditional":
+      return "conditional";
+    case "scheduled":
+      return "scheduled";
     case "snoozed":
       return "warn";
-    case "ready":
-    case "active":
-    case "conditional":
-    case "scheduled":
+    case "done":
+      return "good";
     case "skipped":
+      return "skipped";
     case "not_relevant":
-      return "plain";
+      return "superseded";
   }
 }

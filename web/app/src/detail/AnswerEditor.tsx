@@ -119,10 +119,10 @@ export function answerMutations(decision: string, value: AnswerValue, named: str
 /** One choice of the decision: a radio or a checkbox, its title, and what picking it would do. */
 function Choose({ type, group, title, checked, effect, onPick }: { type: "radio" | "checkbox"; group?: string; title: string; checked: boolean; effect: ChoiceEffect | undefined; onPick: () => void }) {
   return (
-    <label className="choice" data-testid="choice">
+    <label className="opt" data-testid="choice">
       <input type={type} {...(group === undefined ? {} : { name: group })} checked={checked} onChange={onPick} />
       <span>{title}</span>
-      {effect === undefined ? null : <span className="choice-effect mono muted">{effectWords(effect)}</span>}
+      {effect === undefined ? null : <span className="eff">{effectWords(effect)}</span>}
     </label>
   );
 }
@@ -148,7 +148,7 @@ function BooleanInput({ value, pick, effects }: InputProps) {
     ["no", "No", false],
   ] as const;
   return (
-    <div className="choices" role="radiogroup" aria-label="Answer" data-testid="answer">
+    <div className="opts" role="radiogroup" aria-label="Answer" data-testid="answer">
       {options.map(([id, title, boolean]) => (
         <Choose key={id} type="radio" group={group} title={title} checked={value !== undefined && "boolean" in value && value.boolean === boolean} effect={effectOfOption(effects, id)} onPick={() => { pick({ boolean }); }} />
       ))}
@@ -162,7 +162,7 @@ function SingleInput({ node, value, pick, effects }: InputProps) {
   const picked = value !== undefined && "single_choice" in value ? value.single_choice : "";
   if (choices.length <= INLINE_SINGLE_MAX) {
     return (
-      <div className="choices" role="radiogroup" aria-label="Answer" data-testid="answer">
+      <div className="opts" role="radiogroup" aria-label="Answer" data-testid="answer">
         {choices.map(([id, title]) => (
           <Choose key={id} type="radio" group={group} title={title} checked={picked === id} effect={effectOfOption(effects, id)} onPick={() => { pick({ single_choice: id }); }} />
         ))}
@@ -180,7 +180,7 @@ function SingleInput({ node, value, pick, effects }: InputProps) {
           </option>
         ))}
       </select>
-      {picked === "" || effect === undefined ? null : <span className="choice-effect mono muted">{effectWords(effect)}</span>}
+      {picked === "" || effect === undefined ? null : <span className="eff">{effectWords(effect)}</span>}
     </div>
   );
 }
@@ -194,10 +194,10 @@ function MultiInput({ node, value, pick, effects }: InputProps) {
   return choices.length > INLINE_MULTI_MAX ? (
     <details data-testid="answer">
       <summary>Choose ({picked.length} picked)</summary>
-      <div className="choices">{boxes}</div>
+      <div className="opts">{boxes}</div>
     </details>
   ) : (
-    <div className="choices" role="group" aria-label="Answer" data-testid="answer">
+    <div className="opts" role="group" aria-label="Answer" data-testid="answer">
       {boxes}
     </div>
   );
@@ -238,7 +238,7 @@ function EntityListInput({ view, value, pick, named, onNamed }: InputProps) {
   const picked = value !== undefined && "entity_list" in value ? value.entity_list : [];
   return (
     <div className="stack" data-testid="answer">
-      <div className="choices" role="group" aria-label="Answer">
+      <div className="opts" role="group" aria-label="Answer">
         {(view.inputs.deployment.entities ?? []).map((entity) => (
           <Choose key={entity.key} type="checkbox" title={entity.name} checked={picked.includes(entity.key)} effect={undefined} onPick={() => { pick({ entity_list: toggled(picked, entity.key) }); }} />
         ))}

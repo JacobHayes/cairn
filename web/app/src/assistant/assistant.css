@@ -1,6 +1,6 @@
 /* The assistant panel: the inspector column's ASSISTANT tab (shell/InspectorColumn.tsx). The
    transcript is the one scroller (`.inspector-body`) and the composer is pinned under it. Drawn
-   with Graticule's tokens, light and dark; the column is graphite, so the panel sits on a paper card. */
+   with Graticule's tokens, light and dark; the column is chrome, so the panel sits on a paper card. */
 .assistant-panel {
   flex: 1 1 0;
   min-height: 0;
@@ -8,10 +8,6 @@
   flex-direction: column;
   margin: var(--space-3);
   padding: 0;
-  background: var(--color-surface);
-  color: var(--color-text);
-  border: 1px solid var(--color-border);
-  box-shadow: var(--shadow-sm);
 }
 
 .assistant-head {

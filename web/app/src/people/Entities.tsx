@@ -121,6 +121,7 @@ export function Entities() {
       <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an entity holding your verified email is you.</span>
       <CreateEntity deployment={deployment} />
       <MergeEntities key={asked.join(",")} deployment={deployment} entities={entities} asked={asked} />
+      {entities.length === 0 ? <p className="muted small" data-testid="entities-empty">No entities yet.</p> : null}
       <ul className="version-list">
         {entities.map((entity) => (
           <EntityRow key={entity.key} entity={entity} deployment={deployment} yours={yours.has(entity.key)} />

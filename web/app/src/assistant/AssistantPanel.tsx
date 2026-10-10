@@ -227,7 +227,7 @@ function Composer({ draftKey, ready, sending, send }: { draftKey: string; ready:
 /** What the panel says before the first message. */
 function Empty({ target }: { target: AssistantTarget }) {
   return (
-    <p className="muted small" data-testid="assistant-empty">
+    <p className="muted" data-testid="assistant-empty">
       Ask about {aboutWords(target)}, or ask for a change. Changes to state (an answer, a transition, a note, an assignment, a pin,
       a snooze) are made directly and reported here; changes to structure, and any change touching more than ten nodes, come back
       as a proposal for you to review and apply. You can always ask for a proposal instead.
@@ -245,7 +245,7 @@ function AssistantPanel({ assistant, target, titleOf, onClose }: { assistant: As
     scroller.current?.scrollTo({ top: scroller.current.scrollHeight });
   }, [entries.length, sending]);
   return (
-    <section className="assistant-panel" aria-label="Assistant" data-testid="assistant-panel" data-target={key} data-status={sending === undefined ? "idle" : "working"}>
+    <section className="panel assistant-panel" aria-label="Assistant" data-testid="assistant-panel" data-target={key} data-status={sending === undefined ? "idle" : "working"}>
       <div className="row assistant-head">
         <span className="muted small">About {aboutWords(target)}</span>
         <span className="spacer" />

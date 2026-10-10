@@ -1,4 +1,4 @@
-// The inspector column of the frame (design 3.1, 3.3): a graphite column on the right at
+// The inspector column of the frame (design 3.1, 3.3): a chrome column on the right at
 // 1100px and wider, a bottom sheet from 720 to 1099px (with a drag handle that snaps between
 // two heights), and stacked under the workspace on a phone. Its head has two tabs, INSPECTOR
 // and ASSISTANT, when the assistant is on offer, the sheet's grip in the middle, and the collapse
@@ -70,7 +70,7 @@ export function InspectorColumn({ open, tab, snap, assistantOffered, onTab, onSn
     <aside ref={column} className="inspector" aria-label="Inspector column" data-snap={snap} data-tab={tab} hidden={!open}>
       <div className="inspector-head">
         {assistantOffered ? (
-          <div className="segmented on-graphite" role="tablist" aria-label="Inspector">
+          <div className="segmented on-chrome" role="tablist" aria-label="Inspector">
             {(["inspector", "assistant"] as const).map((each) => (
               <button
                 key={each}

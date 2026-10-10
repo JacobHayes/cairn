@@ -154,13 +154,15 @@ function SetAside({ options, group, aside, onChange }: { options: ReturnType<typ
   return (
     <fieldset className="stack">
       <legend className="small muted">Set aside</legend>
-      {options.map((option) => (
-        <label key={option.node} className="choice">
-          <input type="radio" name={`${group}-aside`} checked={aside === option.node} onChange={() => { onChange(option.node); }} />
-          <span>{option.open === undefined ? option.title : `All of ${option.title}`}</span>
-          {option.open === undefined ? null : <span className="choice-effect mono muted">{option.open} open</span>}
-        </label>
-      ))}
+      <div className="opts">
+        {options.map((option) => (
+          <label key={option.node} className="opt">
+            <input type="radio" name={`${group}-aside`} checked={aside === option.node} onChange={() => { onChange(option.node); }} />
+            <span>{option.open === undefined ? option.title : `All of ${option.title}`}</span>
+            {option.open === undefined ? null : <span className="eff">{option.open} open</span>}
+          </label>
+        ))}
+      </div>
     </fieldset>
   );
 }
@@ -207,12 +209,14 @@ export function SnoozePanel({ view, detail, form }: { view: Ready; detail: NodeD
       {options.length === 1 ? null : <SetAside options={options} group={group} aside={aside} onChange={(node) => { change({ aside: node }); }} />}
       <fieldset className="stack">
         <legend className="small muted">Until</legend>
-        {UNTIL_OPTIONS.map((option) => (
-          <label key={option.value} className="choice">
-            <input type="radio" name={`${group}-until`} checked={until === option.value} onChange={() => { change({ until: option.value }); }} />
-            <span>{option.label}</span>
-          </label>
-        ))}
+        <div className="opts">
+          {UNTIL_OPTIONS.map((option) => (
+            <label key={option.value} className="opt">
+              <input type="radio" name={`${group}-until`} checked={until === option.value} onChange={() => { change({ until: option.value }); }} />
+              <span>{option.label}</span>
+            </label>
+          ))}
+        </div>
       </fieldset>
       {until === "date" ? <Field type="date" aria-label="Snooze until" value={date} onChange={(event) => { change({ date: event.target.value }); }} /> : null}
       {until === "node" ? (

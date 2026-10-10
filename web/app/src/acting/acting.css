@@ -529,7 +529,7 @@ table.data.list-table th.bulk-head {
   display: block;
   padding: var(--space-2) 0;
   background: var(--chrome-bg);
-  color: var(--rail-ink);
+  color: var(--chrome-ink);
 }
 
 /* The band's title gives way before Pass does. */

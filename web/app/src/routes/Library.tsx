@@ -93,7 +93,8 @@ export function Library() {
       <TypeChips type={type} onPick={(next) => { setParams(next === undefined ? {} : { type: next }, { replace: true }); }} />
       {view.status === "loading" ? <p className="muted small">Loading the routes...</p> : null}
       {view.status === "failed" ? <p className="callout callout-bad">The routes could not be read: {view.message}</p> : null}
-      {view.status === "ready" ? (
+      {view.status === "ready" && shown.length === 0 ? <p className="muted small" data-testid="library-empty">No routes match.</p> : null}
+      {view.status === "ready" && shown.length > 0 ? (
         <div className="table-wrap">
           <table className="data">
             <thead>

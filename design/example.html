@@ -69,15 +69,37 @@
           <div class="segmented" role="radiogroup" aria-label="Theme">
             <label><input type="radio" name="theme" checked /> System</label><label><input type="radio" name="theme" /> Light</label><label><input type="radio" name="theme" /> Dark</label>
           </div>
-          <div class="popover" style="position: static">
-            <div class="popover-head">Menu</div>
-            <ul class="menu">
-              <li><button type="button">Snooze</button></li>
-              <li><button type="button" aria-checked="true">Skip</button></li>
-              <li role="separator"></li>
-              <li><button type="button">Reopen</button></li>
-            </ul>
+          <div class="popover" role="menu" style="position: static">
+            <div class="popover-body">
+              <div class="mlabel">Decision</div>
+              <button type="button" role="menuitem" class="menu-item">Decide... <small>d</small></button>
+              <hr />
+              <button type="button" role="menuitem" class="menu-item">Snooze... <small>z</small></button>
+              <button type="button" role="menuitem" class="menu-item">Skip...</button>
+              <hr />
+              <button type="button" role="menuitem" class="menu-item">Copy link</button>
+            </div>
           </div>
+          <fieldset class="opts" style="min-width: 300px; margin: 0; padding: 0">
+            <legend class="visually-hidden">Answer</legend>
+            <label class="opt"><input type="radio" name="answer" /><span>Purchase</span><span class="eff">starts rollout</span></label>
+            <label class="opt"><input type="radio" name="answer" checked /><span>Research first</span><span class="eff">adds a study</span></label>
+            <label class="opt"><input type="radio" name="answer" /><span>Skip it</span></label>
+          </fieldset>
+        </div>
+        <h2>Tree rows and group frame</h2>
+        <div class="table-wrap">
+          <table class="data">
+            <tbody>
+              <tr class="container"><td class="tree" style="--depth: 0">Testing <span class="muted">4 of 10 done</span></td><td><span class="badge ring">active</span></td></tr>
+              <tr><td class="tree" style="--depth: 1">Partner runs testing</td><td><span class="badge good">done</span></td></tr>
+              <tr><td class="tree" style="--depth: 1">Decision meeting</td><td><span class="badge ink">ready</span></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="group-frame" style="margin-top: 16px; max-width: 520px">
+          <header><span class="label">Group</span><span class="grow">Testing</span><span class="muted">4/10</span><span class="badge ring">active</span></header>
+          <div class="members"><div class="card"><div class="card-body">Partner runs testing</div></div><div class="card"><div class="card-body">Decision meeting</div></div></div>
         </div>
         <div class="toolbar" style="margin-top: 24px">
           <div class="card" style="position: relative; width: 220px">
@@ -86,7 +108,7 @@
           </div>
           <div class="selbar">3 selected <button type="button">Assign</button> <button type="button">Clear</button></div>
         </div>
-        <div style="background: var(--color-primary); width: 240px; margin-top: 16px"><button class="sheet-handle" aria-label="Resize"></button></div>
+        <div style="background: var(--chrome-bg); width: 240px; margin-top: 16px"><button class="sheet-handle" aria-label="Resize"></button></div>
         <div class="strip" style="margin-top: 16px"><kbd>]</kbd> Inspector <span class="spacer"></span><span class="badge good">Live</span></div>
         <h3>Diff</h3>
         <pre class="diff"><span class="hunk">@@ -1,3 +1,3 @@</span><span class="del">-old line</span><span class="add">+new line</span></pre>

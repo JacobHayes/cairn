@@ -9,7 +9,7 @@
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
 import { createContext, useContext, type CSSProperties } from "react";
 
-import { statusGlyph, statusWord, type DisplayState } from "../status/words.ts";
+import { statusGlyph, statusTone, statusWord } from "../status/words.ts";
 import { TITLE_LINE_PX, cardRows } from "./cards.ts";
 import type { LensChip } from "./lens.ts";
 import { hereWords, nodeClasses } from "./look.ts";
@@ -58,19 +58,6 @@ export type CardData = {
 
 export type CardNode = Node<CardData, "card">;
 
-/** The tone each state's chip takes: its dot's colour and shape, so no two look alike (DESIGN, Status). */
-const CHIP_TONES: Record<DisplayState, string> = {
-  ready: "ink",
-  active: "ring",
-  blocked: "blocked",
-  conditional: "conditional",
-  scheduled: "scheduled",
-  snoozed: "warn",
-  done: "good",
-  skipped: "skipped",
-  not_relevant: "superseded",
-};
-
 const ORIGIN_WORDS = { from_route: "from the route", local: "added here", orphaned: "orphaned", from_segment: "from a segment" } as const;
 
 /** The kind as the card's label says it: a top-level group is a stage. */
@@ -91,7 +78,7 @@ function Head({ card, collapsible }: { card: Card; collapsible: boolean }) {
       ) : null}
       <span className="spacer" />
       {journey === undefined ? null : (
-        <span className={`badge ${CHIP_TONES[journey.state]} node-state`} data-testid="card-state" data-state={journey.state}>
+        <span className={`badge ${statusTone(journey.state)} node-state`} data-testid="card-state" data-state={journey.state}>
           {statusWord(journey.state, card.kind)}
         </span>
       )}

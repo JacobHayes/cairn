@@ -7,11 +7,6 @@
   line-height: 1.55;
 }
 
-/* A solid sheet of paper: the ruling and corner ticks that .panel draws would run under the text. */
-.detail-panel.panel {
-  background: var(--color-surface);
-}
-
 /* The header: where the node sits and its state, its title, one line about it. */
 .detail-head {
   gap: var(--space-2);
@@ -24,7 +19,7 @@
 
 .detail-kind {
   min-width: 0;
-  font-size: 14px;
+  font-size: 13px;
 }
 
 .detail-head h2 {
@@ -36,7 +31,7 @@
 }
 
 .meta {
-  font-size: 14px;
+  font-size: 13px;
 }
 
 /* `Assign ▾` reads as a word in the meta line, not as a form control. */
@@ -50,7 +45,7 @@
   color: var(--color-accent);
 }
 
-/* The shortcut hint is plain muted text here (the chip is for the graphite strip), and a touch screen has no keys. */
+/* The shortcut hint is plain muted text here (the chip is for the strip), and a touch screen has no keys. */
 .detail-panel kbd {
   padding: 0;
   border: 0;
@@ -67,7 +62,7 @@
 /* The sentence: what the node's state means, in words. */
 .sentence {
   margin: 0;
-  font-size: 16px;
+  font-size: 15px;
 }
 
 /* The answer form: the question, what each choice does beside it, a reason, one Save. */
@@ -76,28 +71,8 @@
 }
 
 .question {
-  font-size: 16px;
+  font-size: 15px;
   font-weight: 500;
-}
-
-.choices {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-}
-
-.choice {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: var(--space-1) var(--space-2);
-  min-height: var(--control-h);
-  padding: var(--space-1) 0;
-}
-
-.choice-effect {
-  margin-left: auto;
-  font-size: 13px;
 }
 
 textarea.grow {

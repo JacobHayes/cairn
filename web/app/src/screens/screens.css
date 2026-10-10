@@ -172,14 +172,10 @@
   display: inline-block;
 }
 
-.dropdown-button {
-  font-size: 12px;
-}
+
 
 .dropdown-popover {
   top: calc(100% + var(--space-1));
-  min-width: 14rem;
-  max-width: min(36rem, calc(100vw - 2 * var(--space-4)));
 }
 
 .dropdown-popover[data-side="top"] {
@@ -188,7 +184,6 @@
 }
 
 .dropdown-popover .popover-body {
-  max-height: none;
   gap: var(--space-1);
 }
 
@@ -200,29 +195,9 @@
   right: 0;
 }
 
-.menu-item {
-  display: block;
-  font: inherit;
-  padding: var(--space-1) var(--space-2);
-  border: none;
-  background: none;
-  color: var(--color-text);
-  text-align: left;
-  text-decoration: none;
-  cursor: pointer;
-}
-
-.menu-item:hover:not(:disabled) {
-  background: var(--color-hover);
-}
-
-.menu-item:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
-
 /* A modal <dialog>: the browser draws the backdrop and keeps the focus inside. */
 .key-sheet {
+  box-shadow: var(--shadow-lg);
   width: min(28rem, 92vw);
   color: var(--color-text);
 }
@@ -233,7 +208,7 @@
 }
 
 .key-sheet::backdrop {
-  background: color-mix(in srgb, var(--color-canvas) 60%, transparent);
+  background: color-mix(in srgb, var(--color-ground) 60%, transparent);
 }
 
 .journey-card progress {

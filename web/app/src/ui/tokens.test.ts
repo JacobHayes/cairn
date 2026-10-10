@@ -1,0 +1,56 @@
+// DESIGN.md's contrast floors, held against design/tokens.css in both themes: a token edit that
+// loses a border or a readable text colour fails here instead of in a screenshot.
+import { readFileSync } from "node:fs";
+import { expect, it } from "vitest";
+
+const css = readFileSync(new URL("../../../../design/tokens.css", import.meta.url), "utf8");
+
+/** Every hex colour token declared in `text`. */
+function declared(text: string): Map<string, string> {
+  const found = new Map<string, string>();
+  for (const [, name, hex] of text.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})\b/gi)) {
+    found.set(name ?? "", hex ?? "");
+  }
+  return found;
+}
+
+// Light is the base block; the data-theme dark block (the last one) overrides it.
+const light = declared(css.slice(0, css.indexOf("@media (prefers-color-scheme: dark)")));
+const dark = new Map([...light, ...declared(css.slice(css.indexOf(':root[data-theme="dark"]')))]);
+
+function luminance(hex: string): number {
+  const [r = 0, g = 0, b = 0] = [1, 3, 5].map((i) => {
+    const c = parseInt(hex.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+}
+
+function ratio(tokens: Map<string, string>, a: string, b: string): number {
+  const [hi = 0, lo = 0] = [luminance(tokens.get(a) ?? "#000000"), luminance(tokens.get(b) ?? "#000000")].sort((x, y) => y - x);
+  return (hi + 0.05) / (lo + 0.05);
+}
+
+// [foreground, background, floor]
+const floors: [string, string, number][] = [
+  ["color-text", "color-surface", 4.5],
+  ["color-muted", "color-surface", 4.5],
+  ["color-muted", "color-ground", 4.5],
+  ["color-text", "color-band", 4.5],
+  ["color-muted", "color-band", 4.5],
+  ["chrome-ink", "chrome-bg", 4.5],
+  ["chrome-muted", "chrome-bg", 4.5],
+  ["color-frame", "color-ground", 3],
+  ["color-frame", "color-sunken", 3],
+  ["color-edge", "color-ground", 2],
+  ["color-edge", "color-surface", 2],
+  ["color-surface", "color-ground", 1.08],
+];
+
+it.each([
+  ["light", light],
+  ["dark", dark],
+])("%s theme keeps its contrast floors", (_theme, tokens) => {
+  const short = floors.filter(([fg, bg, floor]) => ratio(tokens, fg, bg) < floor).map(([fg, bg, floor]) => `${fg} on ${bg} needs ${String(floor)}`);
+  expect(short).toEqual([]);
+});
