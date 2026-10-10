@@ -53,7 +53,6 @@ pub(super) fn check(check: &mut Check<'_, '_>) {
             document,
             tree: &tree,
             journey: matches!(id, GraphId::Journey(_)),
-            snoozes_made: Some(&check.session.snoozed),
         };
         let deployment = &check.session.candidate.deployment;
         let found_before = check.violations.len();

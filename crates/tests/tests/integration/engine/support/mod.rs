@@ -215,15 +215,6 @@ pub fn graph(records: &Records) -> &cairn_schema::Graph {
         .graph
 }
 
-/// The test journey's graph, for writing a stored shape no patch can produce.
-pub fn journey_graph_mut(records: &mut Records) -> &mut cairn_schema::Graph {
-    &mut records
-        .journeys
-        .get_mut(&JOURNEY.parse().unwrap())
-        .unwrap()
-        .graph
-}
-
 /// A node key.
 pub fn key(text: &str) -> cairn_schema::NodeKey {
     text.parse().unwrap()

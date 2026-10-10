@@ -9,9 +9,7 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::Records;
-use cairn_schema::{
-    Guard, GuardFailure, Rejection, Relevance, SnoozeTarget, Violation, ViolationCode,
-};
+use cairn_schema::{Guard, GuardFailure, Rejection, Relevance, Violation, ViolationCode};
 use support::{add_nodes as add, key};
 
 fn complete(node: &str) -> String {
@@ -341,30 +339,6 @@ fn snooze_wait_cycles_are_rejected() {
         &snooze("n_box", "n_inside"),
     ));
     assert_eq!(inside, [ViolationCode::SnoozeCycle]);
-    // A container snooze set in an earlier patch still makes its subtree wait for its target.
-    let held = support::accepted(&records, &snooze("n_box", "n_first"));
-    let across = support::journey_patch(&held, &snooze("n_first", "n_inside"));
-    assert_eq!(support::codes(across), [ViolationCode::SnoozeCycle]);
-}
-
-/// B6, compatibility: the container rule binds a snooze when it is set, not the stored graph.
-/// A journey stored with a deliverable snoozed until its own child, accepted before the rule,
-/// still loads and derives (the snooze holds until the child completes), and unsnooze lifts it.
-#[test]
-fn a_stored_container_snooze_on_its_own_child_loads_and_unsnoozes() {
-    let mut records = support::journey(&add(&[
-        "{key: n_box, id: box, kind: deliverable, title: Box}",
-        "{key: n_inside, id: inside, parent: n_box, kind: action, title: Inside}",
-    ]));
-    support::journey_graph_mut(&mut records)
-        .state
-        .snoozes
-        .insert(key("n_box"), SnoozeTarget::Node(key("n_inside")));
-    let held = support::derived(&records, support::JOURNEY);
-    assert!(held.blocking().snoozed(&key("n_box")).is_some());
-    let records = support::accepted(&records, "- op: unsnooze\n  node: n_box\n");
-    let lifted = support::derived(&records, support::JOURNEY);
-    assert!(lifted.blocking().snoozed(&key("n_box")).is_none());
 }
 
 /// Review round 1: an `auto_reach` milestone that reads as reached has nothing left to do, so

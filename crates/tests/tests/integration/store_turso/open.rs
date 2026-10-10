@@ -180,6 +180,70 @@ mod open {
         std::fs::remove_dir_all(&root).unwrap();
     }
 
+    /// B6: a journey stored with a container snoozed until its own child, accepted before the
+    /// snooze rule covered a container's subtree, migrates: that snooze is cleared and the
+    /// journey loads, while a snooze on a node without children stays. The older database is
+    /// the current one with the snooze stored by hand and the migration marked unapplied.
+    #[test]
+    fn a_container_snooze_that_breaks_the_subtree_rule_is_cleared_on_open() {
+        let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
+            .join(format!("snoozes-{}", std::process::id()));
+        std::fs::create_dir_all(&root).unwrap();
+        let path = root.join("store.db");
+        run(async {
+            let store = TursoStore::open(&path).await.unwrap();
+            let nodes = vec![
+                cairn_store::build::node(serde_json::json!({
+                    "key": "n_box", "id": "box", "kind": "deliverable", "title": "Box",
+                })),
+                action("n_in", "in", Some("n_box")),
+                action("n_leaf", "leaf", None),
+            ];
+            store
+                .commit(create_journey("p_one", "j_one", nodes).commit())
+                .await
+                .unwrap();
+            drop(store);
+
+            let database = turso::Builder::new_local(path.to_str().unwrap())
+                .build()
+                .await
+                .unwrap();
+            let connection = database.connect().unwrap();
+            for (node, until) in [("n_box", "n_in"), ("n_leaf", "n_in")] {
+                let insert = format!(
+                    "INSERT INTO snoozes (graph_id, node, until_node) \
+                     SELECT id, '{node}', '{until}' FROM graphs"
+                );
+                connection.execute(&insert, ()).await.unwrap();
+            }
+            connection
+                .execute("DELETE FROM schema_migrations WHERE version >= 9", ())
+                .await
+                .unwrap();
+            drop(connection);
+            drop(database);
+
+            let store = TursoStore::open(&path).await.unwrap();
+            let loaded = store
+                .load(&LoadTarget::Journey(cairn_store::build::id("j_one")))
+                .await
+                .unwrap();
+            let Some(Document::Journey(journey)) = loaded else {
+                panic!("the journey loads: {loaded:?}");
+            };
+            let kept: Vec<_> = journey
+                .graph
+                .state
+                .snoozes
+                .keys()
+                .map(cairn_schema::NodeKey::as_str)
+                .collect();
+            assert_eq!(kept, ["n_leaf"]);
+        });
+        std::fs::remove_dir_all(&root).unwrap();
+    }
+
     /// A14: each stored concept of the PRD glossary and the tables, or `table.column`s, that
     /// hold it. Derived values (due, gravity, rank, frontier, stale, ...) are never stored.
     const GLOSSARY: &[(&str, &[&str])] = &[

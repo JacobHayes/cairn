@@ -9,8 +9,6 @@ mod references;
 pub(crate) mod state;
 mod structure;
 
-use std::collections::BTreeMap;
-
 use cairn_schema::{Deployment, Location, NodeKey, Subject, Violation, ViolationCode};
 
 use crate::graph::{Document, Graph, Tree};
@@ -23,9 +21,6 @@ pub(crate) struct GraphCheck<'a> {
     pub tree: &'a Tree,
     /// A journey's graph, with state; otherwise a route version or draft, with none.
     pub journey: bool,
-    /// The snoozes the patch being applied sets, which are held to the stricter container
-    /// rule (B6); none when a stored graph is checked on its own.
-    pub snoozes_made: Option<&'a BTreeMap<NodeKey, u32>>,
 }
 
 /// A validation stage over one graph.
@@ -50,7 +45,6 @@ pub(crate) fn graph(document: &Document, tree: &Tree) -> Vec<Violation> {
         document,
         tree,
         journey: !document.state.is_empty(),
-        snoozes_made: None,
     };
     let mut violations = Vec::new();
     for stage in GRAPH_STAGES {
