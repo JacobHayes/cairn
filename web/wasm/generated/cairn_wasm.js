@@ -1634,7 +1634,7 @@ function __wbg_get_imports() {
         __wbg___wbindgen_throw_41e9ee4f547fc59a: function(arg0, arg1) {
             throw new Error(getStringFromWasm0(arg0, arg1));
         },
-        __wbg_error_684635163dd9f293: function(arg0, arg1) {
+        __wbg_error_37ea72a6a5b6ad31: function(arg0, arg1) {
             console.error(getStringFromWasm0(arg0, arg1));
         },
         __wbindgen_generic_0000000000000001: function(arg0, arg1) {

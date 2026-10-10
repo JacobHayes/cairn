@@ -301,7 +301,7 @@ dependencies = [
 
 [[package]]
 name = "cairn-engine"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cairn-schema",
  "jiff",
@@ -309,7 +309,7 @@ dependencies = [
 
 [[package]]
 name = "cairn-schema"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "jiff",
  "schemars",
@@ -322,7 +322,7 @@ dependencies = [
 
 [[package]]
 name = "cairn-service"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cairn-engine",
  "cairn-schema",
@@ -335,7 +335,7 @@ dependencies = [
 
 [[package]]
 name = "cairn-store"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cairn-schema",
  "serde",
@@ -344,7 +344,7 @@ dependencies = [
 
 [[package]]
 name = "cairn-store-turso"
-version = "0.1.0"
+version = "0.2.0"
 dependencies = [
  "cairn-schema",
  "cairn-store",
