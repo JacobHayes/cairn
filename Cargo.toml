@@ -121,36 +121,21 @@ unwrap_used = "deny"
 # Configured in clippy.toml, raised to deny only for the engine by the lint step.
 disallowed_types = "allow"
 
-# Debug builds, and the test profile that inherits them: line tables for the workspace's
-# own crates, so panics and backtraces still name file and line, and no debug info for
-# dependencies. With full debug info every test binary was hundreds of megabytes, each with
-# its own copy of Turso's. Raise it locally to step through code in a debugger.
+# Debug builds, and the test profile that inherits them: one setting for every crate, so
+# `serve`, the tests and the checks share one set of artifacts. Optimized because the engine's
+# property and cost tests, and the cases the browser tests compare with, took 5 to 50 s
+# unoptimized; measured against optimizing only the computing crates, an engine edit's
+# check:fast is no slower (103 s against 115 s). Debug assertions and overflow checks stay on.
+# Line tables for the workspace's own crates, so panics and backtraces still name file and
+# line, and no debug info for dependencies: with full debug info every test binary was
+# hundreds of megabytes, each with its own copy of Turso's. Lower both locally to step through
+# code in a debugger.
 [profile.dev]
+opt-level = 2
 debug = "line-tables-only"
 
 [profile.dev.package."*"]
 debug = false
-
-# The tests of the computing crates run optimized (the test profile only: the dev profile and
-# the wasm-dev profile that inherits it stay as they were, so the browser host's module and
-# its bindings do not change). Debug assertions and overflow checks stay on. The property and
-# cost tests of the engine, and the cases the browser tests compare with, took 5 to 50 s
-# unoptimized and take a fifth of that at opt-level 2. The library crates' integration tests
-# (cairn-tests) are built at the default level: they call these crates' optimized code.
-[profile.test.package.cairn-engine]
-opt-level = 2
-
-[profile.test.package.cairn-schema]
-opt-level = 2
-
-[profile.test.package.cairn-service]
-opt-level = 2
-
-[profile.test.package.cairn-store]
-opt-level = 2
-
-[profile.test.package.cairn-wasm]
-opt-level = 2
 
 # The browser host's build (brief 4.5): the release profile, its symbols stripped and linked
 # as one unit, so the module the page downloads is small. The wasm build task uses it for the
