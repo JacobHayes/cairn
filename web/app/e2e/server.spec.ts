@@ -189,8 +189,7 @@ test("a draft follows its journey, not the screen it was typed on", { tag: "@ser
   const copy = await journeyFromHiringRoute(page.request);
   await openJourney(page, "server", copy);
   await expect(nodeCard(page, "n_offer")).toBeVisible();
-  await open(page, "server", "/journeys/j_hiring/plan/graph");
-  await derived(page);
+  await openJourney(page, "server", "j_hiring");
   const draft = fresh("Offer, j_hiring's draft");
   await startRename(page, "n_offer", draft);
   await goWithin(page, `/journeys/${copy}/plan/graph/nodes/n_offer`);

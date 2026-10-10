@@ -46,7 +46,7 @@ export function TriageControls({ settings, onChange }: { settings: TriageSetting
   );
 }
 
-/** What reached the acting frontier since the pass began, other than what the pass's own actions unlocked (the card's band and the rail name those). */
+/** What reached the acting frontier since the pass began, other than what the pass's own actions unlocked and its filters still show (the card's band and the rail name those). */
 function Surfaced({ view, keys }: { view: Ready; keys: string[] }) {
   if (keys.length === 0) {
     return null;
@@ -208,7 +208,7 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
         </p>
       ) : null}
       {error === undefined ? null : <p className="callout callout-bad">The frontier could not be read: {error}</p>}
-      <Surfaced view={view} keys={surfaced(view.derived.acting_frontier, pass).filter((key) => unlockedBy(pass, key) === undefined)} />
+      <Surfaced view={view} keys={surfaced(view.derived.acting_frontier, pass).filter((key) => unlockedBy(pass, key) === undefined || !order.includes(key))} />
       {next === undefined ? <p className="muted small">Reading the frontier...</p> : null}
       {next !== undefined && rows.length === 0 ? (
         <Empty view={view} settings={settings} stalled={next.stalled != null} onContinue={() => void navigate(triagePath(journey, { ...settings, decisions: false }, selected))} />

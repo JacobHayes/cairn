@@ -99,7 +99,8 @@ test.describe("a phone's map", () => {
     await expect(page).toHaveURL(/map=1/);
     await expect(page.getByTestId("map-full")).toBeVisible();
     const opened = await transform(page, '[data-testid="map-full"]');
-    await swipe(page, { x: 195, y: 500 }, { dx: -80, dy: -120 });
+    // From empty pane: a finger that lands on a routed edge selects it and does not pan.
+    await swipe(page, { x: 195, y: 200 }, { dx: -80, dy: -120 });
     await expect.poll(() => transform(page, '[data-testid="map-full"]')).not.toBe(opened);
     expect(await scrolled(page)).toBe(resting);
 

@@ -51,7 +51,8 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
 
   await proposed.getByTestId("review-proposal").click();
   await reviewOpen(page);
-  await expect(page.locator('[data-testid="diff-node"][data-status="added"]')).toHaveCount(2);
+  await page.getByTestId("projection-list").click();
+  await expect(page.locator('[data-testid="diff-node"][data-status="add"]')).toHaveCount(2);
   await confirmAndApply(page);
   await page.getByTestId("applied-journey").click();
   for (const title of ["Ingest workload", "Query workload"]) {
