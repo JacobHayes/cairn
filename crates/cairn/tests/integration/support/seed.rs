@@ -1,6 +1,6 @@
 //! The fixtures seeded into a database file through the service, as the in-browser root
 //! seeds them (crates/wasm: one deployment, in UTC), so the binary serves them. Shared by
-//! the binary's tests and the `seed_fixtures` example the browser tests run.
+//! the binary's tests.
 
 use std::path::Path;
 use std::sync::Arc;

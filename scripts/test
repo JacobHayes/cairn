@@ -15,11 +15,9 @@
 #   - Playwright (web/app/e2e), in Chromium: a spec a filter names (`canvas`, `canvas.spec.ts`)
 #     whole, and a spec whose test titles contain a filter, only those tests. The module is
 #     bound (build:wasm: cargo decides, and the bindings are rebound only if it changed), the
-#     programs the servers start are built (scripts/built: cargo), and the four servers start
-#     side by side (scripts/e2e-servers), as in rung 6. A spec's @server tests run too.
-#     server.spec.ts, which only runs against the real binary, runs in the `binary` project,
-#     with the web build it embeds made first if stale; the other specs start no binary and
-#     build no web app.
+#     servers start side by side (scripts/e2e-servers), as in rung 6. A spec with @server
+#     tests (the server host's) runs them against `cairn demo`, built with the web build it
+#     embeds, made first if stale; a spec with none starts no binary and builds no web app.
 # Quiet, like the ladder: one line per part that ran, a failing test's name, output, and
 # rerun command, and the complete log in dist/ladder/last.log. It fails when nothing matched.
 set -euo pipefail
@@ -118,24 +116,23 @@ for file in web/app/e2e/*.spec.ts; do
   [ -x "$playwright" ] || ladder_fail "$playwright is missing: run npm ci"
   start=$SECONDS
   [ -n "$module_built" ] || { ladder_run "the browser host's module build" mise-tasks/build/wasm; module_built=yes; }
-  if [ "$spec" = server ]; then
-    projects=(--project=binary)
-    # The binary serves the web build it embeds: build it when any source it comes from is
-    # newer than it (what make would do), before cargo links the binary around it.
-    # Directories count, so a file removed from one does too, and so do the manifests, for a
-    # dependency that changed.
+  # A spec with a server-host test needs the binary, which serves the web build it embeds:
+  # build that when any source it comes from is newer than it (what make would do), before
+  # cargo links the binary around it. Directories count, so a file removed from one does too,
+  # and so do the manifests, for a dependency that changed.
+  if grep -q '@server' "$file"; then
     build=web/app/dist/build/index.html
     if [ ! -f "$build" ] || [ -n "$(find web/app/src web/app/index.html web/app/vite.config.ts web/app/package.json \
       web/client/src web/client/package.json web/wasm/src web/wasm/package.json web/wasm/dist/bindgen design \
       package-lock.json -newer "$build" -print -quit)" ]; then
       ladder_run "the app's web build" bash -c 'cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts'
     fi
+    ladder_run "the build of the binary" cargo build --locked --quiet -p cairn
     export CAIRN_E2E_BINARY=1
   else
-    projects=(--project=chromium --project=server)
     export CAIRN_E2E_BINARY=0
   fi
-  ladder_run "the build of the binary, the fixture server, and the seeding example" scripts/built
+  projects=(--project=chromium --project=server)
   grep=()
   [ -n "$named" ] || grep=(-g "$(IFS='|'; echo "${titled[*]}")")
   report=$PWD/web/app/dist/playwright.json

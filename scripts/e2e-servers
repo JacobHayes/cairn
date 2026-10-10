@@ -1,14 +1,13 @@
 #!/usr/bin/env bash
-# The four servers the app's browser tests run against (web/app/playwright.config.ts), started
-# side by side where Playwright would start its webServer entries one after another: the
-# fixture server, the real binary over a seeded database (scripts/e2e-binary), and the app's
-# two Vite dev servers, one on the server host proxying to the fixture server and one on the
-# in-browser host. Each one's wait (the cargo no-op, the seeding, Vite's start) overlaps the
-# others'. Prints READY once all four answer, which is what Playwright waits for, and exits
-# non-zero when any of them stops. The ports are the config's, passed in the environment:
-# CAIRN_APP_PORT, CAIRN_SERVER_PORT, CAIRN_E2E_PORT, and CAIRN_DEMO_PORT. With
-# CAIRN_E2E_BINARY=0 the binary is left out (`mise run check:fast` does so for a spec that does not
-# run against it, which then needs no web build embedded in it).
+# The two servers the app's browser tests run against (web/app/playwright.config.ts), started
+# side by side where Playwright would start its webServer entries one after another: `cairn
+# demo` (the server host: the binary over the fixtures in memory, serving its embedded web
+# build and the API on one port) and the app's Vite dev server on the in-browser host. Each
+# one's wait (the cargo no-op, Vite's start) overlaps the other's. Prints READY once both
+# answer, which is what Playwright waits for, and exits non-zero when either stops. The ports
+# are the config's, passed in the environment: CAIRN_SERVER_PORT and CAIRN_DEMO_PORT. With
+# CAIRN_E2E_BINARY=0 the binary is left out (`mise run check:fast` does so for a spec with no
+# server-host test, which then needs no web build embedded in it).
 #
 # usage: scripts/e2e-servers
 set -euo pipefail
@@ -17,22 +16,16 @@ cd "$(dirname "$0")/.."
 # a JSON line per request.
 mkdir -p dist/ladder
 exec 2>dist/ladder/servers.log
-: "${CAIRN_APP_PORT:?}" "${CAIRN_SERVER_PORT:?}" "${CAIRN_E2E_PORT:?}" "${CAIRN_DEMO_PORT:?}"
-app=http://127.0.0.1:$CAIRN_APP_PORT
-server=http://127.0.0.1:$CAIRN_SERVER_PORT
+: "${CAIRN_SERVER_PORT:?}" "${CAIRN_DEMO_PORT:?}"
 vite=$PWD/node_modules/vite/bin/vite.js
 
 pids=()
-scripts/built examples/fixture_server "$CAIRN_SERVER_PORT" "$app" >/dev/null &
-pids+=($!)
-urls=("$server/api/capabilities" "$app/" "http://127.0.0.1:$CAIRN_DEMO_PORT/")
+urls=("http://127.0.0.1:$CAIRN_DEMO_PORT/")
 if [ "${CAIRN_E2E_BINARY:-1}" != 0 ]; then
-  scripts/e2e-binary "$CAIRN_E2E_PORT" >/dev/null &
+  cargo run --locked --quiet -p cairn -- demo --listen "127.0.0.1:$CAIRN_SERVER_PORT" >/dev/null &
   pids+=($!)
-  urls+=("http://127.0.0.1:$CAIRN_E2E_PORT/api/capabilities")
+  urls+=("http://127.0.0.1:$CAIRN_SERVER_PORT/api/capabilities")
 fi
-(cd web/app && CAIRN_SERVER=$server exec node "$vite" --config vite.config.ts >/dev/null) &
-pids+=($!)
 # The in-browser host's server must not see a CAIRN_SERVER from the caller: it would proxy.
 (cd web/app && exec env -u CAIRN_SERVER CAIRN_APP_PORT="$CAIRN_DEMO_PORT" node "$vite" --config vite.config.ts >/dev/null) &
 pids+=($!)

@@ -24,8 +24,9 @@ cairn-wasm = { path = "crates/wasm" }
 # The auth crate (ARCHITECTURE, Auth): axum for the layer and the providers' own routes
 # (HTTP/1 on tokio, as the spike proved, plus forms, queries, and JSON for the OAuth
 # endpoints); base64 for the built-in server's client ids; chrono only for the clock
-# openidconnect checks expiry against; cookie for the session and sign-in cookies;
-# ed25519-dalek only to sign a test issuer's ID tokens; p256 only to sign test IAP
+# openidconnect checks expiry against (and the claims of the demo's stub issuer); cookie for
+# the session and sign-in cookies; ed25519-dalek only to sign the ID tokens of `cairn demo`'s
+# stub issuer and of the tests; p256 only to sign test IAP
 # assertions (already in the tree under openidconnect); getrandom for secrets; subtle to
 # compare them in constant time; url for the public base URL; hyper, hyper-util, and
 # http-body-util for the one GET to tailscaled's whois over its unix socket (already in the

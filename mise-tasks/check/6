@@ -3,11 +3,11 @@
 # PRACTICES, The validation ladder, rung 6. The browser host's tests (brief 4.5) need the
 # module (mise run build:wasm) and the server's answers to compare with (the cairn-wasm-cases
 # binary, which walks the fixtures through the service natively); both are build outputs
-# under web/wasm/dist/. The app's tests (brief 4.6) need the module and the fixture server.
+# under web/wasm/dist/. The app's tests (brief 4.6) need the module and the binary.
 # The binary (brief 4.7) embeds the app's build (web/app/dist/build/): its own tests that start
 # it (`mod binary` in crates/cairn/tests/integration/binary.rs, so `binary::binary::`) are a
-# suite here, and the app's server-host suite runs against it too (the `binary` project of
-# web/app/playwright.config.ts).
+# suite here, and the app's server-host tests run against `cairn demo`, the same binary over
+# the fixtures in memory (the `server` project of web/app/playwright.config.ts).
 # The module is built first: web unit tests (Vitest, from 4.6) run next, one suite per web
 # package with a vitest.config.ts, and the authoring tests (5.6) check the editors against
 # the module's engine; then each web package with a playwright.config.ts is a suite. A suite
@@ -53,15 +53,14 @@ for config in web/*/vitest.config.ts; do
   ladder_suite "web unit: $package" "$passed" tests
 done
 
-# The web build the binary embeds, then the programs the browser tests start, built as the
-# tests are (scripts/built): the binary, the example that seeds its database, and the fixture
-# server the app's server-host tests (web/app, 4.6) run against. Built here so Playwright's
-# start of them is a run, not a build.
+# The web build the binary embeds, then the binary, which the app's server-host tests
+# (web/app) start as `cairn demo`. Built here so Playwright's start of it is a run, not a
+# build.
 ladder_run "the app's web build" bash -c 'cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts'
 [ -f web/app/dist/build/index.html ] || ladder_fail "the app's web build wrote no index.html"
-ladder_run "the build of the binary, the fixture server, and the seeding example" scripts/built
-# The server's answers the browser host's tests compare with: cairn-wasm-cases, just built with
-# the rest, walks the fixtures through the service. It runs beside the binary's and the app's
+ladder_run "the build of the binary" cargo build --locked --quiet -p cairn
+# The server's answers the browser host's tests compare with: cairn-wasm-cases walks the
+# fixtures through the service. It runs beside the binary's and the app's
 # tests, which do not read its output, and only web/wasm's suite waits for it. Its output is a
 # function of the crates it links and the fixtures, so it is kept under web/wasm/dist/cases
 # with a hash of those inputs (cases.hash, written only after a complete run), and a run whose
@@ -75,7 +74,7 @@ if [ "$(cat web/wasm/dist/cases.hash 2>/dev/null || true)" = "$cases_hash" ] && 
 else
   rm -f web/wasm/dist/cases.hash
   {
-    scripts/built cairn-wasm-cases web/wasm/dist/cases && printf '%s\n' "$cases_hash" >web/wasm/dist/cases.hash
+    cargo run --locked --quiet --profile test -p cairn-wasm --features server --bin cairn-wasm-cases -- web/wasm/dist/cases && printf '%s\n' "$cases_hash" >web/wasm/dist/cases.hash
   } &
   cases=$!
 fi

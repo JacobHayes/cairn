@@ -1,7 +1,6 @@
-// What the assistant panel's browser tests and proof share (brief 5.8): the fixture server's
-// scripted model, set to answer the next turn with given tool calls and words (4.4's scripted
-// provider, mounted by crates/wasm/examples/fixture_server.rs), and the panel opened and a
-// message sent the way a person does.
+// What the assistant panel's browser tests and proof share (brief 5.8): the demo server's
+// scripted model, set to answer the next turn with given tool calls and words
+// (crates/cairn/src/demo.rs), and the panel opened and a message sent the way a person does.
 import { expect, type Locator, type Page } from "@playwright/test";
 
 /** One step of the model's script: words, tool calls, or both, optionally slow. */
@@ -13,8 +12,7 @@ export interface ScriptStep {
 
 /** Sets what the scripted model answers next, replacing what an earlier script left unplayed. */
 export async function script(page: Page, steps: ScriptStep[]): Promise<void> {
-  const server = `http://127.0.0.1:${process.env["CAIRN_SERVER_PORT"] ?? ""}`;
-  const response = await page.request.put(`${server}/fixture/assistant/script`, { data: steps });
+  const response = await page.request.put("/demo/assistant/script", { data: steps });
   expect(response.ok(), await response.text()).toBe(true);
 }
 

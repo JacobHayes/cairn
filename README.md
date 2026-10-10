@@ -75,13 +75,12 @@ mise install   # the pinned Rust, Node, and build tools
 npm ci         # the web app's packages
 ```
 
-**The demo in your browser.** No server and no account: the app runs in the page with a
-few sample journeys (a vendor evaluation, a hiring loop, a product launch). Nothing is
-saved, so a reload starts fresh.
+**The demo.** No setup and no account: Cairn starts with a few sample journeys (a vendor
+evaluation, a hiring loop, a product launch), signed in as a development user. Nothing is
+saved, so stopping it ends the demo.
 
 ```sh
-mise run build:wasm
-(cd web/app && npx vite)   # then open http://127.0.0.1:5173/
+mise run demo   # then open http://127.0.0.1:8080/
 ```
 
 **The real thing, on your machine.** This builds Cairn and runs it with a local database,
@@ -123,6 +122,7 @@ mise run gen          # regenerate the generated files
 mise run sim          # simulation campaigns under patina; not part of check
 mise run build        # the release binary, with the web build embedded
 mise run serve        # a local deployment from cairn.dev.toml
+mise run demo         # the sample journeys in memory, nothing to configure
 ```
 
 CI runs `mise run check` on every push and nightly, and `mise run sim` nightly.

@@ -13,7 +13,8 @@ the web UI, so a screen's address (`/journeys/<id>`) loads directly. Build it wi
 `mise run build` (the web build is embedded; a binary built without it refuses to serve).
 The other commands: `cairn migrate` creates the database or brings its schema up to date,
 `cairn config check` validates a configuration (providers included) without opening
-anything, and `cairn version`.
+anything, and `cairn version`. `cairn demo` serves sample journeys from memory with no
+configuration, for trying Cairn out, never for a deployment.
 
 ## Configuration
 

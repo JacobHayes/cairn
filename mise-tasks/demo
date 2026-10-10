@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+#MISE description="Run the demo: build the web app, then cairn demo on http://127.0.0.1:8080/ (the sample journeys in memory, signed in as a development user)"
+# README, Try it. Nothing to configure and nothing saved: the fixtures are seeded into memory
+# at start (crates/cairn/src/demo.rs).
+set -euo pipefail
+cd "$(dirname "$0")/.."
+mise run build:web
+exec cargo run --locked -p cairn -- demo

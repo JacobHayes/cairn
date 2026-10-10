@@ -1,7 +1,7 @@
 //! The composition root (ARCHITECTURE, Service layer and composition): one function that
-//! builds the server from its configuration. The store is Turso at the configured path; the
-//! notifier is the in-process one, whose ticks the API's stream coalesces on tokio's timer;
-//! the auth providers are the configured ones, in order; the assistant is present exactly
+//! builds the server from its configuration. The store is the caller's (Turso at the
+//! configured path for `cairn serve`, memory for `cairn demo`); the notifier is the
+//! in-process one, whose ticks the API's stream coalesces on tokio's timer; the auth providers are the configured ones, in order; the assistant is present exactly
 //! when configured, a `None` here and absent from the capabilities otherwise (I5). The API
 //! (with MCP at `/api/mcp`), auth's routes, `/api/metrics`, and the embedded UI share one router
 //! behind the `Host` allowlist, served on one port.
@@ -21,7 +21,6 @@ use cairn_auth::{
 };
 use cairn_service::{AuthKind, AuthMethod, Capabilities, Parts, Service};
 use cairn_store::{AuthStore, InProcessNotifier, Notifier, Store, StoreError};
-use cairn_store_turso::TursoStore;
 use metrics_exporter_prometheus::PrometheusHandle;
 use tokio::net::TcpListener;
 
@@ -196,27 +195,20 @@ pub fn app<S: Store + 'static>(
     Ok(AllowedHosts::new(&config.public_url, config.listen).guard(app))
 }
 
-/// `cairn serve`: opens the database, assembles the server with the embedded web build, and
-/// serves it on the configured address until `shutdown` resolves.
+/// `cairn serve` and `cairn demo`: assembles the server over `store` with the embedded web
+/// build, `beside` served with it (the demo's own routes; none for `serve`), and serves it on
+/// the configured address until `shutdown` resolves.
 ///
 /// # Errors
 ///
 /// Any [`StartupError`].
-pub async fn serve(
+pub async fn serve<S: Store + 'static>(
     config: &Config,
+    store: Arc<S>,
+    beside: Router,
     metrics: PrometheusHandle,
     shutdown: impl Future<Output = ()> + Send + 'static,
 ) -> Result<(), StartupError> {
-    // Opened once: a failed open stops the process, never a retry here, since Turso cannot
-    // open again in a process a failed open ran in, and some open failures are not
-    // recoverable at all
-    // (decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md). A
-    // supervisor restarts the process.
-    let store = Arc::new(
-        TursoStore::open(&config.database)
-            .await
-            .map_err(StartupError::Store)?,
-    );
     let app = app(
         config,
         Assembly {
@@ -226,7 +218,8 @@ pub async fn serve(
             metrics,
             clock: Clock::system(),
         },
-    )?;
+    )?
+    .merge(beside);
     let listener = TcpListener::bind(config.listen)
         .await
         .map_err(|error| StartupError::Bind {

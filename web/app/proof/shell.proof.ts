@@ -1,7 +1,7 @@
 // The proof's media for brief 4.6 (briefs/proof/4.6/prove.sh): a screenshot of each acceptance
 // state of the shell and a short video of its main flow, written to CAIRN_PROOF_OUT. Steps only
 // wait for the state they picture; the e2e specs assert it.
-// The proof run starts its own fixture server, so its titles need not be unique.
+// The proof run starts its own demo server, so its titles need not be unique.
 import { join } from "node:path";
 
 import { expect, test, type Browser, type Page } from "@playwright/test";

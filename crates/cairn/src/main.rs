@@ -1,19 +1,24 @@
 //! `cairn`: the command line (ARCHITECTURE, Build, run, deploy). `serve` runs the API, MCP,
-//! the assistant when configured, SSE, and the embedded UI on one port; `migrate` brings the
-//! database's schema up to date; `config check` validates a configuration without starting
-//! anything; `version` prints the versions. Every command but `version` reads the
+//! the assistant when configured, SSE, and the embedded UI on one port; `demo` serves the
+//! sample journeys from memory with nothing to configure; `migrate` brings the database's
+//! schema up to date; `config check` validates a configuration without starting anything;
+//! `version` prints the versions. Every command but `demo` and `version` reads the
 //! configuration file named by `--config` or `CAIRN_CONFIG`, with environment overrides.
 
 #![forbid(unsafe_code)]
 
+use std::net::SocketAddr;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::Arc;
 
+use axum::Router;
 use cairn::config::{self, Config, Environment, env::CONFIG_VARIABLE};
-use cairn::{root, telemetry};
+use cairn::root::StartupError;
+use cairn::{demo, root, telemetry};
 use cairn_auth::{Accounts, Clock};
-use cairn_store::MemoryStore;
+use cairn_store::{MemoryStore, Store};
+use cairn_store_turso::TursoStore;
 use clap::{Parser, Subcommand};
 
 #[derive(Parser)]
@@ -30,6 +35,9 @@ struct Cli {
 enum Command {
     /// Serve the API, MCP, SSE, the assistant when configured, and the UI on one port.
     Serve(ConfigArgument),
+    /// Serve the sample journeys from memory, signed in as a development user, with nothing
+    /// to configure and nothing saved.
+    Demo(DemoArgument),
     /// Create the database if absent and apply the migrations it lacks.
     Migrate(ConfigArgument),
     /// Configuration commands.
@@ -55,6 +63,13 @@ struct ConfigArgument {
     config: Option<PathBuf>,
 }
 
+#[derive(clap::Args)]
+struct DemoArgument {
+    /// The loopback address to listen on.
+    #[arg(long, value_name = "ADDRESS", default_value = "127.0.0.1:8080")]
+    listen: SocketAddr,
+}
+
 fn main() -> ExitCode {
     let cli = Cli::parse();
     let outcome = match cli.command {
@@ -71,6 +86,7 @@ fn main() -> ExitCode {
         } => load(&argument).and_then(|config| check(&config)),
         Command::Migrate(argument) => load(&argument).and_then(|config| runtime(migrate(config))),
         Command::Serve(argument) => load(&argument).and_then(|config| runtime(serve(config))),
+        Command::Demo(argument) => runtime(demo(argument.listen)),
     };
     match outcome {
         Ok(()) => ExitCode::SUCCESS,
@@ -147,14 +163,40 @@ async fn migrate(config: Config) -> Result<(), String> {
 /// `serve`, until SIGINT or SIGTERM.
 async fn serve(config: Config) -> Result<(), String> {
     telemetry::init_logs();
+    // Opened once: a failed open stops the process, never a retry here, since Turso cannot
+    // open again in a process a failed open ran in, and some open failures are not
+    // recoverable at all
+    // (decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md). A
+    // supervisor restarts the process.
+    let store = TursoStore::open(&config.database)
+        .await
+        .map_err(|error| stopped_by(&StartupError::Store(error)))?;
+    run(&config, Arc::new(store), Router::new()).await
+}
+
+/// `demo`, until SIGINT or SIGTERM.
+async fn demo(listen: SocketAddr) -> Result<(), String> {
+    telemetry::init_logs();
+    let config = demo::config(listen)?;
+    let (store, routes) = demo::parts(&config).await?;
+    run(&config, store, routes).await
+}
+
+async fn run<S: Store + 'static>(
+    config: &Config,
+    store: Arc<S>,
+    beside: Router,
+) -> Result<(), String> {
     telemetry::install_panic_policy();
     let metrics = telemetry::install_metrics().map_err(|error| error.to_string())?;
-    root::serve(&config, metrics, stopped())
+    root::serve(config, store, beside, metrics, stopped())
         .await
-        .map_err(|error| {
-            tracing::error!(%error, "stopped");
-            error.to_string()
-        })
+        .map_err(|error| stopped_by(&error))
+}
+
+fn stopped_by(error: &StartupError) -> String {
+    tracing::error!(%error, "stopped");
+    error.to_string()
 }
 
 /// Resolves on SIGINT or, on unix, SIGTERM.

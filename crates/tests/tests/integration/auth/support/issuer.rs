@@ -1,17 +1,14 @@
 //! A stub OIDC issuer on loopback (readiness ruling: every provider tests offline): its
 //! discovery document, its signing key set, and a token endpoint that checks the PKCE
 //! verifier and answers with an ID token signed by a key generated for the test, or one
-//! spoiled in a chosen way. A test approves a sign-in by hand (`approve`); a browser signs
-//! in at its authorization endpoint's form, naming the person it signs in as (the web app's
-//! browser tests link an identity this way, through the fixture server).
+//! spoiled in a chosen way. A test approves a sign-in by hand (`approve`).
 
 use std::collections::HashMap;
-use std::fmt::Write as _;
 use std::sync::{Arc, Mutex};
 
 use axum::extract::State;
 use axum::http::StatusCode;
-use axum::response::{Html, IntoResponse, Redirect, Response};
+use axum::response::{IntoResponse, Response};
 use axum::routing::{get, post};
 use axum::{Form, Json, Router};
 use cairn_auth::Clock;
@@ -113,7 +110,6 @@ impl Issuer {
             .route("/.well-known/openid-configuration", get(discovery))
             .route("/jwks", get(jwks))
             .route("/token", post(token))
-            .route("/authorize", get(authorize_form).post(authorize))
             .with_state(Arc::clone(&inner));
         tokio::spawn(async move { axum::serve(listener, router).await.unwrap() });
         Self { inner }
@@ -157,66 +153,6 @@ fn grant(inner: &Inner, query: &HashMap<String, String>, person: Person, spoil: 
     };
     grants.insert(code.clone(), grant);
     code
-}
-
-/// Text placed in an HTML attribute.
-fn attribute(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('"', "&quot;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-
-/// The authorization endpoint's sign-in form: who signs in, the request carried along.
-async fn authorize_form(
-    axum::extract::Query(query): axum::extract::Query<HashMap<String, String>>,
-) -> Html<String> {
-    let mut carried = String::new();
-    for (name, value) in &query {
-        let (name, value) = (attribute(name), attribute(value));
-        write!(
-            carried,
-            r#"<input type="hidden" name="request.{name}" value="{value}">"#
-        )
-        .unwrap();
-    }
-    Html(format!(
-        r#"<!doctype html><title>Stub issuer</title><form method="post" action="/authorize">{carried}
-<label>Subject <input name="subject"></label>
-<label>Name <input name="name"></label>
-<label>Email <input name="email"></label>
-<label><input type="checkbox" name="email_verified" value="true" checked> Email verified</label>
-<button type="submit">Sign in</button></form>"#
-    ))
-}
-
-/// The form sent: the person approves, and the browser goes back to the client with a code.
-async fn authorize(
-    State(inner): State<Arc<Inner>>,
-    Form(form): Form<HashMap<String, String>>,
-) -> Response {
-    let query: HashMap<String, String> = form
-        .iter()
-        .filter_map(|(name, value)| {
-            Some((name.strip_prefix("request.")?.to_owned(), value.clone()))
-        })
-        .collect();
-    // A stub that lives as long as its process: what a browser types is kept for it.
-    let leak = |name: &str| -> &'static str { form.get(name).cloned().unwrap_or_default().leak() };
-    let person = Person {
-        subject: leak("subject"),
-        name: leak("name"),
-        email: leak("email"),
-        email_verified: form
-            .get("email_verified")
-            .is_some_and(|value| value == "true"),
-    };
-    let code = grant(&inner, &query, person, Spoil::Nothing);
-    let mut back: Url = query["redirect_uri"].parse().unwrap();
-    back.query_pairs_mut()
-        .append_pair("code", &code)
-        .append_pair("state", &query["state"]);
-    Redirect::to(back.as_str()).into_response()
 }
 
 async fn discovery(State(inner): State<Arc<Inner>>) -> Json<serde_json::Value> {

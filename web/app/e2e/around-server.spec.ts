@@ -1,6 +1,6 @@
-// Brief 5.5 on the server host, against the fixture server through Vite's proxy: views stay
+// Brief 5.5 on the server host, against `cairn demo`: views stay
 // current across pages (H6) when a journey is started (the index) and when two entities are
-// merged (an owner on a journey's canvas), and an identity signed in with 3.2's stub issuer
+// merged (an owner on a journey's canvas), and an identity signed in with the demo's stub issuer
 // links to the signed-in user, whose verified email then names their entity (H3). Each test
 // makes what it changes, so the fixtures other tests read stay as seeded.
 import { expect, test, type APIRequestContext } from "@playwright/test";
@@ -68,9 +68,7 @@ test("H3: an identity signed in with the stub issuer links to the user, and its 
   await expect(page.getByTestId("identity")).toHaveCount(1);
   await expect(page.locator(`[data-testid="your-entity"][data-entity="${entity}"]`)).toHaveCount(0);
   await page.getByTestId("link-identity").getByRole("link", { name: "Sign in with stub" }).click();
-  await page.getByLabel("Subject").fill(fresh("subject").replace(/\W/g, "-"));
-  await page.getByLabel("Name").fill("Linked Person");
-  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Email").fill(email);
   await page.getByRole("button", { name: "Sign in" }).click();
   await expect(page.getByTestId("identity-screen")).toBeVisible();
   await expect(page.locator('[data-testid="identity"][data-provider="stub"]').getByTestId("identity-emails")).toContainText(email);

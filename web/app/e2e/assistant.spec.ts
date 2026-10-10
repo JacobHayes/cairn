@@ -1,10 +1,10 @@
-// Brief 5.8 in the browser: the assistant panel on the server host against 4.4's scripted
-// provider. A direct change is applied and reported with links to the node it wrote, and a
+// Brief 5.8 in the browser: the assistant panel on the server host against the demo's
+// scripted model. A direct change is applied and reported with links to the node it wrote, and a
 // breakdown asked for comes back as a proposal that opens in proposal review and applies
 // (I5's two paths, I7: applying is the user's click); the conversation is the user's per
 // target, read back on the journey page and after a reload, on a route's draft too, with
 // a message being typed kept to its target and a turn that outlives the panel closing. The tests on the server
-// host are tagged @server: the fixture server's scripted model is one for the whole server, so
+// host are tagged @server: the demo's scripted model is one for the whole server, so
 // they run one at a time with the other tests that write to it.
 import { expect, test } from "@playwright/test";
 

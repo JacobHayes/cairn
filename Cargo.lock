@@ -493,10 +493,13 @@ dependencies = [
  "cairn-store",
  "cairn-store-turso",
  "cairn-wasm",
+ "chrono",
  "clap",
+ "ed25519-dalek",
  "jiff",
  "metrics",
  "metrics-exporter-prometheus",
+ "openidconnect",
  "rust-embed",
  "serde",
  "serde_json",
@@ -730,23 +733,14 @@ dependencies = [
 name = "cairn-wasm"
 version = "0.1.0"
 dependencies = [
- "axum",
- "cairn-api",
- "cairn-assistant",
- "cairn-auth",
  "cairn-engine",
  "cairn-schema",
  "cairn-service",
  "cairn-store",
- "chrono",
- "ed25519-dalek",
  "jiff",
- "openidconnect",
  "serde",
  "serde_json",
  "serde_path_to_error",
- "tokio",
- "url",
  "wasm-bindgen",
 ]
 

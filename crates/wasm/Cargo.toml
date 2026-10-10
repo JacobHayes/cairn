@@ -35,22 +35,7 @@ serde_path_to_error.workspace = true
 wasm-bindgen.workspace = true
 
 [target.'cfg(not(target_arch = "wasm32"))'.dev-dependencies]
-cairn-api.workspace = true
-# The fixture server mounts the assistant over 4.4's scripted provider, whose script a
-# browser test sets (brief 5.8).
-cairn-assistant.workspace = true
 cairn-engine = { workspace = true, features = ["testing"] }
-# The fixture server (examples/fixture_server.rs) the web shell's server host is tested
-# against: the API over the fixtures, signed in by the dev provider.
-axum.workspace = true
-cairn-auth.workspace = true
-tokio = { workspace = true, features = ["net", "rt"] }
-# 3.2's stub OIDC issuer, which the fixture server starts beside itself so a browser test
-# links an identity (brief 5.5): what that test code builds its tokens and keys with.
-chrono.workspace = true
-ed25519-dalek.workspace = true
-openidconnect.workspace = true
-url.workspace = true
 
 [lints]
 workspace = true

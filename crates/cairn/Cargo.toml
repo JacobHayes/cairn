@@ -18,16 +18,23 @@ cairn-schema.workspace = true
 cairn-service.workspace = true
 cairn-store.workspace = true
 cairn-store-turso.workspace = true
+# `cairn demo` seeds the fixtures the in-browser host is seeded with.
+cairn-wasm.workspace = true
+chrono.workspace = true
 clap.workspace = true
+# `cairn demo`'s stub issuer signs its ID tokens.
+ed25519-dalek.workspace = true
 # The server reads time zones from the system's database (/usr/share/zoneinfo): the service
 # brings no zone database of its own (DeploymentSettings::new).
 jiff = { workspace = true, features = ["tz-system", "tzdb-zoneinfo"] }
 metrics.workspace = true
 metrics-exporter-prometheus.workspace = true
+openidconnect.workspace = true
 # debug-embed: debug builds embed the web build too, rather than read it at run time from an
 # absolute path baked into the compile, which a cached compile can carry from another checkout.
 rust-embed = { workspace = true, features = ["debug-embed"] }
 serde.workspace = true
+serde_json.workspace = true
 socket2.workspace = true
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml.workspace = true
@@ -36,10 +43,6 @@ tracing-subscriber.workspace = true
 url.workspace = true
 
 [dev-dependencies]
-# The binary's tests and the browser tests' server seed the fixtures into its database
-# through the service, as the in-browser root does (crates/wasm).
-cairn-wasm.workspace = true
-serde_json.workspace = true
 tokio = { workspace = true, features = ["io-util"] }
 
 [lints]
