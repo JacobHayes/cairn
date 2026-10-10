@@ -49,6 +49,16 @@ Three ideas carry the rest:
 - **Back-of-the-envelope first.** Every change that adds a pass over the graph states its cost at `node_count_max` before code, in compute and memory, and storage or network where the pass touches them (solving the whole date network once per read, not a lookup per node, is the PRD's own example).
 - **Dependencies are deliberate, not zero.** The engine crate depends on `serde` and a date type and nothing that touches the OS, so it compiles to wasm and runs under any simulator. Shell crates take what they need (axum, turso, rmcp, openidconnect), and the commit that adds a dependency says why in one line. The test for a new dependency is whether it would take longer to maintain our own version than to audit upgrades of theirs; for a small service the answer is usually to take it. A dependency that pulls a runtime or the OS into the engine is rejected regardless. Tools are dependencies too: each tool in `mise.toml` is pinned and earns its place the same way.
 
+### Simplicity
+
+Do as much as necessary and as little as possible. The rules above say how to be careful; this says when to stop. Every layer, process, script, flag, and branch pays for itself or goes.
+
+- **Question a layer before optimizing it.** When a step is slow, first ask whether it should exist. A cache in front of a cheap read, a background process that mirrors a file another process already owns, or a wrapper script around one command is usually cheaper to delete than to tune.
+- **Fail closed, recover from durable state.** When an error leaves in-memory state in doubt, stop: refuse to serve what it covers, or crash, and recover by reopening from what was committed. A write that fails halfway does not record which cached rows are now suspect and keep serving the rest; it drops the cache and reloads. One failure mode with one recovery path beats hidden error modes plus the bookkeeping to limp through them.
+- **Migrate old data once.** When existing data breaks a new rule, a one-off migration brings the data into line and the code keeps one rule. A loader that accepts the old shape and the new one forever is a permanent branch every later change has to reason about: rewrite the stored documents to the new field name, then read only that name.
+- **No compatibility cruft before anyone depends on it.** Cairn has no outside consumers whose upgrades it must stage. Rename and cut over in one change, callers, documents, and stored data together, rather than keeping a deprecated alias, a fallback field, or a shim. One exists only for a named consumer that cannot move in the same change.
+- **Plain and portable over clever.** A plain file copy over a copy-on-write trick, a full rebuild over a freshness heuristic, a fixed interval over an adaptive one, until a measurement shows the plain way is too slow; then the clever version lands with that measurement. Clever saves seconds when it works and costs an afternoon when it silently does not, often on a machine its author never tried.
+
 ### Not adopted
 
 Rules from Tiger Style and the Power of Ten that Cairn does not follow, and why. Work that finds a reason to adopt one raises it.

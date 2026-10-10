@@ -12,7 +12,7 @@ The shape every brief follows.
 2. **Goal**: one paragraph.
 3. **Governing**: PRD ids; ARCHITECTURE and PRACTICES sections by heading.
 4. **Scope**: in, and out where a neighbor could build the same thing.
-5. **Acceptance**: behavior by PRD id and scenario; the planted bug; the rungs this brief adds to the ladder, if any (PRACTICES, Growing the ladder); fixtures used. Every brief also leaves `briefs/proof/<id>/` (AGENTS, Leave proof).
+5. **Acceptance**: behavior by PRD id and scenario; a real bug its tests must catch; the rungs this brief adds to the ladder, if any (PRACTICES, Growing the ladder); fixtures used. Every brief also leaves `briefs/proof/<id>/` (AGENTS, Leave proof).
 6. **Decisions left to the implementer**.
 7. **Decision log**: appended by the implementer, for small calls; calls that matter go in `decisions/`, one new file per decision (AGENTS).
 
