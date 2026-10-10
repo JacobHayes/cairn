@@ -15,7 +15,8 @@ use crate::domain::Domain;
 use crate::field::NodeFieldValue;
 use crate::graph::{Edge, Graph, ParticipationKind, Role};
 use crate::id::{
-    AgentId, AttachmentKey, EntityKey, KindKey, NodeKey, ProposalId, RoleKey, Slug, UserId,
+    AgentId, AttachmentKey, EntityKey, InsertionKey, KindKey, NodeKey, ProposalId, RoleKey, Slug,
+    UserId,
 };
 use crate::node::{Choices, EntitySet, Node, ParticipationSource};
 use crate::notice::Notice;
@@ -63,16 +64,21 @@ pub enum ConflictResolution {
     /// Take the route's value and reopen the node.
     Reopen,
     /// Point every reference to a role the route removed at another role, then remove it.
+    /// Not offered while an insertion maps a segment role onto it (B13).
     RemapRole {
         /// The role the references move to.
         role: RoleKey,
     },
     /// Move every participation of a kind the route removed to another kind, then remove it.
+    /// Not offered while an insertion maps a segment kind onto it (B13).
     RemapKind {
         /// The kind the participations move to.
         kind: KindKey,
     },
-    /// Clear every reference to a role or kind the route removed, then remove it.
+    /// Clear every reference to a role or kind the route removed, then remove it. Where an
+    /// insertion maps a segment role onto a removed role, the segment's nodes keep what the
+    /// role held: whoever filled it now fills their participations directly, and the
+    /// insertion's mapping goes with the role (B13).
     Remove,
 }
 
@@ -102,6 +108,15 @@ pub enum RoleReference {
     },
     /// The role is the graph's `default_owner`.
     DefaultOwner,
+    /// A participation of a kind on a node an insertion copied in, whose segment role the
+    /// insertion mapped onto the role (B13): removing the role hands the node the role's fill
+    /// directly.
+    SegmentParticipation {
+        /// The node.
+        node: NodeKey,
+        /// The kind.
+        kind: KindKey,
+    },
     /// A node's message draft names the role (A10).
     Draft {
         /// The node.
@@ -213,6 +228,14 @@ pub enum Conflict {
         /// What in the journey refers to it.
         #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
         references: BTreeSet<RoleReference>,
+        /// The insertions that map a segment role onto it, when the route removed it (B13):
+        /// the role can then be kept or removed, not remapped.
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        insertions: BTreeSet<InsertionKey>,
+        /// Who fills the role now (E3), when insertions map onto it: removing it hands
+        /// these to the segment's nodes directly.
+        #[serde(default, skip_serializing_if = "EntitySet::is_empty")]
+        members: EntitySet,
     },
     /// A participation kind both sides changed, or one the route removed that the journey
     /// still uses.
@@ -232,6 +255,10 @@ pub enum Conflict {
             deserialize_with = "crate::serde_util::unique_map"
         )]
         references: BTreeMap<NodeKey, ParticipationSource<KeyRefs>>,
+        /// The insertions that map a segment kind onto it, when the route removed it (B13):
+        /// the kind can then be kept or removed, not remapped.
+        #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+        insertions: BTreeSet<InsertionKey>,
     },
     /// The graph's `default_owner`, which both sides changed.
     DefaultOwner {
@@ -249,8 +276,9 @@ impl Conflict {
     /// journey's side; an edit also offers taking the route's, unless the route's names a node
     /// the journey does not hold; a shape change clears the
     /// state; an invalidated answer maps, clears, or reopens; a removed role or kind the
-    /// journey still uses is remapped or removed; a role too narrow for the journey's direct
-    /// fill clears it.
+    /// journey still uses is remapped or removed, unless an insertion maps onto it, which
+    /// leaves keeping or removing it; a role too narrow for the journey's direct fill clears
+    /// it.
     #[must_use]
     pub fn offers(&self, resolution: &ConflictResolution) -> bool {
         use ConflictResolution as R;
@@ -279,9 +307,23 @@ impl Conflict {
             | (
                 Conflict::Role { route: None, .. } | Conflict::Kind { route: None, .. },
                 R::Remove,
+            ) => true,
+            (
+                Conflict::Role {
+                    route: None,
+                    insertions,
+                    ..
+                },
+                R::RemapRole { .. },
             )
-            | (Conflict::Role { route: None, .. }, R::RemapRole { .. })
-            | (Conflict::Kind { route: None, .. }, R::RemapKind { .. }) => true,
+            | (
+                Conflict::Kind {
+                    route: None,
+                    insertions,
+                    ..
+                },
+                R::RemapKind { .. },
+            ) => insertions.is_empty(),
             (
                 Conflict::Role {
                     route: Some(route),

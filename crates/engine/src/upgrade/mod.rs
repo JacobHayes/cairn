@@ -13,11 +13,12 @@ pub use save::save_as_route;
 use std::fmt;
 
 use cairn_schema::{
-    Conflict, ConflictResolution, Domain, GraphKey, GraphRecord, JourneyId, Lineage, Mutation,
-    Mutations, Patch, PatchTarget, ProposalDraft, Rejection, RetiredKey, ReviewItem, VersionNumber,
+    Conflict, ConflictResolution, Deployment, Domain, EntitySet, GraphKey, GraphRecord, JourneyId,
+    Lineage, Mutation, Mutations, Patch, PatchTarget, ProposalDraft, Rejection, RetiredKey,
+    ReviewItem, VersionNumber,
 };
 
-use crate::graph::Document;
+use crate::graph::{Document, Graph, Tree};
 use crate::pipeline::{ApplyInputs, apply};
 use crate::records::Records;
 
@@ -195,7 +196,8 @@ pub fn upgrade(
             .map(|found| &found.graph)
             .ok_or(DraftError::VersionMissing(lineage))
     };
-    let merged = merge::merge(version(lineage.version)?, version(to)?, &held.graph);
+    let mut merged = merge::merge(version(lineage.version)?, version(to)?, &held.graph);
+    with_members(&mut merged.conflicts, &held.graph, &records.deployment);
     let mut items: Vec<ReviewItem> = merged
         .conflicts
         .into_iter()
@@ -231,6 +233,32 @@ pub fn upgrade(
     );
     proposal = with_violations(proposal, violations)?;
     Ok(proposal)
+}
+
+/// E3: who fills each removed role an insertion maps onto, as of now: its filling decision's
+/// answer while in effect, else its direct fill. Removing the role hands them to the
+/// segment's nodes, so the merge, which cannot tell relevance, leaves them to this.
+fn with_members(conflicts: &mut [Conflict], journey: &Document, deployment: &Deployment) {
+    let mapped = |conflict: &Conflict| matches!(conflict, Conflict::Role { insertions, .. } if !insertions.is_empty());
+    if !conflicts.iter().any(mapped) {
+        return;
+    }
+    let graph = Graph::trusted(journey.clone(), Tree::build(journey));
+    let early = crate::derive::early(&graph, deployment);
+    let participation = crate::derive::participation::pass(&graph, &early.relevance, deployment);
+    for conflict in conflicts {
+        if let Conflict::Role {
+            role,
+            insertions,
+            members,
+            ..
+        } = conflict
+            && !insertions.is_empty()
+        {
+            *members = EntitySet::new(participation.members(role).iter().cloned())
+                .unwrap_or_else(|error| unreachable!("a role's members fit a fill: {error}"));
+        }
+    }
 }
 
 pub(crate) fn draft(

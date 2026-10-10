@@ -10,9 +10,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    Conflict, ConflictResolution, EntityKey, LocalEdit, Mutation, NodeFieldValue, NodeKey,
-    ParticipationMapping, ParticipationSource, Participations, ProposalDraft, Removal, ReviewItem,
-    RoleKey, RoleReference, Transition, UnresolvedItem, UnresolvedReason, removed_choices,
+    Conflict, ConflictResolution, EntityKey, EntitySet, LocalEdit, Mutation, NodeFieldValue,
+    NodeKey, ParticipationMapping, ParticipationSource, Participations, ProposalDraft, Removal,
+    ReviewItem, RoleKey, RoleReference, Transition, UnresolvedItem, UnresolvedReason,
+    removed_choices,
 };
 
 use crate::edit::differences;
@@ -317,6 +318,9 @@ struct Claimed {
     /// Removed roles' chosen fates: remapped to a role, or gone; a kind item moving a
     /// participation that names one carries the fate along.
     roles: BTreeMap<RoleKey, Option<RoleKey>>,
+    /// What a removed role hands a segment's node that names it (B13): a kind item moving
+    /// the participation carries it along.
+    handed: BTreeMap<(NodeKey, RoleKey), EntitySet>,
 }
 
 impl Claimed {
@@ -377,7 +381,11 @@ impl Claimed {
     /// Records a removed role's chosen fate.
     fn role_fate(&mut self, conflict: &Conflict, resolution: &ConflictResolution) {
         if let Conflict::Role {
-            role, route: None, ..
+            role,
+            route: None,
+            references,
+            members,
+            ..
         } = conflict
         {
             let fate = match resolution {
@@ -385,13 +393,20 @@ impl Claimed {
                 _ => None,
             };
             self.roles.insert(role.clone(), fate);
+            for reference in references {
+                if let RoleReference::SegmentParticipation { node, .. } = reference {
+                    self.handed
+                        .insert((node.clone(), role.clone()), members.clone());
+                }
+            }
         }
     }
 
     /// Whether a role reference is another item's to rewrite.
     fn role_reference(&self, reference: &RoleReference) -> bool {
         match reference {
-            RoleReference::Participation { node, kind } => {
+            RoleReference::Participation { node, kind }
+            | RoleReference::SegmentParticipation { node, kind } => {
                 let pair = (node.clone(), kind.clone());
                 self.nodes.contains(node)
                     || self.participations.contains(&pair)
@@ -447,6 +462,7 @@ fn drafts(items: &[ReviewItem], claimed: &Claimed) -> Vec<Mutation> {
                     journey,
                     route: None,
                     references,
+                    ..
                 },
             resolution: Some(resolution),
         } = item
@@ -730,12 +746,15 @@ fn is_multi(answer: &cairn_schema::AnswerValue) -> bool {
 }
 
 /// B7: a role taken from the route (clearing a direct fill it is too narrow for), or one the
-/// route removed remapped or removed with every reference to it.
+/// route removed remapped or removed with every reference to it. Removing it hands the nodes
+/// an insertion copied in, whose segment role mapped onto it, whoever filled it, directly (B13);
+/// removing the role drops the insertion's mapping.
 fn role(conflict: &Conflict, resolution: &ConflictResolution, claimed: &Claimed) -> Vec<Mutation> {
     let Conflict::Role {
         role,
         route,
         references,
+        members,
         ..
     } = conflict
     else {
@@ -754,46 +773,62 @@ fn role(conflict: &Conflict, resolution: &ConflictResolution, claimed: &Claimed)
         }
         return mutations;
     }
-    let mut mutations = Vec::new();
-    for reference in references
+    let mut mutations: Vec<Mutation> = references
         .iter()
         .filter(|reference| !claimed.role_reference(reference))
-    {
-        mutations.extend(match (reference, to) {
-            (RoleReference::Participation { node, kind }, Some(to)) => {
-                vec![Mutation::SetParticipation {
-                    node: node.clone(),
-                    kind: kind.clone(),
-                    source: ParticipationSource::Role(to.clone()),
-                }]
-            }
-            (RoleReference::Participation { node, kind }, None) => {
-                vec![Mutation::ClearParticipation {
-                    node: node.clone(),
-                    kind: kind.clone(),
-                }]
-            }
-            (RoleReference::FillsRole { node }, to) => vec![Mutation::SetNodeField {
-                node: node.clone(),
-                value: NodeFieldValue::FillsRole(to.cloned()),
-            }],
-            (RoleReference::Fill { entities }, to) => {
-                let mut fill = vec![Mutation::ClearRoleFill { role: role.clone() }];
-                fill.extend(to.map(|to| Mutation::FillRole {
-                    role: to.clone(),
-                    entities: entities.clone(),
-                }));
-                fill
-            }
-            (RoleReference::DefaultOwner, to) => {
-                vec![Mutation::SetDefaultOwner { role: to.cloned() }]
-            }
-            // Every removed role's rewrites of one draft are written together (`drafts`).
-            (RoleReference::Draft { .. }, _) => Vec::new(),
-        });
-    }
+        .flat_map(|reference| rewritten(role, reference, to, members))
+        .collect();
     mutations.push(Mutation::RemoveRole { role: role.clone() });
     mutations
+}
+
+/// B7: the mutations that point one reference to a removed role at `to`, or clear it; the
+/// segment's nodes get `members`, whoever filled the role, directly (B13).
+fn rewritten(
+    role: &RoleKey,
+    reference: &RoleReference,
+    to: Option<&RoleKey>,
+    members: &EntitySet,
+) -> Vec<Mutation> {
+    match (reference, to) {
+        (RoleReference::SegmentParticipation { node, kind }, _) => {
+            vec![Mutation::SetParticipation {
+                node: node.clone(),
+                kind: kind.clone(),
+                source: ParticipationSource::Entities(members.clone()),
+            }]
+        }
+        (RoleReference::Participation { node, kind }, Some(to)) => {
+            vec![Mutation::SetParticipation {
+                node: node.clone(),
+                kind: kind.clone(),
+                source: ParticipationSource::Role(to.clone()),
+            }]
+        }
+        (RoleReference::Participation { node, kind }, None) => {
+            vec![Mutation::ClearParticipation {
+                node: node.clone(),
+                kind: kind.clone(),
+            }]
+        }
+        (RoleReference::FillsRole { node }, to) => vec![Mutation::SetNodeField {
+            node: node.clone(),
+            value: NodeFieldValue::FillsRole(to.cloned()),
+        }],
+        (RoleReference::Fill { entities }, to) => {
+            let mut moved = vec![Mutation::ClearRoleFill { role: role.clone() }];
+            moved.extend(to.map(|to| Mutation::FillRole {
+                role: to.clone(),
+                entities: entities.clone(),
+            }));
+            moved
+        }
+        (RoleReference::DefaultOwner, to) => {
+            vec![Mutation::SetDefaultOwner { role: to.cloned() }]
+        }
+        // Every removed role's rewrites of one draft are written together (`drafts`).
+        (RoleReference::Draft { .. }, _) => Vec::new(),
+    }
 }
 
 /// B7: a kind taken from the route, or one the route removed whose participations move to
@@ -823,11 +858,14 @@ fn kind(conflict: &Conflict, resolution: &ConflictResolution, claimed: &Claimed)
             kind: kind.clone(),
         });
         // A participation naming a removed role moves with that role's fate: to the role it
-        // was remapped to, or not at all.
+        // was remapped to, to who filled it when a segment's node held it, or not at all.
         let source = match source {
             ParticipationSource::Role(role) => match claimed.roles.get(role) {
                 Some(Some(to)) => Some(ParticipationSource::Role(to.clone())),
-                Some(None) => None,
+                Some(None) => claimed
+                    .handed
+                    .get(&(node.clone(), role.clone()))
+                    .map(|members| ParticipationSource::Entities(members.clone())),
                 None => Some(source.clone()),
             },
             ParticipationSource::Entities(_) => Some(source.clone()),

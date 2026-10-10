@@ -1326,8 +1326,18 @@ export interface components {
         } | {
             /** @constant */
             about: "role";
+            /**
+             * @description The insertions that map a segment role onto it, when the route removed it (B13):
+             *     the role can then be kept or removed, not remapped.
+             */
+            insertions?: components["schemas"]["InsertionKey"][];
             /** @description The journey's role. */
             journey?: components["schemas"]["RoleResolved"] | null;
+            /**
+             * @description Who fills the role now (E3), when insertions map onto it: removing it hands
+             *     these to the segment's nodes directly.
+             */
+            members?: components["schemas"]["EntityKey"][];
             /** @description What in the journey refers to it. */
             references?: components["schemas"]["RoleReference"][];
             /** @description The role. */
@@ -1337,6 +1347,11 @@ export interface components {
         } | {
             /** @constant */
             about: "kind";
+            /**
+             * @description The insertions that map a segment kind onto it, when the route removed it (B13):
+             *     the kind can then be kept or removed, not remapped.
+             */
+            insertions?: components["schemas"]["InsertionKey"][];
             /** @description The journey's kind. */
             journey?: components["schemas"]["ParticipationKindResolved"] | null;
             /** @description The kind. */
@@ -4167,6 +4182,13 @@ export interface components {
                 entities: components["schemas"]["EntityKey"][];
             };
         } | "default_owner" | {
+            segment_participation: {
+                /** @description The kind. */
+                kind: components["schemas"]["KindKey"];
+                /** @description The node. */
+                node: components["schemas"]["NodeKey"];
+            };
+        } | {
             draft: {
                 /** @description The node. */
                 node: components["schemas"]["NodeKey"];

@@ -349,6 +349,8 @@ fn arb_role_reference() -> BoxedStrategy<RoleReference> {
     prop_oneof![
         (arb_node_key(), arb_kind_key())
             .prop_map(|(node, kind)| RoleReference::Participation { node, kind }),
+        (arb_node_key(), arb_kind_key())
+            .prop_map(|(node, kind)| RoleReference::SegmentParticipation { node, kind }),
         arb_node_key().prop_map(|node| RoleReference::FillsRole { node }),
         arb_entity_set().prop_map(|entities| RoleReference::Fill { entities }),
         Just(RoleReference::DefaultOwner),
@@ -432,26 +434,36 @@ fn arb_graph_conflict() -> BoxedStrategy<Conflict> {
             arb_role_key(),
             prop::option::of(arb_role::<KeyRefs>()),
             prop::option::of(arb_role::<KeyRefs>()),
-            prop::collection::btree_set(arb_role_reference(), 0..3)
+            prop::collection::btree_set(arb_role_reference(), 0..3),
+            prop::collection::btree_set(arb_insertion_key(), 0..2),
+            arb_entity_set()
         )
-            .prop_map(|(role, journey, route, references)| Conflict::Role {
-                role,
-                journey,
-                route,
-                references
+            .prop_map(|(role, journey, route, references, insertions, members)| {
+                Conflict::Role {
+                    role,
+                    journey,
+                    route,
+                    references,
+                    insertions,
+                    members,
+                }
             }),
         (
             arb_kind_key(),
             prop::option::of(arb_participation_kind::<KeyRefs>()),
             prop::option::of(arb_participation_kind::<KeyRefs>()),
-            prop::collection::btree_map(arb_node_key(), arb_source(), 0..2)
+            prop::collection::btree_map(arb_node_key(), arb_source(), 0..2),
+            prop::collection::btree_set(arb_insertion_key(), 0..2)
         )
-            .prop_map(|(kind, journey, route, references)| Conflict::Kind {
-                kind,
-                journey,
-                route,
-                references
-            }),
+            .prop_map(
+                |(kind, journey, route, references, insertions)| Conflict::Kind {
+                    kind,
+                    journey,
+                    route,
+                    references,
+                    insertions
+                }
+            ),
         (
             prop::option::of(arb_role_key()),
             prop::option::of(arb_role_key())

@@ -28,9 +28,11 @@ function conflicts(access: Schema<"Node">): [string, Conflict][] {
     ["a shape whose route value dangles", { about: "shape", journey: access, route: { ...access, kind: "action" }, answered: false, dangling: true }],
     ["an answer naming a removed choice", { about: "answer", decision: "n_purpose", answer: { single_choice: "purchase" }, choices: ["buy", "research-only"] }],
     ["a role the route removed", { about: "role", role: "r_findings_reviewer", journey: role(false), route: null, references: [] }],
+    ["a role an insertion maps onto, the route removed", { about: "role", role: "r_findings_reviewer", journey: role(false), route: null, references: [], insertions: ["i_security"] }],
     ["a role the route changed", { about: "role", role: "r_findings_reviewer", journey: role(true), route: role(false), references: [] }],
     ["a role too narrow for its fill", { about: "role", role: "r_findings_reviewer", journey: role(true), route: role(false), references: [{ fill: { entities: ["e_lead", "e_reviewer"] } }] }],
     ["a kind the route removed", { about: "kind", kind: "k_reviewer", journey: kind, route: null, references: {} }],
+    ["a kind an insertion maps onto, the route removed", { about: "kind", kind: "k_reviewer", journey: kind, route: null, references: {}, insertions: ["i_security"] }],
     ["a kind the route changed", { about: "kind", kind: "k_reviewer", journey: kind, route: { ...kind, multi: true }, references: {} }],
     ["the default owner", { about: "default_owner", journey: "r_eval_owner", route: "r_stakeholders" }],
   ];

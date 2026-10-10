@@ -46,13 +46,19 @@ function tooNarrow(conflict: Extract<Conflict, { about: "role" }>): boolean {
   return route != null && route.multi !== true && (conflict.references ?? []).some((reference) => typeof reference === "object" && "fill" in reference && reference.fill.entities.length > 1);
 }
 
+/** B13: an insertion maps a segment role or kind onto what the route removed, so it can only be kept or removed. */
+function mapped(conflict: Extract<Conflict, { about: "role" | "kind" }>): boolean {
+  return (conflict.insertions ?? []).length > 0;
+}
+
 /**
  * B7: the kinds of resolution `conflict` offers, in the order a reviewer reads them. Every
  * conflict keeps the journey's side; an edit also takes the route's unless the route's names a
  * node the journey does not hold; a shape change clears the state; an invalidated answer
  * maps, clears, or reopens; a removed role or kind the journey still uses is remapped or
- * removed; a role too narrow for the journey's direct fill clears it. The engine's
- * `Conflict::offers` is the rule; a test checks this against it.
+ * removed (only removed when an insertion maps onto it); a role too narrow for the journey's
+ * direct fill clears it. The engine's `Conflict::offers` is the rule; a test checks this
+ * against it.
  */
 export function offered(conflict: Conflict): ResolutionKind[] {
   switch (conflict.about) {
@@ -69,11 +75,14 @@ export function offered(conflict: Conflict): ResolutionKind[] {
       return ["keep_journey", "map_choices", "clear_state", "reopen"];
     case "role":
       if (conflict.route == null) {
-        return ["keep_journey", "remap_role", "remove"];
+        return mapped(conflict) ? ["keep_journey", "remove"] : ["keep_journey", "remap_role", "remove"];
       }
       return ["keep_journey", tooNarrow(conflict) ? "clear_state" : "take_route"];
     case "kind":
-      return conflict.route == null ? ["keep_journey", "remap_kind", "remove"] : ["keep_journey", "take_route"];
+      if (conflict.route == null) {
+        return mapped(conflict) ? ["keep_journey", "remove"] : ["keep_journey", "remap_kind", "remove"];
+      }
+      return ["keep_journey", "take_route"];
   }
 }
 

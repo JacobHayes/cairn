@@ -12,8 +12,9 @@
 //! route removed stay as orphans. A route change that would invalidate the journey's state (a
 //! shape change under state or edits, an answered choice removed, a role too narrow for its
 //! fill) is a conflict too, and a role or kind the route removed that the journey still uses
-//! is kept until the reviewer remaps or removes it. Only clean outcomes are in `merged`;
-//! conflicts leave the journey's side in place for their resolutions to change.
+//! is kept until the reviewer remaps or removes it (removes it only, when an insertion maps
+//! onto it). Only clean outcomes are in `merged`; conflicts leave the journey's side in place
+//! for their resolutions to change.
 //!
 //! Cost at the limits (2,000 nodes per graph, 64 edges per node, 32 roles and kinds): three
 //! key-indexed graphs already in memory; per node shared by base and journey, 22 field
@@ -26,9 +27,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AnswerSpec, Conflict, Kept, KeyRefs, KindKey, LocalEdit, Node, NodeField, NodeFieldValue,
-    NodeKey, NodeState, ParticipationSource, Payload, Provenance, RoleKey, RoleReference,
-    removed_choices,
+    AnswerSpec, Conflict, EntitySet, InsertionKey, Kept, KeyRefs, KindKey, LocalEdit, Node,
+    NodeField, NodeFieldValue, NodeKey, NodeState, ParticipationSource, Payload, Provenance,
+    RoleKey, RoleReference, removed_choices,
 };
 
 use crate::graph::{Document, Tree};
@@ -536,7 +537,8 @@ impl Merger<'_> {
                 (Some(before), None, Some(held)) => {
                     let references = references();
                     // An insertion's map onto it uses it as much as a participation does.
-                    let unused = references.is_empty() && !maps_role(&self.found.merged, key);
+                    let unused =
+                        references.is_empty() && maps_role(&self.found.merged, key).is_empty();
                     if held == before && unused {
                         self.found.merged.roles.remove(key);
                         self.found.merged.retired_keys.roles.insert(key.clone());
@@ -548,11 +550,17 @@ impl Merger<'_> {
                 _ => None,
             };
             if let Some((journey, route, references)) = conflict {
+                let insertions = match route {
+                    Some(_) => BTreeSet::new(),
+                    None => maps_role(&self.found.merged, key),
+                };
                 self.found.conflicts.push(Conflict::Role {
                     role: key.clone(),
                     journey: journey.cloned(),
                     route: route.cloned(),
                     references,
+                    insertions,
+                    members: EntitySet::default(),
                 });
             }
         }
@@ -587,7 +595,7 @@ impl Merger<'_> {
                 (Some(_), Some(after), Some(held)) => held != after,
                 (Some(before), None, Some(held)) => {
                     let unused = kind_references(&self.found.merged, key).is_empty()
-                        && !maps_kind(&self.found.merged, key);
+                        && maps_kind(&self.found.merged, key).is_empty();
                     if held == before && unused {
                         self.found.merged.participation_kinds.remove(key);
                         self.found.merged.retired_keys.kinds.insert(key.clone());
@@ -602,6 +610,10 @@ impl Merger<'_> {
                     journey: held.cloned(),
                     route: after.cloned(),
                     references: kind_references(&self.found.merged, key),
+                    insertions: match after {
+                        Some(_) => BTreeSet::new(),
+                        None => maps_kind(&self.found.merged, key),
+                    },
                 });
             }
         }
@@ -699,12 +711,19 @@ fn with_present_requirements(node: &Node<KeyRefs>, present: &BTreeSet<&NodeKey>)
 /// A6, A10, E3: everything in a graph that refers to a role, message drafts included.
 pub(crate) fn role_references(graph: &Document, role: &RoleKey) -> BTreeSet<RoleReference> {
     let mut found = BTreeSet::new();
+    let segment_nodes: BTreeSet<&NodeKey> = maps_role(graph, role)
+        .iter()
+        .filter_map(|key| graph.insertions.get(key))
+        .flat_map(|insertion| insertion.nodes.keys())
+        .collect();
     for node in graph.nodes.values() {
         for (kind, source) in node.participations.as_map() {
             if *source == ParticipationSource::Role(role.clone()) {
-                found.insert(RoleReference::Participation {
-                    node: node.key.clone(),
-                    kind: kind.clone(),
+                let (node, kind) = (node.key.clone(), kind.clone());
+                found.insert(if segment_nodes.contains(&node) {
+                    RoleReference::SegmentParticipation { node, kind }
+                } else {
+                    RoleReference::Participation { node, kind }
                 });
             }
         }
@@ -741,20 +760,24 @@ pub(crate) fn role_references(graph: &Document, role: &RoleKey) -> BTreeSet<Role
     found
 }
 
-/// B13: whether an insertion in the graph maps a segment role onto the role.
-fn maps_role(graph: &Document, role: &RoleKey) -> bool {
+/// B13: the insertions in the graph that map a segment role onto the role.
+fn maps_role(graph: &Document, role: &RoleKey) -> BTreeSet<InsertionKey> {
     graph
         .insertions
         .values()
-        .any(|insertion| insertion.roles.values().any(|mapped| mapped == role))
+        .filter(|insertion| insertion.roles.values().any(|mapped| mapped == role))
+        .map(|insertion| insertion.key.clone())
+        .collect()
 }
 
-/// B13: whether an insertion in the graph maps a segment kind onto the kind.
-fn maps_kind(graph: &Document, kind: &KindKey) -> bool {
+/// B13: the insertions in the graph that map a segment kind onto the kind.
+fn maps_kind(graph: &Document, kind: &KindKey) -> BTreeSet<InsertionKey> {
     graph
         .insertions
         .values()
-        .any(|insertion| insertion.kinds.values().any(|mapped| mapped == kind))
+        .filter(|insertion| insertion.kinds.values().any(|mapped| mapped == kind))
+        .map(|insertion| insertion.key.clone())
+        .collect()
 }
 
 /// A7: every node's participation of a kind.

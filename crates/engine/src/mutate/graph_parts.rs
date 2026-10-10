@@ -89,8 +89,8 @@ fn put_role(session: &mut Session<'_>, role: &Role<KeyRefs>, add: bool) -> Vec<W
     vec![session.put(GraphRecord::Role(role.clone()))]
 }
 
-/// A18: removing a role retires its key and drops its direct fill; anything still naming it
-/// is caught by validation.
+/// A18: removing a role retires its key and drops its direct fill and the maps insertions
+/// have onto it (B13); anything still naming it is caught by validation.
 fn remove_role(session: &mut Session<'_>, role: &RoleKey) -> Vec<Write> {
     let exists = session
         .graph()
@@ -111,6 +111,7 @@ fn remove_role(session: &mut Session<'_>, role: &RoleKey) -> Vec<Write> {
         session.remove(GraphKey::Role(role.clone())),
         retire(session, RetiredKey::Role(role.clone())),
     ];
+    writes.extend(super::insertion::unmapped_role(session, role));
     let filled = session
         .journey()
         .is_some_and(|journey| journey.graph.state.role_fills.contains_key(role));
@@ -185,10 +186,12 @@ fn remove_kind(session: &mut Session<'_>, kind: &KindKey) -> Vec<Write> {
         );
         return Vec::new();
     }
-    vec![
+    let mut writes = vec![
         session.remove(GraphKey::Kind(kind.clone())),
         retire(session, RetiredKey::Kind(kind.clone())),
-    ]
+    ];
+    writes.extend(super::insertion::unmapped_kind(session, kind));
+    writes
 }
 
 /// A10: a resource on a node, added under a new key or edited in place; a journey marks the

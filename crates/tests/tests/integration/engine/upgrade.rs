@@ -825,6 +825,30 @@ fn a_dangling_field_conflict_offers_only_the_journeys_side() {
     assert_eq!(reasons, [cairn_schema::UnresolvedReason::NotOffered; 2]);
 }
 
+/// The vendor evaluation with a segment inserted whose role maps onto the route's `r_spare`,
+/// leaving out `omit`, then `then` applied.
+fn spare_mapped_by_an_insertion(omit: &str, then: &str) -> Records {
+    let mut records = support::with_segment(support::vendor_after(1), "security-review");
+    let first = cairn_schema::Lineage {
+        route: "vendor-evaluation".parse().unwrap(),
+        version: VersionNumber::FIRST,
+    };
+    let held = records.versions.get_mut(&first).unwrap();
+    held.graph
+        .roles
+        .put(cairn_schema::from_yaml("{key: r_spare, id: spare}").unwrap())
+        .unwrap();
+    support::accepted_on(
+        &records,
+        "j_vendor_eval",
+        &format!(
+            "- op: add_role\n  role: {{key: r_spare, id: spare}}\n\
+             - op: insert_segment\n  insertion: i_one\n  segment: {{route: security-review, version: 1}}\n  \
+             omit: [{omit}]\n  roles: {{r_reviewer: {{existing: r_spare}}}}\n{then}"
+        ),
+    )
+}
+
 /// B13, B7: a role an insertion maps onto, unused otherwise, is neither flipped to
 /// multi-valued nor silently removed by an upgrade: the flip is rejected, and the removal is
 /// a conflict that keeps the role by default.
@@ -832,20 +856,7 @@ fn a_dangling_field_conflict_offers_only_the_journeys_side() {
 fn an_upgrade_leaves_alone_what_an_insertion_maps_onto() {
     let spare: cairn_schema::Role<cairn_schema::KeyRefs> =
         cairn_schema::from_yaml("{key: r_spare, id: spare}").unwrap();
-    let mut records = support::with_segment(support::vendor_after(1), "security-review");
-    let first = cairn_schema::Lineage {
-        route: "vendor-evaluation".parse().unwrap(),
-        version: VersionNumber::FIRST,
-    };
-    let held = records.versions.get_mut(&first).unwrap();
-    held.graph.roles.put(spare.clone()).unwrap();
-    let records = support::accepted_on(
-        &records,
-        "j_vendor_eval",
-        "- op: add_role\n  role: {key: r_spare, id: spare}\n\
-         - op: insert_segment\n  insertion: i_one\n  segment: {route: security-review, version: 1}\n  \
-         omit: [n_threat_model, n_who_reviews]\n  roles: {r_reviewer: {existing: r_spare}}\n",
-    );
+    let records = spare_mapped_by_an_insertion("n_threat_model, n_who_reviews", "");
 
     let mut multi = support::vendor_v2();
     multi
@@ -875,4 +886,64 @@ fn an_upgrade_leaves_alone_what_an_insertion_maps_onto() {
             .get(&"r_spare".parse().unwrap())
             .is_some()
     );
+}
+
+/// B13, B7: removing an upgraded-away role an insertion maps onto hands the segment's nodes
+/// whoever filled it, directly (by a direct fill or by a decision's answer), and drops the
+/// insertion's map with the role; remapping it is not offered.
+#[test]
+fn removing_a_mapped_role_hands_its_fill_to_the_segments_nodes() {
+    let direct = spare_mapped_by_an_insertion(
+        "n_who_reviews",
+        "- op: fill_role\n  role: r_spare\n  entities: [e_lead]\n",
+    );
+    let unanswered = spare_mapped_by_an_insertion("", "");
+    let decision = &unanswered.journeys[&journey_id()]
+        .graph
+        .insertions
+        .values()
+        .next()
+        .unwrap();
+    let decision = decision
+        .nodes
+        .iter()
+        .find_map(|(member, original)| (original.as_str() == "n_who_reviews").then_some(member))
+        .unwrap();
+    let decided = support::accepted_on(
+        &unanswered,
+        "j_vendor_eval",
+        &format!("- op: answer\n  decision: {decision}\n  value: {{entity: e_lead}}\n"),
+    );
+    for records in [direct, decided] {
+        let removed = support::publish_vendor(&records, support::vendor_v2());
+        let draft = upgrade_to_two(&removed);
+        let remap = ConflictResolution::RemapRole {
+            role: "r_eval_owner".parse().unwrap(),
+        };
+        assert!(!conflicts(&draft)[0].offers(&remap));
+
+        let after = applied(
+            &removed,
+            &chosen(&draft, |_| Some(ConflictResolution::Remove), true),
+        );
+        let graph = support::vendor_graph(&after);
+        assert!(graph.roles.get(&"r_spare".parse().unwrap()).is_none());
+        assert!(graph.insertions.values().all(|held| held.roles.is_empty()));
+        let handed: Vec<_> = graph
+            .insertions
+            .values()
+            .flat_map(|held| held.nodes.keys())
+            .flat_map(|member| {
+                graph
+                    .nodes
+                    .get(member)
+                    .unwrap()
+                    .participations
+                    .as_map()
+                    .values()
+            })
+            .map(|source| cairn_schema::to_json(source).unwrap())
+            .collect();
+        assert_eq!(handed, [r#"["e_lead"]"#]);
+    }
 }

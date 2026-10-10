@@ -786,3 +786,33 @@ pub(super) fn narrowed(session: &Session<'_>, keeps: impl Fn(&NodeKey) -> bool) 
     }
     writes
 }
+
+/// B13: each insertion the graph holds without its map onto the role being removed. What
+/// referred to the role is the patch's to rewrite; validation catches what it leaves.
+pub(super) fn unmapped_role(session: &Session<'_>, role: &RoleKey) -> Vec<Write> {
+    unmapped(session, |insertion| {
+        insertion.roles.retain(|_, mapped| mapped != role);
+    })
+}
+
+/// B13: each insertion the graph holds without its map onto the kind being removed.
+pub(super) fn unmapped_kind(session: &Session<'_>, kind: &KindKey) -> Vec<Write> {
+    unmapped(session, |insertion| {
+        insertion.kinds.retain(|_, mapped| mapped != kind);
+    })
+}
+
+fn unmapped(session: &Session<'_>, drop_maps: impl Fn(&mut Insertion)) -> Vec<Write> {
+    let Some(graph) = session.graph() else {
+        unreachable!("a graph patch targets an existing graph")
+    };
+    graph
+        .insertions
+        .values()
+        .filter_map(|insertion| {
+            let mut rest = insertion.clone();
+            drop_maps(&mut rest);
+            (rest != *insertion).then(|| session.put(GraphRecord::Insertion(rest)))
+        })
+        .collect()
+}

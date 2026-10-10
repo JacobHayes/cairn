@@ -1662,6 +1662,14 @@
                 "const": "role",
                 "type": "string"
               },
+              "insertions": {
+                "description": "The insertions that map a segment role onto it, when the route removed it (B13):\nthe role can then be kept or removed, not remapped.",
+                "items": {
+                  "$ref": "#/components/schemas/InsertionKey"
+                },
+                "type": "array",
+                "uniqueItems": true
+              },
               "journey": {
                 "anyOf": [
                   {
@@ -1672,6 +1680,15 @@
                   }
                 ],
                 "description": "The journey's role."
+              },
+              "members": {
+                "description": "Who fills the role now (E3), when insertions map onto it: removing it hands\nthese to the segment's nodes directly.",
+                "items": {
+                  "$ref": "#/components/schemas/EntityKey"
+                },
+                "maxItems": 100,
+                "type": "array",
+                "uniqueItems": true
               },
               "references": {
                 "description": "What in the journey refers to it.",
@@ -1710,6 +1727,14 @@
               "about": {
                 "const": "kind",
                 "type": "string"
+              },
+              "insertions": {
+                "description": "The insertions that map a segment kind onto it, when the route removed it (B13):\nthe kind can then be kept or removed, not remapped.",
+                "items": {
+                  "$ref": "#/components/schemas/InsertionKey"
+                },
+                "type": "array",
+                "uniqueItems": true
               },
               "journey": {
                 "anyOf": [
@@ -1846,7 +1871,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "Point every reference to a role the route removed at another role, then remove it.",
+            "description": "Point every reference to a role the route removed at another role, then remove it.\nNot offered while an insertion maps a segment role onto it (B13).",
             "properties": {
               "remap_role": {
                 "additionalProperties": false,
@@ -1869,7 +1894,7 @@
           },
           {
             "additionalProperties": false,
-            "description": "Move every participation of a kind the route removed to another kind, then remove it.",
+            "description": "Move every participation of a kind the route removed to another kind, then remove it.\nNot offered while an insertion maps a segment kind onto it (B13).",
             "properties": {
               "remap_kind": {
                 "additionalProperties": false,
@@ -1892,7 +1917,7 @@
           },
           {
             "const": "remove",
-            "description": "Clear every reference to a role or kind the route removed, then remove it.",
+            "description": "Clear every reference to a role or kind the route removed, then remove it. Where an\ninsertion maps a segment role onto a removed role, the segment's nodes keep what the\nrole held: whoever filled it now fills their participations directly, and the\ninsertion's mapping goes with the role (B13).",
             "type": "string"
           }
         ]
@@ -11952,6 +11977,34 @@
             "const": "default_owner",
             "description": "The role is the graph's `default_owner`.",
             "type": "string"
+          },
+          {
+            "additionalProperties": false,
+            "description": "A participation of a kind on a node an insertion copied in, whose segment role the\ninsertion mapped onto the role (B13): removing the role hands the node the role's fill\ndirectly.",
+            "properties": {
+              "segment_participation": {
+                "additionalProperties": false,
+                "properties": {
+                  "kind": {
+                    "$ref": "#/components/schemas/KindKey",
+                    "description": "The kind."
+                  },
+                  "node": {
+                    "$ref": "#/components/schemas/NodeKey",
+                    "description": "The node."
+                  }
+                },
+                "required": [
+                  "node",
+                  "kind"
+                ],
+                "type": "object"
+              }
+            },
+            "required": [
+              "segment_participation"
+            ],
+            "type": "object"
           },
           {
             "additionalProperties": false,
