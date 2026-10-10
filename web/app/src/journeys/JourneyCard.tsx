@@ -1,6 +1,5 @@
-// C16, C18: the journey card, the inspector's empty state on NEXT and PLAN, and the Summary
-// page, which is the same component at full width (4.7). An observer gets the status summary's
-// figures with no click: how much is done, what needs a look, what is next, the next milestone.
+// C16, C18: the journey card, the inspector's empty state, and the Summary, which is the same
+// component at full width (4.7). An observer gets the status summary's figures with no click: how much is done, what needs a look, what is next, the next milestone.
 // Open decisions, the description, the notes and links, and the lineage are folds. On the
 // Summary page every fold is open and each list is whole: the status summary's parts, with
 // the print view (C18). Kept current (H6): both read the journey's local derivation.
@@ -20,7 +19,7 @@ import { StatusSummaryView } from "../summary/StatusSummary.tsx";
 import { dateAway, dateWords } from "../timeline/model.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
-import { pagePath, summaryPath, type JourneyPage } from "./address.ts";
+import { pagePath } from "./address.ts";
 import { yoursOf } from "./figures-model.ts";
 import { UpgradeMark } from "./JourneyIndex.tsx";
 import { useMineOf } from "./mine.ts";
@@ -183,7 +182,7 @@ function Folds({ ready, model, full, selected }: { ready: Ready; model: SummaryM
  * The journey card: the inspector's empty state (`full` off), or the Summary page, the same
  * card at full width with every fold open and each list whole (`full`).
  */
-export function JourneyCard({ ready, page, selected, full = false }: { ready: Ready; page: JourneyPage | "summary"; selected?: string | undefined; full?: boolean }) {
+export function JourneyCard({ ready, selected, full = false }: { ready: Ready; selected?: string | undefined; full?: boolean }) {
   const journey = ready.journey.header.id;
   const summary = useProjected(ready, { projection: "status_summary" });
   const model = useMemo(() => (summary.value === undefined ? undefined : summaryModel(ready, summary.value)), [ready, summary.value]);
@@ -191,7 +190,7 @@ export function JourneyCard({ ready, page, selected, full = false }: { ready: Re
   const done = model === undefined ? undefined : model.inScope - model.remaining;
   return (
     <section
-      className={full ? "journey-card journey-card-full stack" : "journey-card detail-panel panel stack"}
+      className={full ? "journey-card journey-card-full panel stack" : "journey-card detail-panel panel stack"}
       aria-label={full ? "Summary" : "Journey"}
       data-testid="journey-card"
       data-full={full}
@@ -205,12 +204,12 @@ export function JourneyCard({ ready, page, selected, full = false }: { ready: Re
             <Button className="no-print" onClick={() => { globalThis.print(); }}>
               Print
             </Button>
-            <Link to={pagePath(journey, "next", "list")} className="no-print" data-testid="summary-close" aria-label="Close the summary">
+            <Link to={pagePath(journey, "graph")} className="no-print" data-testid="summary-close" aria-label="Close the summary">
               Close
             </Link>
           </>
         ) : (
-          <Link to={summaryPath(journey)} className="icon-button" data-testid="card-expand" aria-label="Open the summary page" title="Open the summary page">
+          <Link to={pagePath(journey, "summary")} className="icon-button" data-testid="card-expand" aria-label="Open the summary page" title="Open the summary page">
             ⤢
           </Link>
         )}
@@ -226,7 +225,7 @@ export function JourneyCard({ ready, page, selected, full = false }: { ready: Re
           <progress value={done} max={Math.max(model.inScope, 1)} aria-label="Progress" />
           <Yours ready={ready} />
           <Flags ready={ready} model={model} />
-          {full || page === "next" ? null : <NextUp ready={ready} all={false} />}
+          {full ? null : <NextUp ready={ready} all={false} />}
           {full ? <StatusSummaryView ready={ready} model={model} selected={selected} lead={<NextUp ready={ready} all />} /> : <NextMilestone ready={ready} model={model} />}
           <Folds ready={ready} model={model} full={full} selected={selected} />
         </>

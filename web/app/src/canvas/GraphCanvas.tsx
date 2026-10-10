@@ -12,12 +12,13 @@ import "@xyflow/react/dist/base.css";
 import "./canvas.css";
 
 import { Controls, ReactFlow, ReactFlowProvider, useNodesInitialized, useReactFlow, useStore, useStoreApi, type EdgeChange, type NodeChange } from "@xyflow/react";
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 
 import { PHONE_WIDTH, SHEET, useFrameState } from "../shell/frame.tsx";
 import { useResolvedTheme } from "../ui/theme.ts";
+import { ContextMenu } from "../ui/ContextMenu.tsx";
 import { typing } from "../ui/typing.ts";
-import { cardRows, cardHeight } from "./cards.ts";
+import { bandHeight, cardRows } from "./cards.ts";
 import { EdgeLine, type LineEdge } from "./EdgeLine.tsx";
 import { NEAR_ZOOM, bandOf, fitZoom, listenPinch, minZoomOf } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
@@ -56,6 +57,8 @@ export interface GraphCanvasProps {
   origins?: boolean;
   /** Cards a filter fades; the trace decides instead while there is one. */
   faded?: ReadonlySet<string> | undefined;
+  /** The cards to keep at full strength (the frontier lens): every other card fades, a container staying clear while any card in it is kept. None, or null, fades nothing. */
+  emphasis?: ReadonlySet<string> | null | undefined;
   selected: string | undefined;
   /** The edge (a line's id) whose card is open. */
   selectedEdge?: string | undefined;
@@ -92,6 +95,23 @@ function openContainers(model: CanvasModel): Set<string> {
   return new Set(model.cards.flatMap((card) => (card.parent === undefined ? [] : [card.parent])));
 }
 
+/** `props` with the cards `emphasis` leaves out added to those faded. */
+function withEmphasis(props: FlowProps): FlowProps {
+  const { emphasis, model } = props;
+  if (emphasis === null || emphasis === undefined) {
+    return props;
+  }
+  const parents = new Map(model.cards.map((card) => [card.key, card.parent]));
+  const kept = new Set<string>();
+  // A card stands for the nodes folded into it, so it is kept when any of them is.
+  for (const card of model.cards.filter((each) => standsFor(each).some((key) => emphasis.has(key)))) {
+    for (let at: string | undefined = card.key; at !== undefined && !kept.has(at); at = parents.get(at)) {
+      kept.add(at);
+    }
+  }
+  return { ...props, faded: new Set([...(props.faded ?? []), ...model.cards.map((card) => card.key).filter((key) => !kept.has(key))]) };
+}
+
 function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {
   const { model, layout, overlay, lens, faded, selected, selecting } = props;
   const containers = openContainers(model);
@@ -121,7 +141,7 @@ function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {
         faded: faded?.has(card.key) === true,
         selected: card.key === selected,
         picked: selecting?.picked.has(card.key) === true,
-        header: containers.has(card.key) ? cardHeight(cardRows(card)) : undefined,
+        header: containers.has(card.key) ? bandHeight(cardRows(card)) : undefined,
         place: { x: Math.round(placed.x), y: Math.round(placed.y) },
         lens: chip === undefined || lens === undefined ? undefined : { chip, tier: tiers?.get(card.key) ?? 0, name: lens },
         edgeEnd: edgeEnds.has(card.key),
@@ -435,14 +455,45 @@ function EdgeChip({ chip, line }: { chip: RefObject<HTMLDivElement | null>; line
   );
 }
 
+/** The node menu: open on a card at a point, offered only where the cards have actions and nothing is being selected. */
+function useNodeMenu(props: FlowProps, live: boolean) {
+  const [menu, setMenu] = useState<{ key: string; at: { x: number; y: number } } | undefined>(undefined);
+  const closeMenu = useCallback(() => { setMenu(undefined); }, []);
+  const openMenu = (key: string, at: { x: number; y: number }) => { setMenu({ key, at }); };
+  return { menu, menus: live && props.selecting === undefined ? props.actions.menu : undefined, openMenu, closeMenu };
+}
+
+/**
+ * Keys on a focused card: Enter toggles a container (a button inside it keeps its own Enter), and
+ * the menu key, or Shift+F10, opens its menu beside it, as a right-click does at the pointer.
+ */
+function cardKeys(toggle: (key: string) => boolean, openMenu: ((key: string, at: { x: number; y: number }) => void) | undefined) {
+  return (event: ReactKeyboardEvent) => {
+    const card = (event.target as HTMLElement).closest<HTMLElement>(".react-flow__node");
+    if (card === null) {
+      return;
+    }
+    if (openMenu !== undefined && (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))) {
+      const box = card.getBoundingClientRect();
+      event.preventDefault();
+      openMenu(card.dataset["id"] ?? "", { x: box.left + 16, y: box.top + 24 });
+    } else if (event.key === "Enter" && event.target === card && toggle(card.dataset["id"] ?? "")) {
+      // Handled here: the journey's own Enter would press the selected node's button.
+      event.preventDefault();
+      event.stopPropagation();
+    }
+  };
+}
+
 function Flow(props: FlowProps) {
   const theme = useResolvedTheme();
   const live = !props.inert;
   const root = useRef<HTMLDivElement>(null);
   const { chip, hover, move, enter, leave } = useEdgeHover(root);
   const edgeEnds = useMemo(() => new Set(hover === undefined ? [] : [hover.from, hover.to]), [hover]);
-  const nodes = useMemo(() => nodesOf(props, edgeEnds), [props, edgeEnds]);
-  const edges = useMemo(() => edgesOf(props), [props]);
+  const nodes = useMemo(() => nodesOf(withEmphasis(props), edgeEnds), [props, edgeEnds]);
+  const edges = useMemo(() => edgesOf(withEmphasis(props)), [props]);
+  const { menu, menus, openMenu, closeMenu } = useNodeMenu(props, live);
   const band = useStore((state) => bandOf(state.transform[2]));
   const { minZoom, fit } = useZoomRange(props, live, root);
   useFirstFit(props, fit, live);
@@ -458,15 +509,7 @@ function Flow(props: FlowProps) {
       <div
         ref={root}
         className="canvas-root"
-        onKeyDown={(event) => {
-          // Enter on a focused card toggles it (a button inside it keeps its own Enter).
-          const card = (event.target as HTMLElement).closest<HTMLElement>(".react-flow__node");
-          if (event.key === "Enter" && card !== null && event.target === card && toggle(card.dataset["id"] ?? "")) {
-            // Handled here: the journey's own Enter would press the selected node's button.
-            event.preventDefault();
-            event.stopPropagation();
-          }
-        }}
+        onKeyDown={cardKeys(toggle, menus === undefined ? undefined : openMenu)}
       >
         <ReactFlow
           nodes={nodes}
@@ -486,6 +529,12 @@ function Flow(props: FlowProps) {
             }
           }}
           onNodeDoubleClick={(_, node) => { toggle(node.id); }}
+          onNodeContextMenu={(event, node) => {
+            if (menus !== undefined) {
+              event.preventDefault();
+              openMenu(node.id, { x: event.clientX, y: event.clientY });
+            }
+          }}
           onEdgeMouseEnter={(event, edge) => { enter(event, edge.data?.line); }}
           onEdgeMouseMove={move}
           onEdgeMouseLeave={leave}
@@ -501,6 +550,7 @@ function Flow(props: FlowProps) {
           {live ? props.children : null}
         </ReactFlow>
         {hover === undefined ? null : <EdgeChip chip={chip} line={hover} />}
+        {menu === undefined || menus === undefined ? null : <ContextMenu at={menu.at} groups={menus.groups(menu.key)} label={`Actions for ${props.actions.title(menu.key)}`} onChoose={(id) => { menus.choose(menu.key, id); }} onClose={closeMenu} />}
       </div>
     </CardActionsContext>
   );

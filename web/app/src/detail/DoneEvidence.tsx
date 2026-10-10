@@ -56,7 +56,7 @@ export function EvidenceForm({ write, node, needs, form }: { write: NodeWrite; n
     }
   };
   return (
-    <div className="stack next-row-more" data-testid="done-evidence">
+    <div className="stack row-more" data-testid="done-evidence">
       {needs.artifact ? <Field autoFocus aria-label="Artifact address" placeholder="Its artifact's address" value={artifact} onChange={(event) => { form.change({ artifact: event.target.value, note }); }} /> : null}
       {needs.note ? <textarea autoFocus={!needs.artifact} aria-label="Note" placeholder="What was done, in a note" value={note} onChange={(event) => { form.change({ artifact, note: event.target.value }); }} /> : null}
       <span className="row">

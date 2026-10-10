@@ -4,7 +4,7 @@
 // others fade), whether not-relevant and conditional nodes are shown (`show=`, C1), the
 // Signals lens (`lens=`, C6), on a journey whether its structure is being edited (5.6) or
 // nodes are being selected (5.9), and on a phone whether the full-screen map is open. The
-// canvas lives at `/journeys/<id>/plan/graph`; every parameter it does not own (the toolbar's
+// canvas lives at `/journeys/<id>/graph`; every parameter it does not own (the toolbar's
 // `decisions`, `mine`, `q`) rides along untouched, so a link made from the canvas keeps the
 // chips. Every setting at its default leaves the address bare. A route's canvas, which has no
 // ladder, names the container it drilled into by `in=`.
@@ -199,12 +199,12 @@ export function layoutViewOf(view: CanvasSettings, step?: Step): string {
 
 /** The path of a journey's canvas (PLAN, GRAPH), or of a node's detail or an edge's card on it, keeping what the canvas shows. */
 export function canvasPath(journey: string, view: CanvasView, node?: string): string {
-  return `/journeys/${journey}/plan/graph${node === undefined ? "" : `/nodes/${node}`}${searchOf(view)}`;
+  return `/journeys/${journey}/graph${node === undefined ? "" : `/nodes/${node}`}${searchOf(view)}`;
 }
 
 /** An edge's card on the canvas: the ends it joins, `<from>~<to>`, in the address. */
 export function edgePath(journey: string, view: CanvasView, edge: { from: string; to: string }): string {
-  return `/journeys/${journey}/plan/graph/edges/${edge.from}~${edge.to}${searchOf(view)}`;
+  return `/journeys/${journey}/graph/edges/${edge.from}~${edge.to}${searchOf(view)}`;
 }
 
 /** What the ladder asks of the level (5.1): the step, and the containers it and the viewer's clicks collapse. */

@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 import { test, type Browser, type Page } from "@playwright/test";
 
-import { answerCard, card, daysAfter, nextItem, openActing, passOrder, startVendorJourney } from "../e2e/acting.ts";
+import { answerCard, card, daysAfter, frontierItem, openActing, passOrder, startVendorJourney } from "../e2e/acting.ts";
 import { journeyName, startJourney } from "../e2e/around.ts";
 import { openNode, section } from "../e2e/detail.ts";
 import { goWithin, nodePanel, syncChip } from "../e2e/shell.ts";
@@ -28,9 +28,9 @@ async function atFixedToday(page: Page): Promise<void> {
 
 test("the list, hovering a row, and the folds", async ({ page }) => {
   await atFixedToday(page);
-  await openActing(page, "browser", "j_launch", "next/list");
+  await openActing(page, "browser", "j_launch", "list?frontier=1");
   await page.getByTestId("rank-tag").first().waitFor();
-  await nextItem(page, "n_docs").hover();
+  await frontierItem(page, "n_docs").hover();
   await shot(page, "1-the-next-list");
   const group = await openNode(page, "browser", "j_launch", "n_materials");
   const blocking = await section(group, "blocking");
@@ -39,7 +39,7 @@ test("the list, hovering a row, and the folds", async ({ page }) => {
   await blocking.getByLabel("Snooze until").fill(daysAfter(today, 7));
   await blocking.getByTestId("snooze").getByRole("button", { name: "Save" }).click();
   await blocking.getByTestId("snooze").getByText("Snoozed until").waitFor();
-  await openActing(page, "browser", "j_launch", "next/list");
+  await openActing(page, "browser", "j_launch", "list?frontier=1");
   await page.getByTestId("fold-look").locator("summary").click();
   await page.getByTestId("fold-snoozed").locator("summary").click();
   await page.getByTestId("snooze-group").first().waitFor();
@@ -47,12 +47,12 @@ test("the list, hovering a row, and the folds", async ({ page }) => {
 });
 
 test("nothing needs you now, and the stalled journey", async ({ page }) => {
-  await openActing(page, "browser", "j_bakeoff", "next/list");
+  await openActing(page, "browser", "j_bakeoff", "list?frontier=1");
   await page.getByTestId("next-for-you").waitFor();
   await shot(page, "3-nothing-needs-you-now");
-  await openActing(page, "browser", "j_hiring", "next/list");
+  await openActing(page, "browser", "j_hiring", "list?frontier=1");
   const today = (await syncChip(page).getAttribute("data-today")) ?? "";
-  await nextItem(page, "n_offer").getByRole("link", { name: "Offer letter" }).click();
+  await frontierItem(page, "n_offer").getByRole("link", { name: "Offer letter" }).click();
   const blocking = await section(nodePanel(page, "n_offer"), "blocking");
   await blocking.getByRole("button", { name: "Snooze until a date" }).click();
   await blocking.getByLabel("Snooze until").fill(daysAfter(today, 7));
@@ -63,7 +63,7 @@ test("nothing needs you now, and the stalled journey", async ({ page }) => {
 
 test("the cards, the pass rail, a node opened from it, and the end of a pass", async ({ page }) => {
   await atFixedToday(page);
-  await openActing(page, "browser", "j_launch", "next/cards");
+  await openActing(page, "browser", "j_launch", "walk");
   await card(page).waitFor();
   await shot(page, "5-a-card-and-the-pass-rail");
   await page.getByTestId("pass-rail").getByRole("link", { name: "Documentation" }).click();
@@ -79,16 +79,16 @@ test("the cards, the pass rail, a node opened from it, and the end of a pass", a
 
 test("the walkthrough on start", async ({ page }) => {
   const journey = await startVendorJourney(page);
-  await openActing(page, "server", journey, "next/cards?decisions=1");
+  await openActing(page, "server", journey, "walk?decisions=1");
   await page.getByTestId("walkthrough-intro").waitFor();
   await shot(page, "8-the-walkthrough-on-start");
 });
 
 test("Mine", async ({ page }) => {
   const journey = await startJourney(page, "browser", journeyName("Vendor evaluation"), { route: "vendor-evaluation", version: 1 });
-  await openActing(page, "browser", journey, "next/list");
-  await nextItem(page, "n_partner_runs").getByLabel("Assign owner").selectOption("e_lead");
-  await nextItem(page, "n_partner_runs").getByTestId("receipt").waitFor();
+  await openActing(page, "browser", journey, "list?frontier=1");
+  await frontierItem(page, "n_partner_runs").getByLabel("Assign owner").selectOption("e_lead");
+  await frontierItem(page, "n_partner_runs").getByTestId("receipt").waitFor();
   await goWithin(page, "/mine");
   await page.getByTestId("mine-journey").first().waitFor();
   await shot(page, "9-mine");
@@ -102,7 +102,7 @@ async function walkthroughPass(browser: Browser, baseURL: string): Promise<void>
   });
   const page = await context.newPage();
   const journey = await startVendorJourney(page);
-  await openActing(page, "server", journey, "next/cards?decisions=1");
+  await openActing(page, "server", journey, "walk?decisions=1");
   await page.getByTestId("walkthrough-intro").waitFor();
   await beat(page);
   await answerCard(page, "yes");

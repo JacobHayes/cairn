@@ -16,7 +16,7 @@ const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${
 test.use({ viewport: { width: 1280, height: 760 } });
 
 test("the list as a tree, flat when sorted, as decisions, and with a selection", async ({ page }) => {
-  await openActing(page, "browser", "j_vendor_eval", "plan/list");
+  await openActing(page, "browser", "j_vendor_eval", "list");
   await page.getByTestId("list-fold").first().click();
   await expect(page.getByTestId("list-row").first()).toBeVisible();
   await shot(page, "1-tree");
@@ -24,11 +24,11 @@ test("the list as a tree, flat when sorted, as decisions, and with a selection",
   await expect(page.getByTestId("list-fold")).toHaveCount(0);
   await shot(page, "2-sorted-flat");
   await page.setViewportSize({ width: 1500, height: 760 });
-  await openActing(page, "browser", "j_vendor_eval", "plan/list?decisions=1");
+  await openActing(page, "browser", "j_vendor_eval", "list?decisions=1");
   await expect(page.locator('[data-testid="list-row"][data-node="n_partner_runs"]')).toBeVisible();
   await shot(page, "3-decisions");
   await page.setViewportSize({ width: 1280, height: 760 });
-  await openActing(page, "browser", "j_launch", "plan/list?sort=due");
+  await openActing(page, "browser", "j_launch", "list?sort=due");
   await expect(page.getByTestId("list-row").nth(1)).toBeVisible();
   await page.getByTestId("list-row").nth(0).locator("input[type=checkbox]").click();
   await page.getByTestId("list-row").nth(1).locator("input[type=checkbox]").click();
@@ -37,10 +37,10 @@ test("the list as a tree, flat when sorted, as decisions, and with a selection",
 });
 
 test("the timeline with a selected row's float, and without a final milestone", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "plan/timeline?detail=all", { node: "n_final_report", fixedToday: FIXED_TODAY });
+  await openAt(page, "browser", "j_vendor_eval", "timeline?detail=all", { node: "n_final_report", fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("timeline-float")).toHaveCount(1);
   await shot(page, "5-timeline-selected");
-  await openAt(page, "browser", "j_hiring", "plan/timeline", { fixedToday: FIXED_TODAY });
+  await openAt(page, "browser", "j_hiring", "timeline", { fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("timeline-no-end")).toBeVisible();
   await shot(page, "6-timeline-no-end");
 });

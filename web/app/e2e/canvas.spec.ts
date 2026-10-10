@@ -61,4 +61,16 @@ test("C2 to C7: the graph opens at its current stage, expands in place, traces a
   await expect(page.locator(".react-flow__selection")).toHaveCount(0);
   await page.mouse.up();
   await page.keyboard.up("Shift");
+  // A right-click, or the menu key on a focused card, opens the node's menu; a choice that needs a form selects the node and opens it there.
+  await nodeCard(page, "n_plan").click({ button: "right" });
+  await expect(page.getByTestId("context-menu")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("context-menu")).toHaveCount(0);
+  await nodeCard(page, "n_plan").getByTestId("card-open").focus();
+  // With the inspector collapsed, a choice that opens a form brings it back.
+  await page.keyboard.press("]");
+  await expect(page.getByTestId("node-detail")).toBeHidden();
+  await page.keyboard.press("Shift+F10");
+  await page.getByTestId("context-rename").click();
+  await expect(nodePanel(page, "n_plan").getByTestId("rename")).toBeVisible();
 });

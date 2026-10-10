@@ -1,4 +1,4 @@
-// The last projection per page is remembered per journey, and the screens work without the
+// The last projection is remembered per journey, and the screens work without the
 // store: localStorage can be missing or throw (a private window, blocked site data).
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -17,14 +17,12 @@ afterEach(() => {
 });
 
 describe("the remembered projection", () => {
-  it("is each page's own per journey, and the page's default until one is remembered", () => {
+  it("is each journey's own, and the graph until one is remembered", () => {
     vi.stubGlobal("localStorage", storage());
-    expect(recalledProjection("j_a", "plan")).toBe("graph");
-    rememberProjection("j_a", "plan", "timeline");
-    rememberProjection("j_a", "next", "cards");
-    expect(recalledProjection("j_a", "plan")).toBe("timeline");
-    expect(recalledProjection("j_a", "next")).toBe("cards");
-    expect(recalledProjection("j_b", "plan")).toBe("graph");
+    expect(recalledProjection("j_a")).toBe("graph");
+    rememberProjection("j_a", "timeline");
+    expect(recalledProjection("j_a")).toBe("timeline");
+    expect(recalledProjection("j_b")).toBe("graph");
   });
 
   it("falls back to the default when the store throws", () => {
@@ -37,7 +35,7 @@ describe("the remembered projection", () => {
       },
     } as unknown as Storage;
     vi.stubGlobal("localStorage", refusing);
-    expect(() => { rememberProjection("j_a", "plan", "list"); }).not.toThrow();
-    expect(recalledProjection("j_a", "plan")).toBe("graph");
+    expect(() => { rememberProjection("j_a", "list"); }).not.toThrow();
+    expect(recalledProjection("j_a")).toBe("graph");
   });
 });

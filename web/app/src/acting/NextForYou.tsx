@@ -10,7 +10,7 @@ export function NextForYou({ view, entries, nothing = true }: { view: Ready; ent
     return null;
   }
   return (
-    <p className="next-for-you" role="status" data-testid="next-for-you" data-node={next.node}>
+    <p className="for-you" role="status" data-testid="next-for-you" data-node={next.node}>
       {nothing ? <strong>Nothing needs you now. </strong> : null}
       {nextForYouWords(view, next)}
     </p>

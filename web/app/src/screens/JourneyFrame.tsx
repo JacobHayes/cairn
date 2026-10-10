@@ -1,7 +1,7 @@
-// A journey's pages (2.2): the header, the toolbar with its tabs, chips and switcher, the
-// active filters, and the projection the address names, with the inspector column beside it:
-// the open node's detail, or the journey card when nothing is selected. The Summary page is
-// the card at full width. The head stays put and the projection and the inspector scroll on
+// A journey's page (2.2): the header, the toolbar with its views and chips, the active
+// filters, and the view the address names (the graph first), with the inspector column beside
+// it: the open node's detail, or the journey card when nothing is selected. The Summary is the
+// card at full width. The head stays put and the projection and the inspector scroll on
 // their own (screens.css; the frame's slots are shell/frame.tsx). The journey is read and derived in the tab and kept current (H6); what it
 // shows is in the address (journeys/address.ts, canvas/settings.ts), so every link keeps it.
 // Edit mode (5.6) adds the structure's editors: the node's structure in its detail, and
@@ -14,13 +14,13 @@ import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
 import { journeyAuthored } from "../authoring/target.ts";
 import { useProjected } from "../canvas/hooks.ts";
 import { ancestorsOf } from "../canvas/ladder.ts";
-import { canvasPath, DEFAULT_VIEW, revealing, viewFrom } from "../canvas/settings.ts";
+import { canvasPath, DEFAULT_VIEW, revealing, viewFrom, type CanvasView } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
 import { EdgeCard } from "../detail/EdgeCard.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { screenPath } from "../detail/parts.tsx";
-import type { JourneyPage, Projection } from "../journeys/address.ts";
+import { pagePath, withParam, type Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { rememberProjection } from "../journeys/memory.ts";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
@@ -28,6 +28,7 @@ import { InsertEntryContext, useInserting } from "../segments/entry.ts";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
 import { summaryModel } from "../summary/model.ts";
 import { ActiveFilters } from "./ActiveFilters.tsx";
+import { FrontierStrip } from "./FrontierStrip.tsx";
 import { activeFilters } from "./filters.ts";
 import { JourneyHeader } from "./JourneyHeader.tsx";
 import { JourneyToolbar } from "./JourneyToolbar.tsx";
@@ -40,9 +41,7 @@ const InsertionCanvas = lazy(() => import("../segments/Preview.tsx").then((modul
 
 export interface FrameProps {
   id: string;
-  /** A page, or the Summary page. */
-  page: JourneyPage | "summary";
-  projection: Projection | undefined;
+  screen: Screen;
   /** The node whose detail is open. */
   selected: string | undefined;
   /** The link whose card is open, `<from>~<to>`, when no node is. */
@@ -91,8 +90,7 @@ function BackToPass() {
 /** What goes in the frame's inspector column: the open node's detail, or the journey card when nothing is open (the cards' pass rail is theirs). */
 function InspectorSlot({
   ready,
-  page,
-  projection,
+  screen,
   selected,
   edge,
   structure,
@@ -100,8 +98,7 @@ function InspectorSlot({
   inserting,
 }: {
   ready: Ready;
-  page: FrameProps["page"];
-  projection: FrameProps["projection"];
+  screen: Screen;
   selected: string | undefined;
   edge: string | undefined;
   structure: ReactNode;
@@ -127,21 +124,21 @@ function InspectorSlot({
   if (selected !== undefined) {
     return (
       <Inspector focus={`${journey}:${selected}`}>
-        {page === "next" && projection === "cards" ? <BackToPass /> : null}
+        {screen === "walk" ? <BackToPass /> : null}
         {/* Keyed by journey and node, so every form and rejection in it is that node's. */}
         <NodeDetailPanel key={`${journey}:${selected}`} view={ready} nodeKey={selected} extra={structure} />
       </Inspector>
     );
   }
-  return !card || page === "summary" ? null : (
+  return !card || screen === "summary" ? null : (
     <Inspector focus={journey} reveal={false}>
-      <JourneyCard ready={ready} page={page} selected={selected} />
+      <JourneyCard ready={ready} selected={selected} />
     </Inspector>
   );
 }
 
 /** The page's body: the segment being placed, drawn as review will draw it, while the stepper has a preview; else the page's own. */
-function Workspace({ ready, page, projection, selected, edge, authored, drawing, preview }: Pick<FrameProps, "page" | "projection" | "selected" | "edge"> & { ready: Ready; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; preview: InsertPreview | undefined }) {
+function Workspace({ ready, screen, selected, edge, authored, drawing, preview }: Pick<FrameProps, "screen" | "selected" | "edge"> & { ready: Ready; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; preview: InsertPreview | undefined }) {
   if (preview !== undefined) {
     return (
       <Suspense fallback={<p className="muted small">Drawing the preview...</p>}>
@@ -149,60 +146,72 @@ function Workspace({ ready, page, projection, selected, edge, authored, drawing,
       </Suspense>
     );
   }
-  if (page === "summary") {
-    return <JourneyCard ready={ready} page={page} selected={selected} full />;
+  if (screen === "summary") {
+    return <JourneyCard ready={ready} selected={selected} full />;
   }
-  return projection === undefined ? null : <ProjectionBody ready={ready} page={page} projection={projection} selected={selected} edge={edge} authored={authored} drawing={drawing} />;
+  return <ProjectionBody ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} />;
 }
 
-function ReadyFrame({ ready, page, projection, selected, edge }: { ready: Ready } & Omit<FrameProps, "id">) {
+/** The graph's find and the strip's centring: each opens a node on the canvas, its containers expanded, and the canvas centres it once it is drawn (it reads the request from the navigation). `missing` is the search that named no node. */
+function useFind(ready: Ready, view: CanvasView) {
+  const navigate = useNavigate();
+  const [missing, setMissing] = useState<string | undefined>(undefined);
+  const journey = ready.journey.header.id;
+  const centre = (key: string) => {
+    const found = nodeOf(ready, key);
+    if (found !== undefined) {
+      void navigate(canvasPath(journey, revealing(view, { kind: found.kind, ancestors: ancestorsOf(ready.journey.graph.nodes ?? [], key) }, ready.derived.nodes[key]?.display_state), key), { state: { reveal: { key, how: "centre" } } });
+    }
+  };
+  const find = (text: string) => {
+    const key = text === "" ? undefined : findNode(ready, text);
+    setMissing(text !== "" && key === undefined ? text : undefined);
+    if (key !== undefined) {
+      centre(key);
+    }
+  };
+  return { centre, find, missing };
+}
+
+function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<FrameProps, "id">) {
   const { search } = useLocation();
   const navigate = useNavigate();
   const journey = ready.journey.header.id;
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const view = useMemo(() => viewFrom(params), [params]);
-  const planned = page === "plan" && projection === "graph";
+  const planned = screen === "graph";
   const authored = useMemo(() => (planned && view.edit ? journeyAuthored(ready) : undefined), [ready, planned, view.edit]);
   const drawing = useEdgeDrawing(authored);
   const inserting = useInserting(`journey:${journey}`);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const [missing, setMissing] = useState<string | undefined>(undefined);
   const summary = useProjected(ready, { projection: "status_summary" });
-  const planCount = useMemo(() => (summary.value === undefined ? undefined : summaryModel(ready, summary.value).inScope), [ready, summary.value]);
+  const model = useMemo(() => (summary.value === undefined ? undefined : summaryModel(ready, summary.value)), [ready, summary.value]);
   useEffect(() => {
-    if (page !== "summary" && projection !== undefined) {
-      rememberProjection(journey, page, projection);
+    if (screen === "graph" || screen === "list" || screen === "timeline") {
+      rememberProjection(journey, screen);
     }
-  }, [journey, page, projection]);
-  useJourneyKeys({ journey, page, projection, selected, sheetOpen, setSheetOpen });
-  const find = (text: string) => {
-    const key = text === "" ? undefined : findNode(ready, text);
-    setMissing(text !== "" && key === undefined ? text : undefined);
-    const found = key === undefined ? undefined : nodeOf(ready, key);
-    if (key !== undefined && found !== undefined) {
-      // The result is centred in the view once it is drawn (the canvas reads the request from the navigation).
-      void navigate(canvasPath(journey, revealing(view, { kind: found.kind, ancestors: ancestorsOf(ready.journey.graph.nodes ?? [], key) }, ready.derived.nodes[key]?.display_state), key), { state: { reveal: { key, how: "centre" } } });
-    }
-  };
+  }, [journey, screen]);
+  useJourneyKeys({ journey, screen, selected, sheetOpen, setSheetOpen });
+  const { centre, find, missing } = useFind(ready, view);
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
   const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(canvasPath(journey, view))} />;
-  const filters = page === "summary" || projection === undefined ? [] : activeFilters(journey, page, projection, search, selected);
+  const filters = screen === "summary" ? [] : activeFilters(journey, screen, search, selected);
   // The graph is a gesture surface that fills the workspace under the head; the rest scroll.
-  const fills = (page === "plan" && projection === "graph") || inserting.preview !== undefined;
+  const fills = planned || inserting.preview !== undefined;
   // The journey card is the inspector's empty state where the inspector has a column of its own;
   // narrower, it follows the projection (a graph that fills the page has no room for it on a tablet).
   const wide = useMedia(COLUMN);
   const phone = useMedia(PHONE_WIDTH);
-  const cards = page === "next" && projection === "cards";
-  const card = selected !== undefined || edge !== undefined || page === "summary" || cards ? "none" : wide ? "column" : fills && !phone ? "none" : "inline";
+  const card = selected !== undefined || edge !== undefined || screen === "summary" || screen === "walk" ? "none" : wide ? "column" : fills && !phone ? "none" : "inline";
   return (
     <ConnectContext value={authored === undefined ? undefined : drawing.connecting}>
       <InsertEntryContext value={inserting.start}>
-      <div className="ws-fill journey-frame" data-testid="journey-frame" data-page={page} data-projection={projection ?? ""}>
+      <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen}>
         <div className="ws-head stack journey-head">
-          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_VIEW} selected={selected} onKeys={() => { setSheetOpen(true); }} />
-          <JourneyToolbar ready={ready} page={page} projection={projection} node={selected} planCount={planCount} onFind={find} />
+          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_VIEW} selected={selected} model={model} onKeys={() => { setSheetOpen(true); }} />
+          <JourneyToolbar ready={ready} screen={screen} node={selected} onFind={find} />
           <ActiveFilters filters={filters} />
+          {planned ? <FrontierStrip ready={ready} onCentre={centre} onAll={() => void navigate(pagePath(journey, "graph", selected, withParam(search, "frontier", "1")))} /> : null}
           {planned ? <CanvasBars ready={ready} authored={authored} drawing={drawing} /> : null}
           {missing === undefined ? null : (
             <p className="muted small" role="status" data-testid="find-missing">
@@ -211,18 +220,18 @@ function ReadyFrame({ ready, page, projection, selected, edge }: { ready: Ready 
           )}
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>
-          <Workspace ready={ready} page={page} projection={projection} selected={selected} edge={edge} authored={authored} drawing={drawing} preview={inserting.preview} />
-          {card === "inline" ? <JourneyCard ready={ready} page={page} selected={selected} /> : null}
+          <Workspace ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} preview={inserting.preview} />
+          {card === "inline" ? <JourneyCard ready={ready} selected={selected} /> : null}
         </div>
         {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
       {/* After the head, whose assistant opens its tab as it mounts: a node opened from there brings its detail forward last. */}
-      <InspectorSlot ready={ready} page={page} projection={projection} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} />
+      <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} />
       </InsertEntryContext>
     </ConnectContext>
   );
 }
 
-export function JourneyFrame({ id, page, projection, selected, edge }: FrameProps) {
-  return <JourneyGate id={id}>{(ready) => <ReadyFrame ready={ready} page={page} projection={projection} selected={selected} edge={edge} />}</JourneyGate>;
+export function JourneyFrame({ id, screen, selected, edge }: FrameProps) {
+  return <JourneyGate id={id}>{(ready) => <ReadyFrame ready={ready} screen={screen} selected={selected} edge={edge} />}</JourneyGate>;
 }

@@ -30,7 +30,7 @@ async function partnerRunsTesting(page: Page): Promise<void> {
 }
 
 test("the decision view, and an answer revised", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "plan/graph?decisions=1", { node: "n_partner_runs", ...fixed });
+  await openAt(page, "browser", "j_vendor_eval", "graph?decisions=1", { node: "n_partner_runs", ...fixed });
   await expect(affected(page, "n_partner_runs")).toHaveCount(3);
   await expect(affected(page, "n_partner_runs").first()).toHaveAttribute("data-relevance", "not_relevant");
   await shot(page, "1-decision-view");
@@ -39,16 +39,16 @@ test("the decision view, and an answer revised", async ({ page }) => {
 });
 
 test("the timeline: the final anchor, a shortfall and why, no final milestone", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "plan/timeline", fixed);
+  await openAt(page, "browser", "j_vendor_eval", "timeline", fixed);
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-end", "n_decision_meeting");
   await shot(page, "3-timeline-final-anchor");
-  await openAt(page, "browser", "j_launch", "plan/timeline", fixed);
+  await openAt(page, "browser", "j_launch", "timeline", fixed);
   const freeze = page.locator('[data-testid="timeline-entry"][data-node="n_code_freeze"]');
   await expect(freeze).toHaveAttribute("data-shortfall", "2");
   await freeze.getByRole("button", { name: "Why" }).click();
   await expect(freeze.getByTestId("shortfall")).toBeVisible();
   await shot(page, "4-timeline-shortfall-and-why");
-  await openAt(page, "browser", "j_hiring", "plan/timeline", { node: "n_offer", ...fixed });
+  await openAt(page, "browser", "j_hiring", "timeline", { node: "n_offer", ...fixed });
   await pin(nodePanel(page, "n_offer"), "2026-10-20");
   await expect(page.locator('[data-testid="timeline-entry"][data-node="n_offer"]')).toBeVisible();
   await expect(page.getByTestId("timeline")).toHaveAttribute("data-end", "");
@@ -77,7 +77,7 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   await page.clock.setFixedTime(new Date(`${FIXED_TODAY}T12:00:00Z`));
   await openJourney(page, "browser", "j_vendor_eval");
   await beat(page);
-  await goTo(page, "plan", "graph");
+  await goTo(page, "graph");
   await page.getByTestId("chip-decisions").click();
   await expect(page.getByTestId("canvas")).toBeVisible();
   await beat(page);
@@ -85,7 +85,7 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   await beat(page);
   await partnerRunsTesting(page);
   await beat(page);
-  await goTo(page, "plan", "timeline");
+  await goTo(page, "timeline");
   const opens = page.locator('[data-testid="timeline-entry"][data-node="n_review_opens"]');
   await opens.getByRole("button", { name: "Why" }).click();
   await expect(opens.getByTestId("timeline-why")).toBeVisible();

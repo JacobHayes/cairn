@@ -1,21 +1,27 @@
-// C9, C12: what each of the Plan list's columns says about a row, in plain words: a status, a
+// C9, C12: what each of the list's columns says about a row, in plain words: a status, a
 // title with at most one thing under it, who owns it, when it is due. The columns Columns adds
 // say a signal in words beside its number. A row with nothing to say in a column leaves it blank.
-import { Link } from "react-router";
+// Under the Frontier lens the title says why the row is here (C10) and the owner column is
+// where the row's actions are (RowActions).
+import { Link, useLocation } from "react-router";
 
 import { ancestorsOf } from "../canvas/ladder.ts";
 import { DEFAULT_VIEW, canvasPath, revealing } from "../canvas/settings.ts";
 import type { DecisionRow } from "../decisions/model.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
+import { nodePath, screenPath } from "../detail/parts.tsx";
 import { entityName } from "../detail/sections.tsx";
 import { rollups } from "../plan/tree.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { dateWords } from "../timeline/model.ts";
 import { daysWords, dueWords } from "../status/when.ts";
 import { Badge } from "../ui/kit.tsx";
+import type { ListSettings } from "./address.ts";
 import type { Column, Line } from "./listModel.ts";
 import { firstParagraph } from "./listModel.ts";
 import { DetailLink } from "./Parts.tsx";
+import { reasonOf } from "./reasons.ts";
+import { RowActions } from "./RowActions.tsx";
 
 export interface CellContext {
   view: Ready;
@@ -25,6 +31,9 @@ export interface CellContext {
   decisions: Map<string, DecisionRow>;
   /** Each ranked node's place in the journey's rank order. */
   ranks: Map<string, number>;
+  /** The Frontier lens: rows say why they are here and carry their actions. */
+  acting: boolean;
+  sort: ListSettings["sort"];
   onFold: (container: string) => void;
 }
 
@@ -53,6 +62,16 @@ function Progress({ view, line }: { view: Ready; line: Line }) {
   );
 }
 
+/** C10: the one fact that says why a row is on the frontier, in words. */
+function Fact({ line, context }: { line: Line; context: CellContext }) {
+  const fact = line.row === undefined ? undefined : reasonOf(context.view, line.row, context.sort ?? "rank");
+  return fact === undefined ? null : (
+    <span className="muted small" data-testid="fact">
+      {fact}
+    </span>
+  );
+}
+
 function Title({ line, context }: { line: Line; context: CellContext }) {
   const { view, tree } = context;
   return (
@@ -68,7 +87,7 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
       ) : null}
       <div className="list-node">
         <DetailLink view={view} node={line.key} />
-        {tree ? (line.container ? <Progress view={view} line={line} /> : null) : <Under view={view} line={line} />}
+        {tree ? (line.container ? <Progress view={view} line={line} /> : null) : context.acting ? <Fact line={line} context={context} /> : <Under view={view} line={line} />}
       </div>
     </div>
   );
@@ -102,6 +121,7 @@ function Weight({ count, weighted }: { count: number; weighted: number }) {
 /** The cell of `column` for `line`. */
 export function Cell({ column, line, context }: { column: Column; line: Line; context: CellContext }) {
   const { view } = context;
+  const { pathname, search } = useLocation();
   const { row } = line;
   const derived = view.derived.nodes[line.key];
   const node = nodeOf(view, line.key);
@@ -119,7 +139,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
   }
   switch (column) {
     case "owner":
-      return (row.owners ?? []).length > 0 ? (row.owners ?? []).map((key) => entityName(view, key)).join(", ") : row.unassigned === true ? <span className="list-unassigned">Unassigned</span> : null;
+      return context.acting ? <RowActions view={view} row={row} to={`${nodePath(screenPath(pathname), line.key)}${search}`} /> : (row.owners ?? []).length > 0 ? (row.owners ?? []).map((key) => entityName(view, key)).join(", ") : row.unassigned === true ? <span className="list-unassigned">Unassigned</span> : null;
     case "due":
       return row.due == null || !open ? null : <span className={row.overdue === true ? "list-late" : ""} data-testid="list-due">{dueWords(row.due, today, node.kind === "decision")}</span>;
     case "rank": {

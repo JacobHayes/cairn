@@ -20,7 +20,7 @@ const timeline: Timeline = {
   end: "n_meeting",
 };
 
-const narrow: Narrowing = { decisions: false, kinds: [], text: "", mine: undefined };
+const narrow: Narrowing = { decisions: false, kinds: [], text: "", mine: undefined, frontier: undefined };
 
 function drawn(drawnTimeline: Timeline): string {
   return renderToStaticMarkup(

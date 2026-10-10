@@ -5,18 +5,13 @@ import { describe, expect, it } from "vitest";
 
 import {
   DEFAULT_LIST,
-  DEFAULT_NEXT,
   DEFAULT_TRIAGE,
   listFrom,
   listParams,
   listQueryOf,
-  nextFrom,
-  nextParams,
-  nextQueryOf,
   triageFrom,
   triageParams,
   triageQueryOf,
-  nextPath,
   walkthroughPath,
   type ListSettings,
 } from "./address.ts";
@@ -32,6 +27,7 @@ const everything: ListSettings = {
   sort: "slack",
   columns: ["rank", "unlocks"],
   decisions: false,
+  frontier: true,
 };
 
 describe("the list's address (C9)", () => {
@@ -62,7 +58,7 @@ describe("the list's address (C9)", () => {
   });
 
   it("asks the engine for every filter at once, a page from its cursor", () => {
-    expect(listQueryOf({ ...everything, text: "  plan  " }, 200)).toEqual({
+    expect(listQueryOf({ ...everything, frontier: false, text: "  plan  " }, 200)).toEqual({
       flags: everything.flags,
       within: "n_setup",
       owner: "e_lead",
@@ -79,37 +75,16 @@ describe("the list's address (C9)", () => {
   });
 });
 
-describe("the next list's address (C10)", () => {
-  const settings = { sort: "unlocks" as const, mine: true, kinds: ["decision" as const, "milestone" as const], flags: ["overdue" as const, "unassigned" as const], forMe: true, decisions: false, text: "plan" };
-
-  it("keeps every setting, and is bare at the defaults", () => {
-    expect(nextFrom(nextParams(settings))).toEqual(settings);
-    expect(nextParams(DEFAULT_NEXT).toString()).toBe("");
+describe("the frontier lens on the list (C10)", () => {
+  it("asks the engine for what is on the acting frontier, once, with every other filter kept", () => {
+    expect(listQueryOf({ ...DEFAULT_LIST, frontier: true }).flags).toEqual(["next_up"]);
+    expect(listQueryOf({ ...everything, flags: ["mine", "next_up"] }).flags).toEqual(["mine", "next_up"]);
+    expect(listQueryOf(everything).flags).toEqual(["mine", "overdue", "snoozed_and_overdue", "next_up"]);
   });
 
-  it("narrows to the decisions when DECISIONS is on, in the next list and the list alike", () => {
-    expect(nextQueryOf({ ...settings, decisions: true }).kinds).toEqual(["decision"]);
+  it("narrows to the decisions when DECISIONS is on", () => {
     expect(listQueryOf({ ...everything, decisions: true }).kinds).toEqual(["decision"]);
     expect(listQueryOf({ ...everything, decisions: false }).kinds).toEqual(["deliverable", "action"]);
-  });
-
-  it("asks for prioritize for me as the ranking for the viewer", () => {
-    expect(nextQueryOf(settings)).toEqual({ sort: "unlocks", mine: true, kinds: ["decision", "milestone"], for_viewer: true });
-  });
-
-  it("offers no group kind: groups are never on the frontier", () => {
-    expect(nextFrom(new URLSearchParams("kind=group,action")).kinds).toEqual(["action"]);
-  });
-
-  it("opens a node beside the list without touching what the list asks for", () => {
-    const [bare, beside] = [nextPath("j_a", settings), nextPath("j_a", settings, "n_x")];
-    expect(beside).toBe(bare.replace("/next/list", "/next/list/nodes/n_x"));
-    expect(nextQueryOf(nextFrom(new URLSearchParams(beside.split("?")[1])))).toEqual(nextQueryOf(settings));
-  });
-
-  it("reads only the flags a next row carries; the engine's query takes none", () => {
-    expect(nextFrom(new URLSearchParams("flag=stale,snoozed,next_up,overdue")).flags).toEqual(["overdue", "stale"]);
-    expect(nextQueryOf(settings)).not.toHaveProperty("flags");
   });
 });
 
@@ -125,9 +100,9 @@ describe("triage's address (C11)", () => {
     expect(triageQueryOf({ decisions: false, mine: true, kinds: [], flags: [], text: "" })).toEqual({ sort: "rank", mine: true, kinds: [] });
   });
 
-  it("opens the walkthrough on the cards with DECISIONS on", () => {
+  it("opens the walkthrough on the walk through with DECISIONS on", () => {
     const [path = "", query = ""] = walkthroughPath("j_new").split("?");
-    expect(path).toBe("/journeys/j_new/next/cards");
+    expect(path).toBe("/journeys/j_new/walk");
     expect(query).toBe("decisions=1");
     expect(triageFrom(new URLSearchParams(query)).decisions).toBe(true);
   });

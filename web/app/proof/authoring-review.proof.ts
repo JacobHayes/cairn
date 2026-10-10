@@ -8,7 +8,7 @@ import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
-import { chooseFromMenu, openJourneyCard, openRouteDetail, routeAction } from "../e2e/around.ts";
+import { openJourneyCard, openRouteDetail, routeAction } from "../e2e/around.ts";
 import { addNode, newRoute, openEditing } from "../e2e/authoring.ts";
 import { editWhereVersionTwoChanges, pickNode, publishVersionTwo, reviewOpen } from "../e2e/proposals.ts";
 import { goWithin, nodeCard } from "../e2e/shell.ts";
@@ -62,7 +62,7 @@ test("a proposal under review, as the Graph and as the List", async ({ page }) =
   await editWhereVersionTwoChanges(page, "browser");
   await publishVersionTwo(page, "browser");
   await openJourneyCard(page, "browser", "j_vendor_eval");
-  await chooseFromMenu(page, "journey-menu", "menu-upgrade");
+  await page.getByTestId("journey-upgrade").click();
   await page.getByTestId("upgrade-flow").getByRole("button", { name: "Propose the upgrade" }).click();
   await reviewOpen(page);
   await shot(page, "review-graph");

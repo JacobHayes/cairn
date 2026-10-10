@@ -8,7 +8,7 @@ It is for anyone who runs the same kind of project more than once (evaluating a 
 hiring for a role, launching a product) and keeps finding out too late that something was
 needed by Thursday. It also works for one-off projects that have no plan yet.
 
-![Answering a decision on the Next page: the list updates as soon as the answer is saved](docs/images/walkthrough.gif)
+![Opening a journey on its graph, picking a decision from the Frontier strip, and answering it in the inspector](docs/images/walkthrough.gif)
 
 ## How it works
 
@@ -31,23 +31,23 @@ who made it and when. AI agents can do everything a person can, by the same rule
 
 ## A look around
 
-### Next: what you can do now
+### The Frontier: what you can do now
 
-A journey's Next page is a short, ranked list of what is ready, with the decisions that
-are waiting on someone. Hover a row to act on it.
+Turn on a journey's Frontier and the list is a short, ranked list of what is ready, with the
+decisions that are waiting on someone. Hover a row to act on it.
 
-![The Next page of a fresh journey, listing seven things to do now](docs/images/next.png)
+![The Frontier on a fresh journey's List, ranking seven things to do now](docs/images/frontier.png)
 
 ### See an answer's effect before you save it
 
 Open a decision and pick an answer. Before you save, Cairn shows what it changes: here,
 Yes brings in three steps and frees one to start.
 
-![A decision open beside the list, with Yes chosen and a preview of what saving does](docs/images/decision.png)
+![A decision open beside the Frontier list, with Yes chosen and a preview of what saving does](docs/images/decision.png)
 
 ### The graph: what a step needs, and what it unlocks
 
-The Plan page draws the whole journey as a map you can pan and zoom. It opens on the
+A journey opens on its graph, which draws the whole journey as a map you can pan and zoom. It opens on the
 current stage. Click a step to trace it: Cairn marks what it needs and what it unblocks,
 and fades the rest.
 

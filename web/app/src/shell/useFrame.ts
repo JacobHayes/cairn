@@ -89,6 +89,7 @@ export function useFrame(): Frame {
         };
       },
       show: setTab,
+      reveal: () => { setTab("inspector"); setCollapsed(false); },
       dock: (next) => {
         setDock(next);
         return () => {

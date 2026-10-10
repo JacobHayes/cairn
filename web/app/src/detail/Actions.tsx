@@ -5,9 +5,10 @@
 // A guard that fails disables the primary and says what it waits on; answering or finishing
 // anyway is a bypass with a reason (D4). A container holding its own snooze says that moving it
 // on lifts the snooze (B6).
-import { useState } from "react";
-import { useNavigate } from "react-router";
+import { useEffect, useRef, useState } from "react";
+import { useLocation, useNavigate } from "react-router";
 
+import { useFrameActions } from "../shell/frame.tsx";
 import { assignOwner, missingEvidence, type EvidenceDraft } from "../acting/acts.ts";
 import { ancestorsOf } from "../canvas/ladder.ts";
 import { canvasPath, DEFAULT_VIEW, revealing } from "../canvas/settings.ts";
@@ -23,7 +24,7 @@ import { DoneButton, EvidenceForm, type DoneForm } from "./DoneEvidence.tsx";
 import { openSnooze, SnoozePanel, WeightEditor, type SnoozeDraft } from "./editors.tsx";
 import { foldKey, setFold } from "./folds.ts";
 import { answerable, isBlocked, movesFrom, nodeOf, titleOf, transition, unansweredOf, type Mutation, type NodeDetail, type Ready } from "./model.ts";
-import { menuOf, offered, type Act, type MenuId } from "./offers.ts";
+import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { Rejected } from "./Rejected.tsx";
 import { entityName } from "./sections.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
@@ -171,7 +172,7 @@ function AssignOwner({ view, write, node }: { view: Ready; write: NodeWrite; nod
   );
 }
 
-/** What a menu entry opens in place of the row. */
+/** What a menu entry opens in place of the row; none shows the row. */
 type Panel = "assign" | "weight" | "break-down" | "edit-date";
 
 interface Menus {
@@ -180,7 +181,7 @@ interface Menus {
   write: NodeWrite;
   onRename: () => void;
   forms: Record<"skip" | "keep" | "include" | "bypass" | "anyway", ReasonDraft> & { snooze: ReturnType<typeof useFormDraft<SnoozeDraft>> };
-  openPanel: (panel: Panel) => void;
+  openPanel: (panel: Panel | undefined) => void;
   onCopied: () => void;
   /** Starts inserting a segment under a container; none where the screen has no stepper. */
   insertHere: ((parent: string) => void) | undefined;
@@ -225,14 +226,7 @@ function runnersOf({ view, detail, write, onRename, forms, openPanel, onCopied, 
 }
 
 /** The `⋯`: each entry does its one thing or opens its form. */
-function Overflow(menus: Omit<Menus, "insertHere">) {
-  const navigate = useNavigate();
-  const insertHere = useInsertEntry();
-  // Only a frame with a stepper can insert: elsewhere the entry is not offered.
-  const groups = menuOf(menus.view, menus.detail)
-    .map((group) => group.filter((item) => item.id !== "insert-segment" || insertHere !== undefined))
-    .filter((group) => group.length > 0);
-  const runners = runnersOf({ ...menus, insertHere }, (to, state) => void navigate(to, state === undefined ? {} : { state }));
+function Overflow({ groups, runners }: { groups: MenuItem[][]; runners: Record<MenuId, () => void> }) {
   if (groups.length === 0) {
     return null;
   }
@@ -263,14 +257,35 @@ function Overflow(menus: Omit<Menus, "insertHere">) {
   );
 }
 
+/** What a row action sends as its one move, if it is one (the others open a form). */
+function actMutation(act: Act, key: string): Mutation | undefined {
+  switch (act) {
+    case "done":
+      return transition(key, "complete");
+    case "start":
+      return transition(key, "start");
+    case "reach-now":
+      return transition(key, "reach");
+    case "mark-atomic":
+      return { op: "set_atomic", node: key, atomic: true };
+    case "unsnooze":
+      return { op: "unsnooze", node: key };
+    case "done-with-evidence":
+    case "reach":
+    case "break-down":
+      return undefined;
+  }
+}
+
 /** One of the row's buttons. */
 function ActButton({ act, view, detail, write, evidence, waiting }: { act: Act; view: Ready; detail: NodeDetail; write: NodeWrite; evidence: DoneForm; waiting: boolean }) {
   const key = detail.node.key;
-  const run = (mutations: Mutation[]) => () => void write.run(mutations);
+  const mutation = actMutation(act, key);
+  const run = () => void write.run(mutation === undefined ? [] : [mutation]);
   switch (act) {
     case "done":
       return (
-        <Button primary disabled={write.disabled || waiting} onClick={run([transition(key, "complete")])}>
+        <Button primary disabled={write.disabled || waiting} onClick={run}>
           Mark done
         </Button>
       );
@@ -278,7 +293,7 @@ function ActButton({ act, view, detail, write, evidence, waiting }: { act: Act; 
       return <DoneButton write={write} form={evidence} />;
     case "start":
       return (
-        <Button disabled={write.disabled} onClick={run([transition(key, "start")])}>
+        <Button disabled={write.disabled} onClick={run}>
           Start
         </Button>
       );
@@ -286,7 +301,7 @@ function ActButton({ act, view, detail, write, evidence, waiting }: { act: Act; 
       return <Reach write={write} node={key} today={view.derived.today} disabled={waiting} />;
     case "reach-now":
       return (
-        <Button primary disabled={write.disabled} onClick={run([transition(key, "reach")])}>
+        <Button primary disabled={write.disabled} onClick={run}>
           Confirm reached now
         </Button>
       );
@@ -294,13 +309,13 @@ function ActButton({ act, view, detail, write, evidence, waiting }: { act: Act; 
       return <BreakDown ready={view} node={detail.node} />;
     case "mark-atomic":
       return (
-        <Button disabled={write.disabled} onClick={run([{ op: "set_atomic", node: key, atomic: true }])}>
+        <Button disabled={write.disabled} onClick={run}>
           Mark atomic
         </Button>
       );
     case "unsnooze":
       return (
-        <Button disabled={write.disabled} onClick={run([{ op: "unsnooze", node: key }])}>
+        <Button disabled={write.disabled} onClick={run}>
           Unsnooze
         </Button>
       );
@@ -353,6 +368,64 @@ function Opened({ view, detail, write, forms, evidence, panel, onClose }: { view
   );
 }
 
+/**
+ * What the graph's context menu chose for this node: it selects the node and leaves the choice in
+ * the navigation's state, which the node's own Actions carry out once, with the handlers its `⋯`
+ * and buttons use. The choice is taken off the history entry as it is run, so a reload does not repeat it.
+ */
+function useContextChoice(node: string, run: (id: ContextId) => void): void {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const frame = useFrameActions();
+  const chosen = (location.state as { choice?: { node: string; id: ContextId } } | null)?.choice;
+  const done = useRef<string | undefined>(undefined);
+  useEffect(() => {
+    if (chosen === undefined || chosen.node !== node || done.current === location.key) {
+      return;
+    }
+    done.current = location.key;
+    // The form or the move is shown in the inspector, which the viewer may have on the assistant's tab or collapsed.
+    frame?.reveal();
+    void navigate(location, { replace: true, state: { ...(location.state as object), choice: undefined } });
+    run(chosen.id);
+  });
+}
+
+/**
+ * The `⋯` menu's groups and what each entry does, and the choice the graph's context menu left
+ * for this node (done with the same handlers).
+ */
+function useMenu(menus: Omit<Menus, "insertHere">, evidence: DoneForm): { groups: MenuItem[][]; runners: Record<MenuId, () => void> } {
+  const { view, detail, write } = menus;
+  const navigate = useNavigate();
+  const insertHere = useInsertEntry();
+  // Only a frame with a stepper can insert: elsewhere the entry is not offered.
+  const groups = menuOf(view, detail)
+    .map((group) => group.filter((item) => item.id !== "insert-segment" || insertHere !== undefined))
+    .filter((group) => group.length > 0);
+  const runners = runnersOf({ ...menus, insertHere }, (to, state) => void navigate(to, state === undefined ? {} : { state }));
+  useContextChoice(detail.node.key, (id) => {
+    if (id in runners) {
+      runners[id as MenuId]();
+      return;
+    }
+    // What the row itself shows (its buttons and the answer form) is in place of any panel the menu opened.
+    menus.openPanel(undefined);
+    if (id === "done-with-evidence") {
+      if (evidence.draft === undefined) {
+        evidence.open({ artifact: "", note: "" }, write.seen);
+      }
+    } else {
+      const mutation = actMutation(id as Act, detail.node.key);
+      // As the row's buttons are, not offered again while a write is in flight.
+      if (mutation !== undefined && !write.disabled) {
+        void write.run([mutation]);
+      }
+    }
+  });
+  return { groups, runners };
+}
+
 export function Actions({ view, detail, onRename }: { view: Ready; detail: NodeDetail; onRename: () => void }) {
   const write = useNodeWrite(view, `actions:${detail.node.key}`, detail.node.key);
   const { node, record } = detail;
@@ -372,22 +445,8 @@ export function Actions({ view, detail, onRename }: { view: Ready; detail: NodeD
   const offers = offered(view, detail);
   const deciding = answerable(node.kind, record.state);
   const inForm = evidence.draft !== undefined || forms.skip.draft !== undefined || forms.keep.draft !== undefined || forms.include.draft !== undefined || forms.bypass.draft !== undefined || forms.snooze.draft !== undefined;
-  const menu = (
-    <Overflow
-      view={view}
-      detail={detail}
-      write={write}
-      onRename={onRename}
-      forms={forms}
-      openPanel={(next) => {
-        setPanel(next);
-        setCopied(false);
-      }}
-      onCopied={() => {
-        setCopied(true);
-      }}
-    />
-  );
+  const { groups, runners } = useMenu({ view, detail, write, onRename, forms, openPanel: (next) => { setPanel(next); setCopied(false); }, onCopied: () => { setCopied(true); } }, evidence);
+  const menu = <Overflow groups={groups} runners={runners} />;
   const acts = [...(offers.primary === undefined ? [] : [offers.primary]), ...offers.secondary];
   const moving = movesFrom(node.kind, record.state).includes("start") ? "Starting" : "Finishing";
   return (

@@ -2,18 +2,15 @@
 // the journeys referring to the caller's entities, active only (B11), or nothing at all.
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_VIEW, paramsOf, revealing, viewFrom } from "../canvas/settings.ts";
+import { paramsOf, revealing, viewFrom } from "../canvas/settings.ts";
 import { screenPath } from "../detail/parts.tsx";
 import {
   DEFAULT_FILTERS,
   carriedSearch,
-  deepLinkTarget,
   filterParams,
   filtersFrom,
-  landingPath,
   legacyRedirect,
   nextProjection,
-  pageOfPath,
   queryOf,
   withMineFlipped,
   type IndexFilters,
@@ -62,17 +59,10 @@ describe("the host's query for the filters", () => {
   });
 });
 
-describe("the journey's pages (2.2, 2.3)", () => {
-  it("cycles forward with v within the page's own projections", () => {
-    expect(nextProjection("plan", "graph")).toBe("list");
-    expect(nextProjection("next", "cards")).toBe("list");
-  });
-
-  it("reads the page and projection back from an address, node or not", () => {
-    expect(pageOfPath("/journeys/j_a/next/cards")).toEqual({ page: "next", projection: "cards" });
-    expect(pageOfPath("/journeys/j_a/plan/timeline/nodes/n_x")).toEqual({ page: "plan", projection: "timeline" });
-    expect(pageOfPath("/journeys/j_a/plan/cards")).toBeUndefined();
-    expect(pageOfPath("/journeys/j_a/summary")).toBeUndefined();
+describe("the journey's views (2.2, 2.3)", () => {
+  it("cycles forward with v through the projections", () => {
+    expect(nextProjection("graph")).toBe("list");
+    expect(nextProjection("timeline")).toBe("graph");
   });
 
   it("flips MINE whether the address says it as the chip or as the list's own flag", () => {
@@ -82,48 +72,46 @@ describe("the journey's pages (2.2, 2.3)", () => {
     expect(withMineFlipped("?mine=1&flag=mine")).toBe("");
   });
 
-  it("carries a toolbar chip only to the projections that read it", () => {
-    const search = "?decisions=1&sort=due&mine=1&q=plan&kind=action";
-    expect(carriedSearch(search, "plan", "list")).toBe("?decisions=1&mine=1&q=plan");
-    expect(carriedSearch(search, "next", "cards")).toBe("?decisions=1&mine=1&q=plan");
-    expect(carriedSearch(search, "plan", "graph")).toBe("?decisions=1");
-    expect(carriedSearch(search, "plan", "timeline")).toBe("?decisions=1&mine=1&q=plan");
-    expect(carriedSearch("?sort=due", "plan", "list")).toBe("");
-  });
-
-  it("sends the address agents post for a node to the page that shows it, with its containers open (2.4)", () => {
-    expect(deepLinkTarget("j_a", "n_x", { onFrontier: true, reveal: DEFAULT_VIEW })).toBe("/journeys/j_a/next/list/nodes/n_x");
-    expect(deepLinkTarget("j_a", "n_x", { onFrontier: false, reveal: { ...DEFAULT_VIEW, open: ["n_p", "n_q"] } })).toBe("/journeys/j_a/plan/graph/nodes/n_x?open=n_p%2Cn_q");
+  it("carries a toolbar chip only to the views that read it", () => {
+    const search = "?decisions=1&frontier=1&sort=due&mine=1&q=plan&kind=action";
+    expect(carriedSearch(search, "list")).toBe("?decisions=1&mine=1&q=plan&frontier=1");
+    expect(carriedSearch(search, "graph")).toBe("?decisions=1&frontier=1");
+    expect(carriedSearch(search, "walk")).toBe("?decisions=1&mine=1&q=plan");
+    expect(carriedSearch(search, "summary")).toBe("");
   });
 
   it("closes a node's detail to the screen it opened on (C12)", () => {
-    expect(screenPath("/journeys/j_a/plan/graph/nodes/n_x")).toBe("/journeys/j_a/plan/graph");
-    expect(screenPath("/journeys/j_a/plan/graph/edges/n_x~n_y")).toBe("/journeys/j_a/plan/graph");
+    expect(screenPath("/journeys/j_a/graph/nodes/n_x")).toBe("/journeys/j_a/graph");
+    expect(screenPath("/journeys/j_a/graph/edges/n_x~n_y")).toBe("/journeys/j_a/graph");
     expect(screenPath("/journeys/j_a/summary")).toBe("/journeys/j_a/summary");
-  });
-
-  it("opens a journey with nothing recorded and a decision to make on the walkthrough (C11)", () => {
-    expect(landingPath("j_a", { recorded: false, decisions: true })).toBe("/journeys/j_a/next/cards?decisions=1");
-    expect(landingPath("j_a", { recorded: true, decisions: true })).toBe("/journeys/j_a/next/list");
-    expect(landingPath("j_a", { recorded: false, decisions: false })).toBe("/journeys/j_a/next/list");
   });
 });
 
 describe("every old address resolves (2.4, Redirects)", () => {
   const rows: [string, string, string, string][] = [
-    ["the old canvas with hide, in, notrelevant, undecided, heat", "/journeys/j_a", "?hide=action,milestone&in=n_stage&notrelevant=hide&undecided=hide&heat=on", "/journeys/j_a/plan/graph?kind=group%2Cdecision%2Cdeliverable&open=n_stage&show=&lens=gravity"],
-    ["next with its settings and a node", "/journeys/j_a/next/nodes/n_x", "?sort=due&mine=1", "/journeys/j_a/next/list/nodes/n_x?sort=due&mine=1"],
+    ["the old canvas with hide, in, notrelevant, undecided, heat", "/journeys/j_a", "?hide=action,milestone&in=n_stage&notrelevant=hide&undecided=hide&heat=on", "/journeys/j_a/graph?kind=group%2Cdecision%2Cdeliverable&open=n_stage&show=&lens=gravity"],
+    ["the next list, now the list with the Frontier on, with its settings and a node", "/journeys/j_a/next/list/nodes/n_x", "?sort=due&mine=1", "/journeys/j_a/list/nodes/n_x?sort=due&mine=1&frontier=1"],
+    ["the cards, now the walk through", "/journeys/j_a/next/cards", "?decisions=1", "/journeys/j_a/walk?decisions=1"],
+    ["a plan view, now the view", "/journeys/j_a/plan/timeline", "?q=x", "/journeys/j_a/timeline?q=x"],
+    ["a plan graph's edge", "/journeys/j_a/plan/graph/edges/n_x~n_y", "", "/journeys/j_a/graph/edges/n_x~n_y"],
+    ["the bare plan", "/journeys/j_a/plan", "", "/journeys/j_a/graph"],
+    ["the decision walkthrough of the earlier screens", "/journeys/j_a/walkthrough", "", "/journeys/j_a/walk?decisions=1"],
+    ["a node's address with no key, which is the view without it", "/journeys/j_a/graph/nodes", "?kind=action", "/journeys/j_a/graph?kind=action"],
+    ["an old page's node address with no key", "/journeys/j_a/plan/list/nodes", "", "/journeys/j_a/plan/list"],
+    ["a journey's node address with no key", "/journeys/j_a/nodes", "", "/journeys/j_a"],
     ["the journey index, which was at the root with its filters", "/", "?status=archived&route=r&version=2&mine=1", "/journeys?status=archived&route=r&version=2&mine=1"],
   ];
   it.each(rows)("%s", (_, pathname, search, expected) => {
     expect(legacyRedirect(pathname, search)).toBe(expected);
   });
 
-  it("leaves the summary, the landing and every new address alone", () => {
+  it("leaves the new views, the landing and an unknown path alone", () => {
     for (const [pathname, search] of [
       ["/journeys/j_a/summary", ""],
+      ["/journeys/j_a/list", "?frontier=1"],
       ["/", ""],
-      ["/journeys/j_a/plan/graph/nodes/n_x", "?kind=action"],
+      ["/journeys/j_a/graph/nodes/n_x", "?kind=action"],
+      ["/journeys/j_a/nowhere", ""],
     ] as const) {
       expect(legacyRedirect(pathname, search)).toBeUndefined();
     }

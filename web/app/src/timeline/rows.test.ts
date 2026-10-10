@@ -10,7 +10,7 @@ import type { DisplayState } from "../status/words.ts";
 import type { Timeline } from "./model.ts";
 import { chartOf, type ChartOptions, type Narrowing } from "./rows.ts";
 
-const none: Narrowing = { decisions: false, kinds: [], text: "", mine: undefined };
+const none: Narrowing = { decisions: false, kinds: [], text: "", mine: undefined, frontier: undefined };
 const options: ChartOptions = { detail: "stages", flipped: new Set(), selected: undefined, narrow: none };
 
 const timeline: Timeline = {
@@ -71,6 +71,16 @@ describe("a selection and the toolbar's chips fade what they do not reach", () =
     expect(chart.dependencies).toEqual([{ from: "n_findings", to: "n_report", kind: "needs" }]);
     expect(chart.rows.filter((row) => !row.faded).map((row) => row.key).sort()).toEqual(["n_findings", "n_report"]);
     expect(chart.rows.filter((row) => row.float !== undefined).map((row) => [row.key, row.float])).toEqual([["n_report", { from: "2026-10-20", to: "2026-10-30" }]]);
+  });
+
+  it("shows only the frontier and the stages that hold it", () => {
+    const only = (frontier: string[]) => chartOf(testView(), timeline, { ...options, narrow: { ...none, frontier: new Set(frontier) } }).rows.map((row) => row.key);
+    expect(only(["n_report"])).toEqual(["n_stage", "n_report"]);
+    expect(only([])).toEqual([]);
+    // Selecting a row does not bring the rest back.
+    const selected = chartOf(testView(), timeline, { ...options, selected: "n_report", narrow: { ...none, frontier: new Set(["n_report"]) } });
+    expect(selected.rows.map((row) => row.key)).toEqual(["n_stage", "n_report"]);
+    expect(selected.dependencies).toEqual([]);
   });
 
   it("fades what the kinds, the search and Mine exclude, keeping a stage that holds a match", () => {

@@ -3,19 +3,20 @@
 // index is shareable and follows the back button. Every filter at its default leaves the
 // address bare.
 //
-// A journey has two pages, each with projections (2.2):
+// A journey has one page, graph first, with views of its nodes and a walk through its frontier:
 //
-//   /journeys/<id>/next/{list|cards}[/nodes/<key>]
-//   /journeys/<id>/plan/{graph|list|timeline}[/nodes/<key>]
+//   /journeys/<id>/{graph|list|timeline}[/nodes/<key>]   (graph: also /edges/<from>~<to>)
 //   /journeys/<id>/summary[/nodes/<key>]
-//   /journeys/<id>/nodes/<key>      deep link: resolved against the journey (JourneyDeepLink)
-//   /journeys/<id>                  landing: resolved against the journey (JourneyLanding)
+//   /journeys/<id>/walk[/nodes/<key>]
+//   /journeys/<id>/nodes/<key>      deep link: the graph with the node selected (JourneyDeepLink)
+//   /journeys/<id>                  landing: the view last shown, the graph at first (JourneyLanding)
 //
-// The toolbar's chips are in the query on every projection: `decisions=1`, `mine=1`, `q=<text>`.
-// Every address the earlier screens had still resolves (`legacyRedirect`).
+// The toolbar's chips are in the query on every view: `decisions=1`, `mine=1`, `q=<text>`, and
+// `frontier=1`, the lens on what can move now. Every address the earlier screens had still
+// resolves (`legacyRedirect`).
 import type { Schema } from "@cairn/client";
 
-import { canvasPath, graphQueryFromOld, OLD_CANVAS_PARAMS, type CanvasView } from "../canvas/settings.ts";
+import { graphQueryFromOld, OLD_CANVAS_PARAMS } from "../canvas/settings.ts";
 import type { JourneyIndexQuery } from "../data/host.ts";
 
 export type JourneyStatus = Schema<"JourneyStatus">;
@@ -141,58 +142,54 @@ export function newJourneyPath(route?: string, version?: number): string {
   return `/new${searchOf(params)}`;
 }
 
-/** The journey's two pages (2.2). */
-export type JourneyPage = "next" | "plan";
+/** How a journey is drawn: the three projections of its nodes. */
+export type Projection = "graph" | "list" | "timeline";
 
-/** How a page is drawn. One global order, `GRAPH LIST TIMELINE CARDS`; a page shows its subset. */
-export type Projection = "graph" | "list" | "timeline" | "cards";
+/** The projections in the order the toolbar lists them and `v` cycles them. */
+export const PROJECTIONS: readonly Projection[] = ["graph", "list", "timeline"];
 
-/** Each page's projections, in the global order. A projection that does not apply is left out. */
-export const PAGE_PROJECTIONS: Record<JourneyPage, readonly Projection[]> = {
-  next: ["list", "cards"],
-  plan: ["graph", "list", "timeline"],
-};
+/** A journey's screens: a projection, the Summary, or the walk through the frontier. */
+export type Screen = Projection | "summary" | "walk";
 
-export const DEFAULT_PROJECTION: Record<JourneyPage, Projection> = { next: "list", plan: "graph" };
+export const DEFAULT_PROJECTION: Projection = "graph";
 
-/** `text` as one of `page`'s projections, if it is one. */
-export function projectionOf(page: JourneyPage, text: string | undefined): Projection | undefined {
-  return PAGE_PROJECTIONS[page].find((each) => each === text);
+/** `text` as a projection, if it is one. */
+export function projectionOf(text: string | undefined): Projection | undefined {
+  return PROJECTIONS.find((each) => each === text);
 }
 
-/** Key `v`: the projection after `current` on its page, wrapping round. */
-export function nextProjection(page: JourneyPage, current: Projection): Projection {
-  const all = PAGE_PROJECTIONS[page];
-  const at = all.indexOf(current);
-  return all[(at + 1) % all.length] ?? DEFAULT_PROJECTION[page];
+/** Key `v`: the projection after `current`, wrapping round. */
+export function nextProjection(current: Projection): Projection {
+  return PROJECTIONS[(PROJECTIONS.indexOf(current) + 1) % PROJECTIONS.length] ?? DEFAULT_PROJECTION;
 }
 
 /**
- * Where each toolbar chip means something: the projections that read its parameter. The
- * graph's search finds a node rather than filtering, so it is not carried.
+ * Where each toolbar chip means something: the screens that read its parameter. The graph's
+ * search finds a node rather than filtering, so it is not carried; the walk through is the
+ * frontier already.
  */
-const CHIP_APPLIES: Record<"decisions" | "mine" | "q", (page: JourneyPage, projection: Projection) => boolean> = {
-  decisions: () => true,
-  mine: (page, projection) => page === "next" || projection === "list" || projection === "timeline",
-  q: (page, projection) => page === "next" || projection !== "graph",
+const CHIP_APPLIES: Record<"decisions" | "mine" | "q" | "frontier", (screen: Screen) => boolean> = {
+  decisions: (screen) => screen !== "summary",
+  mine: (screen) => screen !== "summary" && screen !== "graph",
+  q: (screen) => screen !== "summary" && screen !== "graph",
+  frontier: (screen) => screen === "graph" || screen === "list" || screen === "timeline",
 };
 
-/** Whether the chip `name` is a filter on `projection` of `page`. */
-export function chipApplies(name: keyof typeof CHIP_APPLIES, page: JourneyPage, projection: Projection): boolean {
-  return CHIP_APPLIES[name](page, projection);
+/** Whether the chip `name` is a filter on `screen`. */
+export function chipApplies(name: keyof typeof CHIP_APPLIES, screen: Screen): boolean {
+  return CHIP_APPLIES[name](screen);
 }
 
 /**
- * `search` reduced to the toolbar's chips that mean something on `projection` of `page`: what
- * a projection switch or a page switch keeps. A chip a projection does not read is left behind,
- * not carried unseen.
+ * `search` reduced to the toolbar's chips that mean something on `screen`: what a switch of
+ * view keeps. A chip a screen does not read is left behind, not carried unseen.
  */
-export function carriedSearch(search: string, page: JourneyPage, projection: Projection): string {
+export function carriedSearch(search: string, screen: Screen): string {
   const from = new URLSearchParams(search);
   const kept = new URLSearchParams();
-  for (const name of ["decisions", "mine", "q"] as const) {
+  for (const name of ["decisions", "mine", "q", "frontier"] as const) {
     const value = from.get(name);
-    if (value !== null && chipApplies(name, page, projection)) {
+    if (value !== null && chipApplies(name, screen)) {
       kept.set(name, value);
     }
   }
@@ -236,106 +233,94 @@ function withQuestion(search: string): string {
   return search === "" || search === "?" ? "" : search.startsWith("?") ? search : `?${search}`;
 }
 
-/** A page's projection, or a node's detail on it. `search` is the query, kept as given. */
-export function pagePath(journey: string, page: JourneyPage, projection: Projection, node?: string, search = ""): string {
-  return `/journeys/${journey}/${page}/${projection}${node === undefined ? "" : `/nodes/${node}`}${withQuestion(search)}`;
+/** A journey's screen, or a node's detail on it. `search` is the query, kept as given. */
+export function pagePath(journey: string, screen: Screen, node?: string, search = ""): string {
+  return `/journeys/${journey}/${screen}${node === undefined ? "" : `/nodes/${node}`}${withQuestion(search)}`;
 }
 
-/** C18: the Summary page, the journey card at full width. */
-export function summaryPath(journey: string, node?: string): string {
-  return `/journeys/${journey}/summary${node === undefined ? "" : `/nodes/${node}`}`;
-}
-
-/** The address agents post for a node; it resolves to a page (JourneyDeepLink). */
+/** The address agents post for a node; it resolves to the graph with the node selected (JourneyDeepLink). */
 export function deepLinkPath(journey: string, node: string): string {
   return `/journeys/${journey}/nodes/${node}`;
-}
-
-/** The page and projection an address of a journey's page is on, if it is one. */
-export function pageOfPath(pathname: string): { page: JourneyPage; projection: Projection } | undefined {
-  const match = /^\/journeys\/[^/]+\/(next|plan)\/([a-z]+)(?:\/|$)/.exec(pathname);
-  const page = match?.[1] === "next" || match?.[1] === "plan" ? match[1] : undefined;
-  const projection = page === undefined ? undefined : projectionOf(page, match?.[2]);
-  return page === undefined || projection === undefined ? undefined : { page, projection };
-}
-
-/**
- * Where the address agents post for a node resolves (2.4, Deep link): a node on the acting
- * frontier opens on NEXT, LIST with its row selected; any other opens on PLAN, GRAPH, selected
- * (so traced), with its containers expanded, and shown even when it is not relevant (`reveal` is
- * the canvas's view with that done). Either way the inspector opens on it.
- */
-export function deepLinkTarget(journey: string, node: string, where: { onFrontier: boolean; reveal: CanvasView }): string {
-  if (where.onFrontier) {
-    return pagePath(journey, "next", "list", node);
-  }
-  return canvasPath(journey, where.reveal, node);
-}
-
-/**
- * C11: a journey with nothing recorded in it yet and a decision to make opens on the
- * walkthrough; any other journey opens on the next list (2.4, landing).
- */
-export function landingPath(journey: string, started: { recorded: boolean; decisions: boolean }): string {
-  return started.recorded || !started.decisions ? pagePath(journey, "next", "list") : pagePath(journey, "next", "cards", undefined, "?decisions=1");
 }
 
 /** The old canvas's parameters, which an address carries only on the canvas of the earlier screens. */
 const OLD_CANVAS_ADDRESS = [...OLD_CANVAS_PARAMS, "trace", "edit"];
 
-/** The old screens, each with where it lives now and the query it adds there. */
-const OLD_SCREENS: Record<string, { to: [JourneyPage, Projection] | "landing"; add?: string }> = {
-  overview: { to: "landing" },
-  next: { to: ["next", "list"] },
-  list: { to: ["plan", "list"] },
-  triage: { to: ["next", "cards"] },
-  walkthrough: { to: ["next", "cards"], add: "decisions=1" },
-  decisions: { to: ["plan", "graph"], add: "decisions=1" },
-  timeline: { to: ["plan", "timeline"] },
+/** Where an address that no longer exists lives now, and the query it adds there. */
+interface Moved {
+  to: Screen;
+  add?: string;
+}
+
+/** The earlier screens at `/journeys/<id>/<name>`. */
+const OLD_SCREENS: Record<string, Moved | "landing"> = {
+  overview: "landing",
+  next: { to: "list", add: "frontier=1" },
+  triage: { to: "walk" },
+  walkthrough: { to: "walk", add: "decisions=1" },
+  decisions: { to: "graph", add: "decisions=1" },
 };
 
+/** The two pages that held the projections before the journey had one: `next/{list|cards}` and `plan/{graph|list|timeline}`. */
+const OLD_PAGES: Record<string, Record<string, Moved>> = {
+  next: { list: { to: "list", add: "frontier=1" }, cards: { to: "walk" } },
+  plan: { graph: { to: "graph" }, list: { to: "list" }, timeline: { to: "timeline" } },
+};
+
+/** `moved`'s address for `journey` and `node`, with `params` carried over (the old canvas's and the triage's parameters under their new names). */
+function movedTo(journey: string, moved: Moved, node: string | undefined, params: URLSearchParams, of: "nodes" | "edges" = "nodes"): string {
+  const query = new URLSearchParams(moved.to === "graph" ? graphQueryFromOld(params) : params);
+  // The triage's walkthrough was a mode; the chips and settings keep their names.
+  if (query.get("mode") === "decisions") {
+    query.delete("mode");
+    query.set("decisions", "1");
+  }
+  if (moved.add !== undefined) {
+    const [name = "", value = ""] = moved.add.split("=");
+    query.set(name, value);
+  }
+  if (moved.to === "timeline") {
+    // The timeline reads none of the old canvas's settings.
+    for (const own of OLD_CANVAS_ADDRESS) {
+      query.delete(own);
+    }
+  }
+  const path = pagePath(journey, moved.to, node, query.toString());
+  return of === "edges" ? path.replace("/nodes/", "/edges/") : path;
+}
+
 /**
- * Where an address of the earlier screens lives now (2.4, Redirects), as a path and query, or
- * nothing when `pathname` is not one of them. The old canvas (`/journeys/<id>` or one of its
- * nodes, with the canvas's own query) is PLAN, GRAPH. A bare journey or node address with no
- * canvas query is not old: it is the landing and the deep link, which need the journey to
- * resolve.
+ * Where an address that no longer exists lives now, as a path and query, or nothing when
+ * `pathname` is none of them: the earlier screens, the two pages, the old canvas (`/journeys/<id>`
+ * or one of its nodes with the canvas's own query), and a `/nodes/` or `/edges/` with no key,
+ * which is the view without it. A bare journey or node address with no canvas query is not old:
+ * it is the landing and the deep link.
  */
 export function legacyRedirect(pathname: string, search: string): string | undefined {
   const params = new URLSearchParams(search);
-  const screen = /^\/journeys\/([^/]+)\/(overview|next|list|triage|walkthrough|decisions|timeline)(?:\/nodes\/([^/]+))?\/?$/.exec(pathname);
+  const keyless = /^(\/journeys\/[^/]+(?:\/(?:next|plan|graph|list|timeline|summary|walk)(?:\/[a-z]+)?)?)\/(?:nodes|edges)\/?$/.exec(pathname);
+  if (keyless !== null) {
+    return `${keyless[1] ?? ""}${withQuestion(search)}`;
+  }
+  const paged = /^\/journeys\/([^/]+)\/(next|plan)(?:\/([a-z]+))?(?:\/(nodes|edges)\/([^/]+))?\/?$/.exec(pathname);
+  if (paged !== null) {
+    const [, journey = "", page = "", projection, of, node] = paged;
+    const moved = OLD_PAGES[page]?.[projection ?? (page === "plan" ? "graph" : "list")];
+    return moved === undefined ? undefined : movedTo(journey, moved, node, params, of === "edges" ? "edges" : "nodes");
+  }
+  const screen = /^\/journeys\/([^/]+)\/(overview|next|triage|walkthrough|decisions)(?:\/nodes\/([^/]+))?\/?$/.exec(pathname);
   if (screen !== null) {
     const [, journey = "", name = "", node] = screen;
-    const target = OLD_SCREENS[name];
-    if (target === undefined) {
+    const moved = OLD_SCREENS[name];
+    if (moved === undefined) {
       return undefined;
     }
-    if (target.to === "landing") {
-      return `/journeys/${journey}`;
-    }
-    const [page, projection] = target.to;
-    // The triage's walkthrough was a mode; the chips and settings keep their names.
-    const query = new URLSearchParams(projection === "graph" ? graphQueryFromOld(params) : params);
-    if (query.get("mode") === "decisions") {
-      query.delete("mode");
-      query.set("decisions", "1");
-    }
-    if (target.add !== undefined) {
-      const [name_ = "", value = ""] = target.add.split("=");
-      query.set(name_, value);
-    }
-    if (projection === "timeline") {
-      // The timeline reads none of the old canvas's settings.
-      for (const own of OLD_CANVAS_ADDRESS) {
-        query.delete(own);
-      }
-    }
-    return pagePath(journey, page, projection, node, query.toString());
+    return moved === "landing" ? `/journeys/${journey}` : movedTo(journey, moved, node, params);
   }
   const canvas = /^\/journeys\/([^/]+)(?:\/nodes\/([^/]+))?\/?$/.exec(pathname);
   if (canvas !== null && OLD_CANVAS_ADDRESS.some((name) => params.has(name))) {
     const [, journey = "", node] = canvas;
-    return pagePath(journey, "plan", "graph", node, graphQueryFromOld(params).toString());
+    return movedTo(journey, { to: "graph" }, node, params);
   }
   if (/^\/routes\/?$/.test(pathname)) {
     return "/library?type=routes";

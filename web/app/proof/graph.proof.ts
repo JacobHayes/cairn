@@ -17,7 +17,7 @@ const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${name}.png`) });
 const beat = (page: Page) => page.waitForTimeout(900);
 const fixed = { fixedToday: FIXED_TODAY };
-const GRAPH = "plan/graph";
+const GRAPH = "graph";
 
 test.use({ viewport: { width: 1280, height: 780 } });
 

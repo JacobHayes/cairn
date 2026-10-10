@@ -10,7 +10,9 @@ import { BulkBar } from "../acting/BulkBar.tsx";
 import type { Authored } from "../authoring/target.ts";
 import { RemoveSelected } from "../authoring/RemoveSelected.tsx";
 import { selectionOf, type Facts } from "../acting/acts.ts";
-import { recordOf, titleOf, type Ready } from "../detail/model.ts";
+import { nodeDetail, recordOf, titleOf, type Ready } from "../detail/model.ts";
+import { contextMenuOf } from "../detail/offers.ts";
+import { pagePath } from "../journeys/address.ts";
 import { typing } from "../ui/typing.ts";
 import { Panel } from "@xyflow/react";
 import { HiddenCount, Ladder, SelectBand, TraceBar, ViewMenu } from "./Chrome.tsx";
@@ -139,6 +141,8 @@ export interface JourneyCanvasProps {
   edge: string | undefined;
   /** The toolbar's Decisions chip: the step rises to at least Decisions and non-decision cards fade (5.1). */
   decisions: boolean;
+  /** The frontier lens: the nodes kept at full strength while every other card fades; none (or null) fades nothing. */
+  emphasis?: ReadonlySet<string> | null | undefined;
   /** In edit mode, a card picked while an edge is drawn ends the edge instead of opening (5.6); true when it took the pick. */
   onPick?: ((key: string) => boolean) | undefined;
   /** In edit mode, the journey's structure as authored: what the selection bar's Remove works on (8.11). */
@@ -200,7 +204,7 @@ function useGraph(ready: Ready, view: CanvasView, selected: string | undefined, 
 }
 
 /** What a card asks of the canvas: open its node, expand or collapse it (and refit to it, 5.1), trace it. */
-function useActions(ready: Ready, view: CanvasView, selected: string | undefined, onPick: JourneyCanvasProps["onPick"]): CardActions {
+function useActions(ready: Ready, view: CanvasView, selected: string | undefined, onPick: JourneyCanvasProps["onPick"], menu: boolean): CardActions {
   const navigate = useNavigate();
   const journey = ready.journey.header.id;
   return useMemo<CardActions>(
@@ -215,8 +219,20 @@ function useActions(ready: Ready, view: CanvasView, selected: string | undefined
       expand: (key, expanded) => void navigate(canvasPath(journey, withExpanded(view, key, expanded), selected), { state: { reveal: { key, how: expanded ? "expanded" : "collapsed" } } }),
       trace: (key) => void navigate(canvasPath(journey, view, key)),
       title: (key) => titleOf(ready, key),
+      menu: menu
+        ? {
+            groups: (key) => {
+              const detail = nodeDetail(ready, key);
+              return detail === undefined ? [] : contextMenuOf(ready, detail).map((items) => ({ items }));
+            },
+            // The node's own Actions carry out the choice once it is open beside the canvas.
+            choose: (key, id) => {
+              void (id === "show-in-list" ? navigate(pagePath(journey, "list", key)) : navigate(canvasPath(journey, view, key), { replace: key === selected, state: { choice: { node: key, id } } }));
+            },
+          }
+        : undefined,
     }),
-    [navigate, journey, view, selected, ready, onPick],
+    [navigate, journey, view, selected, ready, onPick, menu],
   );
 }
 
@@ -279,14 +295,14 @@ function SelectionBar({ ready, picks, authored, setPicked }: { ready: Ready; pic
 }
 
 /** The journey's canvas, laid out, with the selected node's trace. */
-export function JourneyCanvas({ ready, view, selected, edge, decisions, onPick, authored }: JourneyCanvasProps) {
+export function JourneyCanvas({ ready, view, selected, edge, decisions, emphasis, onPick, authored }: JourneyCanvasProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const journey = ready.journey.header.id;
   const graph = useGraph(ready, view, selected, decisions);
   const selecting = view.select || view.edit;
   const { picked, setPicked } = usePicked(selecting);
-  const actions = useActions(ready, view, selected, onPick);
+  const actions = useActions(ready, view, selected, onPick, !selecting);
   const go = (next: CanvasView, node: string | undefined) => void navigate(canvasPath(journey, next, node));
   useEscapeSelect(view.select || view.edit, useCallback(() => { void navigate(canvasPath(journey, { ...view, select: false, edit: false }, selected)); }, [navigate, journey, view, selected]));
   const asked = (location.state as { reveal?: { key: string; how: Reveal["how"] } } | null)?.reveal;
@@ -307,6 +323,7 @@ export function JourneyCanvas({ ready, view, selected, edge, decisions, onPick, 
         lens={view.lens}
         origins={view.origins}
         faded={graph.faded}
+        emphasis={emphasis}
         selected={selected}
         selectedEdge={edge?.replace("~", "->")}
         actions={actions}

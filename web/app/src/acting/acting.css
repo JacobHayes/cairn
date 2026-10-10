@@ -42,48 +42,68 @@
   overflow-wrap: anywhere;
 }
 
-/* NEXT, LIST: roomy rows (about 64px) with one fact; the owner and the primary action wait for
-   hover, focus or selection, so the list reads calmly and nothing moves when they appear. */
-.next-head {
-  padding: 0 var(--space-4);
-}
-
-.next-sort select {
-  width: auto;
-}
-
-.next-for-you {
+.for-you {
   margin: 0;
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
+  border: 1px solid var(--color-edge);
   background: var(--color-tint);
 }
 
-.next-list {
-  gap: var(--space-1);
+/* The one look of a list of nodes (the table's): a bordered panel on the ground, a band header
+   when it has a name, and opaque paper rows (about 64px, with one fact) with an edge hairline
+   under each. The owner and the primary action wait for hover, focus or selection, so the list
+   reads calmly and nothing moves when they appear. */
+.node-panel {
+  border: 1px solid var(--color-edge);
+  background: var(--color-surface);
 }
 
-.next-row {
+.node-panel-head {
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-edge);
+  background: var(--color-band);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+details.node-panel:not([open]) > .node-panel-head {
+  border-bottom: 0;
+}
+
+summary.node-panel-head {
+  cursor: pointer;
+}
+
+.node-rows {
+  gap: 0;
+}
+
+.node-row {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2) var(--space-4);
   min-height: 64px;
   padding: var(--space-3) var(--space-4);
-  border-radius: var(--radius-md);
+  border-bottom: 1px solid var(--color-edge);
+  background: var(--color-surface);
   cursor: pointer;
 }
 
-.next-row:hover,
-.next-row[data-selected="true"] {
-  background: var(--color-hover);
+.node-rows > .node-row:last-child {
+  border-bottom: 0;
 }
 
-.next-row[data-selected="true"] {
-  box-shadow: inset 2px 0 0 var(--color-text);
+.node-row:hover {
+  background: linear-gradient(var(--color-hover), var(--color-hover)), var(--color-surface);
 }
 
-.next-row-main {
+.node-row[data-selected="true"] {
+  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--color-surface);
+  box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.node-row-main {
   display: flex;
   flex: 1 1 280px;
   align-items: center;
@@ -91,35 +111,28 @@
   min-width: 0;
 }
 
-.next-tag {
-  flex: none;
-  width: 24px;
-  font-size: 13px;
-  color: var(--color-muted);
-}
-
-.next-row-main > .badge {
+.node-row-main > .badge {
   flex: none;
 }
 
-.next-row-text {
+.node-row-text {
   display: flex;
   flex-direction: column;
   gap: 2px;
   min-width: 0;
 }
 
-.next-title {
+.node-title {
   font-size: 16px;
   font-weight: 600;
   overflow-wrap: anywhere;
 }
 
-.next-fact {
+.node-fact {
   font-size: 14px;
 }
 
-.next-row-side {
+.row-side {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -127,37 +140,37 @@
 }
 
 /* A row with no owner slot and no action (Mine's, when nothing can be done) takes no height. */
-.next-row-side:not(:has(button, select, .next-owner)) {
+.row-side:not(:has(button, select, a, .row-owner)) {
   display: none;
 }
 
-.next-owner {
+.row-owner {
   min-width: 88px;
   font-size: 14px;
   color: var(--color-muted);
   text-align: right;
 }
 
-.next-owner-other,
-.next-row-act {
+.row-owner-other,
+.row-act {
   opacity: 0;
 }
 
-:is(.next-row, .unblocker):hover :is(.next-owner-other, .next-row-act),
-:is(.next-row, .unblocker):focus-within :is(.next-owner-other, .next-row-act),
-.next-row[data-selected="true"] :is(.next-owner-other, .next-row-act) {
+:is(.node-row, .unblocker, .list-table tbody tr):hover :is(.row-owner-other, .row-act),
+:is(.node-row, .unblocker, .list-table tbody tr):focus-within :is(.row-owner-other, .row-act),
+:is(.node-row[data-selected="true"], .list-table tr[aria-selected="true"]) :is(.row-owner-other, .row-act) {
   opacity: 1;
 }
 
 @media (hover: none) {
-  .next-owner-other,
-  .next-row-act {
+  .row-owner-other,
+  .row-act {
     opacity: 1;
   }
 }
 
 /* Room for both Start and Done, so the owner and the buttons keep their place from row to row. */
-.next-row-act {
+.row-act {
   display: flex;
   justify-content: flex-end;
   gap: var(--space-2);
@@ -165,28 +178,28 @@
 }
 
 /* An unowned row says "Unassigned" quietly; the picker takes its place when the row is reached. */
-.next-assign-slot {
+.row-assign-slot {
   display: grid;
   align-items: center;
   justify-items: end;
 }
 
-.next-assign-slot > * {
+.row-assign-slot > * {
   grid-area: 1 / 1;
 }
 
-.next-assign {
+.row-assign {
   width: 128px;
 }
 
-:is(.next-row, .unblocker):hover .next-unassigned,
-:is(.next-row, .unblocker):focus-within .next-unassigned,
-.next-row[data-selected="true"] .next-unassigned {
+:is(.node-row, .unblocker, .list-table tbody tr):hover .row-unassigned,
+:is(.node-row, .unblocker, .list-table tbody tr):focus-within .row-unassigned,
+:is(.node-row[data-selected="true"], .list-table tr[aria-selected="true"]) .row-unassigned {
   opacity: 0;
 }
 
 @media (hover: none) {
-  .next-unassigned {
+  .row-unassigned {
     opacity: 0;
   }
 }
@@ -194,31 +207,26 @@
 /* Where the region cannot hold the owner and the buttons beside the title, they take a line of
    their own under it: the owner at the left, the buttons at the right. */
 @container journey-scroll (max-width: 720px) {
-  .next-row-side {
+  .row-side {
     flex-basis: 100%;
     justify-content: space-between;
     padding-left: 36px;
   }
 
-  .next-owner {
+  .row-owner {
     min-width: 0;
   }
 
-  .next-row-act {
+  .row-act {
     min-width: 0;
   }
 
-  /* The rank tag, chip and title share a phone's width: an empty tag takes nothing. */
-  .next-tag:empty {
-    display: none;
-  }
-
-  .next-row-text {
+  .node-row-text {
     flex: 1;
   }
 }
 
-.next-row > :not(.next-row-main, .next-row-side) {
+.node-row > :not(.node-row-main, .row-side) {
   flex-basis: 100%;
   padding-left: 36px;
 }
@@ -226,12 +234,7 @@
 /* The folds under the list: closed, their names and counts only. */
 .folds {
   margin-top: var(--space-4);
-  gap: var(--space-2);
-}
-
-.fold > summary {
-  padding: var(--space-3) var(--space-4);
-  cursor: pointer;
+  gap: var(--space-3);
 }
 
 .fold-count {
@@ -241,36 +244,15 @@
   color: var(--color-muted);
 }
 
-.fold-body {
-  padding: 0 var(--space-4) var(--space-3);
-}
-
-.fold-list {
-  gap: var(--space-4);
-}
-
-.fold-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-2) var(--space-4);
-  min-height: 48px;
-  padding: var(--space-2) 0;
-}
-
-.fold-row-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
+/* A snooze and what it holds: its own line in the band's place, the rows under it. */
 .fold-group {
-  gap: var(--space-1);
+  gap: 0;
 }
 
 .fold-group-head {
   justify-content: space-between;
+  padding: var(--space-2) var(--space-4);
+  border-bottom: 1px solid var(--color-edge);
 }
 
 .list-node {
@@ -288,21 +270,6 @@
    and in reach however long the card runs. */
 .pass-edge {
   justify-content: space-between;
-}
-
-.pass-group {
-  gap: var(--space-2);
-}
-
-/* What an action unlocked sits under the work it came from, one level however deep the chain. */
-.pass-unlocked {
-  margin-left: var(--space-4);
-}
-
-.pass-unlocked-mark {
-  margin-right: var(--space-2);
-  color: var(--color-secondary);
-  font-family: var(--font-mono);
 }
 
 /* The decision's why gives way when the region cannot hold it: it is narrower than the window by
@@ -394,12 +361,37 @@ table.data.list-table .badge {
   background: linear-gradient(var(--color-tint), var(--color-tint)), var(--color-surface);
 }
 
-.list-table [data-column="status"].list-pinned {
+/* Under the Frontier lens the Rank column comes first and is held with them. */
+.list-table {
+  --rank-width: 0px;
+}
+
+.list-table[data-ranked="true"] {
+  --rank-width: 56px;
+}
+
+.list-table [data-column="rank"].list-pinned {
   left: var(--space-6);
+  width: var(--rank-width);
+  min-width: var(--rank-width);
+}
+
+.list-table [data-column="status"].list-pinned {
+  left: calc(var(--space-6) + var(--rank-width));
 }
 
 .list-table [data-column="title"].list-pinned {
-  left: calc(var(--space-6) + 112px);
+  left: calc(var(--space-6) + var(--rank-width) + 112px);
+}
+
+/* The owner and the primary action of a frontier row sit in its owner column. */
+.list-table .row-side {
+  margin-left: 0;
+}
+
+/* The owner column shrinks to its content, so the title takes the slack and the table fits its panel. */
+.list-table .row-act {
+  min-width: 0;
 }
 
 .list-table th.list-pinned {
@@ -449,8 +441,69 @@ table.data.list-table .badge {
 
 .list-title {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-1);
+}
+
+/* The table is a bordered panel on the ground. */
+table.data.list-table {
+  border: 1px solid var(--color-edge);
+}
+
+.list-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+/* Tree cues: a 1px guide in --color-edge through each depth's 24px gutter of the title cell,
+   full height, so it runs unbroken down a container's rows, and an elbow into the row at its
+   own level. The fold chevron sits on the guide of the rows it holds. A container is a band with
+   a heavier title, so it reads as the header of the rows under it. The title cell is held at
+   the left, which makes it the guides' anchor. */
+.list-table tr[data-depth]:not([data-depth="0"]) td.list-title-cell::after {
+  content: "";
+  position: absolute;
+  inset-block: 0;
+  inset-inline-start: var(--space-2);
+  width: calc(var(--depth) * var(--space-5));
+  background: repeating-linear-gradient(90deg, transparent 0 11px, var(--color-edge) 11px 12px, transparent 12px var(--space-5));
+  pointer-events: none;
+}
+
+.list-table tr[data-depth]:not([data-depth="0"]) td.list-title-cell::before {
+  content: "";
+  position: absolute;
+  inset-inline-start: calc(var(--space-2) + var(--depth) * var(--space-5) - 13px);
+  top: 50%;
+  width: 13px;
+  border-top: 1px solid var(--color-edge);
+  pointer-events: none;
+}
+
+/* The band sits under the hover and selection tints, which stay. */
+.list-table tr[data-container="true"] td {
+  background-color: var(--color-band);
+}
+
+.list-table tr[data-container="true"] td.list-pinned {
+  background: var(--color-band);
+}
+
+.list-table tr[data-container="true"]:hover td,
+.list-table tr[data-container="true"]:hover td.list-pinned {
+  background: linear-gradient(var(--color-hover), var(--color-hover)), var(--color-band);
+}
+
+.list-table tr[data-container="true"][aria-selected="true"] td,
+.list-table tr[data-container="true"][aria-selected="true"] td.list-pinned {
+  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--color-band);
+}
+
+.list-table tr[data-container="true"] td[data-column="title"] {
+  font-weight: 600;
+}
+
+.list-table tr[data-container="true"] td.list-pinned {
+  background: var(--color-band);
 }
 
 span.list-fold {

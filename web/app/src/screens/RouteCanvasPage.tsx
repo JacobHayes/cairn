@@ -210,6 +210,7 @@ function RouteCanvas({ shown, view, version, selected, unanchored, onPick }: Can
       expand: undefined,
       trace: undefined,
       title: (key) => (shown.graph.nodes ?? []).find((node) => node.key === key)?.title ?? key,
+      menu: undefined,
     }),
     [navigate, id, version, view, shown, onPick, draft],
   );

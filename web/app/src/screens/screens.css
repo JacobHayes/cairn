@@ -1,5 +1,5 @@
-/* The journey's pages: the head (the header, the toolbar with the tabs, the chips and the
-   switcher, the active filters) over the projection, with the inspector column beside it. The
+/* The journey's page: the head (the header, the toolbar with the views, the chips and Walk
+   through, the active filters) over the projection, with the inspector column beside it. The
    workspace (.ws-body) and the inspector are the only scrollers, so the window itself never
    scrolls and nothing sits below the fold (2.1); the graph fills what the head leaves and the
    other projections scroll with the head. Below 720px the frame is one column the document
@@ -49,8 +49,8 @@
   overflow-wrap: anywhere;
 }
 
-/* One row when it fits: the tabs, the chips, and the switcher at the right end. When the
-   head is narrow it is two rows on purpose: the tabs and the switcher, then the chips. */
+/* One row when it fits: the views, the chips, and Walk through at the right end. When the
+   head is narrow it is two rows on purpose: the views and Walk through, then the chips. */
 .journey-toolbar {
   gap: var(--space-2) var(--space-4);
   padding-bottom: var(--space-2);
@@ -77,7 +77,7 @@
 }
 
 @container (max-width: 47.99rem) {
-  .journey-switcher {
+  .journey-toolbar > .button {
     order: 1;
   }
 
@@ -91,31 +91,8 @@
   }
 }
 
-.journey-tabs {
-  gap: var(--space-4);
-}
-
-.journey-tab,
-.journey-switch {
-  font-size: 14px;
-  color: var(--color-text);
-  text-decoration: none;
-}
-
-/* The current page: an ink underline (a marker, not a state). */
-.journey-tab[aria-current="page"] {
-  border-bottom: 2px solid var(--color-text);
-  font-weight: 600;
-}
-
-.journey-tab-count,
-.chip-count {
-  margin-left: var(--space-1);
-  font-variant-numeric: tabular-nums;
-  color: var(--color-muted);
-}
-
-/* The switcher is always the last item of the row, so its right edge does not move. */
+/* The switcher is one segmented control: the current choice filled with an ink underline. The
+   toolbar's views sit at its left; a route's and a proposal's own switchers at the right. */
 .journey-switcher {
   display: inline-flex;
   margin-left: auto;
@@ -124,14 +101,75 @@
   overflow: hidden;
 }
 
+.journey-toolbar .journey-switcher {
+  margin-left: 0;
+}
+
 .journey-switch {
   padding: var(--space-1) var(--space-3);
+  font-size: 14px;
+  color: var(--color-text);
+  text-decoration: none;
+}
+
+.journey-switch + .journey-switch {
+  border-left: 1px solid var(--color-border);
 }
 
 .journey-switch[aria-current="page"] {
-  background: var(--color-tint);
-  border-bottom: 2px solid var(--color-text);
+  background: var(--color-band);
+  box-shadow: inset 0 -2px 0 var(--color-text);
   font-weight: 600;
+}
+
+.chip-count {
+  margin-left: var(--space-1);
+  font-variant-numeric: tabular-nums;
+  color: var(--color-muted);
+}
+
+/* What the journey is, under its name: one muted line, wrapping rather than scrolling. */
+.journey-subline {
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+}
+
+.journey-subline > * + *::before {
+  content: "·";
+  margin-right: var(--space-3);
+}
+
+.journey-subline > .chip::before {
+  content: none;
+  margin: 0;
+}
+
+/* The Frontier strip above the graph: its label, then the best ranked work, then the rest as a count. */
+.frontier-strip {
+  flex-wrap: wrap;
+  gap: var(--space-1) var(--space-3);
+  padding-bottom: var(--space-2);
+}
+
+.frontier-item {
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.frontier-item:hover {
+  text-decoration: underline;
+}
+
+.frontier-item + .frontier-item::before {
+  content: "·";
+  margin-right: var(--space-3);
+  color: var(--color-muted);
 }
 
 .chip {
@@ -264,6 +302,7 @@
 
 .route-list-row[aria-current="true"] {
   background: var(--color-tint);
+  box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
 .route-list-row .node-kind {

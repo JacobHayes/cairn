@@ -4,7 +4,7 @@
 // without a page.
 import { missingEvidence } from "../acting/acts.ts";
 import { breakable } from "../proposals/model.ts";
-import { isBlocked, isTerminal, movesFrom, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, isBlocked, isTerminal, movesFrom, type NodeDetail, type Ready } from "./model.ts";
 
 /** The action in the row beside the form: what a person does to the node in one move. */
 export type Act = "done" | "done-with-evidence" | "start" | "reach" | "reach-now" | "break-down" | "mark-atomic" | "unsnooze";
@@ -76,8 +76,8 @@ export type MenuId =
   | "edit-node"
   | "copy-link";
 
-export interface MenuItem {
-  id: MenuId;
+export interface MenuItem<Id extends string = MenuId> {
+  id: Id;
   label: string;
 }
 
@@ -154,4 +154,34 @@ export function menuOf(view: Ready, detail: NodeDetail): MenuItem[][] {
     }),
     where("edit-node"),
   );
+}
+
+/** What a node's context menu on the graph can ask for: the row's actions, the `⋯` entries, and where else to see the node. */
+export type ContextId = MenuId | Act | "decide" | "show-in-list";
+
+const ACT_LABELS: Record<Act, string> = {
+  done: "Mark done",
+  "done-with-evidence": "Mark done…",
+  start: "Start",
+  reach: "Mark reached…",
+  "reach-now": "Confirm reached now",
+  "break-down": "Break down…",
+  "mark-atomic": "Mark atomic",
+  unsnooze: "Unsnooze",
+};
+
+/**
+ * The context menu's groups: the row's actions (a decision awaiting its answer says Decide…),
+ * then the `⋯` menu's groups as they are, with where to find the node being the graph's
+ * counterpart: the list.
+ */
+export function contextMenuOf(view: Ready, detail: NodeDetail): MenuItem<ContextId>[][] {
+  const offers = offered(view, detail);
+  const acts: Act[] = [...(offers.primary === undefined || offers.waiting ? [] : [offers.primary]), ...offers.secondary];
+  const row: MenuItem<ContextId>[] = [
+    ...(detail.record.state === "open" && answerable(detail.node.kind, detail.record.state) ? [{ id: "decide" as const, label: "Decide…" }] : []),
+    ...acts.map((id) => ({ id, label: ACT_LABELS[id] })),
+  ];
+  const rest = menuOf(view, detail).map((group) => group.flatMap((item): MenuItem<ContextId>[] => (item.id === "show-in-graph" ? [{ id: "show-in-list", label: "Show in list" }] : [item])));
+  return [row, ...rest].filter((group) => group.length > 0);
 }

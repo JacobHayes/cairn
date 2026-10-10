@@ -52,9 +52,9 @@ function ownedBy(view: Ready, row: NodeRow, entities: readonly string[]): boolea
  */
 function AssignInline({ view, write, node }: { view: Ready; write: NodeWrite; node: string }) {
   return (
-    <span className="next-assign-slot">
-      <span className="next-owner next-unassigned">Unassigned</span>
-      <select className="next-assign next-owner-other" aria-label="Assign owner" data-testid="assign" disabled={write.disabled} value="" onChange={(event) => { void write.run([assignOwner(node, event.target.value)]); }}>
+    <span className="row-assign-slot">
+      <span className="row-owner row-unassigned">Unassigned</span>
+      <select className="row-assign row-owner-other" aria-label="Assign owner" data-testid="assign" disabled={write.disabled} value="" onChange={(event) => { void write.run([assignOwner(node, event.target.value)]); }}>
         <option value="">Assign</option>
         {(view.inputs.deployment.entities ?? []).map((each) => (
           <option key={each.key} value={each.key}>
@@ -86,17 +86,17 @@ export function RowActions({ view, row, to, owner = true }: { view: Ready; row: 
   const owners = (row.owners ?? []).map((key) => entityName(view, key)).join(", ");
   return (
     <>
-      <div className="next-row-side">
+      <div className="row-side">
         {row.unassigned === true ? (
           <AssignInline view={view} write={write} node={row.key} />
         ) : !owner ? null : ownedBy(view, row, viewer?.entities ?? []) ? (
-          <span className="next-owner">You</span>
+          <span className="row-owner">You</span>
         ) : (
-          <span className="next-owner next-owner-other" title={owners === "" ? undefined : `Owned by ${owners}`}>
+          <span className="row-owner row-owner-other" title={owners === "" ? undefined : `Owned by ${owners}`}>
             {owners}
           </span>
         )}
-        <span className="next-row-act">
+        <span className="row-act">
           {acts.includes("start") ? <Button disabled={write.disabled} onClick={run([transition(row.key, "start")])}>Start</Button> : null}
           {acts.includes("done") ? (
             needs.artifact || needs.note ? (

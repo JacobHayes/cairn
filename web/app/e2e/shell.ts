@@ -94,12 +94,12 @@ function screenOf(address: string): string {
 }
 
 /**
- * A journey's page, PLAN, GRAPH, once derived and its canvas drawn. The graph opens at its All
+ * A journey's graph, once derived and its canvas drawn. The graph opens at its All
  * step unless `query` says otherwise, so every node has a card to reach (it opens at Stages, with
  * most stages folded, for a person).
  */
 export async function openJourney(page: Page, host: HostKind, journey: string, query = "?detail=all"): Promise<void> {
-  await open(page, host, `/journeys/${journey}/plan/graph${query}`);
+  await open(page, host, `/journeys/${journey}/graph${query}`);
   await derived(page);
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   // A spec reaches any node, so it sees the whole graph; the real default opens on the current stage (the canvas flow test).
@@ -111,7 +111,7 @@ export async function openJourney(page: Page, host: HostKind, journey: string, q
 }
 
 /**
- * Opens journey `journey`'s page at `address` (`next/list`, `plan/timeline`, `summary`, with a
+ * Opens journey `journey`'s page at `address` (`list?frontier=1`, `timeline`, `summary`, with a
  * query), with node `node`'s detail beside it when given, once derived. On the browser host the
  * page's clock is held at noon UTC on `fixedToday` first, so the host derives with that today.
  */
@@ -136,12 +136,9 @@ export async function openFilter(page: Page): Promise<void> {
   await expect(page.getByTestId("filter-panel")).toBeVisible();
 }
 
-/** Goes to `page`'s tab (`next` or `plan`) and its projection, as a person does. */
-export async function goTo(page: Page, tab: "next" | "plan", projection: string): Promise<void> {
-  await page.getByTestId(`tab-${tab}`).click();
-  // The switcher has a List on both pages: wait for the page, or the other page's is read.
-  await expect(page.getByTestId(`tab-${tab}`)).toHaveAttribute("aria-current", "page");
-  const switcher = page.getByTestId(`projection-${projection}`);
+/** Goes to the view `view` (`graph`, `list`, `timeline` or `summary`) from the toolbar's segmented control, as a person does. */
+export async function goTo(page: Page, view: string): Promise<void> {
+  const switcher = page.getByTestId(`view-${view}`);
   if ((await switcher.getAttribute("aria-current")) !== "page") {
     await switcher.click();
   }

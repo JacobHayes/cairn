@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import { nodeDetail, type NodeDerived, type Ready } from "./model.ts";
-import { menuOf, offered } from "./offers.ts";
+import { contextMenuOf, menuOf, offered } from "./offers.ts";
 import { plainSentence, sentenceOf } from "./sentence.ts";
 import { setAsideOptions } from "./snooze.ts";
 import { testView } from "./view.test-support.ts";
@@ -32,6 +32,19 @@ describe("the inspector's offers", () => {
     view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_when: { state: "decided", provenance: "local" } } };
     expect(menuOf(view, detailOf(view, "n_when")).map((group) => group.map((item) => item.id))).toEqual([["reopen"], ["rename", "assign", "weight"], ["show-in-graph", "edit-node", "copy-link"]]);
     expect(offered(view, detailOf(view, "n_when")).primary).toBeUndefined();
+  });
+
+  it("opens the graph's context menu with the row's actions, then the menu's groups, finding the node in the list not the graph it is on", () => {
+    const view = testView();
+    const groups = contextMenuOf(view, detailOf(view, "n_findings")).map((group) => group.map((item) => item.id));
+    expect(groups[0]).toEqual(["done", "start"]);
+    expect(groups.flat()).toContain("show-in-list");
+    expect(groups.flat()).not.toContain("show-in-graph");
+    expect(groups.at(-1)?.at(-1)).toBe("copy-link");
+    // Waiting on a requirement, Mark done is left to Done anyway.
+    const waiting = contextMenuOf(view, detailOf(view, "n_report")).flat().map((item) => item.id);
+    expect(waiting).not.toContain("done");
+    expect(waiting).toContain("done-anyway");
   });
 
   it("offers a placeholder to break down Break down, with Mark atomic beside it and no Mark done (B10)", () => {

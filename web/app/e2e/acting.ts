@@ -1,5 +1,5 @@
-// What the acting surfaces' browser tests and proof share: opening the list, the next list,
-// and triage the way a person does, reading their rows and cards, and starting a fresh journey
+// What the acting surfaces' browser tests and proof share: opening the list, the frontier list,
+// and the walk through the way a person does, reading their rows and cards, and starting a fresh journey
 // from the vendor evaluation's route on the server host (the creation screen is 5.5's).
 import { readFileSync } from "node:fs";
 
@@ -8,7 +8,7 @@ import { expect, type Locator, type Page } from "@playwright/test";
 import { fixtureRoute } from "./around.ts";
 import { derivedRevision, fresh, importIntoLibrary, open, openAt, type HostKind } from "./shell.ts";
 
-/** Opens journey `journey`'s projection at `path` (`next/list`, `plan/list`, `next/cards`, with a query) on `host`, once derived. */
+/** Opens journey `journey`'s projection at `path` (`list?frontier=1`, `walk`, with a query) on `host`, once derived. */
 export async function openActing(page: Page, host: HostKind, journey: string, path: string): Promise<void> {
   await openAt(page, host, journey, path);
 }
@@ -19,9 +19,18 @@ export async function keysOf(page: Page, testId: string): Promise<string[]> {
   return page.getByTestId(testId).evaluateAll((rows) => rows.map((row) => row.getAttribute("data-node") ?? ""));
 }
 
-/** The next list's items, in order. */
-export function nextKeys(page: Page): Promise<string[]> {
-  return keysOf(page, "next-item");
+/** Turns the Frontier chip on or off, on the list or any other view that has it. */
+export async function setFrontier(page: Page, on: boolean): Promise<void> {
+  const chip = page.getByTestId("chip-frontier");
+  if ((await chip.getAttribute("aria-pressed")) !== String(on)) {
+    await chip.click();
+  }
+  await expect(chip).toHaveAttribute("aria-pressed", String(on));
+}
+
+/** The frontier list's rows, in order. */
+export function frontierKeys(page: Page): Promise<string[]> {
+  return keysOf(page, "list-row");
 }
 
 /** The list's rows, in order. */
@@ -29,9 +38,9 @@ export function listKeys(page: Page): Promise<string[]> {
   return keysOf(page, "list-row");
 }
 
-/** Node `node`'s item on the next list. */
-export function nextItem(page: Page, node: string): Locator {
-  return page.locator(`[data-testid="next-item"][data-node="${node}"]`);
+/** Node `node`'s row on the list. */
+export function frontierItem(page: Page, node: string): Locator {
+  return page.locator(`[data-testid="list-row"][data-node="${node}"]`);
 }
 
 /** The cards of the current pass, in its order, once the frontier has been read and holds some. */

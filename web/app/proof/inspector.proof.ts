@@ -19,7 +19,7 @@ async function shot(page: Page, name: string): Promise<void> {
 }
 
 async function show(page: Page, journey: string, node: string): Promise<Locator> {
-  await openAt(page, "browser", journey, "plan/graph", { node });
+  await openAt(page, "browser", journey, "graph", { node });
   const panel = nodePanel(page, node);
   await expect(panel).toBeVisible();
   return panel;
@@ -76,7 +76,7 @@ test("why this rank, a container's gravity, and the edge card", async ({ page })
   const reporting = await show(page, "j_vendor_eval", "n_reporting");
   await (await section(reporting, "rank")).scrollIntoViewIfNeeded();
   await shot(page, "container");
-  await openAt(page, "browser", "j_vendor_eval", "plan/graph/edges/n_access~n_plan");
+  await openAt(page, "browser", "j_vendor_eval", "graph/edges/n_access~n_plan");
   await expect(page.getByTestId("edge-card")).toBeVisible();
   await shot(page, "edge-card");
 });

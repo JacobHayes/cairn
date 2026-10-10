@@ -56,6 +56,8 @@ export interface FrameActions {
   mount: (slot: InspectorTab) => () => void;
   /** Brings `tab` into view. */
   show: (tab: InspectorTab) => void;
+  /** Brings the inspector into view whatever the viewer left in its way: the assistant's tab, a collapsed column. */
+  reveal: () => void;
   /** The assistant can be opened (its toggle is on screen) until the returned function is called. */
   dock: (dock: AssistantDock) => () => void;
   /** Where Esc takes the sheet: `address` closes the open node; undefined when nothing is open. */

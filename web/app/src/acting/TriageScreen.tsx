@@ -1,6 +1,6 @@
-// C11: triage, a queue of cards over the acting frontier, one at a time in rank order, for "act,
-// or move on"; and its decisions-only mode, the decision walkthrough, which starting a journey
-// opens (address.ts, `walkthroughPath`). It is NEXT, CARDS, with DECISIONS on for the
+// C11: the walk through, a queue of cards over the acting frontier, one at a time in rank order,
+// for "act, or move on"; and its decisions-only mode, the decision walkthrough, which starting a
+// journey opens (address.ts, `walkthroughPath`). It is `/walk`, with DECISIONS on for the
 // walkthrough: the journey page (screens/JourneyFrame.tsx) holds its toolbar and the filters it
 // opens (`TriageControls`). A card is the inspector's own component with Pass on the frame's
 // edge, apart from the node's actions; the inspector column holds the pass rail until a linked
@@ -10,7 +10,7 @@
 // storage, never sent. What a write made from the pass unlocked (the patch's consequences, never
 // a diff of the frontier) comes next, each card labeled with the card that unlocked it.
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
 import { useDraft } from "../data/drafts.ts";
@@ -21,7 +21,8 @@ import { screenPath } from "../detail/parts.tsx";
 import { COLUMN, Inspector, useMedia } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { typing } from "../ui/typing.ts";
-import { ACTING_KINDS, NEXT_FILTER_FLAGS, triagePath, triageQueryOf, type TriageSettings } from "./address.ts";
+import { pagePath } from "../journeys/address.ts";
+import { ACTING_KINDS, WALK_FILTER_FLAGS, triagePath, triageQueryOf, type TriageSettings } from "./address.ts";
 import { Check, Checks, FlagChecks } from "./Controls.tsx";
 import { DetailLink } from "./Parts.tsx";
 import { acted, begin, passedAll, passOn, passOrder, roundAgain, surfaced, unlockedBy, type Pass } from "./pass.ts";
@@ -33,7 +34,7 @@ import type { NodeRow } from "./why.ts";
 import { actingDecisions } from "./waiting.ts";
 import "./acting.css";
 
-/** C11: mine, kinds and flags: what the filter holds on NEXT, CARDS. */
+/** C11: mine, kinds and flags: what the filter holds on the walk through. */
 export function TriageControls({ settings, onChange }: { settings: TriageSettings; onChange: (next: TriageSettings) => void }) {
   return (
     <div className="stack acting-controls" data-testid="triage-controls" data-mode={settings.decisions ? "decisions" : "all"}>
@@ -41,7 +42,7 @@ export function TriageControls({ settings, onChange }: { settings: TriageSetting
       {settings.decisions ? null : (
         <Checks legend="Kinds" options={ACTING_KINDS} chosen={settings.kinds} words={(kind) => kind} testId="kind" stacked onChange={(kinds) => { onChange({ ...settings, kinds }); }} />
       )}
-      <FlagChecks options={NEXT_FILTER_FLAGS} chosen={settings.flags} onChange={(flags) => { onChange({ ...settings, flags }); }} />
+      <FlagChecks options={WALK_FILTER_FLAGS} chosen={settings.flags} onChange={(flags) => { onChange({ ...settings, flags }); }} />
     </div>
   );
 }
@@ -70,7 +71,7 @@ function Empty({ view, settings, stalled, onContinue }: { view: Ready; settings:
   const filtered = settings.decisions ? actingDecisions(view).length > 0 : view.derived.acting_frontier.length > 0;
   if (filtered) {
     return (
-      <p className="callout" data-testid="triage-empty" data-status="filtered">
+      <p className="muted" data-testid="triage-empty" data-status="filtered">
         Nothing on the acting frontier matches these filters{settings.decisions ? ": the decisions open now are others'" : ""}.
       </p>
     );
@@ -81,7 +82,7 @@ function Empty({ view, settings, stalled, onContinue }: { view: Ready; settings:
   return stalled ? (
     <StalledPanel view={view} />
   ) : (
-    <p className="callout" data-testid="triage-empty" data-status="none">
+    <p className="muted" data-testid="triage-empty" data-status="none">
       Nothing is left to act on in this journey.
     </p>
   );
@@ -167,7 +168,7 @@ function PassCard({ view, card, place, by, onPass }: { view: Ready; card: NodeRo
   );
 }
 
-/** NEXT, CARDS: one card at a time, in the order of this pass. */
+/** The walk through: one card at a time, in the order of this pass. */
 export function TriageBody({ view, settings, selected }: { view: Ready; settings: TriageSettings; selected: string | undefined }) {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
@@ -202,8 +203,11 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
   const open = settings.decisions ? actingDecisions(view).length : 0;
   return (
     <section className="stack pass" aria-label={settings.decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
+      <Link className="back-to-graph" to={pagePath(journey, "graph")} data-testid="back-to-graph">
+        ‹ Back to graph
+      </Link>
       {settings.decisions && view.journey.revision <= 1 && card !== undefined ? (
-        <p className="next-for-you" data-testid="walkthrough-intro">
+        <p className="for-you" data-testid="walkthrough-intro">
           Start with the decisions that shape this journey. {open} open now; each answer can open more.
         </p>
       ) : null}

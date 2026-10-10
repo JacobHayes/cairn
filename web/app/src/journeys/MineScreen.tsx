@@ -1,17 +1,19 @@
 // C16, E4: the cross-journey "mine" list: what the viewer can do now in each active journey,
 // journey by journey (alphabetical; no ranking across journeys), each in that journey's own rank
-// with the next list's rows. Selecting a row opens the inspector beside it with its form, so a
+// with the frontier's rows. Selecting a row opens the inspector beside it with its form, so a
 // participant who owns work in several journeys can do the day here without opening each. A
 // journey where nothing of theirs can be done yet says what is theirs next. Completed
 // journeys leave it (B11). The candidates are the active journeys referring to the caller's
 // entities (the host's filter, a superset); each is derived in the tab and its own "mine"
 // decides (H3: every entity of the caller's counts). Kept current (H6).
+import type { NextQuery } from "@cairn/wasm";
 import { useMemo } from "react";
 import { Link, useParams } from "react-router";
 
-import { DEFAULT_NEXT, nextQueryOf } from "../acting/address.ts";
 import { NextForYou } from "../acting/NextForYou.tsx";
-import { NextRow } from "../acting/NextRow.tsx";
+import { NodeItem, NodePanel } from "../acting/NodeItem.tsx";
+import { reasonOf } from "../acting/reasons.ts";
+import { RowActions } from "../acting/RowActions.tsx";
 import "../acting/acting.css";
 import { useProjected } from "../canvas/hooks.ts";
 import { indexKey, journeyIndex, type JourneySummary } from "../data/reads.ts";
@@ -26,7 +28,7 @@ import { useMineCounts, useMineOf, useReportMine, type MineEntry } from "./mine.
 /** Where a row of journey `id` opens the inspector, beside Mine. */
 const minePath = (id: string, key: string) => `/mine/${id}/nodes/${key}`;
 
-const MINE_NEXT = nextQueryOf({ ...DEFAULT_NEXT, mine: true });
+const MINE_NEXT: NextQuery = { sort: "rank", mine: true, kinds: [], for_viewer: false };
 
 /** The journey's progress in one line. */
 function Progress({ view }: { view: Ready }) {
@@ -50,11 +52,15 @@ function MineRows({ view, entries, selected }: { view: Ready; entries: MineEntry
   const rows = next?.items ?? [];
   return (
     <>
-      <ol className="plain-list next-list">
-        {rows.map((row) => (
-          <NextRow key={row.key} view={view} row={row} to={minePath(id, row.key)} selected={row.key === selected} sort="rank" testId="mine-item" owner={false} />
-        ))}
-      </ol>
+      {rows.length === 0 ? null : (
+        <NodePanel>
+          {rows.map((row) => (
+            <NodeItem key={row.key} view={view} node={row.key} to={minePath(id, row.key)} selected={row.key === selected} fact={reasonOf(view, row, "rank")} testId="mine-item">
+              <RowActions view={view} row={row} to={minePath(id, row.key)} owner={false} />
+            </NodeItem>
+          ))}
+        </NodePanel>
+      )}
       {next !== undefined && rows.length === 0 ? <NextForYou view={view} entries={entries} nothing={false} /> : null}
     </>
   );

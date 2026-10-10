@@ -16,10 +16,16 @@ export function addableColumns(decisions: boolean): readonly ListColumn[] {
   return decisions ? LIST_COLUMNS.filter((column) => !["kind", "answer", "why", "affects"].includes(column)) : LIST_COLUMNS;
 }
 
+/** Whether the rows are in rank order, which puts the Rank column first: the Frontier lens, or a sort by rank. */
+export function ranked(settings: ListSettings): boolean {
+  return settings.frontier || settings.sort === "rank";
+}
+
 /** C9, C12: the columns shown, left to right. */
 export function columnsOf(settings: ListSettings): Column[] {
-  const chosen = addableColumns(settings.decisions).filter((column) => settings.columns.includes(column));
-  return settings.decisions ? ["status", "title", "answer", "why", "affects", "owner", "due", ...chosen] : ["status", "title", "owner", "due", ...chosen];
+  const chosen = addableColumns(settings.decisions).filter((column) => settings.columns.includes(column) && !(column === "rank" && ranked(settings)));
+  const own: Column[] = settings.decisions ? ["status", "title", "answer", "why", "affects", "owner", "due"] : ["status", "title", "owner", "due"];
+  return [...(ranked(settings) ? (["rank"] as const) : []), ...own, ...chosen];
 }
 
 /** The column words; a decision list says Decision and Decide by. */

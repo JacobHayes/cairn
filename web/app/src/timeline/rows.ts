@@ -75,18 +75,20 @@ export interface Chart {
   dates: string[];
 }
 
-/** What the toolbar narrows the timeline to (2.3: it fades what does not match). */
+/** What the toolbar narrows the timeline to (2.3: it fades what does not match, and FRONTIER leaves it out). */
 export interface Narrowing {
   decisions: boolean;
   kinds: readonly NodeKind[];
   text: string;
   /** The nodes the viewer holds, when MINE is on. */
   mine: ReadonlySet<string> | undefined;
+  /** The nodes on the acting frontier, when FRONTIER is on: only they and what holds them are shown. */
+  frontier: ReadonlySet<string> | undefined;
 }
 
 /** Whether a toolbar chip is narrowing the timeline at all. */
 export function narrowing(narrow: Narrowing): boolean {
-  return narrow.decisions || narrow.kinds.length > 0 || narrow.text.trim() !== "" || narrow.mine !== undefined;
+  return narrow.decisions || narrow.kinds.length > 0 || narrow.text.trim() !== "" || narrow.mine !== undefined || narrow.frontier !== undefined;
 }
 
 /** Whether `node` is full strength under the toolbar's chips. */
@@ -96,7 +98,8 @@ export function keeps(narrow: Narrowing, node: Pick<GraphNode, "key" | "kind" | 
     (!narrow.decisions || node.kind === "decision") &&
     (narrow.decisions || narrow.kinds.length === 0 || narrow.kinds.includes(node.kind)) &&
     (wanted === "" || node.title.toLowerCase().includes(wanted)) &&
-    (narrow.mine === undefined || narrow.mine.has(node.key))
+    (narrow.mine === undefined || narrow.mine.has(node.key)) &&
+    (narrow.frontier === undefined || narrow.frontier.has(node.key))
   );
 }
 
@@ -352,5 +355,15 @@ export function chartOf(view: Ready, timeline: Timeline, options: ChartOptions):
     const state = view.derived.nodes[key]?.display_state;
     return dated.inScope(key) && dated.spans.get(key) === undefined && dated.scopedChildren(key).length === 0 && state !== "done" && state !== "skipped";
   });
-  return { rows, undated, dependencies, dates: rows.flatMap((row) => [row.from, row.to, ...(row.float === undefined ? [] : [row.float.from, row.float.to])]) };
+  // FRONTIER shows only what can move now, and the stages that hold it, selected or not; a link to a row left out is left out.
+  const lens = options.narrow.frontier;
+  const onFrontier = (key: string): boolean => lens === undefined || lens.has(key) || dated.scopedChildren(key).some(onFrontier);
+  const shown = lens === undefined ? rows : rows.filter((row) => onFrontier(row.key));
+  const keys = new Set(shown.map((row) => row.key));
+  return {
+    rows: shown,
+    undated: lens === undefined ? undated : undated.filter((key) => lens.has(key)),
+    dependencies: lens === undefined ? dependencies : dependencies.filter((each) => keys.has(each.from) && keys.has(each.to)),
+    dates: shown.flatMap((row) => [row.from, row.to, ...(row.float === undefined ? [] : [row.float.from, row.float.to])]),
+  };
 }

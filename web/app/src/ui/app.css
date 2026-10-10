@@ -682,6 +682,18 @@ input[type="radio"] {
 }
 
 /* ---- print: a screen alone, in black on white (the summary is the printable one) ---------------- */
+
+/* A menu opened at a point (ContextMenu): the popover's look, placed at the pointer by the window's coordinates. */
+.context-menu {
+  position: fixed;
+  z-index: 60;
+}
+
+.context-menu .menu-item:focus-visible {
+  background: var(--color-hover);
+  outline: none;
+}
+
 @media print {
   /* Print sets its own colours (named, since paper is white and ink black whatever the screen's theme), so these are not tokens. */
   /* More specific than the theme's own selectors (tokens.css), so paper prints light whatever the screen's scheme. */

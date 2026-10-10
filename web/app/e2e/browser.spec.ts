@@ -6,7 +6,7 @@
 // the server is web/wasm's Node tests; every other test here starts from this host working.
 import { expect, test } from "@playwright/test";
 
-import { derivedRevision, fresh, goTo, goWithin, open, openJourney, recentSaves, rename, syncChip, visit } from "./shell.ts";
+import { derivedRevision, fresh, goWithin, open, openJourney, recentSaves, rename, syncChip, visit } from "./shell.ts";
 
 // Every error event the window sees, including the browser's own reports (a ResizeObserver
 // loop) that never reach Playwright's pageerror.
@@ -22,15 +22,18 @@ test("the in-browser host boots, redirects, derives in the worker, applies a pat
   await expect(page).toHaveURL(/\/mine$/);
   await expect(page.getByTestId("mine-journey").first()).toBeVisible();
   await visit(page, "browser", "/journeys/j_hiring?hide=action&heat=on");
-  await expect(page).toHaveURL(/\/journeys\/j_hiring\/plan\/graph\?kind=group%2Cdecision%2Cdeliverable%2Cmilestone&lens=gravity$/);
+  await expect(page).toHaveURL(/\/journeys\/j_hiring\/graph\?kind=group%2Cdecision%2Cdeliverable%2Cmilestone&lens=gravity$/);
+  // A node address with no key is the graph, not a blank page.
+  await visit(page, "browser", "/journeys/j_hiring/graph/nodes/");
+  await expect(page).toHaveURL(/\/journeys\/j_hiring\/graph$/);
+  await expect(page.getByTestId("canvas")).toBeVisible();
 
   await open(page, "browser", "/journeys");
   await expect(page.getByTestId("journey-row")).toHaveCount(4);
   await page.getByRole("link", { name: "Hire a platform engineer" }).click();
   await expect(page.getByTestId("journey-name")).toHaveText("Hire a platform engineer");
-  await expect(page).toHaveURL(/\/journeys\/j_hiring\/next\/list$/);
+  await expect(page).toHaveURL(/\/journeys\/j_hiring\/graph$/);
   expect(await derivedRevision(page)).toBe(6);
-  await goTo(page, "plan", "graph");
   await expect(page.locator("[data-testid=node-card][data-here]").first()).toBeVisible();
   expect(page.workers().length).toBeGreaterThan(0);
 

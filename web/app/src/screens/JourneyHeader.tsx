@@ -1,25 +1,28 @@
-// The journey header (4.1): one line, the name and, on its right, the lifecycle chip
-// (`● ACTIVE ▾`: only the moves the status allows, B11) and the journey's `⋯` (edit its
-// structure, rename it, propose its upgrade, save it as a route, re-link it, open the Summary
-// page, copy its link, list the keys: the flows the overview held, B7 to B9, A19). Route, version
-// and progress, and what is the viewer's, are on the journey card. When completion is
-// suggested, a band under the header offers it.
+// The journey header (4.1): the name, the lifecycle chip (`● ACTIVE ▾`: only the moves the
+// status allows, B11) and, on the right, the assistant, Edit (the structure's editor) and the
+// journey's `⋯` (rename it, insert a segment, save it as a route, re-link it, select nodes,
+// list the keys, copy its link: the flows the overview held, B7 to B9, A19). Under it one muted
+// line says what the journey is: its route and version, how far along it is, its next milestone;
+// a newer route version is offered there. What is the viewer's is on the journey card. When
+// completion is suggested, a band under the header offers it.
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 
 import { AssistantDock, journeyTitles } from "../assistant/AssistantPanel.tsx";
 import { canvasPath, type CanvasView } from "../canvas/settings.ts";
 import { useLive } from "../data/react.ts";
 import { routeIndex } from "../data/reads.ts";
 import type { Ready } from "../detail/model.ts";
-import { summaryPath } from "../journeys/address.ts";
 import { DeleteJourney } from "../journeys/DeleteJourney.tsx";
 import { HeaderEditor } from "../journeys/HeaderEditor.tsx";
 import { statusActions } from "../journeys/lifecycle.ts";
+import { routeDetailPath } from "../routes/address.ts";
+import { dateAway } from "../timeline/model.ts";
+import type { SummaryModel } from "../summary/model.ts";
 import { useInsertEntry } from "../segments/entry.ts";
 import { useSuggested } from "../journeys/suggested.ts";
 import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
-import { Button } from "../ui/kit.tsx";
+import { Badge, Button } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { Menu } from "./Menu.tsx";
 import { Refused } from "./Refused.tsx";
@@ -27,15 +30,16 @@ import { useScreenWrite, type ScreenWrite } from "./write.ts";
 
 type Panel = JourneyFlowName | "rename" | "delete";
 
-/** The versions of the journey's route newer than its own: what `Upgrade to vN…` offers. */
-function useLatestVersion(ready: Ready): number | undefined {
+/** The journey's route as the library names it, and the version of it newer than the journey's own, which `Upgrade to vN` offers. */
+function useLineage(ready: Ready): { route: string; name: string; version: number; latest: number | undefined } | undefined {
   const routes = useLive("routes", routeIndex).view;
   const lineage = ready.journey.header.lineage ?? undefined;
-  if (lineage === undefined || routes.status !== "ready") {
+  if (lineage === undefined) {
     return undefined;
   }
-  const latest = routes.value.find((each) => each.header.id === lineage.route)?.latest_version ?? undefined;
-  return latest !== undefined && latest > lineage.version ? latest : undefined;
+  const found = routes.status === "ready" ? routes.value.find((each) => each.header.id === lineage.route) : undefined;
+  const latest = found?.latest_version ?? undefined;
+  return { route: lineage.route, name: found?.header.name ?? lineage.route, version: lineage.version, latest: latest !== undefined && latest > lineage.version ? latest : undefined };
 }
 
 /** The lifecycle chip (B11): only the moves the status allows, and deletion once archived (A19). */
@@ -48,8 +52,8 @@ function LifecycleMenu({ ready, write, onDelete }: { ready: Ready; write: Screen
       align="end"
       className="no-print"
       trigger={
-        <span className="lifecycle-label" data-status={header.status} data-testid="overview-status">
-          {header.status} ▾
+        <span className="lifecycle-label">
+          <Badge data-status={header.status} data-testid="overview-status">{header.status}</Badge> ▾
         </span>
       }
     >
@@ -96,10 +100,9 @@ function copyLink(): void {
   }
 }
 
-/** The journey's `⋯`: its structure, name, proposals, the Summary page, its keys, and its link. */
+/** The journey's `⋯`, in three groups: its description and structure flows, selecting nodes, and its keys and link. */
 function JourneyMenu({ ready, view, selected, onPanel, onKeys }: { ready: Ready; view: CanvasView; selected: string | undefined; onPanel: (panel: Panel) => void; onKeys: () => void }) {
   const { header } = ready.journey;
-  const upgradeTo = useLatestVersion(ready);
   const insert = useInsertEntry();
   const archived = header.status === "archived";
   return (
@@ -112,28 +115,23 @@ function JourneyMenu({ ready, view, selected, onPanel, onKeys }: { ready: Ready;
         );
         return (
           <>
-            {archived ? null : (
-              <Link role="menuitem" className="menu-item" data-testid="edit-toggle" data-status={view.edit ? "on" : "off"} to={canvasPath(header.id, { ...view, edit: !view.edit }, selected)} onClick={close}>
-                {view.edit ? "Done editing structure" : "Edit structure"}
-              </Link>
-            )}
-            {archived ? null : (
-              <Link role="menuitem" className="menu-item" data-testid="select-toggle" data-status={view.select ? "on" : "off"} to={canvasPath(header.id, { ...view, select: !view.select }, selected)} onClick={close}>
-                {view.select ? "Done selecting" : "Select nodes"}
-              </Link>
-            )}
             {item("menu-rename", "Edit name and description", "rename", archived)}
             {insert === undefined || archived ? null : (
               <button type="button" role="menuitem" className="menu-item" data-testid="menu-insert-segment" onClick={() => { close(); insert(); }}>
                 Insert segment...
               </button>
             )}
-            {upgradeTo === undefined ? null : item("menu-upgrade", `Upgrade to v${String(upgradeTo)}...`, "upgrade")}
             {item("menu-save", "Save as route...", "save")}
             {item("menu-relink", "Re-link...", "relink")}
-            <Link role="menuitem" className="menu-item" data-testid="menu-summary" to={summaryPath(header.id)} onClick={close}>
-              Summary
-            </Link>
+            {archived ? null : (
+              <>
+                <hr />
+                <Link role="menuitem" className="menu-item" data-testid="select-toggle" data-status={view.select ? "on" : "off"} to={canvasPath(header.id, { ...view, select: !view.select }, selected)} onClick={close}>
+                  {view.select ? "Done selecting" : "Select nodes"}
+                </Link>
+              </>
+            )}
+            <hr />
             <button type="button" role="menuitem" className="menu-item" data-testid="menu-keys" onClick={() => { close(); onKeys(); }}>
               Keyboard shortcuts
             </button>
@@ -147,8 +145,52 @@ function JourneyMenu({ ready, view, selected, onPanel, onKeys }: { ready: Ready;
   );
 }
 
+/** Edit: the structure's editor, in the address with what the canvas shows; it opens on the graph. */
+function EditButton({ journey, view, selected }: { journey: string; view: CanvasView; selected: string | undefined }) {
+  const navigate = useNavigate();
+  return (
+    <Button
+      className="no-print"
+      data-testid="edit-toggle"
+      aria-pressed={view.edit}
+      data-status={view.edit ? "on" : "off"}
+      title="Add, move and remove the journey's nodes and links"
+      onClick={() => { void navigate(canvasPath(journey, { ...view, edit: !view.edit }, selected)); }}
+    >
+      Edit
+    </Button>
+  );
+}
+
+/** The line under the name: the route and version, how far along, the next milestone, and the upgrade when there is one. */
+function Subline({ ready, model, onUpgrade }: { ready: Ready; model: SummaryModel | undefined; onUpgrade: () => void }) {
+  const lineage = useLineage(ready);
+  const next = model?.upcoming[0];
+  const done = model === undefined ? undefined : model.inScope - model.remaining;
+  return (
+    <div className="row journey-subline muted small" data-testid="journey-subline">
+      {lineage === undefined ? null : (
+        <span>
+          <Link to={routeDetailPath(lineage.route)}>{lineage.name}</Link> v{lineage.version}
+        </span>
+      )}
+      {model === undefined ? null : <span data-testid="journey-progress" data-done={done} data-in-scope={model.inScope}>{done} of {model.inScope} done</span>}
+      {next === undefined ? null : (
+        <span data-testid="journey-next-milestone" data-node={next.key}>
+          next milestone {next.title} {dateAway(next.date, ready.derived.today)}
+        </span>
+      )}
+      {lineage?.latest === undefined ? null : (
+        <button type="button" className="chip" data-testid="journey-upgrade" title="Propose this journey's upgrade to the route's newer version" onClick={onUpgrade}>
+          Upgrade to v{lineage.latest}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /** `view` is the canvas as the page shows it, or the canvas's defaults off the graph: Edit structure keeps it. */
-export function JourneyHeader({ ready, view, selected, onKeys }: { ready: Ready; view: CanvasView; selected: string | undefined; onKeys: () => void }) {
+export function JourneyHeader({ ready, view, selected, model, onKeys }: { ready: Ready; view: CanvasView; selected: string | undefined; model: SummaryModel | undefined; onKeys: () => void }) {
   const { header, revision } = ready.journey;
   const write = useScreenWrite();
   const suggested = useSuggested(ready);
@@ -157,11 +199,13 @@ export function JourneyHeader({ ready, view, selected, onKeys }: { ready: Ready;
     <section className="stack journey-header" aria-label={header.name} data-testid="journey-header">
       <div className="row">
         <h1 data-testid="journey-name">{header.name}</h1>
+        <LifecycleMenu ready={ready} write={write} onDelete={() => { setPanel("delete"); }} />
         <span className="spacer" />
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
-        <LifecycleMenu ready={ready} write={write} onDelete={() => { setPanel("delete"); }} />
+        {header.status === "archived" ? null : <EditButton journey={header.id} view={view} selected={selected} />}
         <JourneyMenu ready={ready} view={view} selected={selected} onPanel={setPanel} onKeys={onKeys} />
       </div>
+      <Subline ready={ready} model={model} onUpgrade={() => { setPanel("upgrade"); }} />
       {header.status === "active" && suggested ? (
         <div className="callout row" data-testid="completion-suggested">
           <span>Everything in scope is done.</span>

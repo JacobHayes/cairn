@@ -7,10 +7,11 @@
 // on the canvas root): near the whole card, mid the head and title, far the title led by the
 // state's glyph, whose shape says the state. The hidden-prerequisites marker opens the trace.
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { createContext, useContext, type CSSProperties } from "react";
+import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
 
+import type { ContextGroup } from "../ui/ContextMenu.tsx";
 import { statusGlyph, statusTone, statusWord } from "../status/words.ts";
-import { TITLE_LINE_PX, cardRows } from "./cards.ts";
+import { BORDER_PX, CONTROL_PX, OPEN_PX, TITLE_LINE_PX, cardRows, titleFitPx, titleRoom } from "./cards.ts";
 import type { LensChip } from "./lens.ts";
 import { hereWords, nodeClasses } from "./look.ts";
 import { RANK_TAG_COUNT, type Card, type CardBody } from "./model.ts";
@@ -29,6 +30,8 @@ export interface CardActions {
   trace: ((key: string) => void) | undefined;
   /** A node's title by key, for the marker's list. */
   title(key: string): string;
+  /** The node's context menu (right-click, or the menu key on a focused card); none on a canvas that has no actions to offer. */
+  menu: { groups: (key: string) => ContextGroup[]; choose: (key: string, id: string) => void } | undefined;
 }
 
 export const CardActionsContext = createContext<CardActions | undefined>(undefined);
@@ -65,7 +68,31 @@ export function kindLabel(card: Card): string {
   return card.kind === "group" && card.stage ? "stage" : card.kind;
 }
 
-function Head({ card, collapsible }: { card: Card; collapsible: boolean }) {
+/** The title: the button that opens the node's detail, or plain text where there is none. */
+function Title({ card }: { card: Card }) {
+  const actions = useContext(CardActionsContext);
+  return actions?.open === undefined ? (
+    <span data-testid="title" title={card.title}>
+      {card.title}
+    </span>
+  ) : (
+    <button
+      type="button"
+      className="node-open nodrag"
+      data-testid="card-open"
+      title={card.title}
+      onClick={(event) => {
+        event.stopPropagation();
+        actions.open?.(card.key);
+      }}
+    >
+      <span data-testid="title">{card.title}</span>
+    </button>
+  );
+}
+
+/** The head's row. An open container's has its title and progress in it (`band`), so it is one row. */
+function Head({ card, collapsible, band }: { card: Card; collapsible: boolean; band?: ReactNode }) {
   const actions = useContext(CardActionsContext);
   const journey = card.journey;
   return (
@@ -76,7 +103,7 @@ function Head({ card, collapsible }: { card: Card; collapsible: boolean }) {
           current
         </span>
       ) : null}
-      <span className="spacer" />
+      {band ?? <span className="spacer" />}
       {journey === undefined ? null : (
         <span className={`badge ${statusTone(journey.state)} node-state`} data-testid="card-state" data-state={journey.state}>
           {statusWord(journey.state, card.kind)}
@@ -129,7 +156,8 @@ function Control({ card, collapsible }: { card: Card; collapsible: boolean }) {
   );
 }
 
-function Body({ body, card }: { body: CardBody; card: Card }) {
+/** `compact`: the progress as `done/total`, for a container's band. */
+function Body({ body, card, compact = false }: { body: CardBody; card: Card; compact?: boolean }) {
   switch (body.kind) {
     case "answer":
       return (
@@ -148,8 +176,8 @@ function Body({ body, card }: { body: CardBody; card: Card }) {
           <span className="node-meter" aria-hidden="true">
             <span style={{ width: `${String(Math.round((body.done / body.total) * 100))}%` }} />
           </span>
-          <span>{progressWords(body.done, body.total)}</span>
-          {body.badge === undefined ? null : (
+          <span>{compact ? `${String(body.done)}/${String(body.total)}` : progressWords(body.done, body.total)}</span>
+          {body.badge === undefined || compact ? null : (
             <span className={body.badge.tone === "plain" ? "node-flag" : `node-flag ${body.badge.tone}`} data-testid="card-badge" data-status={body.badge.flag}>
               {body.badge.flag}
             </span>
@@ -262,6 +290,11 @@ function Hanging({ data }: { data: CardData }) {
   );
 }
 
+/** The room beside a zoomed-out title that a card's controls take. */
+function controlsOf(card: Card, collapsible: boolean, drill: boolean): number {
+  return (card.drillable && drill ? OPEN_PX : 0) + (card.collapsed || collapsible ? CONTROL_PX : 0);
+}
+
 /** `NodeCard`: one node on the canvas, drawn as cards.ts sized it. */
 export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
   const { card, overlay, selected, picked, header, faded, edgeEnd } = data;
@@ -271,6 +304,9 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
   const classes = [...nodeClasses(card, { overlay, faded }), selected ? "node-selected" : "", picked ? "node-picked" : "", edgeEnd ? "node-edge-end" : "", header === undefined ? "" : "node-container"];
   const here = hereWords(card);
   const mark = overlay?.marks[card.key];
+  const controls = controlsOf(card, data.collapsible, actions?.drill !== undefined);
+  // Zoomed out, a title is set as large as its room lets the whole of it show (cards.ts).
+  const fit = (room: { width: number; height: number }) => `${String(titleFitPx(card.title.length, room.width, room.height))}px`;
   return (
     <div
       className={classes.filter(Boolean).join(" ")}
@@ -288,39 +324,42 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
       title={here.length === 0 ? undefined : `I am here: ${here.join(", ")}`}
     >
       <Handle type="target" position={Position.Left} isConnectable={false} className="node-handle" />
-      <div className="node-inner" style={{ height: header ?? "100%" }}>
-        <Head card={card} collapsible={data.collapsible} />
-        <div className="node-title-row" style={{ "--title-h": `${String(rows.title * TITLE_LINE_PX)}px`, "--title-lines": rows.title } as CSSProperties}>
-          {journey === undefined ? null : (
-            <span className="node-glyph" data-testid="card-glyph" data-state={journey.state} aria-hidden="true">
-              {statusGlyph(journey.state)}
-            </span>
-          )}
-          <div className="node-title">
-            {actions?.open === undefined ? (
-              <span data-testid="title" title={card.title}>
-                {card.title}
+      {header === undefined ? (
+        <div className="node-inner" style={{ height: "100%" }}>
+          <Head card={card} collapsible={data.collapsible} />
+          <div className="node-title-row" style={{ "--title-h": `${String(rows.title * TITLE_LINE_PX)}px`, "--title-lines": rows.title, "--title-fit": fit(titleRoom(width ?? 0, height ?? 0, { glyph: journey !== undefined, controls })) } as CSSProperties}>
+            {journey === undefined ? null : (
+              <span className="node-glyph" data-testid="card-glyph" data-state={journey.state} aria-hidden="true">
+                {statusGlyph(journey.state)}
               </span>
-            ) : (
-              <button
-                type="button"
-                className="node-open nodrag"
-                data-testid="card-open"
-                title={card.title}
-                onClick={(event) => {
-                  event.stopPropagation();
-                  actions.open?.(card.key);
-                }}
-              >
-                <span data-testid="title">{card.title}</span>
-              </button>
             )}
+            <div className="node-title">
+              <Title card={card} />
+            </div>
           </div>
+          {journey?.body === undefined ? null : <Body body={journey.body} card={card} />}
+          <Foot card={card} />
+          <Marker card={card} />
         </div>
-        {journey?.body === undefined ? null : <Body body={journey.body} card={card} />}
-        <Foot card={card} />
-        <Marker card={card} />
-      </div>
+      ) : (
+        // An open container: a header band across the top, the title and progress in its one row, and the children below on the sunken body.
+        <div className="node-inner node-band" style={{ height: header - BORDER_PX, "--title-fit": fit(titleRoom(width ?? 0, header, { glyph: false, controls })) } as CSSProperties}>
+          <Head
+            card={card}
+            collapsible={data.collapsible}
+            band={
+              <>
+                <div className="node-title">
+                  <Title card={card} />
+                </div>
+                {journey?.body === undefined ? null : <Body body={journey.body} card={card} compact />}
+              </>
+            }
+          />
+          <Foot card={card} />
+          <Marker card={card} />
+        </div>
+      )}
       <Hanging data={data} />
       <Handle type="source" position={Position.Right} isConnectable={false} className="node-handle" />
     </div>

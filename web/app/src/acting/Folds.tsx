@@ -1,4 +1,5 @@
-// C10, B6, D3: the two folds under the next list, closed with their counts showing. "Needs a
+// C10, B6, D3: the two folds under the frontier list, closed with their counts showing, each a
+// bordered panel with a band header and the list's own row look. "Needs a
 // look" holds the work that is wrong rather than next (stale, snoozed and overdue, short of its
 // plan), each with its fix beside it. "Snoozed" holds the work set aside, grouped by the
 // snooze that holds it: a container's, once for all it holds, or each node's own target. A
@@ -16,17 +17,21 @@ import { Rejected } from "../detail/Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { dateWords, dayOf } from "../timeline/model.ts";
 import { Button } from "../ui/kit.tsx";
-import type { ListFlag, NextSettings } from "./address.ts";
+import type { ListFlag, ListSettings } from "./address.ts";
+import { NodeItem } from "./NodeItem.tsx";
 import type { NodeRow } from "./why.ts";
 
 type SnoozeTarget = NonNullable<NodeRow["snoozed"]>;
 
-function queryFor(flag: ListFlag, settings: NextSettings): ListQuery {
+/** What the folds are narrowed by: the frontier list's Mine, kinds, DECISIONS and search. */
+export type FoldSettings = Pick<ListSettings, "kinds" | "decisions" | "text"> & { mine: boolean };
+
+function queryFor(flag: ListFlag, settings: FoldSettings): ListQuery {
   return { flags: settings.mine ? ["mine", flag] : [flag], states: [], kinds: settings.decisions ? ["decision"] : settings.kinds, sort: "rank" };
 }
 
 /** The rows with `flag`, narrowed as the next list is (not-relevant nodes never appear), and how many there are in all. */
-function useFlagged(view: Ready, flag: ListFlag, settings: NextSettings): { rows: NodeRow[]; total: number } {
+function useFlagged(view: Ready, flag: ListFlag, settings: FoldSettings): { rows: NodeRow[]; total: number } {
   const request = useMemo(() => ({ projection: "list" as const, query: queryFor(flag, settings) }), [flag, settings]);
   const { value } = useProjected(view, request);
   const wanted = settings.text.trim().toLowerCase();
@@ -38,11 +43,11 @@ function useFlagged(view: Ready, flag: ListFlag, settings: NextSettings): { rows
 
 function Fold({ testId, title, count, children }: { testId: string; title: string; count: number; children: ReactNode }) {
   return (
-    <details className="fold" data-testid={testId} data-count={count}>
-      <summary>
+    <details className="fold node-panel" data-testid={testId} data-count={count}>
+      <summary className="node-panel-head">
         {title} <span className="fold-count">{count}</span>
       </summary>
-      <div className="stack fold-body">{children}</div>
+      {children}
     </details>
   );
 }
@@ -134,21 +139,17 @@ function looksOf(view: Ready, stale: NodeRow[], short: NodeRow[], lapsed: NodeRo
 function LookRow({ view, write, look, to }: { view: Ready; write: NodeWrite; look: Look; to: string }) {
   const holder = look.row.snoozed_via ?? look.row.key;
   return (
-    <li className="fold-row" data-testid="fold-item" data-node={look.row.key} data-reason={look.fix}>
-      <span className="fold-row-text">
-        <Link to={to} className="next-title" data-node={look.row.key}>
-          {look.row.title}
-        </Link>
-        <span className="next-fact muted">{look.reason}</span>
+    <NodeItem view={view} node={look.row.key} to={to} fact={look.reason} testId="fold-item">
+      <span className="row-side">
+        {look.fix === "note" ? <AddNote write={write} node={look.row.key} /> : null}
+        {look.fix === "unsnooze" ? (
+          <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: holder }])}>
+            {holder === look.row.key ? "Unsnooze" : `Unsnooze ${titleOf(view, holder)}`}
+          </Button>
+        ) : null}
+        {look.fix === "open" ? <Link className="button" to={to}>{look.reason.endsWith("plan") ? "Open dates" : "Open"}</Link> : null}
       </span>
-      {look.fix === "note" ? <AddNote write={write} node={look.row.key} /> : null}
-      {look.fix === "unsnooze" ? (
-        <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: holder }])}>
-          {holder === look.row.key ? "Unsnooze" : `Unsnooze ${titleOf(view, holder)}`}
-        </Button>
-      ) : null}
-      {look.fix === "open" ? <Link className="button" to={to}>{look.reason.endsWith("plan") ? "Open dates" : "Open"}</Link> : null}
-    </li>
+    </NodeItem>
   );
 }
 
@@ -186,18 +187,17 @@ function SnoozedGroup({ view, write, held, toOf }: { view: Ready; write: NodeWri
           </Button>
         )}
       </span>
-      <ul className="plain-list">
+      <ul className="plain-list node-rows">
         {held.rows.map((row) => (
-          <li key={row.key} className="fold-row" data-testid="fold-item" data-node={row.key}>
-            <Link to={toOf(row.key)} className="next-title" data-node={row.key}>
-              {row.title}
-            </Link>
+          <NodeItem key={row.key} view={view} node={row.key} to={toOf(row.key)} testId="fold-item">
             {held.container === undefined ? (
-              <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: row.key }])}>
-                Unsnooze
-              </Button>
+              <span className="row-side">
+                <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: row.key }])}>
+                  Unsnooze
+                </Button>
+              </span>
             ) : null}
-          </li>
+          </NodeItem>
         ))}
       </ul>
     </li>
@@ -205,7 +205,7 @@ function SnoozedGroup({ view, write, held, toOf }: { view: Ready; write: NodeWri
 }
 
 /** The folds under the list, each only while it holds something. */
-export function Folds({ view, settings, toOf }: { view: Ready; settings: NextSettings; toOf: (key: string) => string }) {
+export function Folds({ view, settings, toOf }: { view: Ready; settings: FoldSettings; toOf: (key: string) => string }) {
   const write = useNodeWrite(view, "folds");
   const stale = useFlagged(view, "stale", settings);
   const short = useFlagged(view, "shortfall", settings);
@@ -217,7 +217,7 @@ export function Folds({ view, settings, toOf }: { view: Ready; settings: NextSet
     <div className="stack folds" data-testid="folds">
       {looks.length === 0 ? null : (
         <Fold testId="fold-look" title="Needs a look" count={looks.length}>
-          <ul className="plain-list fold-list">
+          <ul className="plain-list node-rows">
             {looks.map((look) => (
               <LookRow key={look.row.key} view={view} write={write} look={look} to={toOf(look.row.key)} />
             ))}
@@ -226,7 +226,7 @@ export function Folds({ view, settings, toOf }: { view: Ready; settings: NextSet
       )}
       {snoozed.total === 0 ? null : (
         <Fold testId="fold-snoozed" title="Snoozed" count={snoozed.total}>
-          <ul className="plain-list fold-list">
+          <ul className="plain-list node-rows">
             {groups.map((held) => (
               <SnoozedGroup key={held.id} view={view} write={write} held={held} toOf={toOf} />
             ))}

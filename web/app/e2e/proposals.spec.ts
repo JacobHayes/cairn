@@ -4,7 +4,7 @@
 // the host. What a proposal offers, blocks and reads as stale is model and host tests'.
 import { expect, test } from "@playwright/test";
 
-import { chooseFromMenu, openJourneyCard } from "./around.ts";
+import { openJourneyCard } from "./around.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
 import { nodeCard } from "./shell.ts";
 
@@ -12,7 +12,7 @@ test("B7, C14: the scenario journey upgraded to version 2, each conflict resolve
   await editWhereVersionTwoChanges(page, "browser");
   await publishVersionTwo(page, "browser");
   await openJourneyCard(page, "browser", "j_vendor_eval");
-  await chooseFromMenu(page, "journey-menu", "menu-upgrade");
+  await page.getByTestId("journey-upgrade").click();
   const flow = page.getByTestId("upgrade-flow");
   await expect(flow.getByLabel("Upgrade to version")).toHaveValue("2");
   await flow.getByRole("button", { name: "Propose the upgrade" }).click();

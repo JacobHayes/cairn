@@ -5,7 +5,8 @@ import { describe, expect, it } from "vitest";
 import { actingView } from "./acting.test-support.ts";
 import { rollups } from "../plan/tree.ts";
 import type { DisplayState } from "../status/words.ts";
-import { firstParagraph, flatLines, treeLines } from "./listModel.ts";
+import { DEFAULT_LIST } from "./address.ts";
+import { columnsOf, firstParagraph, flatLines, treeLines } from "./listModel.ts";
 import type { NodeRow } from "./why.ts";
 
 const view = actingView();
@@ -24,6 +25,14 @@ const row = (key: string, ancestors: string[] = []): NodeRow => ({
 });
 
 const rows = [row("n_inner", ["n_stage"]), row("n_work"), row("n_stage")];
+
+describe("the columns", () => {
+  it("put Rank first under the Frontier or a sort by rank, once, wherever Columns added it", () => {
+    expect(columnsOf(DEFAULT_LIST)).toEqual(["status", "title", "owner", "due"]);
+    expect(columnsOf({ ...DEFAULT_LIST, frontier: true, columns: ["rank", "unlocks"] })).toEqual(["rank", "status", "title", "owner", "due", "unlocks"]);
+    expect(columnsOf({ ...DEFAULT_LIST, sort: "rank" })[0]).toBe("rank");
+  });
+});
 
 describe("the lines", () => {
   it("fold the tree to its top level, open a container to what it holds, and keep one that matched nothing as context", () => {

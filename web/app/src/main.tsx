@@ -17,7 +17,7 @@ import { SessionContext } from "./data/react.ts";
 import type { Session } from "./data/session.ts";
 import { Home } from "./journeys/Home.tsx";
 import { JourneyIndex } from "./journeys/JourneyIndex.tsx";
-import { BarePageRoute, JourneyDeepLink, JourneyLanding, JourneyPageRoute, LegacyRoute, RouteNodeRedirect, SummaryRoute } from "./screens/JourneyRoutes.tsx";
+import { JourneyDeepLink, JourneyLanding, JourneyPageRoute, NoSuchPage, RouteNodeRedirect } from "./screens/JourneyRoutes.tsx";
 import { Shell } from "./shell/Shell.tsx";
 
 const MineScreen = lazy(() => import("./journeys/MineScreen.tsx").then((module) => ({ default: module.MineScreen })));
@@ -44,18 +44,12 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route path="new" element={<NewJourney />} />
               <Route path="journeys/:id" element={<JourneyLanding />} />
               <Route path="journeys/:id/nodes/:key" element={<JourneyDeepLink />} />
-              <Route path="journeys/:id/next/:projection" element={<JourneyPageRoute page="next" />} />
-              <Route path="journeys/:id/next/:projection/nodes/:key" element={<JourneyPageRoute page="next" />} />
-              <Route path="journeys/:id/plan" element={<BarePageRoute page="plan" />} />
-              <Route path="journeys/:id/plan/:projection" element={<JourneyPageRoute page="plan" />} />
-              <Route path="journeys/:id/plan/:projection/nodes/:key" element={<JourneyPageRoute page="plan" />} />
-              <Route path="journeys/:id/plan/:projection/edges/:edge" element={<JourneyPageRoute page="plan" />} />
-              <Route path="journeys/:id/summary" element={<SummaryRoute />} />
-              <Route path="journeys/:id/summary/nodes/:key" element={<SummaryRoute />} />
-              <Route path="journeys/:id/:old" element={<LegacyRoute />} />
-              <Route path="journeys/:id/:old/nodes/:key" element={<LegacyRoute />} />
+              {(["graph", "list", "timeline", "summary", "walk"] as const).map((screen) => [
+                <Route key={screen} path={`journeys/:id/${screen}`} element={<JourneyPageRoute screen={screen} />} />,
+                <Route key={`${screen}/nodes`} path={`journeys/:id/${screen}/nodes/:key`} element={<JourneyPageRoute screen={screen} />} />,
+              ])}
+              <Route path="journeys/:id/graph/edges/:edge" element={<JourneyPageRoute screen="graph" />} />
               <Route path="library" element={<Library />} />
-              <Route path="routes" element={<LegacyRoute />} />
               <Route path="routes/:id" element={<RouteCanvasPage />} />
               <Route path="routes/:id/draft" element={<RouteCanvasPage />} />
               <Route path="routes/:id/draft/nodes/:key" element={<RouteCanvasPage />} />
@@ -65,6 +59,7 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route path="me" element={<Identity />} />
               <Route path="proposals/:id" element={<ProposalScreen />} />
               <Route path="proposals/:id/nodes/:key" element={<ProposalScreen />} />
+              <Route path="*" element={<NoSuchPage />} />
             </Route>
           </Routes>
         </BrowserRouter>

@@ -2,14 +2,14 @@
 // The bindings that ship with the journey pages move you or change the view: `j` and `k`
 // (next and previous row), `Enter` (the open node's primary action), `Esc` (close a popover,
 // then the sheet, then clear the selection),
-// `v` (next projection), `d` and `m` (DECISIONS and MINE), `/` (search), `?` (the sheet). `p`
-// (pass) is the cards' own (acting/TriageScreen.tsx). Pure helpers carry the decisions, so they
+// `v` (next view), `F` (FRONTIER; the canvas has `f` for fit), `w` (walk through), `d` and `m` (DECISIONS and MINE), `/` (search),
+// `?` (the sheet). `p` (pass) is the walk through's own (acting/TriageScreen.tsx). Pure helpers carry the decisions, so they
 // are tested without a page.
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { screenPath, nodePath } from "../detail/parts.tsx";
-import { carriedSearch, chipApplies, nextProjection, pagePath, withMineFlipped, withParam, type JourneyPage, type Projection } from "../journeys/address.ts";
+import { carriedSearch, chipApplies, nextProjection, pagePath, withMineFlipped, withParam, type Projection, type Screen } from "../journeys/address.ts";
 import { typing } from "../ui/typing.ts";
 
 /** The bindings the sheet lists, each with its words. */
@@ -17,11 +17,13 @@ export const KEY_BINDINGS: { keys: string; words: string }[] = [
   { keys: "j / k", words: "Next or previous row" },
   { keys: "Enter", words: "The open node's primary action" },
   { keys: "Esc", words: "Close a popover or the sheet, then clear the selection" },
-  { keys: "v", words: "Next projection" },
+  { keys: "v", words: "Cycle Graph, List and Timeline" },
+  { keys: "Shift F", words: "Toggle Frontier" },
+  { keys: "w", words: "Walk through the frontier" },
   { keys: "d", words: "Toggle Decisions" },
   { keys: "m", words: "Toggle Mine, where the projection has it" },
   { keys: "/", words: "Search or find" },
-  { keys: "p", words: "Pass, on the cards" },
+  { keys: "p", words: "Pass, in the walk through" },
   { keys: "?", words: "This sheet" },
 ];
 
@@ -39,7 +41,7 @@ export function rowAfter(keys: readonly string[], selected: string | undefined, 
 
 /** The keys of the rows the page lists now, in order. */
 function visibleRows(): string[] {
-  const rows = document.querySelectorAll<HTMLElement>('[data-testid="next-item"], [data-testid="list-row"]');
+  const rows = document.querySelectorAll<HTMLElement>('[data-testid="list-row"]');
   return [...rows].map((row) => row.dataset["node"] ?? "").filter(Boolean);
 }
 
@@ -59,8 +61,7 @@ function focusSearch(): boolean {
 
 export interface KeysProps {
   journey: string;
-  page: JourneyPage | "summary";
-  projection: Projection | undefined;
+  screen: Screen;
   selected: string | undefined;
   sheetOpen: boolean;
   setSheetOpen: (open: boolean) => void;
@@ -85,22 +86,34 @@ function escape({ selected, sheetOpen, setSheetOpen, pathname, search, go }: Hea
   }
 }
 
-/** The chips and the switcher: keys that exist where a journey page has a projection. */
-function onProjection(key: string, heard: Heard, page: JourneyPage, projection: Projection): boolean {
-  const { journey, selected, pathname, search, go } = heard;
+/** The chips and the views: keys that exist where a journey screen has them. */
+function onChips(key: string, heard: Heard): boolean {
+  const { journey, screen, selected, pathname, search, go } = heard;
+  const toggle = (name: string) => { go(`${pathname}${withParam(search, name, new URLSearchParams(search).get(name) === "1" ? undefined : "1")}`); };
   switch (key) {
     case "v": {
-      const to = nextProjection(page, projection);
-      go(pagePath(journey, page, to, selected, carriedSearch(search, page, to)));
+      if (screen !== "graph" && screen !== "list" && screen !== "timeline") {
+        return false;
+      }
+      const to: Projection = nextProjection(screen);
+      go(pagePath(journey, to, selected, carriedSearch(search, to)));
       return true;
     }
+    case "w":
+      go(pagePath(journey, "walk", undefined, carriedSearch(search, "walk")));
+      return true;
+    case "F":
+      if (chipApplies("frontier", screen)) {
+        toggle("frontier");
+      }
+      return true;
     case "d":
-      if (chipApplies("decisions", page, projection)) {
-        go(`${pathname}${withParam(search, "decisions", new URLSearchParams(search).get("decisions") === "1" ? undefined : "1")}`);
+      if (chipApplies("decisions", screen)) {
+        toggle("decisions");
       }
       return true;
     case "m":
-      if (chipApplies("mine", page, projection)) {
+      if (chipApplies("mine", screen)) {
         go(`${pathname}${withMineFlipped(search)}`);
       }
       return true;
@@ -123,7 +136,7 @@ function heardKey(event: KeyboardEvent, heard: Heard): void {
   if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) {
     return;
   }
-  const { page, projection, selected, sheetOpen, setSheetOpen } = heard;
+  const { selected, sheetOpen, setSheetOpen } = heard;
   // The sheet is modal: behind it, only the keys that close it act.
   if (sheetOpen && event.key !== "Escape" && event.key !== "?") {
     return;
@@ -137,7 +150,7 @@ function heardKey(event: KeyboardEvent, heard: Heard): void {
     if (pressPrimary(selected)) {
       event.preventDefault();
     }
-  } else if (page !== "summary" && projection !== undefined && onProjection(event.key, heard, page, projection)) {
+  } else if (onChips(event.key, heard)) {
     event.preventDefault();
   }
 }
@@ -145,14 +158,14 @@ function heardKey(event: KeyboardEvent, heard: Heard): void {
 export function useJourneyKeys(props: KeysProps): void {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
-  const { journey, page, projection, selected, sheetOpen, setSheetOpen } = props;
+  const { journey, screen, selected, sheetOpen, setSheetOpen } = props;
   useEffect(() => {
     const heard = (event: KeyboardEvent) => {
-      heardKey(event, { journey, page, projection, selected, sheetOpen, setSheetOpen, pathname, search, go: (to) => void navigate(to) });
+      heardKey(event, { journey, screen, selected, sheetOpen, setSheetOpen, pathname, search, go: (to) => void navigate(to) });
     };
     document.addEventListener("keydown", heard);
     return () => {
       document.removeEventListener("keydown", heard);
     };
-  }, [journey, page, projection, selected, sheetOpen, setSheetOpen, pathname, search, navigate]);
+  }, [journey, screen, selected, sheetOpen, setSheetOpen, pathname, search, navigate]);
 }

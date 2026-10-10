@@ -787,6 +787,7 @@ svg.chart .datum-line {
   cursor: pointer;
 }
 .segmented :is(label:has(input:checked), button[aria-selected="true"]) {
+  background: var(--color-band);
   color: var(--color-text);
   border-bottom-color: var(--color-text);
 }

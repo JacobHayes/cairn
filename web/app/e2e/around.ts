@@ -23,16 +23,16 @@ export async function startJourney(page: Page, host: HostKind, name: string, fro
     await form.getByLabel("Start from").selectOption("");
   }
   await form.getByRole("button", { name: "Start the journey" }).click();
-  await expect(page).toHaveURL(/\/journeys\/j_[a-z0-9_-]+\/next\/cards\?decisions=1$/);
+  await expect(page).toHaveURL(/\/journeys\/j_[a-z0-9_-]+\/walk\?decisions=1$/);
   return /\/journeys\/(j_[a-z0-9_-]+)\//.exec(page.url())?.[1] ?? "";
 }
 
 /** A fresh name for a journey this run starts. */
 export const journeyName = (stem: string) => fresh(stem);
 
-/** Journey `id`'s landing, NEXT, LIST, with its journey card, once derived. */
+/** Journey `id`'s landing, its graph, with its journey card, once derived. */
 export async function openJourneyCard(page: Page, host: HostKind, id: string): Promise<Locator> {
-  await open(page, host, `/journeys/${id}/next/list`);
+  await open(page, host, `/journeys/${id}/graph`);
   const card = page.getByTestId("journey-card");
   await expect(card).toBeVisible();
   return card;

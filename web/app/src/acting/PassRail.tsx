@@ -1,12 +1,13 @@
 // C11: the pass rail, in the inspector column beside the cards: what is up next, what was
-// passed, and what was finished since the pass began, each a link that opens that node in the
+// passed, and what was finished since the pass began, each a row that opens that node in the
 // inspector (with a way back to the pass). A long queue shows its first few and says how many
 // more there are.
-import { Link, useLocation } from "react-router";
+import { useLocation } from "react-router";
 
 import { titleOf, type Ready } from "../detail/model.ts";
 import { nodePath, screenPath } from "../detail/parts.tsx";
 import { Button } from "../ui/kit.tsx";
+import { NodeItem, NodePanel } from "./NodeItem.tsx";
 import { doneThisPass, unlockedBy, type Pass } from "./pass.ts";
 
 /** How many nodes a rail group names before it says how many more. */
@@ -25,24 +26,12 @@ function Group({ view, title, keys, testId, pass }: { view: Ready; title: string
   }
   const by = (key: string) => (pass === undefined ? undefined : unlockedBy(pass, key));
   return (
-    <section className="stack pass-group" aria-label={title} data-testid={testId}>
-      <span className="muted small">
-        {title} <span className="mono">{keys.length}</span>
-      </span>
-      <ul className="plain-list stack">
-        {keys.slice(0, SHOWN).map((key) => (
-          <li key={key} data-node={key} className={by(key) === undefined ? undefined : "pass-unlocked"} title={by(key) === undefined ? undefined : `Unlocked by ${titleOf(view, by(key) ?? key)}`}>
-            {by(key) === undefined ? null : (
-              <span className="pass-unlocked-mark" aria-hidden="true">
-                ↳
-              </span>
-            )}
-            <Link to={{ pathname: nodePath(screenPath(pathname), key), search }}>{titleOf(view, key)}</Link>
-          </li>
-        ))}
-        {keys.length > SHOWN ? <li className="muted small">and {keys.length - SHOWN} more</li> : null}
-      </ul>
-    </section>
+    <NodePanel title={title} count={keys.length} testId={testId}>
+      {keys.slice(0, SHOWN).map((key) => (
+        <NodeItem key={key} view={view} node={key} to={`${nodePath(screenPath(pathname), key)}${search}`} fact={by(key) === undefined ? undefined : `Unlocked by ${titleOf(view, by(key) ?? key)}`} />
+      ))}
+      {keys.length > SHOWN ? <li className="node-row muted small">and {keys.length - SHOWN} more</li> : null}
+    </NodePanel>
   );
 }
 
@@ -51,7 +40,7 @@ export function PassRail({ view, order, pass, onNewPass }: { view: Ready; order:
   const passed = order.filter((key) => pass.passed.includes(key));
   const waiting = order.filter((key) => !pass.passed.includes(key));
   return (
-    <section className="detail-panel panel stack pass-rail" aria-label="This pass" data-testid="pass-rail">
+    <section className="stack pass-rail" aria-label="This pass" data-testid="pass-rail">
       <Group view={view} title="Up next" keys={waiting.slice(1)} testId="up-next" pass={pass} />
       <Group view={view} title="Passed" keys={passed} testId="passed" />
       <Group view={view} title="Done in this pass" keys={doneThisPass(pass, (key) => finished(view, key))} testId="done-this-pass" />

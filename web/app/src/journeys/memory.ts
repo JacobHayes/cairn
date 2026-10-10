@@ -1,8 +1,8 @@
-// Each viewer's last projection per page is remembered per journey (2.3), and the journey's
-// last page beside it, for the rail's Recent list to reopen it (2.1). It is a per-viewer convenience, kept in
-// localStorage, which can be missing or throw (a private window, blocked site data, a
-// preview), so every read and write is guarded and the screens work without it.
-import { DEFAULT_PROJECTION, projectionOf, type JourneyPage, type Projection } from "./address.ts";
+// Each viewer's last projection is remembered per journey (2.3), for the journey's landing to
+// reopen. It is a per-viewer convenience, kept in localStorage, which can be missing or throw
+// (a private window, blocked site data, a preview), so every read and write is guarded and the
+// screens work without it.
+import { DEFAULT_PROJECTION, projectionOf, type Projection } from "./address.ts";
 
 const PREFIX = "cairn:view:";
 
@@ -18,17 +18,16 @@ function write(key: string, value: string): void {
   try {
     globalThis.localStorage.setItem(`${PREFIX}${key}`, value);
   } catch {
-    // Not remembered: the next visit opens the page's default.
+    // Not remembered: the next visit opens the graph.
   }
 }
 
-/** The projection last shown on `page` of `journey`, or the page's default. */
-export function recalledProjection(journey: string, page: JourneyPage): Projection {
-  return projectionOf(page, read(`${journey}:${page}`)) ?? DEFAULT_PROJECTION[page];
+/** The projection last shown for `journey`, or the graph. */
+export function recalledProjection(journey: string): Projection {
+  return projectionOf(read(journey)) ?? DEFAULT_PROJECTION;
 }
 
-/** Remembers that `projection` is where `page` of `journey` was last, and that `page` is the journey's last page. */
-export function rememberProjection(journey: string, page: JourneyPage, projection: Projection): void {
-  write(`${journey}:${page}`, projection);
-  write(`${journey}:page`, page);
+/** Remembers that `projection` is where `journey` was last. */
+export function rememberProjection(journey: string, projection: Projection): void {
+  write(journey, projection);
 }

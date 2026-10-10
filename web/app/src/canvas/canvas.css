@@ -231,7 +231,7 @@
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-edge);
   border-radius: var(--radius-none);
   background:
     var(--tick) left 3px top 3px / 8px 1px no-repeat,
@@ -250,18 +250,47 @@
   position: relative;
 }
 
-/* An open container is a frame: its children sit on the paper below its head. */
+/* An open container is a frame: a header band across the top, and its children on the sunken body below. */
 .node-container {
+  border-color: var(--color-frame);
   background:
-    var(--tick) left 3px top 3px / 8px 1px no-repeat,
-    var(--tick) left 3px top 3px / 1px 8px no-repeat,
-    var(--tick) right 3px top 3px / 8px 1px no-repeat,
-    var(--tick) right 3px top 3px / 1px 8px no-repeat,
     var(--tick) left 3px bottom 3px / 8px 1px no-repeat,
     var(--tick) left 3px bottom 3px / 1px 8px no-repeat,
     var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
     var(--tick) right 3px bottom 3px / 1px 8px no-repeat,
-    color-mix(in srgb, var(--color-surface) 55%, transparent);
+    var(--color-sunken);
+}
+
+/* The band holds the container's kind, title, progress, state and fold control in one row, the date and marker under it. */
+.node-inner.node-band {
+  padding: 0 12px;
+  gap: 4px;
+  background: var(--color-band);
+  border-bottom: 1px solid var(--color-frame);
+}
+
+.node-inner.node-band:has(> :nth-child(2)) {
+  padding-bottom: 10px;
+}
+
+.node-band .node-head {
+  height: 52px;
+}
+
+.node-band .node-head > .node-title {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.node-band .node-body-line {
+  flex: none;
+  height: 24px;
+  line-height: 24px;
+}
+
+.node-band .node-title > *,
+.node-band .node-open {
+  -webkit-line-clamp: 1;
 }
 
 .node-inner {
@@ -616,10 +645,15 @@
 
 /* ---- zoom bands (5.4): what a card draws, never its size -------------------------------------- */
 
-/* Mid and far draw a glyph and the title, which takes the card's whole inner room: set to read at 14px on
-   screen (the zoom is `--z` on the root), as large as the card's own lines allow. Far draws no head at all. */
+/* Mid and far draw a glyph and the title, which takes the card's whole inner room (the padding is smaller) and is
+   not cut to the reading lines: it is set at 14px on screen (the zoom is `--z` on the root) or the largest size at
+   which the whole title fits the room (`--title-fit`, cards.ts), whichever is less. Far draws no head at all. */
 .react-flow:is([data-lod="mid"], [data-lod="far"]) .node :is(.node-body-line, .node-foot) {
   display: none;
+}
+
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node:not(.node-container) .node-inner {
+  padding: 6px;
 }
 
 .react-flow[data-lod="far"] .node-head {
@@ -646,6 +680,22 @@
   padding-right: 72px;
 }
 
+/* A container's header band keeps its row, with the title and the controls only. */
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-band .node-head {
+  display: flex;
+  position: static;
+  flex: 1 1 0;
+  height: auto;
+}
+
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-band .node-head > :not(.node-title, .node-control) {
+  display: none;
+}
+
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-band .node-head > .node-title {
+  display: block;
+}
+
 .react-flow:is([data-lod="mid"], [data-lod="far"]) .node-glyph {
   display: inline;
 }
@@ -658,17 +708,23 @@
 }
 
 .react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title {
-  font-size: clamp(15px, calc(14px / var(--z, 1)), 30px);
+  font-size: min(max(15px, calc(14px / var(--z, 1))), var(--title-fit, 30px));
   line-height: 1.15;
 }
 
 .react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title > * {
-  -webkit-line-clamp: var(--title-lines, 2);
+  display: block;
+  max-height: 100%;
+  overflow: hidden;
+  -webkit-line-clamp: unset;
 }
 
 /* Corner ticks are too small to see far out; the hairline stays, thickened so it is 1px on screen. */
 .react-flow[data-lod="far"] .node {
   border-width: max(1px, calc(1px / var(--z, 1)));
+}
+
+.react-flow[data-lod="far"] .node:not(.node-container) {
   background: var(--color-surface);
 }
 

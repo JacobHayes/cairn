@@ -1,14 +1,13 @@
-// What each projection draws on the journey's pages, from the screens that already drew them
-// (the later tracks redesign each one): NEXT, LIST and CARDS; PLAN, GRAPH, LIST and TIMELINE.
+// What each view draws on the journey's page: the graph, the list, the timeline and the walk
+// through.
 // The graph with DECISIONS on is the decision view (C12): the same canvas at least at the
 // Decisions step, with everything else faded; its stalled surface and, in edit mode, the
 // structure's tools (5.6) are the head's (CanvasBars).
 import { lazy, Suspense, useMemo } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation } from "react-router";
 
-import { listFrom, nextFrom, nextPath, triageFrom } from "../acting/address.ts";
+import { listFrom, triageFrom } from "../acting/address.ts";
 import { ListBody } from "../acting/ListScreen.tsx";
-import { NextList } from "../acting/NextScreen.tsx";
 import { TriageBody } from "../acting/TriageScreen.tsx";
 import { JourneyAuthoringBar } from "../authoring/JourneyAuthoring.tsx";
 import type { useEdgeDrawing } from "../authoring/connect.tsx";
@@ -17,21 +16,21 @@ import { useProjected } from "../canvas/hooks.ts";
 import { viewFrom } from "../canvas/settings.ts";
 import { StalledSurface } from "../canvas/Surfaces.tsx";
 import type { Ready } from "../detail/model.ts";
-import type { JourneyPage, Projection } from "../journeys/address.ts";
+import type { Screen } from "../journeys/address.ts";
 import { TimelineChart, timelineFrom } from "../timeline/TimelineView.tsx";
 
-/** The graph and its library are the Plan page's alone: the Next page opens without them. */
+/** The graph and its library load with the graph alone: the other views open without them. */
 const JourneyCanvas = lazy(() => import("../canvas/JourneyCanvas.tsx").then((module) => ({ default: module.JourneyCanvas })));
 
 function ProjectedTimeline({ ready, selected }: { ready: Ready; selected: string | undefined }) {
   const { search } = useLocation();
   const params = useMemo(() => new URLSearchParams(search), [search]);
-  const { kinds, text, decisions, flags } = useMemo(() => listFrom(params), [params]);
+  const { kinds, text, decisions, flags, frontier } = useMemo(() => listFrom(params), [params]);
   const { detail, range } = useMemo(() => timelineFrom(params), [params]);
   const mine = flags.includes("mine");
   const held = useProjected(ready, mine ? { projection: "mine" } : undefined);
   const holding = useMemo(() => (mine ? new Set((held.value ?? []).map((entry) => entry.node)) : undefined), [mine, held.value]);
-  const narrow = useMemo(() => ({ kinds, text, decisions, mine: holding }), [kinds, text, decisions, holding]);
+  const narrow = useMemo(() => ({ kinds, text, decisions, mine: holding, frontier: frontier ? new Set(ready.derived.acting_frontier) : undefined }), [kinds, text, decisions, holding, frontier, ready.derived.acting_frontier]);
   const timeline = useProjected(ready, { projection: "timeline" });
   if (timeline.error !== undefined) {
     return <p className="callout callout-bad">The timeline could not be read: {timeline.error}</p>;
@@ -44,8 +43,7 @@ function ProjectedTimeline({ ready, selected }: { ready: Ready; selected: string
 
 export interface ProjectionProps {
   ready: Ready;
-  page: JourneyPage;
-  projection: Projection;
+  screen: Exclude<Screen, "summary">;
   selected: string | undefined;
   /** The edge whose card is open, as `<from>~<to>`. */
   edge: string | undefined;
@@ -66,26 +64,25 @@ export function CanvasBars({ ready, authored, drawing }: Pick<ProjectionProps, "
   );
 }
 
-export function ProjectionBody({ ready, page, projection, selected, edge, authored, drawing }: ProjectionProps) {
+export function ProjectionBody({ ready, screen, selected, edge, authored, drawing }: ProjectionProps) {
   const { search } = useLocation();
-  const navigate = useNavigate();
   const params = useMemo(() => new URLSearchParams(search), [search]);
-  if (page === "next" && projection === "list") {
-    return <NextList view={ready} settings={nextFrom(params)} selected={selected} onSettings={(next) => void navigate(nextPath(ready.journey.header.id, next, selected))} />;
-  }
-  if (page === "next") {
+  // FRONTIER fades the graph's cards that cannot move now, and keeps the structure.
+  const frontier = params.get("frontier") === "1";
+  const emphasis = useMemo(() => (frontier ? new Set(ready.derived.acting_frontier) : null), [frontier, ready.derived.acting_frontier]);
+  if (screen === "walk") {
     return <TriageBody view={ready} settings={triageFrom(params)} selected={selected} />;
   }
-  if (projection === "list") {
+  if (screen === "list") {
     // A new query starts from its first page with nothing selected.
     return <ListBody key={search} view={ready} settings={listFrom(params)} selected={selected} />;
   }
-  if (projection === "timeline") {
+  if (screen === "timeline") {
     return <ProjectedTimeline ready={ready} selected={selected} />;
   }
   return (
     <Suspense fallback={<p className="muted small">Drawing the graph...</p>}>
-      <JourneyCanvas ready={ready} view={viewFrom(params)} selected={selected} edge={edge} decisions={params.get("decisions") === "1"} onPick={authored === undefined ? undefined : drawing.pick} authored={authored} />
+      <JourneyCanvas ready={ready} view={viewFrom(params)} selected={selected} edge={edge} decisions={params.get("decisions") === "1"} emphasis={emphasis} onPick={authored === undefined ? undefined : drawing.pick} authored={authored} />
     </Suspense>
   );
 }

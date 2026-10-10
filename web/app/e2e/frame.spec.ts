@@ -31,7 +31,7 @@ async function reachHistory(page: Page, node: string, height: number): Promise<v
 // the sheet over a phone's map.
 test("the inspector scrolls to the end of History at 1440 and 1024px, a node opens at its top, and the page behind never scrolls", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 768 });
-  await openAt(page, "browser", "j_vendor_eval", "plan/graph?detail=all", { node: "n_plan" });
+  await openAt(page, "browser", "j_vendor_eval", "graph?detail=all", { node: "n_plan" });
   await reachHistory(page, "n_plan", 768);
   // The next node opens at its header, not part-way down this one's long body.
   // The card may be off screen: the click is sent to it, as panning to it would.
@@ -40,7 +40,7 @@ test("the inspector scrolls to the end of History at 1440 and 1024px, a node ope
   await expect.poll(() => page.locator('[data-pane="inspector"]').evaluate((element) => element.scrollTop)).toBe(0);
 
   // The decision graph takes the wheel to pan, and the page behind it does not scroll.
-  await openAt(page, "browser", "j_vendor_eval", "plan/graph?decisions=1");
+  await openAt(page, "browser", "j_vendor_eval", "graph?decisions=1");
   const canvas = page.getByTestId("canvas");
   const viewport = canvas.locator(".react-flow__viewport");
   const before = await viewport.evaluate((element) => (element as HTMLElement).style.transform);
@@ -112,11 +112,11 @@ test.describe("a phone's map", () => {
   });
 
   test("opens a tapped decision as a sheet over the map, with nothing off the side", async ({ page }) => {
-    await openAt(page, "browser", "j_hiring", "plan/graph?decisions=1&map=1");
+    await openAt(page, "browser", "j_hiring", "graph?decisions=1&map=1");
     await page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").click();
     const panel = nodePanel(page, "n_make_offer");
     await expect(panel).toBeVisible();
-    await expect(page).toHaveURL(/\/plan\/graph\/nodes\/n_make_offer\?map=1&decisions=1$/);
+    await expect(page).toHaveURL(/\/graph\/nodes\/n_make_offer\?map=1&decisions=1$/);
     await expect(page.getByTestId("map-full")).toBeVisible();
     const sheet = (await page.locator(".inspector").boundingBox())?.y ?? 0;
     expect(sheet).toBeGreaterThan(300);

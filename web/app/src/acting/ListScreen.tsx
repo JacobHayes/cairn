@@ -1,17 +1,21 @@
-// C9: the Plan list. By default the journey as a tree in plan order, folded to its top level,
+// C9: the list. By default the journey as a tree in plan order, folded to its top level,
 // each container saying how far along it is; opening every level is the flat table. Sorting a
-// column (its header) flattens it and puts each row's container under its title. Not-relevant
+// column (its header) flattens it and puts each row's container under its title. With the
+// Frontier chip on it is the frontier: only what can move now, flat in rank order, each row
+// with its owner and primary action, and under the table what needs a look (C10). Not-relevant
 // rows are left out unless asked for, so the list holds what the plan's count does. With
 // DECISIONS on the rows are decisions with their answer, why, and what the answer affects
 // (C12). Hovering a row brings up its checkbox, and a selection turns the header into the
-// bulk actions (BulkBar.tsx). It is PLAN, LIST: the journey page (screens/JourneyFrame.tsx)
-// holds its toolbar and the filter it opens (ListFilters).
-import { useMemo, useState } from "react";
-import { useNavigate } from "react-router";
+// bulk actions (BulkBar.tsx). The journey page (screens/JourneyFrame.tsx) holds its toolbar and
+// the filter it opens (ListFilters).
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { useLocation, useNavigate } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
 import { decisionRows } from "../decisions/model.ts";
 import { type Ready } from "../detail/model.ts";
+import { nodePath, screenPath } from "../detail/parts.tsx";
+import { useMineOf } from "../journeys/mine.ts";
 import { ancestorsOf } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Button } from "../ui/kit.tsx";
@@ -20,6 +24,9 @@ import { listPath, listQueryOf, type ListSettings } from "./address.ts";
 import { BulkBar } from "./BulkBar.tsx";
 import { Checks } from "./Controls.tsx";
 import { Cell, type CellContext } from "./ListCells.tsx";
+import { Folds } from "./Folds.tsx";
+import { NextForYou } from "./NextForYou.tsx";
+import { StalledPanel } from "./Stalled.tsx";
 import { addableColumns, columnsOf, columnWords, flatLines, givesWay, rankPositions, SORT_OF, treeLines, type Column, type Line } from "./listModel.ts";
 import { useRows } from "./useRows.ts";
 import "./acting.css";
@@ -30,19 +37,24 @@ function narrowed(settings: ListSettings): boolean {
 }
 
 /** The columns held at the left while the table scrolls sideways. */
-function pinned(column: Column): string | undefined {
-  return column === "status" || column === "title" ? "list-pinned" : undefined;
+function pinned(column: Column, columns: readonly Column[]): string | undefined {
+  return column === "status" || column === "title" || (column === "rank" && columns[0] === "rank") ? "list-pinned" : undefined;
 }
 
-function Head({ column, settings, onSort }: { column: Column; settings: ListSettings; onSort: (sort: ListSettings["sort"]) => void }) {
+/** A click on the row itself, not on a control inside it, selects it. */
+function onRow(event: MouseEvent): boolean {
+  return !(event.target instanceof Element && event.target.closest("a, button, select, input, textarea, label"));
+}
+
+function Head({ column, columns, settings, onSort }: { column: Column; columns: readonly Column[]; settings: ListSettings; onSort: (sort: ListSettings["sort"]) => void }) {
   const sort = SORT_OF[column];
   const words = columnWords(column, settings.decisions);
   if (sort === undefined) {
-    return <th scope="col" data-column={column} data-gives-way={givesWay(column)} className={pinned(column)}>{words}</th>;
+    return <th scope="col" data-column={column} data-gives-way={givesWay(column)} className={pinned(column, columns)}>{words}</th>;
   }
   const active = settings.sort === sort;
   return (
-    <th scope="col" aria-sort={active ? "descending" : "none"} data-column={column} data-gives-way={givesWay(column)} data-testid={`sort-${column}`}>
+    <th scope="col" aria-sort={active ? "descending" : "none"} data-column={column} data-gives-way={givesWay(column)} className={pinned(column, columns)} data-testid={`sort-${column}`}>
       <button type="button" className="list-sort" aria-label={`Sort by ${words.toLowerCase()}`} onClick={() => { onSort(active ? undefined : sort); }}>
         {words}
         {active ? <span aria-hidden="true"> ▾</span> : null}
@@ -53,20 +65,37 @@ function Head({ column, settings, onSort }: { column: Column; settings: ListSett
 
 function Row({ line, columns, context, chosen, current, onToggle }: { line: Line; columns: Column[]; context: CellContext; chosen: boolean; current: boolean; onToggle: () => void }) {
   const { row } = line;
+  const navigate = useNavigate();
+  const { pathname, search } = useLocation();
+  const item = useRef<HTMLTableRowElement>(null);
+  // j and k move the selection: keep the selected row in view.
+  useEffect(() => {
+    if (current) {
+      item.current?.scrollIntoView({ block: "nearest" });
+    }
+  }, [current]);
   return (
     <tr
+      ref={item}
       data-testid={row === undefined ? "list-context" : "list-row"}
       data-node={line.key}
       data-depth={line.depth}
+      data-container={line.container}
+      style={{ "--depth": line.depth } as CSSProperties}
       data-slack={row?.slack_days ?? ""}
       data-selected={chosen}
       aria-selected={current}
+      onClick={(event) => {
+        if (row !== undefined && onRow(event)) {
+          void navigate(`${nodePath(screenPath(pathname), line.key)}${search}`);
+        }
+      }}
     >
       <td className="list-check list-pinned">
         {row === undefined ? null : <input type="checkbox" className="list-checkbox" aria-label={`Select ${row.title}`} checked={chosen} onChange={onToggle} />}
       </td>
       {columns.map((column) => (
-        <td key={column} data-column={column} data-gives-way={givesWay(column)} className={[column === "title" ? "list-title-cell" : "list-cell", pinned(column)].filter(Boolean).join(" ")}>
+        <td key={column} data-column={column} data-gives-way={givesWay(column)} className={[column === "title" ? "list-title-cell" : "list-cell", pinned(column, columns)].filter(Boolean).join(" ")}>
           <Cell column={column} line={line} context={context} />
         </td>
       ))}
@@ -91,7 +120,7 @@ function Table({ view, settings, lines, columns, context, chosen, selected, ever
   const navigate = useNavigate();
   const picked = selectionOf(view, chosen);
   return (
-    <table className="data list-table" data-testid="list-table" data-selecting={chosen.size > 0}>
+    <table className="data list-table" data-testid="list-table" data-selecting={chosen.size > 0} data-ranked={columns[0] === "rank"}>
       <thead>
         {picked.length > 0 ? (
           <tr>
@@ -105,7 +134,7 @@ function Table({ view, settings, lines, columns, context, chosen, selected, ever
               <input type="checkbox" className="list-checkbox" aria-label="Select every row shown" checked={false} onChange={onSelectAll} />
             </th>
             {columns.map((column) => (
-              <Head key={column} column={column} settings={settings} onSort={(sort) => void navigate(listPath(view.journey.header.id, { ...settings, sort }, selected))} />
+              <Head key={column} column={column} columns={columns} settings={settings} onSort={(sort) => void navigate(listPath(view.journey.header.id, { ...settings, sort }, selected))} />
             ))}
           </tr>
         )}
@@ -161,6 +190,22 @@ function Strip({ view, settings, total, hidden, tree, all, onAll, selectedNode }
   );
 }
 
+/** C10: under the frontier table, what the viewer holds that cannot be done yet, what needs a look, what is snoozed, and, when nothing can move, why. */
+function FrontierPanels({ view, settings, empty, stalled: held }: { view: Ready; settings: ListSettings; empty: boolean; stalled: boolean }) {
+  const { pathname, search } = useLocation();
+  const mine = useMineOf(view.journey.header.id);
+  // The stalled panel already says what the journey waits on, so the line that says the same is left out.
+  const stalled = empty && held;
+  const mineNarrowing = { mine: settings.flags.includes("mine"), kinds: settings.kinds, decisions: settings.decisions, text: settings.text };
+  return (
+    <>
+      {mine.status === "ready" && !stalled ? <NextForYou view={view} entries={mine.entries} /> : null}
+      {stalled ? <StalledPanel view={view} /> : null}
+      <Folds view={view} settings={mineNarrowing} toOf={(key) => `${nodePath(screenPath(pathname), key)}${search}`} />
+    </>
+  );
+}
+
 /** A set of keys with the one change a click makes: in if out, out if in. */
 function useKeys(): [Set<string>, (key: string) => void, (keys: Iterable<string>) => void] {
   const [keys, setKeys] = useState<Set<string>>(new Set());
@@ -186,18 +231,20 @@ export function ListBody({ view, settings, selected }: { view: Ready; settings: 
   const needsDecisions = settings.decisions || settings.columns.some((column) => ["answer", "why", "affects"].includes(column));
   const projected = useProjected(view, needsDecisions ? { projection: "decision_view" as const } : undefined);
   const decisions = useMemo(() => new Map((projected.value === undefined ? [] : decisionRows(view, projected.value)).map((decision) => [decision.key, decision])), [view, projected.value]);
-  const ranks = useMemo(() => rankPositions(view), [view]);
-  const tree = settings.sort === undefined && !settings.decisions;
+  // Under the Frontier lens the places are the engine's order of the frontier, its ties broken as it breaks them (the graph's strip says them too).
+  const frontier = useProjected(view, settings.frontier ? { projection: "next" as const } : undefined);
+  const ranks = useMemo(() => (settings.frontier ? new Map((frontier.value?.items ?? []).map((row, at) => [row.key, at + 1])) : rankPositions(view)), [view, settings.frontier, frontier.value]);
+  const tree = settings.sort === undefined && !settings.decisions && !settings.frontier;
   // The open node's containers stay open, so it is not hidden in a fold; a click flips what the rest would do.
   const holding = useMemo(() => new Set(selected === undefined ? [] : ancestorsOf(view, selected)), [view, selected]);
   const open = everyLevel ?? narrowed(settings);
   const lines = useMemo(
-    () => (rows === undefined ? [] : tree ? treeLines(view, rows, (key) => (open || holding.has(key)) !== flipped.has(key)) : flatLines(view, rows, settings.sort)),
+    () => (rows === undefined ? [] : tree ? treeLines(view, rows, (key) => (open || holding.has(key)) !== flipped.has(key)) : flatLines(view, rows, settings.sort ?? (settings.frontier ? "rank" : undefined))),
     [view, rows, tree, settings.sort, open, holding, flipped],
   );
   const everyLine = lines.flatMap((line) => (line.row === undefined ? [] : [line.row.key]));
   const columns = columnsOf(settings);
-  const context: CellContext = { view, tree, decisions, ranks, onFold: fold };
+  const context: CellContext = { view, tree, decisions, ranks, acting: settings.frontier, sort: settings.sort, onFold: fold };
   return (
     <section className="stack list" aria-label="List" data-testid="list">
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
@@ -228,8 +275,11 @@ export function ListBody({ view, settings, selected }: { view: Ready; settings: 
         onSelectAll={() => { choose(everyLine); }}
       />
       {rows !== undefined && lines.length === 0 ? (
-        <p className="muted" data-testid="list-empty">Nothing matches. Change the filter to see more.</p>
+        <p className="muted" data-testid="list-empty">
+          {!settings.frontier ? "Nothing matches. Change the filter to see more." : narrowed(settings) || settings.decisions ? "Nothing on the frontier matches these filters." : "Nothing is left to act on in this journey."}
+        </p>
       ) : null}
+      {settings.frontier ? <FrontierPanels view={view} settings={settings} empty={rows !== undefined && lines.length === 0} stalled={frontier.value?.stalled != null && frontier.value.items.length === 0} /> : null}
     </section>
   );
 }

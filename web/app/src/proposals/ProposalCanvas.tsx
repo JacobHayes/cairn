@@ -99,6 +99,7 @@ export function ProposalCanvas({ domain, graphs, marks, edges, origins = {}, dim
       expand: undefined,
       trace: undefined,
       title: (key) => (graph?.nodes ?? []).find((node) => node.key === key)?.title ?? key,
+      menu: undefined,
     }),
     [onPick, graph],
   );

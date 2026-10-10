@@ -1,10 +1,10 @@
 // What the acting surfaces show lives in their address, as the canvas's does (5.2), so a
-// filtered list, a re-sorted next list, or a triage mode is shareable, survives a reload, and
+// filtered list, a re-sorted list, or a walk through is shareable, survives a reload, and
 // follows the back button. Every setting at its default leaves the address bare. Each screen
 // turns its settings into the engine's query (C9 `ListQuery`, C10 `NextQuery`), which the
 // derive worker answers over the journey's local derivation. The toolbar's chips are shared
-// by every projection: `decisions=1`, `mine=1` and `q=<text>`; the list, the next list and
-// the cards live at `/journeys/<id>/plan/list`, `/next/list` and `/next/cards`.
+// by every view: `decisions=1`, `mine=1`, `q=<text>` and `frontier=1`; the list and the walk
+// through live at `/journeys/<id>/list` and `/walk`.
 import type { Schema } from "@cairn/client";
 import type { ListQuery, NextQuery } from "@cairn/wasm";
 
@@ -30,9 +30,9 @@ export const LIST_FLAGS: ListFlag[] = [
   "shortfall",
 ];
 
-/** The flags the filter offers: the list's by the engine, NEXT and CARDS by what their rows carry. The rest still read from an old address. */
+/** The flags the filter offers: the list's by the engine, the walk through's by what its cards carry. The rest still read from an old address. */
 export const LIST_FILTER_FLAGS: ListFlag[] = ["overdue", "stale", "unassigned", "shortfall", "snoozed"];
-export const NEXT_FILTER_FLAGS: ListFlag[] = LIST_FILTER_FLAGS.filter((flag) => flag !== "snoozed");
+export const WALK_FILTER_FLAGS: ListFlag[] = LIST_FILTER_FLAGS.filter((flag) => flag !== "snoozed");
 
 /** C9, C10: the single signals a list sorts by (Priority: effort when estimates exist). */
 export const SORTS: SortBy[] = ["rank", "slack", "gravity", "unlocks", "due", "effort"];
@@ -66,29 +66,16 @@ export interface ListSettings {
   columns: ListColumn[];
   /** The DECISIONS chip: the decisions only (C12). */
   decisions: boolean;
+  /** The Frontier chip: only what can move now, flat, in rank order (C10). */
+  frontier: boolean;
 }
 
-/** C10: what the next list shows. */
-export interface NextSettings {
-  sort: SortBy;
-  mine: boolean;
-  kinds: NodeKind[];
-  /** The rows kept: those with every one of these flags (`NEXT_FILTER_FLAGS`). */
-  flags: ListFlag[];
-  /** Rank for me: rank with the owner factor relative to the viewer (Priority). */
-  forMe: boolean;
-  /** The DECISIONS chip: the actionable decisions only (C10). */
-  decisions: boolean;
-  /** The search: rows whose title or place contains it. */
-  text: string;
-}
-
-/** C11: what triage shows; `decisions` is the decision walkthrough. */
+/** C11: what the walk through shows; `decisions` is the decision walkthrough. */
 export interface TriageSettings {
   decisions: boolean;
   mine: boolean;
   kinds: NodeKind[];
-  /** The cards kept: those with every one of these flags (`NEXT_FILTER_FLAGS`). */
+  /** The cards kept: those with every one of these flags (`WALK_FILTER_FLAGS`). */
   flags: ListFlag[];
   /** The search: cards whose title contains it. */
   text: string;
@@ -98,10 +85,6 @@ export interface TriageSettings {
 function listed<T extends string>(params: URLSearchParams, name: string, known: readonly T[]): T[] {
   const given = new Set((params.get(name) ?? "").split(","));
   return known.filter((each) => given.has(each));
-}
-
-function sortFrom(params: URLSearchParams): SortBy {
-  return listSortFrom(params) ?? "rank";
 }
 
 function listSortFrom(params: URLSearchParams): SortBy | undefined {
@@ -142,12 +125,14 @@ export function listFrom(params: URLSearchParams): ListSettings {
     sort: listSortFrom(params),
     columns: listed(params, "cols", LIST_COLUMNS),
     decisions: params.get("decisions") === "1",
+    frontier: params.get("frontier") === "1",
   };
 }
 
 export function listParams(settings: ListSettings): URLSearchParams {
   const params = new URLSearchParams();
   setFlag(params, "decisions", settings.decisions);
+  setFlag(params, "frontier", settings.frontier);
   setFlag(params, "mine", settings.flags.includes("mine"));
   setList(params, "flag", settings.flags.filter((flag) => flag !== "mine"));
   if (settings.within !== undefined) {
@@ -184,7 +169,8 @@ export function listDisplayStates(settings: ListSettings): DisplayState[] {
 
 /** C9: the engine's query for `settings`, from `cursor` when paging. */
 export function listQueryOf(settings: ListSettings, cursor?: number): ListQuery {
-  const query: ListQuery = { flags: settings.flags, display_states: listDisplayStates(settings), kinds: settings.decisions ? ["decision"] : settings.kinds, sort: settings.sort ?? "rank" };
+  const flags = settings.frontier && !settings.flags.includes("next_up") ? [...settings.flags, "next_up" as const] : settings.flags;
+  const query: ListQuery = { flags, display_states: listDisplayStates(settings), kinds: settings.decisions ? ["decision"] : settings.kinds, sort: settings.sort ?? "rank" };
   if (settings.within !== undefined) {
     query.within = settings.within;
   }
@@ -200,45 +186,12 @@ export function listQueryOf(settings: ListSettings, cursor?: number): ListQuery 
   return query;
 }
 
-export function nextFrom(params: URLSearchParams): NextSettings {
-  return {
-    sort: sortFrom(params),
-    mine: params.get("mine") === "1",
-    kinds: listed(params, "kind", ACTING_KINDS),
-    flags: listed(params, "flag", NEXT_FILTER_FLAGS),
-    forMe: params.get("me") === "1",
-    decisions: params.get("decisions") === "1",
-    text: params.get("q") ?? "",
-  };
-}
-
-export function nextParams(settings: NextSettings): URLSearchParams {
-  const params = new URLSearchParams();
-  setFlag(params, "decisions", settings.decisions);
-  if (settings.sort !== "rank") {
-    params.set("sort", settings.sort);
-  }
-  setFlag(params, "mine", settings.mine);
-  setList(params, "kind", settings.kinds);
-  setList(params, "flag", settings.flags);
-  setFlag(params, "me", settings.forMe);
-  if (settings.text !== "") {
-    params.set("q", settings.text);
-  }
-  return params;
-}
-
-/** C10: the engine's query for `settings`. */
-export function nextQueryOf(settings: NextSettings): NextQuery {
-  return { sort: settings.sort, mine: settings.mine, kinds: settings.decisions ? ["decision"] : settings.kinds, for_viewer: settings.forMe };
-}
-
 export function triageFrom(params: URLSearchParams): TriageSettings {
   return {
     decisions: params.get("decisions") === "1",
     mine: params.get("mine") === "1",
     kinds: listed(params, "kind", ACTING_KINDS),
-    flags: listed(params, "flag", NEXT_FILTER_FLAGS),
+    flags: listed(params, "flag", WALK_FILTER_FLAGS),
     text: params.get("q") ?? "",
   };
 }
@@ -263,7 +216,6 @@ export function triageQueryOf(settings: TriageSettings): NextQuery {
 }
 
 export const DEFAULT_LIST: ListSettings = listFrom(new URLSearchParams());
-export const DEFAULT_NEXT: NextSettings = nextFrom(new URLSearchParams());
 export const DEFAULT_TRIAGE: TriageSettings = triageFrom(new URLSearchParams());
 
 /** A node's detail on a screen at `path`: its `/nodes/<key>` is added before the query. */
@@ -272,19 +224,15 @@ function withNode(path: string, node: string | undefined): string {
 }
 
 export function listPath(journey: string, settings: ListSettings = DEFAULT_LIST, node?: string): string {
-  return `${withNode(`/journeys/${journey}/plan/list`, node)}${searchOf(listParams(settings))}`;
-}
-
-export function nextPath(journey: string, settings: NextSettings = DEFAULT_NEXT, node?: string): string {
-  return `${withNode(`/journeys/${journey}/next/list`, node)}${searchOf(nextParams(settings))}`;
+  return `${withNode(`/journeys/${journey}/list`, node)}${searchOf(listParams(settings))}`;
 }
 
 export function triagePath(journey: string, settings: TriageSettings = DEFAULT_TRIAGE, node?: string): string {
-  return `${withNode(`/journeys/${journey}/next/cards`, node)}${searchOf(triageParams(settings))}`;
+  return `${withNode(`/journeys/${journey}/walk`, node)}${searchOf(triageParams(settings))}`;
 }
 
 /**
- * C11: the decision walkthrough of `journey`, the cards with DECISIONS on. Starting a journey
+ * C11: the decision walkthrough of `journey`, the walk through with DECISIONS on. Starting a journey
  * opens it here (the creation flow, 5.5, navigates to this address once the journey exists),
  * and it can be launched any time from the journey's pages.
  */
