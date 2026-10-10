@@ -89,7 +89,7 @@ function Empty({ view, settings, stalled, onContinue }: { view: Ready; settings:
 
 /** The journey's pass, begun over its acting frontier the first time triage opens in this tab. */
 function usePass(view: Ready): [Pass, (pass: Pass) => void] {
-  // A pass kept by an earlier version of the app has no unlocks or acted-on nodes.
+  // A pass kept by an earlier version of the app has no unlocked or acted-on nodes.
   const [stored, setStored] = useDraft<Omit<Pass, "unlocked" | "acted"> & Partial<Pick<Pass, "unlocked" | "acted">>>(`triage-pass:${view.journey.header.id}`);
   const frontier = view.derived.acting_frontier;
   const pass = useMemo(() => (stored === undefined ? begin(frontier) : { ...stored, unlocked: stored.unlocked ?? [], acted: stored.acted ?? [] }), [stored, frontier]);
@@ -103,10 +103,10 @@ function usePass(view: Ready): [Pass, (pass: Pass) => void] {
 
 /**
  * Hears the writes sent while the pass is on screen, the card's and those made in a node opened
- * from it: each one's unlocks come next. Writes sent before the pass opened (on another page,
+ * from it: each one's unlocked nodes come next. Writes sent before the pass opened (on another page,
  * even if they land after) and writes in another tab are never heard.
  */
-function useUnlocks(journey: string, pass: Pass, setPass: (pass: Pass) => void): void {
+function useUnlocked(journey: string, pass: Pass, setPass: (pass: Pass) => void): void {
   const saves = useSaves();
   const { activity } = useSession();
   const opened = useRef(activity.began);
@@ -117,7 +117,7 @@ function useUnlocks(journey: string, pass: Pass, setPass: (pass: Pass) => void):
       return;
     }
     heard.current = Math.max(...fresh.map((save) => save.id));
-    const next = fresh.reduce((now, { unlocks }) => (unlocks?.journey === journey && unlocks.began > opened.current ? acted(now, unlocks.by, unlocks.nodes) : now), pass);
+    const next = fresh.reduce((now, { unlocked }) => (unlocked?.journey === journey && unlocked.began > opened.current ? acted(now, unlocked.by, unlocked.nodes) : now), pass);
     if (next !== pass) {
       setPass(next);
     }
@@ -174,7 +174,7 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
   const wide = useMedia(COLUMN);
   const journey = view.journey.header.id;
   const [pass, setPass] = usePass(view);
-  useUnlocks(journey, pass, setPass);
+  useUnlocked(journey, pass, setPass);
   const request = useMemo(() => ({ projection: "next" as const, query: triageQueryOf(settings) }), [settings]);
   const { value: next, error } = useProjected(view, request);
   const wanted = settings.text.trim().toLowerCase();

@@ -6,7 +6,7 @@
 import { submit, type HttpFailure, type Schema } from "@cairn/client";
 
 import type { Host, Markdown, Patch } from "./host.ts";
-import { consequenceLines, warningOf, type Activity, type ConsequenceLine, type TitleOf, type Unlocks } from "./activity.ts";
+import { consequenceLines, warningOf, type Activity, type ConsequenceLine, type TitleOf, type Unlocked } from "./activity.ts";
 import type { SkewLatch } from "./skew.ts";
 import type { SyncStatus } from "./sync.ts";
 
@@ -87,7 +87,7 @@ function subjectOf(mutation: Mutation): string | undefined {
  * a new entity may come before the action) and what it unlocked, for a pass over the acting
  * frontier; undefined when the write is about no node.
  */
-export function unlocksOf(intent: WriteIntent, answer: Schema<"PatchAnswer">, began: number): Unlocks | undefined {
+export function unlockedOf(intent: WriteIntent, answer: Schema<"PatchAnswer">, began: number): Unlocked | undefined {
   const journey = journeyOf(intent);
   const by = intent.mutations.map(subjectOf).find((node) => node !== undefined);
   if (journey === undefined || by === undefined) {
@@ -142,10 +142,10 @@ export interface WriteEnv {
  * Records a save of this tab: in Recent with the warning sentence its consequences call for
  * (D7), and on the chip as SAVED. The warning is what a receipt shows.
  */
-export function recordSave(env: Pick<WriteEnv, "activity" | "sync" | "titleOf">, text: string, lines: ConsequenceLine[], unlocks?: Unlocks): string | undefined {
+export function recordSave(env: Pick<WriteEnv, "activity" | "sync" | "titleOf">, text: string, lines: ConsequenceLine[], unlocked?: Unlocked): string | undefined {
   const warning = warningOf(lines, env.titleOf);
   const at = new Date();
-  env.activity.saved({ at, text, warning, unlocks });
+  env.activity.saved({ at, text, warning, unlocked });
   env.sync.saved(at.toLocaleTimeString([], { hour12: false }));
   return warning;
 }
@@ -179,7 +179,7 @@ export async function write(env: WriteEnv, intent: WriteIntent): Promise<WriteRe
   );
   switch (submitted.outcome) {
     case "landed": {
-      const warning = recordSave(env, describe(intent, titleOf), consequenceLines(submitted.answer), unlocksOf(intent, submitted.answer, began));
+      const warning = recordSave(env, describe(intent, titleOf), consequenceLines(submitted.answer), unlockedOf(intent, submitted.answer, began));
       sync.resolve(failedKey);
       return { ...submitted, warning };
     }

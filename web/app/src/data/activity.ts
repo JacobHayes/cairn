@@ -70,7 +70,7 @@ export function mayNotApply(unanswered: string[], title: (key: string) => string
 }
 
 /** D7: the node a save acted on and the nodes it newly brought onto the acting frontier (maybe none). */
-export interface Unlocks {
+export interface Unlocked {
   journey: string;
   by: string;
   nodes: string[];
@@ -123,7 +123,7 @@ export interface SaveEvent {
   /** The receipt's warning sentence, when the write had warning consequences. */
   warning: string | undefined;
   /** What the write acted on and unlocked, for a pass over the acting frontier (never shown as a warning). */
-  unlocks: Unlocks | undefined;
+  unlocked: Unlocked | undefined;
 }
 
 /** The saves the popover lists. */
