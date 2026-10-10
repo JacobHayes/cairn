@@ -20,6 +20,15 @@ import { defineConfig, type Plugin, type ProxyOptions } from "vite";
 const DESIGN = fileURLToPath(new URL("../../design", import.meta.url));
 
 /**
+ * The module's bindings are checked in (web/wasm/generated/), but its `.wasm` is only where
+ * `build:wasm` wrote both, and the bindings' own fallback names the `.wasm` beside them
+ * (`new URL("cairn_wasm_bg.wasm", import.meta.url)`). Bundling the bindings from there lets
+ * Vite resolve that URL, so it warns of nothing and the page's `?url` import (boot.ts) is the
+ * same fingerprinted file.
+ */
+const BINDGEN = fileURLToPath(new URL("../wasm/dist/bindgen", import.meta.url));
+
+/**
  * The fonts are SIL OFL 1.1, which asks that the license travel with them: the build carries
  * it beside the page, at `/fonts-LICENSE.txt`.
  */
@@ -52,11 +61,18 @@ export default defineConfig(({ command, mode }) => ({
   },
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [react(), fontLicense()],
-  resolve: { alias: { "@design": DESIGN } },
+  resolve: { alias: [{ find: "@design", replacement: DESIGN }, { find: /^.*\/generated\/cairn_wasm\.js$/, replacement: `${BINDGEN}/cairn_wasm.js` }] },
   logLevel: "warn",
   // `mise run build:web` writes dist/build/, which the binary embeds (crates/cairn/src/assets.rs),
   // and `mise run build:demo` dist/demo/; beside them sit the browser tests' reports.
-  build: { outDir: mode === "demo" ? "dist/demo" : "dist/build", emptyOutDir: true },
+  build: {
+    outDir: mode === "demo" ? "dist/demo" : "dist/build",
+    emptyOutDir: true,
+    // React and the router are most of what every page loads and change only with an upgrade, so
+    // they are one chunk of their own (cached across the app's releases); the screens and the
+    // graph (main.tsx, Projections.tsx) are loaded when first opened.
+    rolldownOptions: { output: { codeSplitting: { groups: [{ name: "react", test: /node_modules[\\/](react|react-dom|react-router|scheduler)[\\/]/ }] } } },
+  },
   // The browser tests run a dev server of each host side by side; each bundles into its own.
   cacheDir: `../../node_modules/.vite/app-${server === undefined ? "demo" : "server"}`,
   // The dev server bundles dependencies it finds by crawling from index.html, which never

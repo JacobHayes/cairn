@@ -3,10 +3,12 @@
 // column on the right (INSPECTOR | ASSISTANT; a bottom sheet on a tablet), and the 28px
 // strip with the sync chip. The frame is one `100dvh` grid with one scroller per
 // region (app.css); below 720px it is one scrolling column.
+import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
 import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
 import { InspectorColumn } from "./InspectorColumn.tsx";
+import { LoadFailure } from "./LoadFailure.tsx";
 import { SyncChip } from "./SyncChip.tsx";
 import { Toast } from "./Toast.tsx";
 import { useFrame, type Frame } from "./useFrame.ts";
@@ -66,7 +68,11 @@ export function Shell() {
           <Rail pathname={pathname} />
           <main className="workspace" data-screen={`${pathname}${search}`}>
             <div className="ws-body">
-              <Outlet />
+              <LoadFailure screen={pathname}>
+                <Suspense fallback={<p className="muted small">Loading...</p>}>
+                  <Outlet />
+                </Suspense>
+              </LoadFailure>
             </div>
             <Toast />
           </main>

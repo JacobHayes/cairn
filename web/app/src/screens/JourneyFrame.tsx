@@ -6,7 +6,7 @@
 // shows is in the address (journeys/address.ts, canvas/settings.ts), so every link keeps it.
 // Edit mode (5.6) adds the structure's editors: the node's structure in its detail, and
 // drawing a requirement between two cards.
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
@@ -25,7 +25,6 @@ import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { rememberProjection } from "../journeys/memory.ts";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
-import { InsertionCanvas } from "../segments/Preview.tsx";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
 import { summaryModel } from "../summary/model.ts";
 import { ActiveFilters } from "./ActiveFilters.tsx";
@@ -36,6 +35,8 @@ import { KeySheet } from "./KeySheet.tsx";
 import { useJourneyKeys } from "./keys.ts";
 import { CanvasBars, ProjectionBody, type ProjectionProps } from "./Projections.tsx";
 import "./screens.css";
+
+const InsertionCanvas = lazy(() => import("../segments/Preview.tsx").then((module) => ({ default: module.InsertionCanvas })));
 
 export interface FrameProps {
   id: string;
@@ -142,7 +143,11 @@ function InspectorSlot({
 /** The page's body: the segment being placed, drawn as review will draw it, while the stepper has a preview; else the page's own. */
 function Workspace({ ready, page, projection, selected, edge, authored, drawing, preview }: Pick<FrameProps, "page" | "projection" | "selected" | "edge"> & { ready: Ready; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; preview: InsertPreview | undefined }) {
   if (preview !== undefined) {
-    return <InsertionCanvas preview={preview} domain={ready.journey.header.id} today={ready.key.today} />;
+    return (
+      <Suspense fallback={<p className="muted small">Drawing the preview...</p>}>
+        <InsertionCanvas preview={preview} domain={ready.journey.header.id} today={ready.key.today} />
+      </Suspense>
+    );
   }
   if (page === "summary") {
     return <JourneyCard ready={ready} page={page} selected={selected} full />;

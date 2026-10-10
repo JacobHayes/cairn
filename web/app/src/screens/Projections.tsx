@@ -3,7 +3,7 @@
 // The graph with DECISIONS on is the decision view (C12): the same canvas at least at the
 // Decisions step, with everything else faded; its stalled surface and, in edit mode, the
 // structure's tools (5.6) are the head's (CanvasBars).
-import { useMemo } from "react";
+import { lazy, Suspense, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { listFrom, nextFrom, nextPath, triageFrom } from "../acting/address.ts";
@@ -14,12 +14,14 @@ import { JourneyAuthoringBar } from "../authoring/JourneyAuthoring.tsx";
 import type { useEdgeDrawing } from "../authoring/connect.tsx";
 import type { Authored } from "../authoring/target.ts";
 import { useProjected } from "../canvas/hooks.ts";
-import { JourneyCanvas } from "../canvas/JourneyCanvas.tsx";
 import { viewFrom } from "../canvas/settings.ts";
 import { StalledSurface } from "../canvas/Surfaces.tsx";
 import type { Ready } from "../detail/model.ts";
 import type { JourneyPage, Projection } from "../journeys/address.ts";
 import { TimelineChart, timelineFrom } from "../timeline/TimelineView.tsx";
+
+/** The graph and its library are the Plan page's alone: the Next page opens without them. */
+const JourneyCanvas = lazy(() => import("../canvas/JourneyCanvas.tsx").then((module) => ({ default: module.JourneyCanvas })));
 
 function ProjectedTimeline({ ready, selected }: { ready: Ready; selected: string | undefined }) {
   const { search } = useLocation();
@@ -81,5 +83,9 @@ export function ProjectionBody({ ready, page, projection, selected, edge, author
   if (projection === "timeline") {
     return <ProjectedTimeline ready={ready} selected={selected} />;
   }
-  return <JourneyCanvas ready={ready} view={viewFrom(params)} selected={selected} edge={edge} decisions={params.get("decisions") === "1"} onPick={authored === undefined ? undefined : drawing.pick} authored={authored} />;
+  return (
+    <Suspense fallback={<p className="muted small">Drawing the graph...</p>}>
+      <JourneyCanvas ready={ready} view={viewFrom(params)} selected={selected} edge={edge} decisions={params.get("decisions") === "1"} onPick={authored === undefined ? undefined : drawing.pick} authored={authored} />
+    </Suspense>
+  );
 }

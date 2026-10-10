@@ -6,7 +6,7 @@ import "@design/tokens.css";
 import "@design/base.css";
 import "./ui/app.css";
 
-import { StrictMode } from "react";
+import { lazy, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router";
 
@@ -17,16 +17,17 @@ import { SessionContext } from "./data/react.ts";
 import type { Session } from "./data/session.ts";
 import { Home } from "./journeys/Home.tsx";
 import { JourneyIndex } from "./journeys/JourneyIndex.tsx";
-import { MineScreen } from "./journeys/MineScreen.tsx";
-import { NewJourney } from "./journeys/NewJourney.tsx";
-import { Entities } from "./people/Entities.tsx";
-import { ProposalScreen } from "./proposals/ProposalScreen.tsx";
-import { Identity } from "./people/Identity.tsx";
-import { RouteDetailPage } from "./routes/RouteDetail.tsx";
-import { Library } from "./routes/Library.tsx";
-import { BarePageRoute, JourneyDeepLink, JourneyLanding, JourneyPageRoute, LegacyRoute, SummaryRoute } from "./screens/JourneyRoutes.tsx";
-import { RouteCanvasPage, RouteNodeRedirect } from "./screens/RouteCanvasPage.tsx";
+import { BarePageRoute, JourneyDeepLink, JourneyLanding, JourneyPageRoute, LegacyRoute, RouteNodeRedirect, SummaryRoute } from "./screens/JourneyRoutes.tsx";
 import { Shell } from "./shell/Shell.tsx";
+
+const MineScreen = lazy(() => import("./journeys/MineScreen.tsx").then((module) => ({ default: module.MineScreen })));
+const NewJourney = lazy(() => import("./journeys/NewJourney.tsx").then((module) => ({ default: module.NewJourney })));
+const Entities = lazy(() => import("./people/Entities.tsx").then((module) => ({ default: module.Entities })));
+const Identity = lazy(() => import("./people/Identity.tsx").then((module) => ({ default: module.Identity })));
+const ProposalScreen = lazy(() => import("./proposals/ProposalScreen.tsx").then((module) => ({ default: module.ProposalScreen })));
+const Library = lazy(() => import("./routes/Library.tsx").then((module) => ({ default: module.Library })));
+const RouteDetailPage = lazy(() => import("./routes/RouteDetail.tsx").then((module) => ({ default: module.RouteDetailPage })));
+const RouteCanvasPage = lazy(() => import("./screens/RouteCanvasPage.tsx").then((module) => ({ default: module.RouteCanvasPage })));
 
 function App({ session, layouts }: { session: Session; layouts: Layouts }) {
   return (

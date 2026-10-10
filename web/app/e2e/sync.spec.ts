@@ -4,7 +4,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 import { openNode, pin } from "./detail.ts";
-import { fresh, goWithin, hold, live, nodeCard, openJourney, rename, save, startRename, syncChip } from "./shell.ts";
+import { fresh, goWithin, hold, live, nodeCard, open, openJourney, rename, save, startRename, syncChip } from "./shell.ts";
 
 const title = (page: Page, node: string) => nodeCard(page, node).getByTestId("title");
 
@@ -26,6 +26,16 @@ test("a rejected change waits under needs-you wherever you go; Go to it returns,
   await page.getByTestId("sync-popover").getByRole("button", { name: "Discard" }).click();
   await expect(page.getByTestId("date-conflict")).toHaveCount(0);
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
+});
+
+test("a screen whose file is gone after a deployment asks for a reload, and another screen still opens", async ({ page }) => {
+  await open(page, "browser", "/journeys");
+  await page.route(/\/(src\/people|assets)\/Entities[.-]/, (route) => route.abort());
+  await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Entities" }).click();
+  await expect(page.getByTestId("load-failure").getByRole("button", { name: "Reload" })).toBeVisible();
+  await expect(syncChip(page)).toBeVisible();
+  await goWithin(page, "/journeys");
+  await expect(page.getByTestId("load-failure")).toHaveCount(0);
 });
 
 test("a write in flight, a revision on its way, and one that cannot be fetched", { tag: "@server" }, async ({ context }) => {

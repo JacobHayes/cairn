@@ -10,7 +10,7 @@ import "./screens.css";
 
 import type { Schema } from "@cairn/client";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { Link, Navigate, useLocation, useNavigate, useParams } from "react-router";
+import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { ruleFoot } from "../authoring/dates.ts";
@@ -73,13 +73,6 @@ export function routeCanvasPath(route: string, version: number | undefined, view
 /** A draft node's form in the inspector beside the route's canvas, keeping what the canvas shows. */
 export function routeNodePath(route: string, view: CanvasView, node: string): string {
   return `/routes/${route}/draft/nodes/${node}${searchOf(view)}`;
-}
-
-/** An earlier address of a draft node's form, `/routes/<id>/nodes/<key>`, opens it at the draft's. */
-export function RouteNodeRedirect() {
-  const { id = "", key = "" } = useParams();
-  const { search } = useLocation();
-  return <Navigate replace to={`/routes/${id}/draft/nodes/${key}${search}`} />;
 }
 
 /** Route `id`'s draft, or `version` (the latest when no draft is open), read again as it moves. */

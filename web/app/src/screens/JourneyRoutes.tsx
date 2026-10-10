@@ -96,3 +96,10 @@ export function LegacyRoute() {
   const to = legacyRedirect(pathname, search);
   return to === undefined ? <p className="callout">There is no such page.</p> : <Navigate replace to={to} />;
 }
+
+/** An earlier address of a draft node's form, `/routes/<id>/nodes/<key>`, opens it at the draft's. */
+export function RouteNodeRedirect() {
+  const { id = "", key = "" } = useParams();
+  const { search } = useLocation();
+  return <Navigate replace to={`/routes/${id}/draft/nodes/${key}${search}`} />;
+}
