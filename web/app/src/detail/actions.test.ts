@@ -7,7 +7,7 @@ import { resolvedAnswer } from "./AnswerEditor.tsx";
 import { isComplete } from "./contributions.ts";
 import { answerInEffect } from "./editors.tsx";
 import type { Mutation } from "./model.ts";
-import { bypassable, withMove } from "./Rejected.tsx";
+import { bypassable, bypassReady, violatingNode, withMove } from "./Rejected.tsx";
 import { entityName } from "./sections.tsx";
 import { testView } from "./view.test-support.ts";
 import { writesEntities } from "./write.ts";
@@ -24,6 +24,15 @@ describe("resolving a rejection", () => {
     const pin: Mutation = { op: "set_pin", node: "n_report", date: "2026-11-25" };
     const move: Mutation = { op: "shift_pin", node: "n_report", offset_days: -5 };
     expect(withMove({ mutations: [pin], base: 4, deployment: 2 }, move)).toEqual([pin, move]);
+  });
+
+  it("names the node each violation of a patch over several nodes is on (C9)", () => {
+    expect(violatingNode(violation("n_final_report"))).toBe("n_final_report");
+    expect(violatingNode({ code: "duplicate_key", at: {}, message: "no subject" })).toBeUndefined();
+  });
+
+  it("takes a reason before finishing past a guard (D4)", () => {
+    expect([bypassReady(""), bypassReady("  "), bypassReady("Reviewed out of band")]).toEqual([false, false, true]);
   });
 
   it("offers a bypass for each node's bypassable guards, each once", () => {

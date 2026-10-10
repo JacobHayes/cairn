@@ -146,6 +146,21 @@ describe("a journey's faults", () => {
     expect(revisionShown(session, "j_one")).toEqual([4, 1, TODAY]);
   });
 
+  it("is asked again at once by a click on BEHIND, without waiting out the delay", async () => {
+    const { host, session } = await started();
+    session.journeys.mount("j_one");
+    await settled();
+    host.open();
+    host.failNext = true;
+    edit(host, "j_one", 4);
+    await settled();
+    expect(revisionShown(session, "j_one")).toEqual([3, 1, TODAY]);
+    session.subscription.reopen();
+    host.open();
+    await settled();
+    expect(revisionShown(session, "j_one")).toEqual([4, 1, TODAY]);
+  });
+
   it("deleted (listed at revision 0 by a stream's current revisions) shows missing", async () => {
     const { host, session } = await started();
     session.journeys.mount("j_one");

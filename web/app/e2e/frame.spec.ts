@@ -4,7 +4,7 @@
 // pan. On the in-browser host.
 import { expect, test, type Page } from "@playwright/test";
 
-import { nodePanel, open, openAt, openJourney } from "./shell.ts";
+import { nodeCard, nodePanel, openAt, openJourney } from "./shell.ts";
 
 /** Opens History in `node`'s inspector and scrolls it to its end the way a person does: the wheel over it. */
 async function reachHistory(page: Page, node: string, height: number): Promise<void> {
@@ -27,15 +27,31 @@ async function reachHistory(page: Page, node: string, height: number): Promise<v
 }
 
 // The inspector is one component and the CSS lint holds each region to one scroller, so one
-// screen per width guards it: a canvas at the desktop, the summary on a tablet, and the sheet
-// over a phone's map.
-test("the plan graph's inspector scrolls to the end of History at 1440px", async ({ page }) => {
+// screen per width guards it: a canvas at the desktop, the summary on a tablet, and (below)
+// the sheet over a phone's map.
+test("the inspector scrolls to the end of History at 1440 and 1024px, a node opens at its top, and the page behind never scrolls", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 768 });
-  await openAt(page, "browser", "j_vendor_eval", "plan/graph", { node: "n_plan" });
+  await openAt(page, "browser", "j_vendor_eval", "plan/graph?detail=all", { node: "n_plan" });
   await reachHistory(page, "n_plan", 768);
-});
+  // The next node opens at its header, not part-way down this one's long body.
+  // The card may be off screen: the click is sent to it, as panning to it would.
+  await nodeCard(page, "n_access").getByTestId("card-open").dispatchEvent("click");
+  await expect(nodePanel(page, "n_access")).toBeVisible();
+  await expect.poll(() => page.locator('[data-pane="inspector"]').evaluate((element) => element.scrollTop)).toBe(0);
 
-test("on a tablet the summary's inspector reaches History, the screen's end is above the sheet, and Esc closes it", async ({ page }) => {
+  // The decision graph takes the wheel to pan, and the page behind it does not scroll.
+  await openAt(page, "browser", "j_vendor_eval", "plan/graph?decisions=1");
+  const canvas = page.getByTestId("canvas");
+  const viewport = canvas.locator(".react-flow__viewport");
+  const before = await viewport.evaluate((element) => (element as HTMLElement).style.transform);
+  const box = await canvas.boundingBox();
+  await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2);
+  await page.mouse.wheel(0, 300);
+  await expect.poll(() => viewport.evaluate((element) => (element as HTMLElement).style.transform)).not.toBe(before);
+  const region = page.locator(".ws-body");
+  expect(await region.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1);
+
+  // On a tablet the summary's inspector reaches History, the screen's end is above the sheet, and Esc closes it.
   await page.setViewportSize({ width: 1024, height: 700 });
   await openAt(page, "browser", "j_vendor_eval", "summary", { node: "n_plan" });
   await reachHistory(page, "n_plan", 700);
@@ -48,20 +64,6 @@ test("on a tablet the summary's inspector reaches History, the screen's end is a
   await page.keyboard.press("Escape");
   await expect(nodePanel(page, "n_plan")).toHaveCount(0);
   await expect(page).toHaveURL(/\/journeys\/j_vendor_eval\/summary$/);
-});
-
-test("the decision graph takes the wheel to pan, and the page behind it does not scroll", async ({ page }) => {
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await openAt(page, "browser", "j_vendor_eval", "plan/graph?decisions=1");
-  const canvas = page.getByTestId("canvas");
-  const viewport = canvas.locator(".react-flow__viewport");
-  const before = await viewport.evaluate((element) => (element as HTMLElement).style.transform);
-  const box = await canvas.boundingBox();
-  await page.mouse.move((box?.x ?? 0) + (box?.width ?? 0) / 2, (box?.y ?? 0) + (box?.height ?? 0) / 2);
-  await page.mouse.wheel(0, 300);
-  await expect.poll(() => viewport.evaluate((element) => (element as HTMLElement).style.transform)).not.toBe(before);
-  const region = page.locator(".ws-body");
-  expect(await region.evaluate((element) => element.scrollHeight - element.clientHeight)).toBeLessThanOrEqual(1);
 });
 
 test.describe("a phone's map", () => {
@@ -122,11 +124,4 @@ test.describe("a phone's map", () => {
     await reachHistory(page, "n_make_offer", 844);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
-});
-
-test("on a phone a short page still ends with the strip at the screen's bottom edge", async ({ page }) => {
-  await page.setViewportSize({ width: 390, height: 844 });
-  await open(page, "browser", "/me");
-  const strip = await page.locator(".strip").boundingBox();
-  expect((strip?.y ?? 0) + (strip?.height ?? 0)).toBeCloseTo(844, 0);
 });

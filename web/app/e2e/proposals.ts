@@ -58,15 +58,6 @@ export function reviewItem(page: Page, item: string, node: string): Locator {
   return page.locator(`[data-testid="review-item"][data-item="${item}"][data-node="${node}"]`);
 }
 
-/** Opens the proposal card's folded list of every change, where the changes are edited and added. */
-export async function openChanges(page: Page): Promise<Locator> {
-  const changes = page.getByTestId("all-changes");
-  if ((await changes.getAttribute("open")) === null) {
-    await changes.locator("summary").first().click();
-  }
-  return changes;
-}
-
 /** The inspector's body scrolls to its end under the wheel, and neither the page nor the workspace scrolls with it (each region scrolls once). */
 export async function scrollsOnce(page: Page): Promise<void> {
   const body = page.locator('.inspector-body[data-pane="inspector"]');

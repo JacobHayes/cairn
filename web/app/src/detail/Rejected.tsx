@@ -46,6 +46,11 @@ export function violatingNode(violation: Violation): string | undefined {
   return subject != null && typeof subject === "object" && "node" in subject ? subject.node : undefined;
 }
 
+/** D4: finishing past a guard takes a reason, so the bypass waits until one is typed. */
+export function bypassReady(reason: string): boolean {
+  return reason.trim() !== "";
+}
+
 /** D4: the guards a bypass would accept the rejected patch past, each once, on the node it is for. */
 export function bypassable(violations: Violation[]): { node: string; guards: Guard[] }[] {
   const byNode = new Map<string, Guard[]>();
@@ -101,7 +106,7 @@ function Bypass({ write, node, guards, onResolved }: Omit<Resolving, "view"> & {
       <span>Do it anyway, bypassing {guards.join(", ")}:</span>
       <Field aria-label="Why bypass the guard" placeholder="Why" value={reason} onChange={(event) => { setReason(event.target.value); }} />
       <Button
-        disabled={write.disabled || reason.trim() === ""}
+        disabled={write.disabled || !bypassReady(reason)}
         onClick={() => {
           retry(write, [override, ...failed.attempt.mutations], failed.attempt, () => {
             setReason(undefined);

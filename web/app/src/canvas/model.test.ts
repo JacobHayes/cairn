@@ -87,6 +87,12 @@ describe("C1: what a card says", () => {
   });
 });
 
+describe("a route's canvas (8.11)", () => {
+  test("draws cards with no journey state, by the same level", () => {
+    expect(cardsOf(wholeLevel(), graph).map((each) => each.journey)).toEqual(whole.cards.map(() => undefined));
+  });
+});
+
 describe("C1: lines", () => {
   test.each([
     ["n_option->n_build", "requires", undefined, "arrow", "Build it needs Optional extra"],

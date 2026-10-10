@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { treeOf, type Graph, type GraphNode } from "../authoring/graph.ts";
-import { NO_CHOICES, planInsertion, type Choices } from "./model.ts";
+import { NO_CHOICES, memberOrigin, originLines, planInsertion, type Choices } from "./model.ts";
 
 const node = (key: string, extra: Partial<GraphNode> = {}): GraphNode => ({ key, id: key.replace("n_", ""), kind: "decision", title: key, ...extra });
 
@@ -48,5 +48,17 @@ describe("what the stepper sends", () => {
     const host = { roles: [{ key: "r_panel", id: "reviewer", multi: true }] } as Graph;
     const [row] = plan(host, segment(false)).rows;
     expect(row).toMatchObject({ mapping: "add", options: [] });
+  });
+});
+
+describe("where a member came from (C8)", () => {
+  const insertion = { key: "i_one", segment: { route: "security-review", version: 1 }, nodes: { n_review: "review", n_threat: "threat" } };
+  const graph = { nodes: [node("n_review", { kind: "group" }), node("n_threat", { parent: "n_review" })], insertions: [insertion] } as unknown as Graph;
+
+  it("names the segment and version, and says when a newer version is published", () => {
+    const origin = memberOrigin(graph, "n_threat");
+    expect(origin && originLines(origin, { segment: "Security review", parent: undefined }, 1)).toEqual(["From segment Security review, version 1."]);
+    expect(origin && originLines(origin, { segment: "Security review", parent: undefined }, 2)).toEqual(["From segment Security review, version 1.", "Version 2 is available."]);
+    expect(memberOrigin(graph, "n_other")).toBeUndefined();
   });
 });

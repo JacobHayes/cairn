@@ -146,6 +146,63 @@ fn hidden_actions_roll_up_and_their_edge_onto_one_node_is_dropped() {
     assert!(!drawn.iter().any(|(from, _, _)| *from == "n_plan_draft"));
 }
 
+/// C2: the scenario's end at the Work step (stages, decisions, deliverables, milestones): each
+/// node is drawn under its container (a node settled not relevant too: the page hides it), and
+/// the hidden actions are in their deliverable's progress.
+#[test]
+fn the_scenarios_end_at_the_work_step_draws_each_node_in_its_container() {
+    let records = support::finished("vendor-evaluation");
+    let work = level(
+        &records,
+        VENDOR,
+        &[
+            NodeKind::Group,
+            NodeKind::Decision,
+            NodeKind::Deliverable,
+            NodeKind::Milestone,
+        ],
+        None,
+    );
+    let top = [
+        "n_decision_meeting",
+        "n_kickoff",
+        "n_meeting_date",
+        "n_partner_runs",
+        "n_purpose",
+        "n_reporting",
+        "n_setup",
+        "n_testing",
+        "n_who_informed",
+        "n_who_owns",
+    ];
+    let inside = [
+        ("n_final_review", "n_reporting"),
+        ("n_final_report", "n_final_review"),
+        ("n_findings", "n_reporting"),
+        ("n_findings_reviewer", "n_reporting"),
+        ("n_review_opens", "n_reporting"),
+        ("n_access", "n_setup"),
+        ("n_plan", "n_setup"),
+        ("n_workload", "n_setup"),
+        ("n_workload_ingest", "n_workload"),
+        ("n_workload_query", "n_workload"),
+        ("n_baseline", "n_testing"),
+        ("n_comparison_set", "n_testing"),
+        ("n_partner_led", "n_testing"),
+    ];
+    let expected: BTreeMap<&str, Option<&str>> = top
+        .into_iter()
+        .map(|node| (node, None))
+        .chain(
+            inside
+                .into_iter()
+                .map(|(node, parent)| (node, Some(parent))),
+        )
+        .collect();
+    assert_eq!(placement(&work), expected);
+    assert_eq!(names(&node(&work, "n_plan").rolled_up).len(), 2);
+}
+
 /// C2: with groups hidden, the roots Setup, Testing, and Reporting are hidden, so their
 /// contents are drawn at the top level; the openings and the requirement on Reporting have no
 /// visible stand-in and are left off, so every node they block carries the hidden-prerequisites

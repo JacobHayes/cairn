@@ -2,10 +2,12 @@
 // the journeys referring to the caller's entities, active only (B11), or nothing at all.
 import { describe, expect, it } from "vitest";
 
-import { paramsOf, revealing, viewFrom } from "../canvas/settings.ts";
+import { DEFAULT_VIEW, paramsOf, revealing, viewFrom } from "../canvas/settings.ts";
+import { screenPath } from "../detail/parts.tsx";
 import {
   DEFAULT_FILTERS,
   carriedSearch,
+  deepLinkTarget,
   filterParams,
   filtersFrom,
   landingPath,
@@ -87,6 +89,17 @@ describe("the journey's pages (2.2, 2.3)", () => {
     expect(carriedSearch(search, "plan", "graph")).toBe("?decisions=1");
     expect(carriedSearch(search, "plan", "timeline")).toBe("?decisions=1&mine=1&q=plan");
     expect(carriedSearch("?sort=due", "plan", "list")).toBe("");
+  });
+
+  it("sends the address agents post for a node to the page that shows it, with its containers open (2.4)", () => {
+    expect(deepLinkTarget("j_a", "n_x", { onFrontier: true, reveal: DEFAULT_VIEW })).toBe("/journeys/j_a/next/list/nodes/n_x");
+    expect(deepLinkTarget("j_a", "n_x", { onFrontier: false, reveal: { ...DEFAULT_VIEW, open: ["n_p", "n_q"] } })).toBe("/journeys/j_a/plan/graph/nodes/n_x?open=n_p%2Cn_q");
+  });
+
+  it("closes a node's detail to the screen it opened on (C12)", () => {
+    expect(screenPath("/journeys/j_a/plan/graph/nodes/n_x")).toBe("/journeys/j_a/plan/graph");
+    expect(screenPath("/journeys/j_a/plan/graph/edges/n_x~n_y")).toBe("/journeys/j_a/plan/graph");
+    expect(screenPath("/journeys/j_a/summary")).toBe("/journeys/j_a/summary");
   });
 
   it("opens a journey with nothing recorded and a decision to make on the walkthrough (C11)", () => {

@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Mutation } from "../detail/model.ts";
 import { actingView } from "./acting.test-support.ts";
-import { actsFor, assignOwner, bulkPlan, doneMutations, factsOf, hasArtifact, hasNote, missingEvidence, runBulk, selectionOf, type Act, type BulkAction, type Facts } from "./acts.ts";
+import { actsFor, assignOwner, bulkPlan, doneMutations, evidenceComplete, factsOf, hasArtifact, hasNote, missingEvidence, runBulk, selectionOf, type Act, type BulkAction, type Facts } from "./acts.ts";
 
 const view = actingView();
 
@@ -63,6 +63,16 @@ describe("C11 done with its artifact (G2) or note (G4)", () => {
     expect(missingEvidence(others, facts("n_log").node).note).toBe(true);
     const own = annotated([{ body: { key: "a_own", node: "n_log", note: "Written up." }, created_by: "u_one", created_at: "2026-10-01T00:00:00Z" }]);
     expect(missingEvidence(own, facts("n_log").node).note).toBe(false);
+  });
+});
+
+describe("C11 the done form (G2, G4)", () => {
+  it("waits for each piece of evidence the node needs, and takes none it does not", () => {
+    const both = { artifact: true, note: true };
+    expect(evidenceComplete({ artifact: false, note: true }, { artifact: "", note: "  " })).toBe(false);
+    expect(evidenceComplete({ artifact: false, note: true }, { artifact: "", note: "Covered it." })).toBe(true);
+    expect(evidenceComplete(both, { artifact: "https://example.org/out", note: "" })).toBe(false);
+    expect(evidenceComplete(both, { artifact: "https://example.org/out", note: "Covered it." })).toBe(true);
   });
 });
 

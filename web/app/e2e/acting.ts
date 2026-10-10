@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { expect, type Locator, type Page } from "@playwright/test";
 
 import { fixtureRoute } from "./around.ts";
-import { derivedRevision, fresh, importIntoLibrary, open, openAt, openFilter, type HostKind } from "./shell.ts";
+import { derivedRevision, fresh, importIntoLibrary, open, openAt, type HostKind } from "./shell.ts";
 
 /** Opens journey `journey`'s projection at `path` (`next/list`, `plan/list`, `next/cards`, with a query) on `host`, once derived. */
 export async function openActing(page: Page, host: HostKind, journey: string, path: string): Promise<void> {
@@ -45,17 +45,6 @@ export async function passOrder(page: Page): Promise<string[]> {
 /** The focus card. */
 export function card(page: Page): Locator {
   return page.getByTestId("triage-card");
-}
-
-/**
- * Turns the filter checkbox `testId` on, in the toolbar's filter: a filter changes the address,
- * and the box follows it once the screen reads the new address.
- */
-export async function turnOn(page: Page, testId: string): Promise<void> {
-  await openFilter(page);
-  const control = page.getByTestId(testId);
-  await control.locator("input").click();
-  await expect(control).toHaveAttribute("data-status", "on");
 }
 
 /** Selects node `node`'s row on the list, opening the tree if it is folded away. */

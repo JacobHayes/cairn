@@ -1,16 +1,17 @@
 #!/usr/bin/env bash
-#MISE description="Rung 6: web unit tests (Vitest, one suite per web package with a vitest.config.ts), the binary with its web build embedded, and in-browser end-to-end against the wasm host and the binary (Playwright in Chromium, one suite per web package with a playwright.config.ts)"
-# PRACTICES, The validation ladder, rung 6. The browser host's tests (brief 4.5) need the
-# module (mise run build:wasm) and the server's answers to compare with (the cairn-wasm-cases
-# binary, which walks the fixtures through the service natively); both are build outputs
-# under web/wasm/dist/. The app's tests (brief 4.6) need the module and the binary.
+#MISE description="Rung 6: web unit tests (Vitest, one suite per web package with a vitest.config.ts: the browser host's agreement tests run in Node), the binary with its web build embedded, and in-browser end-to-end of the app against the wasm host and the binary (Playwright in Chromium, one suite per web package with a playwright.config.ts)"
+# PRACTICES, The validation ladder, rung 6. The browser host's tests (brief 4.5) run in Node
+# and need the module (mise run build:wasm) and the server's answers to compare with (the
+# cairn-wasm-cases binary, which walks the fixtures through the service natively:
+# scripts/agreement-cases); both are build outputs under web/wasm/dist/. The app's tests
+# (brief 4.6) need the module and the binary.
 # The binary (brief 4.7) embeds the app's build (web/app/dist/build/): its own tests that start
 # it (`mod binary` in crates/cairn/tests/integration/binary.rs, so `binary::binary::`) are a
 # suite here, and the app's server-host tests run against `cairn demo`, the same binary over
 # the fixtures in memory (the `server` project of web/app/playwright.config.ts).
 # The module is built first: web unit tests (Vitest, from 4.6) run next, one suite per web
 # package with a vitest.config.ts, and the authoring tests (5.6) check the editors against
-# the module's engine; then each web package with a playwright.config.ts is a suite. A suite
+# the module's engine; then each web package with a playwright.config.ts is a suite (the app). A suite
 # that runs no test, or any test that fails or is skipped, fails the rung. The browsers are
 # Playwright's own, pinned with @playwright/test: `npx playwright install chromium` once per
 # machine.
@@ -28,9 +29,17 @@ ladder_require_tool vitest node_modules/.bin/vitest --version
 export CARGO_TERM_COLOR=never
 
 ladder_run "the browser host's module build" mise run build:wasm
+# The server's answers for web/wasm's tests are made beside the other web unit tests, which do
+# not read them, and only that suite waits for them.
+scripts/agreement-cases &
+cases=$!
+trap 'ladder_exit $?; kill "$cases" 2>/dev/null || true' EXIT
 
 for config in web/*/vitest.config.ts; do
   package=$(dirname "$config")
+  if [ "$package" = web/wasm ]; then
+    wait "$cases" || ladder_fail "the server's agreement cases were not written"
+  fi
   report="$PWD/$package/dist/vitest.json"
   mkdir -p "$package/dist"
   rm -f "$report"
@@ -59,26 +68,6 @@ done
 ladder_run "the app's web build" bash -c 'cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts'
 [ -f web/app/dist/build/index.html ] || ladder_fail "the app's web build wrote no index.html"
 ladder_run "the build of the binary" cargo build --locked --quiet -p cairn
-# The server's answers the browser host's tests compare with: cairn-wasm-cases walks the
-# fixtures through the service. It runs beside the binary's and the app's
-# tests, which do not read its output, and only web/wasm's suite waits for it. Its output is a
-# function of the crates it links and the fixtures, so it is kept under web/wasm/dist/cases
-# with a hash of those inputs (cases.hash, written only after a complete run), and a run whose
-# inputs are unchanged, as in most changes to the app alone, reuses it. Any file under the
-# crates, the fixtures, or the workspace's manifests, lock file, and toolchain pin changes the hash.
-cases_inputs=(crates/engine crates/schema crates/service crates/store crates/wasm fixtures Cargo.toml Cargo.lock mise.toml)
-cases_hash=$(find "${cases_inputs[@]}" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
-cases=
-if [ "$(cat web/wasm/dist/cases.hash 2>/dev/null || true)" = "$cases_hash" ] && [ -n "$(ls web/wasm/dist/cases 2>/dev/null)" ]; then
-  ladder_say "the server's agreement cases: inputs unchanged, reusing web/wasm/dist/cases"
-else
-  rm -f web/wasm/dist/cases.hash
-  {
-    cargo run --locked --quiet --profile test -p cairn-wasm --features server --bin cairn-wasm-cases -- web/wasm/dist/cases && printf '%s\n' "$cases_hash" >web/wasm/dist/cases.hash
-  } &
-  cases=$!
-fi
-trap 'ladder_exit $?; [ -z "$cases" ] || kill "$cases" 2>/dev/null || true' EXIT
 
 ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
 ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
@@ -86,9 +75,6 @@ ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
 for config in web/*/playwright.config.ts; do
   package=$(dirname "$config")
   report="$PWD/$package/dist/playwright.json"
-  if [ "$package" = web/wasm ]; then
-    [ -z "$cases" ] || wait "$cases" || ladder_fail "the server's agreement cases were not written"
-  fi
   status=0
   rm -f "$report"
   # The dot reporter prints a dot per test and the failures; the JSON report is for the

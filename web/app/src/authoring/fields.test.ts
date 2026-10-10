@@ -98,6 +98,12 @@ describe("changesOf", () => {
     expect(changesOf(renamedElsewhere, { ...draft, title: "Report" }, new Set(["description"])).map((change) => change.field)).toEqual(["description"]);
   });
 
+  it("counts a choice added to a decision as one change, sent as the whole list (A4)", () => {
+    const decision: GraphNode = { ...node("decision", "single_choice"), choices: ["one", "two", "three"] };
+    const draft: NodeDraft = { ...draftOf(decision), choices: [...draftOf(decision).choices, { id: "report", title: "Industry report" }] };
+    expect(changesOf(decision, draft).map((change) => change.field)).toEqual(["choices"]);
+  });
+
   it("replaces a decision whole when its answer type changes, which the engine accepts", async () => {
     const host = await seeded();
     const decision = node("decision", "boolean");

@@ -1,21 +1,23 @@
 // The shell on the server host, against `cairn demo` (the `server` project of
-// playwright.config.ts): views stay current across pages (H6), writes from different
-// pages meet through the safe retry (H5), a deployment tick re-derives, and a document from a
-// newer engine stops the tab (version skew). The index and owner cases are
-// around-server.spec.ts's (5.5).
-import { expect, test, type APIRequestContext, type Page } from "@playwright/test";
+// playwright.config.ts): what only a live server shows. Writes from different pages meet
+// through the safe retry and the conflict (H5), a later page and a page on the index follow
+// what another wrote (H6), a deployment tick re-derives what it moved, and an identity
+// signed in at the demo's stub issuer links to the user (H3). Each test makes what it
+// changes, so the fixtures other tests read stay as seeded.
+import { expect, test, type APIRequestContext } from "@playwright/test";
 
+import { startVendorJourney } from "./acting.ts";
+import { addEntity, mergeEntities } from "./around.ts";
+import { section } from "./detail.ts";
 import {
   countDocumentFetches,
-  derived,
   derivedRevision,
   fresh,
   goTo,
-  goWithin,
   live,
   nodeCard,
-  nodePanel,
   open,
+  openFromCanvas,
   openJourney,
   rename,
   renameOf,
@@ -24,12 +26,13 @@ import {
   syncChip,
 } from "./shell.ts";
 
-const title = (page: Page, node: string) => nodeCard(page, node).getByTestId("title");
+const title = (page: Parameters<typeof nodeCard>[0], node: string) => nodeCard(page, node).getByTestId("title");
 
-test("edits to different nodes both land", { tag: "@server" }, async ({ context }) => {
+test("edits to different nodes both land, and edits to one field surface a conflict", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await openJourney(one, "server", "j_hiring");
   await openJourney(two, "server", "j_hiring");
+  // A stale write to another node is retried and lands with no conflict.
   const [offer, screen] = [fresh("Offer"), fresh("Screen")];
   await startRename(two, "n_screen", screen);
   await rename(one, "n_offer", offer);
@@ -37,16 +40,8 @@ test("edits to different nodes both land", { tag: "@server" }, async ({ context 
   await save(two, "n_screen");
   await expect(title(two, "n_screen")).toHaveText(screen);
   await expect(two.getByTestId("conflict")).toHaveCount(0);
-  for (const page of [one, two]) {
-    await expect(title(page, "n_offer")).toHaveText(offer);
-    await expect(title(page, "n_screen")).toHaveText(screen);
-  }
-});
-
-test("edits to one field surface a conflict", { tag: "@server" }, async ({ context }) => {
-  const [one, two] = [await context.newPage(), await context.newPage()];
-  await openJourney(one, "server", "j_hiring");
-  await openJourney(two, "server", "j_hiring");
+  await expect(title(one, "n_screen")).toHaveText(screen);
+  // One to the same field is not: it is shown beside the other's, and kept on the current version when asked.
   const [theirs, mine] = [fresh("Theirs"), fresh("Mine")];
   await startRename(two, "n_onsite", mine);
   await rename(one, "n_onsite", theirs);
@@ -61,7 +56,7 @@ test("edits to one field surface a conflict", { tag: "@server" }, async ({ conte
   await expect(title(one, "n_onsite")).toHaveText(mine);
 });
 
-test("a later page shows the edit", { tag: "@server" }, async ({ context }) => {
+test("a later page shows the edit, and a page on the index shows a journey started elsewhere", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   const fetched = countDocumentFetches(two, "j_launch");
   await openJourney(one, "server", "j_launch");
@@ -71,6 +66,9 @@ test("a later page shows the edit", { tag: "@server" }, async ({ context }) => {
   await expect(title(two, "n_docs")).toHaveText(renamed);
   await two.getByRole("link", { name: "Journeys" }).click();
   await expect(two.getByRole("link", { name: "Launch the reporting release" })).toBeVisible();
+  // The index is live: a journey started in the other page is listed with no reload.
+  const started = await startVendorJourney(one);
+  await expect(two.locator(`[data-testid="journey-row"][data-journey="${started}"]`)).toBeVisible();
   await two.getByRole("link", { name: "Launch the reporting release" }).click();
   await goTo(two, "plan", "graph");
   await expect(title(two, "n_docs")).toHaveText(renamed);
@@ -82,120 +80,70 @@ test("a later page shows the edit", { tag: "@server" }, async ({ context }) => {
   expect(fetched()).toBe(2);
 });
 
-/** Creates an entity through the API: a deployment patch, which moves the deployment revision. */
-async function createEntity(request: APIRequestContext): Promise<number> {
+const patchId = () => `p_${crypto.randomUUID().replaceAll("-", "")}`;
+
+/** An empty journey with one action owned by `owner`, made through the API; its id. */
+async function journeyOwnedBy(request: APIRequestContext, owner: string): Promise<string> {
   const deployment = (await (await request.get("/api/deployment")).json()) as { revision: number };
-  const suffix = Math.random().toString(36).slice(2, 10);
-  const patch = {
-    id: `p_entity_${suffix}`,
-    target: "deployment",
-    base_revision: deployment.revision,
-    mutations: [{ op: "create_entity", entity: { key: `e_probe_${suffix}`, name: `Probe ${suffix}` } }],
-  };
-  const response = await request.post("/api/deployment/patches", { data: { patch } });
-  expect(response.status()).toBe(200);
-  return deployment.revision + 1;
+  const id = `j_${fresh("owned").replace(/\W/g, "_").toLowerCase()}`;
+  const response = await request.post(`/api/journeys/${id}/patches`, {
+    data: {
+      patch: {
+        id: patchId(),
+        target: { journey: id },
+        base_revision: 0,
+        deployment_revision: deployment.revision,
+        mutations: [
+          { op: "create_journey", name: "Owned work" },
+          { op: "add_node", node: { key: "n_task", id: "task", kind: "action", title: "The task" } },
+          { op: "set_participation", node: "n_task", kind: "k_owner", source: [owner] },
+        ],
+      },
+    },
+  });
+  expect(response.ok(), await response.text()).toBe(true);
+  return id;
 }
 
-test("a deployment tick refetches the deployment context and re-derives", { tag: "@server" }, async ({ page }) => {
+test("a deployment tick refetches the deployment context and re-derives: a merge changes the owner another page shows", { tag: "@server" }, async ({ context }) => {
+  const [one, two] = [await context.newPage(), await context.newPage()];
   const deploymentFetches: string[] = [];
-  page.on("request", (request) => {
+  two.on("request", (request) => {
     if (new URL(request.url()).pathname === "/api/deployment") {
       deploymentFetches.push(request.url());
     }
   });
-  await openJourney(page, "server", "j_bakeoff");
-  await live(page);
-  const before = await derivedRevision(page);
-  const fetchedBefore = deploymentFetches.length;
-  const revision = await createEntity(page.request);
-  await expect(syncChip(page)).toHaveAttribute("data-deployment", String(revision));
-  expect(await derivedRevision(page)).toBe(before);
+  await open(one, "server", "/entities");
+  const first = await addEntity(one, fresh("Owner"));
+  const second = await addEntity(one, fresh("Survivor"));
+  const journey = await journeyOwnedBy(one.request, first);
+  await openJourney(two, "server", journey);
+  await live(two);
+  const survivor = (await one.locator(`[data-testid="entity"][data-entity="${second}"]`).getByTestId("entity-name").textContent()) ?? "";
+  // The card names an owner only when it is the viewer or missing: the node's detail names this one.
+  const owners = await section(await openFromCanvas(two, "n_task"), "participations");
+  await expect(owners).not.toContainText(survivor);
+  const [before, fetchedBefore] = [await derivedRevision(two), deploymentFetches.length];
+  await mergeEntities(one, second, first);
+  const deployment = (await (await one.request.get("/api/deployment")).json()) as { revision: number };
+  await expect(syncChip(two)).toHaveAttribute("data-deployment", String(deployment.revision));
+  await expect(owners).toContainText(survivor);
+  expect(await derivedRevision(two)).toBe(before);
   expect(deploymentFetches.length).toBe(fetchedBefore + 1);
 });
 
-test("version skew stops the tab and asks for a reload, keeping unsent edits", { tag: "@server" }, async ({ context }) => {
-  const [one, two] = [await context.newPage(), await context.newPage()];
-  await openJourney(one, "server", "j_vendor_eval");
-  await openJourney(two, "server", "j_vendor_eval");
-  const unsent = fresh("Unsent");
-  await startRename(two, "n_access", unsent);
-  const held = await derivedRevision(two);
-  await two.route("**/api/journeys/j_vendor_eval/document", async (route) => {
-    const response = await route.fetch();
-    const document = (await response.json()) as { engine_version: string };
-    await route.fulfill({ response, json: { ...document, engine_version: "99.0.0" } });
-  });
-  await rename(one, "n_plan", fresh("Plan"));
-  await expect(syncChip(two)).toHaveAttribute("data-state", "new-version");
-  await expect(renameOf(two, "n_access").getByRole("button", { name: "Save" })).toBeDisabled();
-  expect(await derivedRevision(two)).toBe(held);
-  await two.unroute("**/api/journeys/j_vendor_eval/document");
-  await syncChip(two).click();
-  await derived(two);
-  await expect(syncChip(two)).not.toHaveAttribute("data-state", "new-version");
-  await expect(renameOf(two, "n_access").getByRole("textbox")).toHaveValue(unsent);
-  expect(await derivedRevision(two)).toBe(await derivedRevision(one));
-});
-
-test("an address that names no journey is shown missing, and the tab stays live", { tag: "@server" }, async ({ context }) => {
-  const [one, two] = [await context.newPage(), await context.newPage()];
-  await open(two, "server", "/journeys/not-a-journey");
-  await expect(two.getByTestId("journey-missing")).toBeVisible();
-  await live(two);
-  await two.getByRole("link", { name: "Journeys", exact: true }).click();
-  await two.getByRole("link", { name: "Launch the reporting release" }).click();
-  await goTo(two, "plan", "graph");
-  await openJourney(one, "server", "j_launch");
-  const renamed = fresh("Announcement");
-  await rename(one, "n_announcement", renamed);
-  await expect(title(two, "n_announcement")).toHaveText(renamed);
-});
-
-test("typing is held while a save is in flight, so nothing typed is lost", { tag: "@server" }, async ({ page }) => {
-  await openJourney(page, "server", "j_launch");
-  let release: () => void = () => undefined;
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route("**/api/journeys/j_launch/patches", async (route) => {
-    await held;
-    await route.continue();
-  });
-  const renamed = fresh("Beta feedback");
-  await startRename(page, "n_beta_feedback", renamed);
-  await save(page, "n_beta_feedback");
-  await expect(renameOf(page, "n_beta_feedback").getByRole("textbox")).toBeDisabled();
-  release();
-  await expect(title(page, "n_beta_feedback")).toHaveText(renamed);
-});
-
-/** Creates a journey from the hiring loop's route: its nodes share the hiring journey's keys. */
-async function journeyFromHiringRoute(request: APIRequestContext): Promise<string> {
-  const suffix = Math.random().toString(36).slice(2, 10);
-  const id = `j_copy_${suffix}`;
-  const patch = {
-    id: `p_copy_${suffix}`,
-    target: { journey: id },
-    base_revision: 0,
-    mutations: [{ op: "create_journey", name: `Hiring copy ${suffix}`, from: { route: "hiring-loop", version: 1 } }],
-  };
-  const response = await request.post(`/api/journeys/${id}/patches`, { data: { patch } });
-  expect(response.status()).toBe(200);
-  return id;
-}
-
-test("a draft follows its journey, not the screen it was typed on", { tag: "@server" }, async ({ page }) => {
-  const copy = await journeyFromHiringRoute(page.request);
-  await openJourney(page, "server", copy);
-  await expect(nodeCard(page, "n_offer")).toBeVisible();
-  await openJourney(page, "server", "j_hiring");
-  const draft = fresh("Offer, j_hiring's draft");
-  await startRename(page, "n_offer", draft);
-  await goWithin(page, `/journeys/${copy}/plan/graph/nodes/n_offer`);
-  await expect(page.getByTestId("journey-name")).toContainText("Hiring copy");
-  await expect(nodePanel(page, "n_offer")).toBeVisible();
-  await expect(renameOf(page, "n_offer")).toHaveCount(0);
-  await goWithin(page, "/journeys/j_hiring/plan/graph/nodes/n_offer");
-  await expect(renameOf(page, "n_offer").getByRole("textbox")).toHaveValue(draft);
+test("an identity signed in with the stub issuer links to the user, and its verified email names their entity", { tag: "@server" }, async ({ page }) => {
+  const email = `${fresh("linked").replace(/\W/g, "-")}@example.org`;
+  await open(page, "server", "/entities");
+  const entity = await addEntity(page, fresh("Linked person"), email);
+  await open(page, "server", "/me");
+  await expect(page.getByTestId("identity")).toHaveCount(1);
+  await expect(page.locator(`[data-testid="your-entity"][data-entity="${entity}"]`)).toHaveCount(0);
+  await page.getByTestId("link-identity").getByRole("link", { name: "Sign in with stub" }).click();
+  await page.getByLabel("Email").fill(email);
+  await page.getByRole("button", { name: "Sign in" }).click();
+  await expect(page.getByTestId("identity-screen")).toBeVisible();
+  await expect(page.locator('[data-testid="identity"][data-provider="stub"]').getByTestId("identity-emails")).toContainText(email);
+  await expect(page.locator('[data-testid="identity"][data-provider="dev"]')).toBeVisible();
+  await expect(page.locator(`[data-testid="your-entity"][data-entity="${entity}"]`)).toBeVisible();
 });

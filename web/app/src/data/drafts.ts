@@ -55,15 +55,25 @@ export function writeDraft(key: string, value: unknown): void {
   }
 }
 
+/** A draft held with the key it was read under. */
+interface Held<T> {
+  key: string;
+  value: T | undefined;
+}
+
+/** `held` while it is `key`'s draft; otherwise what is kept under `key`, so a draft never follows a screen to another journey or node. */
+export function draftAt<T>(held: Held<T>, key: string): Held<T> {
+  return held.key === key ? held : { key, value: readDraft<T>(key) };
+}
+
 /**
  * A draft kept under `key` across reloads of this tab: the value and its setter. When `key`
  * changes (a screen reused for another journey), the value is the new key's draft.
  */
 export function useDraft<T>(key: string): [T | undefined, (value: T | undefined) => void] {
-  const [state, setState] = useState(() => ({ key, value: readDraft<T>(key) }));
-  let current = state;
-  if (state.key !== key) {
-    current = { key, value: readDraft<T>(key) };
+  const [state, setState] = useState<Held<T>>(() => ({ key, value: readDraft<T>(key) }));
+  const current = draftAt(state, key);
+  if (current !== state) {
     setState(current);
   }
   const set = useCallback(

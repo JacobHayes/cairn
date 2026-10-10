@@ -91,6 +91,11 @@ export interface EvidenceDraft {
   note: string;
 }
 
+/** Whether the done form holds what the node needs, so sending it would complete the node (G2, G4). */
+export function evidenceComplete(needs: { artifact: boolean; note: boolean }, draft: EvidenceDraft): boolean {
+  return (!needs.artifact || draft.artifact.trim() !== "") && (!needs.note || draft.note.trim() !== "");
+}
+
 /** A saved done form: before notes it held the artifact address alone, as text. */
 export function evidenceDraft(saved: EvidenceDraft | string): EvidenceDraft {
   return typeof saved === "string" ? { artifact: saved, note: "" } : saved;

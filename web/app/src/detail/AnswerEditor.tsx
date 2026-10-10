@@ -19,7 +19,7 @@ import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
 import { answerable, isBlocked, nodeOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink, Rationale } from "./parts.tsx";
 import { useSavePreview } from "./preview.ts";
-import { Rejected } from "./Rejected.tsx";
+import { bypassReady, Rejected } from "./Rejected.tsx";
 import { answerText, resolveEntity, roleTitle } from "./sections.tsx";
 import { effectWords, savingWords } from "./words.ts";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
@@ -373,7 +373,7 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
   const bypassing = bypass !== undefined;
   const newAnswer = form.draft !== undefined && !sameAnswer(form.draft.value, stored);
   const blocked = isBlocked(detail.derived, view);
-  const canSave = sending !== undefined && !write.disabled && (!blocked || (bypassing && bypass.trim() !== ""));
+  const canSave = sending !== undefined && !write.disabled && (!blocked || (bypassing && bypassReady(bypass)));
   const close = () => {
     setNamed(undefined);
     form.close();

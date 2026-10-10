@@ -6,7 +6,7 @@ whole service over the memory store, seeded with the fixtures, with no server at
 
 ## What it does
 
-- Every call over every fixture answers in Chromium exactly what the server answers, byte
+- Every call over every fixture answers over the wasm32 module exactly what the server answers, byte
   for byte: the derive, every canvas level, each node's trace and explanations, the decision
   view, timeline, status summary, next list, list, mine, snapshot, proposal previews, a local
   apply and its touched set, and route files exported and imported back. The same holds after
@@ -23,13 +23,16 @@ whole service over the memory store, seeded with the fixtures, with no server at
 ## The derive benchmark at the limits
 
 The document at the limits (3,350,264 bytes), median of 5 runs; reported, not gated. The
-browser times each call from the page, so its figures include posting to the worker and back.
+derive worker's own script runs in Node's V8 over the same wasm32 binary, timed from the caller, so its figures include the message to the worker and back.
 
-| Measure | Native (release) | Browser (Chromium, derive worker) |
+| Measure | Native (release) | Node (V8, derive worker, wasm32) |
 |---|---|---|
-| read the document and derive it | 391.4 ms | 520.3 ms |
-| every derived value to JSON (6,151,226 bytes) | 90.4 ms | 89.0 ms |
-| the top canvas level | 36.9 ms | 41.0 ms |
-| memory | 194 MiB peak resident | 121 MiB wasm linear memory |
+| read the document and derive it | 743.2 ms | 912.6 ms |
+| every derived value to JSON (6,207,908 bytes) | 116.9 ms | 169.4 ms |
+| the top canvas level | 47.0 ms | 80.2 ms |
+| memory | not read on this host | 121 MiB wasm linear memory |
 
-`prove.sh WORK_DIR` prints this table afresh; timings vary with the host's load.
+At 2,000 generated nodes the slowest level takes 23.8 ms and the trace 1.6 ms (median of 9).
+The figures were taken on a loaded machine, so the milliseconds are larger than an idle run's.
+
+`prove.sh` prints this table afresh; timings vary with the host's load.

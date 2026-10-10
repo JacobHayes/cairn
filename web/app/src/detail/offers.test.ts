@@ -34,6 +34,11 @@ describe("the inspector's offers", () => {
     expect(offered(view, detailOf(view, "n_when")).primary).toBeUndefined();
   });
 
+  it("offers a placeholder to break down Break down, with Mark atomic beside it and no Mark done (B10)", () => {
+    const view = made("n_findings", { needs_breakdown: true });
+    expect(offered(view, detailOf(view, "n_findings"))).toEqual({ primary: "break-down", secondary: ["mark-atomic"], waiting: false });
+  });
+
   it("offers Mark done with Start beside it, which waits when something it requires is not done", () => {
     expect(offered(testView(), detailOf(testView(), "n_findings"))).toEqual({ primary: "done", secondary: ["start"], waiting: false });
     expect(offered(testView(), detailOf(testView(), "n_report")).waiting).toBe(true);

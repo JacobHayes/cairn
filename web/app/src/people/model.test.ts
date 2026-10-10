@@ -4,6 +4,7 @@
 import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
+import { linkable } from "./Identity.tsx";
 import { aliasesOf, emailsFrom, entityOf, mergeMutation, newEntityKey, offeredMerge } from "./model.ts";
 
 describe("entities as sent (E6, H3)", () => {
@@ -40,5 +41,13 @@ describe("a merge (E6)", () => {
     expect(offeredMerge(["e_b", "e_a", "e_c"])).toEqual({ survivor: "e_a", merged: "e_b" });
     expect(offeredMerge(["e_a"])).toBeUndefined();
     expect(offeredMerge(null)).toBeUndefined();
+  });
+});
+
+describe("linking an identity (H3)", () => {
+  it("offers a sign-in link for each OIDC provider only, so a host with none offers no link", () => {
+    const capabilities = (...auth: { kind: string; name: string }[]) => ({ auth }) as Schema<"Capabilities">;
+    expect(linkable(capabilities({ kind: "dev", name: "dev" }, { kind: "oidc", name: "stub" }))).toEqual(["stub"]);
+    expect(linkable(capabilities({ kind: "dev", name: "dev" }))).toEqual([]);
   });
 });

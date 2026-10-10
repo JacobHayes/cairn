@@ -68,6 +68,9 @@ for config in web/*/vitest.config.ts; do
   # The authoring tests check the editors against the browser host's module: cargo decides
   # whether it is stale, and the bindings are rebound only when it was.
   [ -n "$built" ] || { ladder_run "the browser host's module build" mise-tasks/build/wasm; built=yes; }
+  # The browser host's agreement tests compare with the server's answers (made again only
+  # when the crates they come from changed).
+  [ "$package" != web/wasm ] || ladder_run "the server's agreement cases" scripts/agreement-cases
   report=$PWD/$package/dist/vitest.json
   mkdir -p "$package/dist"
   rm -f "$report"

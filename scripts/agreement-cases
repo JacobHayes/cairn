@@ -1,0 +1,21 @@
+#!/usr/bin/env bash
+# The server's answers the browser host's agreement tests (web/wasm) compare with: the
+# cairn-wasm-cases binary walks the fixtures through the service natively and writes them to
+# web/wasm/dist/cases. Its output is a function of the crates it links and the fixtures, so it
+# is kept with a hash of those inputs (cases.hash, written only after a complete run), and a
+# run whose inputs are unchanged, as in most changes to the app alone, reuses it. Any file
+# under the crates, the fixtures, or the workspace's manifests, lock file, and toolchain pin
+# changes the hash. It runs in the optimized test profile.
+#
+# usage: scripts/agreement-cases
+set -euo pipefail
+cd "$(dirname "$0")/.."
+inputs=(crates/engine crates/schema crates/service crates/store crates/wasm fixtures Cargo.toml Cargo.lock mise.toml)
+hash=$(find "${inputs[@]}" -type f -print0 | sort -z | xargs -0 sha256sum | sha256sum | cut -d' ' -f1)
+if [ "$(cat web/wasm/dist/cases.hash 2>/dev/null || true)" = "$hash" ] && [ -n "$(ls web/wasm/dist/cases 2>/dev/null)" ]; then
+  echo "the server's agreement cases: inputs unchanged, reusing web/wasm/dist/cases"
+  exit 0
+fi
+rm -f web/wasm/dist/cases.hash
+cargo run --locked --quiet --profile test -p cairn-wasm --features server --bin cairn-wasm-cases -- web/wasm/dist/cases
+printf '%s\n' "$hash" >web/wasm/dist/cases.hash

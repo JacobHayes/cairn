@@ -3,8 +3,9 @@
 import { useMemo } from "react";
 
 import { useProjected } from "../canvas/hooks.ts";
-import type { Ready } from "../detail/model.ts";
+import { isTerminal, nodeOf, recordOf, type Ready } from "../detail/model.ts";
 import { summaryModel, type SummaryModel } from "../summary/model.ts";
+import type { MineEntry } from "./mine.ts";
 
 /** The journey's status summary, read from its local derivation. */
 export function useStatusSummary(ready: Ready): SummaryModel | undefined {
@@ -32,4 +33,26 @@ export function flagOf(ready: Ready, model: SummaryModel | undefined): string {
   ].filter((each) => each !== undefined);
   const [first, ...rest] = flags;
   return first === undefined ? "" : rest.length === 0 ? first : `${first} +${String(rest.length)}`;
+}
+
+/**
+ * What is still the viewer's to do (2.4): of their nodes, those in scope and not finished (an
+ * auto-reached milestone is, a group is only a container), and how many of those are on the acting frontier.
+ */
+export function yoursOf(ready: Ready, entries: readonly MineEntry[]): { open: number; actionable: number } {
+  const open = entries.filter((entry) => {
+    const node = nodeOf(ready, entry.node);
+    const derived = ready.derived.nodes[entry.node];
+    return (
+      node !== undefined &&
+      node.kind !== "group" &&
+      derived !== undefined &&
+      derived.relevance.value !== "not_relevant" &&
+      derived.effectively_skipped !== true &&
+      derived.auto_reached !== true &&
+      !isTerminal(recordOf(ready, node).state)
+    );
+  });
+  const frontier = new Set(ready.derived.acting_frontier);
+  return { open: open.length, actionable: open.filter((entry) => frontier.has(entry.node)).length };
 }

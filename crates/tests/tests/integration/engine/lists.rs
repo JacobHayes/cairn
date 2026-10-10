@@ -369,6 +369,42 @@ fn next_re_sorts_by_one_signal() {
     assert_eq!(by(SortBy::Slack), ["n_soon", "n_heavy"]);
 }
 
+/// C10: the product launch at the scenario matrix's day, where every slack is past the urgency
+/// window: gravity and leverage rank, so the launch leads, then the work feeding it, and the
+/// retrospective, with no deadline, sorts last by slack too.
+#[test]
+fn the_launch_ranks_by_gravity_at_the_matrix_day_and_re_sorts_by_slack() {
+    let launch = Derive::on(
+        &support::finished("product-launch"),
+        "j_launch",
+        "2026-10-06",
+    );
+    assert_eq!(
+        launch.next(&NextQuery::default(), &[]),
+        [
+            "n_launch",
+            "n_docs",
+            "n_announcement",
+            "n_beta_end",
+            "n_retro"
+        ]
+    );
+    let by_slack = NextQuery {
+        sort: SortBy::Slack,
+        ..NextQuery::default()
+    };
+    assert_eq!(
+        launch.next(&by_slack, &[]),
+        [
+            "n_docs",
+            "n_announcement",
+            "n_beta_end",
+            "n_launch",
+            "n_retro"
+        ]
+    );
+}
+
 /// Priority, "prioritize for me": the next list in the viewer's ranking, where the gate that
 /// frees someone else's work leads.
 #[test]

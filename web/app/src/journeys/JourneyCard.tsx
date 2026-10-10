@@ -13,7 +13,7 @@ import { useProjected } from "../canvas/hooks.ts";
 import { useLive } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
-import { isTerminal, nodeOf, recordOf, type Ready } from "../detail/model.ts";
+import type { Ready } from "../detail/model.ts";
 import { NodeLink, Section } from "../detail/parts.tsx";
 import { summaryModel, type SummaryModel } from "../summary/model.ts";
 import { StatusSummaryView } from "../summary/StatusSummary.tsx";
@@ -21,6 +21,7 @@ import { dateAway, dateWords } from "../timeline/model.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import { pagePath, summaryPath, type JourneyPage } from "./address.ts";
+import { yoursOf } from "./figures-model.ts";
 import { UpgradeMark } from "./JourneyIndex.tsx";
 import { useMineOf } from "./mine.ts";
 import { routeDetailPath } from "../routes/address.ts";
@@ -69,28 +70,13 @@ function Yours({ ready }: { ready: Ready }) {
   if (mine.status !== "ready") {
     return null;
   }
-  // Only what is still the viewer's to do: in scope, not finished (an auto-reached milestone is), and not a group.
-  const open = mine.entries.filter((entry) => {
-    const node = nodeOf(ready, entry.node);
-    const derived = ready.derived.nodes[entry.node];
-    return (
-      node !== undefined &&
-      node.kind !== "group" &&
-      derived !== undefined &&
-      derived.relevance.value !== "not_relevant" &&
-      derived.effectively_skipped !== true &&
-      derived.auto_reached !== true &&
-      !isTerminal(recordOf(ready, node).state)
-    );
-  });
-  if (open.length === 0) {
+  const { open, actionable } = yoursOf(ready, mine.entries);
+  if (open === 0) {
     return null;
   }
-  const frontier = new Set(ready.derived.acting_frontier);
-  const actionable = open.filter((entry) => frontier.has(entry.node)).length;
   return (
-    <span className="muted small" data-testid="card-yours" data-open={open.length} data-ready={actionable}>
-      You have {open.length} open {open.length === 1 ? "item" : "items"} here{actionable === 0 ? "" : `, ${String(actionable)} ready`}
+    <span className="muted small" data-testid="card-yours" data-open={open} data-ready={actionable}>
+      You have {open} open {open === 1 ? "item" : "items"} here{actionable === 0 ? "" : `, ${String(actionable)} ready`}
     </span>
   );
 }

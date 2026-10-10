@@ -3,7 +3,7 @@
 // inspector's Actions and the next list's rows both offer it, so a Complete that the engine
 // would reject is never the primary action.
 import { newAttachmentKey } from "./Attachments.tsx";
-import { doneMutations, evidenceDraft, type Evidence, type EvidenceDraft } from "../acting/acts.ts";
+import { doneMutations, evidenceComplete, evidenceDraft, type Evidence, type EvidenceDraft } from "../acting/acts.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import type { NodeWrite, useFormDraft } from "./write.ts";
 
@@ -46,7 +46,6 @@ export function EvidenceForm({ write, node, needs, form }: { write: NodeWrite; n
     return null;
   }
   const { artifact, note } = evidenceDraft(drafted.value);
-  const complete = (!needs.artifact || artifact.trim() !== "") && (!needs.note || note.trim() !== "");
   const send = async () => {
     const evidence: Evidence = {
       ...(needs.artifact ? { artifact: { key: newAttachmentKey(), url: artifact.trim() } } : {}),
@@ -61,7 +60,7 @@ export function EvidenceForm({ write, node, needs, form }: { write: NodeWrite; n
       {needs.artifact ? <Field autoFocus aria-label="Artifact address" placeholder="Its artifact's address" value={artifact} onChange={(event) => { form.change({ artifact: event.target.value, note }); }} /> : null}
       {needs.note ? <textarea autoFocus={!needs.artifact} aria-label="Note" placeholder="What was done, in a note" value={note} onChange={(event) => { form.change({ artifact, note: event.target.value }); }} /> : null}
       <span className="row">
-        <Button primary disabled={write.disabled || !complete} onClick={() => void send()}>
+        <Button primary disabled={write.disabled || !evidenceComplete(needs, { artifact, note })} onClick={() => void send()}>
           {sendLabel(needs)}
         </Button>
         <Button onClick={() => { form.close(); write.dismiss(); }}>Cancel</Button>

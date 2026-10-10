@@ -16,6 +16,7 @@ import {
   triageFrom,
   triageParams,
   triageQueryOf,
+  nextPath,
   walkthroughPath,
   type ListSettings,
 } from "./address.ts";
@@ -98,6 +99,12 @@ describe("the next list's address (C10)", () => {
 
   it("offers no group kind: groups are never on the frontier", () => {
     expect(nextFrom(new URLSearchParams("kind=group,action")).kinds).toEqual(["action"]);
+  });
+
+  it("opens a node beside the list without touching what the list asks for", () => {
+    const [bare, beside] = [nextPath("j_a", settings), nextPath("j_a", settings, "n_x")];
+    expect(beside).toBe(bare.replace("/next/list", "/next/list/nodes/n_x"));
+    expect(nextQueryOf(nextFrom(new URLSearchParams(beside.split("?")[1])))).toEqual(nextQueryOf(settings));
   });
 
   it("reads only the flags a next row carries; the engine's query takes none", () => {

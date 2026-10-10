@@ -1,23 +1,13 @@
-// The Summary page (C18): the journey card's way to it, a node opening beside it, and a print of
-// it leaving out the navigation and the detail panel. Each fixture's counts and lists are held to
-// fixtures/README.md by the engine's tests. The server host draws it from the page's own
-// derivation of the server's document, which web/wasm's agreement cases hold to the server's
-// projection.
+// The Summary page (C18) in print, which only a browser renders: the navigation and the detail
+// panel left out, paper's black on white whatever the screen's theme. Its counts and lists are
+// held to fixtures/README.md by the engine's tests and read by summary/model.test.ts.
 import { expect, test } from "@playwright/test";
 
 import { nodePanel, openAt } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
-test("C18: the journey card opens the Summary page, a node opens beside it, and a print leaves out navigation and the panel", async ({ page }) => {
-  await openAt(page, "browser", "j_bakeoff", "next/list", { fixedToday: FIXED_TODAY });
-  await expect(page.getByTestId("journey-card")).toHaveAttribute("data-full", "false");
-  await expect(page.getByTestId("card-progress")).toHaveText("2 of 8 in scope done, 6 to go");
-  await page.getByTestId("card-expand").click();
-  await expect(page).toHaveURL(/\/journeys\/j_bakeoff\/summary$/);
-  await expect(page.getByTestId("journey-card")).toHaveAttribute("data-full", "true");
-  await page.locator('[data-testid="summary-open"] [data-node="n_winner"] a').click();
-  await expect(nodePanel(page, "n_winner")).toBeVisible();
-  await expect(page).toHaveURL(/\/journeys\/j_bakeoff\/summary\/nodes\/n_winner$/);
+test("C18: a print of the Summary page leaves out navigation and the panel, and paints black on white", async ({ page }) => {
+  await openAt(page, "browser", "j_bakeoff", "summary", { node: "n_winner", fixedToday: FIXED_TODAY });
   await page.emulateMedia({ media: "print", colorScheme: "dark" });
   await expect(page.getByTestId("summary")).toBeVisible();
   // Paper has no dark theme: a dark screen prints its panels in black on white, and muted text in

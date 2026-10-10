@@ -19,6 +19,12 @@ describe("the active filters under the toolbar", () => {
     expect(chips[3]?.without).toBe("/journeys/j_a/next/list/nodes/n_x?sort=due&mine=1&kind=action%2Cmilestone&me=1&q=plan");
   });
 
+  it("keeps a chip for a flag the plan list's panel no longer offers, beside the ones chosen in it (2.3)", () => {
+    const chips = activeFilters("j_a", "plan", "list", "?flag=next_up,stale", undefined);
+    expect(chips.map((chip) => chip.label)).toEqual(["next up", "stale"]);
+    expect(chips[0]?.without).toBe("/journeys/j_a/plan/list?flag=stale");
+  });
+
   it("makes a chip for the kinds the canvas keeps in focus and for conditional nodes it turns off", () => {
     const chips = activeFilters("j_a", "plan", "graph", "?kind=group,decision&show=notrelevant", undefined);
     expect(chips.map((chip) => chip.label)).toEqual(["only group, decision", "no conditional"]);

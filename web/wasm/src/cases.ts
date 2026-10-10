@@ -8,7 +8,7 @@ import type {
   ImportRequest,
   PreviewRequest,
   ProjectionRequest,
-} from "../src/types.ts";
+} from "./types.ts";
 
 /** `crates/wasm` `CaseCall`: one call the browser host makes. */
 export type CaseCall =

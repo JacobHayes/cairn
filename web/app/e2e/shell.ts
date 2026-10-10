@@ -136,12 +136,6 @@ export async function openFilter(page: Page): Promise<void> {
   await expect(page.getByTestId("filter-panel")).toBeVisible();
 }
 
-/** Closes the toolbar's filter. */
-export async function closeFilter(page: Page): Promise<void> {
-  await page.keyboard.press("Escape");
-  await expect(page.getByTestId("filter-panel")).toHaveCount(0);
-}
-
 /** Goes to `page`'s tab (`next` or `plan`) and its projection, as a person does. */
 export async function goTo(page: Page, tab: "next" | "plan", projection: string): Promise<void> {
   await page.getByTestId(`tab-${tab}`).click();
@@ -222,20 +216,4 @@ export function countDocumentFetches(page: Page, journey: string): () => number 
     }
   });
   return () => count;
-}
-
-/** Holds every request matching `url` on `page` until `release` is called, then lets it through. */
-export async function hold(page: Page, url: string): Promise<() => Promise<void>> {
-  let release: () => void = () => undefined;
-  const held = new Promise<void>((resolve) => {
-    release = resolve;
-  });
-  await page.route(url, async (route) => {
-    await held;
-    await route.continue().catch(() => undefined);
-  });
-  return async () => {
-    release();
-    await page.unroute(url);
-  };
 }
