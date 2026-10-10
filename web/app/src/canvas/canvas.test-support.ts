@@ -8,7 +8,7 @@ import type { Level, LevelEdge, LevelNode } from "./model.ts";
 
 const today = "2026-10-06";
 const none = { entries: [], total: 0 };
-const base = { gravity_from: none, leverage_from: none, actionable: false, gravity: 1, leverage: 0, dates: {} };
+const base = { gravity_from: none, unlocks_from: none, actionable: false, gravity: 1, unlocks: 0, dates: {} };
 const relevant = { relevance: { value: "relevant" as const } };
 const owned = { participations: { k_owner: { entities: ["e_one"], origin: "explicit" as const } } };
 const bound = (date: string) => ({ date, chain: { constraints: [], fixed: [] } });
@@ -21,7 +21,7 @@ export function canvasView(): Ready {
       today,
       timezone: "UTC",
       deployment: { revision: 1, entities: [{ key: "e_one", name: "Person One" }] },
-      rank: { urgency: 0.4, late: 0.15, gravity: 0.25, leverage: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
+      rank: { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
     },
     journey: {
       header: { id: "j_canvas", name: "Canvas journey", status: "active", created_at: "2026-10-01T00:00:00Z", created_on: "2026-10-01" },
@@ -51,7 +51,7 @@ export function canvasView(): Ready {
       acting_frontier: ["n_choose", "n_check"],
       nodes: {
         n_kick: { ...base, display_state: "done", ...relevant, gravity: 9 },
-        n_choose: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, gravity: 8, leverage: 1, dates: { due: bound("2026-10-09"), latest_start: bound("2026-10-08"), slack_days: 2 } },
+        n_choose: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, gravity: 8, unlocks: 1, dates: { due: bound("2026-10-09"), latest_start: bound("2026-10-08"), slack_days: 2 } },
         n_stage: { ...base, display_state: "active", ...relevant, gravity: 4 },
         n_build: { ...base, display_state: "active", ...relevant, ...owned, gravity: 4, overdue: true, blocked_by: [{ node: "n_option", via: "explicit" }], dates: { due: bound("2026-10-01") } },
         n_check: { ...base, display_state: "ready", ...relevant, ...owned, actionable: true, gravity: 5, dates: { due: bound("2026-11-30") } },

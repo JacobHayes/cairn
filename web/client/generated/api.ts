@@ -1480,11 +1480,11 @@ export interface components {
         };
         /** @description A lower-case hex SHA-256 digest. */
         ContentHash: string;
-        /** @description A gravity or leverage contribution: the node and how much it adds. */
+        /** @description A gravity or unlocks contribution: the node and how much it adds. */
         Contribution: {
             /** @description The contributing node. */
             node: components["schemas"]["NodeKey"];
-            /** @description It is owned by someone other than the node's owner (leverage's owner factor). */
+            /** @description It is owned by someone other than the node's owner (the owner factor of unlocks). */
             other_owner?: boolean;
             /** @description What it adds. */
             score: components["schemas"]["Score"];
@@ -1834,13 +1834,13 @@ export interface components {
             total: number;
         };
         /** @description ARCHITECTURE, Read path: a derived value whose explanation list a server response pages. */
-        ExplainedField: "gravity" | "leverage" | "still_waiting";
+        ExplainedField: "gravity" | "unlocks" | "still_waiting";
         /**
          * @description A page of one value's explanation list, largest first, `explanation_entry_count_max` at a
          *     time; the first page is what node detail carries.
          */
         ExplanationPage: {
-            /** @description The entries of a gravity or leverage list. */
+            /** @description The entries of a gravity or unlocks list. */
             entries: components["schemas"]["Contribution"][];
             /** @description The value. */
             field: components["schemas"]["ExplainedField"];
@@ -2102,7 +2102,7 @@ export interface components {
         HealthStatus: "ok" | "store_failed_closed";
         /**
          * @description A dependent that completing a node would not yet free, and what else it waits on (C8,
-         *     Priority: Leverage): one entry of node detail's `still_waiting`.
+         *     Priority: Unlocks): one entry of node detail's `still_waiting`.
          */
         HeldDependent: {
             /**
@@ -3065,10 +3065,6 @@ export interface components {
             gravity: components["schemas"]["Score"];
             /** @description The contributors to gravity. */
             gravity_from: components["schemas"]["Explained"];
-            /** @description Leverage (Priority). */
-            leverage: components["schemas"]["Score"];
-            /** @description The nodes completing this would unblock. */
-            leverage_from: components["schemas"]["Explained"];
             /**
              * @deprecated
              * @description A container's largest child gravity, one level down.
@@ -3116,9 +3112,13 @@ export interface components {
              *     finished node, or a group, never is.
              */
             unassigned?: boolean;
+            /** @description Unlocks (Priority). */
+            unlocks: components["schemas"]["Score"];
+            /** @description The nodes completing this would unblock. */
+            unlocks_from: components["schemas"]["Explained"];
         };
         /**
-         * @description C8: one node in full. Its explanation lists (`derived.gravity_from`, `leverage_from`)
+         * @description C8: one node in full. Its explanation lists (`derived.gravity_from`, `unlocks_from`)
          *     carry their largest entries up to `explanation_entry_count_max` with their totals; the rest
          *     page through the node's explanations endpoint.
          */
@@ -3157,7 +3157,7 @@ export interface components {
             record: components["schemas"]["NodeState"];
             /**
              * @description The direct dependents completing it would not yet free, each with what else it waits
-             *     on (C8, Priority: Leverage): the largest entries with the total; page the rest with
+             *     on (C8, Priority: Unlocks): the largest entries with the total; page the rest with
              *     the explanations endpoint, field `still_waiting`.
              */
             still_waiting: components["schemas"]["StillWaiting"];
@@ -3242,8 +3242,6 @@ export interface components {
             key: components["schemas"]["NodeKey"];
             /** @description Its kind. */
             kind: components["schemas"]["NodeKind"];
-            /** @description Leverage: the viewer's, in a ranking for them. */
-            leverage: components["schemas"]["Score"];
             /** @description B10. */
             needs_breakdown?: boolean;
             /** @description Non-terminal with its due before today (D3). */
@@ -3281,6 +3279,8 @@ export interface components {
             title: components["schemas"]["Title"];
             /** @description No owner (E1). */
             unassigned?: boolean;
+            /** @description Unlocks: the viewer's, in a ranking for them. */
+            unlocks: components["schemas"]["Score"];
         };
         /** @description One node's stored state in a journey. */
         NodeState: {
@@ -3849,9 +3849,9 @@ export interface components {
             /** Format: uint32 */
             horizon_days: number;
             late: components["schemas"]["Real"];
-            leverage: components["schemas"]["Real"];
             other_owner_factor: components["schemas"]["Thousandths1000To1000000"];
             undecided_discount: components["schemas"]["Thousandths0To1000"];
+            unlocks: components["schemas"]["Real"];
             urgency: components["schemas"]["Real"];
         };
         /** @description C8, C10: why a node ranks where it does: its rank and the terms it blends. */
@@ -3860,10 +3860,10 @@ export interface components {
             gravity_norm: components["schemas"]["Real"];
             /** @description From negative slack over the horizon. */
             late: components["schemas"]["Real"];
-            /** @description Leverage over the largest in the normalization set. */
-            leverage_norm: components["schemas"]["Real"];
             /** @description The blend. */
             rank: components["schemas"]["Real"];
+            /** @description Unlocks over the largest in the normalization set. */
+            unlocks_norm: components["schemas"]["Real"];
             /** @description From slack over the urgency horizon. */
             urgency: components["schemas"]["Real"];
         };
@@ -4000,7 +4000,7 @@ export interface components {
              * @description D8: when the value is `not_relevant` only because a decision it reads is itself
              *     undecided (so unanswered, and every value operator on it false), the undecided
              *     decisions it rests on: reading them as still to come would leave the node undecided.
-             *     Empty when the value is settled. The value itself is unchanged, so gravity, leverage
+             *     Empty when the value is settled. The value itself is unchanged, so gravity, unlocks
              *     and blocking follow Gating exactly; display state shows such a node as `conditional`.
              */
             pending_on?: components["schemas"]["NodeKey"][];
@@ -4577,7 +4577,7 @@ export interface components {
             node: components["schemas"]["NodeKey"];
         };
         /** @description C9, C10: the single signal a list is sorted by; ties fall back to rank order. */
-        SortBy: "rank" | "slack" | "gravity" | "leverage" | "due" | "effort";
+        SortBy: "rank" | "slack" | "gravity" | "unlocks" | "due" | "effort";
         /** @description I6: a proposal's destination moved past the revision it was drafted against. */
         StaleBase: {
             /** @description The destination's revision the proposal names, and its current one. */
@@ -4656,7 +4656,7 @@ export interface components {
             upcoming_milestones?: components["schemas"]["UpcomingMilestone"][];
         };
         /**
-         * @description The dependents completing a node would not yet free (C8, Priority: Leverage): node
+         * @description The dependents completing a node would not yet free (C8, Priority: Unlocks): node
          *     detail's `still_waiting`, its largest entries up to `explanation_entry_count_max` with the
          *     total; the rest page through the explanations of `ExplainedField::StillWaiting`.
          */

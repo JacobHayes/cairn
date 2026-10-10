@@ -20,7 +20,7 @@ const row = (key: string, ancestors: string[] = []): NodeRow => ({
   display_state: "ready",
   relevance: "relevant",
   gravity: 1,
-  leverage: 0,
+  unlocks: 0,
 });
 
 const rows = [row("n_inner", ["n_stage"]), row("n_work"), row("n_stage")];

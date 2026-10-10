@@ -9,7 +9,7 @@ export type RankConstants = Schema<"RankConstants">;
 
 /** One term of the blend: its signal, its normalized term, its constant, and what it adds. */
 export interface RankPart {
-  signal: "urgency" | "late" | "gravity" | "leverage";
+  signal: "urgency" | "late" | "gravity" | "unlocks";
   term: number;
   weight: number;
   adds: number;
@@ -22,7 +22,7 @@ export function rankParts(terms: RankTerms, constants: RankConstants): RankPart[
     part("urgency", terms.urgency, constants.urgency),
     part("late", terms.late, constants.late),
     part("gravity", terms.gravity_norm, constants.gravity),
-    part("leverage", terms.leverage_norm, constants.leverage),
+    part("unlocks", terms.unlocks_norm, constants.unlocks),
   ];
   return parts.filter((each) => each.adds > 0).sort((left, right) => right.adds - left.adds);
 }

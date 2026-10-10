@@ -108,7 +108,7 @@ pub struct NodeDetail {
     /// Every derived value (D3) with what explains it.
     pub derived: NodeDerived,
     /// The direct dependents completing it would not yet free, each with what else it waits
-    /// on (C8, Priority: Leverage): the largest entries up to `explanation_entry_count_max`
+    /// on (C8, Priority: Unlocks): the largest entries up to `explanation_entry_count_max`
     /// with the total; the rest page through [`Service::explanations`].
     pub still_waiting: StillWaiting,
     /// A decision's per-choice effects (C12): what each answer brings in, drops, and leaves

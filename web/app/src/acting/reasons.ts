@@ -41,13 +41,13 @@ function gravityReason(view: Ready, row: NodeRow): string | undefined {
 }
 
 /** What finishing the row frees, naming others' work when some of it is. */
-function leverageReason(view: Ready, row: NodeRow): string | undefined {
-  const from = view.derived.nodes[row.key]?.leverage_from;
+function unlocksReason(view: Ready, row: NodeRow): string | undefined {
+  const from = view.derived.nodes[row.key]?.unlocks_from;
   const others = from?.entries.filter((entry) => entry.other_owner === true).length ?? 0;
   if (others > 0) {
-    return `Unblocks ${String(others)} ${others === 1 ? "other's" : "others'"} work`;
+    return `Unlocks ${String(others)} ${others === 1 ? "other's" : "others'"} work`;
   }
-  return from === undefined || from.total === 0 ? undefined : `Unblocks ${nodes(from.total)}`;
+  return from === undefined || from.total === 0 ? undefined : `Unlocks ${nodes(from.total)}`;
 }
 
 /** The reason a rank part gives, in words. */
@@ -58,8 +58,8 @@ function partReason(view: Ready, row: NodeRow, part: RankPart): string | undefin
       return dateReason(view, row);
     case "gravity":
       return gravityReason(view, row);
-    case "leverage":
-      return leverageReason(view, row);
+    case "unlocks":
+      return unlocksReason(view, row);
   }
 }
 
@@ -113,8 +113,8 @@ export function reasonOf(view: Ready, row: NodeRow, sort: SortBy = "rank"): stri
       return dateReason(view, row) ?? rankReason(view, row);
     case "gravity":
       return gravityReason(view, row) ?? rankReason(view, row);
-    case "leverage":
-      return leverageReason(view, row) ?? rankReason(view, row);
+    case "unlocks":
+      return unlocksReason(view, row) ?? rankReason(view, row);
     case "rank":
     case "effort":
       return rankReason(view, row);

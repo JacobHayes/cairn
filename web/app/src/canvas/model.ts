@@ -34,7 +34,7 @@ export const STEPS = ["stages", "decisions", "work", "all"] as const;
 export type Step = (typeof STEPS)[number];
 
 /** C6: what the Signals lens puts on each card (8.2). */
-export const LENSES = ["rank", "gravity", "unblocks", "slack"] as const;
+export const LENSES = ["rank", "gravity", "unlocks", "slack"] as const;
 export type Lens = (typeof LENSES)[number];
 
 /**
@@ -138,7 +138,7 @@ export interface Signals {
   rank: number | undefined;
   gravity: number | undefined;
   /** How many nodes finishing it frees (the acting frontier only), and the weighted value the tint follows. */
-  unblocks: { count: number; weighted: number } | undefined;
+  unlocks: { count: number; weighted: number } | undefined;
   slackDays: number | undefined;
 }
 

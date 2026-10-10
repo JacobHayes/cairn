@@ -55,7 +55,7 @@ pub(crate) const SPECS: &[Spec] = &[
         description: "One node in full: as written (a decision's prompt and choices), its \
             stored state, answer, pin, overrides, notes, a page of its children, and every \
             derived value with its explanation (display state, relevance, blocking, dates, \
-            gravity, leverage, rank; a container's `subtree_gravity` is the gravity of its whole \
+            gravity, unlocks, rank; a container's `subtree_gravity` is the gravity of its whole \
             area), and the dependents finishing it would not yet free with \
             what else each waits on (`still_waiting`). Say its status from `display_state`, not \
             the stored state. For a decision, `answer_effects`: per choice, the nodes it \
@@ -196,7 +196,7 @@ pub(crate) struct NodeOutput {
 }
 
 /// C8: what a node is, its stored state and records, and every derived value with what
-/// explains it (gravity and leverage contributions cut to the largest, with totals).
+/// explains it (gravity and unlocks contributions cut to the largest, with totals).
 #[derive(Debug, Serialize, JsonSchema)]
 pub(crate) struct Detail {
     /// The node as written: description, resources, participations, and its kind's payload
@@ -231,10 +231,10 @@ pub(crate) struct Detail {
     /// the next page.
     annotations: Paged<Annotation>,
     /// Every derived value (D3) with its explanation: relevance, blocking, dates, gravity,
-    /// leverage, and rank.
+    /// unlocks, and rank.
     derived: NodeDerived,
     /// The direct dependents completing it would not yet free, each with what else it waits
-    /// on (C8, Priority: Leverage): the largest entries with the total; pass `explanations`
+    /// on (C8, Priority: Unlocks): the largest entries with the total; pass `explanations`
     /// with field `still_waiting` for the rest.
     still_waiting: StillWaiting,
     /// A decision's effects per choice (C12): what each answer brings in, drops, and leaves

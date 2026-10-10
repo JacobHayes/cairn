@@ -247,8 +247,8 @@ mod in_process {
             count,
             "says how many in all"
         );
-        let leverage = &detail.value.derived.leverage_from;
-        assert!(leverage.entries.len() <= cap);
+        let unlocks = &detail.value.derived.unlocks_from;
+        assert!(unlocks.entries.len() <= cap);
 
         let mut entries = Vec::new();
         let mut target = "/api/journeys/j_wide/nodes/n_root/explanations/gravity".to_owned();

@@ -1,4 +1,4 @@
-//! Pass 6, gravity and leverage (PRD Priority; ARCHITECTURE, Read path: derive, pass 6), over
+//! Pass 6, gravity and unlocks (PRD Priority; ARCHITECTURE, Read path: derive, pass 6), over
 //! the pruned gate edges of the effective dependency graph, with the undecided discount and
 //! the owner factor from the rank constants.
 //!
@@ -20,7 +20,7 @@
 //! node's set holds a downstream node's set and the node itself: gravity never decreases
 //! upstream.
 //!
-//! Leverage: for each node in the rank normalization set (relevant or undecided, open, not a
+//! Unlocks: for each node in the rank normalization set (relevant or undecided, open, not a
 //! group), completing it is simulated over pass 5's instants: its finish is satisfied, and
 //! each instant whose last unsatisfied wait that was is satisfied in turn, cascading through
 //! derived group completion, through `auto_reach` milestones due today or earlier (which read
@@ -34,7 +34,7 @@
 //! topological sweep that unions each edge's dependent into its requirement (110,000 x 32
 //! word operations); each node's finish row is kept (512 KiB) and summed once, 2,000 x 2,000
 //! bits; each container's area row is one union per node and child (at most 4,000 x 32 words),
-//! kept (512 KiB) and summed once. Leverage simulates every node in the normalization set. An instant a simulation
+//! kept (512 KiB) and summed once. The unlocks pass simulates every node in the normalization set. An instant a simulation
 //! satisfies has every unsatisfied wait behind it lead back to the completed node's finish, so
 //! the simulations of nodes that only completion satisfies never satisfy the same instant, and
 //! together they read each instant, each pruned edge, and each kept-work entry (at most
@@ -46,7 +46,7 @@
 //! about 700 x 180,000 reads. Memory: two counters and a flag per instant, and the
 //! unblocked nodes, one entry per node per simulation that reaches it.
 
-pub(super) mod leverage;
+pub(super) mod unlocks;
 
 use std::collections::BTreeSet;
 
@@ -73,7 +73,7 @@ const _: () = assert!(
 );
 
 /// Pass 6's output: per node, its gravity with the downstream set it sums, its largest child
-/// gravity, a container's subtree gravity, and, for the normalization set, what completing it would unblock and its leverage.
+/// gravity, a container's subtree gravity, and, for the normalization set, what completing it would unblock and its unlocks.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Priority {
     keys: Vec<NodeKey>,
@@ -101,7 +101,7 @@ pub struct Priority {
     owners: Vec<BTreeSet<EntityKey>>,
     /// Per node in the normalization set: the nodes completing it would unblock.
     unblocks: Vec<Vec<NodeIndex>>,
-    leverage: Vec<Score>,
+    unlocks: Vec<Score>,
     discount: UndecidedDiscount,
     factor: OwnerFactor,
     /// Word operations of the gravity sweep and instants and edges the simulations read.
@@ -135,7 +135,7 @@ impl Priority {
             open: Vec::new(),
             owners: Vec::new(),
             unblocks: Vec::new(),
-            leverage: Vec::new(),
+            unlocks: Vec::new(),
             discount: constants.undecided_discount,
             factor: constants.other_owner_factor,
             operations: 0,
@@ -147,11 +147,11 @@ impl Priority {
         priority.sweep_gravity(early, blocking);
         priority.sum_gravity(graph);
         let (unblocks, operations) =
-            leverage::simulate(graph, early, blocking, &priority.normalized);
+            unlocks::simulate(graph, early, blocking, &priority.normalized);
         priority.unblocks = unblocks;
         priority.operations += operations;
-        priority.leverage = (0..priority.keys.len())
-            .map(|at| priority.leverage_at(at, priority.owners.get(at)).0)
+        priority.unlocks = (0..priority.keys.len())
+            .map(|at| priority.unlocks_at(at, priority.owners.get(at)).0)
             .collect();
         priority
     }
@@ -353,9 +353,9 @@ impl Priority {
         (weight * self.discounted(undecided) * factor, other)
     }
 
-    /// The leverage of the node at `at` with the owner factor relative to `acting`, and its
+    /// The unlocks of the node at `at` with the owner factor relative to `acting`, and its
     /// contributions, largest first, then by key.
-    fn leverage_at(
+    fn unlocks_at(
         &self,
         at: usize,
         acting: Option<&BTreeSet<EntityKey>>,
@@ -459,37 +459,37 @@ impl Priority {
     }
 
     /// Priority: relevant or undecided, open, and not a group: the nodes rank normalizes over
-    /// and ranks, and the nodes leverage is computed for.
+    /// and ranks, and the nodes whose unlocks are computed.
     #[must_use]
     pub fn in_normalization_set(&self, key: &NodeKey) -> bool {
         self.at(key)
             .is_some_and(|at| self.normalized.get(at).copied().unwrap_or(false))
     }
 
-    /// Priority, Leverage: what completing the node frees up, with the owner factor relative
+    /// Priority, Unlocks: what completing the node frees up, with the owner factor relative
     /// to the node's own owners (the global value); zero outside the normalization set.
     #[must_use]
-    pub fn leverage(&self, key: &NodeKey) -> Score {
+    pub fn unlocks(&self, key: &NodeKey) -> Score {
         self.at(key)
-            .and_then(|at| self.leverage.get(at).copied())
+            .and_then(|at| self.unlocks.get(at).copied())
             .unwrap_or_default()
     }
 
-    /// Priority, Leverage: the nodes completing this would unblock, each with its term and
+    /// Priority, Unlocks: the nodes completing this would unblock, each with its term and
     /// whether someone other than the node's owners owns it, largest first.
     #[must_use]
-    pub fn leverage_from(&self, key: &NodeKey) -> Vec<Contribution> {
+    pub fn unlocks_from(&self, key: &NodeKey) -> Vec<Contribution> {
         self.at(key)
-            .map(|at| self.leverage_at(at, self.owners.get(at)).1)
+            .map(|at| self.unlocks_at(at, self.owners.get(at)).1)
             .unwrap_or_default()
     }
 
-    /// Priority, "prioritize for me": the node's leverage with the owner factor relative to
+    /// Priority, "prioritize for me": the node's unlocks with the owner factor relative to
     /// the viewer's entities rather than the node's owners.
     #[must_use]
-    pub fn leverage_for(&self, key: &NodeKey, viewer: &BTreeSet<EntityKey>) -> Score {
+    pub fn unlocks_for(&self, key: &NodeKey, viewer: &BTreeSet<EntityKey>) -> Score {
         self.at(key)
-            .map(|at| self.leverage_at(at, Some(viewer)).0)
+            .map(|at| self.unlocks_at(at, Some(viewer)).0)
             .unwrap_or_default()
     }
 

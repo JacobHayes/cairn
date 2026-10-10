@@ -134,8 +134,8 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
       return row.slack_days == null || !open ? null : row.slack_days >= 0 ? daysWords(row.slack_days) : `${daysWords(-row.slack_days)} behind`;
     case "gravity":
       return (derived.subtree_gravity ?? row.gravity).toFixed(1);
-    case "unblocks":
-      return <Weight count={derived.leverage_from.total} weighted={row.leverage} />;
+    case "unlocks":
+      return <Weight count={derived.unlocks_from.total} weighted={row.unlocks} />;
     case "kind":
       return row.kind;
     case "effort":

@@ -21,7 +21,7 @@ pub(crate) fn build(rank: &RankFile, problems: &mut Vec<Problem>) -> Option<Rank
         ("rank.urgency", rank.urgency),
         ("rank.late", rank.late),
         ("rank.gravity", rank.gravity),
-        ("rank.leverage", rank.leverage),
+        ("rank.unlocks", rank.unlocks),
     ];
     let mut weights = Vec::with_capacity(blend.len());
     for (key, value) in blend {
@@ -35,7 +35,7 @@ pub(crate) fn build(rank: &RankFile, problems: &mut Vec<Problem>) -> Option<Rank
         if (sum - 1.0).abs() > SUM_TOLERANCE {
             problems.push(Problem::new(
                 "rank",
-                format!("urgency, late, gravity, and leverage sum to {sum}, not 1"),
+                format!("urgency, late, gravity, and unlocks sum to {sum}, not 1"),
             ));
         }
     }
@@ -58,12 +58,12 @@ pub(crate) fn build(rank: &RankFile, problems: &mut Vec<Problem>) -> Option<Rank
     if problems.len() > found {
         return None;
     }
-    let [urgency, late, gravity, leverage] = weights.try_into().ok()?;
+    let [urgency, late, gravity, unlocks] = weights.try_into().ok()?;
     Some(RankConstants {
         urgency,
         late,
         gravity,
-        leverage,
+        unlocks,
         horizon_days: horizon_days?,
         undecided_discount: undecided_discount?,
         other_owner_factor: other_owner_factor?,
@@ -125,7 +125,7 @@ mod tests {
             rank.urgency = 0.1;
             rank.late = 0.2;
             rank.gravity = 0.3;
-            rank.leverage = 0.4;
+            rank.unlocks = 0.4;
             rank.horizon_days = 7;
             rank.undecided_discount = 0.25;
             rank.other_owner_factor = 3.0;
@@ -155,7 +155,7 @@ mod tests {
             ),
             (
                 "weights summing short of one",
-                |rank| rank.leverage = 0.0,
+                |rank| rank.unlocks = 0.0,
                 &["rank"],
             ),
             (

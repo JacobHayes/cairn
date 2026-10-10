@@ -370,7 +370,7 @@ fn next_re_sorts_by_one_signal() {
 }
 
 /// C10: the product launch at the scenario matrix's day, where every slack is past the urgency
-/// window: gravity and leverage rank, so the launch leads, then the work feeding it, and the
+/// window: gravity and unlocks rank, so the launch leads, then the work feeding it, and the
 /// retrospective, with no deadline, sorts last by slack too.
 #[test]
 fn the_launch_ranks_by_gravity_at_the_matrix_day_and_re_sorts_by_slack() {

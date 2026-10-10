@@ -30,7 +30,7 @@ const everything: ListSettings = {
   kinds: ["deliverable", "action"],
   text: "plan",
   sort: "slack",
-  columns: ["rank", "unblocks"],
+  columns: ["rank", "unlocks"],
   decisions: false,
 };
 
@@ -80,7 +80,7 @@ describe("the list's address (C9)", () => {
 });
 
 describe("the next list's address (C10)", () => {
-  const settings = { sort: "leverage" as const, mine: true, kinds: ["decision" as const, "milestone" as const], flags: ["overdue" as const, "unassigned" as const], forMe: true, decisions: false, text: "plan" };
+  const settings = { sort: "unlocks" as const, mine: true, kinds: ["decision" as const, "milestone" as const], flags: ["overdue" as const, "unassigned" as const], forMe: true, decisions: false, text: "plan" };
 
   it("keeps every setting, and is bare at the defaults", () => {
     expect(nextFrom(nextParams(settings))).toEqual(settings);
@@ -94,7 +94,7 @@ describe("the next list's address (C10)", () => {
   });
 
   it("asks for prioritize for me as the ranking for the viewer", () => {
-    expect(nextQueryOf(settings)).toEqual({ sort: "leverage", mine: true, kinds: ["decision", "milestone"], for_viewer: true });
+    expect(nextQueryOf(settings)).toEqual({ sort: "unlocks", mine: true, kinds: ["decision", "milestone"], for_viewer: true });
   });
 
   it("offers no group kind: groups are never on the frontier", () => {

@@ -15,9 +15,9 @@
 //! 5. Auto-reach, blocking, and what can be acted on ([`blocking`]): what satisfies
 //!    dependencies, `deps_done`, blocked, actionable, the frontier, snoozes that hold, the
 //!    acting frontier, `stalled`, and `needs_breakdown`.
-//! 6. Gravity and leverage ([`priority`]): each node's downstream set and gravity, its
+//! 6. Gravity and unlocks ([`priority`]): each node's downstream set and gravity, its
 //!    largest child gravity, and for the rank normalization set what completing it would
-//!    unblock and its leverage.
+//!    unblock and its unlocks.
 //! 7. Rank ([`rank`]): each ranked node's terms and rank, the frontiers in rank order, the
 //!    per-viewer recomputation, and effort-adjusted ordering; then `stale` ([`stale`];
 //!    `overdue` is pass 4's): terminal nodes whose completing guards would now fail.
@@ -114,7 +114,7 @@ impl Derived {
         &self.blocking
     }
 
-    /// Pass 6: gravity and leverage.
+    /// Pass 6: gravity and unlocks.
     #[must_use]
     pub fn priority(&self) -> &Priority {
         &self.priority
@@ -127,7 +127,7 @@ impl Derived {
         &self.ranking
     }
 
-    /// Priority, "prioritize for me": the ranking with leverage's owner factor relative to the
+    /// Priority, "prioritize for me": the ranking with the owner factor of unlocks relative to the
     /// viewer's entities (H3) instead of each node's owner. The global ranking is unchanged.
     #[must_use]
     pub fn rank_for(&self, viewer: &BTreeSet<EntityKey>) -> Ranking {
@@ -136,7 +136,7 @@ impl Derived {
             &self.dates,
             &self.blocking,
             &self.rank_constants,
-            |key| self.priority.leverage_for(key, viewer),
+            |key| self.priority.unlocks_for(key, viewer),
         )
     }
 
@@ -274,15 +274,15 @@ impl Derived {
             .collect()
     }
 
-    /// Priority, Leverage: the nodes whose finish completing `key` satisfies: itself, and what
-    /// derived group completion and reached milestones cascade to, as leverage simulates it.
+    /// Priority, Unlocks: the nodes whose finish completing `key` satisfies: itself, and what
+    /// derived group completion and reached milestones cascade to, as the unlocks simulation does.
     /// `graph` is the one derived.
     #[must_use]
     pub(crate) fn finished_by(&self, graph: &Graph, key: &NodeKey) -> BTreeSet<NodeKey> {
         let Some(index) = self.dependencies.node_index(key) else {
             return BTreeSet::new();
         };
-        priority::leverage::cascade(
+        priority::unlocks::cascade(
             graph,
             &self.dependencies,
             &self.skips,
@@ -295,7 +295,7 @@ impl Derived {
         .collect()
     }
 
-    /// Priority, Leverage: what else holds the node once `finished` is: its unsatisfied gate
+    /// Priority, Unlocks: what else holds the node once `finished` is: its unsatisfied gate
     /// dependencies, its own and inherited (each with how it arose), without those in
     /// `finished` (see [`Derived::finished_by`]) and without its children, which a container
     /// waits on whatever else holds it. Empty when `finished` is all that holds it back. Sorted.
@@ -416,7 +416,7 @@ pub(crate) fn derive_at(
     dates.settle_reached(journey, |key| blocking.auto_reached(key));
     let priority = Priority::pass(journey, &early, &participation, &blocking, rank);
     let ranking = Ranking::pass(&priority, &dates, &blocking, rank, |key| {
-        priority.leverage(key)
+        priority.unlocks(key)
     });
     let stale = stale::Staleness::pass(journey, &early.relevance, &early.dependencies, &blocking);
     let Early {

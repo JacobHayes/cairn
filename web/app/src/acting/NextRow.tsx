@@ -50,7 +50,7 @@ export function NextRow({ view, row, to, selected, tag, sort, testId = "next-ite
       data-selected={selected}
       data-slack={row.slack_days ?? ""}
       data-gravity={row.gravity}
-      data-leverage={row.leverage}
+      data-unlocks={row.unlocks}
       data-rank={row.rank?.rank}
       onClick={(event) => {
         if (onRow(event)) {

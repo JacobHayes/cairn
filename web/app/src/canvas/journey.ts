@@ -128,7 +128,7 @@ function signalsOf(context: Context, node: GraphNode, derived: NodeDerived, at: 
   return {
     rank,
     gravity: finished || derived.relevance.value === "not_relevant" ? undefined : at.roll_up?.subtree_gravity ?? derived.gravity,
-    unblocks: context.frontier.has(node.key) ? { count: derived.leverage_from.total, weighted: derived.leverage } : undefined,
+    unlocks: context.frontier.has(node.key) ? { count: derived.unlocks_from.total, weighted: derived.unlocks } : undefined,
     slackDays: finished || slack == null ? undefined : slack,
   };
 }

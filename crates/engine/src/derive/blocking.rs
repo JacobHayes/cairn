@@ -260,7 +260,7 @@ impl Blocking {
 
     /// F1: a pending, relevant `auto_reach` milestone whose effective date is today or
     /// earlier, which reads as reached once its dependencies are satisfied (pass 6 completes
-    /// it in leverage's simulations).
+    /// it in the unlocks simulations).
     #[must_use]
     pub(crate) fn reaches_when_unblocked(&self, key: &NodeKey) -> bool {
         self.flags_of(key)

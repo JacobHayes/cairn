@@ -33,9 +33,9 @@ export function Connections({ view, detail }: { view: Ready; detail: NodeDetail 
   const { node, derived } = detail;
   const name = namer(view);
   const waits = waitingOn(view, node.key);
-  const frees = useContributions(view, node.key, "leverage", derived.leverage_from);
+  const frees = useContributions(view, node.key, "unlocks", derived.unlocks_from);
   const why = relevanceWords(view, detail);
-  const count = waits.length + derived.leverage_from.total;
+  const count = waits.length + derived.unlocks_from.total;
   const open = derived.display_state === "blocked" || derived.display_state === "conditional" || (derived.stale ?? []).length > 0;
   return (
     <Section title="Connections" summary={count === 0 ? undefined : String(count)} open={open} fold={foldKey(node.kind, "connections")} testId="connections">
@@ -56,8 +56,8 @@ export function Connections({ view, detail }: { view: Ready; detail: NodeDetail 
       )}
       {frees.entries.length === 0 ? null : (
         <div className="stack">
-          <span className="muted small">Unblocks when done</span>
-          <ul className="detail-list" data-testid="unblocks-when-done">
+          <span className="muted small">Unlocks when done</span>
+          <ul className="detail-list" data-testid="unlocks-when-done">
             {frees.entries.map((entry) => (
               <li key={entry.node} data-node={entry.node}>
                 <NodeLink view={view} node={entry.node} />

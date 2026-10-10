@@ -46,7 +46,7 @@ const meetingDue: Bound = {
   },
 };
 
-const relevant = { relevance: { value: "relevant" as const }, gravity: 1, leverage: 0 };
+const relevant = { relevance: { value: "relevant" as const }, gravity: 1, unlocks: 0 };
 const none = { entries: [], total: 0 };
 
 export function testView(): Ready {
@@ -57,7 +57,7 @@ export function testView(): Ready {
       today,
       timezone: "UTC",
       deployment: { revision: 2, entities: [{ key: "e_one", name: "Person One" }, { key: "e_two", name: "Person Two" }] },
-      rank: { urgency: 0.4, late: 0.15, gravity: 0.25, leverage: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
+      rank: { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
     },
     journey: {
       header: { id: "j_test", name: "Test journey", status: "active", created_at: "2026-10-01T00:00:00Z", created_on: "2026-10-01" },
@@ -87,7 +87,7 @@ export function testView(): Ready {
       frontier: ["n_findings"],
       acting_frontier: ["n_findings"],
       nodes: {
-        n_stage: { ...relevant, display_state: "active", actionable: false, dates: {}, gravity_from: none, leverage_from: none, blocked_by: [{ node: "n_findings", via: "containment" }] },
+        n_stage: { ...relevant, display_state: "active", actionable: false, dates: {}, gravity_from: none, unlocks_from: none, blocked_by: [{ node: "n_findings", via: "containment" }] },
         n_report: {
           ...relevant,
           display_state: "active",
@@ -96,7 +96,7 @@ export function testView(): Ready {
           dates: { due: pinnedDue, slack_days: 24 },
           gravity: 5,
           gravity_from: { entries: [{ node: "n_meeting", score: 4 }], total: 1 },
-          leverage_from: none,
+          unlocks_from: none,
         },
         n_findings: {
           ...relevant,
@@ -104,11 +104,11 @@ export function testView(): Ready {
           actionable: true,
           dates: { due: derivedDue },
           gravity_from: none,
-          leverage: 2,
-          leverage_from: { entries: [{ node: "n_report", score: 1.5, other_owner: true }], total: 1 },
+          unlocks: 2,
+          unlocks_from: { entries: [{ node: "n_report", score: 1.5, other_owner: true }], total: 1 },
         },
-        n_meeting: { ...relevant, display_state: "ready", actionable: false, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, leverage_from: none },
-        n_when: { ...relevant, display_state: "ready", actionable: false, dates: {}, gravity_from: none, leverage_from: none },
+        n_meeting: { ...relevant, display_state: "ready", actionable: false, dates: { due: meetingDue, effective_date: { date: "2026-11-20", origin: "pin" } }, gravity_from: none, unlocks_from: none },
+        n_when: { ...relevant, display_state: "ready", actionable: false, dates: {}, gravity_from: none, unlocks_from: none },
       },
     },
   };

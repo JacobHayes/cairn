@@ -1,4 +1,4 @@
-//! Leverage's simulations (PRD Priority, Leverage; ARCHITECTURE, Read path: derive, pass 6):
+//! The unlocks simulations (PRD Priority, Unlocks; ARCHITECTURE, Read path: derive, pass 6):
 //! for each node in the normalization set, which nodes' remaining hard dependencies completing
 //! it would satisfy, holding current relevance and dates fixed. Each instant's rule mirrors
 //! pass 5's: a start or entry is satisfied when its pruned gate waits are; a group's finish

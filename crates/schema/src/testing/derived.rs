@@ -316,7 +316,7 @@ fn arb_participation() -> BoxedStrategy<EffectiveParticipation> {
         .boxed()
 }
 
-/// The scores a node carries: gravity and leverage with their contributors, and rank.
+/// The scores a node carries: gravity and unlocks with their contributors, and rank.
 type Scores = (
     Score,
     Explained<Contribution>,
@@ -394,7 +394,7 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                 let (blocked_by, blocked_through) = blocking;
                 let (snoozed, snoozed_via) = snoozed;
                 let flag = |index: usize| flags.get(index).copied().unwrap_or(false);
-                let (gravity, gravity_from, max_child_gravity, leverage, leverage_from, rank) =
+                let (gravity, gravity_from, max_child_gravity, unlocks, unlocks_from, rank) =
                     scores;
                 NodeDerived {
                     relevance,
@@ -417,8 +417,8 @@ pub fn arb_node_derived() -> BoxedStrategy<NodeDerived> {
                     gravity_from,
                     max_child_gravity,
                     subtree_gravity: subtree,
-                    leverage,
-                    leverage_from,
+                    unlocks,
+                    unlocks_from,
                     rank,
                 }
             },

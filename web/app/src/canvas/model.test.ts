@@ -231,13 +231,13 @@ describe("C7: the trace of a selected node", () => {
 });
 
 describe("C6: the Signals lens", () => {
-  test("each lens puts one labelled number on the cards that have it; a container shows the gravity of its whole area; only the acting frontier has Unblocks", () => {
+  test("each lens puts one labelled number on the cards that have it; a container shows the gravity of its whole area; only the acting frontier has Unlocks", () => {
     const ranked = model(wholeLevel(), ["n_check", "n_choose"]);
     const text = (lens: Parameters<typeof lensChips>[1]) => Object.fromEntries([...lensChips(ranked.cards, lens)].map(([key, chip]) => [key, chip.text]));
     expect(text("rank")).toEqual({ n_check: "Rank #1", n_choose: "Rank #2" });
     expect(text("gravity")).toMatchObject({ n_choose: "Gravity 8", n_option: "Gravity 4.5", n_build: "Gravity 9" });
     expect(text("gravity")["n_kick"]).toBeUndefined();
-    expect(Object.keys(text("unblocks")).sort()).toEqual(["n_check", "n_choose"]);
+    expect(Object.keys(text("unlocks")).sort()).toEqual(["n_check", "n_choose"]);
     expect(text("slack")).toEqual({ n_choose: "Slack 2 days", n_build: "Slack 40 days" });
   });
 });

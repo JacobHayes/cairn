@@ -94,7 +94,7 @@ export function Section({
   );
 }
 
-/** Contributing nodes and what each adds (Priority: gravity and leverage). */
+/** Contributing nodes and what each adds (Priority: gravity and unlocks). */
 export function Contributions({
   view,
   entries,

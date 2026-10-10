@@ -13,7 +13,7 @@ use super::DerivedJourney;
 use crate::derive::Ranking;
 
 impl DerivedJourney<'_> {
-    /// The node's row (C9, C10), its leverage and rank from `ranking`: the global one, or a
+    /// The node's row (C9, C10), its unlocks and rank from `ranking`: the global one, or a
     /// viewer's.
     ///
     /// # Panics
@@ -53,14 +53,14 @@ impl DerivedJourney<'_> {
             slack_days: dates.slack_days(key),
             due: dates.due(key),
             gravity: priority.gravity(key),
-            leverage: ranking
-                .leverage(key)
-                .unwrap_or_else(|| priority.leverage(key)),
+            unlocks: ranking
+                .unlocks(key)
+                .unwrap_or_else(|| priority.unlocks(key)),
             rank: ranking.terms(key).map(|terms| cairn_schema::RankTerms {
                 urgency: real(terms.urgency),
                 late: real(terms.late),
                 gravity_norm: real(terms.gravity_norm),
-                leverage_norm: real(terms.leverage_norm),
+                unlocks_norm: real(terms.unlocks_norm),
                 rank: real(terms.rank),
             }),
         }
@@ -70,10 +70,10 @@ impl DerivedJourney<'_> {
     pub(crate) fn sorted(&self, keys: &[NodeKey], by: SortBy, ranking: &Ranking) -> Vec<NodeKey> {
         let dates = self.derived.dates();
         let priority = self.derived.priority();
-        let leverage = |key: &NodeKey| {
+        let unlocks = |key: &NodeKey| {
             ranking
-                .leverage(key)
-                .unwrap_or_else(|| priority.leverage(key))
+                .unlocks(key)
+                .unwrap_or_else(|| priority.unlocks(key))
         };
         let signal: Order<'_> = match by {
             SortBy::Rank => return ranking.sorted(keys),
@@ -81,7 +81,7 @@ impl DerivedJourney<'_> {
             SortBy::Slack => Box::new(|a, b| least_first(dates.slack_days(a), dates.slack_days(b))),
             SortBy::Due => Box::new(|a, b| least_first(dates.due(a), dates.due(b))),
             SortBy::Gravity => Box::new(|a, b| priority.gravity(b).cmp(&priority.gravity(a))),
-            SortBy::Leverage => Box::new(|a, b| leverage(b).cmp(&leverage(a))),
+            SortBy::Unlocks => Box::new(|a, b| unlocks(b).cmp(&unlocks(a))),
         };
         let mut sorted = keys.to_vec();
         sorted.sort_by(|a, b| signal(a, b).then_with(|| ranking.compare(a, b)));

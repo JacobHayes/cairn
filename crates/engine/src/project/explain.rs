@@ -3,7 +3,7 @@
 //! J4's history, per node or per journey, grouped by patch.
 //!
 //! Cost at `node_count_max`: an explanation list is listed in full and sorted (at most 2,000
-//! entries, pass 6) and a page cut from it; a still-waiting list runs one leverage
+//! entries, pass 6) and a page cut from it; a still-waiting list runs one unlocks
 //! simulation and reads each direct dependent's effective dependencies once (at most 2,000
 //! dependents, each about 1,300 edges); history reads each event given once (the nodes it
 //! names off its delta) and cuts a page of `page_item_count_max` events.
@@ -37,7 +37,7 @@ impl DerivedJourney<'_> {
         let priority = self.derived.priority();
         let (entries, held) = match field {
             ExplainedField::Gravity => (priority.gravity_from(key), Vec::new()),
-            ExplainedField::Leverage => (priority.leverage_from(key), Vec::new()),
+            ExplainedField::Unlocks => (priority.unlocks_from(key), Vec::new()),
             ExplainedField::StillWaiting => (Vec::new(), self.still_waiting(key)?),
         };
         let (kept, next_entries) = page(&entries, cursor, EXPLANATION_ENTRY_COUNT_MAX);
@@ -52,11 +52,11 @@ impl DerivedJourney<'_> {
         })
     }
 
-    /// C8, Priority: Leverage: the node's direct dependents that completing it would not yet
+    /// C8, Priority: Unlocks: the node's direct dependents that completing it would not yet
     /// free, each with what else it waits on (its unsatisfied requirements, condition gates,
     /// and stage openings, its own and inherited), largest weight first, then by key. The
-    /// complement of `leverage_from` among the node's open, in-scope dependents: the ones
-    /// leverage does not count. Empty for a node outside the rank normalization set (closed,
+    /// complement of `unlocks_from` among the node's open, in-scope dependents: the ones
+    /// the unlocks do not count. Empty for a node outside the rank normalization set (closed,
     /// not relevant, or a group), which completing frees nothing.
     ///
     /// # Errors
@@ -75,7 +75,7 @@ impl DerivedJourney<'_> {
         let finished = derived.finished_by(self.graph, key);
         let freed: BTreeSet<NodeKey> = derived
             .priority()
-            .leverage_from(key)
+            .unlocks_from(key)
             .into_iter()
             .map(|freed| freed.node)
             .collect();

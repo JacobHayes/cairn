@@ -86,8 +86,8 @@ impl Derived {
             gravity_from: for_response(priority.gravity_from(key)),
             max_child_gravity: priority.max_child_gravity(key),
             subtree_gravity: priority.subtree_gravity(key),
-            leverage: priority.leverage(key),
-            leverage_from: for_response(priority.leverage_from(key)),
+            unlocks: priority.unlocks(key),
+            unlocks_from: for_response(priority.unlocks_from(key)),
             rank: self
                 .ranking
                 .rank(key)

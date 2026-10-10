@@ -13,7 +13,7 @@ const SORT_CHOICES: { value: SortChoice; words: string }[] = [
   { value: "due", words: "Due" },
   { value: "slack", words: "Start by" },
   { value: "gravity", words: "Gravity" },
-  { value: "leverage", words: "Unblocks" },
+  { value: "unlocks", words: "Unlocks" },
   { value: "effort", words: "Effort" },
 ];
 

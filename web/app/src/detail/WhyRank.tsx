@@ -14,7 +14,7 @@ import { useStillWaiting } from "./reads.ts";
 import { holdingPhrase, rankClause } from "./sentence.ts";
 import { plural, relativeDays } from "./words.ts";
 
-const TERM_NAMES: Record<RankPart["signal"], string> = { urgency: "Urgency", late: "Running late", gravity: "Gravity", leverage: "Unblocks" };
+const TERM_NAMES: Record<RankPart["signal"], string> = { urgency: "Urgency", late: "Running late", gravity: "Gravity", unlocks: "Unlocks" };
 
 const percent = (term: number) => `${String(Math.round(term * 100))}%`;
 
@@ -30,8 +30,8 @@ function termWords(part: RankPart, detail: NodeDetail): string {
       return `${slack == null ? "past its latest start" : `${plural(-slack, "day")} past its latest start`} (${adds})`;
     case "gravity":
       return `${derived.gravity.toFixed(1)} rides on it, ${percent(part.term)} of the most (${adds})`;
-    case "leverage":
-      return `unblocks ${plural(derived.leverage_from.total, "node")}, ${percent(part.term)} of the most (${adds})`;
+    case "unlocks":
+      return `unlocks ${plural(derived.unlocks_from.total, "node")}, ${percent(part.term)} of the most (${adds})`;
   }
 }
 
@@ -90,27 +90,27 @@ function Gravity({ view, detail }: { view: Ready; detail: NodeDetail }) {
 }
 
 /** What finishing the node would unblock now, and the dependents it would not yet free. */
-function Unblocks({ view, detail, open }: { view: Ready; detail: NodeDetail; open: boolean }) {
+function Unlocks({ view, detail, open }: { view: Ready; detail: NodeDetail; open: boolean }) {
   const { node, derived } = detail;
-  const frees = useContributions(view, node.key, "leverage", derived.leverage_from);
+  const frees = useContributions(view, node.key, "unlocks", derived.unlocks_from);
   const waiting = useStillWaiting(view, node.key, open);
-  if (derived.leverage_from.total === 0 && (waiting === undefined || waiting.held.length === 0)) {
+  if (derived.unlocks_from.total === 0 && (waiting === undefined || waiting.held.length === 0)) {
     return (
-      <span className="muted small" data-testid="unblocks">
-        Finishing it unblocks nothing.
+      <span className="muted small" data-testid="unlocks">
+        Finishing it unlocks nothing.
       </span>
     );
   }
   return (
-    <div className="stack" data-testid="unblocks">
+    <div className="stack" data-testid="unlocks">
       <span>
-        <strong>Unblocks</strong> {derived.leverage_from.total} <span className="muted small">weighted {derived.leverage.toFixed(1)}</span>
+        <strong>Unlocks</strong> {derived.unlocks_from.total} <span className="muted small">weighted {derived.unlocks.toFixed(1)}</span>
       </span>
-      <Contributions view={view} entries={frees.entries.filter((entry) => entry.other_owner !== true)} testId="leverage-now" />
+      <Contributions view={view} entries={frees.entries.filter((entry) => entry.other_owner !== true)} testId="unlocks-now" />
       {frees.entries.some((entry) => entry.other_owner === true) ? (
         <div className="stack">
           <span className="muted small">For someone else's work</span>
-          <Contributions view={view} entries={frees.entries.filter((entry) => entry.other_owner === true)} testId="leverage-other" />
+          <Contributions view={view} entries={frees.entries.filter((entry) => entry.other_owner === true)} testId="unlocks-other" />
         </div>
       ) : null}
       {waiting === undefined || waiting.held.length === 0 ? null : (
@@ -166,11 +166,11 @@ export function WhyRank({ view, detail, position, row }: { view: Ready; detail: 
         </>
       )}
       <Gravity view={view} detail={detail} />
-      <Unblocks view={view} detail={detail} open={open} />
+      <Unlocks view={view} detail={detail} open={open} />
       <details data-testid="rank-how">
         <summary className="small">How</summary>
         <span className="small">
-          Rank is urgency × {constants.urgency}, plus running late × {constants.late}, plus gravity's share × {constants.gravity}, plus unblocks' share × {constants.leverage}. Urgency looks {constants.horizon_days} days ahead; a
+          Rank is urgency × {constants.urgency}, plus running late × {constants.late}, plus gravity's share × {constants.gravity}, plus unlocks' share × {constants.unlocks}. Urgency looks {constants.horizon_days} days ahead; a
           dependent owned by someone else counts × {constants.other_owner_factor}.
         </span>
       </details>

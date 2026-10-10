@@ -1,4 +1,4 @@
-//! Priority, Gravity and Leverage explained (C2, C8): a container's subtree gravity, and the
+//! Priority, Gravity and Unlocks explained (C2, C8): a container's subtree gravity, and the
 //! direct dependents completing a node would not yet free with what else each waits on, over
 //! the fixtures and small constructed journeys.
 #![cfg(test)]
@@ -134,17 +134,17 @@ fn held_journey() -> Records {
     ]))
 }
 
-/// C8, Priority: a node with leverage from one dependent lists that unblock, and lists the
+/// C8, Priority: a node that unlocks one dependent lists it, and lists the
 /// dependents it would not free with what else each waits on, here a condition and another
 /// action, largest weight first. Answering the decision frees the held dependent, which then
-/// leaves the list and joins the unblocks; reaching the gate leaves nothing waiting on it.
+/// leaves the list and joins what it unlocks; reaching the gate leaves nothing waiting on it.
 #[test]
-fn a_node_lists_what_it_unblocks_and_what_is_still_waiting() {
+fn a_node_lists_what_it_unlocks_and_what_is_still_waiting() {
     let before = held_journey();
     let graph = support::journey_graph(&before, support::JOURNEY);
     let derived = support::derived(&before, support::JOURNEY);
-    assert_eq!(derived.priority().leverage(&key("n_gate")).value(), 10.0);
-    let freed = derived.priority().leverage_from(&key("n_gate"));
+    assert_eq!(derived.priority().unlocks(&key("n_gate")).value(), 10.0);
+    let freed = derived.priority().unlocks_from(&key("n_gate"));
     assert_eq!(
         freed
             .iter()
@@ -178,7 +178,7 @@ fn a_node_lists_what_it_unblocks_and_what_is_still_waiting() {
     );
     let freed: Vec<_> = derived
         .priority()
-        .leverage_from(&key("n_gate"))
+        .unlocks_from(&key("n_gate"))
         .into_iter()
         .map(|found| found.node)
         .collect();
@@ -196,7 +196,7 @@ fn a_node_lists_what_it_unblocks_and_what_is_still_waiting() {
     assert_eq!(waiting, [], "a reached gate holds nothing back");
 }
 
-/// Priority, Leverage: completing a node cascades through derived group completion, so a
+/// Priority, Unlocks: completing a node cascades through derived group completion, so a
 /// dependent that waits on the node and on the group only it holds open is not listed as
 /// waiting on that group, and a group the cascade completes is not listed at all.
 #[test]

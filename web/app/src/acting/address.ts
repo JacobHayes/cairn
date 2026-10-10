@@ -35,13 +35,13 @@ export const LIST_FILTER_FLAGS: ListFlag[] = ["overdue", "stale", "unassigned", 
 export const NEXT_FILTER_FLAGS: ListFlag[] = LIST_FILTER_FLAGS.filter((flag) => flag !== "snoozed");
 
 /** C9, C10: the single signals a list sorts by (Priority: effort when estimates exist). */
-export const SORTS: SortBy[] = ["rank", "slack", "gravity", "leverage", "due", "effort"];
+export const SORTS: SortBy[] = ["rank", "slack", "gravity", "unlocks", "due", "effort"];
 
 /** D8: the states the list's filter offers: every display state but not relevant, which has its own switch. */
 export const STATES: DisplayState[] = DISPLAY_STATES.filter((state) => state !== "not_relevant");
 
 /** C9: the columns Columns adds beyond the ones every list shows, in the order they sit. */
-export const LIST_COLUMNS = ["rank", "start_by", "slack", "gravity", "unblocks", "kind", "answer", "why", "affects", "effort"] as const;
+export const LIST_COLUMNS = ["rank", "start_by", "slack", "gravity", "unlocks", "kind", "answer", "why", "affects", "effort"] as const;
 export type ListColumn = (typeof LIST_COLUMNS)[number];
 
 /** Every kind; groups are never on the frontier, so the acting surfaces offer the others. */

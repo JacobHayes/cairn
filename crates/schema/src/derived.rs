@@ -50,7 +50,7 @@ pub struct RelevanceExplanation {
     /// D8: when the value is `not_relevant` only because a decision it reads is itself
     /// undecided (so unanswered, and every value operator on it false), the undecided
     /// decisions it rests on: reading them as still to come would leave the node undecided.
-    /// Empty when the value is settled. The value itself is unchanged, so gravity, leverage
+    /// Empty when the value is settled. The value itself is unchanged, so gravity, unlocks
     /// and blocking follow Gating exactly; display state shows such a node as `conditional`.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub pending_on: BTreeSet<NodeKey>,
@@ -102,7 +102,7 @@ pub struct Blocker {
     pub via: DependencyVia,
 }
 
-/// A derived weight sum (Priority: gravity, leverage, and their contributions) in millionths
+/// A derived weight sum (Priority: gravity, unlocks, and their contributions) in millionths
 /// of a weight, written as its value in weight units (`2.5`). A weight is a whole number, and
 /// the undecided discount and the other-owner factor are counted in thousandths, so each term
 /// (weight x discount x factor) is a whole number of millionths: sums are exact, and at the
@@ -195,7 +195,7 @@ pub struct Thousandths<const MIN: u32, const MAX: u32>(u32);
 /// The undecided discount (Priority: `effective_weight`), from 0 to 1.
 pub type UndecidedDiscount = Thousandths<0, 1_000>;
 
-/// Leverage's factor for a target owned by someone else (Priority: `owner_factor`), from 1 to
+/// The factor a target owned by someone else gets in unlocks (Priority: `owner_factor`), from 1 to
 /// `weight_max`: the limits table names no bound for it, so it takes the nearest named one.
 pub type OwnerFactor = Thousandths<1_000, { WEIGHT_MAX * 1_000 }>;
 
@@ -348,7 +348,7 @@ impl JsonSchema for Real {
     }
 }
 
-/// A gravity or leverage contribution: the node and how much it adds.
+/// A gravity or unlocks contribution: the node and how much it adds.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Contribution {
@@ -356,7 +356,7 @@ pub struct Contribution {
     pub node: NodeKey,
     /// What it adds.
     pub score: Score,
-    /// It is owned by someone other than the node's owner (leverage's owner factor).
+    /// It is owned by someone other than the node's owner (the owner factor of unlocks).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub other_owner: bool,
 }
@@ -522,17 +522,17 @@ pub struct NodeDerived {
     /// children.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub subtree_gravity: Option<Score>,
-    /// Leverage (Priority).
-    pub leverage: Score,
+    /// Unlocks (Priority).
+    pub unlocks: Score,
     /// The nodes completing this would unblock.
-    pub leverage_from: Explained<Contribution>,
+    pub unlocks_from: Explained<Contribution>,
     /// Rank, for nodes in the normalization set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rank: Option<Real>,
 }
 
 /// A dependent that completing a node would not yet free, and what else it waits on (C8,
-/// Priority: Leverage): one entry of node detail's `still_waiting`.
+/// Priority: Unlocks): one entry of node detail's `still_waiting`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct HeldDependent {
@@ -543,7 +543,7 @@ pub struct HeldDependent {
     pub also_waits_on: Vec<Blocker>,
 }
 
-/// The dependents completing a node would not yet free (C8, Priority: Leverage): node
+/// The dependents completing a node would not yet free (C8, Priority: Unlocks): node
 /// detail's `still_waiting`, its largest entries up to `explanation_entry_count_max` with the
 /// total; the rest page through the explanations of `ExplainedField::StillWaiting`.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -709,13 +709,13 @@ pub struct RankConstants {
     pub late: Real,
     /// Normalized gravity's weight (0.25).
     pub gravity: Real,
-    /// Normalized leverage's weight (0.20).
-    pub leverage: Real,
+    /// Weight of normalized unlocks (0.20).
+    pub unlocks: Real,
     /// Days of slack over which urgency rises from 0 to 1 (14).
     pub horizon_days: u32,
-    /// An undecided node's weight factor in gravity and leverage (0.5).
+    /// An undecided node's weight factor in gravity and unlocks (0.5).
     pub undecided_discount: UndecidedDiscount,
-    /// Leverage's factor for a target owned by someone other than the node's owner (2).
+    /// The factor a target owned by someone other than the node's owner gets in unlocks (2).
     pub other_owner_factor: OwnerFactor,
 }
 
@@ -726,7 +726,7 @@ struct RankConstantsWire {
     urgency: Real,
     late: Real,
     gravity: Real,
-    leverage: Real,
+    unlocks: Real,
     horizon_days: u32,
     undecided_discount: UndecidedDiscount,
     other_owner_factor: OwnerFactor,
@@ -736,7 +736,7 @@ impl TryFrom<RankConstantsWire> for RankConstants {
     type Error = String;
 
     fn try_from(wire: RankConstantsWire) -> Result<Self, String> {
-        let sum = wire.urgency.get() + wire.late.get() + wire.gravity.get() + wire.leverage.get();
+        let sum = wire.urgency.get() + wire.late.get() + wire.gravity.get() + wire.unlocks.get();
         if !sum.is_finite() {
             return Err(format!(
                 "the rank coefficients sum to {sum}: a rank must be a finite number"
@@ -746,7 +746,7 @@ impl TryFrom<RankConstantsWire> for RankConstants {
             urgency: wire.urgency,
             late: wire.late,
             gravity: wire.gravity,
-            leverage: wire.leverage,
+            unlocks: wire.unlocks,
             horizon_days: wire.horizon_days,
             undecided_discount: wire.undecided_discount,
             other_owner_factor: wire.other_owner_factor,
@@ -761,7 +761,7 @@ impl Default for RankConstants {
             urgency: Real(0.40),
             late: Real(0.15),
             gravity: Real(0.25),
-            leverage: Real(0.20),
+            unlocks: Real(0.20),
             horizon_days: 14,
             undecided_discount: Thousandths(500),
             other_owner_factor: Thousandths(2_000),
@@ -930,12 +930,12 @@ mod tests {
     fn reals_are_finite_and_non_negative() {
         for bad in [".nan", ".inf", "-.inf", "-0.5"] {
             let yaml = format!(
-                "urgency: {bad}\nlate: 0.15\ngravity: 0.25\nleverage: 0.2\nhorizon_days: 14\nundecided_discount: 0.5\nother_owner_factor: 2\n"
+                "urgency: {bad}\nlate: 0.15\ngravity: 0.25\nunlocks: 0.2\nhorizon_days: 14\nundecided_discount: 0.5\nother_owner_factor: 2\n"
             );
             assert!(crate::from_yaml::<RankConstants>(&yaml).is_err(), "{bad}");
         }
         assert!(Real::try_from(0.4).is_ok());
-        let overflowing = "urgency: 1e308\nlate: 0.15\ngravity: 1e308\nleverage: 0.2\nhorizon_days: 14\nundecided_discount: 0.5\nother_owner_factor: 2\n";
+        let overflowing = "urgency: 1e308\nlate: 0.15\ngravity: 1e308\nunlocks: 0.2\nhorizon_days: 14\nundecided_discount: 0.5\nother_owner_factor: 2\n";
         assert!(
             crate::from_yaml::<RankConstants>(overflowing).is_err(),
             "coefficients summing past any finite rank"
@@ -948,7 +948,7 @@ mod tests {
         let sum = constants.urgency.get()
             + constants.late.get()
             + constants.gravity.get()
-            + constants.leverage.get();
+            + constants.unlocks.get();
         assert!((sum - 1.0).abs() < 1e-9);
     }
 }

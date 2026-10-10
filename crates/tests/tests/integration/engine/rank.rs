@@ -58,7 +58,7 @@ const LATE: &str = "{key: n_late, id: late, kind: action, title: Late}";
 const FREE: &str = "{key: n_free, id: free, kind: action, title: Free}";
 
 /// Priority, Rank: seven days of slack is half urgent; seven days late is fully urgent and
-/// half late; null slack gives neither; gravity and leverage normalize to the largest in the
+/// half late; null slack gives neither; gravity and unlocks normalize to the largest in the
 /// normalization set, the blocked milestones included; ranked by rank.
 #[test]
 fn urgency_lateness_and_null_slack() {
@@ -102,7 +102,7 @@ fn urgency_lateness_and_null_slack() {
 }
 
 /// Priority, Rank: done, not-relevant, and group nodes are not ranked, and a set whose
-/// largest gravity and leverage are zero normalizes both to zero.
+/// largest gravity and unlocks are zero normalizes both to zero.
 #[test]
 fn only_the_normalization_set_is_ranked() {
     let records = support::journey(&add(&[
@@ -120,13 +120,13 @@ fn only_the_normalization_set_is_ranked() {
     assert_eq!(ranking.rank(&key("n_done")), None, "terminal");
     let inside = ranking.terms(&key("n_inside")).unwrap();
     assert_eq!(
-        (inside.gravity_norm, inside.leverage_norm, inside.rank),
+        (inside.gravity_norm, inside.unlocks_norm, inside.rank),
         (0.0, 0.0, 0.0)
     );
 }
 
 /// Priority, Rank: equal ranks break by smaller slack with null last, then greater gravity,
-/// then key. With gravity's and leverage's coefficients at zero and every slack past the
+/// then key. With the gravity and unlocks coefficients at zero and every slack past the
 /// horizon, every rank is zero.
 #[test]
 fn ties_break_by_slack_then_gravity_then_key() {
@@ -145,7 +145,7 @@ fn ties_break_by_slack_then_gravity_then_key() {
     );
     let constants = RankConstants {
         gravity: Real::try_from(0.0).unwrap(),
-        leverage: Real::try_from(0.0).unwrap(),
+        unlocks: Real::try_from(0.0).unwrap(),
         ..RankConstants::default()
     };
     let derived = derived_with(&records, constants);
@@ -186,18 +186,18 @@ fn prioritize_for_me_recomputes_the_owner_factor_for_the_viewer() {
     let global = derived.ranking().clone();
     assert_eq!(names(global.frontier()), ["n_gate_a", "n_gate_b"]);
     assert_eq!(global.rank(&key("n_gate_a")), global.rank(&key("n_gate_b")));
-    assert_eq!(global.leverage(&key("n_gate_a")).unwrap().value(), 2.0);
+    assert_eq!(global.unlocks(&key("n_gate_a")).unwrap().value(), 2.0);
     let for_a = derived.rank_for(&viewer("e_a"));
     assert_eq!(names(for_a.frontier()), ["n_gate_a", "n_gate_b"]);
-    assert_eq!(for_a.leverage(&key("n_gate_a")).unwrap().value(), 2.0);
-    assert_eq!(for_a.leverage(&key("n_gate_b")).unwrap().value(), 1.0);
+    assert_eq!(for_a.unlocks(&key("n_gate_a")).unwrap().value(), 2.0);
+    assert_eq!(for_a.unlocks(&key("n_gate_b")).unwrap().value(), 1.0);
     let for_b = derived.rank_for(&viewer("e_b"));
     assert_eq!(names(for_b.frontier()), ["n_gate_b", "n_gate_a"]);
     assert!(for_b.rank(&key("n_gate_b")) > for_b.rank(&key("n_gate_a")));
     assert_eq!(derived.ranking(), &global, "the shared rank is unchanged");
 }
 
-/// Priority, Leverage, Rank: a small gate in front of others' parallel work ranks above a
+/// Priority, Unlocks, Rank: a small gate in front of others' parallel work ranks above a
 /// heavy standalone task.
 #[test]
 fn a_small_gate_ranks_early() {

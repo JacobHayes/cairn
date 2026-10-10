@@ -427,8 +427,8 @@ pub enum SortBy {
     Slack,
     /// Gravity, greatest first.
     Gravity,
-    /// Leverage, greatest first.
-    Leverage,
+    /// Unlocks, greatest first.
+    Unlocks,
     /// Due date, earliest first, none last.
     Due,
     /// Gravity per estimated day, greatest first, no estimate last (Priority: Effort-adjusted).
@@ -445,8 +445,8 @@ pub struct RankTerms {
     pub late: Real,
     /// Gravity over the largest in the normalization set.
     pub gravity_norm: Real,
-    /// Leverage over the largest in the normalization set.
-    pub leverage_norm: Real,
+    /// Unlocks over the largest in the normalization set.
+    pub unlocks_norm: Real,
     /// The blend.
     pub rank: Real,
 }
@@ -516,8 +516,8 @@ pub struct NodeRow {
     pub due: Option<Date>,
     /// Gravity.
     pub gravity: Score,
-    /// Leverage: the viewer's, in a ranking for them.
-    pub leverage: Score,
+    /// Unlocks: the viewer's, in a ranking for them.
+    pub unlocks: Score,
     /// Its rank and terms, for nodes in the normalization set.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub rank: Option<RankTerms>,
@@ -761,7 +761,7 @@ pub enum ExplainedField {
     /// The nodes that make up its gravity.
     Gravity,
     /// The nodes completing it would unblock.
-    Leverage,
+    Unlocks,
     /// The direct dependents completing it would not yet free, with what else each waits on.
     StillWaiting,
 }
@@ -775,7 +775,7 @@ pub struct ExplanationPage {
     pub node: NodeKey,
     /// The value.
     pub field: ExplainedField,
-    /// The entries of a gravity or leverage list.
+    /// The entries of a gravity or unlocks list.
     pub entries: Vec<Contribution>,
     /// The entries of a still-waiting list, which holds dependents rather than
     /// contributions; empty for the other fields.

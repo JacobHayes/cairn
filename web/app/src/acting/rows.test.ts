@@ -14,7 +14,7 @@ const row = (key: string): NodeRow => ({
   display_state: "ready",
   relevance: "relevant",
   gravity: 1,
-  leverage: 0,
+  unlocks: 0,
 });
 
 describe("withFlags", () => {

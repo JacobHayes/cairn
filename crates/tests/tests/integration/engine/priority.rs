@@ -1,5 +1,5 @@
 //! Pass 6 (PRD Priority; C6, C8, C10): gravity with the undecided discount on each node's own
-//! weight, count-once downstream sets, not-relevant pruning, and terminal traversal; leverage
+//! weight, count-once downstream sets, not-relevant pruning, and terminal traversal; unlocks
 //! with the owner factor, derived group completion, kept work, and each target once. Hand-built
 //! journeys are created on 2026-10-06 and derived at that day.
 #![cfg(test)]
@@ -22,8 +22,8 @@ fn gravity(derived: &Derived, node: &str) -> f64 {
     derived.priority().gravity(&key(node)).value()
 }
 
-fn leverage(derived: &Derived, node: &str) -> f64 {
-    derived.priority().leverage(&key(node)).value()
+fn unlocks(derived: &Derived, node: &str) -> f64 {
+    derived.priority().unlocks(&key(node)).value()
 }
 
 /// Contributions as (node, value, other owner), in the order listed.
@@ -174,7 +174,7 @@ fn owned(node: &str, requires: &str, weight: u32, owner: Option<&str>) -> String
 
 const PEOPLE: &str = "- op: create_entity\n  entity: {key: e_a, name: A}\n- op: create_entity\n  entity: {key: e_b, name: B}\n";
 
-/// Priority, Leverage: an unblocked node owned by someone other than the node's owner counts
+/// Priority, Unlocks: an unblocked node owned by someone other than the node's owner counts
 /// double, and so does one no one owns when the node is owned; when the node is unowned, an
 /// owned target counts double and an unowned one once. The split is listed per target.
 #[test]
@@ -192,24 +192,24 @@ fn the_owner_factor_favors_other_owners_and_the_unowned_target() {
     let nodes: Vec<&str> = nodes.iter().map(String::as_str).collect();
     let records = support::journey(&format!("{PEOPLE}{}", add(&nodes)));
     let derived = derived(&records);
-    assert_eq!(leverage(&derived, "n_gate"), 2.0 + 3.0 * 2.0 + 4.0 * 2.0);
+    assert_eq!(unlocks(&derived, "n_gate"), 2.0 + 3.0 * 2.0 + 4.0 * 2.0);
     assert_eq!(
-        listed(&derived.priority().leverage_from(&key("n_gate"))),
+        listed(&derived.priority().unlocks_from(&key("n_gate"))),
         [
             ("n_nobodys", 8.0, true),
             ("n_theirs", 6.0, true),
             ("n_mine", 2.0, false)
         ]
     );
-    assert_eq!(leverage(&derived, "n_free"), 3.0 * 2.0 + 2.0);
-    assert_eq!(leverage(&derived, "n_mine"), 0.0, "unblocks nothing");
+    assert_eq!(unlocks(&derived, "n_free"), 3.0 * 2.0 + 2.0);
+    assert_eq!(unlocks(&derived, "n_mine"), 0.0, "unblocks nothing");
 }
 
-/// Priority, Leverage: completing the last open child completes its group (derived group
+/// Priority, Unlocks: completing the last open child completes its group (derived group
 /// completion), which unblocks what waits on the group; each target counts once even when
 /// it waits on both; what still waits on other open work is not unblocked.
 #[test]
-fn leverage_cascades_through_group_completion_once_per_target() {
+fn unlocks_cascade_through_group_completion_once_per_target() {
     let records = support::journey(&add(&[
         "{key: n_stage, id: stage, kind: group, title: Stage}",
         "{key: n_last, id: last, parent: n_stage, kind: action, title: Last}",
@@ -219,26 +219,22 @@ fn leverage_cascades_through_group_completion_once_per_target() {
     ]));
     let derived = derived(&records);
     assert_eq!(
-        listed(&derived.priority().leverage_from(&key("n_last"))),
+        listed(&derived.priority().unlocks_from(&key("n_last"))),
         [("n_next", 2.0, false)]
     );
+    assert_eq!(unlocks(&derived, "n_other"), 0.0, "the stage is still open");
     assert_eq!(
-        leverage(&derived, "n_other"),
-        0.0,
-        "the stage is still open"
-    );
-    assert_eq!(
-        derived.priority().leverage(&key("n_stage")),
+        derived.priority().unlocks(&key("n_stage")),
         Score::default(),
-        "a group has no leverage of its own"
+        "a group has no unlocks of its own"
     );
 }
 
-/// Priority, Leverage, F1: an `auto_reach` milestone due today or earlier reads as reached as
+/// Priority, Unlocks, F1: an `auto_reach` milestone due today or earlier reads as reached as
 /// soon as it is unblocked, so completing what gates it also unblocks what waits on it; one
 /// still ahead of its date is unblocked and holds what follows.
 #[test]
-fn leverage_cascades_through_a_due_auto_reach_milestone() {
+fn unlocks_cascade_through_a_due_auto_reach_milestone() {
     let records = support::journey(&format!(
         "{}- op: set_pin\n  node: n_due\n  date: \"2026-10-01\"\n- op: set_pin\n  node: n_ahead\n  date: \"2026-10-20\"\n",
         add(&[
@@ -252,21 +248,21 @@ fn leverage_cascades_through_a_due_auto_reach_milestone() {
     ));
     let derived = derived(&records);
     assert_eq!(
-        listed(&derived.priority().leverage_from(&key("n_gate"))),
+        listed(&derived.priority().unlocks_from(&key("n_gate"))),
         [("n_after", 10.0, false), ("n_due", 1.0, false)]
     );
     assert_eq!(
-        listed(&derived.priority().leverage_from(&key("n_due"))),
+        listed(&derived.priority().unlocks_from(&key("n_due"))),
         [("n_after", 10.0, false)],
         "completing the milestone itself"
     );
     assert_eq!(
-        listed(&derived.priority().leverage_from(&key("n_other"))),
+        listed(&derived.priority().unlocks_from(&key("n_other"))),
         [("n_ahead", 1.0, false)]
     );
 }
 
-/// Priority, Leverage, D1a: completing the kept work under a skipped container lets the
+/// Priority, Unlocks, D1a: completing the kept work under a skipped container lets the
 /// container satisfy its dependents.
 #[test]
 fn completing_kept_work_unblocks_the_skipped_containers_dependents() {
@@ -282,15 +278,15 @@ fn completing_kept_work_unblocks_the_skipped_containers_dependents() {
     );
     let derived = derived(&skipped);
     assert_eq!(
-        listed(&derived.priority().leverage_from(&key("n_review"))),
+        listed(&derived.priority().unlocks_from(&key("n_review"))),
         [("n_uses", 6.0, false)]
     );
 }
 
-/// Priority, Leverage: a small gate in front of parallel work owned by others has high
-/// leverage and low gravity next to a heavy standalone task.
+/// Priority, Unlocks: a small gate in front of parallel work owned by others has high
+/// unlocks and low gravity next to a heavy standalone task.
 #[test]
-fn a_small_gate_has_high_leverage_and_low_gravity() {
+fn a_small_gate_unlocks_much_and_weighs_little() {
     let mut nodes = vec![
         "{key: n_gate, id: gate, kind: action, title: Gate, participations: {k_owner: [e_a]}}"
             .to_owned(),
@@ -301,8 +297,8 @@ fn a_small_gate_has_high_leverage_and_low_gravity() {
     let records = support::journey(&format!("{PEOPLE}{}", add(&nodes)));
     let derived = derived(&records);
     assert!(gravity(&derived, "n_gate") < gravity(&derived, "n_heavy"));
-    assert!(leverage(&derived, "n_gate") > leverage(&derived, "n_heavy"));
-    assert_eq!(leverage(&derived, "n_gate"), 6.0);
+    assert!(unlocks(&derived, "n_gate") > unlocks(&derived, "n_heavy"));
+    assert_eq!(unlocks(&derived, "n_gate"), 6.0);
 }
 
 /// Illustrative example: with the meeting pinned, environment access has higher gravity than
@@ -323,7 +319,7 @@ fn environment_access_outweighs_the_plan() {
 }
 
 /// D3, C6, C10: the schema's `Derived` carries every node's gravity with its contributors,
-/// largest child gravity, leverage with the split by owner, and rank, and the frontiers in
+/// largest child gravity, unlocks with the split by owner, and rank, and the frontiers in
 /// rank order; it reads back from JSON as written.
 #[test]
 fn the_projection_carries_the_signals_and_their_inputs() {
@@ -350,7 +346,7 @@ fn the_projection_carries_the_signals_and_their_inputs() {
         "largest first"
     );
     assert_eq!(
-        listed(kickoff.leverage_from.entries.as_slice()),
+        listed(kickoff.unlocks_from.entries.as_slice()),
         [("n_access", 1.0, false), ("n_workload", 1.0, false)]
     );
     assert_eq!(
@@ -389,7 +385,7 @@ fn the_projection_cuts_long_explanations_to_the_limit() {
         (limit, 60)
     );
     assert_eq!(
-        (root.leverage_from.entries.len(), root.leverage_from.total),
+        (root.unlocks_from.entries.len(), root.unlocks_from.total),
         (limit, 60)
     );
     assert_eq!(derived.priority().gravity_from(&key("n_root")).len(), 60);

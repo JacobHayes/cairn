@@ -2,7 +2,7 @@
 //! engine derives, so the document cannot drift from the engine: the vendor evaluation's
 //! relevance and participations at each decision point (Gating, E2, E3), its latest starts
 //! and due dates once the meeting is pinned (F3, F4), its frontier after each step (D2, B6),
-//! its ranked frontier with each node's gravity, leverage, and slack (Priority), and each
+//! its ranked frontier with each node's gravity, unlocks, and slack (Priority), and each
 //! fixture's projection lines and status summary, which every fixture has (C2, C4, C10, C18).
 #![cfg(test)]
 
@@ -294,11 +294,11 @@ fn the_frontier_table_is_what_derive_gives() {
 }
 
 /// The rank table: after each step it lists, the ranked frontier in order, each node with its
-/// gravity, leverage, slack (none when it has no deadline), and rank to four places.
+/// gravity, unlocks, slack (none when it has no deadline), and rank to four places.
 #[test]
 fn the_rank_table_is_what_derive_gives() {
     let vendor = Vendor::run();
-    let rows = table("| After step | Node | Gravity | Leverage | Slack | Rank |");
+    let rows = table("| After step | Node | Gravity | Unlocks | Slack | Rank |");
     let mut by_step: BTreeMap<usize, Vec<Vec<String>>> = BTreeMap::new();
     for row in rows {
         by_step
@@ -316,7 +316,7 @@ fn the_rank_table_is_what_derive_gives() {
                 vec![
                     format!("`{key}`"),
                     derived.priority().gravity(key).value().to_string(),
-                    ranking.leverage(key).unwrap().value().to_string(),
+                    ranking.unlocks(key).unwrap().value().to_string(),
                     derived
                         .dates()
                         .slack_days(key)

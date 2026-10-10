@@ -127,7 +127,7 @@ the plan reaches the frontier only after its two actions, and the comparison set
 plan.
 
 The frontier in rank order after the first three steps (brief 2.5), read on 2026-10-06 (the
-scenario matrix's clock), with each node's gravity, leverage, and slack (null is "no deadline")
+scenario matrix's clock), with each node's gravity, unlocks, and slack (null is "no deadline")
 and its rank under the default constants, to four places. Rank is global: every owner is the evaluation's owner (or, at creation, no one), so the
 owner factor is 1 throughout. Kickoff leads while it gates Setup (its gravity holds Setup, the
 plan, and everything after them, the undecided baseline at half); the partner decision's gravity
@@ -136,7 +136,7 @@ fall back to key order; once kickoff is reached, environment access leads. Every
 the 14-day horizon, so urgency is 0. The scenario matrix checks the ranks
 (`crates/tests/tests/integration/engine/matrix.rs`).
 
-| After step | Node | Gravity | Leverage | Slack | Rank |
+| After step | Node | Gravity | Unlocks | Slack | Rank |
 |---|---|---|---|---|---|
 | 1 | `n_kickoff` | 15.5 | 2 | none | 0.4500 |
 | 1 | `n_partner_runs` | 10 | 0.5 | none | 0.2113 |

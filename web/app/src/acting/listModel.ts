@@ -46,7 +46,7 @@ export const SORT_OF: Partial<Record<Column, SortBy>> = {
   rank: "rank",
   slack: "slack",
   gravity: "gravity",
-  unblocks: "leverage",
+  unlocks: "unlocks",
   due: "due",
   effort: "effort",
 };

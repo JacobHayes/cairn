@@ -60,7 +60,7 @@ impl From<Vec<MineEntry>> for Mine {
     }
 }
 
-/// C8: one node in full. Its explanation lists (`derived.gravity_from`, `leverage_from`)
+/// C8: one node in full. Its explanation lists (`derived.gravity_from`, `unlocks_from`)
 /// carry their largest entries up to `explanation_entry_count_max` with their totals; the rest
 /// page through the node's explanations endpoint.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -99,7 +99,7 @@ pub struct NodeDetail {
     /// Every derived value (D3) with what explains it.
     pub derived: NodeDerived,
     /// The direct dependents completing it would not yet free, each with what else it waits
-    /// on (C8, Priority: Leverage): the largest entries with the total; page the rest with
+    /// on (C8, Priority: Unlocks): the largest entries with the total; page the rest with
     /// the explanations endpoint, field `still_waiting`.
     pub still_waiting: StillWaiting,
     /// A decision's effects per choice (C12): what each answer brings in, drops, and leaves

@@ -2188,14 +2188,14 @@
       },
       "Contribution": {
         "additionalProperties": false,
-        "description": "A gravity or leverage contribution: the node and how much it adds.",
+        "description": "A gravity or unlocks contribution: the node and how much it adds.",
         "properties": {
           "node": {
             "$ref": "#/components/schemas/NodeKey",
             "description": "The contributing node."
           },
           "other_owner": {
-            "description": "It is owned by someone other than the node's owner (leverage's owner factor).",
+            "description": "It is owned by someone other than the node's owner (the owner factor of unlocks).",
             "type": "boolean"
           },
           "score": {
@@ -3350,7 +3350,7 @@
             "type": "string"
           },
           {
-            "const": "leverage",
+            "const": "unlocks",
             "description": "The nodes completing it would unblock.",
             "type": "string"
           },
@@ -3366,7 +3366,7 @@
         "description": "A page of one value's explanation list, largest first, `explanation_entry_count_max` at a\ntime; the first page is what node detail carries.",
         "properties": {
           "entries": {
-            "description": "The entries of a gravity or leverage list.",
+            "description": "The entries of a gravity or unlocks list.",
             "items": {
               "$ref": "#/components/schemas/Contribution"
             },
@@ -4457,7 +4457,7 @@
       },
       "HeldDependent": {
         "additionalProperties": false,
-        "description": "A dependent that completing a node would not yet free, and what else it waits on (C8,\nPriority: Leverage): one entry of node detail's `still_waiting`.",
+        "description": "A dependent that completing a node would not yet free, and what else it waits on (C8,\nPriority: Unlocks): one entry of node detail's `still_waiting`.",
         "properties": {
           "also_waits_on": {
             "description": "What else it waits on, besides the node: its unsatisfied requirements, condition\ngates, and stage openings, each with how it arose. Never empty.",
@@ -8100,14 +8100,6 @@
             "$ref": "#/components/schemas/Explained",
             "description": "The contributors to gravity."
           },
-          "leverage": {
-            "$ref": "#/components/schemas/Score",
-            "description": "Leverage (Priority)."
-          },
-          "leverage_from": {
-            "$ref": "#/components/schemas/Explained",
-            "description": "The nodes completing this would unblock."
-          },
           "max_child_gravity": {
             "anyOf": [
               {
@@ -8201,6 +8193,14 @@
           "unassigned": {
             "description": "No owner (E1), for a non-group node that is in scope and unfinished; a not-relevant or\nfinished node, or a group, never is.",
             "type": "boolean"
+          },
+          "unlocks": {
+            "$ref": "#/components/schemas/Score",
+            "description": "Unlocks (Priority)."
+          },
+          "unlocks_from": {
+            "$ref": "#/components/schemas/Explained",
+            "description": "The nodes completing this would unblock."
           }
         },
         "required": [
@@ -8210,14 +8210,14 @@
           "dates",
           "gravity",
           "gravity_from",
-          "leverage",
-          "leverage_from"
+          "unlocks",
+          "unlocks_from"
         ],
         "type": "object"
       },
       "NodeDetail": {
         "additionalProperties": false,
-        "description": "C8: one node in full. Its explanation lists (`derived.gravity_from`, `leverage_from`)\ncarry their largest entries up to `explanation_entry_count_max` with their totals; the rest\npage through the node's explanations endpoint.",
+        "description": "C8: one node in full. Its explanation lists (`derived.gravity_from`, `unlocks_from`)\ncarry their largest entries up to `explanation_entry_count_max` with their totals; the rest\npage through the node's explanations endpoint.",
         "properties": {
           "annotations": {
             "description": "The notes and links on it (G1), in key order.",
@@ -8322,7 +8322,7 @@
           },
           "still_waiting": {
             "$ref": "#/components/schemas/StillWaiting",
-            "description": "The direct dependents completing it would not yet free, each with what else it waits\non (C8, Priority: Leverage): the largest entries with the total; page the rest with\nthe explanations endpoint, field `still_waiting`."
+            "description": "The direct dependents completing it would not yet free, each with what else it waits\non (C8, Priority: Unlocks): the largest entries with the total; page the rest with\nthe explanations endpoint, field `still_waiting`."
           }
         },
         "required": [
@@ -8926,10 +8926,6 @@
             "$ref": "#/components/schemas/NodeKind",
             "description": "Its kind."
           },
-          "leverage": {
-            "$ref": "#/components/schemas/Score",
-            "description": "Leverage: the viewer's, in a ranking for them."
-          },
           "needs_breakdown": {
             "description": "B10.",
             "type": "boolean"
@@ -9019,6 +9015,10 @@
           "unassigned": {
             "description": "No owner (E1).",
             "type": "boolean"
+          },
+          "unlocks": {
+            "$ref": "#/components/schemas/Score",
+            "description": "Unlocks: the viewer's, in a ranking for them."
           }
         },
         "required": [
@@ -9030,7 +9030,7 @@
           "display_state",
           "relevance",
           "gravity",
-          "leverage"
+          "unlocks"
         ],
         "type": "object"
       },
@@ -10670,14 +10670,14 @@
           "late": {
             "$ref": "#/components/schemas/Real"
           },
-          "leverage": {
-            "$ref": "#/components/schemas/Real"
-          },
           "other_owner_factor": {
             "$ref": "#/components/schemas/Thousandths1000To1000000"
           },
           "undecided_discount": {
             "$ref": "#/components/schemas/Thousandths0To1000"
+          },
+          "unlocks": {
+            "$ref": "#/components/schemas/Real"
           },
           "urgency": {
             "$ref": "#/components/schemas/Real"
@@ -10687,7 +10687,7 @@
           "urgency",
           "late",
           "gravity",
-          "leverage",
+          "unlocks",
           "horizon_days",
           "undecided_discount",
           "other_owner_factor"
@@ -10706,13 +10706,13 @@
             "$ref": "#/components/schemas/Real",
             "description": "From negative slack over the horizon."
           },
-          "leverage_norm": {
-            "$ref": "#/components/schemas/Real",
-            "description": "Leverage over the largest in the normalization set."
-          },
           "rank": {
             "$ref": "#/components/schemas/Real",
             "description": "The blend."
+          },
+          "unlocks_norm": {
+            "$ref": "#/components/schemas/Real",
+            "description": "Unlocks over the largest in the normalization set."
           },
           "urgency": {
             "$ref": "#/components/schemas/Real",
@@ -10723,7 +10723,7 @@
           "urgency",
           "late",
           "gravity_norm",
-          "leverage_norm",
+          "unlocks_norm",
           "rank"
         ],
         "type": "object"
@@ -11274,7 +11274,7 @@
             "type": "boolean"
           },
           "pending_on": {
-            "description": "D8: when the value is `not_relevant` only because a decision it reads is itself\nundecided (so unanswered, and every value operator on it false), the undecided\ndecisions it rests on: reading them as still to come would leave the node undecided.\nEmpty when the value is settled. The value itself is unchanged, so gravity, leverage\nand blocking follow Gating exactly; display state shows such a node as `conditional`.",
+            "description": "D8: when the value is `not_relevant` only because a decision it reads is itself\nundecided (so unanswered, and every value operator on it false), the undecided\ndecisions it rests on: reading them as still to come would leave the node undecided.\nEmpty when the value is settled. The value itself is unchanged, so gravity, unlocks\nand blocking follow Gating exactly; display state shows such a node as `conditional`.",
             "items": {
               "$ref": "#/components/schemas/NodeKey"
             },
@@ -13059,8 +13059,8 @@
             "type": "string"
           },
           {
-            "const": "leverage",
-            "description": "Leverage, greatest first.",
+            "const": "unlocks",
+            "description": "Unlocks, greatest first.",
             "type": "string"
           },
           {
@@ -13336,7 +13336,7 @@
       },
       "StillWaiting": {
         "additionalProperties": false,
-        "description": "The dependents completing a node would not yet free (C8, Priority: Leverage): node\ndetail's `still_waiting`, its largest entries up to `explanation_entry_count_max` with the\ntotal; the rest page through the explanations of `ExplainedField::StillWaiting`.",
+        "description": "The dependents completing a node would not yet free (C8, Priority: Unlocks): node\ndetail's `still_waiting`, its largest entries up to `explanation_entry_count_max` with the\ntotal; the rest page through the explanations of `ExplainedField::StillWaiting`.",
         "properties": {
           "entries": {
             "description": "The dependents, largest weight first.",

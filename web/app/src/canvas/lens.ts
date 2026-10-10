@@ -3,13 +3,13 @@
 // card. Pure, so the unit tests read the same chips the canvas draws.
 import type { Card, Lens } from "./model.ts";
 
-export const LENS_WORDS: Record<Lens, string> = { rank: "Rank", gravity: "Gravity", unblocks: "Unblocks", slack: "Slack" };
+export const LENS_WORDS: Record<Lens, string> = { rank: "Rank", gravity: "Gravity", unlocks: "Unlocks", slack: "Slack" };
 
 /** The one-line meaning of each signal, for the key under the View menu. */
 export const LENS_MEANING: Record<Lens, string> = {
   rank: "Where it stands among what can be done now.",
   gravity: "How much rides on it.",
-  unblocks: "How many things finishing it frees.",
+  unlocks: "How many things finishing it frees.",
   slack: "How many days it can slip before the deadline.",
 };
 
@@ -35,10 +35,10 @@ export function lensChip(card: Card, lens: Lens): LensChip | undefined {
       return signals.rank === undefined ? undefined : { text: `Rank #${String(signals.rank)}`, title: `Number ${String(signals.rank)} of what can be done now`, value: -signals.rank };
     case "gravity":
       return signals.gravity === undefined ? undefined : { text: `Gravity ${String(signals.gravity)}`, title: "How much rides on it", value: signals.gravity };
-    case "unblocks":
-      return signals.unblocks === undefined
+    case "unlocks":
+      return signals.unlocks === undefined
         ? undefined
-        : { text: `Unblocks ${String(signals.unblocks.count)}`, title: `Frees ${String(signals.unblocks.count)} ${signals.unblocks.count === 1 ? "node" : "nodes"}, weighted ${String(signals.unblocks.weighted)}`, value: signals.unblocks.weighted };
+        : { text: `Unlocks ${String(signals.unlocks.count)}`, title: `Frees ${String(signals.unlocks.count)} ${signals.unlocks.count === 1 ? "node" : "nodes"}, weighted ${String(signals.unlocks.weighted)}`, value: signals.unlocks.weighted };
     case "slack":
       return signals.slackDays === undefined ? undefined : { text: `Slack ${days(signals.slackDays)}`, title: "How many days it can slip", value: -signals.slackDays };
   }

@@ -7,7 +7,7 @@ import type { Ready } from "../detail/model.ts";
 
 const today = "2026-10-06";
 const none = { entries: [], total: 0 };
-const base = { gravity_from: none, leverage_from: none, actionable: false, gravity: 1, leverage: 0, dates: {} };
+const base = { gravity_from: none, unlocks_from: none, actionable: false, gravity: 1, unlocks: 0, dates: {} };
 const relevant = { relevance: { value: "relevant" as const } };
 const start = (date: string) => ({ earliest_start: { date, chain: { constraints: [], fixed: [] } } });
 
@@ -19,7 +19,7 @@ export function actingView(): Ready {
       today,
       timezone: "UTC",
       deployment: { revision: 1, entities: [{ key: "e_one", name: "Person One" }] },
-      rank: { urgency: 0.4, late: 0.15, gravity: 0.25, leverage: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
+      rank: { urgency: 0.4, late: 0.15, gravity: 0.25, unlocks: 0.2, horizon_days: 14, undecided_discount: 0.5, other_owner_factor: 2 },
     },
     journey: {
       header: { id: "j_act", name: "Acting journey", status: "active", created_at: "2026-10-01T00:00:00Z", created_on: "2026-10-01" },

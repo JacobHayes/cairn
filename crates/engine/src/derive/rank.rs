@@ -1,10 +1,10 @@
 //! Pass 7, rank (PRD Priority; ARCHITECTURE, Read path: derive, pass 7; C5, C10): each node in
 //! the normalization set (relevant or undecided, open, not a group) gets `urgency` and `late`
-//! from its slack, `gravity_norm` and `leverage_norm` against the largest gravity and leverage
+//! from its slack, `gravity_norm` and `unlocks_norm` against the largest gravity and unlocks
 //! in that set (0 when the largest is 0), and their blend under the rank constants; the
 //! frontier and the acting frontier are ordered by rank, then smaller slack (null last), then
-//! greater gravity, then key. Rank is global: leverage's owner factor is relative to each
-//! node's owner. "Prioritize for me" ([`super::Derived::rank_for`]) recomputes leverage with
+//! greater gravity, then key. Rank is global: the owner factor of unlocks is relative to each
+//! node's owner. "Prioritize for me" ([`super::Derived::rank_for`]) recomputes unlocks with
 //! the owner factor relative to the viewer, and the ranks and order from it, leaving the
 //! global ranking unchanged. Effort-adjusted ordering sorts by gravity per estimated day,
 //! nodes with no or a zero estimate last.
@@ -36,8 +36,8 @@ pub struct RankTerms {
     pub late: f64,
     /// Gravity over the largest in the normalization set.
     pub gravity_norm: f64,
-    /// Leverage over the largest in the normalization set.
-    pub leverage_norm: f64,
+    /// Unlocks over the largest in the normalization set.
+    pub unlocks_norm: f64,
     /// The blend of the four under the rank constants.
     pub rank: f64,
 }
@@ -48,7 +48,7 @@ struct Ranked {
     terms: RankTerms,
     slack_days: Option<i32>,
     gravity: Score,
-    leverage: Score,
+    unlocks: Score,
 }
 
 /// Pass 7's output, globally or for one viewer: each ranked node's terms, and the frontier
@@ -61,39 +61,39 @@ pub struct Ranking {
 }
 
 impl Ranking {
-    /// Ranks the normalization set, each node's leverage given by `leverage` (the global value
+    /// Ranks the normalization set, each node's unlocks given by `unlocks` (the global value
     /// or a viewer's).
     pub(crate) fn pass(
         priority: &Priority,
         dates: &Dates,
         blocking: &Blocking,
         constants: &RankConstants,
-        leverage: impl Fn(&NodeKey) -> Score,
+        unlocks: impl Fn(&NodeKey) -> Score,
     ) -> Self {
         let set: Vec<(&NodeKey, Score, Score)> = blocking
             .keys()
             .iter()
             .filter(|key| priority.in_normalization_set(key))
-            .map(|key| (key, priority.gravity(key), leverage(key)))
+            .map(|key| (key, priority.gravity(key), unlocks(key)))
             .collect();
         let gravity_max = set.iter().map(|(_, gravity, _)| *gravity).max();
-        let leverage_max = set.iter().map(|(_, _, leverage)| *leverage).max();
+        let unlocks_max = set.iter().map(|(_, _, unlocks)| *unlocks).max();
         let ranked: BTreeMap<NodeKey, Ranked> = set
             .into_iter()
-            .map(|(key, gravity, leverage)| {
+            .map(|(key, gravity, unlocks)| {
                 let slack_days = dates.slack_days(key);
                 let (urgency, late) = urgency(slack_days, constants.horizon_days);
                 let gravity_norm = normalized(gravity, gravity_max.unwrap_or_default());
-                let leverage_norm = normalized(leverage, leverage_max.unwrap_or_default());
+                let unlocks_norm = normalized(unlocks, unlocks_max.unwrap_or_default());
                 let rank = constants.urgency.get() * urgency
                     + constants.late.get() * late
                     + constants.gravity.get() * gravity_norm
-                    + constants.leverage.get() * leverage_norm;
+                    + constants.unlocks.get() * unlocks_norm;
                 let terms = RankTerms {
                     urgency,
                     late,
                     gravity_norm,
-                    leverage_norm,
+                    unlocks_norm,
                     rank,
                 };
                 assert_terms(&terms, constants);
@@ -101,7 +101,7 @@ impl Ranking {
                     terms,
                     slack_days,
                     gravity,
-                    leverage,
+                    unlocks,
                 };
                 (key.clone(), ranked)
             })
@@ -155,10 +155,10 @@ impl Ranking {
         self.terms(key).map(|terms| terms.rank)
     }
 
-    /// The leverage the rank read: the global value, or the viewer's in a per-viewer ranking.
+    /// The unlocks the rank read: the global value, or the viewer's in a per-viewer ranking.
     #[must_use]
-    pub fn leverage(&self, key: &NodeKey) -> Option<Score> {
-        self.ranked.get(key).map(|ranked| ranked.leverage)
+    pub fn unlocks(&self, key: &NodeKey) -> Option<Score> {
+        self.ranked.get(key).map(|ranked| ranked.unlocks)
     }
 
     /// PRD Frontier, in rank order.
@@ -249,14 +249,14 @@ fn assert_terms(terms: &RankTerms, constants: &RankConstants) {
         terms.urgency,
         terms.late,
         terms.gravity_norm,
-        terms.leverage_norm,
+        terms.unlocks_norm,
     ] {
         assert!((0.0..=1.0).contains(&term), "a rank term is in [0, 1]");
     }
     let sum = constants.urgency.get()
         + constants.late.get()
         + constants.gravity.get()
-        + constants.leverage.get();
+        + constants.unlocks.get();
     assert!(
         terms.rank.is_finite() && terms.rank >= 0.0 && terms.rank <= sum * (1.0 + 1e-12),
         "a rank is within the constants' sum"

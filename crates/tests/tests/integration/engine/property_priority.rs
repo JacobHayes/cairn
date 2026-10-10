@@ -25,7 +25,7 @@ mod property {
     }
 
     /// The graph with no `auto_reach` milestone: completing a node can move a milestone's
-    /// effective date to today, and leverage completes no node but the one completed.
+    /// effective date to today, and the unlocks simulation completes no node but the one completed.
     fn without_auto_reach(graph: &Graph) -> Graph {
         let mut document = graph.document().clone();
         let keys: Vec<NodeKey> = document.nodes.as_map().keys().cloned().collect();
@@ -119,10 +119,10 @@ mod property {
             }
         }
 
-        /// Priority, Leverage: what completing a node unblocks is what derive finds newly
+        /// Priority, Unlocks: what completing a node unblocks is what derive finds newly
         /// `deps_done` in the normalization set once that node is done, each target once.
         #[test]
-        fn leverage_unblocks_what_completing_the_node_does(graph in arb_journey(1..=60)) {
+        fn unlocks_match_what_completing_the_node_unblocks(graph in arb_journey(1..=60)) {
             let graph = without_auto_reach(&graph);
             let before = self::derived(&graph);
             let derived = &before;
@@ -131,7 +131,7 @@ mod property {
                 .filter(|key| priority.in_normalization_set(key))
                 .collect();
             for key in ranked.iter().take(8) {
-                let listed: Vec<NodeKey> = priority.leverage_from(key).into_iter().map(|found| found.node).collect();
+                let listed: Vec<NodeKey> = priority.unlocks_from(key).into_iter().map(|found| found.node).collect();
                 let unique: BTreeSet<NodeKey> = listed.iter().cloned().collect();
                 prop_assert_eq!(unique.len(), listed.len(), "each target once");
                 let Some(after) = completed(&graph, key) else {
@@ -147,11 +147,11 @@ mod property {
             }
         }
 
-        /// Priority, Leverage, F1: with `auto_reach` milestones kept and read late enough that
+        /// Priority, Unlocks, F1: with `auto_reach` milestones kept and read late enough that
         /// any dated one is due, what completing a node unblocks is still what derive finds
         /// newly `deps_done`, wherever completing it moves no effective date.
         #[test]
-        fn leverage_unblocks_through_due_auto_reach_milestones(graph in arb_journey(1..=60)) {
+        fn unlocks_match_what_completing_unblocks_through_due_auto_reach_milestones(graph in arb_journey(1..=60)) {
             let mut inputs = derive_inputs(Deployment::default());
             inputs.today = "2027-06-01".parse().unwrap();
             let derived = derive(&graph, None, &inputs);
@@ -167,7 +167,7 @@ mod property {
                 if moved {
                     continue;
                 }
-                let listed: BTreeSet<NodeKey> = priority.leverage_from(key).into_iter().map(|found| found.node).collect();
+                let listed: BTreeSet<NodeKey> = priority.unlocks_from(key).into_iter().map(|found| found.node).collect();
                 let freed: BTreeSet<NodeKey> = ranked.iter()
                     .filter(|other| **other != *key)
                     .filter(|other| !derived.blocking().deps_done(other) && after.blocking().deps_done(other))
@@ -223,7 +223,7 @@ mod property {
             prop_assert_eq!(projected.acting_frontier.as_slice(), derived.ranking().acting_frontier());
             for (key, node) in &projected.nodes {
                 prop_assert_eq!(node.gravity, derived.priority().gravity(key));
-                prop_assert_eq!(node.leverage, derived.priority().leverage(key));
+                prop_assert_eq!(node.unlocks, derived.priority().unlocks(key));
                 prop_assert_eq!(node.rank.map(cairn_schema::Real::get), derived.ranking().rank(key));
                 prop_assert_eq!(node.actionable, derived.blocking().actionable(key));
                 prop_assert_eq!(node.relevance.value, derived.relevance().value(key));

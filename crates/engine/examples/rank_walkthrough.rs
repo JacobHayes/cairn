@@ -1,6 +1,6 @@
 //! Walks the fixtures through derive's passes 6 and 7 and prints the proof for brief 2.5 as
 //! Markdown: the vendor evaluation's ranked frontier after it is created, after its up-front
-//! decisions are answered, and after kickoff is reached, with each node's gravity, leverage,
+//! decisions are answered, and after kickoff is reached, with each node's gravity, unlocks,
 //! slack, rank, rank terms, and top contributions; the product launch ranked globally and for
 //! two viewers once its feature work goes to a writer; and effort-adjusted ordering. Every
 //! patch goes through `apply`; every derive is at 2026-10-06, the scenario matrix's clock.
@@ -175,7 +175,7 @@ fn vendor_ranks(vendor: &Fixture, out: &mut String) -> Result<()> {
     )?;
     writeln!(
         out,
-        "| After step | Node | Gravity | Leverage | Slack | Rank |"
+        "| After step | Node | Gravity | Unlocks | Slack | Rank |"
     )?;
     writeln!(out, "|---|---|---|---|---|---|")?;
     let mut why = String::new();
@@ -192,19 +192,19 @@ fn vendor_ranks(vendor: &Fixture, out: &mut String) -> Result<()> {
                 out,
                 "| {step} | `{key}` | {} | {} | {} | {rank:.4} |",
                 score(priority.gravity(key)),
-                score(priority.leverage(key)),
+                score(priority.unlocks(key)),
                 slack(&derived, key)
             )?;
             let terms = ranking.terms(key).ok_or("ranked")?;
             writeln!(
                 why,
-                "- `{key}`: urgency {:.3}, late {:.3}, gravity_norm {:.4}, leverage_norm {:.4}; gravity from {}; unblocks {}.",
+                "- `{key}`: urgency {:.3}, late {:.3}, gravity_norm {:.4}, unlocks_norm {:.4}; gravity from {}; unlocks {}.",
                 terms.urgency,
                 terms.late,
                 terms.gravity_norm,
-                terms.leverage_norm,
+                terms.unlocks_norm,
                 top(&priority.gravity_from(key), 3),
-                top(&priority.leverage_from(key), 3)
+                top(&priority.unlocks_from(key), 3)
             )?;
         }
         writeln!(why)?;
@@ -239,23 +239,23 @@ fn per_viewer(launch: &Fixture, out: &mut String) -> Result<()> {
     let writer = derived.rank_for(&viewer("e_writer")?);
     writeln!(
         out,
-        "The product launch after its first step, with `n_features` (feature work, which kickoff unblocks) given to `e_writer`; everything else is `e_launch_lead`'s. Leverage and rank globally (each node's owner factor relative to its own owner) and for each viewer:\n"
+        "The product launch after its first step, with `n_features` (feature work, which kickoff unblocks) given to `e_writer`; everything else is `e_launch_lead`'s. Unlocks and rank globally (each node's owner factor relative to its own owner) and for each viewer:\n"
     )?;
     writeln!(
         out,
-        "| Node | Leverage | Rank | For `e_launch_lead` | For `e_writer` |"
+        "| Node | Unlocks | Rank | For `e_launch_lead` | For `e_writer` |"
     )?;
     writeln!(out, "|---|---|---|---|---|")?;
     for key in global.frontier() {
         let cell = |ranking: &Ranking| -> Result<String> {
-            let leverage = ranking.leverage(key).ok_or("ranked")?;
+            let unlocks = ranking.unlocks(key).ok_or("ranked")?;
             let rank = ranking.rank(key).ok_or("ranked")?;
-            Ok(format!("{} / {rank:.4}", score(leverage)))
+            Ok(format!("{} / {rank:.4}", score(unlocks)))
         };
         writeln!(
             out,
             "| `{key}` | {} | {:.4} | {} | {} |",
-            score(global.leverage(key).ok_or("ranked")?),
+            score(global.unlocks(key).ok_or("ranked")?),
             global.rank(key).ok_or("ranked")?,
             cell(&lead)?,
             cell(&writer)?

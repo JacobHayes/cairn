@@ -152,8 +152,8 @@ export function rankClause(view: Ready, derived: NodeDerived, facts: RankFacts):
         return slack == null ? [] : [`is ${plural(-slack, "day")} past its latest start`];
       case "gravity":
         return derived.gravity_from.total > 0 ? [`holds up ${plural(derived.gravity_from.total, "node")}`] : [];
-      case "leverage":
-        return derived.leverage_from.total > 0 ? [`unblocks ${plural(derived.leverage_from.total, "node")}`] : [];
+      case "unlocks":
+        return derived.unlocks_from.total > 0 ? [`unlocks ${plural(derived.unlocks_from.total, "node")}`] : [];
     }
   });
   // Whatever the blend's top terms were, say at least one thing in words: its date, or what it holds up.

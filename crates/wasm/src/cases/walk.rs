@@ -210,7 +210,7 @@ fn projections(document: &DomainDocument) -> Vec<Projection> {
         });
         for field in [
             ExplainedField::Gravity,
-            ExplainedField::Leverage,
+            ExplainedField::Unlocks,
             ExplainedField::StillWaiting,
         ] {
             requests.push(Projection::Explanations {

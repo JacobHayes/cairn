@@ -2,9 +2,9 @@
 //! validation ladder, rung 3: cost tests budgeted in operations, not wall-clock time). On
 //! `generated::date_limits` (`node_count_max` nodes at the depth limit) with every weight at
 //! `weight_max`: the gravity sweep is one word operation per word of a row for each pruned
-//! gate edge, the container areas at most three more per node, and leverage's simulations
+//! gate edge, the container areas at most three more per node, and the unlocks simulations
 //! together read each instant, each pruned edge, and each kept-work entry at most once, and
-//! once more for each overdue, gated `auto_reach` milestone; the largest gravity and leverage
+//! once more for each overdue, gated `auto_reach` milestone; the largest gravity and unlocks
 //! fit a score; the
 //! schema's `Derived` keeps at most the response limit of explanation entries per list.
 
@@ -89,17 +89,14 @@ mod cost {
         let operations = derived.priority().operation_count();
         let keys: Vec<&NodeKey> = graph.document().nodes.as_map().keys().collect();
         let gravity_max = keys.iter().map(|key| derived.priority().gravity(key)).max();
-        let leverage_max = keys
-            .iter()
-            .map(|key| derived.priority().leverage(key))
-            .max();
+        let unlocks_max = keys.iter().map(|key| derived.priority().unlocks(key)).max();
         let largest = |score: Option<Score>| score.unwrap_or_default().value();
         println!(
             "priority at the limits on {today}: {instants} instants, {edges} pruned edges, \
              {overdue} overdue gated milestones; {operations} operations of a budget of \
-             {budget}; largest gravity {}, leverage {}",
+             {budget}; largest gravity {}, unlocks {}",
             largest(gravity_max),
-            largest(leverage_max)
+            largest(unlocks_max)
         );
         assert_eq!(nodes, u64::from(NODE_COUNT_MAX), "the node limit");
         assert!(operations <= budget, "{operations}");
@@ -112,9 +109,9 @@ mod cost {
         let kept: usize = projected
             .nodes
             .values()
-            .map(|node| node.gravity_from.entries.len() + node.leverage_from.entries.len())
+            .map(|node| node.gravity_from.entries.len() + node.unlocks_from.entries.len())
             .sum();
-        println!("projected at the limits: {kept} gravity and leverage entries kept");
+        println!("projected at the limits: {kept} gravity and unlocks entries kept");
         assert!(kept <= dependencies.node_count() * 2 * limit);
     }
 }
