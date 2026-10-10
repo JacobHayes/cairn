@@ -59,10 +59,10 @@ impl Durability {
 /// When a file that exists cannot be opened or advised.
 #[cfg(target_os = "linux")]
 pub(crate) fn evict_cached_pages(database: &Path) -> Result<(), StoreError> {
-    for suffix in ["", "-log"] {
-        let mut name = database.as_os_str().to_owned();
-        name.push(suffix);
-        let path = Path::new(&name);
+    // Turso names the logical log by replacing the extension (`data.sqlite` logs to
+    // `data.db-log`), not by appending to the file name.
+    for path in [database.to_path_buf(), database.with_extension("db-log")] {
+        let path = path.as_path();
         let evicted = match std::fs::File::open(path) {
             Ok(file) => rustix::fs::fadvise(&file, 0, None, rustix::fs::Advice::DontNeed)
                 .map_err(std::io::Error::from),
