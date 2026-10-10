@@ -2,7 +2,7 @@
 //! Shell: conformance and integration), from [`crate::build::every`]: a value that fills
 //! every optional field and holds every variant loads back equal, a cleared value put over
 //! it loads back equal, and removing every record leaves none. The randomized round trip
-//! (rung 3) covers combinations; these cases cover each field and variant on every run.
+//! (a property test) covers combinations; these cases cover each field and variant on every run.
 
 use cairn_schema::{Domain, EventType, Graph, GraphId, Journey, Record, Subject, Write};
 

@@ -1,35 +1,29 @@
 # shellcheck shell=bash
-# Sourced by every rung of the validation ladder (PRACTICES, The validation ladder).
+# Sourced by every step of the validation ladder (PRACTICES, The validation ladder).
 #
-# A rung reports how many things each of its suites checked or ran, through
+# A step reports how many things each of its suites checked or ran, through
 # `ladder_suite`, and fails when any suite reports none, so one suite vanishing cannot hide
-# behind another's count. A rung that reports no suite at all fails too (`ladder_rung_end`).
-# A missing tool fails the rung rather than skipping it (`ladder_require_tool`).
+# behind another's count. A step that reports no suite at all fails too (`ladder_step_end`).
+# A missing tool fails the step rather than skipping it (`ladder_require_tool`).
 #
-# Quiet by design: everything a rung runs writes to one log (dist/ladder/last.log, which
-# scripts/ladder truncates once per run), and the terminal gets only what a person acts on
-# (`ladder_show`): one line when the rung passes, and on a failure the errors, the failing
-# tests with their output, the failing lint lines, and how to rerun. Descriptor 3 is the
-# terminal; a command that starts something long-lived closes it (`3>&-`).
+# Quiet by design: everything a step runs writes to its own log (dist/ladder/<step>.log), and
+# the terminal gets only what a person acts on (`ladder_show`): one line when the step
+# passes, and on a failure the errors, the failing tests with their output, the failing lint
+# lines, how to rerun, and the log's path. Descriptor 3 is the terminal; a command that
+# starts something long-lived closes it (`3>&-`).
 #
-# The caller sets LADDER_RUNG (its number) before sourcing this file; LADDER_NAME names it in
-# the lines it prints (default "rung N").
+# The caller sets LADDER_STEP (its name, which names its log and prefixes the lines it
+# prints) before sourcing this file.
 
-: "${LADDER_RUNG:?set LADDER_RUNG before sourcing scripts/ladder-lib.sh}"
-ladder_name=${LADDER_NAME:-rung $LADDER_RUNG}
+: "${LADDER_STEP:?set LADDER_STEP before sourcing scripts/ladder-lib.sh}"
+ladder_name=$LADDER_STEP
 ladder_suite_count=0
 ladder_test_count=0
 ladder_started=${LADDER_STARTED:-$(date +%s)}
 ladder_reported=
-# A rung run alone starts its own log and says where it is; under scripts/ladder, the
-# ladder's last line does.
-ladder_alone=
-if [ -z "${LADDER_LOG:-}" ]; then
-  ladder_alone=1
-  LADDER_LOG=dist/ladder/last.log
-  mkdir -p "$(dirname "$LADDER_LOG")"
-  : >"$LADDER_LOG"
-fi
+LADDER_LOG=dist/ladder/$LADDER_STEP.log
+mkdir -p dist/ladder
+: >"$LADDER_LOG"
 exec 3>&1 >>"$LADDER_LOG" 2>&1
 printf '== %s ==\n' "$ladder_name"
 
@@ -52,24 +46,24 @@ ladder_elapsed() {
 ladder_fail() {
   ladder_reported=1
   ladder_show "$ladder_name: FAILED in $(ladder_elapsed): $*"
-  [ -z "$ladder_alone" ] || ladder_show "log: $LADDER_LOG"
+  ladder_show "log: $LADDER_LOG"
   exit 1
 }
 
-# ladder_exit STATUS: the rung's exit trap. A command that failed under `set -e` outside a
+# ladder_exit STATUS: the step's exit trap. A command that failed under `set -e` outside a
 # check (cargo metadata on a malformed manifest, say) leaves nothing on the terminal, so the
 # end of the log stands in for the diagnostic.
 ladder_exit() {
   [ "$1" -eq 0 ] || [ -n "$ladder_reported" ] || {
     ladder_show "$ladder_name: FAILED in $(ladder_elapsed): exit status $1; the end of the log:"
     tail -n 20 "$LADDER_LOG" | ladder_show
-    [ -z "$ladder_alone" ] || ladder_show "log: $LADDER_LOG"
+    ladder_show "log: $LADDER_LOG"
   }
 }
 trap 'ladder_exit $?' EXIT
 
 # ladder_run WHAT COMMAND...: run COMMAND with its output in the log; when it fails, show the
-# output and fail the rung. Give cargo -q, so its output is only diagnostics.
+# output and fail the step. Give cargo -q, so its output is only diagnostics.
 ladder_run() {
   local what=$1 output status=0
   shift
@@ -81,7 +75,7 @@ ladder_run() {
   fi
 }
 
-# ladder_fixing: true when the rung may change files to apply what its tools can fix itself.
+# ladder_fixing: true when the step may change files to apply what its tools can fix itself.
 # A run with CI unset (a developer's machine) does; CI, even set empty, only verifies, so a change that was not
 # formatted or fixed fails there instead of being repaired in a throwaway checkout.
 ladder_fixing() {
@@ -103,7 +97,7 @@ ladder_changed_files() {
   diff <(printf '%s\n' "$1") <(printf '%s\n' "$2") | grep -c '^>' || true
 }
 
-# ladder_require_tool NAME COMMAND...: fail the rung unless COMMAND (a version query) runs.
+# ladder_require_tool NAME COMMAND...: fail the step unless COMMAND (a version query) runs.
 ladder_require_tool() {
   local name=$1
   shift
@@ -119,29 +113,28 @@ ladder_suite() {
   ladder_say "suite $name: $count $unit"
 }
 
-# ladder_rung_end: call last; a rung that reported no suite checked nothing.
-ladder_rung_end() {
+# ladder_step_end: call last; a step that reported no suite checked nothing.
+ladder_step_end() {
   [ "$ladder_suite_count" -gt 0 ] || ladder_fail "reported no suites"
-  # What a passing rung says: one line, with how much it ran (tests, or suites for a rung of tools).
+  # What a passing step says: one line, with how much it ran (tests, or suites for a step of tools).
   ladder_show "$ladder_name: passed, $([ "$ladder_test_count" -gt 0 ] && echo "$ladder_test_count tests" || echo "$ladder_suite_count checks"), $(ladder_elapsed)"
-  [ -z "$ladder_alone" ] || ladder_show "log: $LADDER_LOG"
 }
 
-# The tests rung 2 leaves to later rungs, by name (the module paths PRACTICES lists): rung 2
-# runs everything else.
+# The tests the unit step leaves to later steps, by name (the module paths PRACTICES lists):
+# it runs everything else.
 ladder_unit_skips=(--skip property:: --skip conformance:: --skip cost:: --skip in_process:: --skip binary::binary::)
 
 # ladder_cargo_test [--test NAME] [-- TEST_ARGUMENT...]: the workspace's tests (every crate,
 # every feature), TEST_ARGUMENT being the name filters. Logs the run's output, shows the
 # failing tests, and sets `ladder_tests` to one "package<TAB>test<TAB>result" line per test it
-# ran. Every rung runs
+# ran. Every step runs
 # its Rust tests in this one shape: scripts/ladder-tests builds the workspace's test binaries
-# in one pass (a no-op after the first rung's) and runs them in parallel, each rung picking
-# the ones it owns by name. Cargo resolves features per invocation, so a run scoped to one
+# in one pass (scripts/ladder does it once, before the first step that needs them) and runs
+# them in parallel, each step picking the ones it owns by name. Cargo resolves features per invocation, so a run scoped to one
 # crate (`-p`) would compile its own copy of every dependency whose features differ and link
 # its own test binaries. Returns the run's status.
 ladder_cargo_test() {
-  local status=0 results=dist/ladder/rung-$LADDER_RUNG-tests
+  local status=0 results=dist/ladder/$LADDER_STEP-tests
   mkdir -p dist/ladder
   scripts/ladder-tests "$results" "$@" 2>"$results.err" || status=$?
   ladder_show <"$results.err"

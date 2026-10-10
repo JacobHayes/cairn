@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for conditions, attachments, and nodes in both reference forms:
+//! Property tests for conditions, attachments, and nodes in both reference forms:
 //! every generated value survives JSON unchanged and writes the same bytes twice.
 
 #[cfg(test)]

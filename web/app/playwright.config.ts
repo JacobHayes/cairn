@@ -1,9 +1,9 @@
-// Rung 6's end-to-end tests of the app shell (PRACTICES, The validation ladder): Chromium
+// The browser step's end-to-end tests of the app shell (PRACTICES, The validation ladder): Chromium
 // against the app on its two hosts. The server host is `cairn demo` (crates/cairn/src/demo.rs):
 // the real binary over the fixtures in memory, serving its embedded web build and the API on
 // one port. The in-browser host is the app's Vite dev server with no server behind it
 // (CAIRN_DEMO_PORT; e2e/shell.ts opens each host on its own). Each run serves on free ports,
-// so runs beside one another do not collide. `mise run check:6` builds the module, the web
+// so runs beside one another do not collide. `mise run check` builds the module, the web
 // build, and the binary first.
 import { createServer } from "node:net";
 import { fileURLToPath } from "node:url";

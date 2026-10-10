@@ -1,18 +1,19 @@
 #!/usr/bin/env bash
-#MISE description="Rung 2: unit tests for every Rust crate (property tests: rung 3; store conformance and in-process API tests: rung 4; cost tests: rung 7)"
-# PRACTICES, The validation ladder, rung 2. One suite per crate, so a crate whose tests
-# vanish fails the rung. The library crates' integration tests are modules of one test binary
+# Step unit: unit tests for every Rust crate (the property, integration, and cost steps run
+# the rest).
+# PRACTICES, The validation ladder. One suite per crate, so a crate whose tests
+# vanish fails the step. The library crates' integration tests are modules of one test binary
 # (crates/tests/tests/integration, counted for their crates by scripts/ladder-tests; the
 # binary's and the schema's keep their own), told apart by module path: property tests live in `mod
 # property` (in `property_*.rs`), cost tests in `mod cost` (in `cost_*.rs`), the store
 # conformance suite in `mod conformance` (in `conformance.rs`), the in-process tests of the
 # API and the binary in `mod in_process`, and the binary's tests that need the web build
 # embedded in `mod binary` (in its `binary.rs`, so `binary::binary::`); all are skipped here
-# by name, and rungs 3, 4, 6, and 7 run them. Every rung's tests run through scripts/ladder-tests,
+# by name, and the property, integration, browser, and cost steps run them. Every step's tests run through scripts/ladder-tests,
 # which runs the workspace's test binaries in parallel.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-LADDER_RUNG=2
+LADDER_STEP=unit
 # shellcheck source=scripts/ladder-lib.sh
 source scripts/ladder-lib.sh
 
@@ -31,7 +32,7 @@ crates=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
 # (scripts/ladder-tests); it is no suite of its own.
 crates=$(grep -vx cairn-tests <<<"$crates")
 # Every workspace crate is a suite, whatever test binaries it builds, unit and integration
-# together, each test counted for the crate whose binary ran it. The doc tests are rung 4's:
+# together, each test counted for the crate whose binary ran it. The doc tests are the integration step's:
 # no crate has one, and the pass that looks for them costs seconds.
 ladder_cargo_test -- "${ladder_unit_skips[@]}" || ladder_fail "cargo test reported failures"
 while IFS= read -r crate; do
@@ -39,4 +40,4 @@ while IFS= read -r crate; do
   ladder_suite "$crate tests" "$(ladder_tests_matching "$crate" "")" tests
 done <<<"$crates"
 
-ladder_rung_end
+ladder_step_end

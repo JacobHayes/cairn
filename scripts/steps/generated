@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
-#MISE description="Rung 5: regenerate the generated paths and fail if any file changed, appeared, or disappeared"
-# PRACTICES, The validation ladder, rung 5; ARCHITECTURE, Generated artifacts. Records every
+# Step generated: regenerate the generated paths and fail if any file changed, appeared, or
+# disappeared. It rewrites files the other steps read (the schema, the OpenAPI document, the
+# generated types and bindings), so it runs alone, before the steps that run side by side.
+# PRACTICES, The validation ladder; ARCHITECTURE, Generated artifacts. Records every
 # file path and content hash under the generated paths, runs `mise run gen`, and compares.
 # Works the same in a jj working copy and in CI: it reads the files, not version control.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-LADDER_RUNG=5
+LADDER_STEP=generated
 # shellcheck source=scripts/ladder-lib.sh
 source scripts/ladder-lib.sh
 
@@ -30,4 +32,4 @@ if [ "$before" != "$after" ]; then
   ladder_fail "generated files differ from their sources: run 'mise run gen' and commit the result"
 fi
 ladder_suite "generated files unchanged" "$(grep -c . <<<"$after" || true)" files
-ladder_rung_end
+ladder_step_end

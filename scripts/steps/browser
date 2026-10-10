@@ -1,0 +1,56 @@
+#!/usr/bin/env bash
+# Step browser: the binary with its web build embedded, and in-browser end-to-end of the app
+# against the wasm host and the binary (Playwright in Chromium, one suite per web package with
+# a playwright.config.ts).
+# PRACTICES, The validation ladder. The binary (brief 4.7) embeds the app's build
+# (web/app/dist/build/): its own tests that start it (`mod binary` in
+# crates/cairn/tests/integration/binary.rs, so `binary::binary::`) are a suite here, and the
+# app's server-host tests run against `cairn demo`, the same binary over the fixtures in
+# memory (the `server` project of web/app/playwright.config.ts). The app's tests (brief 4.6)
+# need the module and the binary. A suite that runs no test, or any test that fails or is
+# skipped, fails the step. The browsers are Playwright's own, pinned with @playwright/test:
+# `npx playwright install chromium` once per machine.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+LADDER_STEP=browser
+# shellcheck source=scripts/ladder-lib.sh
+source scripts/ladder-lib.sh
+
+ladder_require_tool cargo cargo --version
+ladder_require_tool node node --version
+ladder_require_tool playwright node_modules/.bin/playwright --version
+export CARGO_TERM_COLOR=never
+
+# The module and the web build the binary embeds were built before this step (scripts/ladder),
+# and so were the test binaries. The binary is built here so that Playwright's start of it
+# (the app's server-host tests start it as `cairn demo`) is a run, not a build.
+ladder_run "the build of the binary" cargo build --locked --quiet -p cairn
+
+ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
+ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
+
+for config in web/*/playwright.config.ts; do
+  package=$(dirname "$config")
+  report="$PWD/$package/dist/playwright.json"
+  status=0
+  rm -f "$report"
+  # The dot reporter prints a dot per test and the failures; the JSON report is for the
+  # counts. The servers Playwright starts must not hold the terminal (descriptor 3) open.
+  output=$(cd "$package" && PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
+    "$OLDPWD/node_modules/.bin/playwright" test --reporter=dot,json 3>&- 2>&1) || status=$?
+  printf '%s\n' "$output"
+  [ -f "$report" ] || { ladder_show "$output"; ladder_fail "Playwright wrote no report for $package"; }
+  # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
+  read -r passed failed skipped < <(node -e '
+    const stats = JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).stats;
+    console.log(`${stats.expected} ${stats.unexpected + stats.flaky} ${stats.skipped}`);' "$report")
+  [ "$status" -eq 0 ] && [ "$failed" -eq 0 ] || {
+    ladder_show "$output"
+    node scripts/reruns playwright "$report" | ladder_show
+    ladder_fail "$failed in-browser tests failed in $package"
+  }
+  [ "$skipped" -eq 0 ] || ladder_fail "$skipped in-browser tests were skipped in $package"
+  ladder_suite "in-browser end-to-end: $package" "$passed" tests
+done
+
+ladder_step_end

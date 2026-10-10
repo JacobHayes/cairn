@@ -114,10 +114,9 @@ covers configuration, sign-in, proxies, upgrades, and backups.
 Tools are pinned in `mise.toml`; tasks live in `mise-tasks/`.
 
 ```sh
-mise run check        # every rung of the validation ladder
-mise run check:fast   # rungs 1 to 3: the inner loop
+mise run check        # the whole validation: lint, tests, generated files, browser
+mise run check:fast   # the inner loop: lint and the tests the change touches
 mise run check:fast dates   # only the Rust tests, Vitest files and Playwright spec matching a filter
-mise run check:1      # one rung
 mise run gen          # regenerate the generated files
 mise run sim          # simulation campaigns under patina; not part of check
 mise run build        # the release binary, with the web build embedded

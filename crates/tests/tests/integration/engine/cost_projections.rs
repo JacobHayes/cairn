@@ -1,5 +1,5 @@
 //! The projections at the limits (PRACTICES, Explicit limits; Back-of-the-envelope first; the
-//! validation ladder, rung 3). On `generated::date_limits` (`node_count_max` nodes at the depth
+//! validation ladder). On `generated::date_limits` (`node_count_max` nodes at the depth
 //! limit): every projection's output stays within its bound (a level within the nodes and the
 //! canvas edges, each edge drawn once; a page within `page_item_count_max`; an explanation page
 //! within `explanation_entry_count_max`), and the elapsed time of each is printed for the

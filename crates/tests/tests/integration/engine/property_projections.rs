@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for the projections (ARCHITECTURE, Engine > Projections). Over
+//! Property tests for the projections (ARCHITECTURE, Engine > Projections). Over
 //! generated journeys: a level's visible set is exactly the nodes within the container whose
 //! kind and relevance class are shown and that no collapsed container above them hides, each
 //! node sits under its nearest visible ancestor, every drawn edge stands for at least one

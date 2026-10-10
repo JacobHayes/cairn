@@ -1,85 +1,105 @@
 #!/usr/bin/env bash
-# Runs the rungs of the validation ladder that exist, in order, and stops at the first
-# failure (PRACTICES, The validation ladder; Growing the ladder).
+# Runs the validation ladder (PRACTICES, The validation ladder): `mise run check` (the whole
+# thing) or `mise run check:fast` (the part a change can affect, fewer steps).
 #
-# usage: scripts/ladder [--changed] [HIGHEST_RUNG]
+# usage: scripts/ladder [--fast]
 #
-# A rung exists when its task file mise-tasks/check/<N> exists; adding the file adds the
-# rung to `mise run check` and makes `mise run check:<N>` run it alone. With HIGHEST_RUNG
-# (`check:fast` passes 3), rungs above it are left out.
+# The steps are the files of scripts/steps/. The fail-early ones run first, one at a time, in
+# order: lint (format, lint, typecheck), then the unit tests (unit: Rust; web-unit: Vitest),
+# then, in the full check, generated (regenerates files the others read, so it runs alone).
+# Only then do the slow steps that are independent of one another run side by side: property,
+# integration, cost, and browser. A step prints one line when it passes and what a person
+# acts on when it fails, and writes everything else to dist/ladder/<step>.log. The side-by-side
+# steps' lines are printed in order once all have finished.
 #
-# Quiet: the whole run's output goes to dist/ladder/last.log, and the terminal gets one line
-# per rung (scripts/ladder-lib.sh), what a failure needs (the errors, the failing tests and
-# lines, how to rerun them), and one last line with the log's path.
-#
-# With --changed (`check:fast`), the Rust rungs (2 and 3) are left out when the current change
-# touches no Rust input (scripts/changed), and a line says so. Rung 1 always runs whole: a Rust
-# change can break the web app through the API and the generated types. Without it, as in
-# `mise run check` and CI, nothing is skipped.
+# With --fast, steps are left out when the current change touches none of their inputs
+# (scripts/changed): the Rust steps (unit, property) when no Rust input changed, and the web
+# steps (web-unit, browser) when neither side changed (the web unit tests compare the browser
+# host's module with the server's answers). The full check and CI skip nothing. The slowest
+# Rust steps (integration, cost) are left out of --fast.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-export LADDER_LOG=dist/ladder/last.log
-mkdir -p dist/ladder
-: >"$LADDER_LOG"
-
-skipped=()
-if [ "${1:-}" = --changed ]; then
+fast=
+if [ "${1:-}" = --fast ]; then
+  fast=1
   shift
-  read -r changed_rust _ changed_count < <(scripts/changed)
-  if [ "$changed_count" != - ] && [ "$changed_rust" != 1 ]; then
-    skipped=(2 3)
-    echo "ladder: ${changed_count} files changed, none a Rust input: skipping rungs 2 and 3 (the Rust tests)"
+fi
+[ $# -eq 0 ] || { echo "usage: scripts/ladder [--fast]" >&2; exit 2; }
+
+rust=1
+web=1
+if [ -n "$fast" ]; then
+  read -r changed_rust changed_web changed_count < <(scripts/changed)
+  if [ "$changed_count" != - ]; then
+    rust=$changed_rust
+    web=$changed_web
+    echo "ladder: $changed_count files changed (Rust inputs: $rust, web inputs: $web); leaving out the steps they do not touch"
   fi
 fi
 
-highest=${1:-}
-rungs=()
-for path in mise-tasks/check/*; do
-  rung=${path##*/}
-  [[ $rung =~ ^[0-9]+$ ]] || continue
-  [ -z "$highest" ] || [ "$rung" -le "$highest" ] || continue
-  [[ " ${skipped[*]} " != *" $rung "* ]] || continue
-  rungs+=("$rung")
-done
-if [ ${#rungs[@]} -eq 0 ]; then
-  echo "ladder: FAILED: no rungs exist${highest:+ at or below $highest}" >&2
-  exit 1
+# The steps that run one at a time, then the ones that run side by side.
+first=(lint)
+side=()
+if [ "$rust" = 1 ]; then first+=(unit); fi
+if [ "$rust" = 1 ] || [ "$web" = 1 ]; then first+=(web-unit); fi
+if [ -z "$fast" ]; then
+  first+=(generated)
+  side=(property integration cost browser)
+else
+  if [ "$rust" = 1 ]; then side+=(property); fi
+  if [ "$web" = 1 ]; then side+=(browser); fi
 fi
-mapfile -t rungs < <(printf '%s\n' "${rungs[@]}" | sort -n)
 
-# Rungs 2, 3, 4, and 7 pick their Rust tests by name out of the same test binaries, which are
-# built once, before the first of them (scripts/ladder-tests). Rung 6 builds its own after the
-# web build changes what the binary embeds.
-test_list=dist/ladder/test-binaries.json
-tests_built=
+mkdir -p dist/ladder
 started=$SECONDS
 failed=
-for rung in "${rungs[@]}"; do
-  LADDER_STARTED=$(date +%s)
-  export LADDER_STARTED
-  list=
-  case $rung in 2 | 3 | 4 | 7)
-    if [ -z "$tests_built" ]; then
-      # stdout is the log; a build error shows on stderr.
-      scripts/ladder-tests --build "$test_list" >>"$LADDER_LOG" || {
-        echo "rung $rung: FAILED in $((SECONDS - started))s: the test binaries did not build"
-        failed=$rung
-        break
-      }
-      tests_built=yes
-    fi
-    list=$test_list
-    ;;
-  esac
-  LADDER_TEST_LIST=$list "mise-tasks/check/$rung" || {
-    failed=$rung
-    break
+
+# After lint, which may fix files, and before the tests: the browser step runs the web app's
+# build embedded in the binary, so that build comes first, and then the test binaries every
+# Rust test step picks from (scripts/ladder-tests), built once, because the embedded build is
+# an input of the binary's tests.
+prepare() {
+  local log=dist/ladder/build.log needs_tests=
+  : >"$log"
+  for step in "${first[@]}" ${side[@]+"${side[@]}"}; do
+    case $step in unit | property | integration | cost | browser) needs_tests=1 ;; esac
+  done
+  if [[ " ${side[*]-} " == *" browser "* ]]; then
+    mise run build:web >>"$log" 2>&1 || { tail -n 30 "$log"; echo "build: FAILED in $((SECONDS - started))s: the web build; log: $log"; exit 1; }
+  fi
+  [ -n "$needs_tests" ] || return 0
+  # stdout is the log; a build error shows on stderr.
+  scripts/ladder-tests --build dist/ladder/test-binaries.json >>"$log" || {
+    echo "build: FAILED in $((SECONDS - started))s: the test binaries did not build; log: $log"
+    exit 1
   }
+  export LADDER_TEST_LIST=dist/ladder/test-binaries.json
+}
+
+for step in "${first[@]}"; do
+  scripts/steps/"$step" || {
+    echo "ladder: FAILED at $step after $((SECONDS - started))s; later steps did not run; log: dist/ladder/$step.log"
+    exit 1
+  }
+  [ "$step" != lint ] || prepare
 done
 
+if [ ${#side[@]} -gt 0 ]; then
+  pids=()
+  for step in "${side[@]}"; do
+    scripts/steps/"$step" >dist/ladder/"$step".out &
+    pids+=($!)
+  done
+  for index in "${!side[@]}"; do
+    step=${side[$index]}
+    wait "${pids[$index]}" || failed="$failed $step"
+    cat dist/ladder/"$step".out
+  done
+fi
+
 if [ -n "$failed" ]; then
-  echo "ladder: FAILED at rung $failed after $((SECONDS - started))s; later rungs did not run; rerun: mise run check:$failed; log: $LADDER_LOG"
+  echo "ladder: FAILED at${failed} after $((SECONDS - started))s; logs: dist/ladder/<step>.log"
   exit 1
 fi
-echo "ladder: passed, rungs ${rungs[*]}, $((SECONDS - started))s; log: $LADDER_LOG"
+echo "ladder: passed, ${first[*]} ${side[*]-}, $((SECONDS - started))s; logs: dist/ladder/"

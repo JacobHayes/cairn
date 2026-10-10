@@ -1,6 +1,6 @@
 //! The assembled server in process, on loopback through the binary's own listener: the
 //! `Host` allowlist in front of everything, the capabilities the configuration offers, the
-//! metrics, and the socket-level SSE write stall (brief 4.7, Acceptance). Rung 4 runs these
+//! metrics, and the socket-level SSE write stall (brief 4.7, Acceptance). The integration step runs these
 //! (`mod in_process`).
 #![cfg(test)]
 

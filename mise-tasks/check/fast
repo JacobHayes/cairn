@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #MISE quiet=true
-#MISE description="The inner loop: rungs 1 to 3 (the Rust rungs only when the change touches a Rust input), or with FILTER... only the Rust tests, Vitest files or tests, and Playwright spec that match"
+#MISE description="The inner loop: lint, the unit tests, and the property and browser tests, each only when the change touches its inputs; with FILTER... only the Rust tests, Vitest files or tests, and Playwright spec that match"
 cd "$(dirname "$0")/../.."
 if [ $# -eq 0 ]; then
-  exec scripts/ladder --changed 3
+  exec scripts/ladder --fast
 fi
 exec scripts/test "$@"

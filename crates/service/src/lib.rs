@@ -8,7 +8,7 @@
 //! request's clock, from which today is computed once, in the deployment's time zone.
 //!
 //! Runtime-free: no tokio, database driver, or transport, so it builds for
-//! `wasm32-unknown-unknown` (rung 1 checks it) and the browser host runs the same service
+//! `wasm32-unknown-unknown` (the lint step checks it) and the browser host runs the same service
 //! over the memory store.
 
 mod call;

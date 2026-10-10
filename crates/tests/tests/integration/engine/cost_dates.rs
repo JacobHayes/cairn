@@ -1,5 +1,5 @@
 //! The date network's cost test at the limits (PRACTICES, Explicit limits; the validation
-//! ladder, rung 3: cost tests budgeted in operations, not wall-clock time). The graph is
+//! ladder: cost tests budgeted in operations, not wall-clock time). The graph is
 //! `generated::date_limits`: `node_count_max` nodes at the depth limit with both date rules
 //! on every node at `edge_count_per_node_max` sources each, which ties most instants into
 //! one strongly connected component, the case Bellman-Ford pays for.

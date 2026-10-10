@@ -1,6 +1,6 @@
 # PRACTICES, The validation ladder: the full ladder on every push, plus a nightly run, and the
 # simulation campaigns nightly outside the gate. Linux runners only. mise installs the pinned
-# tools; a tool that fails to install fails the job, and rung 1 fails on any tool still
+# tools; a tool that fails to install fails the job, and the lint step fails on any tool still
 # missing, so nothing is skipped.
 name: check
 
@@ -30,11 +30,11 @@ jobs:
     env:
       # Only `mise run sim` uses cargo-patina, and it builds from source; the ladder skips it.
       MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
-      # Rung 3's property tests at more cases than a local run's 64
+      # The property tests at more cases than a local run's 64
       # (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
       PROPTEST_CASES: 256
-      # The browser host's module as it ships, optimized: its bindings are the ones rung 5
-      # checks, and rung 6 tests it (a local check builds the faster wasm-dev profile;
+      # The browser host's module as it ships, optimized: its bindings are the ones the generated
+      # step checks, and the browser step tests it (a local check builds the faster wasm-dev profile;
       # decisions/2026-10-08-the-check-builds-the-wasm-module-without-lto.md).
       CAIRN_WASM_PROFILE: wasm
     steps:
@@ -49,16 +49,16 @@ jobs:
         with:
           shared-key: check
           save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      # The npm workspace's tools (TypeScript, eslint, openapi-typescript) for rungs 1 and 5.
+      # The npm workspace's tools (TypeScript, eslint, openapi-typescript) for the lint and generated steps.
       - run: npm ci
-      # Rung 6's browser, at the version @playwright/test pins.
+      # The browser step's browser, at the version @playwright/test pins.
       - run: npx playwright install --with-deps chromium
       - run: mise run check
       # The check prints only what failed; the complete log is a file.
       - if: failure()
-        run: cat dist/ladder/last.log
+        run: tail -n +1 dist/ladder/*.log
 
-  # Every rung that exists, as on push, with rung 3's property tests at a larger case count
+  # Every step, as on push, with the property tests at a larger case count
   # (PRACTICES, The validation ladder).
   nightly:
     if: github.event_name == 'schedule'
@@ -79,14 +79,14 @@ jobs:
         with:
           shared-key: check
           save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      # The npm workspace's tools (TypeScript, eslint, openapi-typescript) for rungs 1 and 5.
+      # The npm workspace's tools (TypeScript, eslint, openapi-typescript) for the lint and generated steps.
       - run: npm ci
-      # Rung 6's browser, at the version @playwright/test pins.
+      # The browser step's browser, at the version @playwright/test pins.
       - run: npx playwright install --with-deps chromium
       - run: mise run check
       # The check prints only what failed; the complete log is a file.
       - if: failure()
-        run: cat dist/ladder/last.log
+        run: tail -n +1 dist/ladder/*.log
 
   # PRACTICES, Simulation with patina: the campaigns, nightly and on demand, never on push and
   # never part of check. mise builds cargo-patina from source at the pinned revision.

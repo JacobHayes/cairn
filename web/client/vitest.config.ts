@@ -1,4 +1,4 @@
-// Rung 6's web unit tests of the client wrapper (PRACTICES, The validation ladder): Vitest
+// The web-unit step's tests of the client wrapper (PRACTICES, The validation ladder): Vitest
 // in Node over src/, where each module's tests sit beside it.
 import { defineConfig } from "vitest/config";
 

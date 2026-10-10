@@ -1,5 +1,5 @@
 // The real engine for authoring's unit tests: the browser host's module (web/wasm/dist, which
-// rung 6 builds before its web unit tests) loaded in Node, seeded with every fixture as the
+// the web-unit step builds before its tests) loaded in Node, seeded with every fixture as the
 // in-browser host is. The editors' rules (which fields a kind has, which operators a decision
 // takes, what a removal must rewrite) are checked against what the engine accepts, so they
 // cannot drift from it unnoticed.

@@ -1,6 +1,6 @@
 # Pinned tools (PRACTICES, Dependencies are deliberate: each tool earns its place) and
-# settings. Tasks are files under mise-tasks/: `check` runs every rung of the validation
-# ladder that exists, `check:fast` rungs 1 to 3, `check:N` one rung, `gen` every generator.
+# settings. Tasks are files under mise-tasks/: `check` runs the whole validation
+# ladder, `check:fast` the inner loop (the steps are scripts/steps/), `gen` every generator.
 
 [tools]
 node = "26.10.0"

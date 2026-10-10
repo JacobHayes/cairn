@@ -69,7 +69,7 @@ pub(crate) struct Session<'a> {
     /// What node removals reach in the patch's graph, built at the first removal and kept
     /// up to date by every later write (A18; [`RemovalIndex`]).
     pub removal_index: Option<RemovalIndex>,
-    /// The operations this patch's removals spent, the index's building included: rung 3's
+    /// The operations this patch's removals spent, the index's building included: the
     /// cost test budgets it.
     pub removal_operations: u64,
 }

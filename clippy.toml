@@ -4,7 +4,7 @@
 # PRACTICES, Code shape: functions of at most 70 lines.
 too-many-lines-threshold = 70
 
-# Read only where rung 1 raises `clippy::disallowed_types`: the engine, whose iteration
+# Read only where the lint step raises `clippy::disallowed_types`: the engine, whose iteration
 # order reaches outputs (PRACTICES, Deterministic by construction).
 disallowed-types = [
   { path = "std::collections::HashMap", reason = "iteration order reaches outputs: use BTreeMap, IndexMap, or a sorted Vec" },

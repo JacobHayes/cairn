@@ -1,4 +1,4 @@
-//! The store conformance suite against the memory backend, the reference (rung 4).
+//! The store conformance suite against the memory backend, the reference.
 
 mod conformance {
     cairn_store::conformance_suite!(

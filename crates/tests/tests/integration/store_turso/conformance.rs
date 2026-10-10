@@ -1,4 +1,4 @@
-//! The store conformance suite against the Turso backend (rung 4), and the Turso-specific
+//! The store conformance suite against the Turso backend, and the Turso-specific
 //! cases: races between concurrent transactions, a long commit beside reads and other
 //! commits, and a crash mid-commit.
 

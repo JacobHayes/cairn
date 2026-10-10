@@ -1,5 +1,5 @@
-//! Pass 5's cost test at the limits (PRACTICES, Explicit limits; the validation ladder, rung
-//! 3: cost tests budgeted in operations, not wall-clock time). On `generated::date_limits`
+//! Pass 5's cost test at the limits (PRACTICES, Explicit limits; the validation ladder:
+//! cost tests budgeted in operations, not wall-clock time). On `generated::date_limits`
 //! (`node_count_max` nodes at the depth limit), the topological order and the sweep read each
 //! instant once and each edge at most three times: counted and released by the order, and
 //! read once by the sweep from its dependent.

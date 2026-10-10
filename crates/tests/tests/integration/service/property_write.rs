@@ -1,4 +1,4 @@
-//! Property test (rung 3) for the service's write path over the memory store (the
+//! Property test for the service's write path over the memory store (the
 //! engine's `Records` and the store stay separate,
 //! decisions/2026-10-06-apply-works-over-loaded-records-and-replay-shares-its-write.md):
 //! over generated operation sequences, each patch the service commits loads back exactly

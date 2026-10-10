@@ -1,4 +1,4 @@
-//! Upgrade at the limits (PRACTICES, Explicit limits; Back-of-the-envelope first; rung 3). A
+//! Upgrade at the limits (PRACTICES, Explicit limits; Back-of-the-envelope first). A
 //! journey of `node_count_max` nodes (`generated::date_limits`, with its state) follows a
 //! route of the same structure; the target retitles every node. Drafting the upgrade (the
 //! merge, the orphan removals, and the trial apply that validates and derives the candidate

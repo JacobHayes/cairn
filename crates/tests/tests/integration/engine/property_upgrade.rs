@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for upgrade (B7, J3), over journeys created from the vendor
+//! Property tests for upgrade (B7, J3), over journeys created from the vendor
 //! evaluation's version 1 and changed by generated operations (local nodes and edges,
 //! answers, transitions, pins, snoozes, removals that leave tombstones): upgrading to an
 //! identical version proposes nothing beyond listing kept edits and changes nothing but the

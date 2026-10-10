@@ -1,4 +1,4 @@
-// The CSS rung of the validation ladder (design 3.2, guard rails): the app's styles keep one
+// The CSS check of the lint step (design 3.2, guard rails): the app's styles keep one
 // scroller per region and use the design's tokens. A rule outside its allowlist is a violation:
 //   - `overflow` or `overflow-y` of auto or scroll, except on the frame's scrollers;
 //   - `max-height` in `vh`, and `100vh` anywhere (the frame is `100dvh`);

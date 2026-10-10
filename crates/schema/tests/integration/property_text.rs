@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for identifiers, bounded text, and numbers: every generated value
+//! Property tests for identifiers, bounded text, and numbers: every generated value
 //! survives its text and JSON forms unchanged.
 
 #[cfg(test)]

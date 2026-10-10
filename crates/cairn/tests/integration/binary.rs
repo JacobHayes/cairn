@@ -1,8 +1,8 @@
 //! The binary itself, as a deployment runs it (brief 4.7, Acceptance): a config file and a
 //! database file, one port for the UI and the API, startup failures that name what is
 //! missing, a clean stop, and a patch it acknowledged still in the file after it. `mod
-//! commands` needs only the binary (rung 2); `mod binary` needs it built with the web build
-//! embedded, so rung 6 runs it after `mise run build:web`.
+//! commands` needs only the binary; `mod binary` needs it built with the web build
+//! embedded, so the browser step runs it after `mise run build:web`.
 #![cfg(test)]
 
 use std::io::{BufRead, BufReader};

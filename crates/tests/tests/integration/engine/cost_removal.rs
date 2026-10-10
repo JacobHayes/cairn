@@ -1,4 +1,4 @@
-//! Node removals at the limits (PRACTICES, Explicit limits; the validation ladder, rung 3:
+//! Node removals at the limits (PRACTICES, Explicit limits; the validation ladder:
 //! cost tests budgeted in operations, not wall-clock time; A18). One patch removes every
 //! node of `generated::date_limits` (`node_count_max` nodes at the depth limit, each with
 //! its edges), deepest first, one removal per node, alone and with a retitle of the last

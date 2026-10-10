@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for rejections and the derived shapes: every generated value
+//! Property tests for rejections and the derived shapes: every generated value
 //! survives the JSON wire form unchanged.
 
 #[cfg(test)]

@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for the effective dependency graph (PRD Containment, Gating;
+//! Property tests for the effective dependency graph (PRD Containment, Gating;
 //! Invariants; ARCHITECTURE, Read path: the reference test). Over generated deep trees, the
 //! entry chain agrees with the plain expansion that copies every inherited requirement and
 //! condition onto each descendant, both in what each node directly depends on and in what it

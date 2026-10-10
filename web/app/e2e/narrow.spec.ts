@@ -1,4 +1,4 @@
-// A screen at a phone's width (rung 6): the next list shows its content with nothing off the
+// A screen at a phone's width: the next list shows its content with nothing off the
 // side of the window, the journey's menus, the lifecycle chip and the filter open inside it, and
 // a short page still ends with the strip at the screen's bottom edge. One representative
 // screen: the page never scrolls sideways. On the in-browser host, fresh on every load.

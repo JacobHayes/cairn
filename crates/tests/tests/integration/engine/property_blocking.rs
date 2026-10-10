@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for pass 5 and the derived guards (PRD Gating, Containment, D2, D4,
+//! Property tests for pass 5 and the derived guards (PRD Gating, Containment, D2, D4,
 //! D5, B6; A17). Over generated journeys: the flags agree with each other and with the lists
 //! read off the entry chains; open work always leaves something on the frontier, so a stalled
 //! journey is held only by snoozes and `auto_reach` dates and never shows as all blocked.

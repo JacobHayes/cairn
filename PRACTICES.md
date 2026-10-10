@@ -22,7 +22,7 @@ Three ideas carry the rest:
 | **Fault site** | A `buggify!` point where simulation may take a rare path on a seed-chosen run. Inert outside simulation. |
 | **Seed** | The single input a deterministic run is a function of. A failure is a seed; a seed is a reproduction. |
 | **Testbed** | A small program that assembles Cairn crates into a world with actors and invariants, run under simulation. |
-| **Rung** | One step of the validation ladder: a named check with a fixed position in the fast-to-slow order. |
+| **Step** | One named check of the validation ladder (lint, unit, web-unit, generated, property, integration, cost, browser), run by `mise run check` or `mise run check:fast`. |
 
 ## Rules
 
@@ -84,7 +84,7 @@ They answer different questions and are not interchangeable.
 - `assert!` is the correctness check. It is on in every build, including release and wasm, and a failure is a panic with a message.
 - `patina_dst::always!(cond, "label")` is a simulation oracle. Under `patina` a violation is a labeled, structured verdict that the campaign classifier, deduplicator, and minimizer read; outside `patina` it compiles to a `debug_assert!`, which is off in release. So it never replaces an `assert!`.
 
-Rule: production crates use `assert!` for invariants, plus `sometimes!` coverage oracles and `buggify!` fault sites where simulation needs them. Testbeds use `always!`, `sometimes!`, and `verdict` because a labeled verdict is what makes a campaign's output triageable. A production crate may add an `always!` next to an `assert!` at a seam where the label helps triage (the commit path, the retry path); the `assert!` stays. Every site's label is a kebab-case string literal, which rung 1 checks: a campaign reads every label declared in a binary, and one holding a space breaks all of them ([`decisions/2026-10-06-patina-a-site-label-holding-a-space-breaks-every-campaign.md`](decisions/2026-10-06-patina-a-site-label-holding-a-space-breaks-every-campaign.md)).
+Rule: production crates use `assert!` for invariants, plus `sometimes!` coverage oracles and `buggify!` fault sites where simulation needs them. Testbeds use `always!`, `sometimes!`, and `verdict` because a labeled verdict is what makes a campaign's output triageable. A production crate may add an `always!` next to an `assert!` at a seam where the label helps triage (the commit path, the retry path); the `assert!` stays. Every site's label is a kebab-case string literal, which the lint step checks: a campaign reads every label declared in a binary, and one holding a space breaks all of them ([`decisions/2026-10-06-patina-a-site-label-holding-a-space-breaks-every-campaign.md`](decisions/2026-10-06-patina-a-site-label-holding-a-space-breaks-every-campaign.md)).
 
 ## Explicit limits
 
@@ -215,62 +215,58 @@ Tooling: `cargo-patina` is not on crates.io. mise installs it through its cargo 
 
 ## The validation ladder
 
-One command, `mise run check`, runs the rungs in order and stops at the first failure. Each rung is also its own task (`mise run check:2`) so an implementer or agent can run the one they just broke. Fast rungs first; the slowest rung is minutes, and nothing is skipped silently.
+Two commands cover it: `mise run check:fast [filter...]` for the inner loop and `mise run check`, the whole thing. Each runs named steps (`scripts/steps/`), and the output names them, so nobody needs a step number, a cargo, vitest, or playwright incantation. The fail-early steps run first, one at a time and in order: lint (format, lint, typecheck), then the unit tests. Only then do the slow steps that do not depend on one another run side by side. Nothing is skipped silently.
 
 ```mermaid
 flowchart TB
-    subgraph fast["check:fast (agent inner loop)"]
-        r1["1 format, lint, typecheck<br/>seconds"]
-        r2["2 unit tests, scenario matrix, replay<br/>seconds"]
-        r3["3 property tests<br/>seconds"]
-        r1 --> r2 --> r3
+    lint["lint: format, lint, typecheck<br/>seconds"] --> unit["unit: Rust unit tests, scenario matrix, replay<br/>seconds"] --> webunit["web-unit: Vitest, browser host agreement<br/>seconds"]
+    webunit --> gate{"check or check:fast?"}
+    gate -- "check" --> generated["generated: regenerate and diff<br/>seconds"]
+    generated --> all
+    subgraph all["side by side"]
+        property["property tests"]
+        integration["integration: store conformance, API and MCP in process"]
+        cost["cost tests at the limits"]
+        browser["browser: binary tests, in-browser end-to-end"]
     end
-    subgraph full["check (before handoff, CI on push)"]
-        r4["4 store conformance: memory, Turso; API and MCP in-process<br/>tens of seconds"]
-        r5["5 generated artifacts: regenerate and diff<br/>tens of seconds"]
-        r6["6 web unit; in-browser end-to-end<br/>minutes"]
-        r7["7 cost tests at the limits<br/>tens of seconds"]
-        r4 --> r5 --> r6 --> r7
+    gate -- "check:fast" --> some
+    subgraph some["side by side, if the change touches their inputs"]
+        property2["property tests"]
+        browser2["browser"]
     end
     sim["sim (not part of check): simulation campaigns<br/>minutes locally, longer nightly"]
-    r3 --> r4
-    r1 -. "any failure stops the ladder" .-> stop([fix, rerun that rung])
 ```
 
-| Rung | Check | Typical time |
+| Step | Check | Typical time |
 |---|---|---|
-| 1 | `rustfmt`, `clippy` (deny), kebab-case patina site labels, TypeScript typecheck, `eslint`, the CSS lint (`mise run lint:css`: one scroller per region, tokens for colour and radius), the `wasm32-unknown-unknown` build of the runtime-free crates (the service and what it stands on) | seconds |
-| 2 | unit tests for every Rust crate, engine scenario matrix, replay harness (memory store) | seconds |
-| 3 | property tests, bounded case count locally (more in CI) | seconds |
-| 4 | store conformance on memory and Turso; API and MCP tests in-process | tens of seconds |
-| 5 | generated artifacts: regenerate the generated paths and fail if any file in them changed, appeared, or disappeared | tens of seconds |
-| 6 | web unit tests; in-browser end-to-end against the wasm host | minutes |
-| 7 | cost tests at the limits, budgeted in operations, not wall-clock time (`decisions/2026-10-09-cost-tests-run-in-the-full-check-only.md`) | tens of seconds |
+| lint | `rustfmt`, `clippy` (deny), kebab-case patina site labels, TypeScript typecheck, `eslint`, the CSS lint (`mise run lint:css`: one scroller per region, tokens for colour and radius), the `wasm32-unknown-unknown` build of the runtime-free crates (the service and what it stands on) | seconds |
+| unit | unit tests for every Rust crate, engine scenario matrix, replay harness (memory store) | seconds |
+| web-unit | web unit tests (Vitest), including the browser host's agreement with the server's answers | seconds |
+| generated | regenerate the generated paths and fail if any file in them changed, appeared, or disappeared | seconds |
+| property | property tests, bounded case count locally (more in CI) | seconds |
+| integration | store conformance on memory and Turso; API and MCP tests in-process; doc tests | tens of seconds |
+| cost | cost tests at the limits, budgeted in operations, not wall-clock time (`decisions/2026-10-09-cost-tests-run-in-the-full-check-only.md`) | tens of seconds |
+| browser | the binary's tests with the web build embedded; in-browser end-to-end against the wasm host and the binary | about a minute |
 
-`mise run check:fast` is rungs 1 to 3: the inner loop for an agent after every change. It leaves out the Rust rungs (2 and 3) when the current change touches no Rust input (`scripts/changed`: the files of `jj diff -r @ --name-only`, or of `@-` when the working copy is empty; any failure to diff runs everything), and says so in one line; rung 1 always runs whole, since a Rust change can break the web app through the API and the generated types. The full `mise run check` and CI never skip, and only they run the cost tests (rung 7), which are structurally slow. The full ladder runs before handing work off and in CI on every push; CI adds a nightly run with a larger property case count, and runs `mise run sim` nightly, outside the gate.
+`mise run check` runs every step, never skipping, and is the gate before landing and what CI runs on every push; CI adds a nightly run with a larger property case count, and runs `mise run sim` nightly, outside the gate. `mise run check:fast` is the inner loop for an agent after every change: lint always, then only the steps whose inputs the change touches (`scripts/changed`: the files of `jj diff -r @ --name-only`, or of `@-` when the working copy is empty; any failure to diff runs everything), and a line says what it left out. The Rust inputs select unit and property; the web inputs and the Rust inputs select web-unit (it compares the browser host's module with the server's answers); the web inputs select browser, so an unfiltered `check:fast` that follows a web change runs the whole browser suite, which is what landing needs. It never runs integration, cost, or generated; those are the full check's (`decisions/2026-10-09-the-check-has-two-commands.md`).
 
-A rung that runs zero tests fails. Every rung's command reports how many tests each of its suites ran, and the rung fails if any suite it lists ran none, so one suite vanishing cannot hide behind another's count. Rung 1 runs tools, not tests: it fails if any tool is missing or reports nothing checked. Outside CI it first applies what its tools can fix themselves (`cargo fmt`, `cargo clippy --fix` for machine-applicable suggestions, `eslint --fix`) and prints `rung 1 fixed: N files`, so only what needs a person fails; with `CI` set it only verifies (`decisions/2026-10-09-local-checks-fix-and-ci-verifies.md`).
+A step that runs zero tests fails. Every step reports how many tests each of its suites ran, and fails if any suite it lists ran none, so one suite vanishing cannot hide behind another's count. Lint runs tools, not tests: it fails if any tool is missing or reports nothing checked. Outside CI it first applies what its tools can fix themselves (`cargo fmt`, `cargo clippy --fix` for machine-applicable suggestions, `eslint --fix`) and prints `lint: fixed N files (commit them)`, so only what needs a person fails; with `CI` set it only verifies (`decisions/2026-10-09-local-checks-fix-and-ci-verifies.md`). The generated step regenerates files the other steps read, so it runs alone, before the side-by-side steps.
 
-The integration tests of the library crates are one test binary, `crates/tests/tests/integration/main.rs` (the package `cairn-tests`), with a module per crate (`engine`, `service`, ...) and a module per file inside it, so the workspace's dependencies are linked, and the executable scanned by endpoint security on its first run, once rather than once per crate. The two crates whose tests run a binary of their own (`cairn`, `cairn-schema`) keep a `tests/integration/main.rs` of their own, since Cargo only names a binary to the tests of its package. A new test file goes in its crate's directory of `crates/tests/tests/integration/` and is declared in that `mod.rs` as `mod <file>;`; `scripts/ladder-tests` counts each test for its crate, so the suites keep their counts, and a property or cost file is labelled `<crate> <file>` (`decisions/2026-10-09-the-library-crates-integration-tests-are-one-test-binary.md`). Rungs pick tests by module path, not by file: `mod property` in `property_*.rs` for rung 3, `mod conformance` and `mod in_process` for rung 4, `mod binary` in the binary's `binary.rs` for rung 6, `mod cost` in `cost_*.rs` for rung 7, and the rest in rung 2.
+The integration tests of the library crates are one test binary, `crates/tests/tests/integration/main.rs` (the package `cairn-tests`), with a module per crate (`engine`, `service`, ...) and a module per file inside it, so the workspace's dependencies are linked, and the executable scanned by endpoint security on its first run, once rather than once per crate. The two crates whose tests run a binary of their own (`cairn`, `cairn-schema`) keep a `tests/integration/main.rs` of their own, since Cargo only names a binary to the tests of its package. A new test file goes in its crate's directory of `crates/tests/tests/integration/` and is declared in that `mod.rs` as `mod <file>;`; `scripts/ladder-tests` counts each test for its crate, so the suites keep their counts, and a property or cost file is labelled `<crate> <file>` (`decisions/2026-10-09-the-library-crates-integration-tests-are-one-test-binary.md`). Steps pick tests by module path, not by file: `mod property` in `property_*.rs` for property, `mod conformance` and `mod in_process` for integration, `mod binary` in the binary's `binary.rs` for browser, `mod cost` in `cost_*.rs` for cost, and the rest in unit.
 
-Two commands cover the work, so nobody needs a cargo, vitest, or playwright incantation:
+With filters, `mise run check:fast <filter>` runs only what matches, built as the ladder builds it so nothing is compiled twice: the Rust tests whose names contain a filter (any step's), the Vitest files whose path contains one (or, where none does, the tests whose name does), and the Playwright spec in Chromium that a filter names (`canvas`) or whose test titles contain one (only those tests; its `@server` tests too), with the module, the web build, and the binary built only if stale. It fails when nothing matches.
 
-- `mise run check:fast [filter...]` while coding and after a change, before review. With no filter, rungs 1 to 3, as above. With filters, only what matches, built as the ladder builds it so nothing is compiled twice: the Rust tests whose names contain a filter (any rung's), the Vitest files whose path contains one (or, where none does, the tests whose name does), and the Playwright spec in Chromium that a filter names (`canvas`) or whose test titles contain one (only those tests; its `@server` tests too), with the module, the web build, and the binary built only if stale. It fails when nothing matches.
-- `mise run check`, the full ladder, never skipping: the gate before landing.
+Both commands are quiet (`scripts/ladder-lib.sh`). Everything a step runs goes to its own log, `dist/ladder/<step>.log`. A passing step prints one line (`unit: passed, 687 tests, 24s`) and the run one summary line; the side-by-side steps' lines come in order once all have finished. A failure prints only what a person acts on: the compiler errors or lint lines, a failing test's name and output (each tool's own terse reporter; the passing tests are left out), the log's path, and the command that reruns it (`mise run check:fast <test name>`). `mise run gen` runs its generators side by side and rebinds the wasm module only when cargo rebuilt it.
 
-Both are quiet (`scripts/ladder-lib.sh`). Everything a rung runs goes to one log, `dist/ladder/last.log`, whose path the last line prints. A passing rung prints one line (`rung 2: passed, 683 tests, 17s`) and the run one summary line. A failure prints only what a person acts on: the compiler errors or lint lines, a failing test's name and output (each tool's own terse reporter; the passing tests are left out), and the command that reruns it (`mise run check:fast <test name>`, or `mise run check:N` for the rung).
-
-The full `mise run check` is the gate before landing. `mise run gen` runs its generators side by side and rebinds the wasm module only when cargo rebuilt it.
-
-The ladder's Rust tests run in one pass: `scripts/ladder-tests` builds every test binary once (before rung 2, when the full ladder runs) and runs them in parallel, and each rung counts its suites by test name from that run, so a suite keeps its name and count whichever rung owns it. The tests of the engine, schema, service, store, and wasm crates are built at opt-level 2 in the `test` profile (`[profile.test.package.<crate>]`, debug assertions on; `dev` and `wasm-dev` are untouched so the module's bindings do not change); rung 6 runs `cairn-wasm-cases` in it. Doc tests run in rung 4 only. In rung 1 eslint caches per file, and in rung 6 `cairn-wasm-cases` (run by `scripts/agreement-cases`, which web/wasm's Node tests read) is reused while the crates it links and the fixtures are unchanged (`web/wasm/dist/cases.hash`). The Playwright servers of web/app, `cairn demo` and the in-browser host's Vite server, start side by side (`scripts/e2e-servers`). The call is in `decisions/2026-10-09-the-ladder-runs-its-tests-in-parallel-from-an-optimized-test-profile.md`.
+The ladder's Rust tests run in one pass: `scripts/ladder-tests` builds every test binary once (after lint, and after the web build the binary embeds) and runs them in parallel, and each step counts its suites by test name from that run, so a suite keeps its name and count whichever step owns it. The tests of the engine, schema, service, store, and wasm crates are built at opt-level 2 in the `test` profile (`[profile.test.package.<crate>]`, debug assertions on; `dev` and `wasm-dev` are untouched so the module's bindings do not change); web-unit runs `cairn-wasm-cases` in it. In lint eslint caches per file, and in web-unit `cairn-wasm-cases` (run by `scripts/agreement-cases`, which web/wasm's Node tests read) is reused while the crates it links and the fixtures are unchanged (`web/wasm/dist/cases.hash`). The Playwright servers of web/app, `cairn demo` and the in-browser host's Vite server, start side by side (`scripts/e2e-servers`). The call is in `decisions/2026-10-09-the-ladder-runs-its-tests-in-parallel-from-an-optimized-test-profile.md`.
 
 ### Growing the ladder
 
-The table above is the finished ladder, and every rung in it now exists. It was built incrementally, `mise run check` meaning every rung that existed at the time: the first brief to have tests for a rung added that rung to `check`, at its fixed position, in the same change as those tests (rung 1 existed from the scaffold). Before that the rung did not exist, rather than existing and passing on nothing, so `check` never depended on a tool or service nothing used yet, and once a rung exists a suite that silently stops running fails it.
+A step is a file in `scripts/steps/`; `scripts/ladder` lists it in the position it belongs to. The first brief to have tests for a kind of check adds its step in the same change as those tests, so `check` never depends on a tool or service nothing uses yet, and once a step exists a suite that silently stops running fails it.
 
 ## For implementers and agents
 
-- Run `check:fast <filter>` while coding, `check:fast` after every change, and `mise run check` (every rung that exists) before declaring work done. A rung that fails is the next thing to fix, not a note in the handoff.
+- Run `check:fast <filter>` while coding, `check:fast` after every change, and `mise run check` before declaring work done. A step that fails is the next thing to fix, not a note in the handoff.
 - A new pass over the graph comes with its cost at `node_count_max` and a property test.
 - A bug found by simulation or a property test becomes an example-based scenario test, then is fixed.
 - Adding or changing a limit needs the user's sign-off first. Then it goes in the table above and in the crate's `limits.rs` in the same commit, with its "why".

@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for the date network (F2, F3, F5, F6; ARCHITECTURE, Date network;
+//! Property tests for the date network (F2, F3, F5, F6; ARCHITECTURE, Date network;
 //! Read path: the reference test). Over generated deep journeys with estimates, rules from
 //! milestones anywhere and from `created_at`, stage closes, pins, and recorded dates:
 //!

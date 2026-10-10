@@ -106,10 +106,10 @@ patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "6a2977e7bce7
 patina-dst-harness = { git = "https://github.com/JacobHayes/patina", rev = "6a2977e7bce794d15eabaa18258a5542115bd872" }
 patina-dst-proptest = { git = "https://github.com/JacobHayes/patina", rev = "6a2977e7bce794d15eabaa18258a5542115bd872" }
 
-# Every crate inherits these with `[lints] workspace = true`; rung 1 fails a crate that
+# Every crate inherits these with `[lints] workspace = true`; the lint step fails a crate that
 # does not. The lints PRACTICES denies only in some crates (indexing and HashMap in the
-# engine, panics in handlers) are raised per crate by rung 1 (mise-tasks/check/1), and
-# clippy.toml holds the thresholds. Rung 1 also denies warnings, so pedantic fails it.
+# engine, panics in handlers) are raised per crate by the lint step (scripts/steps/lint), and
+# clippy.toml holds the thresholds. That step also denies warnings, so pedantic fails it.
 [workspace.lints.rust]
 unsafe_code = "forbid"
 
@@ -118,7 +118,7 @@ pedantic = { level = "warn", priority = -1 }
 expect_used = "deny"
 too_many_lines = "deny"
 unwrap_used = "deny"
-# Configured in clippy.toml, raised to deny only for the engine by rung 1.
+# Configured in clippy.toml, raised to deny only for the engine by the lint step.
 disallowed_types = "allow"
 
 # Debug builds, and the test profile that inherits them: line tables for the workspace's

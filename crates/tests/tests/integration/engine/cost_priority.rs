@@ -1,5 +1,5 @@
 //! Passes 6 and 7 at the limits (PRACTICES, Explicit limits; Back-of-the-envelope first; the
-//! validation ladder, rung 3: cost tests budgeted in operations, not wall-clock time). On
+//! validation ladder: cost tests budgeted in operations, not wall-clock time). On
 //! `generated::date_limits` (`node_count_max` nodes at the depth limit) with every weight at
 //! `weight_max`: the gravity sweep is one word operation per word of a row for each pruned
 //! gate edge, the container areas at most three more per node, and the unlocks simulations

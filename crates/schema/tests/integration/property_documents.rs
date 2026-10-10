@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for the documents: every generated document survives YAML and
+//! Property tests for the documents: every generated document survives YAML and
 //! JSON unchanged, and writing it twice gives the same bytes (ARCHITECTURE, File format).
 
 #[cfg(test)]

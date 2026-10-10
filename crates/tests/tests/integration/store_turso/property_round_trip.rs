@@ -1,4 +1,4 @@
-//! Property tests (rung 3): any graph a journey can hold, written as records, loads back
+//! Property tests: any graph a journey can hold, written as records, loads back
 //! equal from the Turso backend and from the memory backend (A14: every field has a home).
 
 #[cfg(test)]

@@ -1,18 +1,19 @@
 #!/usr/bin/env node
 // Builds the workspace's test binaries once and runs them side by side (PRACTICES, The
-// validation ladder). Rungs 2, 3, 4, and 7 each pick tests by name out of the same binaries, so
-// the binaries are built in one `cargo test --no-run` and run by this script in parallel,
+// validation ladder). The unit, property, integration, cost, and browser steps each pick tests
+// by name out of the same binaries, so the binaries are built in one `cargo test --no-run` and
+// run by this script in parallel,
 // where `cargo test` runs them one after another: most of them finish in under a second and
 // only start-up and the slowest few add up.
 //
 // usage: scripts/ladder-tests --build LIST
 //        scripts/ladder-tests RESULTS [--test NAME] [-- TEST_ARGUMENT...]
 //   --build LIST: only build, and write the binaries to the file LIST. scripts/ladder does
-//     this once before the first rung that runs Rust tests and passes LIST in
-//     LADDER_TEST_LIST, so the full ladder builds once; without it (`mise run check:3`) a
+//     this once, before the steps that run Rust tests, and passes LIST in
+//     LADDER_TEST_LIST, so the ladder builds once; without it (`mise run check:fast FILTER`) a
 //     run builds for itself.
 //   RESULTS: a file this writes one "package<TAB>test<TAB>result" line to for every test it
-//     ran, which is how a rung counts its suites (scripts/ladder-lib.sh, ladder_cargo_test).
+//     ran, which is how a step counts its suites (scripts/ladder-lib.sh, ladder_cargo_test).
 //   --test NAME: run only the integration test binary NAME of each crate; by default every
 //     test binary runs, unit tests included.
 //   TEST_ARGUMENT: what `cargo test -- ...` passes each binary (name filters, `--skip`).
@@ -20,7 +21,7 @@
 // the whole output of one that failed); stderr holds only what a person acts on: the
 // diagnostics of a build that failed, and a failed binary's output without its passing tests,
 // then the command that reruns each failing test. Exits non-zero when the build or any binary
-// fails. Doc tests are not run (rung 4 runs them).
+// fails. Doc tests are not run (the integration step runs them).
 import { spawn, spawnSync } from "node:child_process";
 import { readFileSync, statSync, writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";

@@ -63,7 +63,7 @@ pub fn derive_inputs(deployment: cairn_schema::Deployment) -> cairn_schema::Deri
 
 /// Runs `patch`'s mutations over `records` as [`apply`] does, without the validation that
 /// follows, and returns the operations its node removals spent, the removal index's
-/// building included (A18): rung 3's removal cost test budgets it.
+/// building included (A18): the removal cost test budgets it.
 ///
 /// # Panics
 ///

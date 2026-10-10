@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for passes 6 and 7 (PRD Priority; PRACTICES, Property tests). Over
+//! Property tests for passes 6 and 7 (PRD Priority; PRACTICES, Property tests). Over
 //! generated journeys: gravity is a plain walk's count-once sum, never decreases upstream along
 //! a dependency between in-scope nodes, and is at least an open node's own effective weight;
 //! what completing a node unblocks is exactly what derive finds newly unblocked once the node

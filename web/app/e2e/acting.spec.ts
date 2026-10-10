@@ -1,4 +1,4 @@
-// The acting surfaces in Chromium (rung 6), the two write paths no unit test reaches: the
+// The acting surfaces in Chromium, the two write paths no unit test reaches: the
 // list's bulk bar (selection, one patch, the next list and its folds, C9, B6) and the cards'
 // pass (an answer, what it unlocked, passing, the inspector reached from the rail, a node
 // completed from the pass, C11), over a journey started from a route's form (B1). Every test

@@ -5,7 +5,7 @@
 # gen` copies the bindings (not the .wasm) into web/wasm/generated/, and the browser tests
 # load the .wasm from here. The wasm-bindgen CLI pinned in mise.toml must be the version of
 # the `wasm-bindgen` crate in Cargo.toml, or it refuses the module. Both profiles bind to the
-# same generated files, so rung 5 checks them from whichever profile built them: wasm-dev
+# same generated files, so the generated step checks them from whichever profile built them: wasm-dev
 # locally, wasm in CI (decisions/2026-10-08-the-check-builds-the-wasm-module-without-lto.md).
 set -euo pipefail
 cd "$(dirname "$0")/../.."

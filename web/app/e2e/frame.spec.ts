@@ -1,4 +1,4 @@
-// The app frame (rung 6): one scroller per region, so a node's History is reachable in the
+// The app frame: one scroller per region, so a node's History is reachable in the
 // inspector (or the tablet's sheet) at each width, the page itself never scrolls from it; a
 // phone's map is a preview that leaves swipes to the page and opens full screen, where they
 // pan. On the in-browser host.

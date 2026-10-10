@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-#MISE description="Rung 3: property tests (PROPTEST_CASES cases each, 64 by default; CI runs 256)"
-# PRACTICES, The validation ladder, rung 3; Property tests. Property tests are the tests in
+# Step property: property tests (PROPTEST_CASES cases each, 64 by default; CI runs 256).
+# PRACTICES, The validation ladder; Property tests. Property tests are the tests in
 # `tests/integration/property_*.rs`, each inside `mod property`, run through
 # patina-dst-proptest from a fixed seed. They are modules of their crate's one integration
 # test binary, selected by module path. One suite per property test file, counted from the
-# test names (`<file>::property::<test>`). The cost tests are rung 7's. The case count is
+# test names (`<file>::property::<test>`). The cost tests are the cost step's. The case count is
 # bounded locally and larger in CI: 256 on push and 4096 nightly
 # (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-LADDER_RUNG=3
+LADDER_STEP=property
 # shellcheck source=scripts/ladder-lib.sh
 source scripts/ladder-lib.sh
 
@@ -23,8 +23,8 @@ export PROPTEST_CASES=${PROPTEST_CASES:-64}
 [[ $PROPTEST_CASES =~ ^[1-9][0-9]*$ ]] || ladder_fail "PROPTEST_CASES must be a positive count, not '$PROPTEST_CASES'"
 ladder_say "PROPTEST_CASES=$PROPTEST_CASES"
 
-# The tests rung 2 built, run by name (ladder_cargo_test), one suite per file.
+# The test binaries built once up front, run by name (ladder_cargo_test), one suite per file.
 ladder_cargo_test --test integration -- property:: || ladder_fail "cargo test reported failures"
 ladder_file_suites property
 
-ladder_rung_end
+ladder_step_end

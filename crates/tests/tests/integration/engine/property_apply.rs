@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for the write path (PRACTICES, Testing > Engine; J2, J3, A15, A17):
+//! Property tests for the write path (PRACTICES, Testing > Engine; J2, J3, A15, A17):
 //! over generated journeys and sequences of generated patches, each of one to several
 //! mutations applied together, apply then replay equals apply, a rejected patch leaves the
 //! records unchanged and says why, every accepted patch emits one event per mutation and

@@ -225,8 +225,8 @@ pub(crate) struct RemovalIndex {
     children: BTreeMap<NodeKey, BTreeSet<NodeKey>>,
     edges: BTreeMap<NodeKey, BTreeSet<Edge>>,
     annotations: BTreeMap<NodeKey, BTreeSet<AttachmentKey>>,
-    /// The nodes, edges, and notes visited since last taken, building included (rung 3
-    /// budgets it).
+    /// The nodes, edges, and notes visited since last taken, building included (the cost
+    /// test budgets it).
     operations: u64,
 }
 

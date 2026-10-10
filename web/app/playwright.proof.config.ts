@@ -1,6 +1,6 @@
 // The proof's media run (briefs/proof/<brief>/prove.sh): the app's tests' servers and browser,
 // running one proof/*.proof.ts, which keeps a screenshot of each acceptance state and a video
-// of the main flow in CAIRN_PROOF_OUT. Not a rung 6 suite: it navigates and captures, and waits
+// of the main flow in CAIRN_PROOF_OUT. Not a browser-step suite: it navigates and captures, and waits
 // for the state it pictures; the e2e specs assert.
 import { defineConfig } from "@playwright/test";
 

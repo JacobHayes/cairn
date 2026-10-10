@@ -101,8 +101,8 @@ cairn/
   decisions/       judgment calls awaiting the user's review, one file each (AGENTS.md)
   docs/            the guide to running a deployment, and the README's pictures
   mise.toml        pinned tools
-  mise-tasks/      tasks, one file each: gen, check and its rungs (check/<N>), sim, build, serve
-  scripts/         helpers the tasks share: the ladder runner
+  mise-tasks/      tasks, one file each: gen, check (and check:fast), sim, build, serve
+  scripts/         helpers the tasks share: the ladder runner and its steps (scripts/steps/)
 ```
 
 ```mermaid
@@ -361,7 +361,7 @@ React (Vite) with the wasm engine.
 
 ## Generated artifacts
 
-Rust types are the source of truth for the OpenAPI document, the TypeScript client types, the wasm bindings, and the file-format JSON Schema. They are the only generated files, and they live only in the generated paths: `openapi/`, `schema/`, `web/client/generated/`, and `web/wasm/generated/`. Every generated file carries a header saying so. The compiled `.wasm` binary and the web build are build outputs, never checked in, because they are not guaranteed to rebuild byte for byte. `mise run gen` regenerates the generated paths; the ladder's generation rung records every file path and content under them, regenerates, and fails if any file changed, appeared, or disappeared, which works the same in a jj working copy and in CI. A source change and its generated outputs land in the same commit.
+Rust types are the source of truth for the OpenAPI document, the TypeScript client types, the wasm bindings, and the file-format JSON Schema. They are the only generated files, and they live only in the generated paths: `openapi/`, `schema/`, `web/client/generated/`, and `web/wasm/generated/`. Every generated file carries a header saying so. The compiled `.wasm` binary and the web build are build outputs, never checked in, because they are not guaranteed to rebuild byte for byte. `mise run gen` regenerates the generated paths; the ladder's generated step records every file path and content under them, regenerates, and fails if any file changed, appeared, or disappeared, which works the same in a jj working copy and in CI. A source change and its generated outputs land in the same commit.
 
 ## Build, run, deploy
 

@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for the derive passes (PRACTICES, Testing > Engine; Gating, D1a,
+//! Property tests for the derive passes (PRACTICES, Testing > Engine; Gating, D1a,
 //! D6): over generated journeys with deep containment, conditions, stage openings, stored
 //! states, force includes, and keeps.
 

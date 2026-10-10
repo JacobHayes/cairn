@@ -1,4 +1,4 @@
-// Brief 4.5, Acceptance, in Node over the wasm32 module (rung 6): the derive worker's derive,
+// Brief 4.5, Acceptance, in Node over the wasm32 module: the derive worker's derive,
 // every projection, previews, local applies, and route files agree with the server's answers
 // byte for byte for every fixture. Node's V8 runs the same wasm32 binary a browser does, which
 // is what catches drift only that target has (usize, floats, the stack); the worker in a real

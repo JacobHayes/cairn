@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
-#MISE description="Rung 1: format, lint, typecheck (rustfmt, clippy, workspace lints, patina site labels, the wasm32 build of the runtime-free crates, the TypeScript typecheck, eslint, the CSS lint)"
-# PRACTICES, The validation ladder, rung 1; Code conventions. Rung 1 runs tools, not tests:
-# it fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
+# Step lint of `mise run check` and `check:fast`: format, lint, typecheck (rustfmt, clippy,
+# workspace lints, patina site labels, the wasm32 build of the runtime-free crates, the
+# TypeScript typecheck, eslint, the CSS lint).
+# PRACTICES, The validation ladder; Code conventions. This step runs tools, not tests: it
+# fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
 # eslint joined with the first TypeScript package, web/client
 # (decisions/2026-10-06-rung-1s-typescript-checks-join-with-the-first-typescript.md).
 # Outside CI it first applies the fixes its tools can make themselves (formatting, the lint
@@ -9,7 +11,7 @@
 # has to decide (decisions/2026-10-09-local-checks-fix-and-ci-verifies.md).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-LADDER_RUNG=1
+LADDER_STEP=lint
 # shellcheck source=scripts/ladder-lib.sh
 source scripts/ladder-lib.sh
 
@@ -48,7 +50,7 @@ if ladder_fixing; then
   eslint_fix=(--fix)
   sums_before=$(ladder_source_sums)
 fi
-typescript=dist/ladder/rung-1
+typescript=dist/ladder/lint
 rm -rf "$typescript"
 mkdir -p "$typescript"
 {
@@ -127,14 +129,14 @@ ladder_suite rustfmt "$(grep -c '^Formatting ' <<<"$fmt_output" || true)" files
 # crate's scoped lints on top. Cargo resolves features per invocation, so a run per scoped
 # crate would check its own copy of the dependencies; one run checks them once. The scoped
 # lints are raised to warn for every crate in that run, and a warning from one counts only in
-# a crate that scopes it: any other warning or error fails the rung, as `-D warnings` did.
+# a crate that scopes it: any other warning or error fails the step, as `-D warnings` did.
 # `--no-deps` lints the workspace's crates and none of their dependencies.
 scopes=$(for name in "${!scoped_lints[@]}"; do printf '%s\t%s\n' "$name" "${scoped_lints[$name]}"; done)
 clippy_status=0
 clippy_output=$(cargo clippy -q --locked --workspace --no-deps --all-targets --all-features \
   --message-format=json -- "${raised[@]}" 2>"$typescript/clippy-cargo.err") || clippy_status=$?
 cat "$typescript/clippy-cargo.err"
-# The diagnostics that fail the rung, rendered, then how many crates were checked; a crate's
+# The diagnostics that fail the step, rendered, then how many crates were checked; a crate's
 # package id is "path+file:///<dir>#<name>@<version>", or "...<dir>#<version>" when the name
 # is the directory's.
 # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
@@ -274,4 +276,4 @@ css_files=$(mise-tasks/lint/css 2>"$typescript/css.err") || {
 }
 ladder_suite "css lint" "$css_files" files
 
-ladder_rung_end
+ladder_step_end

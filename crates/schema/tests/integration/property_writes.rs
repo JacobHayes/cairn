@@ -1,4 +1,4 @@
-//! Property tests (rung 3) for patches, events, change sets, proposals, and touched sets.
+//! Property tests for patches, events, change sets, proposals, and touched sets.
 
 #[cfg(test)]
 mod property {

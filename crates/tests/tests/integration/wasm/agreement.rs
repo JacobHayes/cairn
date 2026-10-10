@@ -2,7 +2,7 @@
 //! fixture's domain document (the derive, every projection, two proposal previews, a local
 //! apply, a touched set, the route files, and the vendor evaluation after an entity merge)
 //! answers what the server's service answers, byte for byte, when this crate runs natively.
-//! The browser tests (rung 6) run the same calls in the derive worker's wasm (I1, D3, C14,
+//! The browser tests run the same calls in the derive worker's wasm (I1, D3, C14,
 //! A13, E6). The in-browser root's documents are the server's too.
 #![cfg(test)]
 

@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
 # The targeted inner loop (`mise run check:fast FILTER...`): only what matches the filters,
 # with nothing else built or run. `mise run check:fast` alone is the diff-aware ladder
-# (scripts/ladder).
+# (scripts/ladder --fast).
 #
 # usage: scripts/test FILTER...
-#   - Rust: every test whose name contains a filter (any crate, any rung's: unit, property,
+#   - Rust: every test whose name contains a filter (any crate, any step's: unit, property,
 #     conformance, cost, ...), run as the ladder runs them (scripts/ladder-tests: the
 #     workspace, every feature, no examples), so cargo recompiles only what the change made
 #     stale and the next `mise run check:fast` finds the binaries built. The binary's own
@@ -15,17 +15,16 @@
 #   - Playwright (web/app/e2e), in Chromium: a spec a filter names (`canvas`, `canvas.spec.ts`)
 #     whole, and a spec whose test titles contain a filter, only those tests. The module is
 #     bound (build:wasm: cargo decides, and the bindings are rebound only if it changed), the
-#     servers start side by side (scripts/e2e-servers), as in rung 6. A spec with @server
+#     servers start side by side (scripts/e2e-servers), as in the browser step. A spec with @server
 #     tests (the server host's) runs them against `cairn demo`, built with the web build it
 #     embeds, made first if stale; a spec with none starts no binary and builds no web app.
 # Quiet, like the ladder: one line per part that ran, a failing test's name, output, and
-# rerun command, and the complete log in dist/ladder/last.log. It fails when nothing matched.
+# rerun command, and the complete log in dist/ladder/filter.log. It fails when nothing matched.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 [ $# -gt 0 ] || { echo "usage: scripts/test FILTER..." >&2; exit 2; }
 filters=("$@")
-LADDER_RUNG=filter
-LADDER_NAME=filter
+LADDER_STEP=filter
 # shellcheck source=scripts/ladder-lib.sh
 source scripts/ladder-lib.sh
 ran=0

@@ -1,5 +1,5 @@
 // `mise run lint:css`: checks the app's CSS against lint/css.ts, prints each violation, and prints the
-// number of files it checked (rung 1 counts it). Exits 1 on a violation.
+// number of files it checked (the lint step counts it). Exits 1 on a violation.
 import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, relative } from "node:path";
 import { fileURLToPath } from "node:url";

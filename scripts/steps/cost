@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-#MISE description="Rung 7: cost tests at the schema limits, budgeted in operations, not wall-clock time (left out of check:fast)"
-# PRACTICES, The validation ladder, rung 7. Cost tests are the tests in
+# Step cost: cost tests at the schema limits, budgeted in operations, not wall-clock time
+# (left out of check:fast).
+# PRACTICES, The validation ladder. Cost tests are the tests in
 # `tests/integration/cost_*.rs`, each inside `mod cost`: a pass over a graph at the schema's
 # limits, which is structurally slow, so they run in the full check and not in check:fast
 # (decisions/2026-10-09-cost-tests-run-in-the-full-check-only.md). Like the property tests
@@ -8,7 +9,7 @@
 # suite per file, counted from the test names (`<file>::cost::<test>`).
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-LADDER_RUNG=7
+LADDER_STEP=cost
 # shellcheck source=scripts/ladder-lib.sh
 source scripts/ladder-lib.sh
 
@@ -21,4 +22,4 @@ export CARGO_TERM_COLOR=never
 ladder_cargo_test --test integration -- cost:: || ladder_fail "cargo test reported failures"
 ladder_file_suites cost
 
-ladder_rung_end
+ladder_step_end

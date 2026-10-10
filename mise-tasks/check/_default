@@ -1,3 +1,3 @@
 #!/usr/bin/env bash
-#MISE description="Every rung of the validation ladder that exists, in order; stops at the first failure"
+#MISE description="The whole validation: lint, then the unit tests, then generated-files freshness, then property, integration, cost, and browser tests side by side; stops at the first failing stage"
 exec "$(dirname "$0")/../../scripts/ladder"

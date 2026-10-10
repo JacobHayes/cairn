@@ -1,19 +1,20 @@
 #!/usr/bin/env bash
-#MISE description="Rung 4: the store conformance suite on every backend, one suite each, and the API's and the MCP endpoint's in-process tests"
-# PRACTICES, The validation ladder, rung 4; Testing > Shell: conformance and integration.
+# Step integration: the store conformance suite on every backend, one suite each, and the
+# API's and the MCP endpoint's in-process tests, and the doc tests.
+# PRACTICES, The validation ladder; Testing > Shell: conformance and integration.
 # Each backend runs the suite from `conformance.rs` of its crate's tests (crates/tests/tests/
-# integration/<crate>), inside `mod conformance` (rung 2 skips the module by name; the
+# integration/<crate>), inside `mod conformance` (the unit step skips the module by name; the
 # integration tests are picked by module path). The backends are listed here and each is
-# its own suite, so a backend whose suite stops building or running fails the rung rather
+# its own suite, so a backend whose suite stops building or running fails the step rather
 # than hiding behind another's count. The API's tests run against a server on loopback
-# over the memory store, inside `mod in_process` (rung 2 skips the module by name). The MCP
+# over the memory store, inside `mod in_process` (the unit step skips the module by name). The MCP
 # endpoint's tests drive it through the same API, inside `mod mcp_in_process`, and are their
 # own suite so one cannot hide behind the other's count. The binary's server, assembled by
 # its composition root and served through its listener, runs in process too, inside `mod
 # in_process` in crates/cairn/tests/integration/server.rs.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
-LADDER_RUNG=4
+LADDER_STEP=integration
 # shellcheck source=scripts/ladder-lib.sh
 source scripts/ladder-lib.sh
 
@@ -22,8 +23,8 @@ ladder_require_tool cargo cargo --version
 # CARGO_TERM_COLOR=always).
 export CARGO_TERM_COLOR=never
 
-# The tests rung 2 built, run by name (ladder_cargo_test): every module this rung owns, then
-# one suite each. A test the run picked that no suite counts fails the rung, so the filter
+# The test binaries built once up front, run by name (ladder_cargo_test): every module this step owns, then
+# one suite each. A test the run picked that no suite counts fails the step, so the filter
 # never runs more than the suites report.
 ladder_cargo_test -- conformance:: in_process:: || ladder_fail "cargo test reported failures"
 # suite<TAB>crate<TAB>the test path it holds, as an awk regular expression
@@ -41,7 +42,7 @@ done <<<"$suites"
 ran=$(grep -c . <<<"$ladder_tests" || true)
 [ "$ran" -eq "$counted" ] || ladder_fail "ran $ran tests; the suites hold $counted"
 
-# The doc tests, here rather than in rung 2 because the pass costs seconds in the inner loop
+# The doc tests, here rather than in the unit step because the pass costs seconds in the inner loop
 # and no crate has a doc test. They are a suite once one exists (a suite that ran none fails).
 doc_status=0
 doc_output=$(cargo test --locked --workspace --all-features --doc 2>&1) || doc_status=$?
@@ -53,4 +54,4 @@ printf '%s\n' "$doc_output"
 doc_tests=$(awk '/^test result: / { sum += $4 } END { print sum + 0 }' <<<"$doc_output")
 [ "$doc_tests" -eq 0 ] || ladder_suite "doc tests" "$doc_tests" tests
 
-ladder_rung_end
+ladder_step_end
