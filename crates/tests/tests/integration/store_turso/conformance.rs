@@ -95,14 +95,11 @@ mod conformance {
     );
 
     // What a commit whose log fsync fails leaves
-    // (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
+    // (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md).
     turso_cases!(
         log_sync:
-        a_commit_whose_log_sync_fails_is_answered_once_the_log_is_synced,
         a_commit_whose_log_sync_fails_leaves_nothing_visible,
         a_commit_in_flight_when_the_store_fails_closed_is_not_applied,
-        a_record_write_whose_log_sync_fails_is_settled_before_the_next_answer,
-        a_record_write_whose_log_sync_and_barrier_fail_closes_the_store,
-        an_open_syncs_the_log_before_it_answers,
+        a_record_write_whose_log_sync_fails_closes_the_store,
     );
 }

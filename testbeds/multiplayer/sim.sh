@@ -63,9 +63,6 @@ out_of_reach=(
   assistant-provider-call-timed-out
   assistant-tool-call-past-deadline
   assistant-turn-overflow-proposed
-  # The Turso store settling a commit whose log sync failed: the testbed injects no
-  # filesystem faults (the durability testbed's ground).
-  turso-failed-commit-applied-once-synced
 )
 
 # Builds the artifact first, so `target` (a managed symlink on some hosts) exists.

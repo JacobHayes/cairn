@@ -1,6 +1,9 @@
 //! The service on the Turso store in one data directory, and the client that drives it: it
 //! submits each planned step until it is acknowledged, retrying a failed write with the
-//! same patch id (H5), and reopens the store in-process when writes keep failing.
+//! same patch id (H5), and reopens the store in-process when writes keep failing. A store
+//! that has failed closed ends the run instead: the server exits and its supervisor restarts
+//! it, and patina's disk keeps the dirty data of a failed fsync that Linux drops, so an
+//! in-process reopen would read back what the restart on Linux does not.
 
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
@@ -9,7 +12,7 @@ use cairn_schema::{Actor, RankConstants};
 use cairn_service::{
     Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, WriteError, Written,
 };
-use cairn_store::{CommitPoint, Faults, InProcessNotifier, PauseHook, StoreError};
+use cairn_store::{CommitPoint, Faults, InProcessNotifier, PauseHook, Store, StoreError};
 use cairn_store_turso::TursoStore;
 use jiff::tz::{Offset, TimeZone};
 
@@ -28,7 +31,7 @@ pub enum Stop {
     Abort { label: &'static str, detail: String },
     /// The store kept failing: nothing wrong was observed, but the run could not finish.
     Liveness(String),
-    /// The store did not open.
+    /// The store did not open, or failed closed.
     Unavailable(String),
     /// An invariant broke; its verdict has been reported.
     Violated,
@@ -189,6 +192,9 @@ impl World {
                     eprintln!("DURABILITY_RETRY step={index} error={error}");
                     failed += 1;
                     self.failures += 1;
+                    if let Err(closed) = self.store().health() {
+                        return Err(Stop::Unavailable(closed.to_string()));
+                    }
                     patina_dst::reachable!("durability-failed-write-retried");
                     if failed >= ATTEMPTS {
                         return Err(Stop::Liveness(format!(

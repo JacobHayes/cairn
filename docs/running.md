@@ -77,9 +77,9 @@ what runs it: put it behind a proxy that terminates TLS and forwards the `Host` 
 set `public_url` to the address people use. Requests naming any other host are refused
 (421), as are loopback names unless the listener is bound to loopback. `GET /healthz` needs
 no credential, for the proxy's health check: it answers 200 while the server is serving and
-503 once its database has failed closed (restart the process). Logs are JSON lines on
-standard error; metrics are at `/api/metrics` in Prometheus's format, behind the same auth
-as the API (a scraper uses an agent token). An OIDC provider's redirect URI is
+503 once its database has failed closed, when the process also exits non-zero for its
+supervisor to restart. Logs are JSON lines on standard error; metrics are at `/api/metrics`
+in Prometheus's format, behind the same auth as the API (a scraper uses an agent token). An OIDC provider's redirect URI is
 `<public_url>api/auth/<name>/callback`.
 
 ## Upgrades and backups

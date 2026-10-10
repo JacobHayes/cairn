@@ -14,9 +14,8 @@
 #      byte-granular tearing, over two seeds; every run restarts and completes with the
 #      invariants holding, and every crash oracle fires somewhere in the sweep;
 #   6. crash under errors: the sweep's crash points with fs errors too; no run breaks an
-#      invariant, a commit whose log sync failed is answered once a barrier synced it, a
-#      failed write is retried, and the pinned run of the fixed store finding passes (a
-#      store that does not open on a failing disk is an honest outcome);
+#      invariant, and the pinned run of the fixed store finding ends with the store failed
+#      closed (a store that does not open on a failing disk is an honest outcome);
 #   7. known Turso and patina gaps (README, Findings): each must still reproduce exactly as
 #      recorded. One that stops reproducing fails this leg, so a Turso or patina bump that
 #      fixes it gets its README section and its file in decisions/ updated instead of
@@ -100,10 +99,6 @@ out_of_reach=(
   service-proposal-draft-resubmitted
   service-proposal-patch-answered-from-receipt
   service-proposal-refreshed-against-destination
-  # A write that failed and was retried: most commits that fail at the log now settle as
-  # applied, and the campaign's dampened fs errors leave one failed too rarely; leg 6's
-  # sweep under errors gates it.
-  durability-failed-write-retried
 )
 rm -rf "$out/campaign"
 cargo patina campaign "$bed" --gens 32 --buggify --faults --fault-scale-permille 30 --swarm \
@@ -186,10 +181,9 @@ missing=$(comm -23 <(sort <<<"$crash_oracles") <(printf '%s\n' "$fired"))
 [ -z "$missing" ] || fail "crash sweep: oracles never fired: $missing"
 say "leg 5 passed: crash sweep, $runs crash-restarts, every one recovered; fired: $(paste -sd, <<<"$fired")"
 
-# No run breaks an invariant (README, Findings: the store no longer answers from a commit
-# whose log sync failed until a barrier has synced it), and somewhere in the sweep a commit
-# whose log sync failed is answered applied once a barrier synced it. A store that does not
-# open on a failing disk is an honest outcome.
+# No run breaks an invariant (README, Findings: a commit that fails at its fsync fails the
+# store closed, which ends the run). A store that does not open on a failing disk is an
+# honest outcome.
 sweep crash-errors --fs-error-permille 5
 while read -r status err; do
   if grep -q '^PATINA_VERDICT .*kind=violation' "$err"; then
@@ -203,47 +197,17 @@ while read -r status err; do
   fi
 done <"$out/crash-errors.runs"
 mapfile -t error_logs < <(awk '{print $2}' "$out/crash-errors.runs")
-settled_label=turso-failed-commit-applied-once-synced
-# reached LABEL FILES...: whether any of the runs' reports reached the reachable! site LABEL.
-reached() {
-  local label=$1
-  shift
-  grep -h '^PATINA_SDK_REPORT ' "$@" | tr ' ' '\n' |
-    grep -E "^site=$label\|reachable\|.*\|r1\|" >/dev/null
-}
-reached "$settled_label" "${error_logs[@]}" ||
-  fail "crash under errors: no commit was settled after its log sync failed"
-reached durability-failed-write-retried "${error_logs[@]}" ||
-  fail "crash under errors: no failed write was retried"
 # The finding the testbed found
-# (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md), pinned
-# as a regression at the store's current order of operations: seed 12's first commit fails its log fsync, and the crash
-# lands before any later log sync. With the store answering that commit applied before a
-# barrier synced it (the fix removed), this run loses the acknowledged commit. Its run
-# without the crash shows the failed log sync was settled.
-pinned_crash=28
-run --seed 12 --fs-error-permille 5 --fs-crash-at "sync:$pinned_crash" >/dev/null 2>"$out/finding.err" ||
-  fail "the pinned log sync finding broke an invariant again: $out/finding.err"
-run --seed 12 --fs-error-permille 5 --record "$out/finding-uncrashed.patina" >/dev/null \
-  2>"$out/finding-uncrashed.err" || fail "the pinned log sync run failed without its crash: $out/finding-uncrashed.err"
-# The crashed run is the uncrashed one up to its crash: the successful syncs before the
-# uncrashed run's first failed log fsync must be fewer than the crash point.
-# (Each awk reads its input whole, so no stage of a pipeline dies of a closed pipe.)
-log_fd=$(cargo patina trace events "$out/finding-uncrashed.patina" --kind fs_open |
-  awk '/path=[^ ]*cairn\.db-log flags=read\|write/ && !found {
-    found = 1
-    for (i = 1; i < NF; i++) if ($i == "→") print $(i + 1)
-  }')
-synced_before=$(cargo patina trace events "$out/finding-uncrashed.patina" --kind fs_sync |
-  awk -v fd="fd=$log_fd" '!/error/ { synced++ } /error/ && $0 ~ fd " " && !found { found = 1; print synced + 0 }')
-if ! grep -q '^PATINA_FS_CRASH_RESTART .*result=restarted' "$out/finding.err" ||
-  ! grep -q '^DURABILITY_RESULT outcome=complete ' "$out/finding.err" ||
-  ! reached "$settled_label" "$out/finding-uncrashed.err" ||
-  [ -z "$synced_before" ] || [ "$synced_before" -ge "$pinned_crash" ]; then
-  fail "the pinned log sync run no longer fails a log sync before its crash ($out/finding.err): find a new seed"
-fi
+# (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md), pinned as a
+# regression: seed 2's first failing fsync is a commit's, and the run must end with the store
+# failed closed. A store that answered on after it (and acknowledged the commit from its
+# receipt) would complete the run instead, and lose that acknowledged commit to a crash.
+run --seed 2 --fs-error-permille 5 >/dev/null 2>"$out/finding.err" ||
+  fail "the pinned failed log sync run broke an invariant: $out/finding.err"
+grep -q '^DURABILITY_RESULT outcome=unavailable .*the store failed closed: .*(sync)' "$out/finding.err" ||
+  fail "the pinned run no longer ends with the store failed closed after a failed sync ($out/finding.err): find a new seed"
 complete=$(grep -l '^DURABILITY_RESULT outcome=complete ' "${error_logs[@]}" | wc -l)
-say "leg 6 passed: crash under errors, $complete of $(wc -l <"$out/crash-errors.runs") runs completed, no invariant broke; a commit whose log sync failed was answered once synced (the pinned run too), and a failed write was retried"
+say "leg 6 passed: crash under errors, $complete of $(wc -l <"$out/crash-errors.runs") runs completed, no invariant broke; the pinned run ended with the store failed closed"
 
 # gap NAME PATTERN ARGS...: a run with ARGS must still print PATINA.
 gap() {
@@ -254,7 +218,7 @@ gap() {
     fail "Turso gap '$name' no longer reproduces: update testbeds/durability/README.md and its file in decisions/"
   say "gap $name still reproduces: $(grep -Eo "$pattern" "$out/gap-$name.log" | head -1)"
 }
-gap open-size-panic 'turso panicked: failed to get file size' --seed 23 --fs-error-permille 50
+gap open-size-panic 'turso panicked: failed to get file size' --seed 27 --fs-error-permille 50
 gap open-short-read 'Logical log short read: expected [0-9]+, got [0-9]+' --seed 3 --fs-short-permille 200
 gap reopen-page-cache-panic 'Attempted to insert different page with same key' \
   --seed 6 --fs-error-permille 20 -- --open-attempts 64

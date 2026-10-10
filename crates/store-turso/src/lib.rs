@@ -51,7 +51,7 @@ use sql::execute;
 /// The Turso store over one database file.
 pub struct TursoStore {
     pool: Pool,
-    /// Whether every write Turso shows has reached the disk; no call answers until it has.
+    /// Whether the store still answers: a commit it cannot settle fails it closed.
     durability: durable::Durability,
     faults: Faults,
     /// Turns at what commits write, so commits on the same rows run one after another.
@@ -68,8 +68,9 @@ impl std::fmt::Debug for TursoStore {
 }
 
 /// Runs `$body` (an expression over `$connection`) in a read transaction on a pooled
-/// connection, so every statement in it sees the same commit. It answers only once the
-/// store has settled (`durable`), so nothing it read can be a write that may not be on disk.
+/// connection, so every statement in it sees the same commit. It answers only while the
+/// store has not failed closed (`durable`), so nothing it read can be a write that may not be
+/// on disk.
 macro_rules! read {
     ($store:expr, $connection:ident => $body:expr) => {{
         let lease = $store.pool.acquire().await?;
@@ -79,12 +80,10 @@ macro_rules! read {
         let end = if result.is_ok() { "COMMIT" } else { "ROLLBACK" };
         match execute($connection, end, Vec::new()).await {
             Ok(_) => {
-                let settled = $store.durability.settle($connection).await;
                 lease.release();
-                settled.and(result)
+                $store.durability.still_open().and(result)
             }
-            // Dropping the lease ends what the connection held; with no connection to settle
-            // on, the read is not answered.
+            // Dropping the lease ends what the connection held.
             Err(error) => result.and(Err(StoreError::from(error))),
         }
     }};
@@ -95,12 +94,13 @@ macro_rules! read {
 macro_rules! in_transaction {
     ($store:expr, $connection:ident => $body:expr) => {{
         let lease = $store.pool.acquire().await?;
-        let $connection = lease.connection();
-        let settled = $store.durability.settle($connection).await;
-        if let Err(error) = settled {
+        // After the wait for a connection, so a call queued when the store closed writes
+        // nothing.
+        if let Err(error) = $store.durability.still_open() {
             lease.release();
             return Err(error);
         }
+        let $connection = lease.connection();
         execute($connection, "BEGIN CONCURRENT", Vec::new()).await?;
         let result = $body.await;
         let end = if result.is_ok() { "COMMIT" } else { "ROLLBACK" };
@@ -109,9 +109,9 @@ macro_rules! in_transaction {
             (Ok(value), Ok(_)) => $store.durability.still_open().map(|()| value),
             (Ok(_), Err(error)) => {
                 // Other than by a conflict or a constraint, the commit may have failed after
-                // its log record was written; the next call settles it (`durable`).
-                if matches!(error, sql::SqlError::Other(_)) {
-                    $store.durability.unsettle();
+                // its log record was written: its outcome is unknown (`durable`).
+                if let sql::SqlError::Other(reason) = &error {
+                    $store.durability.fail_closed(reason);
                 }
                 // A failed commit has already ended its transaction; the rollback only
                 // makes sure.
@@ -146,7 +146,7 @@ impl TursoStore {
 
     /// Opens the store over the I/O implementation `io` instead of the platform's: a test
     /// seam, so a test can fail one fsync
-    /// (decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
+    /// (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md).
     ///
     /// # Errors
     ///
@@ -165,6 +165,10 @@ impl TursoStore {
         faults: Faults,
         configure: impl FnOnce(turso::Builder) -> turso::Builder,
     ) -> Result<Self, StoreError> {
+        // Before Turso reads anything, so a log record a failed sync left off the disk is
+        // not read back from the operating system's cache (`durable`).
+        #[cfg(target_os = "linux")]
+        durable::evict_cached_pages(path)?;
         let path = path
             .to_str()
             .ok_or_else(|| StoreError::Backend(format!("{} is not UTF-8", path.display())))?;
@@ -185,16 +189,6 @@ impl TursoStore {
         };
         let events = sequence::Sequencer::new(next("events").await?);
         let auth_log = sequence::Sequencer::new(next("auth_log").await?);
-        // The log may hold a record a failed sync left off the disk, read back from the
-        // operating system's cache: settled before anything is answered from it (`durable`).
-        // On a pooled connection, which keeps the temporary files Turso opens for a write.
-        let lease = pool.acquire().await?;
-        durable::barrier(lease.connection())
-            .await
-            .map_err(|error| {
-                StoreError::Backend(format!("open {path}: settle the log: {error:?}"))
-            })?;
-        lease.release();
         Ok(Self {
             pool,
             durability: durable::Durability::default(),
@@ -215,34 +209,32 @@ impl TursoStore {
         // back only after the transaction has ended.
         let turns = self.queues.take(commit::claims(&commit, &shape)).await?;
         let lease = self.pool.acquire().await?;
-        // Settled first, so a resubmission is never answered from a receipt that may not be
-        // on disk.
-        if let Err(error) = self.durability.settle(lease.connection()).await {
-            lease.release();
-            return Err(error.into());
-        }
-        // Boxed: a commit's state machine is tens of kilobytes, too large to move by value.
-        let result = Box::pin(commit::commit(
-            lease.connection(),
-            &self.durability,
-            &self.faults,
-            &self.events,
-            &commit,
-            &shape,
-        ))
-        .await;
+        // After the waits for a turn and a connection, so a commit queued behind one that
+        // closed the store neither writes nor answers from what that one left.
+        let result = match self.durability.still_open() {
+            // Boxed: a commit's state machine is tens of kilobytes, too large to move by value.
+            Ok(()) => {
+                Box::pin(commit::commit(
+                    lease.connection(),
+                    &self.durability,
+                    &self.faults,
+                    &self.events,
+                    &commit,
+                    &shape,
+                ))
+                .await
+            }
+            Err(error) => Err(error.into()),
+        };
         // Every path out of a commit ends its transaction.
         lease.release();
         drop(turns);
-        // A commit in flight when the store failed closed is not answered as applied.
-        match result {
-            Ok(_) => self
-                .durability
-                .still_open()
-                .map_err(CommitError::from)
-                .and(result),
-            Err(_) => result,
-        }
+        // A commit that ran while the store failed closed is answered failed, never applied
+        // or rejected from state that may not be on disk.
+        self.durability
+            .still_open()
+            .map_err(CommitError::from)
+            .and(result)
     }
 }
 

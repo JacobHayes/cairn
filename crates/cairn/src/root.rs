@@ -11,6 +11,7 @@ use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
 use std::sync::Arc;
+use std::time::Duration;
 
 use axum::Router;
 use cairn_assistant::Assistant;
@@ -212,7 +213,7 @@ pub async fn serve<S: Store + 'static>(
     let app = app(
         config,
         Assembly {
-            store,
+            store: Arc::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
             assets: assets::embedded(),
             metrics,
@@ -237,7 +238,27 @@ pub async fn serve<S: Store + 'static>(
         "listening"
     );
     listener::warn_unsupported();
-    listener::serve(listener, app, shutdown)
+    // A store that has failed closed answers nothing more: the server stops, and exits
+    // non-zero, so a supervisor restarts the process and the open recovers from disk
+    // (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md).
+    let closing = Arc::clone(&store);
+    let stop = async move {
+        tokio::select! {
+            () = shutdown => {}
+            () = failed_closed(closing.as_ref()) => {}
+        }
+    };
+    let served = listener::serve(listener, app, stop)
         .await
-        .map_err(StartupError::Serve)
+        .map_err(StartupError::Serve);
+    store.health().map_err(StartupError::Store)?;
+    served
+}
+
+/// Resolves once `store` has failed closed. A health check reads the store's own state, so
+/// looking once a second costs nothing.
+async fn failed_closed<S: Store>(store: &S) {
+    while store.health().is_ok() {
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 }

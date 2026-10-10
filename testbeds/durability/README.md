@@ -20,7 +20,8 @@ locally and nightly in CI; `mise run check` never builds it (its own Cargo works
   the client acts on it; a torn last entry is cut off on reopen.
 - `world.rs`: the service over `TursoStore` as a composition root builds it. One client
   submits each step until it is answered, retrying a failed write with the same patch id
-  (H5) and reopening the store after three failures in a row. Buggify sites lose an
+  (H5) and reopening the store after three failures in a row, unless the store has failed
+  closed, which ends the run `unavailable`. Buggify sites lose an
   acknowledgement (the resend must be answered from the receipt) and reopen the store
   between steps.
 - `audit.rs`: the invariants, read from the store: every acknowledged step has its events
@@ -37,7 +38,8 @@ locally and nightly in CI; `mise run check` never builds it (its own Cargo works
 Arguments: `--dir`, `--steps`, `--plan-seed`, `--open-attempts` (only to reproduce a Turso
 gap), `--bug ack-before-commit` (the planted client bug). A run ends with a `pass` verdict
 whose detail is echoed as `DURABILITY_RESULT outcome=complete ...`, or `outcome=unavailable`
-when the store did not open on an erroring disk.
+when the store did not open on an erroring disk or failed closed (the server would exit and
+be restarted).
 
 ```
 cargo patina build . --output target/patina/cairn-durability
@@ -56,18 +58,17 @@ mise run sim     # every leg of sim.sh, from the repository root
 4. Smoke campaign: 32 generations of buggify, fs errors and short I/O (bands at 30 per
    mille of their default), and swarm. Every generation passes, and every oracle fires but
    a named out-of-reach list (two writers in flight, proposals, imports, derived reads, and
-   a failed write retried, which leg 6 gates).
+   a failed write retried, which now fires here).
 5. Crash sweep: crash-restart after every 11th write and sync, whole-block and byte
    tearing, seeds 1 and 2 (112 runs). Every run restarts and completes with the invariants
    holding, and the crash oracles fire: a crash between a commit's state rows and its
    events, an interrupted commit lost whole, one that had landed, a restart recovering
    acknowledged commits.
-6. The same sweep with fs errors at 5 per mille: no invariant breaks, and some commit whose
-   log sync failed is answered applied once a barrier synced it
-   (`turso-failed-commit-applied-once-synced`), and some failed write is retried. The store
-   finding below is pinned as a regression run (seed 12, a crash at `sync:28` after its
-   first commit's log fsync failed), which must complete; with the fix removed it loses
-   that acknowledged commit.
+6. The same sweep with fs errors at 5 per mille: no invariant breaks. A run whose store
+   fails closed ends `unavailable`, as one whose store does not open does. The store
+   finding below is pinned as a regression run (seed 2, no crash point): its first failing
+   fsync is a commit's, and the run must end with the store failed closed. A store that
+   answered on would complete it, acknowledging the commit from its receipt.
 7. Known gaps still reproduce.
 
 ## Findings
@@ -77,17 +78,21 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
 - **Store: an acknowledged commit is lost after a failed log fsync (fixed).** Turso keeps a
   commit visible after its log `fsync` fails and its `COMMIT` errors; the resubmission was
   answered from that receipt and acknowledged; a crash before the next log sync lost it.
-  Found at seed 31, `--fs-error-permille 5 --fs-crash-at write:40`. The store now answers
-  nothing after such a failure until a barrier commit has synced the log past it, and fails
-  closed until reopened when it cannot. Its deterministic tests are
-  `crates/tests/tests/integration/store_turso/conformance/conformance/log_sync.rs`; leg 6 pins seed 12 at `sync:28`.
-  Recorded in
+  Found at seed 31, `--fs-error-permille 5 --fs-crash-at write:40`. The store now fails
+  closed after such a failure and the server exits for its supervisor to restart; every
+  open drops the files' cached pages first. Patina keeps the dirty data of a failed fsync
+  (Linux drops it) and accepts `posix_fadvise` without changing anything, so a run cannot
+  show the restart reading from disk: the world ends the run when the store fails closed,
+  instead of reopening it in-process. Its deterministic tests are
+  `crates/tests/tests/integration/store_turso/conformance/conformance/log_sync.rs`; leg 6 pins
+  seed 2. Recorded in
+  [`decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md`](../../decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md),
+  which replaced the barrier of
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 - **Patina: a removed directory stops crash points.** Once the guest removes a directory
   (Turso's temporary directory, when a connection that wrote is dropped), no later
-  `--fs-crash-at` point fires and the run ends uncrashed. So the store's open runs its
-  barrier on a pooled connection, which keeps its temporary directory. An in-process reopen
-  still drops the pool, so a run that reopens is not crashed after it. Recorded in
+  `--fs-crash-at` point fires and the run ends uncrashed. An in-process reopen drops the
+  pool, so a run that reopens is not crashed after it. Recorded in
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 - **Turso: opens under injected faults.** A log size error at open panics; a short read of
   the log header fails the open; an open retried in-process after a failed one panics in the

@@ -86,7 +86,7 @@ pub(crate) fn claims(commit: &Commit, shape: &Shape) -> BTreeSet<Claim> {
 }
 
 /// Commits on `connection`, retrying once on a write-write conflict. A commit that fails
-/// other than by a conflict or a constraint is answered once the store has settled.
+/// other than by a conflict or a constraint fails the store closed.
 pub(crate) async fn commit(
     connection: &Connection,
     durability: &Durability,
@@ -129,27 +129,6 @@ async fn rollback(connection: &Connection) {
     let _ = execute(connection, "ROLLBACK", Vec::new()).await;
 }
 
-/// The answer to a commit whose `COMMIT` failed other than by a conflict or a constraint,
-/// once the store has settled (`durable`): Turso keeps a commit whose log record it appended,
-/// so after a barrier has synced the log past it, the commit is applied when its receipt
-/// is there, and failed when it is not.
-async fn settled(
-    connection: &Connection,
-    durability: &Durability,
-    receipt: PatchReceipt,
-    reason: String,
-) -> Result<Committed, Abort> {
-    durability.settle(connection).await?;
-    if load::receipt(connection, &receipt.patch_id)
-        .await?
-        .is_none()
-    {
-        return Err(StoreError::Backend(reason).into());
-    }
-    patina_dst::reachable!("turso-failed-commit-applied-once-synced");
-    Ok(Committed::Applied(receipt))
-}
-
 async fn attempt(
     connection: &Connection,
     durability: &Durability,
@@ -166,9 +145,11 @@ async fn attempt(
             Ok(_) => Ok(Committed::Applied(receipt)),
             Err(error) => {
                 // A conflict or a constraint fails the commit before its log record is
-                // written; anything else may fail it after (the log's sync).
-                if matches!(error, SqlError::Other(_)) {
-                    durability.unsettle();
+                // written; anything else may fail it after (the log's sync), so the store
+                // cannot say whether the commit holds (`durable`). Closed before anything
+                // awaits, so no call is answered in between.
+                if let SqlError::Other(reason) = &error {
+                    durability.fail_closed(reason);
                 }
                 rollback(connection).await;
                 match error {
@@ -178,9 +159,7 @@ async fn attempt(
                             format!("the commit leaves a row without its parent: {reason}"),
                         ))))
                     }
-                    SqlError::Other(reason) => {
-                        settled(connection, durability, receipt, reason).await
-                    }
+                    SqlError::Other(reason) => Err(StoreError::Backend(reason).into()),
                 }
             }
         },

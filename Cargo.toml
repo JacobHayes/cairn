@@ -90,8 +90,11 @@ sha2 = "0.11.0"
 # the Rust SDK Turso documents for applications, and it re-exports its engine (`turso::core`),
 # which the Turso backend's test seam names. It also builds Turso's two C-ABI crates as static
 # and shared libraries that nothing links, about 450 MB a target directory
-# (decisions/2026-10-08-turso-is-embedded-through-the-turso-crate.md).
-tokio = { version = "1.53.2", default-features = false }
+# (decisions/2026-10-08-turso-is-embedded-through-the-turso-crate.md). rustix, on Linux only,
+# for the safe `posix_fadvise` the Turso backend evicts cached database pages with at open
+# (already in the tree under other crates).
+rustix = { version = "1.1.5", default-features = false, features = ["fs", "std"] }
+tokio ={ version = "1.53.2", default-features = false }
 turso = { version = "=0.8.2", default-features = false }
 # The browser host (ARCHITECTURE, Web UI): the Rust half of the wasm bindings. Pinned exactly,
 # because the `wasm-bindgen` CLI in mise.toml must be this same version to generate them.
