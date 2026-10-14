@@ -12,7 +12,7 @@ mod in_process {
         RouteDetail, RoutePage, SearchHit, SearchPage, Viewer,
     };
     use cairn_engine::{Graph, derive};
-    use cairn_schema::{Deployment, DomainDocument, Entity, Journey, Route, RouteVersion};
+    use cairn_schema::{Deployment, DomainDocument, Journey, Route, RouteVersion};
 
     use crate::api::support::{self, World, get, post};
 
@@ -113,8 +113,6 @@ mod in_process {
         assert_eq!(detail.versions[0].journeys, [id.clone()].into());
         let deployment: Deployment = get(&ann, "/api/deployment").await;
         assert_eq!(deployment, service.deployment().await.unwrap());
-        let entity: Entity = get(&ann, "/api/entities/e_lead").await;
-        assert_eq!(entity.key.as_str(), "e_lead");
 
         let index: JourneyPage = get(&ann, "/api/journeys?status=active&size=1").await;
         assert_eq!((index.items.len(), index.next), (1, None));
@@ -261,7 +259,6 @@ mod in_process {
                 "/api/routes/vendor-evaluation/versions/9",
                 ProblemCode::NotFound,
             ),
-            ("/api/entities/e_nobody", ProblemCode::NotFound),
             ("/api/journeys?colour=blue", ProblemCode::BadRequest),
             ("/api/journeys?route=r_a&route=r_b", ProblemCode::BadRequest),
             ("/api/events?log=node:n_a", ProblemCode::BadRequest),

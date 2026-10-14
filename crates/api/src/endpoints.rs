@@ -232,8 +232,6 @@ pub static ROUTE_VERSION: Endpoint = endpoint(
 );
 /// `GET /api/deployment`: entities and aliases at the deployment revision.
 pub static DEPLOYMENT: Endpoint = endpoint(Method::GET, "/api/deployment", "getDeployment");
-/// `GET /api/entities/{key}`: an entity, through its alias when merged away (E6).
-pub static ENTITY: Endpoint = endpoint(Method::GET, "/api/entities/{key}", "getEntity");
 /// `GET /api/search`: text search across journeys.
 pub static SEARCH: Endpoint = endpoint(Method::GET, "/api/search", "searchJourneys");
 /// `GET /api/events`: the event history, filtered and paged (J5).
@@ -283,7 +281,7 @@ pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = endpoint(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 52] = [
+pub static ALL: [&Endpoint; 51] = [
     &HEALTH,
     &CAPABILITIES,
     &PATCH_JOURNEY,
@@ -324,7 +322,6 @@ pub static ALL: [&Endpoint; 52] = [
     &ROUTE_VERSIONS,
     &ROUTE_VERSION,
     &DEPLOYMENT,
-    &ENTITY,
     &SEARCH,
     &EVENTS,
     &STREAM,

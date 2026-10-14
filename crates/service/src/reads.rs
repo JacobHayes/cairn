@@ -7,8 +7,8 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{
-    Deployment, Entity, EntityKey, Journey, JourneyId, Revision, Route, RouteHeader, RouteId,
-    RouteKind, RouteVersion, VersionNumber,
+    Deployment, Journey, JourneyId, Revision, Route, RouteHeader, RouteId, RouteKind, RouteVersion,
+    VersionNumber,
 };
 use cairn_store::{
     Document, EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoadTarget, LoggedEvent,
@@ -169,15 +169,6 @@ impl<S: Store> Service<S> {
     /// When the store fails.
     pub async fn events(&self, query: &EventQuery) -> Result<Page<LoggedEvent, u64>, ServiceError> {
         Ok(self.store.events(query).await?)
-    }
-
-    /// E6: the entity a key names, through an alias when it was merged away, or none.
-    ///
-    /// # Errors
-    ///
-    /// When the store fails.
-    pub async fn entity(&self, key: &EntityKey) -> Result<Option<Entity>, ServiceError> {
-        Ok(self.store.resolve_entity(key).await?)
     }
 
     /// H6: a subscription to what `watching` names. It is registered with the notifier

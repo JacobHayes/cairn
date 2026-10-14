@@ -20,10 +20,9 @@ use crate::wire::{
     TokenRequest, TurnReply, UpgradeRequest, Viewer,
 };
 use cairn_schema::{
-    AgentId, DecisionView, Deployment, Derived, DomainDocument, Entity, EntityKey, ExplainedField,
-    ExplanationPage, Journey, JourneyId, Level, ListPage, Next, NodeKey, Proposal, ProposalId,
-    Rejection, Route, RouteFile, RouteId, RouteVersion, Snapshot, StatusSummary, Timeline, Trace,
-    VersionNumber,
+    AgentId, DecisionView, Deployment, Derived, DomainDocument, ExplainedField, ExplanationPage,
+    Journey, JourneyId, Level, ListPage, Next, NodeKey, Proposal, ProposalId, Rejection, Route,
+    RouteFile, RouteId, RouteVersion, Snapshot, StatusSummary, Timeline, Trace, VersionNumber,
 };
 
 type SchemaFn = fn(&mut SchemaGenerator) -> Schema;
@@ -425,14 +424,6 @@ fn reads() -> Vec<Operation> {
             &at::DEPLOYMENT,
             "The deployment: entities and aliases (E6).",
         ),
-        Operation {
-            path: &[(
-                "key",
-                "The entity, or an alias of it.",
-                schema_of::<EntityKey>,
-            )],
-            ..read::<Entity>(&at::ENTITY, "An entity, resolved through its aliases (E6).")
-        },
         Operation {
             query: query::SEARCH_PARAMS,
             ..read::<SearchPage>(&at::SEARCH, "Text search across journeys, paged.")

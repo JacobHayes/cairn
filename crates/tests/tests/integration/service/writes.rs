@@ -354,16 +354,14 @@ async fn a_merge_moves_emails_and_an_email_stays_on_one_entity<S: Store>(
         "- op: merge_entities\n  survivor: e_stakeholder_a\n  merged: e_stakeholder_b\n  journeys: {j_vendor_eval: 2}\n",
     );
     applied(service.patch(&call("u_lead", AT), &domain(merge)).await);
-    let survivor = service
-        .entity(&"e_stakeholder_b".parse().unwrap())
-        .await
-        .unwrap()
-        .unwrap();
+    let deployment = service.deployment().await.unwrap();
+    let survivor_key = "e_stakeholder_a".parse().unwrap();
     assert_eq!(
-        survivor.key,
-        "e_stakeholder_a".parse().unwrap(),
+        deployment.aliases.get(&"e_stakeholder_b".parse().unwrap()),
+        Some(&survivor_key),
         "the alias resolves"
     );
+    let survivor = deployment.entities.get(&survivor_key).unwrap();
     assert!(survivor.emails.contains(&"b@example.org".parse().unwrap()));
 }
 

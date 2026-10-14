@@ -4,8 +4,8 @@
 use axum::Json;
 use axum::extract::{Extension, RawQuery, State};
 use cairn_schema::{
-    Actor, Deployment, DomainDocument, Entity, EntityKey, Journey, JourneyId, Route, RouteId,
-    RouteVersion, VersionNumber,
+    Actor, Deployment, DomainDocument, Journey, JourneyId, Route, RouteId, RouteVersion,
+    VersionNumber,
 };
 use cairn_store::Store;
 
@@ -108,18 +108,6 @@ pub async fn route_version<S: Store + 'static>(
 /// `GET /api/deployment`.
 pub async fn deployment<S: Store + 'static>(State(api): State<Api<S>>) -> Answer<Deployment> {
     Ok(Json(api.service.deployment().await?))
-}
-
-/// `GET /api/entities/{key}` (E6).
-pub async fn entity<S: Store + 'static>(
-    State(api): State<Api<S>>,
-    Path(key): Path<String>,
-) -> Answer<Entity> {
-    let key: EntityKey = segment(&key, "entity")?;
-    let entity = api.service.entity(&key).await?;
-    entity
-        .map(Json)
-        .ok_or_else(|| ApiError::not_found(format_args!("entity {key}")))
 }
 
 /// `GET /api/search`.

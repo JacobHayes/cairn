@@ -93,7 +93,6 @@ fn served<S: Store + 'static>(assistant: bool) -> Served<S> {
         (&at::ROUTE_VERSIONS, get(handle::reads::route_versions::<S>)),
         (&at::ROUTE_VERSION, get(handle::reads::route_version::<S>)),
         (&at::DEPLOYMENT, get(handle::reads::deployment::<S>)),
-        (&at::ENTITY, get(handle::reads::entity::<S>)),
         (&at::SEARCH, get(handle::reads::search::<S>)),
         (&at::EVENTS, get(handle::reads::events::<S>)),
         (&at::STREAM, get(stream::stream::<S>)),
