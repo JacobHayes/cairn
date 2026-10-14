@@ -13,10 +13,15 @@
 # steps' lines are printed in order once all have finished.
 #
 # With --fast, steps are left out when the current change touches none of their inputs
-# (scripts/changed): the Rust steps (unit, property) when no Rust input changed, and the web
-# steps (web-unit, browser) when neither side changed (the web unit tests compare the browser
-# host's module with the server's answers). The full check and CI skip nothing. The slowest
-# Rust steps (integration, cost) are left out of --fast.
+# (scripts/changed): the Rust steps (unit, property) and the Rust half of lint (rustfmt,
+# clippy, the wasm32 build, patina labels) when no Rust input changed, and the web steps
+# (web-unit, browser) when neither side changed (the web unit tests compare the browser host's
+# module with the server's answers). The browser step runs only against the in-browser host,
+# with no web build embedded and no binary built or tested, unless the change touches the
+# server side of the web app. The full check and CI skip nothing. The slowest Rust steps
+# (integration, cost) are left out of --fast.
+#
+# The mise tasks hold the machine-wide lock (mise-tasks/check/): one run at a time.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -27,16 +32,21 @@ if [ "${1:-}" = --fast ]; then
 fi
 [ $# -eq 0 ] || { echo "usage: scripts/ladder [--fast]" >&2; exit 2; }
 
+
 rust=1
 web=1
+server=1
 if [ -n "$fast" ]; then
-  read -r changed_rust changed_web changed_count < <(scripts/changed)
+  read -r changed_rust changed_web changed_server changed_count < <(scripts/changed)
   if [ "$changed_count" != - ]; then
     rust=$changed_rust
     web=$changed_web
-    echo "ladder: $changed_count files changed (Rust inputs: $rust, web inputs: $web); leaving out the steps they do not touch"
+    server=$changed_server
+    echo "ladder: $changed_count files changed (Rust inputs: $rust, web inputs: $web, server side: $server); leaving out the steps they do not touch"
   fi
 fi
+# The steps read these: lint leaves out the Rust half, browser the binary and its web build.
+export LADDER_RUST=$rust LADDER_SERVER=$server
 
 # The steps that run one at a time, then the ones that run side by side.
 first=(lint)
@@ -58,14 +68,15 @@ failed=
 # After lint, which may fix files, and before the tests: the browser step runs the web app's
 # build embedded in the binary, so that build comes first, and then the test binaries every
 # Rust test step picks from (scripts/ladder-tests), built once, because the embedded build is
-# an input of the binary's tests.
+# an input of the binary's tests. The browser step needs both only when it runs the binary
+# (server is 1: always in the full check).
 prepare() {
   local log=dist/ladder/build.log needs_tests=
   : >"$log"
   for step in "${first[@]}" ${side[@]+"${side[@]}"}; do
-    case $step in unit | property | integration | cost | browser) needs_tests=1 ;; esac
+    case $step in unit | property | integration | cost) needs_tests=1 ;; browser) [ "$server" != 1 ] || needs_tests=1 ;; esac
   done
-  if [[ " ${side[*]-} " == *" browser "* ]]; then
+  if [[ " ${side[*]-} " == *" browser "* ]] && [ "$server" = 1 ]; then
     mise run build:web >>"$log" 2>&1 || { tail -n 30 "$log"; echo "build: FAILED in $((SECONDS - started))s: the web build; log: $log"; exit 1; }
   fi
   [ -n "$needs_tests" ] || return 0

@@ -7,7 +7,9 @@
 #   - Rust: every test whose name contains a filter (any crate, any step's: unit, property,
 #     conformance, cost, ...), run as the ladder runs them (scripts/ladder-tests: the
 #     workspace, every feature, no examples), so cargo recompiles only what the change made
-#     stale and the next `mise run check:fast` finds the binaries built. The binary's own
+#     stale and the next `mise run check:fast` finds the binaries built. It runs only when a
+#     Rust input changed (scripts/changed) or the filters matched no Vitest file or test and
+#     no Playwright spec: a filter for a web spec builds no Rust test binary. The binary's own
 #     tests that serve the web app (`binary::binary::`) need its build embedded: `mise run
 #     build:web` first.
 #   - Vitest, in each web package: the files whose path contains a filter, or, where no file
@@ -18,6 +20,7 @@
 #     servers start side by side (scripts/e2e-servers), as in the browser step. A spec with @server
 #     tests (the server host's) runs them against `cairn demo`, built with the web build it
 #     embeds, made first if stale; a spec with none starts no binary and builds no web app.
+# No lint. The mise task holds the machine-wide lock (mise-tasks/check/fast).
 # Quiet, like the ladder: one line per part that ran, a failing test's name, output, and
 # rerun command, and the complete log in dist/ladder/filter.log. It fails when nothing matched.
 set -euo pipefail
@@ -28,19 +31,13 @@ LADDER_STEP=filter
 # shellcheck source=scripts/ladder-lib.sh
 source scripts/ladder-lib.sh
 ran=0
+# Whether the filters ran any Vitest or Playwright test.
+web_matched=
 
 # done_line PART START COUNT: one line for a part that ran.
 done_line() {
   ladder_show "$ladder_name $1: passed, $3 tests, $((SECONDS - $2))s"
 }
-
-start=$SECONDS
-ladder_cargo_test -- "${filters[@]}" || ladder_fail "cargo test reported failures"
-rust_ran=$(grep -c . <<<"$ladder_tests" || true)
-if [ "$rust_ran" -gt 0 ]; then
-  done_line Rust "$start" "$rust_ran"
-  ran=$((ran + rust_ran))
-fi
 
 # A test's full name is its suites' titles and its own joined by " > ", but the titles sit
 # apart in the source, so grep looks for the last one. Vitest's -t is a regular expression.
@@ -91,6 +88,7 @@ for config in web/*/vitest.config.ts; do
   if [ "$total" -gt 0 ]; then
     done_line "Vitest $package" "$start" "$total"
     ran=$((ran + total))
+    web_matched=1
   fi
 done
 
@@ -154,7 +152,21 @@ for file in web/app/e2e/*.spec.ts; do
   total=$(node -e 'console.log(JSON.parse(require("fs").readFileSync(process.argv[1], "utf8")).stats.expected);' "$report")
   done_line "Playwright $spec" "$start" "$total"
   ran=$((ran + total))
+  [ "$total" -eq 0 ] || web_matched=1
 done
+
+# The Rust tests, last: they build every test binary, so they run only when a Rust input
+# changed or no web test matched (an error in scripts/changed counts as changed).
+read -r changed_rust _ < <(scripts/changed 2>/dev/null)
+if [ "${changed_rust:-1}" = 1 ] || [ -z "$web_matched" ]; then
+  start=$SECONDS
+  ladder_cargo_test -- "${filters[@]}" || ladder_fail "cargo test reported failures"
+  rust_ran=$(grep -c . <<<"$ladder_tests" || true)
+  if [ "$rust_ran" -gt 0 ]; then
+    done_line Rust "$start" "$rust_ran"
+    ran=$((ran + rust_ran))
+  fi
+fi
 
 [ "$ran" -gt 0 ] || ladder_fail "nothing matched ${filters[*]}"
 ladder_show "$ladder_name: passed, $ran tests, $(ladder_elapsed)" "log: $LADDER_LOG"

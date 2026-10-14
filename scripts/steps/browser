@@ -10,6 +10,9 @@
 # need the module and the binary. A suite that runs no test, or any test that fails or is
 # skipped, fails the step. The browsers are Playwright's own, pinned with @playwright/test:
 # `npx playwright install chromium` once per machine.
+# With LADDER_SERVER=0 (`mise run check:fast` for a change that leaves the server side of the
+# web app alone, scripts/changed) only the in-browser host's tests run, on the Vite dev server:
+# no web build, no binary built or tested.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 LADDER_STEP=browser
@@ -24,10 +27,17 @@ export CARGO_TERM_COLOR=never
 # The module and the web build the binary embeds were built before this step (scripts/ladder),
 # and so were the test binaries. The binary is built here so that Playwright's start of it
 # (the app's server-host tests start it as `cairn demo`) is a run, not a build.
-ladder_run "the build of the binary" cargo build --locked --quiet -p cairn
+projects=(--project=chromium)
+if [ "${LADDER_SERVER:-1}" = 1 ]; then
+  ladder_run "the build of the binary" cargo build --locked --quiet -p cairn
 
-ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
-ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
+  ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
+  ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
+  projects+=(--project=server)
+  export CAIRN_E2E_BINARY=1
+else
+  export CAIRN_E2E_BINARY=0
+fi
 
 for config in web/*/playwright.config.ts; do
   package=$(dirname "$config")
@@ -37,7 +47,7 @@ for config in web/*/playwright.config.ts; do
   # The dot reporter prints a dot per test and the failures; the JSON report is for the
   # counts. The servers Playwright starts must not hold the terminal (descriptor 3) open.
   output=$(cd "$package" && PLAYWRIGHT_JSON_OUTPUT_NAME="$report" \
-    "$OLDPWD/node_modules/.bin/playwright" test --reporter=dot,json 3>&- 2>&1) || status=$?
+    "$OLDPWD/node_modules/.bin/playwright" test --reporter=dot,json "${projects[@]}" 3>&- 2>&1) || status=$?
   printf '%s\n' "$output"
   [ -f "$report" ] || { ladder_show "$output"; ladder_fail "Playwright wrote no report for $package"; }
   # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
