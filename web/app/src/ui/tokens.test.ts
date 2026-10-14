@@ -5,18 +5,32 @@ import { expect, it } from "vitest";
 
 const css = readFileSync(new URL("../../../../design/tokens.css", import.meta.url), "utf8");
 
-/** Every hex colour token declared in `text`. */
+/** Every colour token declared in `text`: a hex, or a `var()` of another token (resolved by the caller). */
 function declared(text: string): Map<string, string> {
   const found = new Map<string, string>();
-  for (const [, name, hex] of text.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6})\b/gi)) {
-    found.set(name ?? "", hex ?? "");
+  for (const [, name, value] of text.matchAll(/--([\w-]+):\s*(#[0-9a-f]{6}|var\(--[\w-]+\))(?=;)/gi)) {
+    found.set(name ?? "", value ?? "");
   }
   return found;
 }
 
+/** `tokens` with each `var(--x)` replaced by what x resolves to. */
+function resolved(tokens: Map<string, string>): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const [name, value] of tokens) {
+    let hex = value;
+    for (let hop = 0; hop < 4 && !hex.startsWith("#"); hop += 1) {
+      hex = tokens.get(hex.slice(6, -1)) ?? "";
+    }
+    out.set(name, hex);
+  }
+  return out;
+}
+
 // Light is the base block; the data-theme dark block (the last one) overrides it.
-const light = declared(css.slice(0, css.indexOf("@media (prefers-color-scheme: dark)")));
-const dark = new Map([...light, ...declared(css.slice(css.indexOf(':root[data-theme="dark"]')))]);
+const raw = declared(css.slice(0, css.indexOf("@media (prefers-color-scheme: dark)")));
+const light = resolved(raw);
+const dark = resolved(new Map([...raw, ...declared(css.slice(css.indexOf(':root[data-theme="dark"]')))]));
 
 function luminance(hex: string): number {
   const [r = 0, g = 0, b = 0] = [1, 3, 5].map((i) => {
@@ -40,6 +54,7 @@ const floors: [string, string, number][] = [
   ["color-muted", "color-band", 4.5],
   ["chrome-ink", "chrome-bg", 4.5],
   ["chrome-muted", "chrome-bg", 4.5],
+  ["chrome-brand", "chrome-bg", 4.5],
   ["color-frame", "color-ground", 3],
   ["color-frame", "color-sunken", 3],
   ["color-edge", "color-ground", 2],
@@ -51,6 +66,6 @@ it.each([
   ["light", light],
   ["dark", dark],
 ])("%s theme keeps its contrast floors", (_theme, tokens) => {
-  const short = floors.filter(([fg, bg, floor]) => ratio(tokens, fg, bg) < floor).map(([fg, bg, floor]) => `${fg} on ${bg} needs ${String(floor)}`);
+  const short = floors.filter(([fg, bg, floor]) => !(ratio(tokens, fg, bg) >= floor)).map(([fg, bg, floor]) => `${fg} on ${bg} needs ${String(floor)}`);
   expect(short).toEqual([]);
 });

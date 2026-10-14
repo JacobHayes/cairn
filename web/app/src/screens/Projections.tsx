@@ -74,8 +74,7 @@ export function ProjectionBody({ ready, screen, selected, edge, authored, drawin
     return <TriageBody view={ready} settings={triageFrom(params)} selected={selected} />;
   }
   if (screen === "list") {
-    // A new query starts from its first page with nothing selected.
-    return <ListBody key={search} view={ready} settings={listFrom(params)} selected={selected} />;
+    return <ListBody view={ready} settings={listFrom(params)} selected={selected} />;
   }
   if (screen === "timeline") {
     return <ProjectedTimeline ready={ready} selected={selected} />;

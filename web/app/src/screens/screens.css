@@ -63,6 +63,12 @@
   }
 }
 
+/* A toolbar control is one line, chevron and count inline: a squeezed row overflows or folds the
+   chips under the views, it never wraps a label (min-content then keeps the flex items whole). */
+:is(.journey-toolbar, .list-strip) :is(button, .button, .chip, .journey-switch, label) {
+  white-space: nowrap;
+}
+
 .journey-chips {
   display: flex;
   align-items: center;

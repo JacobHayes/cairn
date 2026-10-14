@@ -1,16 +1,35 @@
 /* Graticule tokens (DESIGN.md). Light is canonical; dark follows the OS or data-theme="dark". */
 :root {
-  --color-primary: #20242b; /* graphite: rails, inspector, primary buttons */
-  --color-secondary: #5e6877; /* steel: labels, metadata */
+  /* The neutral ramp: OKLCH hue 250, chroma 0.004 (palest) rising to 0.032 at mid and falling to 0.015 at the dark end,
+     lightness stepping from 0.985 to 0.14. Both themes draw every neutral role from it (DESIGN.md, Tokens). */
+  --n-0: #f8fafd; /* L 0.985 C 0.004 */
+  --n-1: #f0f4f8; /* L 0.965 C 0.007 */
+  --n-2: #e6ecf2; /* L 0.94 C 0.01 */
+  --n-3: #dbe2e9; /* L 0.91 C 0.012 */
+  --n-4: #ced5dd; /* L 0.87 C 0.014 */
+  --n-5: #b5bfc9; /* L 0.8 C 0.018 */
+  --n-6: #94a0ad; /* L 0.7 C 0.024 */
+  --n-7: #6d7c8c; /* L 0.58 C 0.03 */
+  --n-8: #4b5a6a; /* L 0.46 C 0.032 */
+  --n-9: #353e48; /* L 0.36 C 0.022 */
+  --n-10: #262f38; /* L 0.3 C 0.02 */
+  --n-11: #1e262e; /* L 0.265 C 0.019 */
+  --n-12: #171e25; /* L 0.23 C 0.018 */
+  --n-13: #10171e; /* L 0.2 C 0.017 */
+  --n-14: #0a1016; /* L 0.17 C 0.016 */
+  --n-15: #050a0f; /* L 0.14 C 0.015 */
+
+  --color-primary: var(--n-12); /* graphite: primary buttons, chart ink */
+  --color-secondary: var(--n-8); /* steel: labels, metadata */
   --color-accent: #2f6fff; /* state: selection, focus, flagged datum */
-  --color-ground: #e9edf2; /* the plain ground behind workspace content, and the canvas ground */
-  --color-sunken: #eef1f5; /* inside container frames */
-  --color-edge: #9aa5b4; /* card, row and panel borders: 2:1 on ground and on paper */
-  --color-frame: #6b7585; /* container frames and menu borders: 3:1 on ground and on sunken */
-  --color-surface: #f7f9fc; /* paper */
-  --color-text: #14181e; /* ink on paper */
-  --color-muted: #616b7a; /* AA (4.5:1) on the band */
-  --color-border: #c3ccd8; /* hairlines */
+  --color-ground: var(--n-2); /* the plain ground behind workspace content, and the canvas ground */
+  --color-sunken: var(--n-1); /* inside container frames */
+  --color-edge: var(--n-6); /* card, row and panel borders: 2:1 on ground and on paper */
+  --color-frame: var(--n-7); /* container frames and menu borders: 3:1 on ground and on sunken */
+  --color-surface: var(--n-0); /* paper */
+  --color-text: var(--n-15); /* ink on paper */
+  --color-muted: var(--n-8); /* AA (4.5:1) on the band */
+  --color-border: var(--n-4); /* hairlines */
   --color-error: #b8342c;
   --color-success: #1f7a55;
   --color-warning: #a66a12;
@@ -44,13 +63,14 @@
   --type-heading-weight: 700;
 
   /* Derived */
-  --chrome-bg: #e0e5ec; /* rail, inspector, sheet, strip: a step off the ground */
-  --chrome-ink: #14181e;
-  --chrome-muted: #4f5968;
-  --chrome-border: #b9c3d0;
+  --chrome-bg: var(--n-4); /* rail, inspector, sheet, strip: a step off the ground (deeper in light, deeper in dark) */
+  --chrome-ink: var(--n-15);
+  --chrome-muted: var(--n-8);
+  --chrome-border: var(--n-5);
+  --chrome-brand: #214f7c; /* the ramp's hue at higher chroma: the brand mark and the active nav marker, never state */
   --rail-w: 184px;
   --inspector-w: 360px;
-  --color-band: #e8ecf2; /* steel header band on paper */
+  --color-band: var(--n-3); /* steel header band on paper */
   --color-rule: rgba(20, 24, 30, 0.045); /* 24px ruling */
   --color-tick: var(--color-secondary); /* corner registration ticks */
   --ruling: linear-gradient(90deg, var(--color-rule) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(0deg, var(--color-rule) 1px, transparent 1px) 0 0 / 24px 24px;
@@ -62,7 +82,7 @@
   --chart-steel: var(--color-secondary);
   --chart-grid: var(--color-border);
   --ink-fill: var(--color-primary); /* primary button */
-  --ink-hover: #343b46;
+  --ink-hover: var(--n-10);
 
   /* Categorical (no hue in 200-240, so nothing reads as the accent) and neutral ramp, dark to pale. */
   --cat-1: hsl(96 30% 38%);
@@ -73,31 +93,33 @@
   --cat-6: hsl(46 40% 40%);
   --cat-7: hsl(182 40% 34%);
   --cat-8: hsl(320 40% 42%);
-  --ramp-1: #20242b;
-  --ramp-2: #5e6877;
-  --ramp-3: #97a1b0;
-  --ramp-4: #c3ccd8;
+  --ramp-1: var(--n-12);
+  --ramp-2: var(--n-8);
+  --ramp-3: var(--n-6);
+  --ramp-4: var(--n-4);
   color-scheme: light;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
-    --color-surface: #20242b;
-    --color-ground: #171b22;
-    --color-sunken: #1b1f26;
-    --color-edge: #4a5361;
-    --color-frame: #7d8796;
-    --chrome-bg: #1b1f26;
-    --chrome-ink: #e6ebf2;
-    --chrome-muted: #97a1b0;
-    --chrome-border: #343b46;
-    --color-text: #e6ebf2;
-    --color-muted: #97a1b0;
-    --color-border: #343b46;
-    --color-secondary: #a3acba; /* #5e6877 is 2.5:1 on graphite */
+    --color-surface: var(--n-11);
+    --color-ground: var(--n-13);
+    --color-sunken: var(--n-12);
+    --color-edge: var(--n-8);
+    --color-frame: var(--n-7);
+    --chrome-bg: var(--n-14);
+    --chrome-ink: var(--n-1);
+    --chrome-muted: var(--n-6);
+    --chrome-border: var(--n-11);
+    --chrome-brand: #90bce9;
+    --color-text: var(--n-1);
+    --color-muted: var(--n-6);
+    --color-border: var(--n-9);
+    --color-secondary: var(--n-6);
+    --color-primary: var(--n-11);
     --color-error: #c53b32;
-    --color-band: #282d35;
+    --color-band: var(--n-10);
     --color-rule: rgba(255, 255, 255, 0.06);
-    --color-tick: #97a1b0;
+    --color-tick: var(--n-6);
     --color-hover: rgba(255, 255, 255, 0.07);
     --color-tint: rgba(47, 111, 255, 0.16);
     --color-add: rgba(31, 122, 85, 0.28);
@@ -114,31 +136,33 @@
     --cat-6: hsl(46 40% 56%);
     --cat-7: hsl(182 40% 50%);
     --cat-8: hsl(320 40% 62%);
-    --ramp-1: #e6ebf2;
-    --ramp-2: #97a1b0;
-    --ramp-3: #6b7585;
-    --ramp-4: #454d59;
+    --ramp-1: var(--n-1);
+    --ramp-2: var(--n-6);
+    --ramp-3: var(--n-7);
+    --ramp-4: var(--n-9);
     color-scheme: dark;
   }
 }
 :root[data-theme="dark"] {
-  --color-surface: #20242b;
-  --color-ground: #171b22;
-  --color-sunken: #1b1f26;
-  --color-edge: #4a5361;
-  --color-frame: #7d8796;
-  --chrome-bg: #1b1f26;
-  --chrome-ink: #e6ebf2;
-  --chrome-muted: #97a1b0;
-  --chrome-border: #343b46;
-  --color-text: #e6ebf2;
-  --color-muted: #97a1b0;
-  --color-border: #343b46;
-  --color-secondary: #a3acba;
+  --color-surface: var(--n-11);
+  --color-ground: var(--n-13);
+  --color-sunken: var(--n-12);
+  --color-edge: var(--n-8);
+  --color-frame: var(--n-7);
+  --chrome-bg: var(--n-14);
+  --chrome-ink: var(--n-1);
+  --chrome-muted: var(--n-6);
+  --chrome-border: var(--n-11);
+  --chrome-brand: #90bce9;
+  --color-text: var(--n-1);
+  --color-muted: var(--n-6);
+  --color-border: var(--n-9);
+  --color-secondary: var(--n-6);
+  --color-primary: var(--n-11);
   --color-error: #c53b32;
-  --color-band: #282d35;
+  --color-band: var(--n-10);
   --color-rule: rgba(255, 255, 255, 0.06);
-  --color-tick: #97a1b0;
+  --color-tick: var(--n-6);
   --color-hover: rgba(255, 255, 255, 0.07);
   --color-tint: rgba(47, 111, 255, 0.16);
   --color-add: rgba(31, 122, 85, 0.28);
@@ -155,9 +179,9 @@
   --cat-6: hsl(46 40% 56%);
   --cat-7: hsl(182 40% 50%);
   --cat-8: hsl(320 40% 62%);
-  --ramp-1: #e6ebf2;
-  --ramp-2: #97a1b0;
-  --ramp-3: #6b7585;
-  --ramp-4: #454d59;
+  --ramp-1: var(--n-1);
+  --ramp-2: var(--n-6);
+  --ramp-3: var(--n-7);
+  --ramp-4: var(--n-9);
   color-scheme: dark;
 }

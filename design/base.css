@@ -120,7 +120,7 @@ h3 {
   font: 700 15px / 1.2 var(--font-heading);
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  color: var(--chrome-ink);
+  color: var(--chrome-brand);
   text-decoration: none;
 }
 .rail nav {
@@ -148,7 +148,7 @@ h3 {
 }
 .rail nav a[aria-current="page"] {
   color: var(--chrome-ink);
-  border-left-color: var(--chrome-ink);
+  border-left-color: var(--chrome-brand);
   background: var(--color-hover);
 }
 .rail button {
@@ -1076,7 +1076,7 @@ svg.chart .datum-line {
     padding: 4px 8px;
   }
   .rail nav a[aria-current="page"] {
-    border-bottom-color: var(--chrome-ink);
+    border-bottom-color: var(--chrome-brand);
   }
   .rail button {
     width: auto;

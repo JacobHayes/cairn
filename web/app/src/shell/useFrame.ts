@@ -1,8 +1,8 @@
 // The frame's state: which of the inspector column's panes have something in them, which tab
-// is in view, whether the viewer collapsed the column (`]`), and where Esc takes the sheet.
+// is in view, whether the viewer hid the column (`]`), and where Esc takes the sheet.
 // The screens report through `FrameActions` (frame.tsx); the shell reads the result.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import type { SheetSnap } from "./InspectorColumn.tsx";
 import { typing } from "../ui/typing.ts";
@@ -11,14 +11,13 @@ import { PHONE_WIDTH, SHEET, useMedia, type AssistantDock, type FrameActions, ty
 export interface Frame {
   state: FrameState;
   actions: FrameActions;
-  /** The column is on screen: something is in a pane and the viewer has not collapsed it. */
+  /** The column is on screen: something is in a pane and the viewer has not hidden it. */
   open: boolean;
-  /** Something is in a pane, collapsed or not. */
+  /** Something is in a pane, hidden or not. */
   present: boolean;
-  collapsed: boolean;
-  toggleCollapsed: () => void;
-  /** Closes what the column shows: the open node (back to the screen it is on) or the assistant. */
-  close: () => void;
+  /** The viewer hid it: the rail, or the sheet's bar, is all that shows. */
+  folded: boolean;
+  toggleFolded: () => void;
   snap: SheetSnap;
   setSnap: (snap: SheetSnap) => void;
   dock: AssistantDock | undefined;
@@ -34,10 +33,10 @@ interface Closable {
   dock: AssistantDock | undefined;
 }
 
-/** `]` collapses the inspector; Esc closes the tablet's sheet, unless a field has focus. */
-function useFrameKeys(onClose: { current: () => void }, collapse: () => void): void {
-  const toggle = useRef(collapse);
-  toggle.current = collapse;
+/** `]` hides and shows the inspector; Esc closes the tablet's sheet, unless a field has focus. */
+function useFrameKeys(onClose: { current: () => void }, fold: () => void): void {
+  const toggle = useRef(fold);
+  toggle.current = fold;
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) {
@@ -77,7 +76,7 @@ export function useFrame(): Frame {
   const [counts, setCounts] = useState({ inspector: 0, assistant: 0 });
   const [tab, setTab] = useState<InspectorTab>("inspector");
   const [dock, setDock] = useState<AssistantDock | undefined>(undefined);
-  const [collapsed, setCollapsed] = useState(false);
+  const [hidden, setHidden] = useState(false);
   const [snap, setSnap] = useState<SheetSnap>("half");
   const close = useRef<string | undefined>(undefined);
   const actions = useMemo<FrameActions>(
@@ -88,8 +87,10 @@ export function useFrame(): Frame {
           setCounts((now) => ({ ...now, [slot]: now[slot] - 1 }));
         };
       },
-      show: setTab,
-      reveal: () => { setTab("inspector"); setCollapsed(false); },
+      show: (next) => {
+        setTab(next);
+        setHidden(false);
+      },
       dock: (next) => {
         setDock(next);
         return () => {
@@ -105,26 +106,24 @@ export function useFrame(): Frame {
   // A pane with nothing in it cannot be the tab in view.
   const shown: InspectorTab = counts.assistant > 0 && (counts.inspector === 0 || tab === "assistant") ? "assistant" : "inspector";
   const present = counts.inspector > 0 || counts.assistant > 0;
-  const narrow = useMedia(PHONE_WIDTH);
+  // A phone stacks the inspector under the page, except over the full-screen map, where it is a sheet that can be hidden.
+  const stacked = useMedia(PHONE_WIDTH) && new URLSearchParams(useLocation().search).get("map") !== "1";
   const closable = useRef<Closable>({ tab: "inspector", dock: undefined });
   closable.current = { tab: shown, dock };
   const closeShown = useCloseShown(close, closable);
   useFrameKeys(closeShown, () => {
-    setCollapsed((now) => !now);
+    setHidden((now) => !now);
   });
   const state = useMemo<FrameState>(() => ({ inspector, assistant, tab: shown }), [inspector, assistant, shown]);
   return {
     state,
     actions,
-    // A phone stacks the inspector under the page and has no way to expand a collapsed one.
-    open: present && (!collapsed || narrow),
+    // The stacked inspector has no way to hide it.
+    open: present && (!hidden || stacked),
     present,
-    collapsed,
-    toggleCollapsed: () => {
-      setCollapsed((now) => !now);
-    },
-    close: () => {
-      closeShown.current();
+    folded: present && hidden && !stacked,
+    toggleFolded: () => {
+      setHidden((now) => !now);
     },
     snap,
     setSnap,

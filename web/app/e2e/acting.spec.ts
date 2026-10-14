@@ -65,3 +65,15 @@ test("B1, C11: a journey started from a route opens its walkthrough; an answer s
   await expect(card(page)).toHaveAttribute("data-node", "n_partner_results");
   await expect(page.getByTestId("unlocked-by").getByRole("link", { name: "Review the partner's criteria" })).toBeVisible();
 });
+
+test("C9: showing the not-relevant rows keeps the levels a person opened", async ({ page }) => {
+  await openActing(page, "browser", "j_vendor_eval", "list");
+  await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
+  const total = Number(await page.getByTestId("list-total").getAttribute("data-total"));
+  await page.getByTestId("list-fold-all").click();
+  const folds = page.getByTestId("list-fold");
+  await expect(folds.first()).toHaveAttribute("aria-expanded", "true");
+  await page.getByTestId("list-not-relevant").click();
+  await expect(page.getByTestId("list-total")).not.toHaveAttribute("data-total", String(total));
+  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
+});

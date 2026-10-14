@@ -37,17 +37,49 @@ Cairn is used by people who open it a few times a week as well as by people who 
 
 Use tokens everywhere. Screen code never uses raw hex values, pixel radii above `--radius-lg`, or its own durations.
 
+### The neutral ramp and its roles
+
+Every neutral comes from one cool ramp, `--n-0` to `--n-15`: OKLCH hue 250 throughout, lightness stepping from 0.985 to 0.14, chroma 0.004 at the palest rising to 0.032 at mid and settling at 0.015 at the darkest. A role is a step, never a hex of its own, and a theme only chooses which step each role takes. New neutrals are added by picking a step.
+
+| Step | Hex | L | Step | Hex | L |
+| --- | --- | --- | --- | --- | --- |
+| `--n-0` | `#f8fafd` | .985 | `--n-8` | `#4b5a6a` | .46 |
+| `--n-1` | `#f0f4f8` | .965 | `--n-9` | `#353e48` | .36 |
+| `--n-2` | `#e6ecf2` | .94 | `--n-10` | `#262f38` | .30 |
+| `--n-3` | `#dbe2e9` | .91 | `--n-11` | `#1e262e` | .265 |
+| `--n-4` | `#ced5dd` | .87 | `--n-12` | `#171e25` | .23 |
+| `--n-5` | `#b5bfc9` | .80 | `--n-13` | `#10171e` | .20 |
+| `--n-6` | `#94a0ad` | .70 | `--n-14` | `#0a1016` | .17 |
+| `--n-7` | `#6d7c8c` | .58 | `--n-15` | `#050a0f` | .14 |
+
+| Role | Token | Light | Dark |
+| --- | --- | --- | --- |
+| chrome (rail, inspector column, sheet, strip, toast, selection bar) | `--chrome-bg` | `--n-4` | `--n-14` |
+| workspace ground, canvas ground | `--color-ground` | `--n-2` | `--n-13` |
+| inside container frames | `--color-sunken` | `--n-1` | `--n-12` |
+| paper: rows, cards, panels, menus | `--color-surface` | `--n-0` | `--n-11` |
+| header band, table headers | `--color-band` | `--n-3` | `--n-10` |
+| hairlines, row rules, separators | `--color-border` | `--n-4` | `--n-9` |
+| card, row and panel borders | `--color-edge` | `--n-6` | `--n-8` |
+| container frames, menu borders | `--color-frame` | `--n-7` | `--n-7` |
+| hairlines on chrome | `--chrome-border` | `--n-5` | `--n-11` |
+| text on paper, text on chrome | `--color-text`, `--chrome-ink` | `--n-15` | `--n-1` |
+| secondary and muted text, on chrome too | `--color-secondary`, `--color-muted`, `--chrome-muted` | `--n-8` | `--n-6` |
+| primary button, chart ink | `--color-primary` | `--n-12` | `--n-11` (`--ink-fill` is chrome ink) |
+
+The hierarchy is the order of the steps. In light, paper is the lightest, then the sunken frames, the ground, the band, and the chrome the deepest: the chrome is the slightly deeper tone that frames the page. In dark the order flips: the chrome is the deepest step, then the ground, the sunken frames, paper (raised), the band, the hairlines. Chrome is always one clear step off the ground (two ramp steps), in both themes. The ramp has no gradients and no second hue, and the roles above are the only places it is used for structure.
+
 ### Core (light, canonical)
 
 | Token | Value | Role |
 | --- | --- | --- |
-| `--color-primary` | `#20242b` | graphite: primary buttons, chart ink |
-| `--color-secondary` | `#5e6877` | steel: labels, column headers, metadata, second chart series |
+| `--color-primary` | `--n-12` | graphite: primary buttons, chart ink |
+| `--color-secondary` | `--n-8` | steel: labels, column headers, metadata, second chart series |
 | `--color-accent` | `#2f6fff` | electric blue: selection, focus ring, flagged datum |
-| `--color-surface` | `#f7f9fc` | paper: rows, cards, panels, menus |
-| `--color-text` | `#14181e` | ink on paper |
-| `--color-muted` | `#616b7a` | secondary text (AA on the header band) |
-| `--color-border` | `#c3ccd8` | hairlines, row rules, separators, chart gridlines |
+| `--color-surface` | `--n-0` | paper: rows, cards, panels, menus |
+| `--color-text` | `--n-15` | ink on paper |
+| `--color-muted` | `--n-8` | secondary text (AA on the header band) |
+| `--color-border` | `--n-4` | hairlines, row rules, separators, chart gridlines |
 | `--color-error` | `#b8342c` | 4.5:1 on the light ground (dark: `#c53b32`) |
 | `--color-success` | `#1f7a55` | |
 | `--color-warning` | `#a66a12` | |
@@ -57,22 +89,23 @@ Use tokens everywhere. Screen code never uses raw hex values, pixel radii above 
 
 | Token | Light | Dark | Role |
 | --- | --- | --- | --- |
-| `--color-ground` | `#e9edf2` | `#171b22` | the plain ground behind workspace content, and under a canvas's ruling |
-| `--color-sunken` | `#eef1f5` | `#1b1f26` | inside container frames, so the paper cards in them stand out |
-| `--color-edge` | `#9aa5b4` | `#4a5361` | card, row and panel borders |
-| `--color-frame` | `#6b7585` | `#7d8796` | container frames and menu borders |
-| `--chrome-bg` | `#e0e5ec` | `#1b1f26` | rail, inspector column, sheet, strip, toast, selection bar |
-| `--chrome-ink` | `#14181e` | `#e6ebf2` | text on chrome |
-| `--chrome-muted` | `#4f5968` | `#97a1b0` | secondary text on chrome |
-| `--chrome-border` | `#b9c3d0` | `#343b46` | hairlines on chrome |
-| `--color-band` | `#e8ecf2` | `#282d35` | steel header band on panels and table headers |
+| `--color-ground` | `--n-2` | `--n-13` | the plain ground behind workspace content, and under a canvas's ruling |
+| `--color-sunken` | `--n-1` | `--n-12` | inside container frames, so the paper cards in them stand out |
+| `--color-edge` | `--n-6` | `--n-8` | card, row and panel borders |
+| `--color-frame` | `--n-7` | `--n-7` | container frames and menu borders |
+| `--chrome-bg` | `--n-4` | `--n-14` | rail, inspector column, sheet, strip, toast, selection bar |
+| `--chrome-ink` | `--n-15` | `--n-1` | text on chrome |
+| `--chrome-muted` | `--n-8` | `--n-6` | secondary text on chrome |
+| `--chrome-border` | `--n-5` | `--n-11` | hairlines on chrome |
+| `--chrome-brand` | `#214f7c` | `#90bce9` | ink-blue (the ramp's hue at higher chroma): the brand mark and the active nav marker. Quiet identity, never state: the electric accent stays for selection and focus |
+| `--color-band` | `--n-3` | `--n-10` | steel header band on panels and table headers |
 | `--color-rule` | `rgba(20,24,30,.045)` | `rgba(255,255,255,.06)` | the 24px ruling, drawn by `--ruling` on canvases only |
-| `--color-tick` | `--color-secondary` | `#97a1b0` | corner registration ticks |
+| `--color-tick` | `--color-secondary` | `--n-6` | corner registration ticks |
 | `--color-hover` | `rgba(20,24,30,.07)` | `rgba(255,255,255,.07)` | neutral row hover |
 | `--color-tint` | `rgba(47,111,255,.12)` | `rgba(47,111,255,.16)` | faint blue behind a selected row |
 | `--color-add` / `--color-del` | success / error at 12% | at 28% | diff line backgrounds |
 | `--chart-ink` / `--chart-steel` / `--chart-grid` | primary / secondary / border | text / muted / border | chart marks and scaffold |
-| `--ink-fill` / `--ink-hover` | primary / `#343b46` | chrome-ink / chrome-muted | primary button fill |
+| `--ink-fill` / `--ink-hover` | primary / `--n-10` | chrome-ink / chrome-muted | primary button fill |
 
 ### Contrast floors
 
@@ -80,14 +113,14 @@ Both themes meet these, and `web/app/src/ui/tokens.test.ts` parses `design/token
 
 | Pair | Floor |
 | --- | --- |
-| text and muted on surface and on band, muted on ground, and chrome ink and muted on chrome | 4.5:1 |
+| text and muted on surface and on band, muted on ground, and chrome ink, muted and brand on chrome | 4.5:1 |
 | `--color-frame` on ground and on sunken | 3:1 |
 | `--color-edge` on ground and on surface | 2:1 |
 | surface on ground (a visible step before any border) | 1.08:1 |
 
 ### Dark theme
 
-Dark mode follows the OS preference and can be forced with `data-theme="dark"` or `"light"` on the root element. Every theme-dependent token has a value in each theme (the tables above); nothing is graphite by default. The paper turns graphite (`--color-surface: #20242b`), the ground and the chrome go a step darker, and the borders lighten so they keep their contrast. `--color-secondary` is `#a3acba` (the light steel is only 2.5:1 on graphite). The accent and status colours are the same in both themes.
+Dark mode follows the OS preference and can be forced with `data-theme="dark"` or `"light"` on the root element. Every theme-dependent token has a value in each theme (the tables above): the same ramp, with each role taking a darker step. The paper is raised (`--n-11`) above the ground and the chrome goes deeper than both, and the borders lighten so they keep their contrast. The accent and status colours are the same in both themes.
 
 ### Categorical and ramp palettes
 
@@ -99,7 +132,7 @@ Most screens need no categorical colour. When one is unavoidable (colour by grou
 | light L | 38% | 48% | 34% | 48% | 54% | 40% | 34% | 42% |
 | dark L | 56% | 62% | 52% | 64% | 70% | 56% | 50% | 62% |
 
-For ordered values, use the neutral ramp `--ramp-1` to `--ramp-4`, from dark to pale: `#20242b #5e6877 #97a1b0 #c3ccd8` (dark: `#e6ebf2 #97a1b0 #6b7585 #454d59`). Show binary or ordinal attributes with shape, a ring or a label, not with more saturated colour.
+For ordered values, use `--ramp-1` to `--ramp-4`, four steps of the neutral ramp from dark to pale: `--n-12 --n-8 --n-6 --n-4` (dark: `--n-1 --n-6 --n-7 --n-9`). Show binary or ordinal attributes with shape, a ring or a label, not with more saturated colour.
 
 ### Shape, space, depth, motion
 
@@ -135,6 +168,15 @@ Mono uppercase is kept for labels, column headers, keys and status chips; button
   - a status strip, 28px tall, along the bottom of the workspace and inspector, holding the sync chip at its right end and "? Keys"
   The chrome follows the theme: light chrome in light, dark in dark. The workspace runs edge to edge between the rail and the viewport. Only a canvas inside it is ruled.
 - **One scroller per region.** At 720px and wider the frame fills the viewport (`100dvh`) and the document never scrolls. The rail, the workspace body, the inspector body, a sheet body, a popover body and a modal body are the only scrolling elements, each scrolling once. A gesture surface (a graph or timeline canvas, which owns the wheel and touch) never sits inside a scroller. A primary table is its region's scroller, so its sticky header sticks to the right box; secondary tables (inside the inspector or a card) never scroll and end in "Show all" instead.
+- **Inspector.** A right-hand column, or a resizable sheet along the bottom when the workspace must keep its full width. Both are chrome, with paper cards inside. One control hides it: the head's "Hide inspector" button (a `›|` chevron, tooltip "Hide the inspector  ]"), with no close button, since deselecting is the canvas background click or Esc. Hidden, the column folds to a 32px rail on the right edge, still visible, with a `|‹` "Show inspector" button and a vertical mono INSPECTOR label; the whole rail opens it, and so does `]`, which toggles it. Selecting a node (a canvas click or a list row) brings a hidden inspector back. The sheet has the same single control, and hidden it is a slim handle bar along the bottom that opens it. The status strip carries no inspector control.
+- **Grid.** Inside the workspace, modules sit on repeating `minmax(0, 1fr)` columns.
+- **Responsive.** From 720 to 1099px the inspector becomes a bottom sheet over the workspace (a drag handle, two snap heights, Esc closes it) rather than dropping below the workspace, so the document still never scrolls. Below 720px everything stacks into one scrolling column and the rail becomes a top bar with wrapping nav; a gesture surface there is an inert preview (a fitted, static picture a swipe scrolls past) with one button that opens it full screen, where gestures belong to it. Supported from about 390px to 2560px.
+
+## Components
+
+- **Panel / card.** Opaque paper surface, four corner ticks (L-shaped 1px strokes, 8px long, inset 3px), a 1px border, `--shadow-sm`, square corners. No ruling: only a canvas is ruled (see Charts and graphs). A panel's first label becomes its header band: `--color-band`, a bottom hairline, and an uppercase mono label in steel. Cards have a header band and an optional action row with a top hairline. Never give one edge a colour. Inspector sections are the exception: each is a sentence-case Plex Sans heading row, folded by default, showing its name and at most a count.
+- **Label.** Uppercase Plex Mono 12px, letter-spacing .08em, steel. Use it for module titles, field labels above controls, and keys in key/value tables.
+- **Table.** The one row component for every list of nodes (the Plan list, the frontier, folds, Mine, decision lists): opaque paper rows with a `--color-edge` hairline under each, the table inside a bordered panel on the ground, a status chip column and an owner column. Rows have room (a two-line row about 64px, a one-line row 8px 12px padding); vertical hairlines between columns only in data tables opened in full. The header is a sticky band with steel labels, uppercase mono in a data table and sentence case in the Plan list, where a column that sorts is a button. Numbers are right-aligned mono with tabular figures, and secondary parts of a cell (a percentage, a rank) are steel. Hover is a neutral tint. A tree is a classic tree: for each ancestor with more children below, a continuous 1px `--color-border` vertical line through the full row height (across the row hairlines) centred on that ancestor's chevron, and for the row itself a `├` or, as the last child, a `└` joining the line to its chevron or bullet. A container's fold is a real 24px icon button with a 12px chevron in `--color-text`; a leaf has a small bullet in the same slot, so every title starts at its level's 24px column. A container row (a group or a stage) is a `--color-band` row with a 600-weight title and its progress, so it reads as the header of the rows under it. A tree keeps the levels a person opened or folded when the row set changes (a filter, Show not relevant). A primary table is its region's scroller, so its sticky header sticks to the right box; secondary tables (inside the inspector or a card) never scroll and end in "Show all" instead.
 - **Inspector.** A right-hand column, or a resizable sheet along the bottom when the workspace must keep its full width. Both are chrome, with paper cards inside.
 - **Grid.** Inside the workspace, modules sit on repeating `minmax(0, 1fr)` columns.
 - **Responsive.** From 720 to 1099px the inspector becomes a bottom sheet over the workspace (a drag handle, two snap heights, Esc closes it) rather than dropping below the workspace, so the document still never scrolls. Below 720px everything stacks into one scrolling column and the rail becomes a top bar with wrapping nav; a gesture surface there is an inert preview (a fitted, static picture a swipe scrolls past) with one button that opens it full screen, where gestures belong to it. Supported from about 390px to 2560px.

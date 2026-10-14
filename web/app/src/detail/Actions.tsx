@@ -384,8 +384,8 @@ function useContextChoice(node: string, run: (id: ContextId) => void): void {
       return;
     }
     done.current = location.key;
-    // The form or the move is shown in the inspector, which the viewer may have on the assistant's tab or collapsed.
-    frame?.reveal();
+    // The form or the move is shown in the inspector, which the viewer may have on the assistant's tab or hidden.
+    frame?.show("inspector");
     void navigate(location, { replace: true, state: { ...(location.state as object), choice: undefined } });
     run(chosen.id);
   });

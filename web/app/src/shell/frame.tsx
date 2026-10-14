@@ -54,10 +54,8 @@ export interface AssistantDock {
 export interface FrameActions {
   /** Something is in `slot`'s pane until the returned function is called. */
   mount: (slot: InspectorTab) => () => void;
-  /** Brings `tab` into view. */
+  /** Brings `tab` into view whatever the viewer left in its way: the other tab, a hidden column. */
   show: (tab: InspectorTab) => void;
-  /** Brings the inspector into view whatever the viewer left in its way: the assistant's tab, a collapsed column. */
-  reveal: () => void;
   /** The assistant can be opened (its toggle is on screen) until the returned function is called. */
   dock: (dock: AssistantDock) => () => void;
   /** Where Esc takes the sheet: `address` closes the open node; undefined when nothing is open. */
@@ -79,7 +77,7 @@ export function useFrameActions(): FrameActions | undefined {
 
 /**
  * The inspector's content, rendered in the shell's inspector column. `focus` names what it is
- * about (the open node): when it changes, the inspector tab comes into view. Closing sends
+ * about (the open node): when it changes, the inspector tab comes into view, even if the viewer hid the column. Closing sends
  * the sheet's Esc to the screen the node is open on, keeping what that screen shows. With
  * `reveal` off (the journey card, which is there without being asked for) it leaves the tab
  * in view alone and a phone does not scroll to it.

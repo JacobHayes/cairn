@@ -1,9 +1,10 @@
 // The inspector column of the frame (design 3.1, 3.3): a chrome column on the right at
 // 1100px and wider, a bottom sheet from 720 to 1099px (with a drag handle that snaps between
 // two heights), and stacked under the workspace on a phone. Its head has two tabs, INSPECTOR
-// and ASSISTANT, when the assistant is on offer, the sheet's grip in the middle, and the collapse
-// (the column only) and close controls at the right. The panes are empty slots: the screens'
-// content arrives through portals (frame.tsx). The inspector pane is the column's one
+// and ASSISTANT, when the assistant is on offer, the sheet's grip in the middle, and one control
+// at the right that hides it. Hidden, the column folds to a rail on the right edge (a slim bar
+// at the bottom for the sheet) whose one button shows it again. The panes are empty slots: the
+// screens' content arrives through portals (frame.tsx). The inspector pane is the column's one
 // scroller; the assistant pane holds its own (a transcript above a pinned composer).
 import { useRef, type PointerEvent as ReactPointerEvent, type Ref, type RefObject } from "react";
 
@@ -49,26 +50,43 @@ function useSheetDrag(column: RefObject<HTMLElement | null>, snap: SheetSnap, on
   };
 }
 
+/** A chevron against a bar: `toward` is the way it points, the bar sits at the edge the column folds to. */
+function FoldIcon({ toward }: { toward: "right" | "left" }) {
+  const flip = toward === "left";
+  return (
+    <svg className="fold-icon" viewBox="0 0 16 16" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="1.5">
+      <path d={flip ? "M10 3.5 5.5 8l4.5 4.5" : "M6 3.5 10.5 8 6 12.5"} />
+      <path d={flip ? "M2.5 3v10" : "M13.5 3v10"} />
+    </svg>
+  );
+}
+
 export interface InspectorColumnProps {
-  open: boolean;
+  /** Something is in a pane. */
+  present: boolean;
+  /** The viewer hid it: only the rail (or the sheet's bar) shows. */
+  folded: boolean;
   tab: InspectorTab;
   snap: SheetSnap;
   /** The assistant can be opened: show the tab bar. */
   assistantOffered: boolean;
   onTab: (tab: InspectorTab) => void;
   onSnap: (snap: SheetSnap) => void;
-  onCollapse: () => void;
-  onClose: () => void;
+  onToggle: () => void;
   inspectorRef: Ref<HTMLDivElement>;
   assistantRef: Ref<HTMLDivElement>;
 }
 
-export function InspectorColumn({ open, tab, snap, assistantOffered, onTab, onSnap, onCollapse, onClose, inspectorRef, assistantRef }: InspectorColumnProps) {
+export function InspectorColumn({ present, folded, tab, snap, assistantOffered, onTab, onSnap, onToggle, inspectorRef, assistantRef }: InspectorColumnProps) {
   const column = useRef<HTMLElement>(null);
   const drag = useSheetDrag(column, snap, onSnap);
   return (
-    <aside ref={column} className="inspector" aria-label="Inspector column" data-snap={snap} data-tab={tab} hidden={!open}>
-      <div className="inspector-head">
+    <aside ref={column} className="inspector" aria-label="Inspector column" data-snap={snap} data-tab={tab} data-folded={folded} hidden={!present}>
+      <button type="button" className="inspector-rail" aria-label="Show inspector" title="Show the inspector  ]" hidden={!folded} onClick={onToggle}>
+        <FoldIcon toward="left" />
+        <span className="rail-label">Inspector</span>
+      </button>
+      <div className="inspector-head" hidden={folded}>
         {assistantOffered ? (
           <div className="segmented on-chrome" role="tablist" aria-label="Inspector">
             {(["inspector", "assistant"] as const).map((each) => (
@@ -91,15 +109,12 @@ export function InspectorColumn({ open, tab, snap, assistantOffered, onTab, onSn
         )}
         <button type="button" className="sheet-handle" aria-label="Resize the inspector" {...drag} />
         <span className="spacer" />
-        <button type="button" className="ghost collapse" aria-label="Collapse the inspector" onClick={onCollapse}>
-          ⤢
-        </button>
-        <button type="button" className="ghost" aria-label="Close" onClick={onClose}>
-          ×
+        <button type="button" className="ghost hide" aria-label="Hide inspector" title="Hide the inspector  ]" onClick={onToggle}>
+          <FoldIcon toward="right" />
         </button>
       </div>
-      <div ref={inspectorRef} className="inspector-body" data-pane="inspector" hidden={tab !== "inspector"} />
-      <div ref={assistantRef} className="assistant-pane" data-pane="assistant" hidden={tab !== "assistant"} />
+      <div ref={inspectorRef} className="inspector-body" data-pane="inspector" hidden={folded || tab !== "inspector"} />
+      <div ref={assistantRef} className="assistant-pane" data-pane="assistant" hidden={folded || tab !== "assistant"} />
     </aside>
   );
 }

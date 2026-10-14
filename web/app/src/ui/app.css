@@ -9,6 +9,7 @@
   --rail-w: 200px;
   --inspector-w: 400px;
   --strip-h: 28px;
+  --fold-w: 32px; /* the hidden inspector's rail */
   /* The sheet's two heights. The tall one leaves room above it for a notice: a window's worth, less the strip and a notice. */
   --sheet-half: 40dvh;
   --sheet-full: min(85dvh, calc(100dvh - 160px));
@@ -61,20 +62,6 @@ a.button.primary:hover {
   background: var(--ink-hover);
   border-color: var(--ink-hover);
 }
-button.ghost.strip-button {
-  min-height: 20px;
-  padding: 0 6px;
-  border-color: transparent;
-  color: var(--chrome-muted);
-  font: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
-}
-button.ghost.strip-button:hover {
-  color: var(--chrome-ink);
-  border-color: var(--chrome-border);
-}
-
 /* ---- the frame -------------------------------------------------------------------------------- */
 html,
 body,
@@ -98,6 +85,9 @@ body {
   grid-template-areas:
     "rail work"
     "rail strip";
+}
+.frame[data-inspector="folded"] {
+  grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--fold-w);
 }
 .frame [hidden] {
   display: none !important;
@@ -258,6 +248,57 @@ body {
 .inspector-head .label {
   color: var(--chrome-muted);
 }
+/* Hidden, the sheet is a slim bar that opens it (a short grip, like the handle)... */
+.inspector-rail {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--chrome-muted);
+  cursor: pointer;
+}
+.inspector-rail::before {
+  content: "";
+  width: 40px;
+  height: 4px;
+  background: var(--chrome-muted);
+  opacity: 0.6;
+}
+.inspector-rail :is(.fold-icon, .rail-label) {
+  display: none;
+}
+.inspector-rail:hover {
+  background: var(--color-hover);
+  color: var(--chrome-ink);
+}
+/* ...and the column's is a rail on the right edge: a chevron over a vertical label. */
+@media (min-width: 1100px) {
+  .inspector-rail {
+    flex-direction: column;
+    justify-content: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) 0;
+  }
+  .inspector-rail::before {
+    display: none;
+  }
+  .inspector-rail :is(.fold-icon, .rail-label) {
+    display: block;
+  }
+  .inspector-rail .rail-label {
+    writing-mode: vertical-rl;
+    font: 500 12px / 1 var(--font-mono);
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+  }
+}
+.frame > .inspector[data-folded="true"] {
+  width: var(--fold-w);
+}
 .inspector-head button.ghost {
   min-height: 28px;
   min-width: 28px;
@@ -271,13 +312,15 @@ body {
   color: var(--chrome-ink);
   border-color: var(--chrome-border);
 }
-/* Collapsing is the column's; the sheet and the phone's stack have only close. */
-.inspector-head .collapse {
+/* The phone's stack is under the page and cannot be hidden. */
+.inspector-head .hide {
   display: none;
 }
-@media (min-width: 1100px) {
-  .inspector-head .collapse {
-    display: block;
+@media (min-width: 720px) {
+  .inspector-head .hide {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
   }
 }
 /* The sheet's grip sits in the middle of the head, behind its controls. */
@@ -414,6 +457,18 @@ body {
   .inspector-head .sheet-handle {
     display: block;
   }
+  /* Hidden, the sheet is a slim bar along the bottom that opens it. */
+  .frame > .inspector[data-folded="true"] {
+    width: auto;
+    height: 24px;
+    box-shadow: none;
+  }
+  .frame[data-inspector="folded"] {
+    grid-template-columns: var(--rail-w) minmax(0, 1fr);
+  }
+  .frame[data-inspector="folded"] .ws-body:not(:has(> .ws-fill)) {
+    padding-bottom: calc(24px + var(--space-5));
+  }
   /* The sheet covers the workspace's lower part: a scrolling screen's region ends above it, so its last row can be reached. */
   .frame[data-inspector="on"] .ws-body:not(:has(> .ws-fill)) {
     padding-bottom: calc(var(--sheet-h, var(--sheet-half)) + var(--space-5));
@@ -511,9 +566,15 @@ body {
   .frame[data-map="open"] .inspector-head .sheet-handle {
     display: block;
   }
-  /* A phone has no ] key, and the inspector is stacked under the page. */
-  button.ghost.strip-button {
-    display: none;
+  .frame[data-map="open"] .inspector-head .hide {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+  }
+  /* Hidden over the map, the sheet is the same slim bar as a tablet's. */
+  .frame[data-map="open"] > .inspector[data-folded="true"] {
+    height: 24px;
+    box-shadow: none;
   }
   .frame[data-map="open"] .inspector-body {
     overflow-y: auto;

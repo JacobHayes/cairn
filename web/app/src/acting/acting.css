@@ -454,29 +454,47 @@ table.data.list-table {
   border-bottom: 0;
 }
 
-/* Tree cues: a 1px guide in --color-edge through each depth's 24px gutter of the title cell,
-   full height, so it runs unbroken down a container's rows, and an elbow into the row at its
-   own level. The fold chevron sits on the guide of the rows it holds. A container is a band with
-   a heavier title, so it reads as the header of the rows under it. The title cell is held at
-   the left, which makes it the guides' anchor. */
-.list-table tr[data-depth]:not([data-depth="0"]) td.list-title-cell::after {
-  content: "";
+/* Tree guides, a classic tree in --color-edge through the title cell's full height (and over
+   its row hairline): one line per ancestor with more children below, centred on that
+   ancestor's chevron, and for the row itself a "├" or "└" (last child) that joins the line to its
+   chevron or bullet. The title cell is held at the left, which makes it the guides' anchor. */
+.list-guide {
   position: absolute;
-  inset-block: 0;
-  inset-inline-start: var(--space-2);
-  width: calc(var(--depth) * var(--space-5));
-  background: repeating-linear-gradient(90deg, transparent 0 11px, var(--color-edge) 11px 12px, transparent 12px var(--space-5));
+  inset-block: 0 -1px;
+  inset-inline-start: calc(var(--space-2) + var(--level) * var(--space-5) + 11.5px);
+  border-inline-start: 1px solid var(--color-edge);
   pointer-events: none;
 }
 
-.list-table tr[data-depth]:not([data-depth="0"]) td.list-title-cell::before {
+.list-guide[data-elbow="true"] {
+  /* Only to the row's middle when it is the last child. */
+  bottom: auto;
+  height: calc(50% + 1px);
+}
+
+.list-guide[data-elbow="true"][data-more="true"] {
+  bottom: -1px;
+  height: auto;
+}
+
+/* A last child's guide is already only as tall as the row's middle, so its arm sits at the guide's foot. */
+.list-guide[data-elbow="true"][data-more="false"]::after {
+  top: auto;
+  bottom: 0;
+}
+
+/* Below an open container's chevron, down to its first child. */
+.list-guide[data-down="true"] {
+  top: calc(50% + 9px);
+}
+
+.list-guide[data-elbow="true"]::after {
   content: "";
   position: absolute;
-  inset-inline-start: calc(var(--space-2) + var(--depth) * var(--space-5) - 13px);
   top: 50%;
+  inset-inline-start: 0;
   width: 13px;
   border-top: 1px solid var(--color-edge);
-  pointer-events: none;
 }
 
 /* The band sits under the hover and selection tints, which stay. */
@@ -506,22 +524,43 @@ table.data.list-table {
   background: var(--color-band);
 }
 
-span.list-fold {
+.list-fold {
+  position: relative;
   flex: none;
   width: var(--space-5);
 }
 
+/* A leaf has a small bullet where a chevron would be, so every title starts at its level's column. */
+span.list-stub::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--color-secondary);
+}
+
 button.list-fold {
-  flex: none;
-  width: var(--space-5);
-  min-height: 24px;
+  display: grid;
+  place-items: center;
+  height: var(--space-5);
+  min-height: var(--space-5);
   padding: 0;
   border: 0;
+  border-radius: var(--radius-sm, 4px);
   background: none;
-  color: var(--color-muted);
-  font-size: 12px;
-  line-height: 1.5;
-  text-align: center;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+button.list-fold:hover {
+  background: var(--color-hover);
+}
+
+button.list-fold[aria-expanded="true"] .list-chevron {
+  transform: rotate(90deg);
 }
 
 button.list-sort {

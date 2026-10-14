@@ -219,11 +219,24 @@ function useKeys(): [Set<string>, (key: string) => void, (keys: Iterable<string>
   return [keys, toggle, (replacement) => { setKeys(new Set(replacement)); }];
 }
 
-/** PLAN, LIST: keyed by the address's query by its caller, so a new query starts with nothing selected and the tree folded. */
-export function ListBody({ view, settings, selected }: { view: Ready; settings: ListSettings; selected?: string | undefined }) {
+/** What a person has opened or folded in the tree, by container, and whether Open every level or Fold to the top level was the last word. */
+interface Folds {
+  by: ReadonlyMap<string, boolean>;
+  every: boolean | undefined;
+}
+
+/**
+ * PLAN, LIST: a new query starts from its first page with nothing selected, but the tree keeps
+ * its open and folded levels: a filter or a row-set toggle changes the rows, not what was opened.
+ */
+export function ListBody(props: { view: Ready; settings: ListSettings; selected?: string | undefined }) {
+  const { search } = useLocation();
+  const folds = useState<Folds>({ by: new Map(), every: undefined });
+  return <ListRows key={search} {...props} folds={folds} />;
+}
+
+function ListRows({ view, settings, selected, folds: [folds, setFolds] }: { view: Ready; settings: ListSettings; selected?: string | undefined; folds: [Folds, (folds: Folds) => void] }) {
   const [chosen, toggle, choose] = useKeys();
-  const [flipped, fold, setFlipped] = useKeys();
-  const [everyLevel, setEveryLevel] = useState<boolean | undefined>(undefined);
   const query = useMemo(() => listQueryOf(settings), [settings]);
   const { rows, error } = useRows(view, query);
   // What Show not relevant would add under the same filters, so the button never promises rows the filters would drop.
@@ -237,14 +250,15 @@ export function ListBody({ view, settings, selected }: { view: Ready; settings: 
   const tree = settings.sort === undefined && !settings.decisions && !settings.frontier;
   // The open node's containers stay open, so it is not hidden in a fold; a click flips what the rest would do.
   const holding = useMemo(() => new Set(selected === undefined ? [] : ancestorsOf(view, selected)), [view, selected]);
-  const open = everyLevel ?? narrowed(settings);
+  const open = folds.every ?? narrowed(settings);
+  const isOpen = (key: string) => folds.by.get(key) ?? (open || holding.has(key));
   const lines = useMemo(
-    () => (rows === undefined ? [] : tree ? treeLines(view, rows, (key) => (open || holding.has(key)) !== flipped.has(key)) : flatLines(view, rows, settings.sort ?? (settings.frontier ? "rank" : undefined))),
-    [view, rows, tree, settings.sort, open, holding, flipped],
+    () => (rows === undefined ? [] : tree ? treeLines(view, rows, (key) => folds.by.get(key) ?? (open || holding.has(key))) : flatLines(view, rows, settings.sort ?? (settings.frontier ? "rank" : undefined))),
+    [view, rows, tree, settings.sort, open, holding, folds.by],
   );
   const everyLine = lines.flatMap((line) => (line.row === undefined ? [] : [line.row.key]));
   const columns = columnsOf(settings);
-  const context: CellContext = { view, tree, decisions, ranks, acting: settings.frontier, sort: settings.sort, onFold: fold };
+  const context: CellContext = { view, tree, decisions, ranks, acting: settings.frontier, sort: settings.sort, onFold: (key) => { setFolds({ ...folds, by: new Map(folds.by).set(key, !isOpen(key)) }); } };
   return (
     <section className="stack list" aria-label="List" data-testid="list">
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
@@ -257,8 +271,7 @@ export function ListBody({ view, settings, selected }: { view: Ready; settings: 
         all={open}
         selectedNode={selected}
         onAll={() => {
-          setEveryLevel(!open);
-          setFlipped([]);
+          setFolds({ by: new Map(), every: !open });
         }}
       />
       <Table

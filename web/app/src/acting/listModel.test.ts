@@ -44,6 +44,28 @@ describe("the lines", () => {
     expect(treeLines(view, [row("n_inner", ["n_stage"])], () => true).map((line) => line.row?.key)).toEqual([undefined, "n_inner"]);
   });
 
+  it("say per row which guide lines run beside it: its own elbow, and each ancestor's while that ancestor has more below", () => {
+    const deep = structuredClone(view);
+    const inner = deep.derived.nodes["n_inner"];
+    if (inner === undefined) {
+      throw new Error("the fixture's inner node has no derivation");
+    }
+    deep.journey.graph.nodes?.push(
+      { key: "n_leaf", id: "leaf", parent: "n_inner", kind: "action", title: "Leaf" },
+      { key: "n_zlast", id: "zlast", parent: "n_stage", kind: "action", title: "Last" },
+    );
+    deep.derived.nodes["n_leaf"] = structuredClone(inner);
+    deep.derived.nodes["n_zlast"] = structuredClone(inner);
+    const everything = [row("n_inner", ["n_stage"]), row("n_leaf", ["n_stage", "n_inner"]), row("n_zlast", ["n_stage"]), row("n_stage"), row("n_work")];
+    expect(treeLines(deep, everything, () => true).map((line) => [line.key, line.guides])).toEqual([
+      ["n_stage", []],
+      ["n_inner", [true]],
+      ["n_leaf", [true, false]],
+      ["n_zlast", [false]],
+      ["n_work", []],
+    ]);
+  });
+
   it("keep the engine's order when sorted, put the rows that are over last when sorted by a date, and plan order (the schedule's, undated last) when not", () => {
     const keysOf = (lines: { key: string }[]) => lines.map((line) => line.key);
     expect(keysOf(flatLines(view, rows, "rank"))).toEqual(["n_inner", "n_work", "n_stage"]);

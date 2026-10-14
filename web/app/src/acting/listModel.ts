@@ -66,6 +66,11 @@ export interface Line {
   /** It holds lines of its own, shown or folded. */
   container: boolean;
   open: boolean;
+  /**
+   * The tree's guide lines, one per level: at `depth - 1` (the last) the row's own `├` or `└`,
+   * before it each ancestor's line. True while that level's parent has more children below.
+   */
+  guides: boolean[];
 }
 
 /**
@@ -80,15 +85,15 @@ export function treeLines(view: Ready, rows: readonly NodeRow[], open: (containe
   }
   const { roots, children } = treeOf(view);
   const lines: Line[] = [];
-  const visit = (key: string, depth: number) => {
+  const visit = (key: string, depth: number, guides: boolean[]) => {
     const held = (children.get(key) ?? []).filter((child) => needed.has(child));
     const isOpen = held.length > 0 && open(key);
-    lines.push({ key, depth, row: matched.get(key), container: held.length > 0, open: isOpen });
+    lines.push({ key, depth, row: matched.get(key), container: held.length > 0, open: isOpen, guides });
     if (isOpen) {
-      held.forEach((child) => { visit(child, depth + 1); });
+      held.forEach((child, at) => { visit(child, depth + 1, [...guides, at < held.length - 1]); });
     }
   };
-  roots.filter((root) => needed.has(root)).forEach((root) => { visit(root, 0); });
+  roots.filter((root) => needed.has(root)).forEach((root) => { visit(root, 0, []); });
   return lines;
 }
 
@@ -100,7 +105,7 @@ export function flatLines(view: Ready, rows: readonly NodeRow[], sort: SortBy | 
   const order = new Map(planOrder(view).map((key, at) => [key, at]));
   const ordered = sort === undefined ? [...rows].sort((left, right) => (order.get(left.key) ?? 0) - (order.get(right.key) ?? 0)) : rows;
   const over = (row: NodeRow) => (sort === "due" || sort === "slack") && ["done", "skipped", "not_relevant"].includes(row.display_state);
-  return [...ordered.filter((row) => !over(row)), ...ordered.filter(over)].map((row) => ({ key: row.key, depth: 0, row, container: false, open: false }));
+  return [...ordered.filter((row) => !over(row)), ...ordered.filter(over)].map((row) => ({ key: row.key, depth: 0, row, container: false, open: false, guides: [] }));
 }
 
 /** C10: each ranked node's place in the journey's order, by rank, best first (`#1`). */

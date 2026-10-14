@@ -3,6 +3,7 @@
 // say a signal in words beside its number. A row with nothing to say in a column leaves it blank.
 // Under the Frontier lens the title says why the row is here (C10) and the owner column is
 // where the row's actions are (RowActions).
+import type { CSSProperties } from "react";
 import { Link, useLocation } from "react-router";
 
 import { ancestorsOf } from "../canvas/ladder.ts";
@@ -72,18 +73,35 @@ function Fact({ line, context }: { line: Line; context: CellContext }) {
   );
 }
 
+/** The classic tree guides through the title cell's full height: each ancestor's line while it has more below, the row's own elbow into its chevron or bullet, and from an open container's chevron down to its first child. */
+function Guides({ line }: { line: Line }) {
+  return (
+    <>
+      {line.guides.map((more, level) =>
+        more || level === line.depth - 1 ? <span key={level} className="list-guide" data-more={more} data-elbow={level === line.depth - 1} style={{ "--level": level } as CSSProperties} aria-hidden="true" /> : null,
+      )}
+      {line.open ? <span className="list-guide" data-down="true" style={{ "--level": line.depth } as CSSProperties} aria-hidden="true" /> : null}
+    </>
+  );
+}
+
 function Title({ line, context }: { line: Line; context: CellContext }) {
   const { view, tree } = context;
   return (
     <div className="list-title" style={{ paddingInlineStart: `calc(${String(line.depth)} * var(--space-5))` }}>
       {tree ? (
-        line.container ? (
-          <button type="button" className="list-fold" aria-expanded={line.open} aria-label={`${line.open ? "Fold" : "Open"} ${nodeOf(view, line.key)?.title ?? line.key}`} data-testid="list-fold" onClick={() => { context.onFold(line.key); }}>
-            {line.open ? "▾" : "▸"}
-          </button>
-        ) : (
-          <span className="list-fold" aria-hidden="true" />
-        )
+        <>
+          <Guides line={line} />
+          {line.container ? (
+            <button type="button" className="list-fold" aria-expanded={line.open} aria-label={`${line.open ? "Fold" : "Open"} ${nodeOf(view, line.key)?.title ?? line.key}`} data-testid="list-fold" onClick={() => { context.onFold(line.key); }}>
+              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="list-chevron">
+                <path d="M4 2l4 4-4 4" />
+              </svg>
+            </button>
+          ) : (
+            <span className="list-fold list-stub" aria-hidden="true" />
+          )}
+        </>
       ) : null}
       <div className="list-node">
         <DetailLink view={view} node={line.key} />

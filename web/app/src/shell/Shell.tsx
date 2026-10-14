@@ -1,6 +1,6 @@
 // The app frame every screen renders inside (design 3.1): a chrome rail with the screens,
 // the workspace (the screen the router shows, its one scroller `.ws-body`), the inspector
-// column on the right (INSPECTOR | ASSISTANT; a bottom sheet on a tablet), and the 28px
+// column on the right (INSPECTOR | ASSISTANT; a bottom sheet on a tablet; a rail when hidden), and the 28px
 // strip with the sync chip. The frame is one `100dvh` grid with one scroller per
 // region (app.css); below 720px it is one scrolling column.
 import { Suspense } from "react";
@@ -11,7 +11,7 @@ import { InspectorColumn } from "./InspectorColumn.tsx";
 import { LoadFailure } from "./LoadFailure.tsx";
 import { SyncChip } from "./SyncChip.tsx";
 import { Toast } from "./Toast.tsx";
-import { useFrame, type Frame } from "./useFrame.ts";
+import { useFrame } from "./useFrame.ts";
 
 /** The screens, as links; the one the viewer is on is marked. */
 function Rail({ pathname }: { pathname: string }) {
@@ -41,15 +41,10 @@ function Rail({ pathname }: { pathname: string }) {
   );
 }
 
-/** The strip: the inspector's way back while it is collapsed on the left, the sync chip on the right. */
-function Strip({ frame }: { frame: Frame }) {
+/** The strip: the sync chip on the right. */
+function Strip() {
   return (
     <footer className="strip">
-      {frame.present && frame.collapsed ? (
-        <button type="button" className="ghost strip-button" aria-expanded="false" onClick={frame.toggleCollapsed}>
-          <kbd>]</kbd> Inspector
-        </button>
-      ) : null}
       <span className="spacer" />
       <SyncChip />
     </footer>
@@ -64,7 +59,7 @@ export function Shell() {
   return (
     <FrameActionsContext value={frame.actions}>
       <FrameStateContext value={frame.state}>
-        <div className="frame" data-inspector={frame.open ? "on" : "off"} data-map={mapOpen ? "open" : "closed"}>
+        <div className="frame" data-inspector={frame.folded ? "folded" : frame.open ? "on" : "off"} data-map={mapOpen ? "open" : "closed"}>
           <Rail pathname={pathname} />
           <main className="workspace" data-screen={`${pathname}${search}`}>
             <div className="ws-body">
@@ -77,18 +72,18 @@ export function Shell() {
             <Toast />
           </main>
           <InspectorColumn
-            open={frame.open}
+            present={frame.present}
+            folded={frame.folded}
             tab={frame.state.tab}
             snap={frame.snap}
             assistantOffered={frame.dock !== undefined}
             onTab={frame.choose}
             onSnap={frame.setSnap}
-            onCollapse={frame.toggleCollapsed}
-            onClose={frame.close}
+            onToggle={frame.toggleFolded}
             inspectorRef={frame.setInspector}
             assistantRef={frame.setAssistant}
           />
-          <Strip frame={frame} />
+          <Strip />
         </div>
       </FrameStateContext>
     </FrameActionsContext>

@@ -66,6 +66,25 @@ test("the inspector scrolls to the end of History at 1440 and 1024px, a node ope
   await expect(page).toHaveURL(/\/journeys\/j_vendor_eval\/summary$/);
 });
 
+test("the inspector hides to a rail that shows it again, and selecting a node brings it back", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 768 });
+  await openAt(page, "browser", "j_vendor_eval", "graph?detail=all", { node: "n_plan" });
+  const show = page.getByRole("button", { name: "Show inspector" });
+  await expect(show).toBeHidden();
+  await page.getByRole("button", { name: "Hide inspector" }).click();
+  await expect(nodePanel(page, "n_plan")).toBeHidden();
+  await expect(show).toBeVisible();
+  // The rail is the way back, and so is the key.
+  await show.click();
+  await expect(nodePanel(page, "n_plan")).toBeVisible();
+  await page.keyboard.press("]");
+  await expect(show).toBeVisible();
+  // Picking another node on the canvas opens it in the inspector again.
+  await nodeCard(page, "n_access").getByTestId("card-open").dispatchEvent("click");
+  await expect(nodePanel(page, "n_access")).toBeVisible();
+  await expect(show).toBeHidden();
+});
+
 test.describe("a phone's map", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
@@ -123,5 +142,10 @@ test.describe("a phone's map", () => {
     // The sheet is bounded and its body scrolls, so the end of the node's detail is reachable.
     await reachHistory(page, "n_make_offer", 844);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    // Hiding the sheet gives the whole map back, and a bar along the bottom opens it again.
+    await page.getByRole("button", { name: "Hide inspector" }).click();
+    await expect(panel).toBeHidden();
+    await page.getByRole("button", { name: "Show inspector" }).click();
+    await expect(panel).toBeVisible();
   });
 });
