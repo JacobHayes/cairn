@@ -24,6 +24,7 @@ chrono.workspace = true
 clap.workspace = true
 # `cairn demo`'s stub issuer signs its ID tokens.
 ed25519-dalek.workspace = true
+futures-core.workspace = true
 # The server reads time zones from the system's database (/usr/share/zoneinfo): the service
 # brings no zone database of its own (DeploymentSettings::new).
 jiff = { workspace = true, features = ["tz-system", "tzdb-zoneinfo"] }

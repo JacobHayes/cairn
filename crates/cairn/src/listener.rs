@@ -8,10 +8,17 @@
 use std::future::Future;
 use std::io;
 use std::net::SocketAddr;
+use std::pin::Pin;
+use std::task::{Context, Poll};
 use std::time::Duration;
 
 use axum::Router;
+use axum::body::{Body, BodyDataStream};
+use axum::http::{Request, header::CONTENT_TYPE};
+use axum::middleware::{self, Next};
+use axum::response::Response;
 use axum::serve::ListenerExt;
+use futures_core::Stream;
 use socket2::{SockRef, TcpKeepalive};
 use tokio::net::{TcpListener, TcpStream};
 
@@ -62,9 +69,54 @@ pub fn warn_unsupported() {
     }
 }
 
+/// An event stream's body, ended cleanly when the server stops: the client sees the stream
+/// close between two events and reopens it against whatever comes next.
+struct EndsAtShutdown {
+    body: BodyDataStream,
+    stopping: Pin<Box<dyn Future<Output = ()> + Send>>,
+}
+
+impl Stream for EndsAtShutdown {
+    type Item = <BodyDataStream as Stream>::Item;
+
+    fn poll_next(mut self: Pin<&mut Self>, context: &mut Context<'_>) -> Poll<Option<Self::Item>> {
+        if self.stopping.as_mut().poll(context).is_ready() {
+            return Poll::Ready(None);
+        }
+        Pin::new(&mut self.body).poll_next(context)
+    }
+}
+
+/// Wraps each event stream's body (any `text/event-stream` response: the revision stream and
+/// the MCP endpoint's) so it ends when the server begins to stop. Ordinary responses finish
+/// by themselves; these never would, and graceful shutdown would wait on them.
+async fn end_streams_at_shutdown(
+    mut stopped: tokio::sync::watch::Receiver<bool>,
+    request: Request<Body>,
+    next: Next,
+) -> Response {
+    let response = next.run(request).await;
+    let streaming = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .is_some_and(|kind| kind.as_bytes().starts_with(b"text/event-stream"));
+    if !streaming {
+        return response;
+    }
+    let (head, body) = response.into_parts();
+    let ending = EndsAtShutdown {
+        body: body.into_data_stream(),
+        stopping: Box::pin(async move {
+            let _ = stopped.wait_for(|stopped| *stopped).await;
+        }),
+    };
+    Response::from_parts(head, Body::from_stream(ending))
+}
+
 /// Serves `app` on `listener` until `shutdown` resolves, every connection configured and its
 /// peer recorded for the auth layer. Requests in flight then get up to the request duration
-/// to finish; connections still open after it (SSE streams) are dropped.
+/// to finish; event streams end at once, so they do not hold the stop up, and connections
+/// still open after the duration are dropped.
 ///
 /// # Errors
 ///
@@ -97,6 +149,10 @@ pub async fn serve_with_user_timeout(
         }
     });
     let (stopping, stopped) = tokio::sync::watch::channel(false);
+    let streams = stopped.clone();
+    let app = app.layer(middleware::from_fn(move |request, next| {
+        end_streams_at_shutdown(streams.clone(), request, next)
+    }));
     let serving = axum::serve(
         listener,
         app.into_make_service_with_connect_info::<SocketAddr>(),
@@ -116,7 +172,7 @@ pub async fn serve_with_user_timeout(
     if let Ok(outcome) = tokio::time::timeout(SHUTDOWN_DRAIN_MAX, serving).await {
         return outcome;
     }
-    tracing::info!("stopped with connections still open (event streams)");
+    tracing::info!("stopped with connections still open");
     Ok(())
 }
 

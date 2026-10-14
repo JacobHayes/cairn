@@ -23,8 +23,8 @@ pub const KEEPALIVE_IDLE: Duration = SSE_WRITE_STALL;
 pub const KEEPALIVE_INTERVAL: Duration = SSE_HEARTBEAT_INTERVAL;
 
 /// How long a stopping server waits for requests in flight before it exits: the request
-/// duration, which bounds every request but the SSE streams (which never end by themselves)
-/// and the assistant's turns (whose writes each commit whole or not at all).
+/// duration, which bounds every request but the assistant's turns (whose writes each commit
+/// whole or not at all). Event streams end at once when the server stops.
 pub const SHUTDOWN_DRAIN_MAX: Duration = REQUEST_DURATION_MAX;
 
 /// How often the metrics exporter folds its histograms (the Prometheus exporter's upkeep):

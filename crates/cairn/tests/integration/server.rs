@@ -509,4 +509,48 @@ mod in_process {
             tokio::time::sleep(Duration::from_millis(20)).await;
         }
     }
+
+    /// Stopping the server ends its open event streams, cleanly and at once, so the stop
+    /// completes when the requests in flight have, not after the drain limit with the
+    /// streams dropped.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn stopping_the_server_ends_open_event_streams_and_completes_promptly() {
+        use std::time::Duration;
+
+        use cairn::limits::SHUTDOWN_DRAIN_MAX;
+        use tokio::io::{AsyncReadExt, AsyncWriteExt};
+
+        let notifier = Arc::new(InProcessNotifier::new());
+        let config = support::config(&support::dev_provider(None));
+        let app = root::app(&config, support::assembly(notifier)).unwrap();
+        let bound = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let address = bound.local_addr().unwrap();
+        let (stop, stopped) = tokio::sync::oneshot::channel::<()>();
+        let serving = tokio::spawn(cairn::listener::serve(bound, app, async move {
+            let _ = stopped.await;
+        }));
+
+        let mut client = tokio::net::TcpStream::connect(address).await.unwrap();
+        let request = format!(
+            "GET /api/events/stream?domain=journeys HTTP/1.1\r\nhost: {PUBLIC_HOST}\r\n\r\n"
+        );
+        client.write_all(request.as_bytes()).await.unwrap();
+        let mut head = [0_u8; 64];
+        let read = client.read(&mut head).await.unwrap();
+        assert!(head[..read].starts_with(b"HTTP/1.1 200"));
+
+        stop.send(()).unwrap();
+        let served = tokio::time::timeout(SHUTDOWN_DRAIN_MAX / 4, serving).await;
+        served
+            .expect("the stop waited on the open event stream")
+            .unwrap()
+            .unwrap();
+        // The client sees the stream end, not a reset: the body's last chunk, then EOF.
+        let mut rest = Vec::new();
+        tokio::time::timeout(Duration::from_secs(5), client.read_to_end(&mut rest))
+            .await
+            .unwrap()
+            .unwrap();
+        assert!(rest.ends_with(b"0\r\n\r\n"), "{rest:?}");
+    }
 }
