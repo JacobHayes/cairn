@@ -74,8 +74,12 @@ export interface GraphCanvasProps {
   onEdge?: ((line: Line) => void) | undefined;
   /** The empty canvas was clicked (a pan or a lasso is not a click). */
   onBackground?: (() => void) | undefined;
-  /** The Select mode (5.9): shift-click and shift-drag pick cards. */
-  selecting?: { picked: ReadonlySet<string>; onPicked: (keys: string[]) => void } | undefined;
+  /**
+   * The selection when it has several members (`picked`); a card clicked with Shift, Cmd or Ctrl
+   * is toggled into it (`toggle`, also Shift+Space on a focused card), and a Shift-drag on the
+   * background sets it to what it holds plus the cards in the box (`set`).
+   */
+  selection?: { picked: ReadonlySet<string>; members: readonly string[]; toggle: (key: string) => void; set: (keys: string[]) => void } | undefined;
   reveal?: Reveal | undefined;
   /** The nodes the view first opens fitted to (a proposal's changes), with the whole graph when none is drawn; Fit still fits all. */
   firstFit?: readonly string[] | undefined;
@@ -114,7 +118,7 @@ function withEmphasis(props: FlowProps): FlowProps {
 }
 
 function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {
-  const { model, layout, overlay, lens, faded, selected, selecting } = props;
+  const { model, layout, overlay, lens, faded, selected, selection } = props;
   const containers = openContainers(model);
   const chips = lens === undefined ? undefined : lensChips(model.cards, lens);
   const tiers = chips === undefined ? undefined : lensTiers(chips);
@@ -141,7 +145,7 @@ function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {
         overlay,
         faded: faded?.has(card.key) === true,
         selected: card.key === selected,
-        picked: selecting?.picked.has(card.key) === true,
+        picked: selection?.picked.has(card.key) === true,
         header: containers.has(card.key) ? headHeight(card) : undefined,
         place: { x: Math.round(placed.x), y: Math.round(placed.y) },
         lens: chip === undefined || lens === undefined ? undefined : { chip, tier: tiers?.get(card.key) ?? 0, name: lens },
@@ -149,9 +153,9 @@ function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {
         collapsible: containers.has(card.key),
       },
       draggable: false,
-      // xyflow selects only for the Select mode's lasso; which node is open is ours (the address).
-      selectable: selecting !== undefined,
-      selected: selecting?.picked.has(card.key) === true,
+      // xyflow selects only for the lasso; which nodes are selected is ours (the address and the frame's set).
+      selectable: selection !== undefined,
+      selected: selection?.members.includes(card.key) === true,
       connectable: false,
     };
     if (card.parent !== undefined) {
@@ -392,31 +396,45 @@ function useZoomVariable(root: RefObject<HTMLDivElement | null>): void {
   }, [store, root]);
 }
 
-/** What xyflow tells us was picked: the lasso's cards in the Select mode, or the edge chosen by click or key. */
-function useChanges({ selecting, model, selectedEdge, onEdge, onBackground }: FlowProps, live: boolean) {
+/** What xyflow tells us was picked: the lasso's cards, added to the selection as the box moves, or the edge chosen by click or key. */
+function useChanges({ selection, model, selectedEdge, onEdge, onBackground }: FlowProps, live: boolean) {
+  // A box adds to what was selected when it began; the cards it passes over come and go.
+  const lassoing = useRef(false);
+  const before = useRef<readonly string[]>([]);
+  const boxed = useRef(new Set<string>());
   return {
     onPaneClick: () => {
       if (live) {
         onBackground?.();
       }
     },
+    onSelectionStart: () => {
+      lassoing.current = true;
+      before.current = selection?.members ?? [];
+      boxed.current = new Set();
+    },
+    onSelectionEnd: () => { lassoing.current = false; },
     onNodesChange: (changes: NodeChange[]) => {
-      if (selecting === undefined) {
+      // A click on a card selects it in xyflow's terms too; only a box adds, a click is ours (onNodeClick).
+      if (selection === undefined || !lassoing.current) {
         return;
       }
-      const picked = new Set(selecting.picked);
       for (const change of changes) {
         if (change.type === "select") {
           if (change.selected) {
-            picked.add(change.id);
+            boxed.current.add(change.id);
           } else {
-            picked.delete(change.id);
+            boxed.current.delete(change.id);
           }
         }
       }
-      selecting.onPicked([...picked]);
+      selection.set([...new Set([...before.current, ...boxed.current])]);
     },
     onEdgesChange: (changes: EdgeChange[]) => {
+      // A box also selects the lines between the cards it holds; it is the cards that are wanted.
+      if (lassoing.current) {
+        return;
+      }
       for (const change of changes) {
         const line = change.type === "select" && change.selected ? model.lines.find((each) => each.id === change.id) : undefined;
         if (line !== undefined && line.id !== selectedEdge) {
@@ -425,6 +443,18 @@ function useChanges({ selecting, model, selectedEdge, onEdge, onBackground }: Fl
       }
     },
   };
+}
+
+/** A click on a card: Shift, Cmd or Ctrl adds it to the selection or takes it out; a plain click selects it alone. */
+function clicked({ selection, actions }: FlowProps, live: boolean, event: ReactMouseEvent, key: string): void {
+  if (!live) {
+    return;
+  }
+  if (selection !== undefined && (event.shiftKey || event.metaKey || event.ctrlKey)) {
+    selection.toggle(key);
+  } else {
+    actions.open?.(key);
+  }
 }
 
 /** Expand a collapsed container, or collapse an open one: a double-click, or Enter on the focused card (5.1). True when it did. */
@@ -454,7 +484,7 @@ function inputOf(live: boolean, inScroller: boolean) {
     zoomOnDoubleClick: false,
     preventScrolling: wheel,
     nodesFocusable: live,
-    // Needed for an edge's click and for the Select mode's lasso; which node is open stays ours.
+    // Needed for an edge's click and for the lasso; which nodes are selected stays ours.
     elementsSelectable: live,
     edgesFocusable: live,
   };
@@ -470,25 +500,29 @@ function EdgeChip({ chip, line }: { chip: RefObject<HTMLDivElement | null>; line
   );
 }
 
-/** The node menu: open on a card at a point, offered only where the cards have actions and nothing is being selected. */
+/** The node menu: open on a card at a point, offered only where the cards have actions. */
 function useNodeMenu(props: FlowProps, live: boolean) {
   const [menu, setMenu] = useState<{ key: string; at: { x: number; y: number } } | undefined>(undefined);
   const closeMenu = useCallback(() => { setMenu(undefined); }, []);
   const openMenu = (key: string, at: { x: number; y: number }) => { setMenu({ key, at }); };
-  return { menu, menus: live && props.selecting === undefined ? props.actions.menu : undefined, openMenu, closeMenu };
+  return { menu, menus: live ? props.actions.menu : undefined, openMenu, closeMenu };
 }
 
 /**
- * Keys on a focused card: Enter toggles a container (a button inside it keeps its own Enter), and
- * the menu key, or Shift+F10, opens its menu beside it, as a right-click does at the pointer.
+ * Keys on a focused card: Enter toggles a container (a button inside it keeps its own Enter),
+ * Shift+Space toggles the card in the selection, and the menu key, or Shift+F10, opens its menu
+ * beside it, as a right-click does at the pointer.
  */
-function cardKeys(toggle: (key: string) => boolean, openMenu: ((key: string, at: { x: number; y: number }) => void) | undefined) {
+function cardKeys(toggle: (key: string) => boolean, select: ((key: string) => void) | undefined, openMenu: ((key: string, at: { x: number; y: number }) => void) | undefined) {
   return (event: ReactKeyboardEvent) => {
     const card = (event.target as HTMLElement).closest<HTMLElement>(".react-flow__node");
     if (card === null) {
       return;
     }
-    if (openMenu !== undefined && (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))) {
+    if (select !== undefined && event.key === " " && event.shiftKey) {
+      event.preventDefault();
+      select(card.dataset["id"] ?? "");
+    } else if (openMenu !== undefined && (event.key === "ContextMenu" || (event.key === "F10" && event.shiftKey))) {
       const box = card.getBoundingClientRect();
       event.preventDefault();
       openMenu(card.dataset["id"] ?? "", { x: box.left + 16, y: box.top + 24 });
@@ -525,13 +559,13 @@ function Flow(props: FlowProps) {
   useCanvasKeys(props, live);
   const changes = useChanges(props, live);
   const toggle = toggleOf(props, live);
-  const selecting = props.selecting;
+  const selection = props.selection;
   return (
     <CardActionsContext value={props.actions}>
       <div
         ref={root}
         className="canvas-root"
-        onKeyDown={cardKeys(toggle, menus === undefined ? undefined : openMenu)}
+        onKeyDown={cardKeys(toggle, live ? selection?.toggle : undefined, menus === undefined ? undefined : openMenu)}
       >
         <ReactFlow
           nodes={nodes}
@@ -541,14 +575,10 @@ function Flow(props: FlowProps) {
           nodesDraggable={false}
           nodesConnectable={false}
           {...inputOf(live, props.inScroller === true)}
-          selectionKeyCode={selecting === undefined ? null : "Shift"}
-          multiSelectionKeyCode={selecting === undefined ? null : "Shift"}
+          selectionKeyCode={selection === undefined ? null : "Shift"}
+          multiSelectionKeyCode={null}
           {...changes}
-          onNodeClick={(event, node) => {
-            if (live && !(selecting !== undefined && event.shiftKey)) {
-              props.actions.open?.(node.id);
-            }
-          }}
+          onNodeClick={(event, node) => { clicked(props, live, event, node.id); }}
           onNodeDoubleClick={(_, node) => { toggle(node.id); }}
           onNodeContextMenu={(event, node) => {
             if (menus !== undefined) {

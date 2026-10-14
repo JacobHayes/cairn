@@ -15,6 +15,7 @@ import type { Authored } from "../authoring/target.ts";
 import { useProjected } from "../canvas/hooks.ts";
 import { viewFrom } from "../canvas/settings.ts";
 import { StalledSurface } from "../canvas/Surfaces.tsx";
+import type { Selection } from "../canvas/selection.ts";
 import type { Ready } from "../detail/model.ts";
 import type { Screen } from "../journeys/address.ts";
 import { TimelineChart, timelineFrom } from "../timeline/TimelineView.tsx";
@@ -43,6 +44,7 @@ function ProjectedTimeline({ ready, selected }: { ready: Ready; selected: string
 
 export interface ProjectionProps {
   ready: Ready;
+  selection: Selection;
   screen: Exclude<Screen, "summary">;
   selected: string | undefined;
   /** The edge whose card is open, as `<from>~<to>`. */
@@ -64,7 +66,7 @@ export function CanvasBars({ ready, authored, drawing }: Pick<ProjectionProps, "
   );
 }
 
-export function ProjectionBody({ ready, screen, selected, edge, authored, drawing }: ProjectionProps) {
+export function ProjectionBody({ ready, screen, selected, edge, authored, drawing, selection }: ProjectionProps) {
   const { search } = useLocation();
   const params = useMemo(() => new URLSearchParams(search), [search]);
   // FRONTIER fades the graph's cards that cannot move now, and keeps the structure.
@@ -81,7 +83,7 @@ export function ProjectionBody({ ready, screen, selected, edge, authored, drawin
   }
   return (
     <Suspense fallback={<p className="muted small">Drawing the graph...</p>}>
-      <JourneyCanvas ready={ready} view={viewFrom(params)} selected={selected} edge={edge} decisions={params.get("decisions") === "1"} emphasis={emphasis} onPick={authored === undefined ? undefined : drawing.pick} authored={authored} />
+      <JourneyCanvas ready={ready} view={viewFrom(params)} selected={selected} edge={edge} decisions={params.get("decisions") === "1"} emphasis={emphasis} onPick={authored === undefined ? undefined : drawing.pick} selection={selection} />
     </Suspense>
   );
 }

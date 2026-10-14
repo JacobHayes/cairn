@@ -55,7 +55,7 @@ Every neutral comes from one cool ramp, `--n-0` to `--n-15`: OKLCH hue 250 throu
 
 | Role | Token | Light | Dark |
 | --- | --- | --- | --- |
-| chrome (rail, inspector column, sheet, toast, selection bar) | `--chrome-bg` | `--n-4` | `--n-14` |
+| chrome (rail, inspector column, sheet, toast) | `--chrome-bg` | `--n-4` | `--n-14` |
 | workspace ground, canvas ground | `--color-ground` | `--n-2` | `--n-13` |
 | inside container frames | `--color-sunken` | `--n-1` | `--n-12` |
 | paper: rows, cards, panels, menus | `--color-surface` | `--n-0` | `--n-11` |
@@ -94,7 +94,7 @@ The hierarchy is the order of the steps. In light, paper is the lightest, then t
 | `--color-sunken` | `--n-1` | `--n-12` | inside container frames, so the paper cards in them stand out |
 | `--color-edge` | `--n-6` | `--n-8` | card, row and panel borders |
 | `--color-frame` | `--n-7` | `--n-7` | container frames and menu borders |
-| `--chrome-bg` | `--n-4` | `--n-14` | rail, inspector column, sheet, toast, selection bar |
+| `--chrome-bg` | `--n-4` | `--n-14` | rail, inspector column, sheet, toast |
 | `--chrome-ink` | `--n-15` | `--n-1` | text on chrome |
 | `--chrome-muted` | `--n-8` | `--n-6` | secondary text on chrome |
 | `--chrome-border` | `--n-5` | `--n-11` | hairlines on chrome |
@@ -193,7 +193,7 @@ Mono uppercase is kept for labels, column headers, keys and status chips; button
 - **Group frame.** A container drawn around its members (its children sit one frame padding, 20px, in from the head rule, the bottom edge and both sides alike, so their NEEDS and UNBLOCKS tags never touch the rule): a 1px `--color-frame` border, a translucent paper body (no sunken fill, no filled header), and a head of three lines: the kind label (with CURRENT), the status chip and the fold control; the title; the progress meter with its "0 of 8 done" and any warning words ("needs breakdown") right-aligned on the same line. Under the head a rule across the frame's full width, in the frame's own stroke (its colour, and its thickness when selected or zoomed far out), ends it; the "Waits on N hidden prerequisites" marker sits just below the rule. A container shows no owner; a date, when it has one, is a fourth line in the head; where a node came from is told in the inspector's Origin section only, never on the canvas. Zoomed out the head is only its title, and the rule stays.
 - **Tooltip.** A jargon term (Frontier, Gravity) carries a native `title` on its primary element that says what it means in one sentence. There are no first-run hints or custom tooltips.
 - **Bottom sheet.** A chrome sheet with a 24px drag handle (a short hairline bar), snapping to two heights; its body is the one scroller.
-- **Selection bar.** A chrome bar floating bottom-centre over the workspace, above the window's bottom edge, while several items are selected: the count, the bulk actions, and Clear.
+- **Multi-select.** Selection is one set: one member is inspected and traced; several are listed and acted on in the inspector. There is no select mode and no selection bar. On the graph a plain click on a card (title or body) selects it alone; Shift-, Cmd- or Ctrl-click adds or removes it; a Shift-drag on the background adds the cards in the box; a background click or Esc clears; on touch the card menu's "Add to selection" does the same, and Shift+Space on a focused card toggles it. With one member the inspector shows the node and the graph its trace. With two or more it shows "N selected" and Clear, the members (title, kind, status, and a × to drop one), then the actions in a fixed order (Status, Assign owner, Snooze); the graph tints the members and draws no trace, and a folded inspector unfolds. An action every member's state does not allow stays visible and disabled, its reason in its tooltip. Changing the members closes an open form. The list's checked rows use the same actions in its header.
 - **Rank tag.** A small square hanging off a card's top-left corner: the primary-button pair (`--ink-fill` with `--color-surface` mono figures), so it flips with the theme.
 - **Hanging tag.** A small mono label hanging off a card's top-right or bottom-right edge for transient or lens information (a trace role, a signal value). Each slot has one owner, so two tags never displace each other.
 - **Dates.** Words first: `Decide by Oct 14`, `Due in 3 days`, `3 days late`. A date is `Oct 14` in the current year and `Oct 14, 2027` otherwise; ISO dates appear only in tooltips and History. A soon date is in warning ink and an overdue one in error ink, always with its words. Dates in a column or on an axis are mono with tabular figures.

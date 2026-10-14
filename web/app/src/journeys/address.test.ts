@@ -95,7 +95,7 @@ describe("the journey's views (2.2, 2.3)", () => {
 
 describe("the canvas's settings in the address", () => {
   it("round-trips every setting and leaves the toolbar's chips alone", () => {
-    const params = new URLSearchParams("decisions=1&detail=work&open=n_s&shut=n_t&kind=action,milestone&show=notrelevant,conditional&lens=gravity&edit=on&select=1&q=x");
+    const params = new URLSearchParams("decisions=1&detail=work&open=n_s&shut=n_t&kind=action,milestone&show=notrelevant,conditional&lens=gravity&edit=on&q=x");
     const view = viewFrom(params);
     expect(view.rest).toEqual([["decisions", "1"], ["q", "x"]]);
     expect(Object.fromEntries(paramsOf(view))).toEqual(Object.fromEntries(params));

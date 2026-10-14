@@ -6,7 +6,7 @@
 // rows are left out unless asked for, so the list holds what the plan's count does. With
 // DECISIONS on the rows are decisions with their answer, why, and what the answer affects
 // (C12). Hovering a row brings up its checkbox, and a selection turns the header into the
-// bulk actions (BulkBar.tsx). The journey page (screens/JourneyFrame.tsx) holds its toolbar and
+// bulk actions (SelectionActions.tsx). The journey page (screens/JourneyFrame.tsx) holds its toolbar and
 // the filter it opens (ListFilters).
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
@@ -22,10 +22,10 @@ import { useFrameActions } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { selectionOf } from "./acts.ts";
 import { listPath, listQueryOf, type ListSettings } from "./address.ts";
-import { BulkBar } from "./BulkBar.tsx";
 import { Checks } from "./Controls.tsx";
 import { Cell, type CellContext } from "./ListCells.tsx";
 import { Folds } from "./Folds.tsx";
+import { SelectionActions } from "./SelectionActions.tsx";
 import { NextForYou } from "./NextForYou.tsx";
 import { StalledPanel } from "./Stalled.tsx";
 import { addableColumns, columnsOf, columnWords, flatLines, givesWay, rankPositions, SORT_OF, treeLines, type Column, type Line } from "./listModel.ts";
@@ -130,7 +130,12 @@ function Table({ view, settings, lines, columns, context, chosen, selected, ever
         {picked.length > 0 ? (
           <tr>
             <th colSpan={columns.length + 1} className="bulk-head">
-              <BulkBar view={view} selected={picked} hidden={picked.filter((facts) => !everyLine.includes(facts.node.key)).length} onClear={onClear} onLanded={onClear} />
+              <div className="panel row bulk-bar" data-testid="bulk-bar" data-count={picked.length}>
+                <strong>{picked.length} selected</strong>
+                {picked.some((facts) => !everyLine.includes(facts.node.key)) ? <span className="muted small" data-testid="selected-elsewhere">({picked.filter((facts) => !everyLine.includes(facts.node.key)).length} not shown)</span> : null}
+                <SelectionActions view={view} selected={picked} onLanded={onClear} />
+                <Button ghost onClick={onClear}>Clear selection</Button>
+              </div>
             </th>
           </tr>
         ) : (

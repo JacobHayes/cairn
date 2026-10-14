@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import type { Mutation } from "../detail/model.ts";
 import { actingView } from "./acting.test-support.ts";
-import { actsFor, assignOwner, bulkPlan, doneMutations, evidenceComplete, factsOf, hasArtifact, hasNote, missingEvidence, runBulk, selectionOf, type Act, type BulkAction, type Facts } from "./acts.ts";
+import { actsFor, assignOwner, bulkPlan, doneMutations, evidenceComplete, factsOf, hasArtifact, hasNote, missingEvidence, reasonFor, runBulk, selectionOf, type Act, type BulkAction, type Facts } from "./acts.ts";
 
 const view = actingView();
 
@@ -149,4 +149,15 @@ describe("C9: bulk actions", () => {
     expect(await runBulk({ act: "start" }, [facts("n_work"), facts("n_pick")], run)).toEqual({ outcome: "unable", unable: ["n_pick"] });
     expect(sent).toEqual([]);
   });
+});
+
+it("an action is offered over a selection only when every member can take it, and says who cannot", () => {
+  const title = (key: string) => key.slice(2);
+  expect(reasonFor({ act: "start" }, [facts("n_work")], title)).toBeUndefined();
+  const one = reasonFor({ act: "start" }, [facts("n_work"), facts("n_pick")], title) ?? "";
+  expect(one).toContain("pick");
+  expect(one).not.toContain("work");
+  const two = reasonFor({ act: "done" }, [facts("n_pick"), facts("n_pick")], title) ?? "";
+  expect(two).toContain("pick");
+  expect(two).toContain("1 more");
 });

@@ -43,7 +43,7 @@ export type CardData = {
   /** A filter or the decisions view fades it, unless the trace decides. */
   faded: boolean;
   selected: boolean;
-  /** In the Select mode: picked into the selection. */
+  /** A member of a selection of several. */
   picked: boolean;
   /** Its height when it is a container (its children sit below its own card). */
   header: number | undefined;
@@ -65,7 +65,7 @@ export function kindLabel(card: Card): string {
   return card.kind === "group" && card.stage ? "stage" : card.kind;
 }
 
-/** The title: the button that opens the node's detail, or plain text where there is none. */
+/** The title: a button that selects the node as a click on the card does (the click reaches the canvas), or plain text where there is none. */
 function Title({ card }: { card: Card }) {
   const actions = useContext(CardActionsContext);
   return actions?.open === undefined ? (
@@ -78,10 +78,6 @@ function Title({ card }: { card: Card }) {
       className="node-open nodrag"
       data-testid="card-open"
       title={card.title}
-      onClick={(event) => {
-        event.stopPropagation();
-        actions.open?.(card.key);
-      }}
     >
       <span data-testid="title">{card.title}</span>
     </button>

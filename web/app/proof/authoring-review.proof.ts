@@ -54,7 +54,7 @@ test("Edit structure on a journey", async ({ page }) => {
   await page.getByTestId("node-card").first().waitFor();
   await nodeCard(page, "n_access").click({ modifiers: ["Shift"] });
   await nodeCard(page, "n_plan").click({ modifiers: ["Shift"] });
-  await expect(page.getByTestId("bulk-bar")).toBeVisible();
+  await expect(page.getByTestId("selection-panel")).toBeVisible();
   await shot(page, "edit-structure");
 });
 

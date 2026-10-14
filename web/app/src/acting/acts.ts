@@ -152,9 +152,27 @@ function bulkMutation(action: BulkAction, facts: Facts): Mutation | undefined {
   }
 }
 
-/** Whether `facts`' node can take `action`: the bulk bar offers an action when any selected node can. */
-export function canTake(action: BulkAction, facts: Facts): boolean {
-  return bulkMutation(action, facts) !== undefined;
+const VERB: Record<BulkAction["act"], string> = {
+  start: "start",
+  done: "be marked done",
+  skip: "be skipped",
+  assign: "be assigned",
+  snooze: "be snoozed",
+  unsnooze: "be unsnoozed",
+};
+
+/**
+ * Why `action` is not offered over `selected`: the members whose kind or state cannot take it,
+ * named, or nothing when every one can. The actions are enabled only then, so none is sent that
+ * is certain to be refused; the engine still checks the guards on the whole patch.
+ */
+export function reasonFor(action: BulkAction, selected: Facts[], title: (key: string) => string): string | undefined {
+  const plan = bulkPlan(action, selected);
+  if (!("unable" in plan)) {
+    return undefined;
+  }
+  const [first = "", ...rest] = plan.unable.map(title);
+  return `${first}${rest.length === 0 ? "" : ` and ${String(rest.length)} more`} cannot ${VERB[action.act]} in ${rest.length === 0 ? "its" : "their"} current state`;
 }
 
 /**
@@ -181,8 +199,8 @@ export type BulkOutcome = { outcome: "unable"; unable: string[] } | { outcome: "
 
 /**
  * C9: `action` over `selected`, sent through `run` as one patch (one mutation, so one event,
- * per node), or refused before anything is sent when a node cannot take it. The list's bulk
- * bar acts only through this.
+ * per node), or refused before anything is sent when a node cannot take it. Selections act only
+ * through this.
  */
 export async function runBulk(action: BulkAction, selected: Facts[], run: (mutations: Mutation[]) => Promise<boolean>): Promise<BulkOutcome> {
   const plan = bulkPlan(action, selected);

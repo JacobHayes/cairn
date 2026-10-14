@@ -1,6 +1,6 @@
 // The journey header (4.1): the name, the lifecycle chip (`● ACTIVE ▾`: only the moves the
 // status allows, B11) and, on the right, the journey's `⋯` (Edit, insert a segment, save it as a
-// route, re-link it, select nodes, copy its link: the flows the overview held, B7 to B9, A19).
+// route, re-link it, copy its link: the flows the overview held, B7 to B9, A19).
 // What the journey is (progress, next milestone, route) is on the journey card in the inspector.
 // When completion is suggested, a band under the header offers it.
 import { useState } from "react";
@@ -80,7 +80,7 @@ function copyLink(): void {
   }
 }
 
-/** The journey's `⋯`, in groups: Edit and the structure flows, selecting nodes, and its link. */
+/** The journey's `⋯`, in groups: Edit and the structure flows, and its link. */
 function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: CanvasView; selected: string | undefined; onPanel: (panel: Panel) => void }) {
   const { header } = ready.journey;
   const insert = useInsertEntry();
@@ -107,14 +107,6 @@ function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: C
             )}
             {item("menu-save", "Save as route...", "save")}
             {item("menu-relink", "Re-link...", "relink")}
-            {archived ? null : (
-              <>
-                <hr />
-                <Link role="menuitem" className="menu-item" data-testid="select-toggle" data-status={view.select ? "on" : "off"} to={canvasPath(header.id, { ...view, select: !view.select }, selected)} onClick={close}>
-                  {view.select ? "Done selecting" : "Select nodes"}
-                </Link>
-              </>
-            )}
             <hr />
             <button type="button" role="menuitem" className="menu-item" data-testid="menu-copy-link" onClick={() => { close(); copyLink(); }}>
               Copy link

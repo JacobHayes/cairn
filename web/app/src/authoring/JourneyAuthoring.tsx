@@ -45,7 +45,7 @@ export function JourneyAuthoringBar({
             void navigate(canvasPath(journey, view, node.key));
           }}
         />
-        <Link to={canvasPath(journey, { ...view, select: false, edit: false })} className="button" data-testid="edit-done">
+        <Link to={canvasPath(journey, { ...view, edit: false })} className="button" data-testid="edit-done">
           Done
         </Link>
       </div>

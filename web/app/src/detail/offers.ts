@@ -157,7 +157,7 @@ export function menuOf(view: Ready, detail: NodeDetail): MenuItem[][] {
 }
 
 /** What a node's context menu on the graph can ask for: the row's actions, the `⋯` entries, and where else to see the node. */
-export type ContextId = MenuId | Act | "decide" | "show-in-list";
+export type ContextId = MenuId | Act | "decide" | "show-in-list" | "toggle-selection";
 
 const ACT_LABELS: Record<Act, string> = {
   done: "Mark done",
@@ -173,9 +173,10 @@ const ACT_LABELS: Record<Act, string> = {
 /**
  * The context menu's groups: the row's actions (a decision awaiting its answer says Decide…),
  * then the `⋯` menu's groups as they are, with where to find the node being the graph's
- * counterpart: the list.
+ * counterpart: the list. On the canvas, where cards are selected, the last group adds the node
+ * to the selection or takes it out (`member`: it is in it), which is how touch selects several.
  */
-export function contextMenuOf(view: Ready, detail: NodeDetail): MenuItem<ContextId>[][] {
+export function contextMenuOf(view: Ready, detail: NodeDetail, member?: boolean): MenuItem<ContextId>[][] {
   const offers = offered(view, detail);
   const acts: Act[] = [...(offers.primary === undefined || offers.waiting ? [] : [offers.primary]), ...offers.secondary];
   const row: MenuItem<ContextId>[] = [
@@ -183,5 +184,6 @@ export function contextMenuOf(view: Ready, detail: NodeDetail): MenuItem<Context
     ...acts.map((id) => ({ id, label: ACT_LABELS[id] })),
   ];
   const rest = menuOf(view, detail).map((group) => group.flatMap((item): MenuItem<ContextId>[] => (item.id === "show-in-graph" ? [{ id: "show-in-list", label: "Show in list" }] : [item])));
-  return [row, ...rest].filter((group) => group.length > 0);
+  const select: MenuItem<ContextId>[] = member === undefined ? [] : [{ id: "toggle-selection", label: member ? "Remove from selection" : "Add to selection" }];
+  return [row, ...rest, select].filter((group) => group.length > 0);
 }

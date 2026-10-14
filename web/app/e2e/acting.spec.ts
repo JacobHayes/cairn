@@ -15,8 +15,8 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   const revision = await derivedRevision(page);
   await select(page, "n_docs");
   await select(page, "n_announcement");
-  await page.getByRole("button", { name: "More actions" }).click();
-  await page.getByRole("menuitem", { name: "Snooze until a node..." }).click();
+  await page.getByTestId("selection-snooze").click();
+  await page.getByRole("menuitem", { name: "Snooze until a node…" }).click();
   await page.getByLabel("Snooze them until node").selectOption("n_beta_end");
   await page.getByRole("button", { name: "Apply to 2" }).click();
   expect(await revisionAfter(page, revision)).toBe(revision + 1);
@@ -31,7 +31,8 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   await expect(frontierItem(page, "n_docs")).toBeVisible();
   await setFrontier(page, false);
   await select(page, "n_announcement");
-  await page.getByTestId("bulk-bar").getByRole("button", { name: "Unsnooze" }).click();
+  await page.getByTestId("selection-snooze").click();
+  await page.getByRole("menuitem", { name: "Unsnooze" }).click();
   expect(await revisionAfter(page, revision + 2)).toBe(revision + 3);
   await setFrontier(page, true);
   await expect(frontierItem(page, "n_announcement")).toBeVisible();

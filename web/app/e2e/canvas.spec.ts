@@ -47,7 +47,7 @@ test("C2 to C7: the graph opens fitted at every detail, expands in place, traces
   await expect(page.getByTestId("edge-card")).toBeVisible();
   await page.getByRole("link", { name: "Go to Environment access" }).click();
   await expect(nodePanel(page, "n_access")).toBeVisible();
-  // A wheel pans and never zooms; with the control key it zooms. A shift-drag outside the Select mode draws no lasso.
+  // A wheel pans and never zooms; with the control key it zooms.
   const [start, pointer] = [await viewportOf(page), { x: 600, y: 500 }];
   await page.mouse.move(pointer.x, pointer.y);
   await page.mouse.wheel(0, 120);
@@ -57,12 +57,6 @@ test("C2 to C7: the graph opens fitted at every detail, expands in place, traces
   await page.mouse.wheel(0, -120);
   await page.keyboard.up("Control");
   await expect.poll(async () => (await viewportOf(page)).zoom).not.toBe(start.zoom);
-  await page.keyboard.down("Shift");
-  await page.mouse.down();
-  await page.mouse.move(pointer.x + 120, pointer.y + 80);
-  await expect(page.locator(".react-flow__selection")).toHaveCount(0);
-  await page.mouse.up();
-  await page.keyboard.up("Shift");
   // A right-click, or the menu key on a focused card, opens the node's menu; a choice that needs a form selects the node and opens it there.
   await nodeCard(page, "n_plan").click({ button: "right" });
   await expect(page.getByTestId("context-menu")).toBeVisible();
@@ -93,4 +87,55 @@ test("a click on the empty canvas deselects and a drag that pans does not", asyn
   await page.mouse.click(corner.x, corner.y);
   await expect(page).not.toHaveURL(/\/nodes\//);
   await expect(page.getByTestId("card-mark")).toHaveCount(0);
+});
+
+test("selection is one set with no mode: click selects, shift-click adds, the inspector lists the members and the actions that fit them all", async ({ page }) => {
+  await openJourney(page, "browser", "j_vendor_eval");
+  const members = page.getByTestId("selection-member");
+  await nodeCard(page, "n_access").getByTestId("card-open").click();
+  await expect(nodePanel(page, "n_access")).toBeVisible();
+  // Shift on a title adds as it does on the body; two members are listed, with no trace left drawn.
+  await nodeCard(page, "n_plan").getByTestId("card-open").click({ modifiers: ["Shift"] });
+  await nodeCard(page, "n_decision_meeting").click({ modifiers: ["Shift"] });
+  await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "3");
+  await expect(members).toHaveCount(3);
+  await expect(page.getByTestId("node-detail")).toHaveCount(0);
+  await expect(page.getByTestId("card-mark")).toHaveCount(0);
+  // Start fits an action but not a milestone: shown, disabled, with who cannot.
+  await page.getByTestId("selection-status").click();
+  const start = page.getByRole("menuitem", { name: "Start" });
+  await expect(start).toBeDisabled();
+  await expect(start).toHaveAttribute("title", /cannot start/);
+  await page.keyboard.press("Escape");
+  // A member dropped with its × leaves the rest; a plain click on one card is that card alone.
+  await members.filter({ hasText: "decision" }).first().getByRole("button", { name: /Remove .* from the selection/ }).click();
+  await expect(members).toHaveCount(2);
+  await nodeCard(page, "n_plan").getByTestId("card-open").click();
+  await expect(nodePanel(page, "n_plan")).toBeVisible();
+  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
+  // Esc clears several to nothing.
+  await nodeCard(page, "n_access").click({ modifiers: ["Shift"] });
+  await expect(page.getByTestId("selection-panel")).toBeVisible();
+  await page.locator("main").click({ position: { x: 5, y: 5 } });
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
+  await expect(page).not.toHaveURL(/\/nodes\//);
+  // Back to the node the set was made at opens that node alone: a cleared set stays cleared.
+  await page.goBack();
+  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
+  await expect(page.getByTestId("node-detail")).toBeVisible();
+  // A shift-drag over empty canvas selects the cards in its box.
+  await viewportSettled(page);
+  const [from, to] = [await nodeCard(page, "n_purpose").boundingBox(), await nodeCard(page, "n_who_owns").boundingBox()];
+  if (from === null || to === null) {
+    throw new Error("the cards have no box");
+  }
+  await page.keyboard.down("Shift");
+  await page.mouse.move(Math.min(from.x, to.x) - 12, Math.min(from.y, to.y) - 12);
+  await page.mouse.down();
+  await page.mouse.move(Math.max(from.x + from.width, to.x + to.width) + 10, Math.max(from.y + from.height, to.y + to.height) + 10, { steps: 6 });
+  await page.mouse.up();
+  await page.keyboard.up("Shift");
+  await expect(page.getByTestId("selection-panel")).toBeVisible();
+  expect(await members.count()).toBeGreaterThanOrEqual(2);
 });

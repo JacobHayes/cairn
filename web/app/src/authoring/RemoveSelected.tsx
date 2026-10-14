@@ -15,7 +15,7 @@ export function outermost(authored: Authored, keys: readonly string[]): string[]
   return keys.filter((key) => authored.tree.byKey.has(key) && !ancestorsOf(authored.tree, key).some((ancestor) => keys.includes(ancestor.key)));
 }
 
-export function RemoveSelected({ authored, keys, onRemoved }: { authored: Authored; keys: readonly string[]; onRemoved: (key: string) => void }) {
+export function RemoveSelected({ authored, keys }: { authored: Authored; keys: readonly string[] }) {
   const [asking, setAsking] = useState(false);
   const [first] = outermost(authored, keys);
   const plan = asking && first !== undefined ? planRemoval(authored.tree, first) : undefined;
@@ -34,7 +34,8 @@ export function RemoveSelected({ authored, keys, onRemoved }: { authored: Author
       plan={plan}
       dangling={plan.dangling}
       mutations={removalMutations(plan)}
-      onDone={() => { onRemoved(first); }}
+      // The node leaves the graph and the selection with it; the next one's dialog opens in its place.
+      onDone={() => undefined}
       onCancel={() => { setAsking(false); }}
     />
   );

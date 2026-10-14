@@ -13,11 +13,13 @@ import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
 import { journeyAuthored } from "../authoring/target.ts";
 import { ancestorsOf } from "../canvas/ladder.ts";
+import { useSelection, type Selection } from "../canvas/selection.ts";
 import { canvasPath, DEFAULT_VIEW, revealing, viewFrom, type CanvasView } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
 import { EdgeCard } from "../detail/EdgeCard.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
+import { SelectionPanel } from "../detail/SelectionPanel.tsx";
 import { screenPath } from "../detail/parts.tsx";
 import type { Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
@@ -92,6 +94,8 @@ function InspectorSlot({
   structure,
   card,
   inserting,
+  selection,
+  authored,
 }: {
   ready: Ready;
   screen: Screen;
@@ -100,6 +104,8 @@ function InspectorSlot({
   structure: ReactNode;
   card: boolean;
   inserting: ReturnType<typeof useInserting>;
+  selection: Selection;
+  authored: ProjectionProps["authored"];
 }) {
   const journey = ready.journey.header.id;
   const insertable = useMemo(() => (inserting.at === undefined ? undefined : journeyAuthored(ready)), [ready, inserting.at]);
@@ -107,6 +113,13 @@ function InspectorSlot({
     return (
       <Inspector focus="insert-segment">
         <InsertStepper key={inserting.at.parent ?? ""} authored={insertable} parent={inserting.at.parent} onClose={inserting.close} onPreview={inserting.setPreview} />
+      </Inspector>
+    );
+  }
+  if (screen === "graph" && selection.members.length >= 2) {
+    return (
+      <Inspector focus={`${journey}:selection`}>
+        <SelectionPanel ready={ready} selection={selection} authored={authored} />
       </Inspector>
     );
   }
@@ -134,7 +147,7 @@ function InspectorSlot({
 }
 
 /** The page's body: the segment being placed, drawn as review will draw it, while the stepper has a preview; else the page's own. */
-function Workspace({ ready, screen, selected, edge, authored, drawing, preview }: Pick<FrameProps, "screen" | "selected" | "edge"> & { ready: Ready; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; preview: InsertPreview | undefined }) {
+function Workspace({ ready, screen, selected, edge, authored, drawing, selection, preview }: Pick<FrameProps, "screen" | "selected" | "edge"> & { ready: Ready; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; selection: Selection; preview: InsertPreview | undefined }) {
   if (preview !== undefined) {
     return (
       <Suspense fallback={<p className="muted small">Drawing the preview...</p>}>
@@ -145,17 +158,19 @@ function Workspace({ ready, screen, selected, edge, authored, drawing, preview }
   if (screen === "summary") {
     return <JourneyCard ready={ready} selected={selected} full />;
   }
-  return <ProjectionBody ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} />;
+  return <ProjectionBody ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} />;
 }
 
 /** The graph's find: it opens a node on the canvas, its containers expanded, and the canvas centres it once it is drawn (it reads the request from the navigation). `missing` is the search that named no node. */
-function useFind(ready: Ready, view: CanvasView) {
+function useFind(ready: Ready, view: CanvasView, release: () => void) {
   const navigate = useNavigate();
   const [missing, setMissing] = useState<string | undefined>(undefined);
   const journey = ready.journey.header.id;
   const centre = (key: string) => {
     const found = nodeOf(ready, key);
     if (found !== undefined) {
+      // Opening a node replaces a selection of several, even when it is one of them.
+      release();
       void navigate(canvasPath(journey, revealing(view, { kind: found.kind, ancestors: ancestorsOf(ready.journey.graph.nodes ?? [], key) }, ready.derived.nodes[key]?.display_state), key), { state: { reveal: { key, how: "centre" } } });
     }
   };
@@ -178,10 +193,11 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const planned = screen === "graph";
   const authored = useMemo(() => (planned && view.edit ? journeyAuthored(ready) : undefined), [ready, planned, view.edit]);
   const drawing = useEdgeDrawing(authored);
+  const selection = useSelection(selected, (node) => void navigate(canvasPath(journey, view, node)));
   const inserting = useInserting(`journey:${journey}`);
   const [sheetOpen, setSheetOpen] = useState(false);
   useJourneyKeys({ journey, screen, selected, sheetOpen, setSheetOpen });
-  const { find, missing } = useFind(ready, view);
+  const { find, missing } = useFind(ready, view, selection.release);
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
   const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(canvasPath(journey, view))} />;
   const filters = screen === "summary" ? [] : activeFilters(journey, screen, search, selected);
@@ -208,13 +224,13 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
           )}
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>
-          <Workspace ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} preview={inserting.preview} />
+          <Workspace ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} />
           {card === "inline" ? <JourneyCard ready={ready} selected={selected} /> : null}
         </div>
         {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
       {/* After the head: a node opened from the assistant brings its detail forward last. */}
-      <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} />
+      <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} />
       </InsertEntryContext>
     </ConnectContext>
   );

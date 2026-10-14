@@ -106,7 +106,8 @@ test("the list: filters, grouping, search, bulk", async ({ page }) => {
   const before = await derivedRevision(page);
   await select(page, "n_final_report");
   await select(page, "n_decision_meeting");
-  await page.getByTestId("bulk-bar").getByRole("button", { name: "Done", exact: true }).click();
+  await page.getByTestId("selection-status").click();
+  await page.getByRole("menuitem", { name: "Mark done" }).click();
   await expect(page.locator('[data-testid="violation"][data-node="n_final_report"]')).toBeVisible();
   record("bulkRejected", { before, after: await derivedRevision(page) });
   await shot(page, "11-bulk-done-rejected-naming-the-node");
@@ -114,8 +115,8 @@ test("the list: filters, grouping, search, bulk", async ({ page }) => {
   const snoozedFrom = await derivedRevision(page);
   await select(page, "n_docs");
   await select(page, "n_announcement");
-  await page.getByRole("button", { name: "More actions" }).click();
-  await page.getByRole("menuitem", { name: "Snooze until a node..." }).click();
+  await page.getByTestId("selection-snooze").click();
+  await page.getByRole("menuitem", { name: "Snooze until a node…" }).click();
   await page.getByLabel("Snooze them until node").selectOption("n_beta_end");
   await page.getByRole("button", { name: "Apply to 2" }).click();
   record("bulkSnooze", { before: snoozedFrom, after: await revisionAfter(page, snoozedFrom) });

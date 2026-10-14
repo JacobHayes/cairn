@@ -2,8 +2,7 @@
 // follows the back button: the detail step (`detail=`, C2), the containers the viewer expanded
 // and collapsed since (`open=`, `shut=`, C4), the kinds kept at full strength (`kind=`, the
 // others fade), whether not-relevant and conditional nodes are shown (`show=`, C1), the
-// Signals lens (`lens=`, C6), on a journey whether its structure is being edited (5.6) or
-// nodes are being selected (5.9), and on a phone whether the full-screen map is open. The
+// Signals lens (`lens=`, C6), on a journey whether its structure is being edited (5.6), and on a phone whether the full-screen map is open. The
 // canvas lives at `/journeys/<id>/graph`; every parameter it does not own (the toolbar's
 // `decisions`, `mine`, `q`) rides along untouched, so a link made from the canvas keeps the
 // chips. Every setting at its default leaves the address bare. A route's canvas, which has no
@@ -15,12 +14,10 @@ import { kindsAt } from "./ladder.ts";
 import { DEFAULT_SETTINGS, KINDS, LENSES, STEPS, type CanvasSettings, type LevelDisplay, type Step } from "./model.ts";
 
 /**
- * The canvas's settings, whether the structure is edited, whether nodes are being selected, and
- * whether the full-screen map is open (below 720px, where the canvas is otherwise a preview).
+ * The canvas's settings, whether the structure is edited, and whether the full-screen map is open (below 720px, where the canvas is otherwise a preview).
  */
 export interface CanvasView extends CanvasSettings {
   edit: boolean;
-  select: boolean;
   map: boolean;
   /** The address's other parameters, in order, kept as they were. */
   rest: [string, string][];
@@ -39,12 +36,11 @@ const IN = "in";
 const SHOW = "show";
 const LENS = "lens";
 const EDIT = "edit";
-const SELECT = "select";
 /** The full-screen map's address parameter (MapFrame), so Back closes it. */
 export const MAP = "map";
 
 /** The parameters the canvas reads; every other one is left to the toolbar and the page. */
-const OWN = new Set([DETAIL, OPEN, SHUT, KIND, IN, SHOW, LENS, EDIT, SELECT, MAP]);
+const OWN = new Set([DETAIL, OPEN, SHUT, KIND, IN, SHOW, LENS, EDIT, MAP]);
 
 /** The values of `name`, split on commas, empty when the parameter is there but holds none. */
 function listOf(params: URLSearchParams, name: string): string[] | undefined {
@@ -108,7 +104,6 @@ export function viewFrom(params: URLSearchParams): CanvasView {
     undecided: shown === undefined ? DEFAULT_SETTINGS.undecided : shown.includes("conditional"),
     lens: LENSES.find((each) => each === lens),
     edit: params.get(EDIT) === "on",
-    select: params.get(SELECT) === "1",
     map: params.get(MAP) === "1",
     rest: [...params.entries()].filter(([name]) => !OWN.has(name)),
   };
@@ -140,9 +135,6 @@ export function paramsOf(view: CanvasView): URLSearchParams {
   }
   if (view.edit) {
     params.set(EDIT, "on");
-  }
-  if (view.select) {
-    params.set(SELECT, "1");
   }
   if (view.map) {
     params.set(MAP, "1");
@@ -185,7 +177,7 @@ export function revealing(view: CanvasView, node: { kind: NodeKind; ancestors: r
 }
 
 /** The view a fresh canvas opens with. */
-export const DEFAULT_VIEW: CanvasView = { ...DEFAULT_SETTINGS, edit: false, select: false, map: false, rest: [] };
+export const DEFAULT_VIEW: CanvasView = { ...DEFAULT_SETTINGS, edit: false, map: false, rest: [] };
 
 /** What a canvas is laid out for besides its graph: the step, the relevance shown. Expanding a container keeps it, so the layout keeps its positions (C15). */
 export function layoutViewOf(view: CanvasSettings, step?: Step): string {

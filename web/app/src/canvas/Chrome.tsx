@@ -1,17 +1,17 @@
-// What sits over the graph (5.8): the detail ladder at the top left, the Signal button beside it (the lens, Key), the Select mode's band, and the status bar along the bottom for what the
+// What sits over the graph (5.8): the detail ladder at the top left, the Signal button beside it (the lens, Key), and the status bar along the bottom for what the
 // picture cannot show (nodes hidden). Quiet by rule: one control each.
 import { Panel } from "@xyflow/react";
 import { useId, type ReactNode } from "react";
 
 import { Menu } from "../screens/Menu.tsx";
-import { Button, Segmented } from "../ui/kit.tsx";
+import { Segmented } from "../ui/kit.tsx";
 import { STEP_WORDS } from "./ladder.ts";
 import { LENS_MEANING, LENS_WORDS } from "./lens.ts";
 import { LENSES, type Lens, type Step } from "./model.ts";
 
 /**
  * C2: the detail ladder (All, Work, Decisions, Stages: general to specific), which replaces the kind checkboxes. The
- * trace bar or the Select band shares its row, and wraps under it when the canvas is narrow.
+ * Signal button shares its row, and wraps under it when the canvas is narrow.
  */
 export function Ladder({ steps, step, onStep, children }: { steps: readonly Step[]; step: Step; onStep: (step: Step) => void; children?: ReactNode }) {
   return (
@@ -80,17 +80,6 @@ export function SignalMenu({ lens, onLens }: { lens: Lens | undefined; onLens: (
         </div>
       )}
     </Menu>
-  );
-}
-
-/** The Select mode's band (5.9). Editing structure has its own full-width band under the header (authoring/JourneyAuthoring.tsx). */
-export function SelectBand({ onDone }: { onDone: () => void }) {
-  return (
-    <div className="canvas-trace" data-testid="select-band">
-      <strong>Selecting</strong>
-      <span>shift-click or shift-drag</span>
-      <Button onClick={onDone}>Done</Button>
-    </div>
   );
 }
 

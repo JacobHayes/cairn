@@ -1,22 +1,18 @@
 // The journey canvas (C1 to C7, C15): the journey's level for the detail step and the containers
 // collapsed (the ladder, 5.1), read from its local derivation with the next list (rank) and
 // "mine", turned into cards and lines, laid out in the layout worker, and drawn; the trace of the
-// selected node as an overlay (selecting a node traces it); the Select mode's bulk actions. A card
-// opens the node's detail (5.1) beside the canvas; an edge opens the edge's card.
+// selected node as an overlay (selecting a node traces it; several selected trace nothing). A card
+// opens the node's detail (5.1) beside the canvas, or joins the selection; an edge opens the
+// edge's card.
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { BulkBar } from "../acting/BulkBar.tsx";
-import type { Authored } from "../authoring/target.ts";
-import { RemoveSelected } from "../authoring/RemoveSelected.tsx";
-import { selectionOf, type Facts } from "../acting/acts.ts";
 import { nodeDetail, recordOf, titleOf, type Ready } from "../detail/model.ts";
 import { contextMenuOf } from "../detail/offers.ts";
 import { pagePath } from "../journeys/address.ts";
 import { useFrameActions } from "../shell/frame.tsx";
 import { typing } from "../ui/typing.ts";
-import { Panel } from "@xyflow/react";
-import { CanvasStatus, Ladder, SelectBand, SignalMenu } from "./Chrome.tsx";
+import { CanvasStatus, Ladder, SignalMenu } from "./Chrome.tsx";
 import { GraphCanvas, type Reveal } from "./GraphCanvas.tsx";
 import { useJoinedTrace, useLaidOut, useProjected } from "./hooks.ts";
 import { journeyLooks } from "./journey.ts";
@@ -25,6 +21,7 @@ import { KINDS, STRENGTH, cardsOf, linesOf, type CanvasModel, type Card, type Jo
 import type { CardActions } from "./NodeCard.tsx";
 import { standsFor, traceOverlay } from "./overlay.ts";
 import { refitKey } from "./refit.ts";
+import type { Selection } from "./selection.ts";
 import { canvasPath, edgePath, layoutViewOf, levelRequest, type CanvasView } from "./settings.ts";
 
 /** C1, C2, C5, C6: the journey's canvas model for one level. */
@@ -139,8 +136,8 @@ export interface JourneyCanvasProps {
   emphasis?: ReadonlySet<string> | null | undefined;
   /** In edit mode, a card picked while an edge is drawn ends the edge instead of opening (5.6); true when it took the pick. */
   onPick?: ((key: string) => boolean) | undefined;
-  /** In edit mode, the journey's structure as authored: what the selection bar's Remove works on (8.11). */
-  authored?: Authored | undefined;
+  /** The selection: who is selected, and what adds to it. */
+  selection: Selection;
 }
 
 /** What each filter fades: the kinds not kept at full strength, and with the decisions view every other kind. */
@@ -196,7 +193,7 @@ function useGraph(ready: Ready, view: CanvasView, selected: string | undefined, 
 }
 
 /** What a card asks of the canvas: open its node, expand or collapse it (and refit to it, 5.1), trace it. */
-function useActions(ready: Ready, view: CanvasView, selected: string | undefined, onPick: JourneyCanvasProps["onPick"], menu: boolean): CardActions {
+function useActions(ready: Ready, view: CanvasView, selected: string | undefined, onPick: JourneyCanvasProps["onPick"], selection: Selection): CardActions {
   const navigate = useNavigate();
   const frame = useFrameActions();
   const journey = ready.journey.header.id;
@@ -206,44 +203,36 @@ function useActions(ready: Ready, view: CanvasView, selected: string | undefined
         if (onPick?.(key) !== true) {
           // Picking the node that is already open changes no address, so the inspector must be asked to come back.
           frame?.show("inspector");
-          void navigate(canvasPath(journey, view, key));
+          selection.pick(key);
         }
       },
       drill: undefined,
       // The refit rides on the navigation, not the address.
       expand: (key, expanded) => void navigate(canvasPath(journey, withExpanded(view, key, expanded), selected), { state: { reveal: { key, how: expanded ? "expanded" : "collapsed" } } }),
-      trace: (key) => void navigate(canvasPath(journey, view, key)),
+      trace: (key) => { selection.pick(key); },
       title: (key) => titleOf(ready, key),
-      menu: menu
-        ? {
-            groups: (key) => {
-              const detail = nodeDetail(ready, key);
-              return detail === undefined ? [] : contextMenuOf(ready, detail).map((items) => ({ items }));
-            },
-            // The node's own Actions carry out the choice once it is open beside the canvas.
-            choose: (key, id) => {
-              void (id === "show-in-list" ? navigate(pagePath(journey, "list", key)) : navigate(canvasPath(journey, view, key), { replace: key === selected, state: { choice: { node: key, id } } }));
-            },
+      menu: {
+        groups: (key) => {
+          const detail = nodeDetail(ready, key);
+          return detail === undefined ? [] : contextMenuOf(ready, detail, selection.members.includes(key)).map((items) => ({ items }));
+        },
+        // The node's own Actions carry out the choice once it is open beside the canvas.
+        choose: (key, id) => {
+          if (id === "toggle-selection") {
+            selection.toggle(key);
+            return;
           }
-        : undefined,
+          selection.release();
+          void (id === "show-in-list" ? navigate(pagePath(journey, "list", key)) : navigate(canvasPath(journey, view, key), { replace: key === selected, state: { choice: { node: key, id } } }));
+        },
+      },
     }),
-    [navigate, frame, journey, view, selected, ready, onPick, menu],
+    [navigate, frame, journey, view, selected, ready, onPick, selection],
   );
 }
 
-/** The cards picked in the Select mode (5.9): kept only while the mode is on. */
-function usePicked(on: boolean) {
-  const [picked, setPicked] = useState<ReadonlySet<string>>(new Set());
-  useEffect(() => {
-    if (!on) {
-      setPicked(new Set());
-    }
-  }, [on]);
-  return { picked, setPicked };
-}
-
-/** Esc leaves the Select mode (5.9), as its Done does, unless a popover is open (it closes first) or the key sheet is. */
-function useEscapeSelect(on: boolean, leave: () => void): void {
+/** Esc leaves the edit mode, unless a popover is open (it closes first) or the key sheet is. */
+function useEscapeEdit(on: boolean, leave: () => void): void {
   useEffect(() => {
     if (!on) {
       return undefined;
@@ -268,41 +257,20 @@ function outsideOf(trace: { upstream: string[]; downstream: string[] } | undefin
   return trace === undefined ? 0 : [...trace.upstream, ...trace.downstream].filter((key) => !drawnAs.has(key)).length;
 }
 
-/** The bar over the Select mode's picks: the journey's work on them, or (editing structure) Remove. */
-function SelectionBar({ ready, picks, authored, setPicked }: { ready: Ready; picks: Facts[]; authored: Authored | undefined; setPicked: (update: (held: ReadonlySet<string>) => ReadonlySet<string>) => void }) {
-  return (
-    <BulkBar
-      view={ready}
-      selected={picks}
-      hidden={0}
-      onLanded={() => { setPicked(() => new Set()); }}
-      structure={
-        authored === undefined ? undefined : (
-          <RemoveSelected
-            authored={authored}
-            keys={picks.map((facts) => facts.node.key)}
-            onRemoved={(key) => { setPicked((held) => new Set([...held].filter((each) => each !== key))); }}
-          />
-        )
-      }
-    />
-  );
-}
-
 /** The journey's canvas, laid out, with the selected node's trace. */
-export function JourneyCanvas({ ready, view, selected, edge, decisions, emphasis, onPick, authored }: JourneyCanvasProps) {
+export function JourneyCanvas({ ready, view, selected, edge, decisions, emphasis, onPick, selection }: JourneyCanvasProps) {
   const navigate = useNavigate();
   const location = useLocation();
   const journey = ready.journey.header.id;
-  const graph = useGraph(ready, view, selected, decisions);
-  const selecting = view.select || view.edit;
-  const { picked, setPicked } = usePicked(selecting);
-  const actions = useActions(ready, view, selected, onPick, !selecting);
+  // One member is inspected and traced; several are only tinted.
+  const [single, ...others] = selection.members;
+  const alone = others.length === 0 ? single : undefined;
+  const graph = useGraph(ready, view, alone, decisions);
+  const actions = useActions(ready, view, selected, onPick, selection);
   const go = (next: CanvasView, node: string | undefined) => void navigate(canvasPath(journey, next, node));
-  useEscapeSelect(view.select || view.edit, useCallback(() => { void navigate(canvasPath(journey, { ...view, select: false, edit: false }, selected)); }, [navigate, journey, view, selected]));
+  useEscapeEdit(view.edit && others.length === 0, useCallback(() => { void navigate(canvasPath(journey, { ...view, edit: false }, selected)); }, [navigate, journey, view, selected]));
   const asked = (location.state as { reveal?: { key: string; how: Reveal["how"] } } | null)?.reveal;
   const reveal = useMemo<Reveal | undefined>(() => (asked === undefined ? undefined : { key: asked.key, how: asked.how, id: location.key }), [asked, location.key]);
-  const picks = useMemo(() => selectionOf(ready, picked), [ready, picked]);
   const { laidOut, overlay, trace } = graph;
   if (graph.error !== undefined) {
     return <p className="callout callout-bad">The canvas could not be drawn: {graph.error}</p>;
@@ -318,29 +286,29 @@ export function JourneyCanvas({ ready, view, selected, edge, decisions, emphasis
         lens={view.lens}
         faded={graph.faded}
         emphasis={emphasis}
-        selected={selected}
+        selected={alone}
         selectedEdge={edge?.replace("~", "->")}
         actions={actions}
         viewKey={refitKey(laidOut, view.edit)}
         label={`${ready.journey.header.name}: canvas`}
         title={ready.journey.header.name}
         onEdge={(line) => void navigate(edgePath(journey, view, line))}
-        onBackground={() => { if (selected !== undefined || edge !== undefined) { go(view, undefined); } }}
-        selecting={selecting ? { picked, onPicked: (keys) => { setPicked(new Set(keys)); } } : undefined}
+        onBackground={() => {
+          if (selection.members.length > 0) {
+            selection.clear();
+          } else if (edge !== undefined) {
+            go(view, undefined);
+          }
+        }}
+        selection={{ picked: new Set(others.length === 0 ? [] : selection.members), members: selection.members, toggle: selection.toggle, set: selection.set }}
         reveal={reveal}
         steps={graph.steps}
         onStep={(next) => { go(withStep(view, next), selected); }}
       >
         <Ladder steps={graph.steps} step={graph.step} onStep={(next) => { go(withStep(view, next), selected); }}>
           <SignalMenu lens={view.lens} onLens={(lens) => { go({ ...view, lens }, selected); }} />
-          {view.select && !view.edit ? <SelectBand onDone={() => { go({ ...view, select: false, edit: false }, selected); }} /> : null}
         </Ladder>
-        {selecting && picks.length > 0 ? (
-          <Panel position="bottom-center" className="canvas-panel">
-            <SelectionBar ready={ready} picks={picks} authored={authored} setPicked={setPicked} />
-          </Panel>
-        ) : null}
-        <CanvasStatus linked={selected === undefined || selecting ? 0 : outsideOf(trace, laidOut.model)} notRelevant={graph.hidden} onReveal={graph.reveal} onShow={() => { go({ ...view, notRelevant: true }, selected); }} />
+        <CanvasStatus linked={alone === undefined ? 0 : outsideOf(trace, laidOut.model)} notRelevant={graph.hidden} onReveal={graph.reveal} onShow={() => { go({ ...view, notRelevant: true }, selected); }} />
       </GraphCanvas>
   );
 }
