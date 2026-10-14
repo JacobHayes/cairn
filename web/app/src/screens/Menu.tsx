@@ -76,6 +76,7 @@ function useDismiss(open: boolean, root: RefObject<HTMLElement | null>, close: (
 export function Menu({
   trigger,
   label,
+  title,
   testId,
   align = "start",
   className = "",
@@ -86,6 +87,8 @@ export function Menu({
   trigger: ReactNode;
   /** The button's accessible name. */
   label: string;
+  /** A tooltip for the button. */
+  title?: string;
   testId: string;
   align?: "start" | "end";
   className?: string;
@@ -108,6 +111,7 @@ export function Menu({
         aria-haspopup={role}
         aria-expanded={open}
         aria-label={label}
+        {...(title === undefined ? {} : { title })}
         data-testid={testId}
         onClick={() => {
           setOpen(!open);

@@ -91,7 +91,7 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   await expect(opens.getByTestId("timeline-why")).toBeVisible();
   await beat(page);
   await beat(page);
-  await page.getByTestId("card-expand").click();
+  await page.getByTestId("view-summary").click();
   await expect(page.getByTestId("summary")).toBeVisible();
   await beat(page);
   await beat(page);

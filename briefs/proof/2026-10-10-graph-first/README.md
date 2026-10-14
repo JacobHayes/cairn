@@ -11,7 +11,7 @@ A journey opens on `/journeys/<id>/graph`. The head is two lines: the name, its 
 actions, then one muted line with the route and version, progress and the next milestone. Under the
 toolbar a strip names the best ranked work (`FRONTIER  #1 ... · #2 ...`); each item centres its
 node, and `+N` turns the Frontier chip on. With the chip on, cards that cannot move now fade and the
-structure stays. Stages and groups are frames with a header row (kind, title, progress, status, fold).
+structure stays. The ladder row above the canvas holds the detail steps and the Signal button. Stages and groups are frames with a header row (kind, title, progress, status, fold).
 
 ![The graph with the Frontier on, light](1-graph-light.png)
 ![The graph with the Frontier on, dark](1-graph-dark.png)
@@ -50,7 +50,7 @@ the graph. The pass rail uses the same row look.
 
 ## Zoomed out
 
-Zoomed out, a card's title takes the whole card and is not cut off.
+Zoomed out, a card's title shrinks to fit, breaks only between words, and ends in an ellipsis on a whole line.
 
 ![The graph zoomed out, light](6-graph-zoomed-out-light.png)
 ![The graph zoomed out, dark](6-graph-zoomed-out-dark.png)

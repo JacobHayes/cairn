@@ -106,6 +106,22 @@ describe("C1: lines", () => {
     }
   });
 
+  test("an edge with a hidden end is drawn to the card that stands for it; one inside a card, or into nowhere, is not drawn, and edges between the same two cards are one", () => {
+    const level = actionsAndDecisionsHidden();
+    const edge = (from: string, to: string) => ({ from, to, gates: true, implicit: false, underlying: [{ requirement: from, dependent: to, origin: "explicit" as const, gates: true }] });
+    level.edges = [
+      edge("n_option", "n_build"),
+      // The check is rolled up into the build: this joins it to the same line as the build's own.
+      edge("n_option", "n_check"),
+      // A card's requirement on the node rolled up inside it, and a container's on its own child.
+      edge("n_build", "n_check"),
+      edge("n_stage", "n_build"),
+      // The decision is hidden and nothing drawn holds it.
+      edge("n_choose", "n_option"),
+    ];
+    expect(linesOf(level, graph).map((line) => [line.id, line.count])).toEqual([["n_option->n_build", 2]]);
+  });
+
   test("a stand-in for a requirement and a condition is solid and says how many it stands for", () => {
     const level = wholeLevel();
     level.edges = [
@@ -201,18 +217,29 @@ describe("C7: the trace of a selected node", () => {
     expect(overlay.outside).toEqual([]);
   });
 
-  test("a selected container does not tag its own members, and keeps the lines from them to cards outside it", () => {
+  test("a selected container's members are traced like any other card: tagged, with the lines between them lit", () => {
     const overlay = traceOverlay({ ...trace, node: "n_stage", upstream: ["n_build", "n_check", "n_option"], downstream: [] }, whole, "Build stage");
-    const quiet = (key: string) => overlay.marks[key]?.quiet;
-    expect([quiet("n_build"), quiet("n_check"), overlay.marks["n_option"]?.label]).toEqual([true, true, TRACE_LABELS.needs]);
+    expect(["n_build", "n_check", "n_option"].map((key) => overlay.marks[key]?.label)).toEqual([TRACE_LABELS.needs, TRACE_LABELS.needs, TRACE_LABELS.needs]);
+    expect(overlay.marks["n_stage"]?.quiet).toBe(true);
     expect(overlay.lines).toEqual({ "n_option->n_build": "ink" });
   });
 
-  test("a finished upstream line is faint", () => {
+  test("a requirement into a container that holds something needed is upstream, and one out of a container that holds something unblocked is downstream", () => {
+    const line = whole.lines[0];
+    if (line === undefined) {
+      throw new Error("the fixture has no line");
+    }
+    const lines = [...whole.lines, { ...line, id: "n_stage->n_choose", from: "n_stage", to: "n_choose", satisfied: false }];
+    const overlay = (traced: typeof trace) => traceOverlay(traced, { ...whole, lines }, "Build it").lines;
+    expect(overlay({ ...trace, node: "n_option", upstream: ["n_kick", "n_build"], downstream: [] })["n_kick->n_stage"]).toBe("ink");
+    expect(overlay({ ...trace, node: "n_option", upstream: [], downstream: ["n_build", "n_choose"] })["n_stage->n_choose"]).toBe("accent");
+  });
+
+  test("a finished upstream line is lit like any other", () => {
     const finished = changed((each) => {
       derivedOf(each, "n_choose").display_state = "done";
     });
-    expect(traceOverlay(trace, model(wholeLevel(), [], [], finished), "Optional extra").lines["n_choose->n_option"]).toBe("faint");
+    expect(traceOverlay(trace, model(wholeLevel(), [], [], finished), "Optional extra").lines["n_choose->n_option"]).toBe("ink");
   });
 
   test("a traced node rolled up into a card marks that card; one with no card is listed outside", () => {

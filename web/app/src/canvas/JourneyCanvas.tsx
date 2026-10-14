@@ -13,9 +13,10 @@ import { selectionOf, type Facts } from "../acting/acts.ts";
 import { nodeDetail, recordOf, titleOf, type Ready } from "../detail/model.ts";
 import { contextMenuOf } from "../detail/offers.ts";
 import { pagePath } from "../journeys/address.ts";
+import { useFrameActions } from "../shell/frame.tsx";
 import { typing } from "../ui/typing.ts";
 import { Panel } from "@xyflow/react";
-import { HiddenCount, Ladder, SelectBand, TraceBar, ViewMenu } from "./Chrome.tsx";
+import { CanvasStatus, Ladder, SelectBand, SignalMenu } from "./Chrome.tsx";
 import { GraphCanvas, type Reveal } from "./GraphCanvas.tsx";
 import { useJoinedTrace, useLaidOut, useProjected } from "./hooks.ts";
 import { journeyLooks } from "./journey.ts";
@@ -25,8 +26,6 @@ import type { CardActions } from "./NodeCard.tsx";
 import { standsFor, traceOverlay } from "./overlay.ts";
 import { refitKey } from "./refit.ts";
 import { canvasPath, edgePath, layoutViewOf, levelRequest, type CanvasView } from "./settings.ts";
-import { insertionOrigins, withOriginFoots } from "../segments/model.ts";
-import { useSegmentNames } from "../segments/read.ts";
 
 /** C1, C2, C5, C6: the journey's canvas model for one level. */
 export function journeyModel(ready: Ready, level: Level, extras: JourneyExtras): CanvasModel {
@@ -116,19 +115,16 @@ function useJourneyModel(ready: Ready, view: CanvasView, collapsed: string[], st
   const level = useProjected(ready, levelRequest(shown, { kinds: revealed === undefined ? kindsAt(step) : KINDS, collapsed }));
   const next = useProjected(ready, { projection: "next" });
   const mine = useProjected(ready, { projection: "mine" });
-  const nameOf = useSegmentNames();
-  // Editing structure names where each insertion came from on its root card (C19).
-  const roots = useMemo(() => (view.edit ? insertionOrigins(undefined, ready.journey.graph, nameOf).roots : {}), [view.edit, ready, nameOf]);
   const model = useMemo(() => {
     if (level.value === undefined) {
       return undefined;
     }
     const ranked = (next.value?.items ?? []).map((item) => item.key);
     const entries = mine.value ?? [];
-    const whole = withOriginFoots(journeyModel(ready, level.value, { ranked, mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node) }), roots);
+    const whole = journeyModel(ready, level.value, { ranked, mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node) });
     const leftOut = leftOutAt(step, ready.journey.graph.nodes ?? []);
     return revealed === undefined ? withoutLeftOut(whole, leftOut) : onlyTraced(whole, revealed, view, step, leftOut);
-  }, [ready, level.value, next.value, mine.value, revealed, view, step, roots]);
+  }, [ready, level.value, next.value, mine.value, revealed, view, step]);
   // Fading a kind lays nothing out again, so the kinds shown are not part of what the layout is keyed by.
   return { model, error: level.error, layoutView: layoutViewOf({ ...shown, shown: KINDS }, step) };
 }
@@ -206,11 +202,14 @@ function useGraph(ready: Ready, view: CanvasView, selected: string | undefined, 
 /** What a card asks of the canvas: open its node, expand or collapse it (and refit to it, 5.1), trace it. */
 function useActions(ready: Ready, view: CanvasView, selected: string | undefined, onPick: JourneyCanvasProps["onPick"], menu: boolean): CardActions {
   const navigate = useNavigate();
+  const frame = useFrameActions();
   const journey = ready.journey.header.id;
   return useMemo<CardActions>(
     () => ({
       open: (key) => {
         if (onPick?.(key) !== true) {
+          // Picking the node that is already open changes no address, so the inspector must be asked to come back.
+          frame?.show("inspector");
           void navigate(canvasPath(journey, view, key));
         }
       },
@@ -232,7 +231,7 @@ function useActions(ready: Ready, view: CanvasView, selected: string | undefined
           }
         : undefined,
     }),
-    [navigate, journey, view, selected, ready, onPick, menu],
+    [navigate, frame, journey, view, selected, ready, onPick, menu],
   );
 }
 
@@ -321,16 +320,17 @@ export function JourneyCanvas({ ready, view, selected, edge, decisions, emphasis
         layout={laidOut.layout}
         overlay={overlay}
         lens={view.lens}
-        origins={view.origins}
         faded={graph.faded}
         emphasis={emphasis}
         selected={selected}
         selectedEdge={edge?.replace("~", "->")}
         actions={actions}
         viewKey={refitKey(laidOut, view.edit)}
+        keep={journey}
         label={`${ready.journey.header.name}: canvas`}
         title={ready.journey.header.name}
         onEdge={(line) => void navigate(edgePath(journey, view, line))}
+        onBackground={() => { if (selected !== undefined || edge !== undefined) { go(view, undefined); } }}
         selecting={selecting ? { picked, onPicked: (keys) => { setPicked(new Set(keys)); } } : undefined}
         reveal={reveal}
         focus={graph.focus}
@@ -338,25 +338,15 @@ export function JourneyCanvas({ ready, view, selected, edge, decisions, emphasis
         onStep={(next) => { go(withStep(view, next), selected); }}
       >
         <Ladder steps={graph.steps} step={graph.step} onStep={(next) => { go(withStep(view, next), selected); }}>
-          {selected === undefined || selecting ? null : (
-            <TraceBar
-              title={titleOf(ready, selected)}
-              needs={trace?.upstream.length ?? 0}
-              unblocks={trace?.downstream.length ?? 0}
-              outside={outsideOf(trace, laidOut.model)}
-              onReveal={graph.reveal}
-              onClear={() => { go(view, undefined); }}
-            />
-          )}
+          <SignalMenu lens={view.lens} onLens={(lens) => { go({ ...view, lens }, selected); }} />
           {view.select && !view.edit ? <SelectBand onDone={() => { go({ ...view, select: false, edit: false }, selected); }} /> : null}
         </Ladder>
-        <ViewMenu lens={view.lens} origins={view.origins} onLens={(lens) => { go({ ...view, lens }, selected); }} onOrigins={(origins) => { go({ ...view, origins }, selected); }} />
         {selecting && picks.length > 0 ? (
           <Panel position="bottom-center" className="canvas-panel">
             <SelectionBar ready={ready} picks={picks} authored={authored} setPicked={setPicked} />
           </Panel>
         ) : null}
-        <HiddenCount count={graph.hidden} onShow={() => { go({ ...view, notRelevant: true }, selected); }} />
+        <CanvasStatus linked={selected === undefined || selecting ? 0 : outsideOf(trace, laidOut.model)} notRelevant={graph.hidden} onReveal={graph.reveal} onShow={() => { go({ ...view, notRelevant: true }, selected); }} />
       </GraphCanvas>
   );
 }

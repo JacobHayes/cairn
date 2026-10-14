@@ -1,5 +1,5 @@
-// The sync chip at the strip's right end (design 9): one button with a mark and an
-// always-visible label that says whether what you see is what exists and whether your edits
+// The sync dot to the right of the brand at the top of the rail (design 9): one button that is
+// only a mark (its colour and shape, the tooltip and its accessible name carry the words) that says whether what you see is what exists and whether your edits
 // are landing. Hovering shows one sentence; clicking opens the popover with the revision,
 // engine and today, what needs you, and this tab's recent saves. Nothing on it closes itself
 // or needs closing but the popover, which Esc dismisses. A polite and an assertive live
@@ -33,6 +33,13 @@ function useSavedAnnouncement(): { id: number; text: string } | undefined {
   }, [id]);
   return spoken;
 }
+
+/** Where the popover opens: just below the dot, kept inside the window (it is fixed, so the rail's scroller does not clip it). */
+type Anchor = { top: number; left: number };
+const anchorBelow = (dot: HTMLElement): Anchor => {
+  const box = dot.getBoundingClientRect();
+  return { top: box.bottom + 8, left: Math.max(12, Math.min(box.left, globalThis.innerWidth - 372)) };
+};
 
 function NeedsYou({ problems, onGo }: { problems: readonly Problem[]; onGo: () => void }) {
   const navigate = useNavigate();
@@ -86,7 +93,7 @@ function Recent({ saves }: { saves: readonly SaveEvent[] }) {
   );
 }
 
-function Popover({ summary, problems, onClose }: { summary: SyncSummary; problems: readonly Problem[]; onClose: () => void }) {
+function Popover({ summary, problems, anchor, onClose }: { summary: SyncSummary; problems: readonly Problem[]; anchor: Anchor; onClose: () => void }) {
   const session = useSession();
   const stream = useStreamStatus();
   const saves = useSaves();
@@ -94,7 +101,7 @@ function Popover({ summary, problems, onClose }: { summary: SyncSummary; problem
   const skew = useSkew();
   const heading = useId();
   return (
-    <div className="popover sync-popover" role="dialog" aria-labelledby={heading} tabIndex={-1} data-popover="" data-testid="sync-popover">
+    <div className="popover sync-popover" role="dialog" aria-labelledby={heading} tabIndex={-1} data-popover="" data-testid="sync-popover" style={anchor}>
       <div className="popover-head" id={heading}>
         Sync
       </div>
@@ -151,11 +158,15 @@ function usePopover() {
         setOpen(false);
       }
     };
+    // It is placed from the dot's box when it opens, so a resize closes it rather than leaving it adrift.
+    const onResize = () => { setOpen(false); };
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
+    globalThis.addEventListener("resize", onResize);
     return () => {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onPointer);
+      globalThis.removeEventListener("resize", onResize);
     };
   }, [open]);
   return { open, setOpen, wrap, chip };
@@ -167,6 +178,7 @@ export function SyncChip() {
   const derivation = useDerivation();
   const { open, setOpen, wrap, chip } = usePopover();
   const saved = useSavedAnnouncement();
+  const [anchor, setAnchor] = useState<Anchor>({ top: 0, left: 0 });
   return (
     <span className="sync-wrap" ref={wrap}>
       <button
@@ -184,20 +196,19 @@ export function SyncChip() {
         aria-label={`${summary.label}. ${summary.sentence}`}
         aria-haspopup="dialog"
         aria-expanded={open}
-        onClick={() => {
+        onClick={(event) => {
           if (summary.state === "new-version") {
             location.reload();
           } else if (summary.state === "behind") {
             // A refetch failed or is slow: the stream's current revisions ask every view again.
             session.subscription.reopen();
           } else {
+            setAnchor(anchorBelow(event.currentTarget));
             setOpen(!open);
           }
         }}
-      >
-        {summary.label}
-      </button>
-      {open ? <Popover summary={summary} problems={problems} onClose={() => { setOpen(false); }} /> : null}
+      />
+      {open ? <Popover summary={summary} problems={problems} anchor={anchor} onClose={() => { setOpen(false); }} /> : null}
       <span className="visually-hidden" role="status" aria-live="polite">
         {saved === undefined ? null : <span key={saved.id}>{saved.text}</span>}
         {summary.announce === "polite" ? summary.sentence : ""}

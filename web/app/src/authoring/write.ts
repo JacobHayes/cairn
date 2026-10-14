@@ -41,6 +41,8 @@ export interface AuthorWrite {
   disabled: boolean;
   /** The last attempt's rejection (the preview's or the host's), until dismissed or a later attempt. */
   failed: { sent: Sent; rejection: Rejection } | undefined;
+  /** The last attempt got no answer (`failed`: it may or may not have been saved) or was not sent (`stopped`: the app was updated), until a later attempt. */
+  unanswered: "failed" | "stopped" | undefined;
   dismiss: () => void;
   /** What the last landed write leaves under the form, for a few seconds. */
   receipt: ReceiptState | undefined;
@@ -113,6 +115,7 @@ export function useAuthorWrite(authored: Authored): AuthorWrite {
   const preview = usePreviewer(authored);
   const [pending, setPending] = useState(false);
   const [failed, setFailed] = useState<AuthorWrite["failed"]>();
+  const [unanswered, setUnanswered] = useState<AuthorWrite["unanswered"]>();
   const receipt = useReceipt();
   const key = `author:${useId()}`;
   const dismiss = () => {
@@ -139,12 +142,13 @@ export function useAuthorWrite(authored: Authored): AuthorWrite {
     });
     setPending(false);
     setFailed(result.outcome === "rejected" ? { sent, rejection: result.rejection } : undefined);
+    setUnanswered(result.outcome === "failed" || result.outcome === "stopped" ? result.outcome : undefined);
     if (result.outcome === "landed") {
       receipt.show(result.warning);
     }
     return result.outcome === "landed";
   };
-  return { run, pending, disabled: pending || skew !== undefined, failed, dismiss, receipt: receipt.receipt };
+  return { run, pending, disabled: pending || skew !== undefined, failed, unanswered, dismiss, receipt: receipt.receipt };
 }
 
 /** How long typing settles before a form's preview runs. */

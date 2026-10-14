@@ -7,11 +7,11 @@
 // on the canvas root): near the whole card, mid the head and title, far the title led by the
 // state's glyph, whose shape says the state. The hidden-prerequisites marker opens the trace.
 import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
-import { createContext, useContext, type CSSProperties, type ReactNode } from "react";
+import { createContext, useContext, type CSSProperties } from "react";
 
 import type { ContextGroup } from "../ui/ContextMenu.tsx";
 import { statusGlyph, statusTone, statusWord } from "../status/words.ts";
-import { BORDER_PX, CONTROL_PX, OPEN_PX, TITLE_LINE_PX, cardRows, titleFitPx, titleRoom } from "./cards.ts";
+import { BORDER_PX, CONTROL_PX, MARKER_ROW_PX, OPEN_PX, TITLE_LINE_PX, cardRows, titleFitPx, titleLines, titleRoom, titleWordOverflows, type CardRows } from "./cards.ts";
 import type { LensChip } from "./lens.ts";
 import { hereWords, nodeClasses } from "./look.ts";
 import { RANK_TAG_COUNT, type Card, type CardBody } from "./model.ts";
@@ -47,6 +47,7 @@ export type CardData = {
   picked: boolean;
   /** Its height when it is a container (its children sit below its own card). */
   header: number | undefined;
+  /** A container's zoomed-out title is at least this large (px): the largest of its cards' fits, so it is never smaller than the cards it holds. */
   /** Where the layout put it in its container (C15), rounded, for whoever reads the page. */
   place: { x: number; y: number };
   /** The Signals lens's chip for it, and its tint (0 to 3). */
@@ -55,13 +56,9 @@ export type CardData = {
   edgeEnd: boolean;
   /** The container is open and has children to collapse. */
   collapsible: boolean;
-  /** View, Show origins: say where the node came from. */
-  origins: boolean;
 };
 
 export type CardNode = Node<CardData, "card">;
-
-const ORIGIN_WORDS = { from_route: "from the route", local: "added here", orphaned: "orphaned", from_segment: "from a segment" } as const;
 
 /** The kind as the card's label says it: a top-level group is a stage. */
 export function kindLabel(card: Card): string {
@@ -91,8 +88,7 @@ function Title({ card }: { card: Card }) {
   );
 }
 
-/** The head's row. An open container's has its title and progress in it (`band`), so it is one row. */
-function Head({ card, collapsible, band }: { card: Card; collapsible: boolean; band?: ReactNode }) {
+function Head({ card, collapsible }: { card: Card; collapsible: boolean }) {
   const actions = useContext(CardActionsContext);
   const journey = card.journey;
   return (
@@ -103,7 +99,7 @@ function Head({ card, collapsible, band }: { card: Card; collapsible: boolean; b
           current
         </span>
       ) : null}
-      {band ?? <span className="spacer" />}
+      <span className="spacer" />
       {journey === undefined ? null : (
         <span className={`badge ${statusTone(journey.state)} node-state`} data-testid="card-state" data-state={journey.state}>
           {statusWord(journey.state, card.kind)}
@@ -156,8 +152,7 @@ function Control({ card, collapsible }: { card: Card; collapsible: boolean }) {
   );
 }
 
-/** `compact`: the progress as `done/total`, for a container's band. */
-function Body({ body, card, compact = false }: { body: CardBody; card: Card; compact?: boolean }) {
+function Body({ body, card }: { body: CardBody; card: Card }) {
   switch (body.kind) {
     case "answer":
       return (
@@ -176,8 +171,8 @@ function Body({ body, card, compact = false }: { body: CardBody; card: Card; com
           <span className="node-meter" aria-hidden="true">
             <span style={{ width: `${String(Math.round((body.done / body.total) * 100))}%` }} />
           </span>
-          <span>{compact ? `${String(body.done)}/${String(body.total)}` : progressWords(body.done, body.total)}</span>
-          {body.badge === undefined || compact ? null : (
+          <span>{progressWords(body.done, body.total)}</span>
+          {body.badge === undefined ? null : (
             <span className={body.badge.tone === "plain" ? "node-flag" : `node-flag ${body.badge.tone}`} data-testid="card-badge" data-status={body.badge.flag}>
               {body.badge.flag}
             </span>
@@ -193,7 +188,8 @@ function Body({ body, card, compact = false }: { body: CardBody; card: Card; com
   }
 }
 
-function Foot({ card }: { card: Card }) {
+/** `owner: false` leaves the owner out (a container's). */
+function Foot({ card, owner = true }: { card: Card; owner?: boolean }) {
   const journey = card.journey;
   if (journey === undefined && card.route?.foot !== undefined) {
     return (
@@ -204,7 +200,7 @@ function Foot({ card }: { card: Card }) {
       </div>
     );
   }
-  if (journey === undefined || (journey.foot === undefined && journey.owner === undefined)) {
+  if (journey === undefined || (journey.foot === undefined && (!owner || journey.owner === undefined))) {
     return null;
   }
   return (
@@ -215,7 +211,7 @@ function Foot({ card }: { card: Card }) {
         </span>
       )}
       <span className="spacer" />
-      {journey.owner === undefined ? null : (
+      {!owner || journey.owner === undefined ? null : (
         <span className={journey.owner.missing ? "node-owner warn" : "node-owner"} data-testid="card-owner" title={journey.owners}>
           {journey.owner.words}
         </span>
@@ -263,7 +259,6 @@ function Hanging({ data }: { data: CardData }) {
   const { card, overlay, lens } = data;
   const mark = overlay?.marks[card.key];
   const rank = card.journey?.rank;
-  const origin = card.journey?.origin;
   return (
     <>
       {rank === undefined || rank > RANK_TAG_COUNT ? null : (
@@ -276,17 +271,29 @@ function Hanging({ data }: { data: CardData }) {
           {mark.label}
         </span>
       )}
-      {!data.origins || origin === undefined ? null : (
-        <span className="node-origin hang-tag bottom steel" data-testid="card-origin" data-origin={origin}>
-          {ORIGIN_WORDS[origin]}
-        </span>
-      )}
       {lens === undefined ? null : (
         <span className={`node-lens hang-tag bottom lens-tier-${String(lens.tier)}`} data-testid="card-lens" data-lens={lens.name} title={lens.chip.title}>
           {lens.chip.text}
         </span>
       )}
     </>
+  );
+}
+
+/** The title with the state's glyph before it. */
+function TitleRow({ card, rows, fit }: { card: Card; rows: CardRows; fit: { size: number; lines: number; cut: boolean } }) {
+  const journey = card.journey;
+  return (
+    <div className="node-title-row" data-cut={fit.cut || undefined} style={{ "--title-h": `${String(rows.title * TITLE_LINE_PX)}px`, "--title-lines": rows.title, "--title-fit": `${String(fit.size)}px`, "--title-fit-lines": fit.lines } as CSSProperties}>
+      {journey === undefined ? null : (
+        <span className="node-glyph" data-testid="card-glyph" data-state={journey.state} aria-hidden="true">
+          {statusGlyph(journey.state)}
+        </span>
+      )}
+      <div className="node-title">
+        <Title card={card} />
+      </div>
+    </div>
   );
 }
 
@@ -306,7 +313,10 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
   const mark = overlay?.marks[card.key];
   const controls = controlsOf(card, data.collapsible, actions?.drill !== undefined);
   // Zoomed out, a title is set as large as its room lets the whole of it show (cards.ts).
-  const fit = (room: { width: number; height: number }) => `${String(titleFitPx(card.title.length, room.width, room.height))}px`;
+  const fit = (room: { width: number; height: number }) => {
+    const size = titleFitPx(card.title, room.width, room.height);
+    return { size, lines: titleLines(size, room.height), cut: titleWordOverflows(card.title, room.width) };
+  };
   return (
     <div
       className={classes.filter(Boolean).join(" ")}
@@ -327,38 +337,26 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
       {header === undefined ? (
         <div className="node-inner" style={{ height: "100%" }}>
           <Head card={card} collapsible={data.collapsible} />
-          <div className="node-title-row" style={{ "--title-h": `${String(rows.title * TITLE_LINE_PX)}px`, "--title-lines": rows.title, "--title-fit": fit(titleRoom(width ?? 0, height ?? 0, { glyph: journey !== undefined, controls })) } as CSSProperties}>
-            {journey === undefined ? null : (
-              <span className="node-glyph" data-testid="card-glyph" data-state={journey.state} aria-hidden="true">
-                {statusGlyph(journey.state)}
-              </span>
-            )}
-            <div className="node-title">
-              <Title card={card} />
-            </div>
-          </div>
+          <TitleRow card={card} rows={rows} fit={fit(titleRoom(width ?? 0, height ?? 0, { glyph: journey !== undefined, controls }))} />
           {journey?.body === undefined ? null : <Body body={journey.body} card={card} />}
           <Foot card={card} />
           <Marker card={card} />
         </div>
       ) : (
-        // An open container: a header band across the top, the title and progress in its one row, and the children below on the sunken body.
-        <div className="node-inner node-band" style={{ height: header - BORDER_PX, "--title-fit": fit(titleRoom(width ?? 0, header, { glyph: false, controls })) } as CSSProperties}>
-          <Head
-            card={card}
-            collapsible={data.collapsible}
-            band={
-              <>
-                <div className="node-title">
-                  <Title card={card} />
-                </div>
-                {journey?.body === undefined ? null : <Body body={journey.body} card={card} compact />}
-              </>
-            }
-          />
-          <Foot card={card} />
-          <Marker card={card} />
-        </div>
+        // An open container: its head (kind, title, progress), a rule under it, then the hidden-prerequisites marker and the children.
+        <>
+          <div className="node-inner" style={{ height: header - BORDER_PX - (rows.marker ? MARKER_ROW_PX : 0) }}>
+            <Head card={card} collapsible={data.collapsible} />
+            <TitleRow card={card} rows={rows} fit={fit(titleRoom(width ?? 0, header - BORDER_PX - (rows.marker ? MARKER_ROW_PX : 0), { glyph: false, controls }))} />
+            {journey?.body === undefined ? null : <Body body={journey.body} card={card} />}
+            <Foot card={card} owner={false} />
+          </div>
+          {rows.marker ? (
+            <div className="node-marker-row">
+              <Marker card={card} />
+            </div>
+          ) : null}
+        </>
       )}
       <Hanging data={data} />
       <Handle type="source" position={Position.Right} isConnectable={false} className="node-handle" />

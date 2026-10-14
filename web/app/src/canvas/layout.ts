@@ -116,7 +116,7 @@ export function elkGraph(request: LayoutRequest): ElkNode {
     if (parents.has(node.key)) {
       shape.children = [];
       shape.layoutOptions = {
-        "elk.padding": `[top=${String(node.header ?? 0)},left=${String(CONTAINER_PAD_PX)},bottom=${String(CONTAINER_PAD_PX)},right=${String(CONTAINER_PAD_PX)}]`,
+        "elk.padding": `[top=${String((node.header ?? 0) + CONTAINER_PAD_PX)},left=${String(CONTAINER_PAD_PX)},bottom=${String(CONTAINER_PAD_PX)},right=${String(CONTAINER_PAD_PX)}]`,
         // A container is never narrower than its own card.
         "elk.nodeSize.constraints": "MINIMUM_SIZE",
         "elk.nodeSize.minimum": `(${String(node.width)}, ${String(node.height)})`,

@@ -20,15 +20,15 @@ import { nodeOf, type Ready } from "../detail/model.ts";
 import { EdgeCard } from "../detail/EdgeCard.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { screenPath } from "../detail/parts.tsx";
-import { pagePath, withParam, type Screen } from "../journeys/address.ts";
+import type { Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
+import { keepQuery } from "../journeys/kept.ts";
 import { rememberProjection } from "../journeys/memory.ts";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
 import { summaryModel } from "../summary/model.ts";
 import { ActiveFilters } from "./ActiveFilters.tsx";
-import { FrontierStrip } from "./FrontierStrip.tsx";
 import { activeFilters } from "./filters.ts";
 import { JourneyHeader } from "./JourneyHeader.tsx";
 import { JourneyToolbar } from "./JourneyToolbar.tsx";
@@ -152,7 +152,7 @@ function Workspace({ ready, screen, selected, edge, authored, drawing, preview }
   return <ProjectionBody ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} />;
 }
 
-/** The graph's find and the strip's centring: each opens a node on the canvas, its containers expanded, and the canvas centres it once it is drawn (it reads the request from the navigation). `missing` is the search that named no node. */
+/** The graph's find: it opens a node on the canvas, its containers expanded, and the canvas centres it once it is drawn (it reads the request from the navigation). `missing` is the search that named no node. */
 function useFind(ready: Ready, view: CanvasView) {
   const navigate = useNavigate();
   const [missing, setMissing] = useState<string | undefined>(undefined);
@@ -170,7 +170,7 @@ function useFind(ready: Ready, view: CanvasView) {
       centre(key);
     }
   };
-  return { centre, find, missing };
+  return { find, missing };
 }
 
 function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<FrameProps, "id">) {
@@ -191,8 +191,14 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       rememberProjection(journey, screen);
     }
   }, [journey, screen]);
+  // Where each screen was left, so coming back to it opens it as it was.
+  useEffect(() => {
+    if (screen !== "summary") {
+      keepQuery(journey, screen, search);
+    }
+  }, [journey, screen, search]);
   useJourneyKeys({ journey, screen, selected, sheetOpen, setSheetOpen });
-  const { centre, find, missing } = useFind(ready, view);
+  const { find, missing } = useFind(ready, view);
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
   const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(canvasPath(journey, view))} />;
   const filters = screen === "summary" ? [] : activeFilters(journey, screen, search, selected);
@@ -208,10 +214,9 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       <InsertEntryContext value={inserting.start}>
       <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen}>
         <div className="ws-head stack journey-head">
-          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_VIEW} selected={selected} model={model} onKeys={() => { setSheetOpen(true); }} />
+          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_VIEW} selected={selected} model={model} />
           <JourneyToolbar ready={ready} screen={screen} node={selected} onFind={find} />
           <ActiveFilters filters={filters} />
-          {planned ? <FrontierStrip ready={ready} onCentre={centre} onAll={() => void navigate(pagePath(journey, "graph", selected, withParam(search, "frontier", "1")))} /> : null}
           {planned ? <CanvasBars ready={ready} authored={authored} drawing={drawing} /> : null}
           {missing === undefined ? null : (
             <p className="muted small" role="status" data-testid="find-missing">

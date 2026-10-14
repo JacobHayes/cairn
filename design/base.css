@@ -151,7 +151,7 @@ h3 {
   border-left-color: var(--chrome-brand);
   background: var(--color-hover);
 }
-.rail button {
+.rail > button {
   width: 100%;
   color: var(--chrome-ink);
   background: transparent;
@@ -160,7 +160,7 @@ h3 {
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
-.rail button:hover {
+.rail > button:hover {
   border-color: var(--chrome-muted);
 }
 .workspace {
@@ -672,72 +672,74 @@ svg.chart .datum-line {
 }
 
 /* ---- app frame parts (DESIGN amendments 5 and 10) ------------------------------------------- */
-/* Chrome (the strip and the sheet) follows the theme: --chrome-bg. */
-.strip {
+/* Chrome (the rail and the sheet) follows the theme: --chrome-bg. */
+/* Sync dot (to the right of the brand in the rail): one 10px mark and nothing else; the sentence is its tooltip and the popover. The colour rule: green is nothing to do, a steel ring is working on it, amber is it will sort itself out or is safe to wait, red is your change is not landing until you act. Each state has its own shape too (a disc, a ring, a diamond, a square, a "!", a dotted ring for sample data), so colour is never the only signal. */
+.rail-head {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  min-height: 28px;
-  padding: 0 var(--space-3);
-  background: var(--chrome-bg);
-  color: var(--chrome-muted);
-  border-top: 1px solid var(--chrome-border);
-  font: 500 12px / 1 var(--font-mono);
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+  gap: var(--space-2);
 }
-.strip > .spacer {
-  flex: 1;
-}
-
-/* Sync chip (the strip's right end): a 6px mark and a mono label in rail ink. The colour rule: green is nothing to do, a steel ring is working on it, amber is it will sort itself out or is safe to wait, red is your change is not landing until you act. A conflict's mark is a "!", the demo's a hollow dot: colour is never the only signal. */
 .sync {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 20px;
-  padding: 0 6px;
+  justify-content: center;
+  width: 24px;
+  min-height: 24px;
+  padding: 0;
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
   background: transparent;
   color: var(--chrome-ink);
-  font: inherit;
-  letter-spacing: inherit;
-  text-transform: inherit;
   cursor: pointer;
 }
 .sync:hover {
-  border-color: var(--chrome-border);
+  border-color: transparent;
+}
+.sync:hover::before {
+  opacity: 0.65;
+}
+.sync:focus-visible {
+  outline: 2px solid var(--chrome-muted);
+  outline-offset: 2px;
 }
 .sync::before {
   content: "";
-  width: 6px;
-  height: 6px;
+  width: 10px;
+  height: 10px;
   border-radius: var(--radius-full);
   background: var(--mark, var(--color-success));
+  box-sizing: border-box;
   flex: none;
 }
 .sync[data-tone="working"]::before {
   background: transparent;
-  border: 1.5px solid var(--chrome-muted);
+  border: 2px solid var(--chrome-muted);
 }
 .sync[data-tone="wait"] {
   --mark: var(--color-warning);
 }
+.sync[data-tone="wait"]::before {
+  border-radius: 0;
+  clip-path: polygon(50% 0, 100% 50%, 50% 100%, 0 50%);
+}
 .sync[data-tone="act"] {
   --mark: var(--color-error);
 }
+.sync[data-tone="act"]::before {
+  border-radius: 0;
+}
 .sync[data-tone="hollow"]::before {
   background: transparent;
-  border: 1px solid var(--chrome-muted);
+  border: 2px dotted var(--chrome-muted);
 }
 .sync[data-state="conflict"]::before {
   content: "!";
   width: auto;
   height: auto;
+  border-radius: 0;
   background: transparent;
   color: var(--color-error);
-  font-weight: 700;
+  font: 700 14px / 1 var(--font-mono);
 }
 .visually-hidden {
   position: absolute;
@@ -1078,7 +1080,7 @@ svg.chart .datum-line {
   .rail nav a[aria-current="page"] {
     border-bottom-color: var(--chrome-brand);
   }
-  .rail button {
+  .rail > button {
     width: auto;
   }
   .workspace {

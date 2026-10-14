@@ -1,7 +1,7 @@
 // The Graticule toast, kept only for confirmations that are not about syncing ("Route file
 // exported", design 9.7): it takes itself down after a few seconds, waits while the pointer is
 // on it, has no close button, and the next one replaces it. It rises at the workspace's
-// bottom right, above the strip, so it never covers the sync chip (app.css).
+// bottom right (app.css).
 import { useEffect, useState } from "react";
 
 import { useSession, useToast } from "../data/react.ts";

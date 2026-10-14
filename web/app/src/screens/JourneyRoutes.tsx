@@ -7,6 +7,7 @@ import { ancestorsOf } from "../canvas/ladder.ts";
 import { canvasPath, DEFAULT_VIEW, revealing } from "../canvas/settings.ts";
 import { nodeOf } from "../detail/model.ts";
 import { legacyRedirect, pagePath, type Screen } from "../journeys/address.ts";
+import { keptQuery } from "../journeys/kept.ts";
 import { recalledProjection } from "../journeys/memory.ts";
 import { JourneyFrame, JourneyGate } from "./JourneyFrame.tsx";
 
@@ -23,7 +24,8 @@ export function JourneyPageRoute({ screen }: { screen: Screen }) {
 export function JourneyLanding() {
   const { id = "" } = useParams();
   const { pathname, search } = useLocation();
-  return <Navigate replace to={legacyRedirect(pathname, search) ?? pagePath(id, recalledProjection(id))} />;
+  const projection = recalledProjection(id);
+  return <Navigate replace to={legacyRedirect(pathname, search) ?? pagePath(id, projection, undefined, keptQuery(id, projection))} />;
 }
 
 /**

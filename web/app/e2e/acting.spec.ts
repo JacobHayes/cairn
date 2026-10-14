@@ -66,14 +66,23 @@ test("B1, C11: a journey started from a route opens its walkthrough; an answer s
   await expect(page.getByTestId("unlocked-by").getByRole("link", { name: "Review the partner's criteria" })).toBeVisible();
 });
 
-test("C9: showing the not-relevant rows keeps the levels a person opened", async ({ page }) => {
+test("C9: showing the not-relevant rows keeps the levels a person opened and clears the rows checked; so does a visit to the graph, which keeps the levels", async ({ page }) => {
   await openActing(page, "browser", "j_vendor_eval", "list");
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
   const total = Number(await page.getByTestId("list-total").getAttribute("data-total"));
   await page.getByTestId("list-fold-all").click();
   const folds = page.getByTestId("list-fold");
   await expect(folds.first()).toHaveAttribute("aria-expanded", "true");
+  await page.getByTestId("list-row").first().getByRole("checkbox").check();
   await page.getByTestId("list-not-relevant").click();
   await expect(page.getByTestId("list-total")).not.toHaveAttribute("data-total", String(total));
+  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="list-row"] input:checked')).toHaveCount(0);
+  await page.getByTestId("list-not-relevant").click();
+  await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", String(total));
+  await expect(page.locator('[data-testid="list-row"] input:checked')).toHaveCount(0);
+  await page.getByTestId("view-graph").click();
+  await page.getByTestId("view-list").click();
+  await expect(page.getByTestId("list-fold").first()).toBeVisible();
   await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
 });

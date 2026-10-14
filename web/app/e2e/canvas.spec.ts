@@ -5,7 +5,7 @@
 // model's tests'.
 import { expect, test } from "@playwright/test";
 
-import { lineBetween, pointOn, viewportOf } from "./canvas.ts";
+import { lineBetween, pointOn, viewportOf, viewportSettled } from "./canvas.ts";
 import { nodeCard, nodePanel, openJourney } from "./shell.ts";
 
 test("C2 to C7: the graph opens at its current stage, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
@@ -20,7 +20,7 @@ test("C2 to C7: the graph opens at its current stage, expands in place, traces a
   await expect(page.locator(".react-flow__attribution")).toHaveCount(0);
   // A folded stage traces what the nodes folded into it trace: the line leaving it is followed.
   await nodeCard(page, "n_setup").getByTestId("card-open").click();
-  await expect(page.getByTestId("trace-bar")).not.toContainText("unblocks 0");
+  await expect(page.getByTestId("card-mark").filter({ hasText: "unblocks" }).first()).toBeVisible();
   // Expanding opens it in place, and the address remembers.
   await nodeCard(page, "n_setup").getByTestId("card-expand").click();
   await expect(nodeCard(page, "n_plan")).toBeVisible();
@@ -28,16 +28,17 @@ test("C2 to C7: the graph opens at its current stage, expands in place, traces a
   // At far zoom a card's glyph, not its colour, names its state: no two states share one.
   const glyphs = await page.getByTestId("card-glyph").evaluateAll((all) => all.map((each) => [each.getAttribute("data-state"), each.textContent]));
   expect(new Set(glyphs.map(([, glyph]) => glyph)).size).toBe(new Set(glyphs.map(([state]) => state)).size);
-  // Selecting a node traces it: what it needs and what it unblocks are tagged, and the bar says how many.
+  // Selecting a node traces it: what it needs and what it unblocks are tagged,.
   await nodeCard(page, "n_plan").getByTestId("card-open").click();
-  await expect(page.getByTestId("trace-bar")).toContainText("Test plan");
   await expect(page.getByTestId("card-mark").filter({ hasText: "needs" }).first()).toBeVisible();
   await expect(page.getByTestId("card-mark").filter({ hasText: "unblocks" }).first()).toBeVisible();
   // What the step folds away is counted, and Reveal draws it.
+  await expect(page.getByTestId("linked-hidden")).toContainText("2 linked nodes hidden");
   await page.getByTestId("trace-reveal").click();
   await expect(page.getByTestId("trace-reveal")).toHaveCount(0);
   // Hovering an edge says what it is; clicking it opens its card, which follows it to either end.
   const edge = lineBetween(page, "n_access", "n_plan");
+  await viewportSettled(page);
   const at = await pointOn(edge);
   await page.mouse.move(at.x, at.y);
   await expect(page.getByTestId("edge-hover")).toContainText("Test plan needs Environment access");
@@ -73,4 +74,22 @@ test("C2 to C7: the graph opens at its current stage, expands in place, traces a
   await page.keyboard.press("Shift+F10");
   await page.getByTestId("context-rename").click();
   await expect(nodePanel(page, "n_plan").getByTestId("rename")).toBeVisible();
+});
+
+test("a click on the empty canvas deselects and a drag that pans does not", async ({ page }) => {
+  await openJourney(page, "browser", "j_vendor_eval", "");
+  await nodeCard(page, "n_reporting").getByTestId("card-open").click();
+  await expect(page).toHaveURL(/\/nodes\/n_reporting/);
+  const pane = (await page.locator(".react-flow__pane").boundingBox()) ?? { x: 0, y: 0, width: 0, height: 0 };
+  const corner = { x: pane.x + pane.width - 12, y: pane.y + pane.height - 60 };
+  await page.mouse.move(corner.x, corner.y);
+  await page.mouse.down();
+  await page.mouse.move(corner.x - 40, corner.y - 30);
+  await page.mouse.up();
+  await expect(page).toHaveURL(/\/nodes\/n_reporting/);
+  // A click straight after a pan is swallowed by the pan; wait for it to end.
+  await viewportSettled(page);
+  await page.mouse.click(corner.x, corner.y);
+  await expect(page).not.toHaveURL(/\/nodes\//);
+  await expect(page.getByTestId("card-mark")).toHaveCount(0);
 });

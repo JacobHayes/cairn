@@ -31,24 +31,27 @@
   --xy-controls-button-background-color: var(--color-surface);
   --xy-controls-button-background-color-hover: var(--color-band);
   --xy-controls-button-color: var(--color-text);
-  --xy-controls-button-border-color: var(--color-border);
+  --xy-controls-button-border-color: var(--color-edge);
   background: transparent;
 }
 
-/* The controls as square hairline buttons (5.8). */
+/* The controls as square hairline buttons (5.8), in a row along the bottom edge: with the ladder's row at the top, the left edge is clear of them, and a fit keeps its bottom padding clear of the row. */
 .canvas .react-flow__controls {
+  z-index: 6;
   box-shadow: none;
   gap: 4px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
 }
 
+/* What floats over the canvas (controls, the ladder, the status bar) is paper with an edge and a shadow, so it reads against the ruling in light too. */
 .canvas .react-flow__controls-button {
   width: 28px;
   height: 28px;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-edge);
   border-radius: 0;
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 .canvas .react-flow__panel {
@@ -63,44 +66,40 @@
   font-size: 14px;
 }
 
+/* No overlap onto the group's bottom border: inside the ladder's full border the active underline sits within it. */
 .canvas-panel .segmented :is(label, button) {
+  margin: 0;
   font: 500 14px / 1.4 var(--font-body);
   letter-spacing: 0;
   text-transform: none;
   background: var(--color-surface);
 }
 
-.canvas-view {
-  gap: var(--space-2);
-}
-
-.canvas-lens-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--space-1);
-  padding: 0 var(--space-2);
-  border: 1px solid var(--color-border);
+/* The Signal button; not Off, it is pressed: the band fill and an ink underline, as the active segment is. */
+.canvas-signal > .dropdown-button {
   background: var(--color-surface);
-  font: 500 12px / 24px var(--font-mono);
+  border-color: var(--color-edge);
+  box-shadow: var(--shadow-sm);
 }
 
-.canvas-lens-chip button {
-  min-height: 0;
-  padding: 0 2px;
+.canvas-signal-on > .dropdown-button {
+  background: var(--color-band);
+  box-shadow: inset 0 -2px 0 var(--color-text);
+}
+
+.canvas-signal-rule {
+  width: 100%;
+  margin: 0;
   border: 0;
-  background: transparent;
-  color: var(--color-secondary);
+  border-top: 1px solid var(--color-edge);
 }
 
-/* The trace bar and the Select band: one slim line at the top. */
-/* The ladder's row: the trace bar follows it and wraps under it, never over the View menu. */
-.canvas .canvas-top {
-  max-width: calc(100% - 220px);
-}
-
+/* The ladder's row holds the ladder, the Signal button and the Select band, and wraps on a narrow canvas; the top right stays clear of cards' tags. */
 /* The ladder keeps its own paper, so a card panned under it never reads through. */
 .canvas-top .segmented {
+  border: 1px solid var(--color-edge);
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
 }
 
 /* On a phone the trace bar is a row of its own under the ladder, and a long title is cut short. */
@@ -111,22 +110,31 @@
 
   .canvas-top > .canvas-trace {
     flex: 1 1 100%;
+    flex-wrap: wrap;
   }
 }
 
+/* One line: the title gives way (an ellipsis), the counts and Esc never wrap. */
 .canvas-trace {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  min-width: 0;
   align-items: center;
   padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-edge);
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
   gap: var(--space-3);
 }
 
+.canvas-trace > :not(strong) {
+  flex: none;
+  white-space: nowrap;
+}
+
 .canvas-trace strong {
+  flex: 0 1 auto;
   min-width: 0;
-  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -149,16 +157,88 @@
   text-decoration: underline;
 }
 
-/* Beside the zoom controls, not over them. */
-.canvas .canvas-hidden {
-  margin-left: 62px;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-border);
-  background: var(--color-surface);
-  font-size: 14px;
+/* The status bar: one line along the canvas's bottom edge, on paper like the other floating controls; the zoom buttons ride above it
+   while it shows. Where the inspector is a sheet over the canvas's lower part (a tablet, or the phone's full-screen map) the bar
+   and the buttons ride above it too (`--status-lift`), so Reveal is never behind it. */
+.canvas {
+  --status-h: 36px;
 }
 
-.canvas-hidden .link {
+.canvas .react-flow__panel.canvas-status {
+  right: 0;
+  bottom: var(--status-lift, 0);
+  display: flex;
+  gap: var(--space-4);
+  box-sizing: border-box;
+  height: var(--status-h);
+  margin: 0;
+  padding: 0 var(--space-3);
+  align-items: center;
+  border-top: 1px solid var(--color-edge);
+  background: var(--color-surface);
+  font-size: 14px;
+  white-space: nowrap;
+}
+
+/* Only the words give way (an ellipsis); Show and Reveal stay whole. */
+.canvas-status > span {
+  display: flex;
+  min-width: 0;
+  gap: var(--space-1);
+}
+
+.canvas-status .status-text {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.canvas-status .link {
+  flex: none;
+}
+
+/* The zoom buttons rise above the sheet or rail always; while the status bar shows they sit in its row, ahead of its text. */
+.canvas .react-flow__controls {
+  margin-bottom: calc(var(--status-lift, 0px) + var(--status-gap, var(--space-3)));
+}
+
+.canvas:has(.canvas-status) .canvas-status {
+  padding-left: 124px;
+}
+
+.canvas:has(.canvas-status) {
+  --status-gap: 4px;
+}
+
+@media (min-width: 720px) and (max-width: 1099px) {
+  .frame[data-inspector="folded"] .canvas {
+    --status-lift: 24px;
+  }
+
+  .frame[data-inspector="on"] .canvas {
+    --status-lift: var(--sheet-h, var(--sheet-half));
+  }
+
+  .frame[data-inspector="on"]:has(.inspector[data-snap="full"]) .canvas {
+    --status-lift: var(--sheet-h, var(--sheet-full));
+  }
+}
+
+@media (max-width: 719px) {
+  .frame[data-map="open"][data-inspector="folded"] .canvas {
+    --status-lift: 24px;
+  }
+
+  .frame[data-map="open"][data-inspector="on"] .canvas {
+    --status-lift: var(--sheet-h, var(--sheet-half));
+  }
+
+  .frame[data-map="open"][data-inspector="on"]:has(.inspector[data-snap="full"]) .canvas {
+    --status-lift: var(--sheet-h, var(--sheet-full));
+  }
+}
+
+.canvas-status .link {
   min-height: 0;
   padding: 0;
   border: 0;
@@ -250,47 +330,36 @@
   position: relative;
 }
 
-/* An open container is a frame: a header band across the top, and its children on the sunken body below. */
+/* An open container is a frame: its children sit on the paper below its head, which a rule in the frame's colour ends. */
 .node-container {
-  border-color: var(--color-frame);
-  background:
+  --container-paper:
+    var(--tick) left 3px top 3px / 8px 1px no-repeat,
+    var(--tick) left 3px top 3px / 1px 8px no-repeat,
+    var(--tick) right 3px top 3px / 8px 1px no-repeat,
+    var(--tick) right 3px top 3px / 1px 8px no-repeat,
     var(--tick) left 3px bottom 3px / 8px 1px no-repeat,
     var(--tick) left 3px bottom 3px / 1px 8px no-repeat,
     var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
     var(--tick) right 3px bottom 3px / 1px 8px no-repeat,
-    var(--color-sunken);
+    color-mix(in srgb, var(--color-surface) 55%, transparent);
+  border-color: var(--color-frame);
+  background: var(--container-paper);
 }
 
-/* The band holds the container's kind, title, progress, state and fold control in one row, the date and marker under it. */
-.node-inner.node-band {
+/* The rule is the frame's own stroke: the colour and width of its border (which a trace mark recolours and far zoom thickens), 2px with the selection's. */
+.node-container > .node-inner {
+  border-bottom: 1px solid;
+  border-bottom-color: inherit;
+  border-bottom-width: inherit;
+}
+
+.node-container:is(.node-selected, .node-picked) > .node-inner {
+  border-bottom: 2px solid var(--color-accent);
+}
+
+.node-marker-row {
+  height: 31px;
   padding: 0 12px;
-  gap: 4px;
-  background: var(--color-band);
-  border-bottom: 1px solid var(--color-frame);
-}
-
-.node-inner.node-band:has(> :nth-child(2)) {
-  padding-bottom: 10px;
-}
-
-.node-band .node-head {
-  height: 52px;
-}
-
-.node-band .node-head > .node-title {
-  flex: 1 1 0;
-  min-width: 0;
-}
-
-.node-band .node-body-line {
-  flex: none;
-  height: 24px;
-  line-height: 24px;
-}
-
-.node-band .node-title > *,
-.node-band .node-open {
-  -webkit-line-clamp: 1;
 }
 
 .node-inner {
@@ -379,6 +448,24 @@
 .node-open:hover,
 .node-open:focus-visible {
   text-decoration: underline;
+}
+
+/* Keyboard focus only, as a square 2px accent ring drawn inside (the title's box clips an outside one); a click leaves none. */
+.node-open {
+  outline: none;
+  border-radius: 0;
+}
+
+.node-open:focus-visible {
+  box-shadow: inset 0 0 0 2px var(--color-accent);
+}
+
+/* Forced colours drop box shadows: the ring is an outline there. */
+@media (forced-colors: active) {
+  .node-open:focus-visible {
+    outline: 2px solid Highlight;
+    outline-offset: -2px;
+  }
 }
 
 .node-control {
@@ -537,6 +624,15 @@
     var(--shadow-sm);
 }
 
+/* A selected container is the 2px accent frame and the tint over its whole body, head included; only it is tinted: what it holds keeps its trace marks. */
+.node-container.node-selected,
+.node-container.node-picked {
+  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--container-paper);
+  box-shadow:
+    inset 0 0 0 2px var(--color-accent),
+    var(--shadow-sm);
+}
+
 /* An edge being hovered ends here: both ends get an ink outline. */
 .node-edge-end {
   outline: 1px solid var(--color-text);
@@ -546,11 +642,6 @@
 .node .hang-tag {
   font-size: 12px;
   line-height: 20px;
-}
-
-.node-origin.hang-tag {
-  right: auto;
-  left: 8px;
 }
 
 /* A diff's tag keeps its size on screen however far out the view is, so the word is always readable. */
@@ -680,20 +771,9 @@
   padding-right: 72px;
 }
 
-/* A container's header band keeps its row, with the title and the controls only. */
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-band .node-head {
-  display: flex;
-  position: static;
-  flex: 1 1 0;
-  height: auto;
-}
-
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-band .node-head > :not(.node-title, .node-control) {
-  display: none;
-}
-
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-band .node-head > .node-title {
-  display: block;
+/* A container's head shows only its title, and the marker under the rule goes; the rule stays. */
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-marker-row {
+  visibility: hidden;
 }
 
 .react-flow:is([data-lod="mid"], [data-lod="far"]) .node-glyph {
@@ -704,7 +784,6 @@
   flex: 1 1 0;
   min-height: 0;
   height: auto;
-  overflow: hidden;
 }
 
 .react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title {
@@ -712,16 +791,28 @@
   line-height: 1.15;
 }
 
+/* A title breaks only between words and shows whole lines: the line count is what the room holds at the fit size, the rest ends in an ellipsis. */
 .react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title > * {
+  overflow-wrap: normal;
+  word-break: normal;
+  -webkit-line-clamp: var(--title-fit-lines, 2);
+}
+
+/* A word wider than the room even at the reading size is cut with an ellipsis on one line, not through its letters. */
+.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title-row[data-cut] .node-title > * {
   display: block;
-  max-height: 100%;
   overflow: hidden;
-  -webkit-line-clamp: unset;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Corner ticks are too small to see far out; the hairline stays, thickened so it is 1px on screen. */
 .react-flow[data-lod="far"] .node {
   border-width: max(1px, calc(1px / var(--z, 1)));
+}
+
+.react-flow[data-lod="far"] .node-container:is(.node-selected, .node-picked) > .node-inner {
+  border-bottom-width: max(2px, calc(1px / var(--z, 1)));
 }
 
 .react-flow[data-lod="far"] .node:not(.node-container) {
@@ -733,16 +824,19 @@
 .line .react-flow__edge-path {
   fill: none;
   stroke: var(--color-secondary);
-  stroke-width: 1px;
+  stroke-width: 1.5px;
   vector-effect: non-scaling-stroke;
 }
 
-.line-satisfied .react-flow__edge-path {
-  stroke: var(--color-border);
+/* A line that is dotted says so in its dashes (an implicit edge, or one that holds dates only), never in a wash or a thinner stroke: its dashes are as long as the stroke is wide, so it weighs as much as a solid one, and a lit one has the heavier stroke and longer dashes. The pattern is in layout units, so it is divided by the zoom to stay the same on screen. */
+.line[data-dash="2 3"] .react-flow__edge-path {
+  stroke-dasharray: calc(2px / var(--z, 1)) calc(3px / var(--z, 1));
 }
 
-.line-dates .react-flow__edge-path {
-  stroke-opacity: 0.5;
+.line-lit-ink[data-dash="2 3"] .react-flow__edge-path,
+.line-lit-accent[data-dash="2 3"] .react-flow__edge-path,
+.line-lit-lit[data-dash="2 3"] .react-flow__edge-path {
+  stroke-dasharray: calc(3px / var(--z, 1)) calc(4px / var(--z, 1));
 }
 
 .line-marker {
@@ -761,13 +855,7 @@
   stroke-width: 2px;
 }
 
-.line-satisfied .line-marker {
-  stroke: var(--color-border);
-}
 
-.line-satisfied.line-requires .line-marker {
-  fill: var(--color-border);
-}
 
 .line-count {
   fill: var(--color-secondary);
@@ -777,7 +865,7 @@
 /* Hovering a line thickens it to ink; selecting one marks it in the accent. */
 .react-flow__edge:hover .line .react-flow__edge-path {
   stroke: var(--color-text);
-  stroke-width: 1.5px;
+  stroke-width: 2.5px;
 }
 
 .react-flow__edge:hover .line .line-marker {
@@ -798,11 +886,12 @@
   fill: var(--color-accent);
 }
 
-/* A trace colours the lines it runs along: upstream in ink, downstream in the accent, a finished upstream line faint. */
+/* A trace colours the lines it runs along: upstream in ink, downstream in the accent. */
 .line-lit-ink .react-flow__edge-path,
 .line-lit-ink .line-marker {
   stroke: var(--color-text);
-  stroke-width: 1.5px;
+  stroke-opacity: 1;
+  stroke-width: 2.5px;
 }
 
 .line-lit-ink.line-requires .line-marker {
@@ -814,7 +903,8 @@
 .line-lit-lit .react-flow__edge-path,
 .line-lit-lit .line-marker {
   stroke: var(--color-accent);
-  stroke-width: 1.5px;
+  stroke-opacity: 1;
+  stroke-width: 2.5px;
 }
 
 .line-lit-accent.line-requires .line-marker,
@@ -843,17 +933,10 @@
   fill: var(--color-error);
 }
 
-.line-lit-faint .react-flow__edge-path,
-.line-lit-faint .line-marker {
-  stroke: var(--color-border);
-}
 
-.line-lit-faint.line-requires .line-marker {
-  fill: var(--color-border);
-}
-
+/* A faded line stays readable (a thin line loses more to the fade than a card does), but subordinate. */
 .line-faded {
-  opacity: 0.3;
+  opacity: 0.5;
 }
 
 .stalled {

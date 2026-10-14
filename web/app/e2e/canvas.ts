@@ -1,6 +1,6 @@
 // What the canvas's browser tests and proofs share: the lines a canvas draws, read the way the
 // page shows them, and its viewport.
-import type { Locator, Page } from "@playwright/test";
+import { expect, type Locator, type Page } from "@playwright/test";
 
 /** A card's line on the canvas, from `from` to `to`. */
 export function lineBetween(page: Page, from: string, to: string) {
@@ -20,4 +20,17 @@ export async function viewportOf(page: Page): Promise<{ x: number; y: number; zo
   const style = (await page.locator(".react-flow__viewport").getAttribute("style")) ?? "";
   const [x = 0, y = 0] = /translate\(([-\d.]+)px, ([-\d.]+)px\)/.exec(style)?.slice(1).map(Number) ?? [];
   return { x, y, zoom: Number(/scale\(([\d.]+)\)/.exec(style)?.[1] ?? 1) };
+}
+
+/** Waits for the viewport to stop moving (a layout change refits it with an animation). */
+export async function viewportSettled(page: Page): Promise<void> {
+  let last = "";
+  await expect
+    .poll(async () => {
+      const now = JSON.stringify(await viewportOf(page));
+      const still = now === last;
+      last = now;
+      return still;
+    })
+    .toBe(true);
 }

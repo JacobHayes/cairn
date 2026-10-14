@@ -7,6 +7,24 @@ import { useEffect, useRef } from "react";
 import { Button } from "../ui/kit.tsx";
 import { KEY_BINDINGS } from "./keys.ts";
 
+/** The bindings as a table, for the sheet and the rail's hint. */
+export function KeyTable() {
+  return (
+    <table className="data">
+      <tbody>
+        {KEY_BINDINGS.map((binding) => (
+          <tr key={binding.keys}>
+            <td>
+              <kbd>{binding.keys}</kbd>
+            </td>
+            <td>{binding.words}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  );
+}
+
 export function KeySheet({ onClose }: { onClose: () => void }) {
   const sheet = useRef<HTMLDialogElement>(null);
   useEffect(() => {
@@ -43,18 +61,7 @@ export function KeySheet({ onClose }: { onClose: () => void }) {
           <span className="spacer" />
           <Button onClick={onClose}>Close</Button>
         </span>
-        <table className="data">
-          <tbody>
-            {KEY_BINDINGS.map((binding) => (
-              <tr key={binding.keys}>
-                <td>
-                  <kbd>{binding.keys}</kbd>
-                </td>
-                <td>{binding.words}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <KeyTable />
         <span className="muted small">Keys never fire while a field has focus.</span>
       </div>
     </dialog>

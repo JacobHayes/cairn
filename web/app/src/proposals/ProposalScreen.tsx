@@ -20,7 +20,7 @@ import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
 import { ShortfallView } from "../detail/ShortfallView.tsx";
 import { RejectionView } from "../screens/RejectionView.tsx";
-import { addedRoles, insertionOrigins, noteOrigins } from "../segments/model.ts";
+import { addedRoles, insertionMembers, noteOrigins } from "../segments/model.ts";
 import { useSegmentNames } from "../segments/read.ts";
 import { Inspector } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
@@ -309,7 +309,6 @@ interface Model {
   diff: GraphDiff;
   marks: Record<string, DiffMark>;
   /** C19: the insertions it adds, named on their root cards and by member, and the roles it adds. */
-  origins: ReturnType<typeof insertionOrigins>;
   rolesAdded: ReturnType<typeof addedRoles>;
   entries: ReviewEntry[];
   counts: Record<ReviewFilter, number>;
@@ -332,8 +331,8 @@ function useReviewModel({ review, ready, before, deployment }: BodyProps, draft:
   const known = after !== undefined;
   const diff = useMemo(() => (known ? graphDiff(before, after) : NOTHING_COMPARED), [known, before, after]);
   const nameOf = useSegmentNames();
-  const origins = useMemo(() => insertionOrigins(before, after, nameOf), [before, after, nameOf]);
-  const marks = useMemo(() => noteOrigins(diffMarks(diff, draft.items ?? []), origins.members), [diff, draft.items, origins]);
+  const members = useMemo(() => insertionMembers(before, after, nameOf), [before, after, nameOf]);
+  const marks = useMemo(() => noteOrigins(diffMarks(diff, draft.items ?? []), members), [diff, draft.items, members]);
   const added = useMemo<Graph>(() => ({ nodes: (draft.mutations ?? []).flatMap((mutation) => (mutation.op === "add_node" ? [mutation.node] : [])) }), [draft.mutations]);
   const structure = useMemo<Graph>(() => after ?? before ?? { nodes: [] }, [after, before]);
   return {
@@ -346,7 +345,6 @@ function useReviewModel({ review, ready, before, deployment }: BodyProps, draft:
     after,
     diff,
     marks,
-    origins,
     rolesAdded: useMemo(() => addedRoles(before, after), [before, after]),
     entries: useMemo(() => reviewEntries(diff, marks, before), [diff, marks, before]),
     counts: useMemo(() => filterCounts(marks, diff), [marks, diff]),
@@ -528,7 +526,7 @@ function Workspace({ model, filter, listed, selected, domain, deployment, onPick
   if (listed) {
     return model.known ? <ReviewList entries={model.entries} diff={model.diff} names={model.names} filter={filter} selected={selected} onPick={onPick} /> : <NoGraphAfter preview={model.preview} />;
   }
-  return model.graphs.length === 0 ? <NoGraphAfter preview={model.preview} /> : <ProposalCanvas domain={domain} graphs={model.graphs} marks={kept} edges={model.diff} origins={model.origins.roots} dim={filter !== "all"} deployment={deployment} today={model.today} selected={selected} onPick={onPick} />;
+  return model.graphs.length === 0 ? <NoGraphAfter preview={model.preview} /> : <ProposalCanvas domain={domain} graphs={model.graphs} marks={kept} edges={model.diff} dim={filter !== "all"} deployment={deployment} today={model.today} selected={selected} onPick={onPick} />;
 }
 
 function ReviewBody(props: BodyProps) {

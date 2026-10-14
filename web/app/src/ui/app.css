@@ -8,9 +8,8 @@
 :root {
   --rail-w: 200px;
   --inspector-w: 400px;
-  --strip-h: 28px;
   --fold-w: 32px; /* the hidden inspector's rail */
-  /* The sheet's two heights. The tall one leaves room above it for a notice: a window's worth, less the strip and a notice. */
+  /* The sheet's two heights. The tall one leaves room above it for a notice: a window's worth, less a notice. */
   --sheet-half: 40dvh;
   --sheet-full: min(85dvh, calc(100dvh - 160px));
 }
@@ -75,16 +74,12 @@ body {
   display: grid;
   height: 100dvh;
   grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--inspector-w);
-  grid-template-rows: minmax(0, 1fr) var(--strip-h);
-  grid-template-areas:
-    "rail work insp"
-    "rail strip strip";
+  grid-template-rows: minmax(0, 1fr);
+  grid-template-areas: "rail work insp";
 }
 .frame[data-inspector="off"] {
   grid-template-columns: var(--rail-w) minmax(0, 1fr);
-  grid-template-areas:
-    "rail work"
-    "rail strip";
+  grid-template-areas: "rail work";
 }
 .frame[data-inspector="folded"] {
   grid-template-columns: var(--rail-w) minmax(0, 1fr) var(--fold-w);
@@ -169,23 +164,43 @@ body {
   border-top: 0;
 }
 
-/* The status strip: chrome, 28px, with the sync chip on its right. It does not clip: the chip's popover opens upward from it. */
-.frame > .strip {
-  grid-area: strip;
-  background: var(--chrome-bg);
-  flex-wrap: nowrap;
-  white-space: nowrap;
+/* The shortcuts hint at the rail's foot: quiet text, its key list a fixed popover beside the rail. */
+.rail-foot {
+  display: flex;
+  align-items: center;
 }
-.strip kbd {
-  background: transparent;
+.rail-foot > a {
+  flex: 1;
 }
+.keys-hint-button {
+  width: 24px;
+  min-height: 24px;
+  padding: 0;
+  border-color: transparent;
+  color: var(--chrome-muted);
+  font: 500 12.5px / 1 var(--font-mono);
+}
+.keys-hint-button:hover {
+  color: var(--chrome-ink);
+  border-color: transparent;
+}
+.keys-hint-button:focus-visible {
+  color: var(--chrome-ink);
+  outline: 2px solid var(--chrome-muted);
+  outline-offset: 2px;
+}
+.keys-popover {
+  position: fixed;
+  width: min(360px, calc(100vw - 24px));
+}
+
+/* The sync dot sits beside the brand at the top of the rail; its popover is fixed (placed from the dot's box) so the rail's scroller does not clip it. */
 .sync-wrap {
   position: relative;
   display: inline-flex;
 }
 .sync-popover {
-  right: 0;
-  bottom: calc(100% + var(--space-2));
+  position: fixed;
   width: 360px;
   font: 400 14px / 1.5 var(--font-body);
   letter-spacing: 0;
@@ -272,8 +287,12 @@ body {
   display: none;
 }
 .inspector-rail:hover {
-  background: var(--color-hover);
   color: var(--chrome-ink);
+  border-color: transparent;
+}
+.inspector-rail:focus-visible {
+  outline: 2px solid var(--chrome-muted);
+  outline-offset: -2px;
 }
 /* ...and the column's is a rail on the right edge: a chevron over a vertical label. */
 @media (min-width: 1100px) {
@@ -310,7 +329,11 @@ body {
 }
 .inspector-head button.ghost:hover {
   color: var(--chrome-ink);
-  border-color: var(--chrome-border);
+  border-color: transparent;
+}
+.inspector-head button.ghost:focus-visible {
+  outline: 2px solid var(--chrome-muted);
+  outline-offset: 2px;
 }
 /* The phone's stack is under the page and cannot be hidden. */
 .inspector-head .hide {
@@ -435,9 +458,7 @@ body {
   .frame,
   .frame[data-inspector="off"] {
     grid-template-columns: var(--rail-w) minmax(0, 1fr);
-    grid-template-areas:
-      "rail work"
-      "rail strip";
+    grid-template-areas: "rail work";
   }
   .frame > .inspector {
     position: fixed;
@@ -445,7 +466,7 @@ body {
     top: auto;
     left: var(--rail-w);
     right: 0;
-    bottom: var(--strip-h);
+    bottom: 0;
     height: var(--sheet-h, var(--sheet-half));
     border-left: 0;
     border-top: 1px solid var(--chrome-border);
@@ -479,7 +500,7 @@ body {
 }
 
 /* Below 720px: one column the document scrolls. The rail is a top bar, the inspector stacks under the
-   workspace, the strip sticks to the bottom, and the map is a preview that opens full screen. */
+   workspace, and the map is a preview that opens full screen. */
 @media (max-width: 719px) {
   html,
   body,
@@ -492,16 +513,12 @@ body {
   html:has(.frame[data-map="open"]) {
     overflow: hidden;
   }
-  /* A short page still ends with the strip at the screen's bottom edge. */
   .frame,
   .frame[data-inspector="off"] {
     display: flex;
     flex-direction: column;
     height: auto;
     min-height: 100dvh;
-  }
-  .frame > .strip {
-    margin-top: auto;
   }
   .frame > .rail {
     overflow-y: visible;
@@ -544,11 +561,6 @@ body {
   .inspector-body {
     overflow: visible;
   }
-  .frame > .strip {
-    position: sticky;
-    bottom: 0;
-    z-index: 10;
-  }
   .frame[data-map="open"] > .inspector {
     display: flex;
     position: fixed;
@@ -573,6 +585,7 @@ body {
   }
   /* Hidden over the map, the sheet is the same slim bar as a tablet's. */
   .frame[data-map="open"] > .inspector[data-folded="true"] {
+    width: auto;
     height: 24px;
     box-shadow: none;
   }
@@ -582,7 +595,7 @@ body {
 }
 
 /* ---- the toast and callouts ------------------------------------------------------------------- */
-/* A confirmation that is not about syncing rises at the workspace's bottom right, above the strip, so it never covers the sync chip. */
+/* A confirmation that is not about syncing rises at the workspace's bottom right, above any sheet. */
 .toasts {
   position: absolute;
   right: var(--space-3);
@@ -796,7 +809,6 @@ input[type="radio"] {
   }
   .rail,
   .inspector,
-  .strip,
   .banner,
   .toasts,
   .journey-toolbar,

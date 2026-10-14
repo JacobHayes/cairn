@@ -53,8 +53,6 @@ export interface CanvasSettings {
   notRelevant: boolean;
   undecided: boolean;
   lens: Lens | undefined;
-  /** View, Show origins (5.5): each card says where its node came from. */
-  origins: boolean;
 }
 
 /** Q3: conditional nodes are drawn ghosted; only the settled not-relevant ones are hidden. */
@@ -67,7 +65,6 @@ export const DEFAULT_SETTINGS: CanvasSettings = {
   notRelevant: false,
   undecided: true,
   lens: undefined,
-  origins: false,
 };
 
 export type Tone = "plain" | "good" | "warn" | "bad";
@@ -162,8 +159,6 @@ export interface CardState {
   signals: Signals;
   /** C5: a stage holding the acting frontier or active work, which the Stages step opens (5.1). */
   current: boolean;
-  /** Where the node came from (PRD glossary, Provenance). */
-  origin: "from_route" | "local" | "orphaned" | "from_segment";
 }
 
 /** How an edge is drawn (5.6), strongest first: a requirement, a condition gate, a stage opening, or dates alone. */
@@ -239,21 +234,69 @@ function kindOf(edge: Schema<"UnderlyingEdge">): LineKind {
   return edge.origin === "explicit" ? "requires" : edge.origin;
 }
 
-/** C1: the level's edges as lines, each saying in words what it stands for. */
+/**
+ * The card that stands for node `key` on a level: the card itself, the card it is rolled up into,
+ * or else the nearest card holding it (a folded container, or a drawn ancestor); none when nothing
+ * drawn stands for it.
+ */
+function standIn(level: Level, nodes: Nodes): (key: string) => string | undefined {
+  const cards = new Map(level.nodes.flatMap((at) => [at.key, ...(at.rolled_up ?? [])].map((key) => [key, at.key] as const)));
+  return (key) => {
+    const seen = new Set<string>();
+    for (let at: string | null | undefined = key; at != null && !seen.has(at); at = nodes.get(at)?.parent) {
+      seen.add(at);
+      const card = cards.get(at);
+      if (card !== undefined) {
+        return card;
+      }
+    }
+    return undefined;
+  };
+}
+
+/** Whether card `inner` sits somewhere inside card `outer`, given each card's parent. */
+function inside(parents: Map<string, string | null | undefined>, inner: string, outer: string): boolean {
+  for (let at = parents.get(inner); at != null; at = parents.get(at)) {
+    if (at === outer) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/**
+ * C1: the level's edges as lines, each saying in words what it stands for. An edge whose end is
+ * hidden is drawn to the card that stands for it (where it is rolled up, or the container folded
+ * over it); one that then joins a card to itself or to a card around it (a node's requirement on
+ * its own child) is not drawn, and edges that land between the same two cards are one line. A line
+ * never ends where no card is.
+ */
 export function linesOf(level: Level, graph: GraphNode[], finished?: (key: string) => boolean): Line[] {
   const nodes = nodesOf(graph);
-  return level.edges.map((edge) => {
-    const kind = edge.underlying.map(kindOf).reduce<LineKind>((best, each) => (STRENGTH[each] > STRENGTH[best] ? each : best), "dates");
-    const strongest = edge.underlying.filter((each) => kindOf(each) === kind).map((each) => sentenceOf(each, nodes, graph));
+  const cardFor = standIn(level, nodes);
+  const parents = new Map(level.nodes.map((at) => [at.key, at.parent]));
+  const joined = new Map<string, { from: string; to: string; underlying: Schema<"UnderlyingEdge">[]; implicit: boolean }>();
+  for (const edge of level.edges) {
+    const [from, to] = [cardFor(edge.from), cardFor(edge.to)];
+    if (from === undefined || to === undefined || from === to || inside(parents, from, to) || inside(parents, to, from)) {
+      continue;
+    }
+    const id = `${from}->${to}`;
+    const before = joined.get(id);
+    joined.set(id, { from, to, underlying: [...(before?.underlying ?? []), ...edge.underlying], implicit: (before?.implicit ?? true) && edge.implicit === true });
+  }
+  return [...joined.entries()].map(([id, line]) => {
+    const kind = line.underlying.map(kindOf).reduce<LineKind>((best, each) => (STRENGTH[each] > STRENGTH[best] ? each : best), "dates");
+    const strongest = line.underlying.filter((each) => kindOf(each) === kind).map((each) => sentenceOf(each, nodes, graph));
     return {
-      id: `${edge.from}->${edge.to}`,
-      from: edge.from,
-      to: edge.to,
-      implicit: edge.implicit === true,
-      gates: edge.gates,
+      id,
+      from: line.from,
+      to: line.to,
+      implicit: line.implicit,
+      gates: line.underlying.some((each) => each.gates),
       kind,
-      count: edge.underlying.length,
-      ...(finished === undefined ? {} : { satisfied: edge.underlying.every((each) => !each.gates || finished(each.requirement)) }),
+      count: line.underlying.length,
+      ...(finished === undefined ? {} : { satisfied: line.underlying.every((each) => !each.gates || finished(each.requirement)) }),
       sentence: `${strongest.slice(0, 2).join("; ")}${strongest.length > 2 ? `; and ${String(strongest.length - 2)} more` : ""}`,
     };
   });

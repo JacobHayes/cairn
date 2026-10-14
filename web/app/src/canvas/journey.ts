@@ -164,7 +164,6 @@ function cardState(context: Context, node: GraphNode, at: LevelNode): CardState 
     rank,
     signals: signalsOf(context, node, derived, at, rank, finished),
     current: context.current.has(node.key) && isStage(node),
-    origin: recordOf(view, node).provenance,
   };
 }
 

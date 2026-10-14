@@ -34,8 +34,8 @@ export interface OverlayMark {
   ghost?: true;
 }
 
-/** How a line is lit: ink (upstream) or accent (downstream), faint when it is a finished upstream line, lit for a card a diff marks, or add or remove for a requirement the diff adds or removes. */
-export type LineMark = "ink" | "accent" | "faint" | "lit" | "add" | "remove";
+/** How a line is lit: ink (upstream) or accent (downstream), lit for a card a diff marks, or add or remove for a requirement the diff adds or removes. */
+export type LineMark = "ink" | "accent" | "lit" | "add" | "remove";
 
 /** A layer over a canvas: marks by card, lines it lights, and what it marks off this canvas. */
 export interface CanvasOverlay {
@@ -85,29 +85,17 @@ function markOf(card: Card, trace: Trace, sets: { up: Set<string>; down: Set<str
 }
 
 /**
- * C7: the trace of one node over a canvas: its upstream ("needs", in ink) and downstream
- * ("unblocks", in the accent), terminal and not-relevant nodes included, marked on the cards that
- * stand for them, with the gravity contributors dotted and the lines along either direction (a
- * finished upstream line faint, so what is still in the way stands out).
+ * C7: the trace of one node over a canvas, its tags and its lines. A line is upstream (ink) when
+ * its source is needed and its target is needed or holds something needed (the node itself
+ * included, so the containers around it count); downstream (accent) when its target is unblocked
+ * and its source is unblocked or holds something unblocked; any other line rests. Rolled-up ends
+ * follow their card's marks, and a line's kind or finished state never matters.
  */
 export function traceOverlay(trace: Trace, model: CanvasModel, title: string): CanvasOverlay {
   const sets = { up: new Set(trace.upstream), down: new Set(trace.downstream), contributors: new Set(trace.gravity_contributors) };
   const marks: Record<string, OverlayMark> = {};
-  // A selected container's own members are not tagged: they are what it is made of, and its outline
-  // stands for them. Their lines to the cards outside it are still lit. (A leaf rolled up into a
-  // container is not a selected container: its neighbours are traced as usual.)
-  const cardOf = new Map(model.cards.map((card) => [card.key, card]));
-  const inside = (card: Card): boolean => {
-    for (let at = cardOf.get(card.parent ?? ""); at !== undefined; at = cardOf.get(at.parent ?? "")) {
-      if (at.key === trace.node) {
-        return true;
-      }
-    }
-    return false;
-  };
-  const members = new Set(model.cards.filter(inside).map((card) => card.key));
   for (const card of model.cards) {
-    const mark = members.has(card.key) ? { tone: "accent" as const, label: TRACE_LABELS.traced, quiet: true as const } : markOf(card, trace, sets);
+    const mark = markOf(card, trace, sets);
     if (mark !== undefined) {
       marks[card.key] = mark;
     }
@@ -115,14 +103,27 @@ export function traceOverlay(trace: Trace, model: CanvasModel, title: string): C
   const label = (key: string) => marks[key]?.label;
   const upward = (key: string) => label(key) === TRACE_LABELS.needs || label(key) === TRACE_LABELS.traced || label(key) === TRACE_LABELS.both;
   const downward = (key: string) => label(key) === TRACE_LABELS.unblocks || label(key) === TRACE_LABELS.traced || label(key) === TRACE_LABELS.both;
+  // A card carries a side of the trace when it, or a card inside it, is on that side; the traced
+  // card is on both, so the containers around it carry both.
+  const parentOf = new Map(model.cards.map((card) => [card.key, card.parent]));
+  const carriers = (onSide: (key: string) => boolean) => {
+    const carrying = new Set<string>();
+    for (const card of model.cards.filter((each) => onSide(each.key))) {
+      for (let at: string | undefined = card.key; at !== undefined && !carrying.has(at); at = parentOf.get(at)) {
+        carrying.add(at);
+      }
+    }
+    return carrying;
+  };
+  const [upCarriers, downCarriers] = [carriers(upward), carriers(downward)];
   const lines: Record<string, LineMark> = {};
   for (const line of model.lines) {
     if (label(line.from) === TRACE_LABELS.traced && label(line.to) === TRACE_LABELS.traced) {
       continue;
     }
-    if (upward(line.from) && upward(line.to)) {
-      lines[line.id] = line.satisfied === true ? "faint" : "ink";
-    } else if (downward(line.from) && downward(line.to)) {
+    if (upward(line.from) && upCarriers.has(line.to)) {
+      lines[line.id] = "ink";
+    } else if (downCarriers.has(line.from) && downward(line.to)) {
       lines[line.id] = "accent";
     }
   }

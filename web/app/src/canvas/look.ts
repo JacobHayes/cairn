@@ -1,5 +1,5 @@
 // How cards and lines look, as data the components apply (C1, C5, C7): requirements solid with
-// an arrowhead, gates dotted with their own end marker, waiting lines in steel and satisfied
+// an arrowhead, gates dotted with their own end marker, lines in steel and satisfied
 // ones grey; not-relevant cards hollow and conditional ones ghosted, "I am here" outlined in ink,
 // finished work receding, and an overlay's tags and the one fade level. Quiet by rule: nothing
 // animates or flashes (C6). Pure, so the unit tests read the same decisions the canvas draws.
@@ -28,7 +28,7 @@ export interface LineLook {
 
 /**
  * C1: a line solid when a requirement stands behind it and dotted otherwise (a condition gate,
- * a stage opening, a link that holds dates only), steel while it waits and grey once satisfied,
+ * a stage opening, a link that holds dates only), steel, waiting or satisfied,
  * lit by an overlay in the colour of its direction, and faded to the one level when an overlay
  * dims what it does not light (or when `faded`, a filter's).
  */

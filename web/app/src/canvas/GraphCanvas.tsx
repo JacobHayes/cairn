@@ -14,11 +14,12 @@ import "./canvas.css";
 import { Controls, ReactFlow, ReactFlowProvider, useNodesInitialized, useReactFlow, useStore, useStoreApi, type EdgeChange, type NodeChange } from "@xyflow/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 
+import { keepViewport, keptViewport } from "../journeys/kept.ts";
 import { PHONE_WIDTH, SHEET, useFrameState } from "../shell/frame.tsx";
 import { useResolvedTheme } from "../ui/theme.ts";
 import { ContextMenu } from "../ui/ContextMenu.tsx";
 import { typing } from "../ui/typing.ts";
-import { bandHeight, cardRows } from "./cards.ts";
+import { headHeight } from "./cards.ts";
 import { EdgeLine, type LineEdge } from "./EdgeLine.tsx";
 import { NEAR_ZOOM, bandOf, fitZoom, listenPinch, minZoomOf } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
@@ -53,8 +54,6 @@ export interface GraphCanvasProps {
   layout: Layout;
   overlay: CanvasOverlay | undefined;
   lens: Lens | undefined;
-  /** View, Show origins. */
-  origins?: boolean;
   /** Cards a filter fades; the trace decides instead while there is one. */
   faded?: ReadonlySet<string> | undefined;
   /** The cards to keep at full strength (the frontier lens): every other card fades, a container staying clear while any card in it is kept. None, or null, fades nothing. */
@@ -65,6 +64,8 @@ export interface GraphCanvasProps {
   actions: CardActions;
   /** What the canvas shows; the view fits the graph again when it changes. */
   viewKey: string;
+  /** The journey whose viewport is kept per `viewKey` for when the canvas is opened again (a visit to another view), not fitted afresh. */
+  keep?: string | undefined;
   /** The accessible name of the canvas. */
   label: string;
   /** What the map is of, as its full-screen bar shows it (the journey's name, not the label). */
@@ -73,6 +74,8 @@ export interface GraphCanvasProps {
   inScroller?: boolean;
   /** An edge was clicked, or reached with the keyboard and chosen. */
   onEdge?: ((line: Line) => void) | undefined;
+  /** The empty canvas was clicked (a pan or a lasso is not a click). */
+  onBackground?: (() => void) | undefined;
   /** The Select mode (5.9): shift-click and shift-drag pick cards. */
   selecting?: { picked: ReadonlySet<string>; onPicked: (keys: string[]) => void } | undefined;
   reveal?: Reveal | undefined;
@@ -88,6 +91,8 @@ export interface GraphCanvasProps {
 /** `inert`: the phone's preview, which takes no gesture and opens nothing (MapFrame). */
 interface FlowProps extends GraphCanvasProps {
   inert: boolean;
+  /** Picks up the viewport left at the last visit instead of fitting: only the first view this canvas shows, and only a live one. */
+  restore: boolean;
 }
 
 /** Whether a card is a container drawn open, with children to collapse. */
@@ -141,12 +146,11 @@ function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {
         faded: faded?.has(card.key) === true,
         selected: card.key === selected,
         picked: selecting?.picked.has(card.key) === true,
-        header: containers.has(card.key) ? bandHeight(cardRows(card)) : undefined,
+        header: containers.has(card.key) ? headHeight(card) : undefined,
         place: { x: Math.round(placed.x), y: Math.round(placed.y) },
         lens: chip === undefined || lens === undefined ? undefined : { chip, tier: tiers?.get(card.key) ?? 0, name: lens },
         edgeEnd: edgeEnds.has(card.key),
         collapsible: containers.has(card.key),
-        origins: props.origins === true,
       },
       draggable: false,
       // xyflow selects only for the Select mode's lasso; which node is open is ours (the address).
@@ -192,12 +196,25 @@ function boundsOf(model: CanvasModel, layout: Layout): { width: number; height: 
   return { width, height };
 }
 
+/** The height (px) the inspector's sheet or its folded rail lies over the canvas's lower part: a tablet's, or a phone map's. */
+function coveredBy(sheet: HTMLElement | null | undefined): number {
+  return sheet !== null && sheet !== undefined && (globalThis.matchMedia(SHEET).matches || globalThis.matchMedia(PHONE_WIDTH).matches) ? sheet.getBoundingClientRect().height : 0;
+}
+
+/** The padding a manual fit keeps, read when it runs: FIT_PADDING, and more at the bottom under the sheet or rail. */
+function useFitPadding(): () => typeof FIT_PADDING {
+  const sheet = useFrameState()?.inspector?.parentElement;
+  return useCallback(() => ({ ...FIT_PADDING, bottom: px(PAD.bottom + coveredBy(sheet)) }), [sheet]);
+}
+
 /**
  * On a tablet, and in a phone's full-screen map, the inspector is a sheet over the canvas's lower
- * part: a node picked is centred in the band the sheet leaves, so the selection is never under it.
+ * part: a node picked is centred in the band the sheet leaves, less the zones the floating controls
+ * keep (PAD), so the selection is never under the sheet and its neighbours clear the controls.
  */
 function useCenterAboveSheet(selected: string | undefined, live: boolean): void {
   const flow = useReactFlow();
+  const store = useStoreApi();
   const sheet = useFrameState()?.inspector?.parentElement;
   useEffect(() => {
     if (!live || selected === undefined || sheet === null || sheet === undefined || !(globalThis.matchMedia(SHEET).matches || globalThis.matchMedia(PHONE_WIDTH).matches)) {
@@ -213,7 +230,9 @@ function useCenterAboveSheet(selected: string | undefined, live: boolean): void 
       const { x, y } = card.internals.positionAbsolute;
       const zoom = flow.getZoom();
       const covered = sheet.getBoundingClientRect().height;
-      void flow.setCenter(x + (card.measured.width ?? 0) / 2, y + (card.measured.height ?? 0) / 2 + covered / 2 / zoom, { zoom });
+      const { width, height } = store.getState();
+      const at = { x: (PAD.left + width - PAD.right) / 2, y: (PAD.top + height - covered - PAD.bottom) / 2 };
+      void flow.setViewport({ zoom, x: at.x - (x + (card.measured.width ?? 0) / 2) * zoom, y: at.y - (y + (card.measured.height ?? 0) / 2) * zoom });
     });
     return () => {
       cancelAnimationFrame(frame);
@@ -225,6 +244,7 @@ function useCenterAboveSheet(selected: string | undefined, live: boolean): void 
 /** A find centres its result, and an expand or collapse fits the container (5.1): once the card is drawn as asked. */
 function useReveal(reveal: Reveal | undefined, model: CanvasModel, live: boolean): void {
   const flow = useReactFlow();
+  const padding = useFitPadding();
   const done = useRef<string | undefined>(undefined);
   useEffect(() => {
     if (!live || reveal === undefined || done.current === reveal.id) {
@@ -244,18 +264,19 @@ function useReveal(reveal: Reveal | undefined, model: CanvasModel, live: boolean
           void flow.setCenter(x + (card.measured.width ?? 0) / 2, y + (card.measured.height ?? 0) / 2, { zoom: Math.max(flow.getZoom(), 0.6) });
         }
       } else {
-        void flow.fitView({ nodes: [{ id: reveal.key }], padding: FIT_PADDING, maxZoom: 1 });
+        void flow.fitView({ nodes: [{ id: reveal.key }], padding: padding(), maxZoom: 1 });
       }
     });
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [reveal, model, live, flow]);
+  }, [reveal, model, live, flow, padding]);
 }
 
 /** Keys on the canvas: 1 to 4 pick a step, `f` fits the selection, or the whole graph with none. */
 function useCanvasKeys(props: FlowProps, live: boolean): void {
   const flow = useReactFlow();
+  const padding = useFitPadding();
   const { steps, onStep, selected } = props;
   useEffect(() => {
     if (!live) {
@@ -272,14 +293,14 @@ function useCanvasKeys(props: FlowProps, live: boolean): void {
           onStep?.(step);
         }
       } else if (event.key === "f") {
-        void flow.fitView(selected === undefined ? FIT : { nodes: [{ id: selected }], padding: FIT_PADDING, maxZoom: 1 });
+        void flow.fitView(selected === undefined ? { ...FIT, padding: padding() } : { nodes: [{ id: selected }], padding: padding(), maxZoom: 1 });
       }
     };
     document.addEventListener("keydown", onKey);
     return () => {
       document.removeEventListener("keydown", onKey);
     };
-  }, [flow, steps, onStep, selected, live]);
+  }, [flow, steps, onStep, selected, live, padding]);
 }
 
 /** The line under the pointer, and the chip that says what it is: where the pointer is only moves the chip, it never re-renders the cards. */
@@ -350,20 +371,40 @@ function useFirstFit(props: FlowProps, fit: number, live: boolean): void {
   const [initialized, sized] = [useNodesInitialized(), useStore((state) => state.width > 0 && state.height > 0)];
   const sheet = useFrameState()?.inspector?.parentElement;
   const done = useRef(false);
+  // Settled when this view mounts: a later render of the page must not turn a restore into a fit.
+  const [restore] = useState(props.restore);
+  // The preview is not a view to return to (it shares the full map's key and has no gestures to recover a pan).
+  const kept = props.keep === undefined || !live ? undefined : `${props.keep}/${props.viewKey}`;
+  useEffect(() => {
+    if (kept === undefined) {
+      return undefined;
+    }
+    return store.subscribe((state) => {
+      if (done.current) {
+        keepViewport(kept, { x: state.transform[0], y: state.transform[1], zoom: state.transform[2] });
+      }
+    });
+  }, [store, kept]);
   useEffect(() => {
     if (!initialized || !sized || done.current) {
       return;
     }
     done.current = true;
+    // A change of detail level is a new view, which fits; only coming back to the page restores.
+    const held = kept === undefined || !restore ? undefined : keptViewport(kept);
+    if (held !== undefined) {
+      void flow.setViewport(held);
+      return;
+    }
     const { width, height } = store.getState();
     // On a tablet the inspector's sheet lies over the canvas's lower part: fit into what it leaves.
-    const covered = sheet !== null && sheet !== undefined && globalThis.matchMedia(SHEET).matches ? sheet.getBoundingClientRect().height : 0;
+    const covered = coveredBy(sheet);
     const padding = { ...FIT_PADDING, bottom: px(PAD.bottom + covered) };
     const room = { width, height: height - covered };
     const groups = (live && fit < NEAR_ZOOM ? (props.focus ?? []) : []).map((keys) => props.model.cards.filter((card) => standsFor(card).some((key) => keys.includes(key))).map((card) => card.key)).filter((ids) => ids.length > 0);
     const near = groups.find((ids) => fitZoom(flow.getNodesBounds(ids), room, PAD) >= NEAR_ZOOM) ?? groups.at(-1);
     void flow.fitView(near === undefined ? { ...FIT, padding, minZoom: minZoomOf(fit) } : { nodes: near.map((id) => ({ id })), padding, minZoom: NEAR_ZOOM, maxZoom: 1 });
-  }, [initialized, sized, flow, store, fit, live, props.model, props.focus]);
+  }, [initialized, sized, flow, store, fit, live, props.model, props.focus, restore, kept]);
 }
 
 /** The zoom, as `--z` on the canvas root, so the far bands can set a title to a readable size on screen without the cards re-rendering. */
@@ -383,8 +424,13 @@ function useZoomVariable(root: RefObject<HTMLDivElement | null>): void {
 }
 
 /** What xyflow tells us was picked: the lasso's cards in the Select mode, or the edge chosen by click or key. */
-function useChanges({ selecting, model, selectedEdge, onEdge }: FlowProps) {
+function useChanges({ selecting, model, selectedEdge, onEdge, onBackground }: FlowProps, live: boolean) {
   return {
+    onPaneClick: () => {
+      if (live) {
+        onBackground?.();
+      }
+    },
     onNodesChange: (changes: NodeChange[]) => {
       if (selecting === undefined) {
         return;
@@ -485,6 +531,13 @@ function cardKeys(toggle: (key: string) => boolean, openMenu: ((key: string, at:
   };
 }
 
+/** The zoom buttons; Fit pads for the sheet or rail like the other fits. */
+function FitControls() {
+  const flow = useReactFlow();
+  const padding = useFitPadding();
+  return <Controls showInteractive={false} position="bottom-left" onFitView={() => void flow.fitView({ ...FIT, padding: padding() })} />;
+}
+
 function Flow(props: FlowProps) {
   const theme = useResolvedTheme();
   const live = !props.inert;
@@ -501,7 +554,7 @@ function Flow(props: FlowProps) {
   useCenterAboveSheet(props.selected, live);
   useReveal(props.reveal, props.model, live);
   useCanvasKeys(props, live);
-  const { onNodesChange, onEdgesChange } = useChanges(props);
+  const changes = useChanges(props, live);
   const toggle = toggleOf(props, live);
   const selecting = props.selecting;
   return (
@@ -521,8 +574,7 @@ function Flow(props: FlowProps) {
           {...inputOf(live, props.inScroller === true)}
           selectionKeyCode={selecting === undefined ? null : "Shift"}
           multiSelectionKeyCode={selecting === undefined ? null : "Shift"}
-          onNodesChange={onNodesChange}
-          onEdgesChange={onEdgesChange}
+          {...changes}
           onNodeClick={(event, node) => {
             if (live && !(selecting !== undefined && event.shiftKey)) {
               props.actions.open?.(node.id);
@@ -546,7 +598,7 @@ function Flow(props: FlowProps) {
           aria-label={props.label}
           data-lod={band}
         >
-          {live ? <Controls showInteractive={false} position="bottom-left" fitViewOptions={FIT} /> : null}
+          {live ? <FitControls /> : null}
           {live ? props.children : null}
         </ReactFlow>
         {hover === undefined ? null : <EdgeChip chip={chip} line={hover} />}
@@ -558,13 +610,18 @@ function Flow(props: FlowProps) {
 
 /** A graph's canvas: laid-out cards and lines, with pan and zoom (a preview on a phone, MapFrame). */
 export function GraphCanvas(props: GraphCanvasProps) {
+  // Only the first view this canvas shows may restore a kept viewport: later ones are changes of level or map.
+  const arriving = useRef(true);
+  useEffect(() => {
+    arriving.current = false;
+  }, []);
   return (
     <MapFrame title={props.title}>
       {(inert) => (
         <div className="canvas" data-testid="canvas" data-view={props.viewKey}>
           {/* A new view mounts a new flow, which fits the whole graph (C3); a revision keeps the viewport. */}
           <ReactFlowProvider key={props.viewKey}>
-            <Flow {...props} inert={inert} />
+            <Flow {...props} inert={inert} restore={arriving.current} />
           </ReactFlowProvider>
         </div>
       )}

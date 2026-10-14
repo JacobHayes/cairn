@@ -1,13 +1,14 @@
 // The app frame every screen renders inside (design 3.1): a chrome rail with the screens,
 // the workspace (the screen the router shows, its one scroller `.ws-body`), the inspector
-// column on the right (INSPECTOR | ASSISTANT; a bottom sheet on a tablet; a rail when hidden), and the 28px
-// strip with the sync chip. The frame is one `100dvh` grid with one scroller per
+// column on the right (INSPECTOR | ASSISTANT; a bottom sheet on a tablet; a rail when hidden). The sync dot sits
+// beside the brand at the top of the rail. The frame is one `100dvh` grid with one scroller per
 // region (app.css); below 720px it is one scrolling column.
 import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
 import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
 import { InspectorColumn } from "./InspectorColumn.tsx";
+import { KeysHint } from "./KeysHint.tsx";
 import { LoadFailure } from "./LoadFailure.tsx";
 import { SyncChip } from "./SyncChip.tsx";
 import { Toast } from "./Toast.tsx";
@@ -23,9 +24,12 @@ function Rail({ pathname }: { pathname: string }) {
   ];
   return (
     <aside className="rail">
-      <Link to="/" className="brand">
-        Cairn
-      </Link>
+      <div className="rail-head">
+        <Link to="/" className="brand">
+          Cairn
+        </Link>
+        <SyncChip />
+      </div>
       <nav aria-label="Screens">
         {screens.map(({ to, label, on }) => (
           <Link key={to} to={to} {...(on ? { "aria-current": "page" as const } : {})}>
@@ -33,21 +37,14 @@ function Rail({ pathname }: { pathname: string }) {
           </Link>
         ))}
         <span className="spacer" />
-        <Link to="/me" {...(pathname.startsWith("/me") ? { "aria-current": "page" as const } : {})}>
-          You
-        </Link>
+        <span className="rail-foot">
+          <Link to="/me" {...(pathname.startsWith("/me") ? { "aria-current": "page" as const } : {})}>
+            You
+          </Link>
+          <KeysHint />
+        </span>
       </nav>
     </aside>
-  );
-}
-
-/** The strip: the sync chip on the right. */
-function Strip() {
-  return (
-    <footer className="strip">
-      <span className="spacer" />
-      <SyncChip />
-    </footer>
   );
 }
 
@@ -83,7 +80,6 @@ export function Shell() {
             inspectorRef={frame.setInspector}
             assistantRef={frame.setAssistant}
           />
-          <Strip />
         </div>
       </FrameStateContext>
     </FrameActionsContext>

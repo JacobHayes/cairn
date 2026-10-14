@@ -38,14 +38,13 @@ const IN = "in";
 /** What is shown beyond the live nodes: `notrelevant` and `conditional` (C1). */
 const SHOW = "show";
 const LENS = "lens";
-const ORIGINS = "origins";
 const EDIT = "edit";
 const SELECT = "select";
 /** The full-screen map's address parameter (MapFrame), so Back closes it. */
 export const MAP = "map";
 
 /** The parameters the canvas reads; every other one is left to the toolbar and the page. */
-const OWN = new Set([DETAIL, OPEN, SHUT, KIND, IN, SHOW, LENS, ORIGINS, EDIT, SELECT, MAP]);
+const OWN = new Set([DETAIL, OPEN, SHUT, KIND, IN, SHOW, LENS, EDIT, SELECT, MAP]);
 
 /** The values of `name`, split on commas, empty when the parameter is there but holds none. */
 function listOf(params: URLSearchParams, name: string): string[] | undefined {
@@ -108,7 +107,6 @@ export function viewFrom(params: URLSearchParams): CanvasView {
     notRelevant: shown?.includes("notrelevant") ?? DEFAULT_SETTINGS.notRelevant,
     undecided: shown === undefined ? DEFAULT_SETTINGS.undecided : shown.includes("conditional"),
     lens: LENSES.find((each) => each === lens),
-    origins: params.get(ORIGINS) === "1",
     edit: params.get(EDIT) === "on",
     select: params.get(SELECT) === "1",
     map: params.get(MAP) === "1",
@@ -139,9 +137,6 @@ export function paramsOf(view: CanvasView): URLSearchParams {
   }
   if (view.lens !== undefined) {
     params.set(LENS, view.lens);
-  }
-  if (view.origins) {
-    params.set(ORIGINS, "1");
   }
   if (view.edit) {
     params.set(EDIT, "on");

@@ -20,13 +20,8 @@ export const ROW_GAP_PX = 4;
 /** The border's width on each side (px): the box is the border plus the padding plus the rows. */
 export const BORDER_PX = 1;
 
-/**
- * An open container's header band (px): one row holding its kind, title, progress, state and
- * fold control, with the date and the hidden-prerequisites marker under it when it has them.
- */
-export const BAND_PX = 52;
-/** The least width of an open container (px): its band's row needs the room for its title between the rest. */
-export const CONTAINER_WIDTH_PX = 384;
+/** The hidden-prerequisites marker's row under a container's rule (px): a line and the padding below it. */
+export const MARKER_ROW_PX = BODY_PX + CARD_PAD_Y_PX;
 
 /** Characters that surely fit one line of a title at the card's width. */
 export const TITLE_LINE_CHARS = 24;
@@ -63,10 +58,20 @@ export function cardRows(card: Card): CardRows {
   };
 }
 
-/** The height of an open container's own header band: its row, and the rows under it that it has, inside its border above and the hairline below. */
-export function bandHeight(rows: CardRows): number {
-  const heights = [BAND_PX, ...(rows.foot ? [FOOT_PX] : []), ...(rows.marker ? [BODY_PX] : [])];
-  return heights.reduce((sum, each) => sum + each, 0) + (heights.length - 1) * ROW_GAP_PX + (heights.length > 1 ? CARD_PAD_Y_PX : 0) + 2 * BORDER_PX;
+/** Whether an open container's head has a foot line: its date (or, in an insertion, the segment it came from), but never its owner. */
+export function headFoot(card: Card): boolean {
+  return card.journey?.foot !== undefined || card.route?.foot !== undefined;
+}
+
+/**
+ * The height of an open container's own head: kind and state, the title, the progress and the
+ * foot line, inside its padding, the border above and the rule below, and under the rule the
+ * hidden-prerequisites marker when it has one.
+ */
+export function headHeight(card: Card): number {
+  const rows = cardRows(card);
+  const heights = [HEAD_PX, rows.title * TITLE_LINE_PX, ...(rows.body ? [BODY_PX] : []), ...(headFoot(card) ? [FOOT_PX] : [])];
+  return heights.reduce((sum, each) => sum + each, 0) + (heights.length - 1) * ROW_GAP_PX + 2 * CARD_PAD_Y_PX + 2 * BORDER_PX + (rows.marker ? MARKER_ROW_PX : 0);
 }
 
 /** A card's height for its rows: the rows, the gaps between them, and the padding. */
@@ -84,35 +89,70 @@ export function layoutRequestOf(model: CanvasModel): Omit<LayoutRequest, "hints"
   return {
     nodes: model.cards.map((card) => {
       const rows = cardRows(card);
+      const height = containers.has(card.key) ? headHeight(card) : cardHeight(rows);
       return {
         key: card.key,
         ...(card.parent === undefined ? {} : { parent: card.parent }),
-        ...(containers.has(card.key) ? { width: CONTAINER_WIDTH_PX, height: bandHeight(rows), header: bandHeight(rows) } : { width: CARD_WIDTH_PX, height: cardHeight(rows) }),
+        width: CARD_WIDTH_PX,
+        height,
+        ...(containers.has(card.key) ? { header: height } : {}),
       };
     }),
     edges: model.lines.map((line) => ({ from: line.from, to: line.to })),
   };
 }
 
-/** The share of its size an average character of a title takes in width, and a line's height as a share of its size. */
+/** A character's width as a share of its size: capitals and digits are wide, the rest average; a space; and a line's height. */
 const CHAR_EM = 0.58;
+const WIDE_CHAR_EM = 0.78;
+const SPACE_EM = 0.3;
 const LEADING_EM = 1.15;
-/** Characters a line gives up to words that do not break at its end. */
-const WRAP_WASTE_CHARS = 4;
 /** The sizes (layout px) a zoomed-out title is set between: the reading size, and the most the room gives. */
 export const TITLE_FIT_MIN_PX = 15;
 export const TITLE_FIT_MAX_PX = 60;
 
+const wordEm = (word: string) => Array.from(word).reduce((sum, char) => sum + (/[\p{Lu}\p{N}]/u.test(char) ? WIDE_CHAR_EM : CHAR_EM), 0);
+const wordsOf = (title: string) => title.split(/\s+/).filter(Boolean).map(wordEm);
+
+/** The lines a title takes wrapped between its words in `width` ems, or undefined when a word is wider than a line. */
+function wrappedLines(title: string, width: number): number | undefined {
+  let lines = 1;
+  let used = 0;
+  for (const word of wordsOf(title)) {
+    if (word > width) {
+      return undefined;
+    }
+    if (used === 0) {
+      used = word;
+    } else if (used + SPACE_EM + word <= width) {
+      used += SPACE_EM + word;
+    } else {
+      lines += 1;
+      used = word;
+    }
+  }
+  return lines;
+}
+
+/** Whether a word of the title is wider than `width` even at the reading size: it can only be cut, with an ellipsis, on one line. */
+export function titleWordOverflows(title: string, width: number): boolean {
+  return wrappedLines(title, width / TITLE_FIT_MIN_PX) === undefined;
+}
+
+/** The whole lines a title of `size` px sets in a room `height` tall. */
+export function titleLines(size: number, height: number): number {
+  return Math.max(1, Math.floor(height / (size * LEADING_EM)));
+}
+
 /**
- * The largest size (layout px) a title of `length` characters is set at, zoomed out, so it fits
- * whole in a box of `width` by `height`: the more room per character, the larger. Never below
- * the reading size, so a title too long for its room is cut short there instead.
+ * The largest size (layout px) a title is set at, zoomed out, so it wraps between its words and
+ * fits whole in a box of `width` by `height`: the more room, the larger. Never below the reading
+ * size, so a title too long for its room is cut short there, at a whole line, instead.
  */
-export function titleFitPx(length: number, width: number, height: number): number {
+export function titleFitPx(title: string, width: number, height: number): number {
   for (let size = TITLE_FIT_MAX_PX; size > TITLE_FIT_MIN_PX; size -= 1) {
-    const lines = Math.floor(height / (size * LEADING_EM));
-    const perLine = Math.floor(width / (size * CHAR_EM)) - WRAP_WASTE_CHARS;
-    if (lines * perLine >= length) {
+    const lines = wrappedLines(title, width / size);
+    if (lines !== undefined && lines <= titleLines(size, height) && lines * size * LEADING_EM <= height) {
       return size;
     }
   }

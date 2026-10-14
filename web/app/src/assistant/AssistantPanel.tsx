@@ -249,8 +249,8 @@ function AssistantPanel({ assistant, target, titleOf, onClose }: { assistant: As
       <div className="row assistant-head">
         <span className="muted small">About {aboutWords(target)}</span>
         <span className="spacer" />
-        <Button aria-label="Close the assistant" onClick={onClose}>
-          ×
+        <Button aria-label="Close the assistant" title="Close the assistant" onClick={onClose}>
+          Close
         </Button>
       </div>
       <div ref={scroller} className="assistant-scroll inspector-body">

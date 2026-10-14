@@ -150,34 +150,6 @@
   margin: 0;
 }
 
-/* The Frontier strip above the graph: its label, then the best ranked work, then the rest as a count. */
-.frontier-strip {
-  flex-wrap: wrap;
-  gap: var(--space-1) var(--space-3);
-  padding-bottom: var(--space-2);
-}
-
-.frontier-item {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--color-text);
-  font: inherit;
-  font-size: 14px;
-  cursor: pointer;
-}
-
-.frontier-item:hover {
-  text-decoration: underline;
-}
-
-.frontier-item + .frontier-item::before {
-  content: "·";
-  margin-right: var(--space-3);
-  color: var(--color-muted);
-}
-
 .chip {
   font: inherit;
   font-size: 12px;

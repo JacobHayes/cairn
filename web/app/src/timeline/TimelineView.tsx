@@ -317,7 +317,7 @@ function Tracks({ chart, axis, selected }: { chart: Chart; axis: Axis; selected:
 function Controls({ detail, range, panned, onChoose, onReset }: { detail: Detail; range: Range; panned: boolean; onChoose: (name: string, value: string) => void; onReset: () => void }) {
   return (
     <div className="row timeline-controls">
-      <Segmented label="Detail" value={detail} options={DETAILS.map((each) => ({ value: each, label: DETAIL_WORDS[each] }))} onChange={(value) => { onChoose("detail", value); }} data-testid="timeline-detail" />
+      <Segmented label="Detail" value={detail} options={[...DETAILS].reverse().map((each) => ({ value: each, label: DETAIL_WORDS[each] }))} onChange={(value) => { onChoose("detail", value); }} data-testid="timeline-detail" />
       <Segmented label="Range" value={range} options={RANGES.map((each) => ({ value: each, label: RANGE_WORDS[each] }))} onChange={(value) => { onChoose("range", value); }} data-testid="timeline-range" />
       {panned ? (
         <Button ghost data-testid="timeline-reset" onClick={onReset}>

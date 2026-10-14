@@ -74,10 +74,21 @@ describe("the journey's views (2.2, 2.3)", () => {
 
   it("carries a toolbar chip only to the views that read it", () => {
     const search = "?decisions=1&frontier=1&sort=due&mine=1&q=plan&kind=action";
-    expect(carriedSearch(search, "list")).toBe("?decisions=1&mine=1&q=plan&frontier=1");
-    expect(carriedSearch(search, "graph")).toBe("?decisions=1&frontier=1");
-    expect(carriedSearch(search, "walk")).toBe("?decisions=1&mine=1&q=plan");
-    expect(carriedSearch(search, "summary")).toBe("");
+    expect(carriedSearch(search, "list", "timeline")).toBe("?decisions=1&mine=1&q=plan&frontier=1");
+    expect(carriedSearch(search, "list", "graph")).toBe("?decisions=1&frontier=1");
+    expect(carriedSearch(search, "list", "walk")).toBe("?decisions=1&mine=1&q=plan");
+    expect(carriedSearch(search, "list", "summary")).toBe("");
+  });
+
+  it("opens a view with the settings it was left with, and the chips as the view being left has them", () => {
+    const held = "?open=n_setup&lens=gravity&decisions=1&q=old";
+    // The graph's own settings return; Decisions follows the list (off there), and a search the graph does not read is not carried in.
+    expect(carriedSearch("?sort=due", "list", "graph", held)).toBe("?open=n_setup&lens=gravity");
+    // The list's search, set before a visit to the graph, is still there when the graph is left; the graph's chips follow the graph.
+    expect(carriedSearch("?decisions=1", "graph", "list", "?sort=due&q=plan")).toBe("?sort=due&decisions=1&q=plan");
+    // Mine turned off on the timeline is off on the list, whichever of its two spellings the list held; on, it is the chip.
+    expect(carriedSearch("", "timeline", "list", "?flag=mine,stalled")).toBe("?flag=stalled");
+    expect(carriedSearch("?flag=mine", "list", "timeline")).toBe("?mine=1");
   });
 
   it("closes a node's detail to the screen it opened on (C12)", () => {
@@ -120,7 +131,7 @@ describe("every old address resolves (2.4, Redirects)", () => {
 
 describe("the canvas's settings in the address", () => {
   it("round-trips every setting and leaves the toolbar's chips alone", () => {
-    const params = new URLSearchParams("decisions=1&detail=work&open=n_s&shut=n_t&kind=action,milestone&show=notrelevant,conditional&lens=gravity&origins=1&edit=on&select=1&q=x");
+    const params = new URLSearchParams("decisions=1&detail=work&open=n_s&shut=n_t&kind=action,milestone&show=notrelevant,conditional&lens=gravity&edit=on&select=1&q=x");
     const view = viewFrom(params);
     expect(view.rest).toEqual([["decisions", "1"], ["q", "x"]]);
     expect(Object.fromEntries(paramsOf(view))).toEqual(Object.fromEntries(params));

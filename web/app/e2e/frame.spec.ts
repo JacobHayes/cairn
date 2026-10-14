@@ -83,6 +83,24 @@ test("the inspector hides to a rail that shows it again, and selecting a node br
   await nodeCard(page, "n_access").getByTestId("card-open").dispatchEvent("click");
   await expect(nodePanel(page, "n_access")).toBeVisible();
   await expect(show).toBeHidden();
+  // So does clicking the node that is already selected, which changes no address.
+  await page.keyboard.press("]");
+  await expect(show).toBeVisible();
+  await nodeCard(page, "n_access").getByTestId("card-open").dispatchEvent("click");
+  await expect(nodePanel(page, "n_access")).toBeVisible();
+});
+
+test("the rail's shortcuts hint lists the keys on hover and focus, and goes on leaving", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "graph");
+  const hint = page.getByRole("button", { name: "Keyboard shortcuts" });
+  await hint.hover();
+  await expect(page.getByTestId("keys-hint").locator("kbd").first()).toBeVisible();
+  await page.mouse.move(700, 300);
+  await expect(page.getByTestId("keys-hint")).toHaveCount(0);
+  await hint.focus();
+  await expect(page.getByTestId("keys-hint")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("keys-hint")).toHaveCount(0);
 });
 
 test.describe("a phone's map", () => {

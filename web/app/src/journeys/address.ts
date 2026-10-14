@@ -180,20 +180,43 @@ export function chipApplies(name: keyof typeof CHIP_APPLIES, screen: Screen): bo
   return CHIP_APPLIES[name](screen);
 }
 
+const CHIPS = ["decisions", "mine", "q", "frontier"] as const;
+
 /**
- * `search` reduced to the toolbar's chips that mean something on `screen`: what a switch of
- * view keeps. A chip a screen does not read is left behind, not carried unseen.
+ * The query a switch from `from` to `to` opens: `to`'s own settings as it last had them (`held`:
+ * its sort, columns, expanded containers, ...), with the toolbar's chips that mean something on
+ * `to`. A chip both screens read follows the screen being left, so turning it off there turns it
+ * off here; one only `to` reads (the list's search, while the graph was open) stays as it was.
+ * A chip `to` does not read is left behind, not carried unseen.
  */
-export function carriedSearch(search: string, screen: Screen): string {
-  const from = new URLSearchParams(search);
+export function carriedSearch(search: string, from: Screen, to: Screen, held = ""): string {
+  const now = new URLSearchParams(search);
+  const before = new URLSearchParams(held);
+  // Mine is the chip's `mine=1` or the list's `flag=mine`; where the screen being left says it, the held flag must not say it again.
+  const follows = chipApplies("mine", from) && chipApplies("mine", to);
   const kept = new URLSearchParams();
-  for (const name of ["decisions", "mine", "q", "frontier"] as const) {
-    const value = from.get(name);
-    if (value !== null && chipApplies(name, screen)) {
+  for (const [name, value] of before) {
+    if (CHIPS.some((chip) => chip === name)) {
+      continue;
+    }
+    const flags = name === "flag" && follows ? value.split(",").filter((flag) => flag !== "mine").join(",") : value;
+    // A setting can be empty and mean something (`show=`, `kind=`): only an emptied flag list goes.
+    if (flags !== "" || name !== "flag") {
+      kept.append(name, flags);
+    }
+  }
+  for (const name of CHIPS) {
+    const value = chipApplies(name, from) ? (name === "mine" ? (mineOn(now) ? "1" : null) : now.get(name)) : before.get(name);
+    if (value !== null && chipApplies(name, to)) {
       kept.set(name, value);
     }
   }
   return searchOf(kept);
+}
+
+/** Whether MINE is on in `params`: the chip's, or the list's own `flag=mine`. */
+function mineOn(params: URLSearchParams): boolean {
+  return params.get("mine") === "1" || (params.get("flag") ?? "").split(",").includes("mine");
 }
 
 /** `search` with the parameter `name` set to `value`, or removed when `value` is undefined. */
@@ -215,7 +238,7 @@ export function withParam(search: string, name: string, value: string | undefine
 export function withMineFlipped(search: string): string {
   const params = new URLSearchParams(search);
   const flags = (params.get("flag") ?? "").split(",").filter(Boolean);
-  if (params.get("mine") !== "1" && !flags.includes("mine")) {
+  if (!mineOn(params)) {
     return withParam(search, "mine", "1");
   }
   params.delete("mine");

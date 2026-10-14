@@ -13,8 +13,6 @@ import type { InspectorTab } from "./frame.tsx";
 /** The sheet's two heights, as `data-snap` on the column (app.css sets each). */
 export type SheetSnap = "half" | "full";
 
-/** The status strip's height, which the sheet sits above (app.css, `--strip-h`). */
-const STRIP_PX = 28;
 /** Past this share of the window, a released drag snaps to the full height. */
 const FULL_FROM = 0.62;
 
@@ -23,7 +21,7 @@ function useSheetDrag(column: RefObject<HTMLElement | null>, snap: SheetSnap, on
   // On the frame, not the column, so the workspace's inset above the sheet follows the drag (app.css).
   const frame = () => column.current?.closest<HTMLElement>(".frame");
   const start = useRef<{ moved: boolean } | undefined>(undefined);
-  const heightAt = (clientY: number) => globalThis.innerHeight - clientY - STRIP_PX;
+  const heightAt = (clientY: number) => globalThis.innerHeight - clientY;
   return {
     onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => {
       event.currentTarget.setPointerCapture(event.pointerId);

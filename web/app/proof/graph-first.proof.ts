@@ -1,5 +1,5 @@
 // The proof's media for the graph-first journey page (briefs/proof/2026-10-10-graph-first/README.md):
-// the graph with its Frontier strip and group header rows, the list with the Frontier on, the
+// the graph with the Frontier on and group header rows, the list with the Frontier on, the
 // list as a tree with its guide lines, a node's context menu, the walk through, and a zoomed-out
 // graph, each in the light and the dark theme, written to CAIRN_PROOF_OUT. Steps only wait for
 // the state they picture. Everything runs on the in-browser host, seeded on each load, at the
@@ -24,9 +24,8 @@ for (const scheme of ["light", "dark"] as const) {
     test.use({ colorScheme: scheme });
     const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${name}-${scheme}.png`) });
 
-    test("the graph, with the Frontier strip and group header rows", async ({ page }) => {
+    test("the graph, with the Frontier on and group header rows", async ({ page }) => {
       await openAt(page, "browser", "j_vendor_eval", "graph?detail=work&frontier=1", fixed);
-      await page.getByTestId("frontier-strip").waitFor();
       await page.getByTestId("node-card").first().waitFor();
       await beat(page);
       await shot(page, "1-graph");

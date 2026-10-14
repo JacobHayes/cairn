@@ -1,6 +1,6 @@
 // The app frame's slots (design: the grid frame). The shell owns three regions beside the
-// workspace: the inspector column (a bottom sheet on a tablet, stacked on a phone), its
-// assistant tab, and the strip. A screen puts its node detail in the inspector with
+// workspace: the inspector column (a bottom sheet on a tablet, stacked on a phone) and its
+// assistant tab. A screen puts its node detail in the inspector with
 // `<Inspector>` and the assistant puts its panel in the assistant tab with `<AssistantSlot>`:
 // each renders into the shell's slot through a portal, so the screens keep their own state
 // and the shell only learns that something is there (it shows the column when so).

@@ -17,7 +17,7 @@ import { useDraft } from "../data/drafts.ts";
 import { Problem, useDraftAndOpen } from "../proposals/Entries.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { stepperDraftKey } from "./entry.ts";
-import { insertionOrigins, NO_CHOICES, planInsertion, sizeWords, type Choices, type Mapping, type PeopleRow, type Plan } from "./model.ts";
+import { insertionMembers, NO_CHOICES, planInsertion, sizeWords, type Choices, type Mapping, type PeopleRow, type Plan } from "./model.ts";
 import { useCandidate, type Candidate } from "./preview.ts";
 import { useSegmentNames, useSegmentOffers, useSegmentVersion, type SegmentOffer, type SegmentVersion } from "./read.ts";
 
@@ -25,7 +25,7 @@ import { useSegmentNames, useSegmentOffers, useSegmentVersion, type SegmentOffer
 export interface InsertPreview {
   before: Graph;
   after: Graph;
-  origins: ReturnType<typeof insertionOrigins>;
+  members: Record<string, string>;
 }
 
 type Step = 1 | 2 | 3;
@@ -86,8 +86,8 @@ function NodePicks({ label, authored, chosen, onChange }: { label: string; autho
       {chosen.map((key) => (
         <span key={key} className="row" data-testid="pick" data-node={key}>
           <span>{authored.tree.byKey.get(key)?.title ?? key}</span>
-          <Button ghost aria-label={`Remove ${authored.tree.byKey.get(key)?.title ?? key} from ${label}`} onClick={() => { onChange(chosen.filter((each) => each !== key)); }}>
-            ×
+          <Button ghost aria-label={`Remove ${authored.tree.byKey.get(key)?.title ?? key} from ${label}`} title="Remove" onClick={() => { onChange(chosen.filter((each) => each !== key)); }}>
+            Remove
           </Button>
         </span>
       ))}
@@ -194,7 +194,7 @@ function useInsertion(authored: Authored, parent: string | undefined, onPreview:
     if (step === 1 || candidate.status === "refused") {
       onPreview(undefined);
     } else if (candidate.status === "placed") {
-      onPreview({ before: candidate.before, after: candidate.after, origins: insertionOrigins(candidate.before, candidate.after, nameOf) });
+      onPreview({ before: candidate.before, after: candidate.after, members: insertionMembers(candidate.before, candidate.after, nameOf) });
     }
   }, [step, candidate, nameOf, onPreview]);
   useEffect(() => () => { onPreview(undefined); }, [onPreview]);

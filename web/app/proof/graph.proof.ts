@@ -46,7 +46,7 @@ test("a stage expanded in place, a node's trace, and an edge's hover", async ({ 
   await beat(page);
   await shot(page, "5-expanded-in-place");
   await nodeCard(page, "n_plan").getByTestId("card-open").click();
-  await page.getByTestId("trace-bar").waitFor();
+  await page.getByTestId("card-mark").first().waitFor();
   await beat(page);
   await shot(page, "6-trace");
   const at = await pointOn(lineBetween(page, "n_access", "n_plan"));
@@ -88,7 +88,7 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   await nodeCard(page, "n_plan").waitFor();
   await beat(page);
   await nodeCard(page, "n_plan").getByTestId("card-open").click();
-  await page.getByTestId("trace-bar").waitFor();
+  await page.getByTestId("card-mark").first().waitFor();
   await beat(page);
   await beat(page);
   await context.close();

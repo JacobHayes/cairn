@@ -8,7 +8,6 @@ import type { Schema } from "@cairn/client";
 import { decisionsIn } from "../authoring/condition.ts";
 import { childrenOf, type Graph, type GraphNode, type Kind, type Mutation, type Role, type Tree } from "../authoring/graph.ts";
 import { mintKey, slugOf, uniqueId } from "../authoring/keys.ts";
-import type { CanvasModel } from "../canvas/model.ts";
 import { DIFF_LABELS, type DiffMark } from "../proposals/model.ts";
 
 type Lineage = Schema<"Lineage">;
@@ -196,39 +195,16 @@ export function originWords(name: string, version: number): string {
   return `⧉ ${name} v${String(version)}`;
 }
 
-/**
- * C19: the insertions `after` adds, each as the words that name it on its root card and as the
- * members that belong to it, so review and the stepper's preview mark them the same way.
- */
-export function insertionOrigins(before: Graph | null | undefined, after: Graph | null | undefined, nameOf: (route: string) => string): { roots: Record<string, string>; members: Record<string, string> } {
-  const roots: Record<string, string> = {};
+/** C19: the insertions `after` adds, as the members that belong to each (named by its segment and version), so review and the stepper's preview mark them the same way. */
+export function insertionMembers(before: Graph | null | undefined, after: Graph | null | undefined, nameOf: (route: string) => string): Record<string, string> {
   const members: Record<string, string> = {};
   for (const insertion of newInsertions(before, after)) {
     const words = originWords(nameOf(insertion.segment.route), insertion.segment.version);
-    const root = after === null || after === undefined ? undefined : insertionRoot(after, insertion);
-    if (root !== undefined) {
-      roots[root] = words;
-    }
     for (const key of Object.keys(insertion.nodes)) {
       members[key] = words;
     }
   }
-  return { roots, members };
-}
-
-/** C19: a canvas's cards, with an insertion's root saying which segment and version it is in its foot (a journey's card keeps its date elsewhere). */
-export function withOriginFoots(model: CanvasModel, roots: Readonly<Record<string, string>>): CanvasModel {
-  if (Object.keys(roots).length === 0) {
-    return model;
-  }
-  const cards = model.cards.map((card) => {
-    const words = roots[card.key];
-    if (words === undefined) {
-      return card;
-    }
-    return card.journey === undefined ? { ...card, route: { foot: words, unanchored: card.route?.unanchored ?? false } } : { ...card, journey: { ...card.journey, foot: { words, tone: "plain" as const } } };
-  });
-  return { ...model, cards };
+  return members;
 }
 
 /** The marks of a diff with each added member saying which insertion it belongs to, on the tag's hover and in the list's foot. */

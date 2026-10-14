@@ -15,7 +15,8 @@ import { TriageControls } from "../acting/TriageScreen.tsx";
 import { GraphFilters } from "../canvas/KindToggles.tsx";
 import { canvasPath, viewFrom } from "../canvas/settings.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
-import { carriedSearch, chipApplies, pagePath, withMineFlipped, withParam, type Screen } from "../journeys/address.ts";
+import { chipApplies, pagePath, withMineFlipped, withParam, type Screen } from "../journeys/address.ts";
+import { switchedSearch } from "../journeys/kept.ts";
 import { Menu } from "./Menu.tsx";
 import { activeFilters } from "./filters.ts";
 
@@ -112,7 +113,7 @@ function Views({ journey, screen, node }: { journey: string; screen: Screen; nod
           className="journey-switch"
           aria-current={each.screen === screen ? "page" : undefined}
           data-testid={`view-${each.screen}`}
-          to={pagePath(journey, each.screen, node, each.screen === screen ? search : carriedSearch(search, each.screen))}
+          to={pagePath(journey, each.screen, node, each.screen === screen ? search : switchedSearch(journey, search, screen, each.screen))}
         >
           {each.words}
         </Link>
@@ -161,8 +162,9 @@ function Chips({ ready, screen, node, onFind }: { ready: Ready; screen: Screen; 
           </div>
         )}
       </Menu>
+      {/* Keyed by screen: text typed for the graph's find is not a filter the next view holds. */}
       <Search
-        key={params.get("q") ?? ""}
+        key={`${screen}:${params.get("q") ?? ""}`}
         text={params.get("q") ?? ""}
         onSearch={(text) => {
           // The graph's search finds a node; the others filter by text.
@@ -190,7 +192,7 @@ export function JourneyToolbar({ ready, screen, node, onFind }: ToolbarProps) {
         aria-current={screen === "walk" ? "page" : undefined}
         title="Go through the frontier one card at a time"
         data-testid="walk-through"
-        to={pagePath(journey, "walk", undefined, carriedSearch(search, "walk"))}
+        to={pagePath(journey, "walk", undefined, switchedSearch(journey, search, screen, "walk"))}
       >
         Walk through
       </Link>

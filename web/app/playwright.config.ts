@@ -41,7 +41,8 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   forbidOnly: true,
   reporter: [["list"]],
-  use: { baseURL: `http://127.0.0.1:${serverPort}` },
+  // A trace is kept only for a failure: a flake in a long run leaves what happened (no measurable cost on green runs).
+  use: { baseURL: `http://127.0.0.1:${serverPort}`, trace: "retain-on-failure" },
   // The projects run side by side. The tests tagged @server are the ones only the server host
   // can run: pages meeting through the server (live updates, conflicts), sign-in, and the
   // assistant. They share the one binary, whose scripted assistant is global, so they run one

@@ -8,7 +8,7 @@ It is for anyone who runs the same kind of project more than once (evaluating a 
 hiring for a role, launching a product) and keeps finding out too late that something was
 needed by Thursday. It also works for one-off projects that have no plan yet.
 
-![Opening a journey on its graph, picking a decision from the Frontier strip, and answering it in the inspector](docs/images/walkthrough.gif)
+![Opening a journey on its graph, picking a decision on it, and answering it in the inspector](docs/images/walkthrough.gif)
 
 ## How it works
 

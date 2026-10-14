@@ -42,22 +42,22 @@ function LineageFold({ ready, full }: { ready: Ready; full: boolean }) {
   const routes = useLive("routes", routeIndex).view;
   const summary = view.status === "ready" ? view.value.find((item) => item.id === header.id) : undefined;
   const route = lineage === undefined || routes.status !== "ready" ? undefined : routes.value.find((each) => each.header.id === lineage.route);
-  const name = lineage === undefined ? undefined : (route?.header.name ?? lineage.route);
+  // A journey that did not come from a route has no lineage to show.
+  if (lineage === undefined) {
+    return null;
+  }
+  const name = route?.header.name ?? lineage.route;
   return (
-    <Section title="Lineage" summary={lineage === undefined ? "no route" : `${name ?? ""} v${String(lineage.version)}`} open={full} testId="card-lineage">
-      {lineage === undefined ? (
-        <span className="muted small" data-testid="overview-lineage">Started empty: no route, so no upgrades.</span>
-      ) : (
-        <span className="row" data-testid="overview-lineage">
-          <Link to={routeDetailPath(lineage.route)}>
-            {name}, version {lineage.version}
-          </Link>
-          <Link to={`/routes/${lineage.route}?version=${String(lineage.version)}`} data-testid="lineage">
-            See its graph
-          </Link>
-          {summary === undefined ? null : <UpgradeMark summary={summary} />}
-        </span>
-      )}
+    <Section title="Lineage" summary={`${name} v${String(lineage.version)}`} open={full} testId="card-lineage">
+      <span className="row" data-testid="overview-lineage">
+        <Link to={routeDetailPath(lineage.route)}>
+          {name}, version {lineage.version}
+        </Link>
+        <Link to={`/routes/${lineage.route}?version=${String(lineage.version)}`} data-testid="lineage">
+          See its graph
+        </Link>
+        {summary === undefined ? null : <UpgradeMark summary={summary} />}
+      </span>
       <span className="muted small">Started {dateWords(header.created_on, ready.derived.today)}</span>
     </Section>
   );
@@ -208,11 +208,7 @@ export function JourneyCard({ ready, selected, full = false }: { ready: Ready; s
               Close
             </Link>
           </>
-        ) : (
-          <Link to={pagePath(journey, "summary")} className="icon-button" data-testid="card-expand" aria-label="Open the summary page" title="Open the summary page">
-            ⤢
-          </Link>
-        )}
+        ) : null}
       </div>
       {summary.error === undefined ? null : <p className="callout callout-bad">The summary could not be read: {summary.error}</p>}
       {model === undefined || done === undefined ? (

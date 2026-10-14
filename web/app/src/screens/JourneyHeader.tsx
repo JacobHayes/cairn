@@ -101,7 +101,7 @@ function copyLink(): void {
 }
 
 /** The journey's `⋯`, in three groups: its description and structure flows, selecting nodes, and its keys and link. */
-function JourneyMenu({ ready, view, selected, onPanel, onKeys }: { ready: Ready; view: CanvasView; selected: string | undefined; onPanel: (panel: Panel) => void; onKeys: () => void }) {
+function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: CanvasView; selected: string | undefined; onPanel: (panel: Panel) => void }) {
   const { header } = ready.journey;
   const insert = useInsertEntry();
   const archived = header.status === "archived";
@@ -132,9 +132,6 @@ function JourneyMenu({ ready, view, selected, onPanel, onKeys }: { ready: Ready;
               </>
             )}
             <hr />
-            <button type="button" role="menuitem" className="menu-item" data-testid="menu-keys" onClick={() => { close(); onKeys(); }}>
-              Keyboard shortcuts
-            </button>
             <button type="button" role="menuitem" className="menu-item" data-testid="menu-copy-link" onClick={() => { close(); copyLink(); }}>
               Copy link
             </button>
@@ -190,7 +187,7 @@ function Subline({ ready, model, onUpgrade }: { ready: Ready; model: SummaryMode
 }
 
 /** `view` is the canvas as the page shows it, or the canvas's defaults off the graph: Edit structure keeps it. */
-export function JourneyHeader({ ready, view, selected, model, onKeys }: { ready: Ready; view: CanvasView; selected: string | undefined; model: SummaryModel | undefined; onKeys: () => void }) {
+export function JourneyHeader({ ready, view, selected, model }: { ready: Ready; view: CanvasView; selected: string | undefined; model: SummaryModel | undefined }) {
   const { header, revision } = ready.journey;
   const write = useScreenWrite();
   const suggested = useSuggested(ready);
@@ -203,7 +200,7 @@ export function JourneyHeader({ ready, view, selected, model, onKeys }: { ready:
         <span className="spacer" />
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
         {header.status === "archived" ? null : <EditButton journey={header.id} view={view} selected={selected} />}
-        <JourneyMenu ready={ready} view={view} selected={selected} onPanel={setPanel} onKeys={onKeys} />
+        <JourneyMenu ready={ready} view={view} selected={selected} onPanel={setPanel} />
       </div>
       <Subline ready={ready} model={model} onUpgrade={() => { setPanel("upgrade"); }} />
       {header.status === "active" && suggested ? (

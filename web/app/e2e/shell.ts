@@ -31,7 +31,7 @@ export async function importIntoLibrary(page: Page, file: string | { name: strin
   await page.getByLabel("Import a file…").setInputFiles(file);
 }
 
-/** The sync chip at the strip's right end. */
+/** The sync dot beside the brand at the top of the rail. */
 export function syncChip(page: Page): Locator {
   return page.getByTestId("sync");
 }

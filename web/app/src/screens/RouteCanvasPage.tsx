@@ -37,8 +37,6 @@ import { openDraft } from "../routes/model.ts";
 import { routeDetailPath } from "../routes/address.ts";
 import type { ImportedHandler } from "../routes/ImportFile.tsx";
 import { useInserting } from "../segments/entry.ts";
-import { insertionOrigins, withOriginFoots } from "../segments/model.ts";
-import { useSegmentNames } from "../segments/read.ts";
 import { InsertionCanvas } from "../segments/Preview.tsx";
 import { InsertStepper } from "../segments/Stepper.tsx";
 import { Button } from "../ui/kit.tsx";
@@ -134,7 +132,6 @@ function useRouteModel(shown: Shown, view: CanvasView, unanchored: ReadonlySet<s
   const { deriver } = useSession();
   const deployment = useDeployment();
   const step = routeStepOf(view, shown.graph.nodes ?? []);
-  const nameOf = useSegmentNames();
   const [answer, setAnswer] = useState<{ level: Level; shown: Shown; view: string } | { error: string } | undefined>(undefined);
   useEffect(() => {
     if (deployment === undefined) {
@@ -171,10 +168,8 @@ function useRouteModel(shown: Shown, view: CanvasView, unanchored: ReadonlySet<s
       const node = tree.byKey.get(card.key);
       return { ...card, route: { foot: node === undefined ? undefined : ruleFoot(node, tree), unanchored: unanchored.has(card.key) } };
     });
-    // A draft names where each insertion came from on its root card (C19).
-    const roots = shown.of === "draft" ? insertionOrigins(undefined, shown.graph, nameOf).roots : {};
-    return withOriginFoots({ cards, lines: linesOf(answer.level, nodes) }, roots);
-  }, [answer, shown, view, step, unanchored, nameOf]);
+    return { cards, lines: linesOf(answer.level, nodes) };
+  }, [answer, shown, view, step, unanchored]);
   return { model, error: answer !== undefined && "error" in answer ? answer.error : undefined };
 }
 

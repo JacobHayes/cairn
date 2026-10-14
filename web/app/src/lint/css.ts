@@ -2,7 +2,7 @@
 // scroller per region and use the design's tokens. A rule outside its allowlist is a violation:
 //   - `overflow` or `overflow-y` of auto or scroll, except on the frame's scrollers;
 //   - `max-height` in `vh`, and `100vh` anywhere (the frame is `100dvh`);
-//   - `position: sticky`, except table headers, the list's pinned columns, the timeline axis, the way back to the pass, and the strip below 720px;
+//   - `position: sticky`, except table headers, the list's pinned columns, the timeline axis, and the way back to the pass;
 //   - a raw hex colour (tokens carry colours);
 //   - a border radius over 4px (DESIGN's `--radius-lg`).
 // A small reader, not a CSS parser: it tracks braces and at-rules, which is all these need.
@@ -24,10 +24,8 @@ export interface Source {
 
 /** The only elements that scroll (design 3.2): the rail, the workspace body, and the inspector's, sheet's, popover's and modal's bodies. */
 const SCROLLERS = [".rail", ".ws-body", ".inspector-body", ".sheet-body", ".popover-body", ".modal-body"];
-/** Elements that may stick: table headers, the Plan list's pinned columns, the timeline's axis, the inspector's way back to the pass, and the strip on a phone. */
+/** Elements that may stick: table headers, the Plan list's pinned columns, the timeline's axis, the inspector's way back to the pass. */
 const STICKY = ["th", ".list-pinned", ".timeline-axis", ".back-to-pass"];
-const STICKY_ON_PHONE = [".strip"];
-const PHONE = "max-width: 719px";
 /** DESIGN's `--radius-lg`, the largest radius there is (px); a rem is the design's 17px. */
 const RADIUS_MAX_PX = 4;
 const REM_PX = 17;
@@ -38,8 +36,6 @@ interface Declaration {
   value: string;
   /** The selector list of the rule it is in. */
   selector: string;
-  /** The at-rule preludes around it (`@media ...`). */
-  context: string[];
 }
 
 function withoutComments(text: string): string {
@@ -68,7 +64,6 @@ export function declarationsOf(text: string): Declaration[] {
           property: buffer.slice(0, colon).trim().toLowerCase(),
           value: buffer.slice(colon + 1).trim().replace(/\s+/g, " "),
           selector: rule.prelude,
-          context: stack.filter((each) => each.prelude.startsWith("@")).map((each) => each.prelude),
         });
       }
       buffer = "";
@@ -103,7 +98,7 @@ function radiusTooBig(value: string): boolean {
 }
 
 function broken(declaration: Declaration): string | undefined {
-  const { property, value, selector, context } = declaration;
+  const { property, value, selector } = declaration;
   if ((property === "overflow" || property === "overflow-y") && /\b(auto|scroll)\b/.test(value) && !styles(selector, SCROLLERS)) {
     return `${property}: ${value} on ${selector}: only ${SCROLLERS.join(", ")} scroll`;
   }
@@ -114,9 +109,8 @@ function broken(declaration: Declaration): string | undefined {
     return `100vh: the frame is 100dvh`;
   }
   if (property === "position" && value === "sticky") {
-    const onPhone = context.some((each) => each.includes(PHONE));
-    if (!styles(selector, STICKY) && !(onPhone && styles(selector, STICKY_ON_PHONE))) {
-      return `position: sticky on ${selector}: only table headers, the list's pinned columns, the timeline axis, the way back to the pass, and the strip below 720px stick`;
+    if (!styles(selector, STICKY)) {
+      return `position: sticky on ${selector}: only table headers, the list's pinned columns, the timeline axis, and the way back to the pass stick`;
     }
   }
   if (/#[0-9a-f]{3,8}\b/i.test(value)) {

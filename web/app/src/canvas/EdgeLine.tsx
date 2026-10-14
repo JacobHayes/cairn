@@ -2,9 +2,8 @@
 // orthogonal polyline with 4px corners, and at its target end the marker that says what it is: a
 // closed arrowhead for a requirement, a hollow diamond for a condition gate, a bar for a stage
 // opening, none for a link that holds dates only. No words on the line; hovering one gives the
-// sentence (GraphCanvas), and a click selects it. The line is steel while it waits and grey once
-// satisfied, and an overlay's trace colours it.
-import { BaseEdge, type Edge, type EdgeProps } from "@xyflow/react";
+// sentence (GraphCanvas), and a click selects it. The line is steel, and an overlay's trace colours it.
+import { BaseEdge, useStore, type Edge, type EdgeProps } from "@xyflow/react";
 
 import type { Point } from "./layout.ts";
 import { lineLook } from "./look.ts";
@@ -27,6 +26,11 @@ export type LineEdge = Edge<LineData, "line">;
 export const CORNER_PX = 4;
 export const MARKER_LENGTH_PX = 9;
 const MARKER_HALF_PX = 4.5;
+
+/** The marker's size at zoom `zoom`, as a multiple of its layout size: it grows as the graph shrinks (not to a hairline at fit) and shrinks as it zooms in (not huge), while the strokes stay constant on screen. */
+export function markerScale(zoom: number): number {
+  return Math.min(2.4, Math.max(0.6, zoom ** -0.75));
+}
 
 /** The unit vector from `from` to `to`; a point is its own direction when they meet. */
 function direction(from: Point, to: Point): Point {
@@ -69,25 +73,28 @@ export function polyline(points: Point[], radius = CORNER_PX): string {
 }
 
 /** The marker's outline at `end`, pointing along `way`: its tip at the end of the route. */
-function markerPath(kind: "arrow" | "diamond" | "bar", end: Point, way: Point): string {
+function markerPath(kind: "arrow" | "diamond" | "bar", end: Point, way: Point, scale: number): string {
+  const [length, half] = [MARKER_LENGTH_PX * scale, MARKER_HALF_PX * scale];
   const across = { x: -way.y, y: way.x };
   const at = (along: number, side: number) => `${String(end.x - way.x * along + across.x * side)} ${String(end.y - way.y * along + across.y * side)}`;
   switch (kind) {
     case "arrow":
-      return `M${at(0, 0)} L${at(MARKER_LENGTH_PX, MARKER_HALF_PX)} L${at(MARKER_LENGTH_PX, -MARKER_HALF_PX)} Z`;
+      return `M${at(0, 0)} L${at(length, half)} L${at(length, -half)} Z`;
     case "diamond":
-      return `M${at(0, 0)} L${at(MARKER_LENGTH_PX / 2, MARKER_HALF_PX)} L${at(MARKER_LENGTH_PX, 0)} L${at(MARKER_LENGTH_PX / 2, -MARKER_HALF_PX)} Z`;
+      return `M${at(0, 0)} L${at(length / 2, half)} L${at(length, 0)} L${at(length / 2, -half)} Z`;
     case "bar":
-      return `M${at(1.5, MARKER_HALF_PX + 1)} L${at(1.5, -MARKER_HALF_PX - 1)}`;
+      return `M${at(1.5, half + 1)} L${at(1.5, -half - 1)}`;
   }
 }
 
 /** How far a marker reaches back from the route's end (px): the line stops there. */
-function reach(kind: "arrow" | "diamond" | "bar" | "none"): number {
-  return kind === "arrow" || kind === "diamond" ? MARKER_LENGTH_PX : 0;
+function reach(kind: "arrow" | "diamond" | "bar" | "none", scale: number): number {
+  return kind === "arrow" || kind === "diamond" ? MARKER_LENGTH_PX * scale : 0;
 }
 
 export function EdgeLine({ id, data, selected }: EdgeProps<LineEdge>) {
+  // Rounded, so the lines redraw when the size changes visibly, not on every zoom tick.
+  const scale = useStore((state) => Math.round(markerScale(state.transform[2]) * 10) / 10);
   if (data === undefined || data.route === undefined || data.route.length < 2) {
     return null;
   }
@@ -107,12 +114,12 @@ export function EdgeLine({ id, data, selected }: EdgeProps<LineEdge>) {
       className={classes}
     >
       <title>{line.sentence}</title>
-      <BaseEdge id={id} path={polyline(trimmed(route, reach(look.marker)))} style={look.dash === undefined ? {} : { strokeDasharray: look.dash }} />
+      <BaseEdge id={id} path={polyline(trimmed(route, reach(look.marker, scale)))} />
       {look.marker === "none" || end === undefined || before === undefined ? null : (
-        <path className="line-marker" d={markerPath(look.marker, end, direction(before, end))} />
+        <path className="line-marker" d={markerPath(look.marker, end, direction(before, end), scale)} />
       )}
       {line.count > 1 && end !== undefined ? (
-        <text className="line-count" x={end.x - MARKER_LENGTH_PX - 4} y={end.y - 6} textAnchor="end">
+        <text className="line-count" x={end.x - MARKER_LENGTH_PX * scale - 4} y={end.y - 6} textAnchor="end">
           {`\u00d7${String(line.count)}`}
         </text>
       ) : null}

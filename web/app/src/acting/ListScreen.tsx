@@ -15,9 +15,11 @@ import { useProjected } from "../canvas/hooks.ts";
 import { decisionRows } from "../decisions/model.ts";
 import { type Ready } from "../detail/model.ts";
 import { nodePath, screenPath } from "../detail/parts.tsx";
+import { keepFolds, keptFolds } from "../journeys/kept.ts";
 import { useMineOf } from "../journeys/mine.ts";
 import { ancestorsOf } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
+import { useFrameActions } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { selectionOf } from "./acts.ts";
 import { listPath, listQueryOf, type ListSettings } from "./address.ts";
@@ -66,6 +68,7 @@ function Head({ column, columns, settings, onSort }: { column: Column; columns: 
 function Row({ line, columns, context, chosen, current, onToggle }: { line: Line; columns: Column[]; context: CellContext; chosen: boolean; current: boolean; onToggle: () => void }) {
   const { row } = line;
   const navigate = useNavigate();
+  const frame = useFrameActions();
   const { pathname, search } = useLocation();
   const item = useRef<HTMLTableRowElement>(null);
   // j and k move the selection: keep the selected row in view.
@@ -87,6 +90,8 @@ function Row({ line, columns, context, chosen, current, onToggle }: { line: Line
       aria-selected={current}
       onClick={(event) => {
         if (row !== undefined && onRow(event)) {
+          // The selected row clicked again changes no address, so the inspector must be asked to come back.
+          frame?.show("inspector");
           void navigate(`${nodePath(screenPath(pathname), line.key)}${search}`);
         }
       }}
@@ -206,38 +211,38 @@ function FrontierPanels({ view, settings, empty, stalled: held }: { view: Ready;
   );
 }
 
-/** A set of keys with the one change a click makes: in if out, out if in. */
-function useKeys(): [Set<string>, (key: string) => void, (keys: Iterable<string>) => void] {
-  const [keys, setKeys] = useState<Set<string>>(new Set());
+/** A set of keys with the one change a click makes: in if out, out if in. They are `scope`'s: in another scope there are none. */
+function useKeys(scope: string): [Set<string>, (key: string) => void, (keys: Iterable<string>) => void] {
+  const [held, setHeld] = useState<{ scope: string; keys: Set<string> }>({ scope, keys: new Set() });
+  if (held.scope !== scope) {
+    // Cleared, not hidden: the old query coming back must not bring its checks back.
+    setHeld({ scope, keys: new Set() });
+  }
+  const keys = held.scope === scope ? held.keys : new Set<string>();
   const toggle = (key: string) => {
     const next = new Set(keys);
     if (!next.delete(key)) {
       next.add(key);
     }
-    setKeys(next);
+    setHeld({ scope, keys: next });
   };
-  return [keys, toggle, (replacement) => { setKeys(new Set(replacement)); }];
-}
-
-/** What a person has opened or folded in the tree, by container, and whether Open every level or Fold to the top level was the last word. */
-interface Folds {
-  by: ReadonlyMap<string, boolean>;
-  every: boolean | undefined;
+  return [keys, toggle, (replacement) => { setHeld({ scope, keys: new Set(replacement) }); }];
 }
 
 /**
- * PLAN, LIST: a new query starts from its first page with nothing selected, but the tree keeps
- * its open and folded levels: a filter or a row-set toggle changes the rows, not what was opened.
+ * PLAN, LIST: the tree keeps its open and folded levels, which are the viewer's, across a
+ * filter, a row-set toggle, and a visit to another view; the rows checked are the query's.
  */
-export function ListBody(props: { view: Ready; settings: ListSettings; selected?: string | undefined }) {
-  const { search } = useLocation();
-  const folds = useState<Folds>({ by: new Map(), every: undefined });
-  return <ListRows key={search} {...props} folds={folds} />;
-}
-
-function ListRows({ view, settings, selected, folds: [folds, setFolds] }: { view: Ready; settings: ListSettings; selected?: string | undefined; folds: [Folds, (folds: Folds) => void] }) {
-  const [chosen, toggle, choose] = useKeys();
+export function ListBody({ view, settings, selected }: { view: Ready; settings: ListSettings; selected?: string | undefined }) {
+  const journey = view.journey.header.id;
+  const [folds, setHeld] = useState(() => keptFolds(journey));
+  const setFolds = (next: typeof folds) => {
+    keepFolds(journey, next);
+    setHeld(next);
+  };
   const query = useMemo(() => listQueryOf(settings), [settings]);
+  // Another query is another list of rows, which the old checks do not name.
+  const [chosen, toggle, choose] = useKeys(JSON.stringify(query));
   const { rows, error } = useRows(view, query);
   // What Show not relevant would add under the same filters, so the button never promises rows the filters would drop.
   const ruledOut = useRows(view, useMemo(() => ({ ...query, display_states: ["not_relevant" as const] }), [query])).rows?.length ?? 0;
