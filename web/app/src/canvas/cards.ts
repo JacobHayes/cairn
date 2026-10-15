@@ -107,9 +107,12 @@ const CHAR_EM = 0.58;
 const WIDE_CHAR_EM = 0.78;
 const SPACE_EM = 0.3;
 const LEADING_EM = 1.15;
-/** The sizes (layout px) a zoomed-out title is set between: the reading size, and the most the room gives. */
-export const TITLE_FIT_MIN_PX = 15;
+/** The sizes (layout px) a zoomed-out container title is set between: the most its room gives, and the least a narrow head can shrink to. */
 export const TITLE_FIT_MAX_PX = 60;
+export const TITLE_FIT_MIN_PX = 5;
+/** A zoomed-out title is held at the reading size (layout px) while its room allows, and at this size on screen (px) as the view zooms out. */
+export const TITLE_READING_PX = 15;
+export const TITLE_SCREEN_PX = 13;
 
 const wordEm = (word: string) => Array.from(word).reduce((sum, char) => sum + (/[\p{Lu}\p{N}]/u.test(char) ? WIDE_CHAR_EM : CHAR_EM), 0);
 const wordsOf = (title: string) => title.split(/\s+/).filter(Boolean).map(wordEm);
@@ -134,7 +137,7 @@ function wrappedLines(title: string, width: number): number | undefined {
   return lines;
 }
 
-/** Whether a word of the title is wider than `width` even at the reading size: it can only be cut, with an ellipsis, on one line. */
+/** Whether a word of the title is wider than `width` even at the least size: it can only be cut, with an ellipsis, on one line. */
 export function titleWordOverflows(title: string, width: number): boolean {
   return wrappedLines(title, width / TITLE_FIT_MIN_PX) === undefined;
 }
@@ -145,9 +148,9 @@ export function titleLines(size: number, height: number): number {
 }
 
 /**
- * The largest size (layout px) a title is set at, zoomed out, so it wraps between its words and
- * fits whole in a box of `width` by `height`: the more room, the larger. Never below the reading
- * size, so a title too long for its room is cut short there, at a whole line, instead.
+ * The largest size (layout px) a zoomed-out title is set at so it wraps between its words and fits
+ * whole in a box of `width` by `height`: the more room, the larger, down to the least a narrow
+ * head shrinks to, where a title too long for its room is cut short at a whole line instead.
  */
 export function titleFitPx(title: string, width: number, height: number): number {
   for (let size = TITLE_FIT_MAX_PX; size > TITLE_FIT_MIN_PX; size -= 1) {
@@ -159,13 +162,33 @@ export function titleFitPx(title: string, width: number, height: number): number
   return TITLE_FIT_MIN_PX;
 }
 
-/** The padding a zoomed-out card keeps, the room the glyph takes before a title, and the room a card's controls take after it (px). */
-export const ZOOMED_PAD_PX = 6;
-export const GLYPH_PX = 20;
-export const CONTROL_PX = 30;
-export const OPEN_PX = 72;
+/** The padding a zoomed-out container head keeps around its title, sides and top and bottom (px). */
+export const HEAD_PAD_X_PX = 20;
+export const HEAD_PAD_Y_PX = 6;
 
-/** The room (px) a title has zoomed out in a box `width` by `height`: less its padding, the state's glyph if it leads, and the controls beside it. */
-export function titleRoom(width: number, height: number, beside: { glyph: boolean; controls: number }): { width: number; height: number } {
-  return { width: width - 2 * (BORDER_PX + ZOOMED_PAD_PX) - (beside.glyph ? GLYPH_PX : 0) - beside.controls, height: height - 2 * (BORDER_PX + ZOOMED_PAD_PX) };
+/** The room (px) a title has in a zoomed-out container head of `header` px (its marker row included) in a card `width` wide. */
+export function headTitleBox(width: number, header: number, marker: boolean): { width: number; height: number } {
+  return { width: width - 2 * (BORDER_PX + HEAD_PAD_X_PX), height: header - 2 * BORDER_PX - (marker ? MARKER_ROW_PX : 0) - 2 * HEAD_PAD_Y_PX };
+}
+
+/** A zoomed-out title's size (layout px): the reading size, or 13px on screen when that is larger, but never more than its room allows. */
+export function titleSizePx(title: string, box: { width: number; height: number }, zoom: number): number {
+  return Math.min(Math.max(TITLE_READING_PX, TITLE_SCREEN_PX / zoom), titleFitPx(title, box.width, box.height));
+}
+
+/** The state chip beside a zoomed-out head's title is set at this size on screen (px), with this line height (a multiple of it) and border, at about this width per letter, plus its padding, dot and gap; CSS reads the first three from the chip's style. */
+export const CHIP_FONT_PX = 10.5;
+export const CHIP_LEADING = 1.6;
+export const CHIP_BORDER_PX = 1;
+const CHIP_LETTER_PX = 6.9;
+const CHIP_EXTRA_PX = 31;
+
+/** Whether a chip of `letters` fits beside the title in `box` at `zoom` without the title getting smaller or taking more lines. */
+export function headChipFits(title: string, letters: number, box: { width: number; height: number }, zoom: number): boolean {
+  const width = box.width - (letters * CHIP_LETTER_PX + CHIP_EXTRA_PX) / zoom;
+  if (width <= 0 || (CHIP_FONT_PX * CHIP_LEADING + 2 * CHIP_BORDER_PX) / zoom > box.height) {
+    return false;
+  }
+  const size = titleSizePx(title, box, zoom);
+  return titleSizePx(title, { width, height: box.height }, zoom) >= size && wrappedLines(title, width / size) === wrappedLines(title, box.width / size);
 }

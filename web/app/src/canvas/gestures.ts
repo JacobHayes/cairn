@@ -87,12 +87,5 @@ export function minZoomOf(fit: number): number {
   return Math.min(0.1, fit * 0.9);
 }
 
-/** The zoom band a card draws for (5.4): near, mid or far. */
-export type Band = "near" | "mid" | "far";
-
+/** Below this zoom a container's head is simplified (5.4): its title, and a stage's state chip. */
 export const NEAR_ZOOM = 0.6;
-export const MID_ZOOM = 0.3;
-
-export function bandOf(zoom: number): Band {
-  return zoom >= NEAR_ZOOM ? "near" : zoom >= MID_ZOOM ? "mid" : "far";
-}

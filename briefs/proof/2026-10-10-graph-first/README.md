@@ -50,7 +50,7 @@ the graph. The pass rail uses the same row look.
 
 ## Zoomed out
 
-Zoomed out, a card's title shrinks to fit, breaks only between words, and ends in an ellipsis on a whole line.
+Zoomed out, cards stay whole and only scale, so their text is too small to read. A stage or group's head shrinks to its title, which holds 13px on screen and breaks only between words, and a stage keeps its state chip at the right. Done work is faded to half and its chip draws a check.
 
 ![The graph zoomed out, light](6-graph-zoomed-out-light.png)
 ![The graph zoomed out, dark](6-graph-zoomed-out-dark.png)

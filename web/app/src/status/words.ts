@@ -1,4 +1,4 @@
-// D8: the words, dots and far-zoom glyphs of the engine's display state, in one place so every
+// D8: the words and badge tones of the engine's display state, in one place so every
 // surface says the same thing (mirrored in the MCP instructions, `instructions/SKILL.md`).
 // Stored state names (OPEN, TODO, PENDING) are not display words: they stay in the API and in
 // History ("recorded Open"). A group says NOT STARTED where a node waits for work to begin;
@@ -52,45 +52,6 @@ export function stateWord(state: DisplayState): string {
   return WORDS[state];
 }
 
-/** A chip's dot: its colour and its shape, so no two states look alike (DESIGN, Status). */
-export interface StatusDot {
-  tone: "ink" | "steel" | "warning" | "success" | "none";
-  shape: "filled" | "ring" | "square" | "dashed" | "struck" | "hollow";
-}
-
-const DOTS: Record<DisplayState, StatusDot> = {
-  ready: { tone: "ink", shape: "filled" },
-  active: { tone: "ink", shape: "ring" },
-  blocked: { tone: "steel", shape: "square" },
-  conditional: { tone: "none", shape: "dashed" },
-  scheduled: { tone: "steel", shape: "ring" },
-  snoozed: { tone: "warning", shape: "filled" },
-  done: { tone: "success", shape: "filled" },
-  skipped: { tone: "none", shape: "struck" },
-  not_relevant: { tone: "none", shape: "hollow" },
-};
-
-export function statusDot(state: DisplayState): StatusDot {
-  return DOTS[state];
-}
-
-/** The glyph a card shows at far zoom, where the word does not fit: its shape alone says the state. */
-const GLYPHS: Record<DisplayState, string> = {
-  ready: "●",
-  active: "◐",
-  blocked: "■",
-  conditional: "◌",
-  scheduled: "◷",
-  snoozed: "z",
-  done: "✓",
-  skipped: "–",
-  not_relevant: "○",
-};
-
-export function statusGlyph(state: DisplayState): string {
-  return GLYPHS[state];
-}
-
 /** The badge tone each state takes: its dot's colour and shape, so no two states look alike (DESIGN, Status). */
 export function statusTone(state: DisplayState): Tone {
   switch (state) {
@@ -107,7 +68,7 @@ export function statusTone(state: DisplayState): Tone {
     case "snoozed":
       return "warn";
     case "done":
-      return "good";
+      return "done";
     case "skipped":
       return "skipped";
     case "not_relevant":

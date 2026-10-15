@@ -25,9 +25,6 @@ test("C2 to C7: the graph opens fitted at every detail, expands in place, traces
   await nodeCard(page, "n_setup").getByTestId("card-expand").click();
   await expect(nodeCard(page, "n_plan")).toBeVisible();
   await expect(page).toHaveURL(/open=n_setup/);
-  // At far zoom a card's glyph, not its colour, names its state: no two states share one.
-  const glyphs = await page.getByTestId("card-glyph").evaluateAll((all) => all.map((each) => [each.getAttribute("data-state"), each.textContent]));
-  expect(new Set(glyphs.map(([, glyph]) => glyph)).size).toBe(new Set(glyphs.map(([state]) => state)).size);
   // Selecting a node traces it: what it needs and what it unblocks are tagged,.
   await nodeCard(page, "n_plan").getByTestId("card-open").click();
   await expect(page.getByTestId("card-mark").filter({ hasText: "needs" }).first()).toBeVisible();
@@ -165,4 +162,27 @@ test("the controls row: Detail redraws, Filter wears a badge for what it hides, 
   await expect.poll(() => cards.count()).toBeLessThan(drawn);
   await expect(page.getByTestId("detail-badge")).toBeVisible();
   await expect(page.getByTestId("detail-button")).toHaveAttribute("title", /hidden at this detail; choose All to see them/);
+});
+
+test("a card takes the lowest opacity that applies, and a zoomed-out stage head keeps its chip", async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openJourney(page, "browser", "j_vendor_eval", "");
+  await page.keyboard.press("f");
+  // Open and in focus is full, done is half; a zoomed-out stage head draws its chip inside the head, a group's has none.
+  await expect(nodeCard(page, "n_reporting")).toHaveCSS("opacity", "1");
+  await expect(nodeCard(page, "n_testing")).toHaveCSS("opacity", "0.5");
+  const chip = nodeCard(page, "n_testing").getByTestId("card-head-chip");
+  await expect(chip).toBeVisible();
+  const [chipBox, cardBox] = [await chip.boundingBox(), await nodeCard(page, "n_testing").boundingBox()];
+  if (chipBox === null || cardBox === null) {
+    throw new Error("the stage and its chip are drawn");
+  }
+  expect(chipBox.y).toBeGreaterThanOrEqual(cardBox.y);
+  expect(chipBox.x + chipBox.width).toBeLessThanOrEqual(cardBox.x + cardBox.width);
+  await expect(nodeCard(page, "n_final_review").getByTestId("card-head-chip")).toHaveCount(0);
+  // Tracing a card puts what is outside the trace at a third, done or not: the levels are never multiplied.
+  await nodeCard(page, "n_final_review").getByTestId("card-open").click({ force: true });
+  await expect(nodeCard(page, "n_decision_meeting")).toHaveCSS("opacity", "0.3");
+  await expect(nodeCard(page, "n_purpose")).toHaveCSS("opacity", "0.3");
+  await expect(nodeCard(page, "n_kickoff")).toHaveCSS("opacity", "0.5");
 });

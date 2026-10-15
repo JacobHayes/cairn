@@ -411,7 +411,7 @@ kbd {
   padding: 2px 0;
 }
 
-/* Status: mono label + small dot, never colour alone. */
+/* Status: mono label + small dot (a check for done work), never colour alone. */
 .badge {
   display: inline-flex;
   align-items: center;
@@ -430,7 +430,7 @@ kbd {
 .badge[hidden] {
   display: none;
 }
-.badge:is(.good, .bad, .warn, .pending, .superseded, .ink, .ring, .scheduled, .blocked, .conditional, .skipped)::before {
+.badge:is(.done, .good, .bad, .warn, .pending, .superseded, .ink, .ring, .scheduled, .blocked, .conditional, .skipped)::before {
   content: "";
   width: 6px;
   height: 6px;
@@ -438,8 +438,16 @@ kbd {
   background: var(--dot, var(--color-secondary));
   flex: none;
 }
-.badge.good {
+.badge:is(.done, .good) {
   --dot: var(--color-success);
+}
+/* Done, decided and reached draw a check in the dot's place: a mask the chip's cap height, its stroke the text's weight, in the success colour. */
+.badge.done::before {
+  width: 0.7em;
+  height: 0.7em;
+  border-radius: 0;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.2 5.4 4 8 8.8 1.8' fill='none' stroke='black' stroke-width='1.3' stroke-linecap='square'/%3E%3C/svg%3E") center / contain no-repeat;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M1.2 5.4 4 8 8.8 1.8' fill='none' stroke='black' stroke-width='1.3' stroke-linecap='square'/%3E%3C/svg%3E") center / contain no-repeat;
 }
 .badge.bad {
   --dot: var(--color-error);

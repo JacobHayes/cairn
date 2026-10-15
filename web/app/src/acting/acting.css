@@ -78,7 +78,7 @@ summary.node-panel-head {
   gap: 0;
 }
 
-/* The same status fill as the table's rows: done is the pale green, skipped and not relevant hollow (the ground). */
+/* A finished row is the pale green, skipped and not relevant hollow (the ground). */
 .node-row[data-state="done"] {
   --row-paper: var(--color-done);
 }
@@ -351,7 +351,7 @@ table.data.list-table .badge {
   left: 0;
 }
 
-/* A held cell is opaque, so what scrolls under it does not show through; a selected row's tint sits on top. A finished row (done, decided, reached) is the cards' pale green, a ruled-out one muted: the same status language as the canvas. */
+/* A held cell is opaque, so what scrolls under it does not show through; a selected row's tint sits on top. A finished row (done, decided, reached) is the pale green, a ruled-out one muted. */
 .list-table tr[data-state="done"] {
   --row-paper: var(--color-done);
 }

@@ -1,7 +1,7 @@
 /* The canvas (5.4 to 5.8): cards, lines, and what sits over them, drawn with Graticule's tokens in light
    and dark. Quiet by rule (C6): nothing animates or flashes. A card's row heights match cards.ts, which
-   sized the layout, so sizes here are px. Zoom only switches what a card draws, by `data-lod` on the
-   canvas root (near, mid, far), so the boxes never change size. The canvas fills its region (`.ws-canvas`,
+   sized the layout, so sizes here are px. A card is always drawn whole; only an open container's head is
+   simplified below the near zoom, by `data-lod` on the canvas root, so the boxes never change size. The canvas fills its region (`.ws-canvas`,
    which does not scroll) or, where a screen has no such region, a fixed height. */
 
 .canvas {
@@ -256,7 +256,7 @@
   background: var(--container-paper);
 }
 
-/* The rule is the frame's own stroke: the colour and width of its border (which a trace mark recolours and far zoom thickens), 2px with the selection's. */
+/* The rule is the frame's own stroke: the colour and width of its border (which a trace mark recolours), 2px with the selection's. */
 .node-container > .node-inner {
   border-bottom: 1px solid;
   border-bottom-color: inherit;
@@ -494,19 +494,7 @@
   pointer-events: none;
 }
 
-/* The state's glyph leads the title at far zoom; its shape says the state (5.4). */
-.node-glyph {
-  display: none;
-  flex: none;
-  font: 600 20px / 21px var(--font-mono);
-}
-
-/* One status language: fill says state, contrast says focus. Done, decided and reached are a pale green (a container's body too); skipped and not relevant are hollow, the ruling showing through; open work is paper. Conditional is a ghost, dashed, in steel. */
-.node-done {
-  --paper: var(--color-done);
-  --container-fill: var(--color-done);
-}
-
+/* One status language: fill says state. Skipped and not relevant are hollow, the ruling showing through; open work is paper; done work is paper too, faded (below). Conditional is a ghost, dashed, in steel. */
 .node-skipped,
 .node-not-relevant {
   --paper: transparent;
@@ -620,7 +608,22 @@
   text-decoration: line-through;
 }
 
-/* Out of focus (a trace, a filter, the decisions view): the whole card fades to the one level; the state fill stays underneath. */
+/* Opacity is one hierarchy and the lowest that applies wins, never a product: 1 open and in focus, .5 done, .3 out of focus (a trace, a filter, the decisions view) whatever the state. Later rules win at equal weight, so the lowest is last. A container fades its own head and frame only: its children are separate nodes. */
+.node-done {
+  opacity: 0.5;
+}
+
+.node-done :is(.node-title, .node-kind, .node-foot, .node-owner, .node-body-line) {
+  color: var(--color-muted);
+}
+
+/* The chip of done work is the green one: hollow, in the success colour, with the check. */
+.node-done .badge.done {
+  background: transparent;
+  border-color: var(--color-success);
+  color: var(--color-success);
+}
+
 .node-faded {
   opacity: 0.3;
 }
@@ -650,89 +653,67 @@
   border-color: var(--ink-fill);
 }
 
-/* ---- zoom bands (5.4): what a card draws, never its size -------------------------------------- */
+/* ---- zoomed out (5.4): an open container's head ---------------------------------------------- */
 
-/* Mid and far draw a glyph and the title, which takes the card's whole inner room (the padding is smaller) and is
-   not cut to the reading lines: it is set at 14px on screen (the zoom is `--z` on the root) or the largest size at
-   which the whole title fits the room (`--title-fit`, cards.ts), whichever is less. Far draws no head at all. */
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node :is(.node-body-line, .node-foot) {
+/* Below the near zoom a container's head is its title, left aligned and centred in the head's box, and a stage's state chip at the far right. The kind, progress, date, owner, the marker and the fold control go (a double-click still folds); the marker's row keeps its height, the rule stays. The title is 13px on screen (the zoom is `--z` on the root), never below the reading size 15px unless the room needs it, or the largest size at which the whole title fits the room (`--title-fit`, cards.ts), whichever is less. */
+.react-flow[data-lod="out"] .node-container .node-inner {
+  padding: 6px 20px;
+}
+
+.react-flow[data-lod="out"] .node-container :is(.node-head, .node-body-line, .node-foot) {
   display: none;
 }
 
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node:not(.node-container) .node-inner {
-  padding: 6px;
-}
-
-.react-flow[data-lod="far"] .node-head {
-  display: none;
-}
-
-/* At mid only a card's controls stay (a container's plus or minus, a route's Open), in the corner, so a card can still be opened or folded. */
-.react-flow[data-lod="mid"] .node-head {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  height: auto;
-}
-
-.react-flow[data-lod="mid"] .node-head > :not(.node-control) {
-  display: none;
-}
-
-.react-flow[data-lod="mid"] .node-inner:has(.node-control) .node-title-row {
-  padding-right: 30px;
-}
-
-.react-flow[data-lod="mid"] .node-inner:has(.node-control:not(.node-toggle)) .node-title-row {
-  padding-right: 72px;
-}
-
-/* A container's head shows only its title, and the marker under the rule goes; the rule stays. */
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-marker-row {
+.react-flow[data-lod="out"] .node-container .node-marker-row {
   visibility: hidden;
 }
 
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-glyph {
-  display: inline;
-}
-
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title-row {
+.react-flow[data-lod="out"] .node-container .node-title-row {
   flex: 1 1 0;
   min-height: 0;
   height: auto;
+  align-items: center;
+  overflow: hidden;
+  gap: calc(6px / var(--z, 1));
 }
 
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title {
-  font-size: min(max(15px, calc(14px / var(--z, 1))), var(--title-fit, 30px));
+.react-flow[data-lod="out"] .node-container .node-title {
+  flex: 0 1 auto;
+  font-size: min(max(15px, calc(13px / var(--z, 1))), var(--title-fit, 15px));
   line-height: 1.15;
 }
 
 /* A title breaks only between words and shows whole lines: the line count is what the room holds at the fit size, the rest ends in an ellipsis. */
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title > * {
+.react-flow[data-lod="out"] .node-container .node-title > * {
   overflow-wrap: normal;
   word-break: normal;
+  width: auto;
   -webkit-line-clamp: var(--title-fit-lines, 2);
 }
 
-/* A word wider than the room even at the reading size is cut with an ellipsis on one line, not through its letters. */
-.react-flow:is([data-lod="mid"], [data-lod="far"]) .node-title-row[data-cut] .node-title > * {
+/* A word wider than the head even at the least size is cut with an ellipsis on one line, not clipped through its letters. */
+.react-flow[data-lod="out"] .node-container .node-title-row[data-cut] .node-title > * {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-/* Corner ticks are too small to see far out; the hairline stays, thickened so it is 1px on screen. */
-.react-flow[data-lod="far"] .node {
-  border-width: max(1px, calc(1px / var(--z, 1)));
+/* The chip is set at 10.5px on screen, its border and radius keeping their hairline weight, laid out as on every card's head: the title left, the chip far right. */
+.react-flow[data-lod="out"] .node-container .node-head-chip.badge {
+  flex: none;
+  margin-left: auto;
+  padding: 0 0.45em;
+  gap: 0.4em;
+  border-width: calc(var(--chip-border) / var(--z, 1));
+  border-radius: calc(2px / var(--z, 1));
+  font-size: calc(var(--chip-font) / var(--z, 1));
+  line-height: var(--chip-leading);
 }
 
-.react-flow[data-lod="far"] .node-container:is(.node-selected, .node-picked) > .node-inner {
-  border-bottom-width: max(2px, calc(1px / var(--z, 1)));
-}
-
-.react-flow[data-lod="far"] .node:not(.node-container) {
-  background: var(--paper);
+.react-flow[data-lod="out"] .node-container .node-head-chip.badge:not(.done)::before {
+  width: 0.55em;
+  height: 0.55em;
 }
 
 /* ---- lines (5.6) ------------------------------------------------------------------------------ */

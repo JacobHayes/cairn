@@ -32,7 +32,7 @@
   --color-border: var(--n-4); /* hairlines */
   --color-error: #b8342c;
   --color-success: #1f7a55;
-  --color-done: #e0f0e7; /* the fill of finished work (done, decided, reached): a pale wash of the success green */
+  --color-done: #e0f0e7; /* the fill of a finished list row (done, decided, reached): a pale wash of the success green */
   --color-warning: #a66a12;
   --radius-none: 0;
   --radius-sm: 0;

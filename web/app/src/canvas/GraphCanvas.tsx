@@ -7,7 +7,7 @@
 //
 // Input (5.10), 720px and wider: two-finger scroll pans freely, the wheel alone never zooms, a
 // pinch or Ctrl/Cmd+wheel zooms at the pointer, a double-click expands a container. Zoom only
-// changes how much each card draws, through three bands on the root (`data-lod`, CSS only).
+// simplifies a container's head below a zoom (`data-lod` on the root, CSS only); a card never changes size.
 import "@xyflow/react/dist/base.css";
 import "./canvas.css";
 
@@ -20,7 +20,7 @@ import { ContextMenu } from "../ui/ContextMenu.tsx";
 import { typing } from "../ui/typing.ts";
 import { headHeight } from "./cards.ts";
 import { EdgeLine, type LineEdge } from "./EdgeLine.tsx";
-import { bandOf, fitZoom, listenPinch, minZoomOf } from "./gestures.ts";
+import { NEAR_ZOOM, fitZoom, listenPinch, minZoomOf } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
 import { MapFrame } from "./MapFrame.tsx";
@@ -380,7 +380,7 @@ function useFirstFit(props: FlowProps, fit: number): void {
   }, [initialized, sized, flow, fit, props.firstFit, props.model.cards]);
 }
 
-/** The zoom, as `--z` on the canvas root, so the far bands can set a title to a readable size on screen without the cards re-rendering. */
+/** The zoom, as `--z` on the canvas root, so a zoomed-out head can set its title to a readable size on screen without the cards re-rendering. */
 function useZoomVariable(root: RefObject<HTMLDivElement | null>): void {
   const store = useStoreApi();
   useLayoutEffect(() => {
@@ -552,7 +552,7 @@ function Flow(props: FlowProps) {
   const nodes = useMemo(() => nodesOf(withEmphasis(props), edgeEnds), [props, edgeEnds]);
   const edges = useMemo(() => edgesOf(withEmphasis(props)), [props]);
   const { menu, menus, openMenu, closeMenu } = useNodeMenu(props, live);
-  const band = useStore((state) => bandOf(state.transform[2]));
+  const near = useStore((state) => state.transform[2] >= NEAR_ZOOM);
   const { minZoom, fit } = useZoomRange(props, live, root);
   useFirstFit(props, fit);
   useZoomVariable(root);
@@ -597,7 +597,7 @@ function Flow(props: FlowProps) {
           proOptions={{ hideAttribution: true }}
           colorMode={theme}
           aria-label={props.label}
-          data-lod={band}
+          data-lod={near ? "near" : "out"}
         >
           {live ? <FitControls /> : null}
           {live ? props.children : null}

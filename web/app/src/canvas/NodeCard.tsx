@@ -3,15 +3,17 @@
 // body line (a decided decision's answer, a container's progress, what a conditional node depends
 // on), and at most one foot line (the one date in words, and the owner when it is the viewer or
 // missing). A rank tag hangs off the top-left of the top three, the trace's tag off the top-right,
-// the Signals lens's chip off the bottom-right. Zoom only chooses what is drawn, in CSS (`data-lod`
-// on the canvas root): near the whole card, mid the head and title, far the title led by the
-// state's glyph, whose shape says the state. The hidden-prerequisites marker opens the trace.
-import { Handle, Position, type Node, type NodeProps } from "@xyflow/react";
+// the Signals lens's chip off the bottom-right. A card is always
+// drawn whole and only scales with the zoom; below the near zoom an open container's head is
+// simplified, in CSS (`data-lod` on the canvas root), to its title and, on a stage, the state chip.
+// The hidden-prerequisites marker opens the trace.
+import { Handle, Position, useStore, type Node, type NodeProps } from "@xyflow/react";
 import { createContext, useContext, type CSSProperties } from "react";
 
 import type { ContextGroup } from "../ui/ContextMenu.tsx";
-import { statusGlyph, statusTone, statusWord } from "../status/words.ts";
-import { BORDER_PX, CONTROL_PX, MARKER_ROW_PX, OPEN_PX, TITLE_LINE_PX, cardRows, titleFitPx, titleLines, titleRoom, titleWordOverflows, type CardRows } from "./cards.ts";
+import { statusTone, statusWord } from "../status/words.ts";
+import { BORDER_PX, CHIP_BORDER_PX, CHIP_FONT_PX, CHIP_LEADING, MARKER_ROW_PX, TITLE_LINE_PX, cardRows, headChipFits, headTitleBox, titleFitPx, titleLines, titleWordOverflows, type CardRows } from "./cards.ts";
+import { NEAR_ZOOM } from "./gestures.ts";
 import type { LensChip } from "./lens.ts";
 import { hereWords, nodeClasses } from "./look.ts";
 import { RANK_TAG_COUNT, type Card, type CardBody } from "./model.ts";
@@ -47,7 +49,6 @@ export type CardData = {
   picked: boolean;
   /** Its height when it is a container (its children sit below its own card). */
   header: number | undefined;
-  /** A container's zoomed-out title is at least this large (px): the largest of its cards' fits, so it is never smaller than the cards it holds. */
   /** Where the layout put it in its container (C15), rounded, for whoever reads the page. */
   place: { x: number; y: number };
   /** The Signals lens's chip for it, and its tint (0 to 3). */
@@ -276,43 +277,47 @@ function Hanging({ data }: { data: CardData }) {
   );
 }
 
-/** The title with the state's glyph before it. */
-function TitleRow({ card, rows, fit }: { card: Card; rows: CardRows; fit: { size: number; lines: number; cut: boolean } }) {
+/** A zoomed-out stage head's state chip, beside the title and only while it costs the title no size or line. */
+function HeadChip({ card, box }: { card: Card; box: { width: number; height: number } }) {
   const journey = card.journey;
+  const word = journey === undefined ? "" : statusWord(journey.state, card.kind);
+  const show = useStore((state) => state.transform[2] < NEAR_ZOOM && headChipFits(card.title, word.length, box, state.transform[2]));
+  if (journey === undefined || !show) {
+    return null;
+  }
   return (
-    <div className="node-title-row" data-cut={fit.cut || undefined} style={{ "--title-h": `${String(rows.title * TITLE_LINE_PX)}px`, "--title-lines": rows.title, "--title-fit": `${String(fit.size)}px`, "--title-fit-lines": fit.lines } as CSSProperties}>
-      {journey === undefined ? null : (
-        <span className="node-glyph" data-testid="card-glyph" data-state={journey.state} aria-hidden="true">
-          {statusGlyph(journey.state)}
-        </span>
-      )}
-      <div className="node-title">
-        <Title card={card} />
-      </div>
-    </div>
+    <span className={`badge ${statusTone(journey.state)} node-head-chip`} style={{ "--chip-font": `${String(CHIP_FONT_PX)}px`, "--chip-leading": CHIP_LEADING, "--chip-border": `${String(CHIP_BORDER_PX)}px` } as CSSProperties} data-testid="card-head-chip" data-state={journey.state}>
+      {word}
+    </span>
   );
 }
 
-/** The room beside a zoomed-out title that a card's controls take. */
-function controlsOf(card: Card, collapsible: boolean, drill: boolean): number {
-  return (card.drillable && drill ? OPEN_PX : 0) + (card.collapsed || collapsible ? CONTROL_PX : 0);
+/** The title row; a container's also carries what its zoomed-out head sets the title by (the largest size and lines its room holds) and a stage's chip. */
+function TitleRow({ card, rows, head }: { card: Card; rows: CardRows; head?: { box: { width: number; height: number }; chip: boolean } }) {
+  const style: Record<string, string | number> = { "--title-h": `${String(rows.title * TITLE_LINE_PX)}px`, "--title-lines": rows.title };
+  if (head !== undefined) {
+    const size = titleFitPx(card.title, head.box.width, head.box.height);
+    style["--title-fit"] = `${String(size)}px`;
+    style["--title-fit-lines"] = titleLines(size, head.box.height);
+  }
+  return (
+    <div className="node-title-row" data-cut={head !== undefined && titleWordOverflows(card.title, head.box.width) ? "" : undefined} style={style}>
+      <div className="node-title">
+        <Title card={card} />
+      </div>
+      {head?.chip === true ? <HeadChip card={card} box={head.box} /> : null}
+    </div>
+  );
 }
 
 /** `NodeCard`: one node on the canvas, drawn as cards.ts sized it. */
 export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
   const { card, overlay, selected, picked, header, faded, edgeEnd } = data;
-  const actions = useContext(CardActionsContext);
   const journey = card.journey;
   const rows = cardRows(card);
   const classes = [...nodeClasses(card, { overlay, faded }), selected ? "node-selected" : "", picked ? "node-picked" : "", edgeEnd ? "node-edge-end" : "", header === undefined ? "" : "node-container"];
   const here = hereWords(card);
   const mark = overlay?.marks[card.key];
-  const controls = controlsOf(card, data.collapsible, actions?.drill !== undefined);
-  // Zoomed out, a title is set as large as its room lets the whole of it show (cards.ts).
-  const fit = (room: { width: number; height: number }) => {
-    const size = titleFitPx(card.title, room.width, room.height);
-    return { size, lines: titleLines(size, room.height), cut: titleWordOverflows(card.title, room.width) };
-  };
   return (
     <div
       className={classes.filter(Boolean).join(" ")}
@@ -333,7 +338,7 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
       {header === undefined ? (
         <div className="node-inner" style={{ height: "100%" }}>
           <Head card={card} collapsible={data.collapsible} />
-          <TitleRow card={card} rows={rows} fit={fit(titleRoom(width ?? 0, height ?? 0, { glyph: journey !== undefined, controls }))} />
+          <TitleRow card={card} rows={rows} />
           {journey?.body === undefined ? null : <Body body={journey.body} card={card} />}
           <Foot card={card} />
           <Marker card={card} />
@@ -343,7 +348,7 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
         <>
           <div className="node-inner" style={{ height: header - BORDER_PX - (rows.marker ? MARKER_ROW_PX : 0) }}>
             <Head card={card} collapsible={data.collapsible} />
-            <TitleRow card={card} rows={rows} fit={fit(titleRoom(width ?? 0, header - BORDER_PX - (rows.marker ? MARKER_ROW_PX : 0), { glyph: false, controls }))} />
+            <TitleRow card={card} rows={rows} head={{ box: headTitleBox(width ?? 0, header, rows.marker), chip: card.stage && journey !== undefined }} />
             {journey?.body === undefined ? null : <Body body={journey.body} card={card} />}
             <Foot card={card} owner={false} />
           </div>

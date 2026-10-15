@@ -34,12 +34,12 @@ export function Input({ label, ...props }: InputHTMLAttributes<HTMLInputElement>
 export const Field = Input;
 
 /**
- * A status dot's tone, by its meaning: `good` done, `bad` failed, `warn` attention or deferred,
+ * A status dot's tone, by its meaning: `done` done, decided or reached (a check, not a dot), `good` approved or new, `bad` failed, `warn` attention or deferred,
  * `pending` steel; `ink` filled is actionable now and `ring` in progress; `scheduled`, `blocked`
  * (square), `conditional` (dashed), `skipped` (struck) and `superseded` (hollow) keep states
  * apart by shape where colour is close (DESIGN, Status).
  */
-export type Tone = "plain" | "good" | "warn" | "bad" | "pending" | "ink" | "ring" | "scheduled" | "blocked" | "conditional" | "skipped" | "superseded";
+export type Tone = "plain" | "done" | "good" | "warn" | "bad" | "pending" | "ink" | "ring" | "scheduled" | "blocked" | "conditional" | "skipped" | "superseded";
 
 export function Badge({
   tone = "plain",
