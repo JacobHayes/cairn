@@ -58,7 +58,7 @@ Do as much as necessary and as little as possible. The rules above say how to be
 - **Migrate old data once.** When existing data breaks a new rule, a one-off migration brings the data into line and the code keeps one rule. A loader that accepts the old shape and the new one forever is a permanent branch every later change has to reason about: rewrite the stored documents to the new field name, then read only that name.
 - **No compatibility cruft before anyone depends on it.** Cairn has no outside consumers whose upgrades it must stage. Rename and cut over in one change, callers, documents, and stored data together, rather than keeping a deprecated alias, a fallback field, or a shim. One exists only for a named consumer that cannot move in the same change.
 - **Change by removing first.** Before adding code, state, or UI for a new intent, delete what the new intent makes redundant; then add only what is still missing.
-- **Plain and portable over clever.** A plain file copy over a copy-on-write trick, a full rebuild over a freshness heuristic, a fixed interval over an adaptive one, until a measurement shows the plain way is too slow; then the clever version lands with that measurement. Clever saves seconds when it works and costs an afternoon when it silently does not, often on a machine its author never tried.
+- **Plain and portable over clever.** Take the plain, portable way until a measurement shows it is too slow; then the clever version lands with that measurement. Clever saves seconds when it works and costs an afternoon when it silently does not, often on a machine its author never tried.
 
 ### Not adopted
 
