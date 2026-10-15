@@ -142,9 +142,19 @@ export interface JourneyCanvasProps {
   selection: Selection;
 }
 
-/** What the Decisions highlight fades: every card that is not a decision. */
+/** What the Decisions highlight fades: every card that is not a decision or around one. */
 function fadedBy(model: CanvasModel, decisions: boolean): ReadonlySet<string> {
-  return new Set(decisions ? model.cards.filter((card) => card.kind !== "decision").map((card) => card.key) : []);
+  if (!decisions) {
+    return new Set();
+  }
+  const parents = new Map(model.cards.map((card) => [card.key, card.parent]));
+  const kept = new Set<string>();
+  for (const card of model.cards.filter((each) => each.kind === "decision")) {
+    for (let at: string | undefined = card.key; at !== undefined && !kept.has(at); at = parents.get(at)) {
+      kept.add(at);
+    }
+  }
+  return new Set(model.cards.map((card) => card.key).filter((key) => !kept.has(key)));
 }
 
 /**

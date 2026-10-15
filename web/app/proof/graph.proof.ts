@@ -108,4 +108,10 @@ for (const scheme of ["light", "dark"] as const) {
     await beat(page);
     await shot(page, `status-trace-${scheme}`);
   });
+  test(`Frontier highlight fades the rest, ${scheme}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await vendor(page, "?detail=all&frontier=1");
+    await beat(page);
+    await shot(page, `frontier-${scheme}`);
+  });
 }

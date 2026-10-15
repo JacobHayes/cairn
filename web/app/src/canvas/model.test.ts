@@ -176,7 +176,7 @@ describe("C2, C4: roll-ups", () => {
     expect(nodeClasses(build)).toContain("node-skipped");
   });
 
-  test("done is filled and out of focus is not a fade: state classes are independent of the focus class", () => {
+  test("done is filled whatever the focus: state classes are independent of the focus class", () => {
     const finished = changed((each) => { derivedOf(each, "n_build").display_state = "done"; });
     const done = card(model(wholeLevel(), [], [], finished), "n_build");
     expect(nodeClasses(done, { faded: true })).toEqual(expect.arrayContaining(["node-done", "node-faded"]));

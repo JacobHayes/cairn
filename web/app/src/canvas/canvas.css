@@ -620,18 +620,9 @@
   text-decoration: line-through;
 }
 
-/* Out of focus (filters, the decisions view, what a trace does not reach): the card keeps its fill and its title; its border and secondary text drop to muted. No opacity, so the state stays readable. */
+/* Out of focus (a trace, a filter, the decisions view): the whole card fades to the one level; the state fill stays underneath. */
 .node-faded {
-  border-color: var(--color-border);
-  color: var(--color-muted);
-}
-
-.node-faded .node-title {
-  color: var(--color-text);
-}
-
-.node-faded .node-owner {
-  color: var(--color-muted);
+  opacity: 0.3;
 }
 
 /* The Signals chip is tinted on the neutral ramp by quartile of the range shown. */
