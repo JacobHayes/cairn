@@ -16,17 +16,10 @@ test("the in-browser host boots, redirects, derives in the worker, applies a pat
     Object.assign(window, { seenErrors: seen });
     window.addEventListener("error", (event) => seen.push(event.message));
   });
-  // The landing opens Mine, and an old canvas address lands on its page (the table of old
-  // addresses is journeys/address.test.ts's).
+  // The landing opens Mine.
   await visit(page, "browser", "/");
   await expect(page).toHaveURL(/\/mine$/);
   await expect(page.getByTestId("mine-journey").first()).toBeVisible();
-  await visit(page, "browser", "/journeys/j_hiring?hide=action&heat=on");
-  await expect(page).toHaveURL(/\/journeys\/j_hiring\/graph\?kind=group%2Cdecision%2Cdeliverable%2Cmilestone&lens=gravity$/);
-  // A node address with no key is the graph, not a blank page.
-  await visit(page, "browser", "/journeys/j_hiring/graph/nodes/");
-  await expect(page).toHaveURL(/\/journeys\/j_hiring\/graph$/);
-  await expect(page.getByTestId("canvas")).toBeVisible();
 
   await open(page, "browser", "/journeys");
   await expect(page.getByTestId("journey-row")).toHaveCount(4);

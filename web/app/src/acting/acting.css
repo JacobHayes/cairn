@@ -78,6 +78,15 @@ summary.node-panel-head {
   gap: 0;
 }
 
+/* The same status fill as the table's rows: done is the pale green, skipped and not relevant hollow (the ground). */
+.node-row[data-state="done"] {
+  --row-paper: var(--color-done);
+}
+
+.node-row:is([data-state="skipped"], [data-state="not_relevant"]) {
+  --row-paper: var(--color-ground);
+}
+
 .node-row {
   display: flex;
   flex-wrap: wrap;
@@ -86,7 +95,7 @@ summary.node-panel-head {
   min-height: 64px;
   padding: var(--space-3) var(--space-4);
   border-bottom: 1px solid var(--color-edge);
-  background: var(--color-surface);
+  background: var(--row-paper, var(--color-surface));
   cursor: pointer;
 }
 
@@ -95,11 +104,11 @@ summary.node-panel-head {
 }
 
 .node-row:hover {
-  background: linear-gradient(var(--color-hover), var(--color-hover)), var(--color-surface);
+  background: linear-gradient(var(--color-hover), var(--color-hover)), var(--row-paper, var(--color-surface));
 }
 
 .node-row[data-selected="true"] {
-  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--color-surface);
+  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--row-paper, var(--color-surface));
   box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
@@ -347,18 +356,43 @@ table.data.list-table .badge {
   left: 0;
 }
 
-/* A held cell is opaque, so what scrolls under it does not show through; a selected row's tint sits on top. */
+/* A held cell is opaque, so what scrolls under it does not show through; a selected row's tint sits on top. A finished row (done, decided, reached) is the cards' pale green, a ruled-out one muted: the same status language as the canvas. */
+.list-table tr[data-state="done"] {
+  --row-paper: var(--color-done);
+}
+
+/* Hollow: the ground shows (held cells are opaque, so they take its colour). */
+.list-table tr:is([data-state="skipped"], [data-state="not_relevant"]) {
+  --row-paper: var(--color-ground);
+}
+
+.list-table tr[data-state="not_relevant"] td {
+  color: var(--color-muted);
+}
+
 .list-table td.list-pinned {
-  background: var(--color-surface);
+  background: var(--row-paper, var(--color-surface));
 }
 
 .list-table tbody tr:hover td.list-pinned {
-  background: linear-gradient(var(--color-hover), var(--color-hover)), var(--color-surface);
+  background: linear-gradient(var(--color-hover), var(--color-hover)), var(--row-paper, var(--color-surface));
 }
 
 .list-table tr[data-selected="true"] td.list-pinned,
 .list-table tr[aria-selected="true"] td.list-pinned {
-  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--color-surface);
+  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--row-paper, var(--color-surface));
+}
+
+.list-table tr[data-state] td:not(.list-pinned) {
+  background-image: linear-gradient(var(--row-paper), var(--row-paper));
+}
+
+.list-table tr[data-state][aria-selected="true"] td:not(.list-pinned) {
+  background-image: linear-gradient(var(--color-tint), var(--color-tint)), linear-gradient(var(--row-paper), var(--row-paper));
+}
+
+.list-table tbody tr[data-state]:hover td:not(.list-pinned) {
+  background-image: linear-gradient(var(--color-hover), var(--color-hover)), linear-gradient(var(--row-paper), var(--row-paper));
 }
 
 /* Under the Frontier lens the Rank column comes first and is held with them. */
@@ -499,29 +533,25 @@ table.data.list-table {
 
 /* The band sits under the hover and selection tints, which stay. */
 .list-table tr[data-container="true"] td {
-  background-color: var(--color-band);
+  background-color: var(--row-paper, var(--color-band));
 }
 
 .list-table tr[data-container="true"] td.list-pinned {
-  background: var(--color-band);
+  background: var(--row-paper, var(--color-band));
 }
 
 .list-table tr[data-container="true"]:hover td,
 .list-table tr[data-container="true"]:hover td.list-pinned {
-  background: linear-gradient(var(--color-hover), var(--color-hover)), var(--color-band);
+  background: linear-gradient(var(--color-hover), var(--color-hover)), var(--row-paper, var(--color-band));
 }
 
 .list-table tr[data-container="true"][aria-selected="true"] td,
 .list-table tr[data-container="true"][aria-selected="true"] td.list-pinned {
-  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--color-band);
+  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--row-paper, var(--color-band));
 }
 
 .list-table tr[data-container="true"] td[data-column="title"] {
   font-weight: 600;
-}
-
-.list-table tr[data-container="true"] td.list-pinned {
-  background: var(--color-band);
 }
 
 .list-fold {

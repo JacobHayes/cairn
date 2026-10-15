@@ -1,6 +1,6 @@
 // The journey canvas over the vendor evaluation (C2 to C7): the flow of reading the graph in a
 // real browser, which only a browser can check (SVG hit-testing, the wheel and its modifiers,
-// the viewport). It opens at its current stage, expands in place, traces a selection, follows an
+// the viewport). It opens fitted at every detail, expands in place, traces a selection, follows an
 // edge, and pans and zooms. What the canvas draws (its levels, lines, lens, layout) is the
 // model's tests'.
 import { expect, test } from "@playwright/test";
@@ -8,13 +8,14 @@ import { expect, test } from "@playwright/test";
 import { lineBetween, pointOn, viewportOf, viewportSettled } from "./canvas.ts";
 import { nodeCard, nodePanel, openJourney } from "./shell.ts";
 
-test("C2 to C7: the graph opens at its current stage, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
+test("C2 to C7: the graph opens fitted at every detail, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
-  // It opens at Stages: the stage holding the work is open and says so, the others fold.
-  await expect(page.getByTestId("ladder").getByLabel("Stages")).toBeChecked();
-  await expect(nodeCard(page, "n_reporting").getByTestId("card-current")).toBeVisible();
-  // It opens where the work is, at a size titles can be read at; the Fit button shows the rest.
-  expect((await viewportOf(page)).zoom).toBeGreaterThanOrEqual(0.6);
+  // It opens at the stock view: every detail, fitted to the whole graph, as Fit does.
+  const ladder = page.getByTestId("ladder");
+  await expect(ladder.getByLabel("All")).toBeChecked();
+  // At Stages the stage holding the work is open and says so, the others fold.
+  await ladder.getByText("Stages", { exact: true }).click();
+  await expect(nodeCard(page, "n_reporting").getByTestId("card-current")).toBeAttached();
   await page.keyboard.press("f");
   await expect(nodeCard(page, "n_setup").getByTestId("card-expand")).toBeVisible();
   await expect(page.locator(".react-flow__attribution")).toHaveCount(0);

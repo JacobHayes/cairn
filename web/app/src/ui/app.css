@@ -267,6 +267,11 @@ body {
 .inspector-rail {
   flex: 1 1 auto;
   display: flex;
+  min-height: 0;
+}
+.rail-show {
+  flex: 1;
+  display: flex;
   align-items: center;
   justify-content: center;
   min-height: 0;
@@ -276,43 +281,59 @@ body {
   color: var(--chrome-muted);
   cursor: pointer;
 }
-.inspector-rail::before {
+.rail-show::before {
   content: "";
   width: 40px;
   height: 4px;
   background: var(--chrome-muted);
   opacity: 0.6;
 }
-.inspector-rail :is(.fold-icon, .rail-label) {
+.rail-show .fold-icon,
+.rail-tab {
   display: none;
 }
-.inspector-rail:hover {
+.rail-show:hover,
+.rail-tab:hover {
   color: var(--chrome-ink);
   border-color: transparent;
 }
-.inspector-rail:focus-visible {
+.rail-show:focus-visible,
+.rail-tab:focus-visible {
   outline: 2px solid var(--chrome-muted);
   outline-offset: -2px;
 }
-/* ...and the column's is a rail on the right edge: a chevron over a vertical label. */
+/* ...and the column's is a rail on the right edge: a chevron over vertical Inspector and Assistant tabs. */
 @media (min-width: 1100px) {
   .inspector-rail {
     flex-direction: column;
-    justify-content: flex-start;
+    align-items: center;
     gap: var(--space-3);
     padding: var(--space-3) 0;
   }
-  .inspector-rail::before {
+  .rail-show {
+    flex: none;
+    width: 100%;
+  }
+  .rail-show::before {
     display: none;
   }
-  .inspector-rail :is(.fold-icon, .rail-label) {
+  .rail-show .fold-icon {
     display: block;
   }
-  .inspector-rail .rail-label {
+  .rail-tab {
+    display: block;
+    padding: var(--space-3) 0;
+    border: 0;
+    background: transparent;
+    color: var(--chrome-muted);
+    cursor: pointer;
     writing-mode: vertical-rl;
     font: 500 12px / 1 var(--font-mono);
     letter-spacing: 0.08em;
     text-transform: uppercase;
+  }
+  .rail-tab[data-on="true"] {
+    color: var(--chrome-ink);
   }
 }
 .frame > .inspector[data-folded="true"] {

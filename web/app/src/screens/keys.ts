@@ -9,8 +9,7 @@ import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { screenPath, nodePath } from "../detail/parts.tsx";
-import { chipApplies, nextProjection, pagePath, withMineFlipped, withParam, type Projection, type Screen } from "../journeys/address.ts";
-import { switchedSearch } from "../journeys/kept.ts";
+import { chipApplies, nextProjection, pagePath, switchedSearch, withMineFlipped, withParam, type Projection, type Screen } from "../journeys/address.ts";
 import { typing } from "../ui/typing.ts";
 
 /** The bindings the sheet lists, each with its words. */
@@ -97,11 +96,11 @@ function onChips(key: string, heard: Heard): boolean {
         return false;
       }
       const to: Projection = nextProjection(screen);
-      go(pagePath(journey, to, selected, switchedSearch(journey, search, screen, to)));
+      go(pagePath(journey, to, selected, switchedSearch(search, screen, to)));
       return true;
     }
     case "w":
-      go(pagePath(journey, "walk", undefined, switchedSearch(journey, search, screen, "walk")));
+      go(pagePath(journey, "walk", undefined, switchedSearch(search, screen, "walk")));
       return true;
     case "F":
       if (chipApplies("frontier", screen)) {

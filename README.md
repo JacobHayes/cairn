@@ -47,8 +47,8 @@ Yes brings in three steps and frees one to start.
 
 ### The graph: what a step needs, and what it unlocks
 
-A journey opens on its graph, which draws the whole journey as a map you can pan and zoom. It opens on the
-current stage. Click a step to trace it: Cairn marks what it needs and what it unblocks,
+A journey opens on its graph, which draws the whole journey as a map you can pan and zoom. It opens fitted to
+the whole graph. Click a step to trace it: Cairn marks what it needs and what it unblocks,
 and fades the rest.
 
 ![The graph traced from one step, with what it needs and what it unblocks marked](docs/images/graph.png)

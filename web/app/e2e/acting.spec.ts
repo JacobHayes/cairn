@@ -66,7 +66,7 @@ test("B1, C11: a journey started from a route opens its walkthrough; an answer s
   await expect(page.getByTestId("unlocked-by").getByRole("link", { name: "Review the partner's criteria" })).toBeVisible();
 });
 
-test("C9: showing the not-relevant rows keeps the levels a person opened and clears the rows checked; so does a visit to the graph, which keeps the levels", async ({ page }) => {
+test("C9: showing the not-relevant rows keeps the levels a person opened and clears the rows checked; a visit to the graph starts the levels afresh", async ({ page }) => {
   await openActing(page, "browser", "j_vendor_eval", "list");
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
   const total = Number(await page.getByTestId("list-total").getAttribute("data-total"));
@@ -84,5 +84,5 @@ test("C9: showing the not-relevant rows keeps the levels a person opened and cle
   await page.getByTestId("view-graph").click();
   await page.getByTestId("view-list").click();
   await expect(page.getByTestId("list-fold").first()).toBeVisible();
-  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
+  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]').first()).toBeVisible();
 });

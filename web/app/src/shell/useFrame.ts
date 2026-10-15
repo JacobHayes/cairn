@@ -13,7 +13,7 @@ export interface Frame {
   actions: FrameActions;
   /** The column is on screen: something is in a pane and the viewer has not hidden it. */
   open: boolean;
-  /** Something is in a pane, hidden or not. */
+  /** Something is in a pane, or the assistant is offered, hidden or not. */
   present: boolean;
   /** The viewer hid it: the rail, or the sheet's bar, is all that shows. */
   folded: boolean;
@@ -105,7 +105,8 @@ export function useFrame(): Frame {
   );
   // A pane with nothing in it cannot be the tab in view.
   const shown: InspectorTab = counts.assistant > 0 && (counts.inspector === 0 || tab === "assistant") ? "assistant" : "inspector";
-  const present = counts.inspector > 0 || counts.assistant > 0;
+  // An offered assistant keeps the column, and so its tabs, on screen: they are its only way in.
+  const present = counts.inspector > 0 || counts.assistant > 0 || dock !== undefined;
   // A phone stacks the inspector under the page, except over the full-screen map, where it is a sheet that can be hidden.
   const stacked = useMedia(PHONE_WIDTH) && new URLSearchParams(useLocation().search).get("map") !== "1";
   const closable = useRef<Closable>({ tab: "inspector", dock: undefined });

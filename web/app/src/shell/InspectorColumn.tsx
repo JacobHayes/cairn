@@ -3,7 +3,7 @@
 // two heights), and stacked under the workspace on a phone. Its head has two tabs, INSPECTOR
 // and ASSISTANT, when the assistant is on offer, the sheet's grip in the middle, and one control
 // at the right that hides it. Hidden, the column folds to a rail on the right edge (a slim bar
-// at the bottom for the sheet) whose one button shows it again. The panes are empty slots: the
+// at the bottom for the sheet) that shows it again, with a vertical tab for each of Inspector and Assistant that opens it on that tab. The panes are empty slots: the
 // screens' content arrives through portals (frame.tsx). The inspector pane is the column's one
 // scroller; the assistant pane holds its own (a transcript above a pinned composer).
 import { useRef, type PointerEvent as ReactPointerEvent, type Ref, type RefObject } from "react";
@@ -80,10 +80,27 @@ export function InspectorColumn({ present, folded, tab, snap, assistantOffered, 
   const drag = useSheetDrag(column, snap, onSnap);
   return (
     <aside ref={column} className="inspector" aria-label="Inspector column" data-snap={snap} data-tab={tab} data-folded={folded} hidden={!present}>
-      <button type="button" className="inspector-rail" aria-label="Show inspector" title="Show the inspector  ]" hidden={!folded} onClick={onToggle}>
-        <FoldIcon toward="left" />
-        <span className="rail-label">Inspector</span>
-      </button>
+      <div className="inspector-rail" hidden={!folded}>
+        <button type="button" className="rail-show" aria-label="Show inspector" title="Show the inspector  ]" onClick={onToggle}>
+          <FoldIcon toward="left" />
+        </button>
+        {(assistantOffered ? (["inspector", "assistant"] as const) : (["inspector"] as const)).map((each) => (
+          <button
+            key={each}
+            type="button"
+            className="rail-tab"
+            data-testid={`rail-tab-${each}`}
+            data-on={tab === each}
+            title={`Show the ${each}`}
+            onClick={() => {
+              onTab(each);
+              onToggle();
+            }}
+          >
+            {each}
+          </button>
+        ))}
+      </div>
       <div className="inspector-head" hidden={folded}>
         {assistantOffered ? (
           <div className="segmented on-chrome" role="tablist" aria-label="Inspector">

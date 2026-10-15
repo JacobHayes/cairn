@@ -15,8 +15,7 @@ import { TriageControls } from "../acting/TriageScreen.tsx";
 import { GraphFilters } from "../canvas/KindToggles.tsx";
 import { canvasPath, viewFrom } from "../canvas/settings.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
-import { chipApplies, pagePath, withMineFlipped, withParam, type Screen } from "../journeys/address.ts";
-import { switchedSearch } from "../journeys/kept.ts";
+import { chipApplies, pagePath, switchedSearch, withMineFlipped, withParam, type Screen } from "../journeys/address.ts";
 import { Menu } from "./Menu.tsx";
 import { activeFilters } from "./filters.ts";
 
@@ -113,7 +112,7 @@ function Views({ journey, screen, node }: { journey: string; screen: Screen; nod
           className="journey-switch"
           aria-current={each.screen === screen ? "page" : undefined}
           data-testid={`view-${each.screen}`}
-          to={pagePath(journey, each.screen, node, each.screen === screen ? search : switchedSearch(journey, search, screen, each.screen))}
+          to={pagePath(journey, each.screen, node, each.screen === screen ? search : switchedSearch(search, screen, each.screen))}
         >
           {each.words}
         </Link>
@@ -192,7 +191,7 @@ export function JourneyToolbar({ ready, screen, node, onFind }: ToolbarProps) {
         aria-current={screen === "walk" ? "page" : undefined}
         title="Go through the frontier one card at a time"
         data-testid="walk-through"
-        to={pagePath(journey, "walk", undefined, switchedSearch(journey, search, screen, "walk"))}
+        to={pagePath(journey, "walk", undefined, switchedSearch(search, screen, "walk"))}
       >
         Walk through
       </Link>

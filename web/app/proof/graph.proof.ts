@@ -98,3 +98,14 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
 test("the main flow, on video", async ({ browser, baseURL }) => {
   await mainFlow(browser, baseURL ?? "");
 });
+
+for (const scheme of ["light", "dark"] as const) {
+  test(`done work filled green at fit, and a trace over it, ${scheme}`, async ({ page }) => {
+    await page.emulateMedia({ colorScheme: scheme });
+    await vendor(page, "?detail=all");
+    await shot(page, `status-all-${scheme}`);
+    await nodeCard(page, "n_review_opens").click();
+    await beat(page);
+    await shot(page, `status-trace-${scheme}`);
+  });
+}

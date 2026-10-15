@@ -7,7 +7,7 @@ import { expect, test, type Page } from "@playwright/test";
 
 import { savedText } from "./around.ts";
 import { addNode, addRole, formField, newRoute, nodeForm, openEditing, openForm, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";
-import { nodeCard, open, openFromCanvas } from "./shell.ts";
+import { nodeCard, open, openFromCanvas, openJourney } from "./shell.ts";
 
 /** The fields the open node's form offers. */
 async function offered(page: Page): Promise<string[]> {
@@ -115,3 +115,16 @@ test("B4: on a fixture journey, a local node added, a route-copied title edited 
   await expect(formField(page, "title").getByTestId("edited-here")).toHaveCount(0);
 });
 
+
+test("Edit is one state entered from the journey menu: structure tools and the name editor together, left with Done", async ({ page }) => {
+  await openJourney(page, "browser", "j_vendor_eval");
+  await expect(page.getByTestId("authoring-bar")).toHaveCount(0);
+  await page.getByTestId("journey-menu").click();
+  await page.getByTestId("menu-edit").click();
+  const bar = page.getByTestId("authoring-bar");
+  await expect(bar).toBeVisible();
+  await bar.getByRole("button", { name: "Edit the name and description" }).click();
+  await expect(bar.getByTestId("header-editor")).toBeVisible();
+  await page.getByTestId("edit-done").click();
+  await expect(bar).toHaveCount(0);
+});

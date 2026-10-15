@@ -1,6 +1,6 @@
 /* Graticule tokens (DESIGN.md). Light is canonical; dark follows the OS or data-theme="dark". */
 :root {
-  /* The neutral ramp: OKLCH hue 250, chroma 0.004 (palest) rising to 0.032 at mid and falling to 0.015 at the dark end,
+  /* The neutral ramp: OKLCH hue 250, chroma 0.004 (palest) rising to 0.032 at mid and settling at 0.012 at the dark end,
      lightness stepping from 0.985 to 0.14. Both themes draw every neutral role from it (DESIGN.md, Tokens). */
   --n-0: #f8fafd; /* L 0.985 C 0.004 */
   --n-1: #f0f4f8; /* L 0.965 C 0.007 */
@@ -11,13 +11,13 @@
   --n-6: #94a0ad; /* L 0.7 C 0.024 */
   --n-7: #6d7c8c; /* L 0.58 C 0.03 */
   --n-8: #4b5a6a; /* L 0.46 C 0.032 */
-  --n-9: #353e48; /* L 0.36 C 0.022 */
-  --n-10: #262f38; /* L 0.3 C 0.02 */
-  --n-11: #1e262e; /* L 0.265 C 0.019 */
-  --n-12: #171e25; /* L 0.23 C 0.018 */
-  --n-13: #10171e; /* L 0.2 C 0.017 */
-  --n-14: #0a1016; /* L 0.17 C 0.016 */
-  --n-15: #050a0f; /* L 0.14 C 0.015 */
+  --n-9: #3a4047; /* L 0.37 C 0.014 */
+  --n-10: #2d3238; /* L 0.315 C 0.013 */
+  --n-11: #22272d; /* L 0.27 C 0.013 */
+  --n-12: #1b2025; /* L 0.24 C 0.012 */
+  --n-13: #181c21; /* L 0.225 C 0.012 */
+  --n-14: #12171b; /* L 0.2 C 0.012 */
+  --n-15: #060a0e; /* L 0.14 C 0.012 */
 
   --color-primary: var(--n-12); /* graphite: primary buttons, chart ink */
   --color-secondary: var(--n-8); /* steel: labels, metadata */
@@ -32,8 +32,8 @@
   --color-border: var(--n-4); /* hairlines */
   --color-error: #b8342c;
   --color-success: #1f7a55;
+  --color-done: #e0f0e7; /* the fill of finished work (done, decided, reached): a pale wash of the success green */
   --color-warning: #a66a12;
-  --color-info: #2f6fff;
   --radius-none: 0;
   --radius-sm: 0;
   --radius-md: 2px;
@@ -46,7 +46,6 @@
   --space-5: 24px;
   --space-6: 32px;
   --space-7: 48px;
-  --space-8: 64px;
   --shadow-sm: 0 1px 0 rgba(20, 24, 30, 0.06);
   --shadow-md: 0 12px 30px rgba(20, 24, 30, 0.1);
   --shadow-lg: 0 24px 60px rgba(20, 24, 30, 0.14);
@@ -57,7 +56,6 @@
   --font-body: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   --type-base-size: 17px;
-  --type-scale-ratio: 1.25;
   --type-line-height: 1.5;
   --type-letter-spacing: 0.01em;
   --type-heading-weight: 700;
@@ -84,15 +82,7 @@
   --ink-fill: var(--color-primary); /* primary button */
   --ink-hover: var(--n-10);
 
-  /* Categorical (no hue in 200-240, so nothing reads as the accent) and neutral ramp, dark to pale. */
-  --cat-1: hsl(96 30% 38%);
-  --cat-2: hsl(28 40% 48%);
-  --cat-3: hsl(152 40% 34%);
-  --cat-4: hsl(352 40% 48%);
-  --cat-5: hsl(268 40% 54%);
-  --cat-6: hsl(46 40% 40%);
-  --cat-7: hsl(182 40% 34%);
-  --cat-8: hsl(320 40% 42%);
+  /* Neutral ramp, dark to pale. */
   --ramp-1: var(--n-12);
   --ramp-2: var(--n-8);
   --ramp-3: var(--n-6);
@@ -117,6 +107,7 @@
     --color-secondary: var(--n-6);
     --color-primary: var(--n-11);
     --color-error: #c53b32;
+    --color-done: #1b392c;
     --color-band: var(--n-10);
     --color-rule: rgba(255, 255, 255, 0.06);
     --color-tick: var(--n-6);
@@ -128,14 +119,6 @@
     --chart-steel: var(--color-muted);
     --ink-fill: var(--chrome-ink);
     --ink-hover: var(--chrome-muted);
-    --cat-1: hsl(96 30% 56%);
-    --cat-2: hsl(28 40% 62%);
-    --cat-3: hsl(152 40% 52%);
-    --cat-4: hsl(352 40% 64%);
-    --cat-5: hsl(268 40% 70%);
-    --cat-6: hsl(46 40% 56%);
-    --cat-7: hsl(182 40% 50%);
-    --cat-8: hsl(320 40% 62%);
     --ramp-1: var(--n-1);
     --ramp-2: var(--n-6);
     --ramp-3: var(--n-7);
@@ -160,6 +143,7 @@
   --color-secondary: var(--n-6);
   --color-primary: var(--n-11);
   --color-error: #c53b32;
+  --color-done: #1b392c;
   --color-band: var(--n-10);
   --color-rule: rgba(255, 255, 255, 0.06);
   --color-tick: var(--n-6);
@@ -171,14 +155,6 @@
   --chart-steel: var(--color-muted);
   --ink-fill: var(--chrome-ink);
   --ink-hover: var(--chrome-muted);
-  --cat-1: hsl(96 30% 56%);
-  --cat-2: hsl(28 40% 62%);
-  --cat-3: hsl(152 40% 52%);
-  --cat-4: hsl(352 40% 64%);
-  --cat-5: hsl(268 40% 70%);
-  --cat-6: hsl(46 40% 56%);
-  --cat-7: hsl(182 40% 50%);
-  --cat-8: hsl(320 40% 62%);
   --ramp-1: var(--n-1);
   --ramp-2: var(--n-6);
   --ramp-3: var(--n-7);

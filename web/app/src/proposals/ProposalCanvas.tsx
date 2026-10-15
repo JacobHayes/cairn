@@ -84,11 +84,6 @@ export function ProposalCanvas({ domain, graphs, marks, edges, dim, deployment, 
   }, [answer]);
   const { laidOut, error } = useLaidOut(`proposal:${domain}`, "diff", model);
   const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the proposal changes", marks, laidOut.model, dim, { added: edges.edgesAdded, removed: edges.edgesRemoved })), [laidOut, marks, edges, dim]);
-  // The view opens on the changes (all of them when they fit at a readable zoom, else the first one), not fitted to a journey whose cards are too small to read.
-  const focus = useMemo(() => {
-    const changed = Object.keys(marks);
-    return changed.length === 0 ? undefined : [changed, changed.slice(0, 1)];
-  }, [marks]);
   const actions = useMemo<CardActions>(
     () => ({
       open: onPick,
@@ -110,6 +105,6 @@ export function ProposalCanvas({ domain, graphs, marks, edges, dim, deployment, 
     return <p className="muted small">Laying out the diff...</p>;
   }
   return (
-    <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={overlay} lens={undefined} selected={selected} actions={actions} focus={focus} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" title="The proposal's diff" />
+    <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={overlay} lens={undefined} selected={selected} actions={actions} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" title="The proposal's diff" />
   );
 }

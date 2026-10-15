@@ -19,7 +19,7 @@ body {
 a {
   color: inherit;
   text-decoration: underline;
-  text-decoration-color: var(--color-border);
+  text-decoration-color: var(--color-secondary);
   text-underline-offset: 3px;
   text-decoration-thickness: 1px;
 }

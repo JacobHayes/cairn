@@ -21,10 +21,11 @@ import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import { pagePath } from "./address.ts";
 import { yoursOf } from "./figures-model.ts";
+import { JourneyFlow } from "../proposals/Entries.tsx";
 import { UpgradeMark } from "./JourneyIndex.tsx";
 import { useMineOf } from "./mine.ts";
 import { routeDetailPath } from "../routes/address.ts";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import "./journeys.css";
 
 /** The most items "next up" lists on the card; the Summary page lists every one. */
@@ -35,6 +36,7 @@ const NEXT_UP_SHOWN = 3;
  * index gives the host's "upgrade available"), and the day it started.
  */
 function LineageFold({ ready, full }: { ready: Ready; full: boolean }) {
+  const [upgrading, setUpgrading] = useState(false);
   const { header } = ready.journey;
   const lineage = header.lineage ?? undefined;
   const query = lineage === undefined ? undefined : { route: lineage.route, version: lineage.version };
@@ -47,8 +49,10 @@ function LineageFold({ ready, full }: { ready: Ready; full: boolean }) {
     return null;
   }
   const name = route?.header.name ?? lineage.route;
+  const latest = route?.latest_version ?? undefined;
+  const upgradable = latest !== undefined && latest > lineage.version;
   return (
-    <Section title="Lineage" summary={`${name} v${String(lineage.version)}`} open={full} testId="card-lineage">
+    <Section title="Lineage" summary={`${name} v${String(lineage.version)}`} open={full || upgradable} testId="card-lineage">
       <span className="row" data-testid="overview-lineage">
         <Link to={routeDetailPath(lineage.route)}>
           {name}, version {lineage.version}
@@ -57,7 +61,13 @@ function LineageFold({ ready, full }: { ready: Ready; full: boolean }) {
           See its graph
         </Link>
         {summary === undefined ? null : <UpgradeMark summary={summary} />}
+        {!upgradable ? null : (
+          <button type="button" className="chip" data-testid="journey-upgrade" title="Propose this journey's upgrade to the route's newer version" onClick={() => { setUpgrading(true); }}>
+            Upgrade to v{latest}
+          </button>
+        )}
       </span>
+      {upgrading ? <JourneyFlow ready={ready} flow="upgrade" onClose={() => { setUpgrading(false); }} /> : null}
       <span className="muted small">Started {dateWords(header.created_on, ready.derived.today)}</span>
     </Section>
   );

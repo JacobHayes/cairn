@@ -87,7 +87,3 @@
   min-height: 64px;
   resize: vertical;
 }
-
-.assistant-toggle[aria-pressed="true"] {
-  border-color: var(--color-text);
-}

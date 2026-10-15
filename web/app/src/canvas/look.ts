@@ -1,7 +1,7 @@
 // How cards and lines look, as data the components apply (C1, C5, C7): requirements solid with
 // an arrowhead, gates dotted with their own end marker, lines in steel and satisfied
 // ones grey; not-relevant cards hollow and conditional ones ghosted, "I am here" outlined in ink,
-// finished work receding, and an overlay's tags and the one fade level. Quiet by rule: nothing
+// done work filled green, and an overlay's tags and the one out-of-focus level. Quiet by rule: nothing
 // animates or flashes (C6). Pure, so the unit tests read the same decisions the canvas draws.
 import type { Card, Line, LineKind } from "./model.ts";
 import type { CanvasOverlay } from "./overlay.ts";
@@ -46,8 +46,8 @@ export function lineLook(line: Line, options: { overlay?: CanvasOverlay | undefi
 
 /**
  * C1, C5, C7: a card's classes: its kind, its display state's look (hollow when not relevant,
- * ghosted when conditional, receding when finished), "I am here" (the frontier and active work
- * outlined in ink), the overlay's tone, and the one fade level.
+ * ghosted when conditional, green when done, hollow when skipped), "I am here" (the frontier and active work
+ * outlined in ink), the overlay's tone, and the one out-of-focus level.
  */
 export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | undefined; faded?: boolean } = {}): string[] {
   const { overlay, faded = false } = options;
@@ -57,8 +57,10 @@ export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | und
     classes.push("node-not-relevant");
   } else if (journey?.state === "conditional") {
     classes.push("node-conditional");
-  } else if (journey?.finished === true) {
-    classes.push("node-finished");
+  } else if (journey?.state === "done") {
+    classes.push("node-done");
+  } else if (journey?.state === "skipped") {
+    classes.push("node-skipped");
   }
   if (journey !== undefined && (journey.here.frontier || journey.here.active)) {
     classes.push("node-here");

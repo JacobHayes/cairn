@@ -58,7 +58,7 @@ export function CanvasBars({ ready, authored, drawing }: Pick<ProjectionProps, "
   const view = useMemo(() => viewFrom(new URLSearchParams(search)), [search]);
   return (
     <>
-      {authored === undefined ? null : <JourneyAuthoringBar authored={authored} view={view} drawing={drawing} />}
+      {authored === undefined ? null : <JourneyAuthoringBar ready={ready} authored={authored} view={view} drawing={drawing} />}
       <StalledSurface ready={ready} view={view} />
     </>
   );

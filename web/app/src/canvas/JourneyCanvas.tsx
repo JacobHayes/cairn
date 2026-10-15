@@ -43,9 +43,7 @@ function useLadder(ready: Ready, view: CanvasView, decisions: boolean) {
     const step: Step = decisions && picked === "stages" ? "decisions" : picked;
     const active = nodes.filter((node) => recordOf(ready, node).state === "active").map((node) => node.key);
     const current = currentStages(nodes, ready.derived.acting_frontier, active);
-    // Where the view opens when the whole graph is too small to read: the current stages and what acts now (C5).
-    const focus = [[...current, ...ready.derived.acting_frontier], [...current]];
-    return { nodes, step, steps: stepsFor(nodes), collapsed: collapsedAt(step, nodes, current, view.open, view.shut), focus };
+    return { nodes, step, steps: stepsFor(nodes), collapsed: collapsedAt(step, nodes, current, view.open, view.shut) };
   }, [ready, view, decisions]);
 }
 
@@ -169,7 +167,7 @@ function useSelectionTrace(ready: Ready, selected: string | undefined) {
 /** What the canvas draws: the ladder's level laid out, the selected node's trace over it, and what Reveal asks for. */
 function useGraph(ready: Ready, view: CanvasView, selected: string | undefined, decisions: boolean) {
   const journey = ready.journey.header.id;
-  const { nodes, step, steps, collapsed, focus } = useLadder(ready, view, decisions);
+  const { nodes, step, steps, collapsed } = useLadder(ready, view, decisions);
   const { trace, learn } = useSelectionTrace(ready, selected);
   // Reveal (5.7) is a moment, not an address: it ends when something else is selected.
   const [revealedFor, setRevealedFor] = useState<string | undefined>(undefined);
@@ -194,9 +192,7 @@ function useGraph(ready: Ready, view: CanvasView, selected: string | undefined, 
     const leftOut = leftOutAt(step, nodes);
     return view.notRelevant ? 0 : hiddenCount(nodes.filter((node) => !leftOut.has(node.key)), (key) => ready.derived.nodes[key]?.display_state === "not_relevant", kindsAt(step), collapsed);
   }, [view.notRelevant, nodes, ready.derived.nodes, step, collapsed]);
-  // The view opens on the acting area at a step, not while structure is edited (all of it is in reach) nor after the viewer's own expands or a Reveal, which fit what they show.
-  const opening = traceOnly === undefined && !view.edit && view.open.length === 0 && view.shut.length === 0 ? focus : undefined;
-  return { step, steps, focus: opening, trace, laidOut, overlay, faded, hidden, error: error ?? layoutError, reveal: () => { setRevealedFor(selected); } };
+  return { step, steps, trace, laidOut, overlay, faded, hidden, error: error ?? layoutError, reveal: () => { setRevealedFor(selected); } };
 }
 
 /** What a card asks of the canvas: open its node, expand or collapse it (and refit to it, 5.1), trace it. */
@@ -326,14 +322,12 @@ export function JourneyCanvas({ ready, view, selected, edge, decisions, emphasis
         selectedEdge={edge?.replace("~", "->")}
         actions={actions}
         viewKey={refitKey(laidOut, view.edit)}
-        keep={journey}
         label={`${ready.journey.header.name}: canvas`}
         title={ready.journey.header.name}
         onEdge={(line) => void navigate(edgePath(journey, view, line))}
         onBackground={() => { if (selected !== undefined || edge !== undefined) { go(view, undefined); } }}
         selecting={selecting ? { picked, onPicked: (keys) => { setPicked(new Set(keys)); } } : undefined}
         reveal={reveal}
-        focus={graph.focus}
         steps={graph.steps}
         onStep={(next) => { go(withStep(view, next), selected); }}
       >

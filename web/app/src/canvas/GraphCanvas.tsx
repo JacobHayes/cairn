@@ -2,8 +2,8 @@
 // the edges ELK routed (ARCHITECTURE, Web UI: Canvas), over cards and lines already laid out.
 // Nothing is dragged (layout is automatic, C15; pinned positions are Later), nothing animates
 // (C6), and the view fits when what it shows changes (a step, an expand or a collapse), not on
-// every revision, so a live edit never jumps the viewport. It fits the whole graph when that is
-// readable (0.6 or more), else the acting area at 0.6 (C5); `f` and the Fit button fit all.
+// every revision, so a live edit never jumps the viewport. It always opens fitted to the whole
+// drawn graph, as `f` and the Fit button do.
 //
 // Input (5.10), 720px and wider: two-finger scroll pans freely, the wheel alone never zooms, a
 // pinch or Ctrl/Cmd+wheel zooms at the pointer, a double-click expands a container. Zoom only
@@ -14,14 +14,13 @@ import "./canvas.css";
 import { Controls, ReactFlow, ReactFlowProvider, useNodesInitialized, useReactFlow, useStore, useStoreApi, type EdgeChange, type NodeChange } from "@xyflow/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 
-import { keepViewport, keptViewport } from "../journeys/kept.ts";
 import { PHONE_WIDTH, SHEET, useFrameState } from "../shell/frame.tsx";
 import { useResolvedTheme } from "../ui/theme.ts";
 import { ContextMenu } from "../ui/ContextMenu.tsx";
 import { typing } from "../ui/typing.ts";
 import { headHeight } from "./cards.ts";
 import { EdgeLine, type LineEdge } from "./EdgeLine.tsx";
-import { NEAR_ZOOM, bandOf, fitZoom, listenPinch, minZoomOf } from "./gestures.ts";
+import { bandOf, fitZoom, listenPinch, minZoomOf } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
 import { MapFrame } from "./MapFrame.tsx";
@@ -64,8 +63,6 @@ export interface GraphCanvasProps {
   actions: CardActions;
   /** What the canvas shows; the view fits the graph again when it changes. */
   viewKey: string;
-  /** The journey whose viewport is kept per `viewKey` for when the canvas is opened again (a visit to another view), not fitted afresh. */
-  keep?: string | undefined;
   /** The accessible name of the canvas. */
   label: string;
   /** What the map is of, as its full-screen bar shows it (the journey's name, not the label). */
@@ -79,8 +76,6 @@ export interface GraphCanvasProps {
   /** The Select mode (5.9): shift-click and shift-drag pick cards. */
   selecting?: { picked: ReadonlySet<string>; onPicked: (keys: string[]) => void } | undefined;
   reveal?: Reveal | undefined;
-  /** Where the view opens when the whole graph is too small to read (C5): groups of nodes, the widest first (the current stages and the acting frontier, then the stages). */
-  focus?: readonly (readonly string[])[] | undefined;
   /** The ladder's steps, for keys 1 to 4. */
   steps?: readonly Step[];
   onStep?: ((step: Step) => void) | undefined;
@@ -91,8 +86,6 @@ export interface GraphCanvasProps {
 /** `inert`: the phone's preview, which takes no gesture and opens nothing (MapFrame). */
 interface FlowProps extends GraphCanvasProps {
   inert: boolean;
-  /** Picks up the viewport left at the last visit instead of fitting: only the first view this canvas shows, and only a live one. */
-  restore: boolean;
 }
 
 /** Whether a card is a container drawn open, with children to collapse. */
@@ -339,8 +332,10 @@ function useEdgeHover(root: RefObject<HTMLDivElement | null>) {
 function useZoomRange(props: FlowProps, live: boolean, root: RefObject<HTMLDivElement | null>): { minZoom: number; fit: number } {
   const flow = useReactFlow();
   const [width, height] = [useStore((state) => state.width), useStore((state) => state.height)];
+  // The room a fit has is what a sheet over the canvas's lower part leaves.
+  const covered = coveredBy(useFrameState()?.inspector?.parentElement);
   // Before the canvas has a size there is nothing to fit.
-  const fit = useMemo(() => (width === 0 || height === 0 ? 1 : fitZoom(boundsOf(props.model, props.layout), { width, height }, PAD)), [props.model, props.layout, width, height]);
+  const fit = useMemo(() => (width === 0 || height === 0 ? 1 : fitZoom(boundsOf(props.model, props.layout), { width, height: Math.max(1, height - covered) }, PAD)), [props.model, props.layout, width, height, covered]);
   const minZoom = minZoomOf(fit);
   const minZoomNow = useRef(minZoom);
   minZoomNow.current = minZoom;
@@ -359,52 +354,21 @@ function useZoomRange(props: FlowProps, live: boolean, root: RefObject<HTMLDivEl
   return { minZoom, fit };
 }
 
-/**
- * The first fit, once the canvas has a size and its cards are in: the whole graph when it is
- * readable at that zoom, else the first group of the focus that fits at the readable zoom (or
- * the last, cropped), so the view opens on where the work is (C5) rather than on titles too
- * small to read.
- */
-function useFirstFit(props: FlowProps, fit: number, live: boolean): void {
+/** The first fit, once the canvas has a size and its cards are in: always the whole drawn graph. */
+function useFirstFit(fit: number): void {
   const flow = useReactFlow();
-  const store = useStoreApi();
   const [initialized, sized] = [useNodesInitialized(), useStore((state) => state.width > 0 && state.height > 0)];
   const sheet = useFrameState()?.inspector?.parentElement;
   const done = useRef(false);
-  // Settled when this view mounts: a later render of the page must not turn a restore into a fit.
-  const [restore] = useState(props.restore);
-  // The preview is not a view to return to (it shares the full map's key and has no gestures to recover a pan).
-  const kept = props.keep === undefined || !live ? undefined : `${props.keep}/${props.viewKey}`;
-  useEffect(() => {
-    if (kept === undefined) {
-      return undefined;
-    }
-    return store.subscribe((state) => {
-      if (done.current) {
-        keepViewport(kept, { x: state.transform[0], y: state.transform[1], zoom: state.transform[2] });
-      }
-    });
-  }, [store, kept]);
   useEffect(() => {
     if (!initialized || !sized || done.current) {
       return;
     }
     done.current = true;
-    // A change of detail level is a new view, which fits; only coming back to the page restores.
-    const held = kept === undefined || !restore ? undefined : keptViewport(kept);
-    if (held !== undefined) {
-      void flow.setViewport(held);
-      return;
-    }
-    const { width, height } = store.getState();
     // On a tablet the inspector's sheet lies over the canvas's lower part: fit into what it leaves.
     const covered = coveredBy(sheet);
-    const padding = { ...FIT_PADDING, bottom: px(PAD.bottom + covered) };
-    const room = { width, height: height - covered };
-    const groups = (live && fit < NEAR_ZOOM ? (props.focus ?? []) : []).map((keys) => props.model.cards.filter((card) => standsFor(card).some((key) => keys.includes(key))).map((card) => card.key)).filter((ids) => ids.length > 0);
-    const near = groups.find((ids) => fitZoom(flow.getNodesBounds(ids), room, PAD) >= NEAR_ZOOM) ?? groups.at(-1);
-    void flow.fitView(near === undefined ? { ...FIT, padding, minZoom: minZoomOf(fit) } : { nodes: near.map((id) => ({ id })), padding, minZoom: NEAR_ZOOM, maxZoom: 1 });
-  }, [initialized, sized, flow, store, fit, live, props.model, props.focus, restore, kept]);
+    void flow.fitView({ ...FIT, padding: { ...FIT_PADDING, bottom: px(PAD.bottom + covered) }, minZoom: minZoomOf(fit) });
+  }, [initialized, sized, flow, fit]);
 }
 
 /** The zoom, as `--z` on the canvas root, so the far bands can set a title to a readable size on screen without the cards re-rendering. */
@@ -549,7 +513,7 @@ function Flow(props: FlowProps) {
   const { menu, menus, openMenu, closeMenu } = useNodeMenu(props, live);
   const band = useStore((state) => bandOf(state.transform[2]));
   const { minZoom, fit } = useZoomRange(props, live, root);
-  useFirstFit(props, fit, live);
+  useFirstFit(fit);
   useZoomVariable(root);
   useCenterAboveSheet(props.selected, live);
   useReveal(props.reveal, props.model, live);
@@ -610,18 +574,13 @@ function Flow(props: FlowProps) {
 
 /** A graph's canvas: laid-out cards and lines, with pan and zoom (a preview on a phone, MapFrame). */
 export function GraphCanvas(props: GraphCanvasProps) {
-  // Only the first view this canvas shows may restore a kept viewport: later ones are changes of level or map.
-  const arriving = useRef(true);
-  useEffect(() => {
-    arriving.current = false;
-  }, []);
   return (
     <MapFrame title={props.title}>
       {(inert) => (
         <div className="canvas" data-testid="canvas" data-view={props.viewKey}>
           {/* A new view mounts a new flow, which fits the whole graph (C3); a revision keeps the viewport. */}
           <ReactFlowProvider key={props.viewKey}>
-            <Flow {...props} inert={inert} restore={arriving.current} />
+            <Flow {...props} inert={inert} />
           </ReactFlowProvider>
         </div>
       )}

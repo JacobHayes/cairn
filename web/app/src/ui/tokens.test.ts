@@ -50,6 +50,8 @@ const floors: [string, string, number][] = [
   ["color-text", "color-surface", 4.5],
   ["color-muted", "color-surface", 4.5],
   ["color-muted", "color-ground", 4.5],
+  ["color-text", "color-done", 4.5],
+  ["color-muted", "color-done", 4.5],
   ["color-text", "color-band", 4.5],
   ["color-muted", "color-band", 4.5],
   ["chrome-ink", "chrome-bg", 4.5],

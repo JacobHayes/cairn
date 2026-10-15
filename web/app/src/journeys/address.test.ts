@@ -6,10 +6,9 @@ import { paramsOf, revealing, viewFrom } from "../canvas/settings.ts";
 import { screenPath } from "../detail/parts.tsx";
 import {
   DEFAULT_FILTERS,
-  carriedSearch,
+  switchedSearch,
   filterParams,
   filtersFrom,
-  legacyRedirect,
   nextProjection,
   queryOf,
   withMineFlipped,
@@ -74,58 +73,23 @@ describe("the journey's views (2.2, 2.3)", () => {
 
   it("carries a toolbar chip only to the views that read it", () => {
     const search = "?decisions=1&frontier=1&sort=due&mine=1&q=plan&kind=action";
-    expect(carriedSearch(search, "list", "timeline")).toBe("?decisions=1&mine=1&q=plan&frontier=1");
-    expect(carriedSearch(search, "list", "graph")).toBe("?decisions=1&frontier=1");
-    expect(carriedSearch(search, "list", "walk")).toBe("?decisions=1&mine=1&q=plan");
-    expect(carriedSearch(search, "list", "summary")).toBe("");
+    expect(switchedSearch(search, "list", "timeline")).toBe("?decisions=1&mine=1&q=plan&frontier=1");
+    expect(switchedSearch(search, "list", "graph")).toBe("?decisions=1&frontier=1");
+    expect(switchedSearch(search, "list", "walk")).toBe("?decisions=1&mine=1&q=plan");
+    expect(switchedSearch(search, "list", "summary")).toBe("");
   });
 
-  it("opens a view with the settings it was left with, and the chips as the view being left has them", () => {
-    const held = "?open=n_setup&lens=gravity&decisions=1&q=old";
-    // The graph's own settings return; Decisions follows the list (off there), and a search the graph does not read is not carried in.
-    expect(carriedSearch("?sort=due", "list", "graph", held)).toBe("?open=n_setup&lens=gravity");
-    // The list's search, set before a visit to the graph, is still there when the graph is left; the graph's chips follow the graph.
-    expect(carriedSearch("?decisions=1", "graph", "list", "?sort=due&q=plan")).toBe("?sort=due&decisions=1&q=plan");
-    // Mine turned off on the timeline is off on the list, whichever of its two spellings the list held; on, it is the chip.
-    expect(carriedSearch("", "timeline", "list", "?flag=mine,stalled")).toBe("?flag=stalled");
-    expect(carriedSearch("?flag=mine", "list", "timeline")).toBe("?mine=1");
+  it("opens a view with the chips only: its own settings are the stock ones, and the screen already open keeps its query", () => {
+    expect(switchedSearch("?sort=due&open=n_setup&decisions=1", "list", "graph")).toBe("?decisions=1");
+    expect(switchedSearch("?flag=mine", "list", "timeline")).toBe("?mine=1");
+    expect(switchedSearch("?sort=due", "list", "list")).toBe("?sort=due");
   });
 
   it("closes a node's detail to the screen it opened on (C12)", () => {
     expect(screenPath("/journeys/j_a/graph/nodes/n_x")).toBe("/journeys/j_a/graph");
     expect(screenPath("/journeys/j_a/graph/edges/n_x~n_y")).toBe("/journeys/j_a/graph");
     expect(screenPath("/journeys/j_a/summary")).toBe("/journeys/j_a/summary");
-  });
-});
-
-describe("every old address resolves (2.4, Redirects)", () => {
-  const rows: [string, string, string, string][] = [
-    ["the old canvas with hide, in, notrelevant, undecided, heat", "/journeys/j_a", "?hide=action,milestone&in=n_stage&notrelevant=hide&undecided=hide&heat=on", "/journeys/j_a/graph?kind=group%2Cdecision%2Cdeliverable&open=n_stage&show=&lens=gravity"],
-    ["the next list, now the list with the Frontier on, with its settings and a node", "/journeys/j_a/next/list/nodes/n_x", "?sort=due&mine=1", "/journeys/j_a/list/nodes/n_x?sort=due&mine=1&frontier=1"],
-    ["the cards, now the walk through", "/journeys/j_a/next/cards", "?decisions=1", "/journeys/j_a/walk?decisions=1"],
-    ["a plan view, now the view", "/journeys/j_a/plan/timeline", "?q=x", "/journeys/j_a/timeline?q=x"],
-    ["a plan graph's edge", "/journeys/j_a/plan/graph/edges/n_x~n_y", "", "/journeys/j_a/graph/edges/n_x~n_y"],
-    ["the bare plan", "/journeys/j_a/plan", "", "/journeys/j_a/graph"],
-    ["the decision walkthrough of the earlier screens", "/journeys/j_a/walkthrough", "", "/journeys/j_a/walk?decisions=1"],
-    ["a node's address with no key, which is the view without it", "/journeys/j_a/graph/nodes", "?kind=action", "/journeys/j_a/graph?kind=action"],
-    ["an old page's node address with no key", "/journeys/j_a/plan/list/nodes", "", "/journeys/j_a/plan/list"],
-    ["a journey's node address with no key", "/journeys/j_a/nodes", "", "/journeys/j_a"],
-    ["the journey index, which was at the root with its filters", "/", "?status=archived&route=r&version=2&mine=1", "/journeys?status=archived&route=r&version=2&mine=1"],
-  ];
-  it.each(rows)("%s", (_, pathname, search, expected) => {
-    expect(legacyRedirect(pathname, search)).toBe(expected);
-  });
-
-  it("leaves the new views, the landing and an unknown path alone", () => {
-    for (const [pathname, search] of [
-      ["/journeys/j_a/summary", ""],
-      ["/journeys/j_a/list", "?frontier=1"],
-      ["/", ""],
-      ["/journeys/j_a/graph/nodes/n_x", "?kind=action"],
-      ["/journeys/j_a/nowhere", ""],
-    ] as const) {
-      expect(legacyRedirect(pathname, search)).toBeUndefined();
-    }
+    expect(screenPath("/mine/j_a/nodes/n_x")).toBe("/mine");
   });
 });
 

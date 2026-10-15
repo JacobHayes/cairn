@@ -1,24 +1,16 @@
 // The journey header (4.1): the name, the lifecycle chip (`● ACTIVE ▾`: only the moves the
-// status allows, B11) and, on the right, the assistant, Edit (the structure's editor) and the
-// journey's `⋯` (rename it, insert a segment, save it as a route, re-link it, select nodes,
-// list the keys, copy its link: the flows the overview held, B7 to B9, A19). Under it one muted
-// line says what the journey is: its route and version, how far along it is, its next milestone;
-// a newer route version is offered there. What is the viewer's is on the journey card. When
-// completion is suggested, a band under the header offers it.
+// status allows, B11) and, on the right, the journey's `⋯` (Edit, insert a segment, save it as a
+// route, re-link it, select nodes, copy its link: the flows the overview held, B7 to B9, A19).
+// What the journey is (progress, next milestone, route) is on the journey card in the inspector.
+// When completion is suggested, a band under the header offers it.
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 
 import { AssistantDock, journeyTitles } from "../assistant/AssistantPanel.tsx";
 import { canvasPath, type CanvasView } from "../canvas/settings.ts";
-import { useLive } from "../data/react.ts";
-import { routeIndex } from "../data/reads.ts";
 import type { Ready } from "../detail/model.ts";
 import { DeleteJourney } from "../journeys/DeleteJourney.tsx";
-import { HeaderEditor } from "../journeys/HeaderEditor.tsx";
 import { statusActions } from "../journeys/lifecycle.ts";
-import { routeDetailPath } from "../routes/address.ts";
-import { dateAway } from "../timeline/model.ts";
-import type { SummaryModel } from "../summary/model.ts";
 import { useInsertEntry } from "../segments/entry.ts";
 import { useSuggested } from "../journeys/suggested.ts";
 import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
@@ -28,19 +20,7 @@ import { Menu } from "./Menu.tsx";
 import { Refused } from "./Refused.tsx";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
 
-type Panel = JourneyFlowName | "rename" | "delete";
-
-/** The journey's route as the library names it, and the version of it newer than the journey's own, which `Upgrade to vN` offers. */
-function useLineage(ready: Ready): { route: string; name: string; version: number; latest: number | undefined } | undefined {
-  const routes = useLive("routes", routeIndex).view;
-  const lineage = ready.journey.header.lineage ?? undefined;
-  if (lineage === undefined) {
-    return undefined;
-  }
-  const found = routes.status === "ready" ? routes.value.find((each) => each.header.id === lineage.route) : undefined;
-  const latest = found?.latest_version ?? undefined;
-  return { route: lineage.route, name: found?.header.name ?? lineage.route, version: lineage.version, latest: latest !== undefined && latest > lineage.version ? latest : undefined };
-}
+type Panel = JourneyFlowName | "delete";
 
 /** The lifecycle chip (B11): only the moves the status allows, and deletion once archived (A19). */
 function LifecycleMenu({ ready, write, onDelete }: { ready: Ready; write: ScreenWrite; onDelete: () => void }) {
@@ -100,7 +80,7 @@ function copyLink(): void {
   }
 }
 
-/** The journey's `⋯`, in three groups: its description and structure flows, selecting nodes, and its keys and link. */
+/** The journey's `⋯`, in groups: Edit and the structure flows, selecting nodes, and its link. */
 function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: CanvasView; selected: string | undefined; onPanel: (panel: Panel) => void }) {
   const { header } = ready.journey;
   const insert = useInsertEntry();
@@ -115,7 +95,11 @@ function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: C
         );
         return (
           <>
-            {item("menu-rename", "Edit name and description", "rename", archived)}
+            {archived ? null : (
+              <Link role="menuitem" className="menu-item" data-testid="menu-edit" to={canvasPath(header.id, { ...view, edit: !view.edit }, selected)} onClick={close}>
+                {view.edit ? "Done editing" : "Edit"}
+              </Link>
+            )}
             {insert === undefined || archived ? null : (
               <button type="button" role="menuitem" className="menu-item" data-testid="menu-insert-segment" onClick={() => { close(); insert(); }}>
                 Insert segment...
@@ -142,52 +126,8 @@ function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: C
   );
 }
 
-/** Edit: the structure's editor, in the address with what the canvas shows; it opens on the graph. */
-function EditButton({ journey, view, selected }: { journey: string; view: CanvasView; selected: string | undefined }) {
-  const navigate = useNavigate();
-  return (
-    <Button
-      className="no-print"
-      data-testid="edit-toggle"
-      aria-pressed={view.edit}
-      data-status={view.edit ? "on" : "off"}
-      title="Add, move and remove the journey's nodes and links"
-      onClick={() => { void navigate(canvasPath(journey, { ...view, edit: !view.edit }, selected)); }}
-    >
-      Edit
-    </Button>
-  );
-}
-
-/** The line under the name: the route and version, how far along, the next milestone, and the upgrade when there is one. */
-function Subline({ ready, model, onUpgrade }: { ready: Ready; model: SummaryModel | undefined; onUpgrade: () => void }) {
-  const lineage = useLineage(ready);
-  const next = model?.upcoming[0];
-  const done = model === undefined ? undefined : model.inScope - model.remaining;
-  return (
-    <div className="row journey-subline muted small" data-testid="journey-subline">
-      {lineage === undefined ? null : (
-        <span>
-          <Link to={routeDetailPath(lineage.route)}>{lineage.name}</Link> v{lineage.version}
-        </span>
-      )}
-      {model === undefined ? null : <span data-testid="journey-progress" data-done={done} data-in-scope={model.inScope}>{done} of {model.inScope} done</span>}
-      {next === undefined ? null : (
-        <span data-testid="journey-next-milestone" data-node={next.key}>
-          next milestone {next.title} {dateAway(next.date, ready.derived.today)}
-        </span>
-      )}
-      {lineage?.latest === undefined ? null : (
-        <button type="button" className="chip" data-testid="journey-upgrade" title="Propose this journey's upgrade to the route's newer version" onClick={onUpgrade}>
-          Upgrade to v{lineage.latest}
-        </button>
-      )}
-    </div>
-  );
-}
-
 /** `view` is the canvas as the page shows it, or the canvas's defaults off the graph: Edit structure keeps it. */
-export function JourneyHeader({ ready, view, selected, model }: { ready: Ready; view: CanvasView; selected: string | undefined; model: SummaryModel | undefined }) {
+export function JourneyHeader({ ready, view, selected }: { ready: Ready; view: CanvasView; selected: string | undefined }) {
   const { header, revision } = ready.journey;
   const write = useScreenWrite();
   const suggested = useSuggested(ready);
@@ -199,10 +139,8 @@ export function JourneyHeader({ ready, view, selected, model }: { ready: Ready; 
         <LifecycleMenu ready={ready} write={write} onDelete={() => { setPanel("delete"); }} />
         <span className="spacer" />
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
-        {header.status === "archived" ? null : <EditButton journey={header.id} view={view} selected={selected} />}
         <JourneyMenu ready={ready} view={view} selected={selected} onPanel={setPanel} />
       </div>
-      <Subline ready={ready} model={model} onUpgrade={() => { setPanel("upgrade"); }} />
       {header.status === "active" && suggested ? (
         <div className="callout row" data-testid="completion-suggested">
           <span>Everything in scope is done.</span>
@@ -218,9 +156,8 @@ export function JourneyHeader({ ready, view, selected, model }: { ready: Ready; 
       ) : null}
       {header.status === "archived" ? <span className="muted small">Archived: it accepts only un-archiving or deletion.</span> : null}
       {write.rejected === undefined ? <Receipt receipt={write.receipt} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
-      {panel === "rename" ? <HeaderEditor ready={ready} onClose={() => { setPanel(undefined); }} /> : null}
       {panel === "delete" ? <DeleteJourney ready={ready} onCancel={() => { setPanel(undefined); }} /> : null}
-      {panel === "upgrade" || panel === "save" || panel === "relink" ? (
+      {panel === "save" || panel === "relink" ? (
         <JourneyFlow ready={ready} flow={panel} onClose={() => { setPanel(undefined); }} />
       ) : null}
     </section>

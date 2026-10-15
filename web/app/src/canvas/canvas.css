@@ -307,6 +307,7 @@
 
 /* Paper, a hairline, and DESIGN's four corner ticks (L-shaped, 8px, inset 3px). */
 .node {
+  --paper: var(--color-surface);
   --tick: linear-gradient(var(--color-tick), var(--color-tick));
   box-sizing: border-box;
   display: flex;
@@ -322,7 +323,7 @@
     var(--tick) left 3px bottom 3px / 1px 8px no-repeat,
     var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
     var(--tick) right 3px bottom 3px / 1px 8px no-repeat,
-    var(--color-surface);
+    var(--paper);
   color: var(--color-text);
   font-size: 13px;
   line-height: 21px;
@@ -341,7 +342,7 @@
     var(--tick) left 3px bottom 3px / 1px 8px no-repeat,
     var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
     var(--tick) right 3px bottom 3px / 1px 8px no-repeat,
-    color-mix(in srgb, var(--color-surface) 55%, transparent);
+    var(--container-fill, color-mix(in srgb, var(--color-surface) 55%, transparent));
   border-color: var(--color-frame);
   background: var(--container-paper);
 }
@@ -591,11 +592,22 @@
   font: 600 20px / 21px var(--font-mono);
 }
 
-/* Not relevant, when shown: hollow, the ruling shows through. Conditional: a ghost, dashed, in steel. */
+/* One status language: fill says state, contrast says focus. Done, decided and reached are a pale green (a container's body too); skipped and not relevant are hollow, the ruling showing through; open work is paper. Conditional is a ghost, dashed, in steel. */
+.node-done {
+  --paper: var(--color-done);
+  --container-fill: var(--color-done);
+}
+
+.node-skipped,
 .node-not-relevant {
-  opacity: 0.55;
+  --paper: transparent;
+  --container-fill: transparent;
   background: transparent;
   box-shadow: none;
+}
+
+.node-not-relevant {
+  color: var(--color-muted);
 }
 
 .node-conditional {
@@ -603,11 +615,6 @@
   background: transparent;
   box-shadow: none;
   color: var(--color-secondary);
-}
-
-/* Finished work recedes to the ramp, so history reads as a path. */
-.node-finished {
-  color: var(--ramp-2);
 }
 
 /* C5: I am here, in ink (structure, not blue). */
@@ -618,7 +625,7 @@
 /* DESIGN's selection: a 2px accent line on the left edge and the faint tint. */
 .node-selected,
 .node-picked {
-  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--color-surface);
+  background: linear-gradient(var(--color-tint), var(--color-tint)), var(--paper);
   box-shadow:
     inset 2px 0 0 var(--color-accent),
     var(--shadow-sm);
@@ -704,9 +711,18 @@
   text-decoration: line-through;
 }
 
-/* The one fade level: filters, the decisions view, and what a trace does not reach all fade the same, and never multiply. */
+/* Out of focus (filters, the decisions view, what a trace does not reach): the card keeps its fill and its title; its border and secondary text drop to muted. No opacity, so the state stays readable. */
 .node-faded {
-  opacity: 0.3;
+  border-color: var(--color-border);
+  color: var(--color-muted);
+}
+
+.node-faded .node-title {
+  color: var(--color-text);
+}
+
+.node-faded .node-owner {
+  color: var(--color-muted);
 }
 
 /* The Signals chip is tinted on the neutral ramp by quartile of the range shown. */
@@ -816,7 +832,7 @@
 }
 
 .react-flow[data-lod="far"] .node:not(.node-container) {
-  background: var(--color-surface);
+  background: var(--paper);
 }
 
 /* ---- lines (5.6) ------------------------------------------------------------------------------ */

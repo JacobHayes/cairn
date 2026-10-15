@@ -111,7 +111,7 @@ test("a route's draft has its own conversation", async ({ page }) => {
 
 test("the in-browser host has no panel", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval");
-  await expect(page.getByTestId("assistant-toggle")).toHaveCount(0);
+  await expect(page.getByTestId("tab-assistant")).toHaveCount(0);
   await shot(page, "9-in-browser-host-without-it");
 });
 

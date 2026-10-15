@@ -6,7 +6,7 @@ import { describe, expect, test } from "vitest";
 import { canvasView, actionsAndDecisionsHidden, wholeLevel } from "./canvas.test-support.ts";
 import { journeyLooks } from "./journey.ts";
 import { lensChips } from "./lens.ts";
-import { DOTTED, hereWords, lineLook } from "./look.ts";
+import { DOTTED, hereWords, lineLook, nodeClasses } from "./look.ts";
 import { cardsOf, linesOf, type CanvasModel, type Card, type Level } from "./model.ts";
 import { TRACE_LABELS, traceOverlay } from "./overlay.ts";
 import { DEFAULT_VIEW, levelRequest } from "./settings.ts";
@@ -173,6 +173,14 @@ describe("C2, C4: roll-ups", () => {
     const build = card(model(wholeLevel(), [], [], skipped), "n_build");
     expect([build.journey?.state, build.journey?.finished, hereWords(build)]).toEqual(["skipped", true, []]);
     expect(card(model(actionsAndDecisionsHidden(), [], [], skipped), "n_build").checklist[0]?.done).toBe(true);
+    expect(nodeClasses(build)).toContain("node-skipped");
+  });
+
+  test("done is filled and out of focus is not a fade: state classes are independent of the focus class", () => {
+    const finished = changed((each) => { derivedOf(each, "n_build").display_state = "done"; });
+    const done = card(model(wholeLevel(), [], [], finished), "n_build");
+    expect(nodeClasses(done, { faded: true })).toEqual(expect.arrayContaining(["node-done", "node-faded"]));
+    expect(nodeClasses(done)).not.toContain("node-skipped");
   });
 
   test("a node of a shown kind that rolled up is not a checklist item", () => {

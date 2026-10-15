@@ -44,7 +44,7 @@ export interface FrameState {
   tab: InspectorTab;
 }
 
-/** The assistant's toggle, which the tab bar uses to open it from the shell. */
+/** The assistant's controls, which the inspector column's tabs and Esc use from the shell. */
 export interface AssistantDock {
   open: () => void;
   close: () => void;
@@ -56,7 +56,7 @@ export interface FrameActions {
   mount: (slot: InspectorTab) => () => void;
   /** Brings `tab` into view whatever the viewer left in its way: the other tab, a hidden column. */
   show: (tab: InspectorTab) => void;
-  /** The assistant can be opened (its toggle is on screen) until the returned function is called. */
+  /** The assistant can be opened (its tab is offered) until the returned function is called. */
   dock: (dock: AssistantDock) => () => void;
   /** Where Esc takes the sheet: `address` closes the open node; undefined when nothing is open. */
   closeTo: (address: string | undefined) => void;
@@ -146,7 +146,7 @@ export function AssistantSlot({ children }: { children: ReactNode }) {
   return state.assistant === null ? null : createPortal(children, state.assistant);
 }
 
-/** Registers the assistant's opener with the shell while the toggle is on screen. */
+/** Registers the assistant's opener with the shell while it is offered. */
 export function useAssistantDock(dock: AssistantDock | undefined): void {
   const actions = useFrameActions();
   useEffect(() => {

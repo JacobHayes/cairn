@@ -12,11 +12,9 @@
 //   /journeys/<id>                  landing: the view last shown, the graph at first (JourneyLanding)
 //
 // The toolbar's chips are in the query on every view: `decisions=1`, `mine=1`, `q=<text>`, and
-// `frontier=1`, the lens on what can move now. Every address the earlier screens had still
-// resolves (`legacyRedirect`).
+// `frontier=1`, the lens on what can move now.
 import type { Schema } from "@cairn/client";
 
-import { graphQueryFromOld, OLD_CANVAS_PARAMS } from "../canvas/settings.ts";
 import type { JourneyIndexQuery } from "../data/host.ts";
 
 export type JourneyStatus = Schema<"JourneyStatus">;
@@ -109,9 +107,6 @@ export function queryOf(filters: IndexFilters, entities: readonly string[]): Jou
   return query;
 }
 
-/** The journey index's parameters (filterParams). */
-const INDEX_PARAMS = ["status", "route", "version", "mine", "upgrade"];
-
 function searchOf(params: URLSearchParams): string {
   const text = params.toString();
   return text === "" ? "" : `?${text}`;
@@ -183,35 +178,24 @@ export function chipApplies(name: keyof typeof CHIP_APPLIES, screen: Screen): bo
 const CHIPS = ["decisions", "mine", "q", "frontier"] as const;
 
 /**
- * The query a switch from `from` to `to` opens: `to`'s own settings as it last had them (`held`:
- * its sort, columns, expanded containers, ...), with the toolbar's chips that mean something on
- * `to`. A chip both screens read follows the screen being left, so turning it off there turns it
- * off here; one only `to` reads (the list's search, while the graph was open) stays as it was.
- * A chip `to` does not read is left behind, not carried unseen.
+ * The query a switch from `from` to `to` opens: the toolbar's chips that mean something on `to`
+ * (a chip both screens read follows the screen being left), and nothing else of `from`'s own
+ * settings. A chip `to` does not read is left behind, not carried unseen. The screen already
+ * open keeps its query.
  */
-export function carriedSearch(search: string, from: Screen, to: Screen, held = ""): string {
+export function switchedSearch(search: string, from: Screen, to: Screen): string {
+  if (from === to) {
+    return search;
+  }
   const now = new URLSearchParams(search);
-  const before = new URLSearchParams(held);
-  // Mine is the chip's `mine=1` or the list's `flag=mine`; where the screen being left says it, the held flag must not say it again.
-  const follows = chipApplies("mine", from) && chipApplies("mine", to);
-  const kept = new URLSearchParams();
-  for (const [name, value] of before) {
-    if (CHIPS.some((chip) => chip === name)) {
-      continue;
-    }
-    const flags = name === "flag" && follows ? value.split(",").filter((flag) => flag !== "mine").join(",") : value;
-    // A setting can be empty and mean something (`show=`, `kind=`): only an emptied flag list goes.
-    if (flags !== "" || name !== "flag") {
-      kept.append(name, flags);
-    }
-  }
+  const carried = new URLSearchParams();
   for (const name of CHIPS) {
-    const value = chipApplies(name, from) ? (name === "mine" ? (mineOn(now) ? "1" : null) : now.get(name)) : before.get(name);
+    const value = chipApplies(name, from) ? (name === "mine" ? (mineOn(now) ? "1" : null) : now.get(name)) : null;
     if (value !== null && chipApplies(name, to)) {
-      kept.set(name, value);
+      carried.set(name, value);
     }
   }
-  return searchOf(kept);
+  return searchOf(carried);
 }
 
 /** Whether MINE is on in `params`: the chip's, or the list's own `flag=mine`. */
@@ -264,93 +248,4 @@ export function pagePath(journey: string, screen: Screen, node?: string, search 
 /** The address agents post for a node; it resolves to the graph with the node selected (JourneyDeepLink). */
 export function deepLinkPath(journey: string, node: string): string {
   return `/journeys/${journey}/nodes/${node}`;
-}
-
-/** The old canvas's parameters, which an address carries only on the canvas of the earlier screens. */
-const OLD_CANVAS_ADDRESS = [...OLD_CANVAS_PARAMS, "trace", "edit"];
-
-/** Where an address that no longer exists lives now, and the query it adds there. */
-interface Moved {
-  to: Screen;
-  add?: string;
-}
-
-/** The earlier screens at `/journeys/<id>/<name>`. */
-const OLD_SCREENS: Record<string, Moved | "landing"> = {
-  overview: "landing",
-  next: { to: "list", add: "frontier=1" },
-  triage: { to: "walk" },
-  walkthrough: { to: "walk", add: "decisions=1" },
-  decisions: { to: "graph", add: "decisions=1" },
-};
-
-/** The two pages that held the projections before the journey had one: `next/{list|cards}` and `plan/{graph|list|timeline}`. */
-const OLD_PAGES: Record<string, Record<string, Moved>> = {
-  next: { list: { to: "list", add: "frontier=1" }, cards: { to: "walk" } },
-  plan: { graph: { to: "graph" }, list: { to: "list" }, timeline: { to: "timeline" } },
-};
-
-/** `moved`'s address for `journey` and `node`, with `params` carried over (the old canvas's and the triage's parameters under their new names). */
-function movedTo(journey: string, moved: Moved, node: string | undefined, params: URLSearchParams, of: "nodes" | "edges" = "nodes"): string {
-  const query = new URLSearchParams(moved.to === "graph" ? graphQueryFromOld(params) : params);
-  // The triage's walkthrough was a mode; the chips and settings keep their names.
-  if (query.get("mode") === "decisions") {
-    query.delete("mode");
-    query.set("decisions", "1");
-  }
-  if (moved.add !== undefined) {
-    const [name = "", value = ""] = moved.add.split("=");
-    query.set(name, value);
-  }
-  if (moved.to === "timeline") {
-    // The timeline reads none of the old canvas's settings.
-    for (const own of OLD_CANVAS_ADDRESS) {
-      query.delete(own);
-    }
-  }
-  const path = pagePath(journey, moved.to, node, query.toString());
-  return of === "edges" ? path.replace("/nodes/", "/edges/") : path;
-}
-
-/**
- * Where an address that no longer exists lives now, as a path and query, or nothing when
- * `pathname` is none of them: the earlier screens, the two pages, the old canvas (`/journeys/<id>`
- * or one of its nodes with the canvas's own query), and a `/nodes/` or `/edges/` with no key,
- * which is the view without it. A bare journey or node address with no canvas query is not old:
- * it is the landing and the deep link.
- */
-export function legacyRedirect(pathname: string, search: string): string | undefined {
-  const params = new URLSearchParams(search);
-  const keyless = /^(\/journeys\/[^/]+(?:\/(?:next|plan|graph|list|timeline|summary|walk)(?:\/[a-z]+)?)?)\/(?:nodes|edges)\/?$/.exec(pathname);
-  if (keyless !== null) {
-    return `${keyless[1] ?? ""}${withQuestion(search)}`;
-  }
-  const paged = /^\/journeys\/([^/]+)\/(next|plan)(?:\/([a-z]+))?(?:\/(nodes|edges)\/([^/]+))?\/?$/.exec(pathname);
-  if (paged !== null) {
-    const [, journey = "", page = "", projection, of, node] = paged;
-    const moved = OLD_PAGES[page]?.[projection ?? (page === "plan" ? "graph" : "list")];
-    return moved === undefined ? undefined : movedTo(journey, moved, node, params, of === "edges" ? "edges" : "nodes");
-  }
-  const screen = /^\/journeys\/([^/]+)\/(overview|next|triage|walkthrough|decisions)(?:\/nodes\/([^/]+))?\/?$/.exec(pathname);
-  if (screen !== null) {
-    const [, journey = "", name = "", node] = screen;
-    const moved = OLD_SCREENS[name];
-    if (moved === undefined) {
-      return undefined;
-    }
-    return moved === "landing" ? `/journeys/${journey}` : movedTo(journey, moved, node, params);
-  }
-  const canvas = /^\/journeys\/([^/]+)(?:\/nodes\/([^/]+))?\/?$/.exec(pathname);
-  if (canvas !== null && OLD_CANVAS_ADDRESS.some((name) => params.has(name))) {
-    const [, journey = "", node] = canvas;
-    return movedTo(journey, { to: "graph" }, node, params);
-  }
-  if (/^\/routes\/?$/.test(pathname)) {
-    return "/library?type=routes";
-  }
-  // The index was at `/` with its filters; `/` is the landing now.
-  if (pathname === "/" && INDEX_PARAMS.some((name) => params.has(name))) {
-    return `${indexPath()}${searchOf(params)}`;
-  }
-  return undefined;
 }

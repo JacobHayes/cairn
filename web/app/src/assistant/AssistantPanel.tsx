@@ -15,7 +15,7 @@ import { useDraft } from "../data/drafts.ts";
 import { linesOf, mayNotApply } from "../data/activity.ts";
 import { useSession } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
-import { AssistantSlot, useAssistantDock, useFrameActions, useFrameState } from "../shell/frame.tsx";
+import { AssistantSlot, useAssistantDock } from "../shell/frame.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import { aboutWords, assistantOffered, becauseWords, endedWords, shown, toolWords, type Entry } from "./model.ts";
@@ -280,14 +280,12 @@ function AssistantPanel({ assistant, target, titleOf, onClose }: { assistant: As
 }
 
 /**
- * The panel's toggle, for a screen's header, and the panel when open: nothing at all when
- * the host offers no assistant (capabilities gating).
+ * The panel when open, and its opener for the inspector column's tabs: nothing at all when the host
+ * offers no assistant (capabilities gating).
  */
 export function AssistantDock({ target, titleOf }: { target: AssistantTarget; titleOf?: TitleOf }) {
   const session = useSession();
   const [open, setOpen] = useDraft<boolean>("assistant-open");
-  const frame = useFrameState();
-  const actions = useFrameActions();
   const assistant = session.host.assistant;
   const offered = assistantOffered(session) && assistant !== undefined;
   const dock = useMemo(
@@ -305,39 +303,17 @@ export function AssistantDock({ target, titleOf }: { target: AssistantTarget; ti
   if (!offered) {
     return null;
   }
-  // Open but behind the inspector tab: the toggle brings it forward, and only then closes it.
-  const inView = open === true && (frame === undefined || frame.tab === "assistant");
-  return (
-    <>
-      <Button
-        className="assistant-toggle"
-        data-testid="assistant-toggle"
-        aria-pressed={inView}
-        onClick={() => {
-          if (open !== true) {
-            setOpen(true);
-          } else if (inView) {
-            setOpen(undefined);
-          } else {
-            actions?.show("assistant");
-          }
+  return open === true ? (
+    <AssistantSlot>
+      <AssistantPanel
+        key={targetKey(target)}
+        assistant={assistant}
+        target={target}
+        titleOf={titleOf}
+        onClose={() => {
+          setOpen(undefined);
         }}
-      >
-        Assistant
-      </Button>
-      {open === true ? (
-        <AssistantSlot>
-          <AssistantPanel
-            key={targetKey(target)}
-            assistant={assistant}
-            target={target}
-            titleOf={titleOf}
-            onClose={() => {
-              setOpen(undefined);
-            }}
-          />
-        </AssistantSlot>
-      ) : null}
-    </>
-  );
+      />
+    </AssistantSlot>
+  ) : null;
 }

@@ -2,7 +2,7 @@
 // layout and the window show. The keys act on the view the pointer left them on (j, Enter, Esc,
 // v), the Frontier chip turns the lens on, and no view scrolls the window: the head stays, a
 // popover taller than the room scrolls inside itself, the toolbar keeps its row, and a canvas
-// fills its region. The addresses, chips, filters and memory behind them are vitest's
+// fills its region. The addresses, chips and filters behind them are vitest's
 // (journeys/address.test.ts and screens/filters.test.ts).
 import { expect, test } from "@playwright/test";
 
@@ -52,47 +52,38 @@ test("the Frontier chip turns the lens on for every view", async ({ page }) => {
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", counted ?? "");
 });
 
-test("a view comes back as it was left: the graph's expanded stage, pan and zoom survive a visit to the list", async ({ page }) => {
+test("a journey opens as the stock view, switching views keeps the chips, and coming back to the journey starts over", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
-  await page.keyboard.press("f");
-  await nodeCard(page, "n_setup").getByTestId("card-expand").click();
-  await expect(page).toHaveURL(/open=n_setup/);
+  const ladder = page.getByTestId("ladder");
+  // The stock view: every detail, fitted to the whole graph.
+  await expect(ladder.getByLabel("All")).toBeChecked();
+  await expect(nodeCard(page, "n_plan")).toBeVisible();
   await viewportSettled(page);
+  const opened = await viewportOf(page);
+  await page.keyboard.press("f");
+  await viewportSettled(page);
+  expect(await viewportOf(page)).toEqual(opened);
+  // A chip follows a switch of view and back; the pan is the view's own.
+  await page.getByTestId("chip-frontier").click();
   await page.mouse.move(600, 500);
   await page.mouse.wheel(0, 150);
-  await page.keyboard.down("Control");
-  await page.mouse.wheel(0, -120);
-  await page.keyboard.up("Control");
   await viewportSettled(page);
-  const left = await viewportOf(page);
   await page.getByTestId("view-list").click();
+  await expect(page).toHaveURL(/\/list\?frontier=1$/);
   await page.getByTestId("view-graph").click();
-  await expect(page).toHaveURL(/\/graph\?open=n_setup$/);
+  await expect(page).toHaveURL(/\/graph\?frontier=1$/);
+  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   await viewportSettled(page);
-  expect(await viewportOf(page)).toEqual(left);
-  // A change of detail level is a new view: it fits, even to a level whose pan was kept before.
-  const ladder = page.getByTestId("ladder");
-  const canvas = page.getByTestId("canvas");
-  const before = (await canvas.getAttribute("data-view")) ?? "";
-  await ladder.getByText("All", { exact: true }).click();
-  // The new level draws, and fits, before its viewport is read: until then it is the default one.
-  await expect(canvas).not.toHaveAttribute("data-view", before);
-  await expect.poll(async () => (await viewportOf(page)).zoom).not.toBe(1);
-  await viewportSettled(page);
-  const fitted = await viewportOf(page);
-  await page.mouse.move(600, 500);
-  await page.mouse.wheel(0, 150);
-  await viewportSettled(page);
-  expect(await viewportOf(page)).not.toEqual(fitted);
-  const allView = (await canvas.getAttribute("data-view")) ?? "";
-  await ladder.getByText("Stages", { exact: true }).click();
-  // The drawn canvas has to switch before All is chosen again, or the second choice finds nothing changed.
-  await expect(canvas).not.toHaveAttribute("data-view", allView);
-  await ladder.getByText("All", { exact: true }).click();
-  await expect(canvas).toHaveAttribute("data-view", allView);
-  await viewportSettled(page);
-  expect(await viewportOf(page)).toEqual(fitted);
+  expect(await viewportOf(page)).toEqual(opened);
+  // Back at the journey's landing, nothing is held: no chip, no pan.
+  await page.evaluate(() => {
+    history.pushState(null, "", location.pathname.replace(/\/graph.*/, ""));
+    dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(page).toHaveURL(/\/graph$/);
+  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
+  await expect(ladder.getByLabel("All")).toBeChecked();
 });
 
 test("the window does not scroll: the head stays, a popover scrolls inside itself, the toolbar keeps its row with Walk through at one edge, and a canvas fills its region", async ({ page }) => {

@@ -3,11 +3,11 @@
 // and the journey index otherwise. Which it is depends on every candidate journey's own
 // "mine", derived in the tab, so the landing waits for them and then moves on.
 import { useEffect } from "react";
-import { Navigate, useLocation } from "react-router";
+import { Navigate } from "react-router";
 
 import { indexKey, journeyIndex, type JourneySummary } from "../data/reads.ts";
 import { useLive, useViewer } from "../data/react.ts";
-import { DEFAULT_FILTERS, indexPath, legacyRedirect, MINE_PATH, queryOf } from "./address.ts";
+import { DEFAULT_FILTERS, indexPath, MINE_PATH, queryOf } from "./address.ts";
 import { useMineCounts, useMineOf } from "./mine.ts";
 
 /** Reports how many of journey `id`'s "mine" are on its acting frontier; none when it cannot be read. */
@@ -39,15 +39,9 @@ function Settling({ items }: { items: JourneySummary[] }) {
 }
 
 export function Home() {
-  const { pathname, search } = useLocation();
   const { viewer, failed } = useViewer();
   const query = viewer === undefined ? undefined : queryOf({ ...DEFAULT_FILTERS, mine: true }, viewer.entities);
   const { view } = useLive(indexKey(query), journeyIndex(query));
-  // The index was here once, with its filters in the address.
-  const moved = legacyRedirect(pathname, search);
-  if (moved !== undefined) {
-    return <Navigate replace to={moved} />;
-  }
   if (failed !== undefined || (viewer !== undefined && query === undefined) || view.status === "failed" || view.status === "missing") {
     return <Navigate replace to={indexPath()} />;
   }

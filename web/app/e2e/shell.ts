@@ -102,7 +102,7 @@ export async function openJourney(page: Page, host: HostKind, journey: string, q
   await open(page, host, `/journeys/${journey}/graph${query}`);
   await derived(page);
   await expect(page.getByTestId("node-card").first()).toBeVisible();
-  // A spec reaches any node, so it sees the whole graph; the real default opens on the current stage (the canvas flow test).
+  // The default opens the whole graph at every detail, fitted, so a spec reaches any node.
   if (query !== "") {
     // After the opening fit has moved the viewport off its start, so it cannot land after this one.
     await page.waitForFunction(() => document.querySelector<HTMLElement>(".react-flow__viewport")?.style.transform !== "translate(0px, 0px) scale(1)");

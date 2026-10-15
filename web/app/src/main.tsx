@@ -8,7 +8,7 @@ import "./ui/app.css";
 
 import { lazy, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { BrowserRouter, Route, Routes } from "react-router";
 
 import { boot } from "./boot.ts";
 import { LayoutsContext } from "./canvas/hooks.ts";
@@ -17,7 +17,7 @@ import { SessionContext } from "./data/react.ts";
 import type { Session } from "./data/session.ts";
 import { Home } from "./journeys/Home.tsx";
 import { JourneyIndex } from "./journeys/JourneyIndex.tsx";
-import { JourneyDeepLink, JourneyLanding, JourneyPageRoute, NoSuchPage, RouteNodeRedirect } from "./screens/JourneyRoutes.tsx";
+import { JourneyDeepLink, JourneyLanding, JourneyPageRoute, NoSuchPage } from "./screens/JourneyRoutes.tsx";
 import { Shell } from "./shell/Shell.tsx";
 
 const MineScreen = lazy(() => import("./journeys/MineScreen.tsx").then((module) => ({ default: module.MineScreen })));
@@ -39,7 +39,6 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route index element={<Home />} />
               <Route path="journeys" element={<JourneyIndex />} />
               <Route path="mine" element={<MineScreen />} />
-              <Route path="mine/:id" element={<Navigate replace to="/mine" />} />
               <Route path="mine/:id/nodes/:key" element={<MineScreen />} />
               <Route path="new" element={<NewJourney />} />
               <Route path="journeys/:id" element={<JourneyLanding />} />
@@ -53,7 +52,6 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
               <Route path="routes/:id" element={<RouteCanvasPage />} />
               <Route path="routes/:id/draft" element={<RouteCanvasPage />} />
               <Route path="routes/:id/draft/nodes/:key" element={<RouteCanvasPage />} />
-              <Route path="routes/:id/nodes/:key" element={<RouteNodeRedirect />} />
               <Route path="routes/:id/versions" element={<RouteDetailPage />} />
               <Route path="entities" element={<Entities />} />
               <Route path="me" element={<Identity />} />

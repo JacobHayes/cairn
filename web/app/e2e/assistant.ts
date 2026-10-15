@@ -21,11 +21,11 @@ export function patchId(): string {
   return `p_${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
-/** Opens the panel from the screen's header, unless it is open already. */
+/** Opens the panel from the inspector column's Assistant tab, unless it is open already. */
 export async function openPanel(page: Page): Promise<Locator> {
   const panel = page.getByTestId("assistant-panel");
   if (!(await panel.isVisible())) {
-    await page.getByTestId("assistant-toggle").click();
+    await page.getByTestId("tab-assistant").click();
   }
   await expect(panel).toBeVisible();
   await expect(panel.getByTestId("assistant-send")).toBeDisabled();

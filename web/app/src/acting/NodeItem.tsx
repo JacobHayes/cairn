@@ -46,6 +46,7 @@ export function NodeItem({ view, node, to, selected = false, fact, testId = "nod
       className="node-row"
       data-testid={testId}
       data-node={node}
+      data-state={state}
       data-selected={selected}
       onClick={(event) => {
         if (onRow(event)) {

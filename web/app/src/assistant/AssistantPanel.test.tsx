@@ -11,25 +11,18 @@ import type { AssistantAction, AssistantHost } from "../data/assistant.ts";
 import { browserHost } from "../data/browser-host.ts";
 import { FakeDeriver, FakeHost, manualTimers } from "../data/fake.test-support.ts";
 import type { Host } from "../data/host.ts";
-import { SessionContext } from "../data/react.ts";
 import { Session } from "../data/session.ts";
-import { AssistantDock, Transcript } from "./AssistantPanel.tsx";
+import { Transcript } from "./AssistantPanel.tsx";
+import { assistantOffered } from "./model.ts";
 
 const anAssistant: AssistantHost = {
   conversation: () => Promise.resolve({ conversation: "cv_one", messages: [] }),
   turn: () => Promise.resolve({ outcome: "failed", error: { status: 0, message: "not in this test" } }),
 };
 
-/** The dock on a journey's screen over `host`, rendered once the session has started. */
-async function dockOver(host: Host): Promise<string> {
-  const session = await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers });
-  return renderToStaticMarkup(
-    <SessionContext value={session}>
-      <MemoryRouter>
-        <AssistantDock target={{ journey: "j_vendor_eval" }} />
-      </MemoryRouter>
-    </SessionContext>,
-  );
+/** Whether the rail offers the assistant over `host`, once the session has started. */
+async function offeredOver(host: Host): Promise<boolean> {
+  return assistantOffered(await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers }));
 }
 
 function serverHost({ offers, assistant }: { offers: boolean; assistant: AssistantHost | undefined }): FakeHost {
@@ -39,16 +32,14 @@ function serverHost({ offers, assistant }: { offers: boolean; assistant: Assista
   return host;
 }
 
-const toggle = 'data-testid="assistant-toggle"';
-
 describe("the assistant panel's gating (I5, capabilities)", () => {
   it("is offered on a host whose capabilities say it has an assistant", async () => {
-    expect(await dockOver(serverHost({ offers: true, assistant: anAssistant }))).toContain(toggle);
+    expect(await offeredOver(serverHost({ offers: true, assistant: anAssistant }))).toBe(true);
   });
 
   it("is absent when the capabilities offer no assistant, whatever the host could reach", async () => {
     for (const assistant of [anAssistant, undefined]) {
-      expect(await dockOver(serverHost({ offers: false, assistant }))).not.toContain(toggle);
+      expect(await offeredOver(serverHost({ offers: false, assistant }))).toBe(false);
     }
   });
 
@@ -56,7 +47,7 @@ describe("the assistant panel's gating (I5, capabilities)", () => {
     const host = browserHost(await seeded());
     expect((await host.capabilities()).assistant).toBe(false);
     expect(host.assistant).toBeUndefined();
-    expect(await dockOver(host)).toBe("");
+    expect(await offeredOver(host)).toBe(false);
   });
 });
 

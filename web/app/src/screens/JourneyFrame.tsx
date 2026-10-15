@@ -6,13 +6,12 @@
 // shows is in the address (journeys/address.ts, canvas/settings.ts), so every link keeps it.
 // Edit mode (5.6) adds the structure's editors: the node's structure in its detail, and
 // drawing a requirement between two cards.
-import { lazy, Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
 import { journeyAuthored } from "../authoring/target.ts";
-import { useProjected } from "../canvas/hooks.ts";
 import { ancestorsOf } from "../canvas/ladder.ts";
 import { canvasPath, DEFAULT_VIEW, revealing, viewFrom, type CanvasView } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
@@ -22,12 +21,9 @@ import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { screenPath } from "../detail/parts.tsx";
 import type { Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
-import { keepQuery } from "../journeys/kept.ts";
-import { rememberProjection } from "../journeys/memory.ts";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
-import { summaryModel } from "../summary/model.ts";
 import { ActiveFilters } from "./ActiveFilters.tsx";
 import { activeFilters } from "./filters.ts";
 import { JourneyHeader } from "./JourneyHeader.tsx";
@@ -184,19 +180,6 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const drawing = useEdgeDrawing(authored);
   const inserting = useInserting(`journey:${journey}`);
   const [sheetOpen, setSheetOpen] = useState(false);
-  const summary = useProjected(ready, { projection: "status_summary" });
-  const model = useMemo(() => (summary.value === undefined ? undefined : summaryModel(ready, summary.value)), [ready, summary.value]);
-  useEffect(() => {
-    if (screen === "graph" || screen === "list" || screen === "timeline") {
-      rememberProjection(journey, screen);
-    }
-  }, [journey, screen]);
-  // Where each screen was left, so coming back to it opens it as it was.
-  useEffect(() => {
-    if (screen !== "summary") {
-      keepQuery(journey, screen, search);
-    }
-  }, [journey, screen, search]);
   useJourneyKeys({ journey, screen, selected, sheetOpen, setSheetOpen });
   const { find, missing } = useFind(ready, view);
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
@@ -214,7 +197,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       <InsertEntryContext value={inserting.start}>
       <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen}>
         <div className="ws-head stack journey-head">
-          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_VIEW} selected={selected} model={model} />
+          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_VIEW} selected={selected} />
           <JourneyToolbar ready={ready} screen={screen} node={selected} onFind={find} />
           <ActiveFilters filters={filters} />
           {planned ? <CanvasBars ready={ready} authored={authored} drawing={drawing} /> : null}
@@ -230,7 +213,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
         </div>
         {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
-      {/* After the head, whose assistant opens its tab as it mounts: a node opened from there brings its detail forward last. */}
+      {/* After the head: a node opened from the assistant brings its detail forward last. */}
       <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} />
       </InsertEntryContext>
     </ConnectContext>

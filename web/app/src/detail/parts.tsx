@@ -25,7 +25,8 @@ export function Rationale({ text }: { text: string | undefined }) {
  * panel at its own address with that added, so the panel's links and its close stay on that screen.
  */
 export function screenPath(pathname: string): string {
-  return pathname.replace(/\/(?:nodes|edges)\/[^/]*$/, "");
+  // Mine's node address is `/mine/<journey>/nodes/<key>`; Mine itself is `/mine`.
+  return pathname.replace(/\/(?:nodes|edges)\/[^/]*$/, "").replace(/^\/mine\/[^/]+$/, "/mine");
 }
 
 /** Node `key`'s detail on the journey screen at `screen` (`screenPath`). */
@@ -87,7 +88,7 @@ export function Section({
     >
       <summary>
         <span className="detail-section-title">{title}</span>
-        {summary === undefined ? null : <span className="muted small"> {summary}</span>}
+        {summary === undefined || summary === "0" ? null : <span className="muted small"> {summary}</span>}
       </summary>
       <div className="stack detail-section-body">{children}</div>
     </details>

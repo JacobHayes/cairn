@@ -15,7 +15,6 @@ import { useProjected } from "../canvas/hooks.ts";
 import { decisionRows } from "../decisions/model.ts";
 import { type Ready } from "../detail/model.ts";
 import { nodePath, screenPath } from "../detail/parts.tsx";
-import { keepFolds, keptFolds } from "../journeys/kept.ts";
 import { useMineOf } from "../journeys/mine.ts";
 import { ancestorsOf } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
@@ -84,6 +83,7 @@ function Row({ line, columns, context, chosen, current, onToggle }: { line: Line
       data-node={line.key}
       data-depth={line.depth}
       data-container={line.container}
+      data-state={row?.display_state ?? ""}
       style={{ "--depth": line.depth } as CSSProperties}
       data-slack={row?.slack_days ?? ""}
       data-selected={chosen}
@@ -231,15 +231,10 @@ function useKeys(scope: string): [Set<string>, (key: string) => void, (keys: Ite
 
 /**
  * PLAN, LIST: the tree keeps its open and folded levels, which are the viewer's, across a
- * filter, a row-set toggle, and a visit to another view; the rows checked are the query's.
+ * filter and a row-set toggle; the rows checked are the query's.
  */
 export function ListBody({ view, settings, selected }: { view: Ready; settings: ListSettings; selected?: string | undefined }) {
-  const journey = view.journey.header.id;
-  const [folds, setHeld] = useState(() => keptFolds(journey));
-  const setFolds = (next: typeof folds) => {
-    keepFolds(journey, next);
-    setHeld(next);
-  };
+  const [folds, setFolds] = useState<{ by: ReadonlyMap<string, boolean>; every: boolean | undefined }>({ by: new Map(), every: undefined });
   const query = useMemo(() => listQueryOf(settings), [settings]);
   // Another query is another list of rows, which the old checks do not name.
   const [chosen, toggle, choose] = useKeys(JSON.stringify(query));

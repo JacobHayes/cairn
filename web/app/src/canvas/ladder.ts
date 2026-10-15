@@ -87,13 +87,13 @@ export function hasStages(nodes: readonly GraphNode[]): boolean {
   return nodes.some((node) => node.kind === "group" && node.parent == null);
 }
 
-/** The step a view is at: the one picked, else Stages, or Work when there are no stages. */
+/** The step a view is at: the one picked, else All. */
 export function stepOf(view: Pick<CanvasSettings, "step">, nodes: readonly GraphNode[]): Step {
   const picked = view.step;
   if (picked !== undefined && (picked !== "stages" || hasStages(nodes))) {
     return picked;
   }
-  return hasStages(nodes) ? "stages" : "work";
+  return "all";
 }
 
 /** Whether `node` is a stage: a top-level group. */
