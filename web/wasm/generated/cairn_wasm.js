@@ -1029,12 +1029,11 @@ export class Derivation {
         }
     }
     /**
-     * Reads `document` (refusing another engine version's) and derives it.
+     * Reads `document` and derives it.
      *
      * # Errors
      *
-     * The JSON of a [`HostError`]: version skew, an unreadable document, or an invalid
-     * journey.
+     * The JSON of a [`HostError`]: an unreadable document or an invalid journey.
      * @param {string} document
      */
     constructor(document) {
@@ -1195,8 +1194,7 @@ if (Symbol.dispose) RootSubscription.prototype[Symbol.dispose] = RootSubscriptio
  *
  * # Errors
  *
- * The JSON of a [`HostError`]: version skew, unreadable input, the rejection, or a patch to
- * another domain.
+ * The JSON of a [`HostError`]: unreadable input, the rejection, or a patch to another domain.
  * @param {string} document
  * @param {string} request
  * @returns {string}
@@ -1264,28 +1262,6 @@ export function applyRoute(request) {
     } finally {
         wasm.__wbindgen_add_to_stack_pointer(16);
         wasm.__wbindgen_export3(deferred3_0, deferred3_1, 1);
-    }
-}
-
-/**
- * The engine version this module was built from: what a host compares a document's with
- * before deriving, previewing, or writing with it.
- * @returns {string}
- */
-export function engineVersion() {
-    let deferred1_0;
-    let deferred1_1;
-    try {
-        const retptr = wasm.__wbindgen_add_to_stack_pointer(-16);
-        wasm.engineVersion(retptr);
-        var r0 = getDataViewMemory0().getInt32(retptr + 4 * 0, true);
-        var r1 = getDataViewMemory0().getInt32(retptr + 4 * 1, true);
-        deferred1_0 = r0;
-        deferred1_1 = r1;
-        return getStringFromWasm0(r0, r1);
-    } finally {
-        wasm.__wbindgen_add_to_stack_pointer(16);
-        wasm.__wbindgen_export3(deferred1_0, deferred1_1, 1);
     }
 }
 
@@ -1369,8 +1345,7 @@ export function importRoute(request) {
  *
  * # Errors
  *
- * The JSON of a [`HostError`]: version skew, unreadable input, or a proposal to another
- * domain.
+ * The JSON of a [`HostError`]: unreadable input, or a proposal to another domain.
  * @param {string} document
  * @param {string} request
  * @returns {string}

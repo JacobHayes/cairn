@@ -1,5 +1,5 @@
-//! The domain document (ARCHITECTURE, Terms: Domain document): stored state, the derive
-//! inputs, and the engine version, with nothing derived in it, so deriving what arrives
+//! The domain document (ARCHITECTURE, Terms: Domain document): stored state and the derive
+//! inputs, with nothing derived in it, so deriving what arrives
 //! gives what the host derives at the same inputs.
 #![cfg(test)]
 
@@ -60,7 +60,7 @@ fn a_document_holds_the_stored_journey_and_nothing_derived() {
             .keys()
             .map(String::as_str)
             .collect();
-        assert_eq!(fields, ["engine_version", "inputs", "journey"], "{name}");
+        assert_eq!(fields, ["inputs", "journey"], "{name}");
         assert_eq!(
             sent["journey"],
             serde_json::to_value(&journey).unwrap(),
@@ -71,6 +71,5 @@ fn a_document_holds_the_stored_journey_and_nothing_derived() {
             serde_json::to_value(&inputs).unwrap(),
             "{name}"
         );
-        assert_eq!(sent["engine_version"], env!("CARGO_PKG_VERSION"), "{name}");
     }
 }

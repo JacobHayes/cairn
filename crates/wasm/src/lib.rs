@@ -1,8 +1,8 @@
 //! The browser host (ARCHITECTURE, Repository layout: `crates/wasm`; Web UI): the engine and
 //! the service compiled to wasm with wasm-bindgen.
 //!
-//! For every host, the engine over JSON: a domain document read with its engine version
-//! checked first ([`read_document`]: version skew), derived once ([`Derivation`]) and
+//! For every host, the engine over JSON: a domain document read ([`read_document`]), derived
+//! once ([`Derivation`]) and
 //! projected ([`Projection`]), a draft patch applied locally to a journey ([`apply`]) or a
 //! route ([`apply_route`]), a proposal previewed ([`preview`]), a patch's touched set for the
 //! H5 safe retry ([`touched`]), route files exported and imported ([`export_route`],
@@ -30,7 +30,7 @@ mod route;
 #[cfg(feature = "server")]
 pub mod cases;
 
-pub use derivation::{Derivation, DraftRequest, Projection, engine_version_text, read_document};
+pub use derivation::{Derivation, DraftRequest, Projection, read_document};
 pub use error::HostError;
 pub use files::{
     ExportRequest, ImportRequest, export_route, exported, import_route, imported, read_route_file,

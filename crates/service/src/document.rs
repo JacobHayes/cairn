@@ -10,8 +10,8 @@ use crate::{Call, Service, ServiceError};
 impl<S: Store> Service<S> {
     /// A journey's domain document for `call`'s user, or none: its graph and state, the
     /// derive inputs at `call`'s today in the deployment's zone (A9) with the user's
-    /// entities as the viewer (H3) and the current deployment context (E4, E6), and the
-    /// engine version. Nothing derived is in it.
+    /// entities as the viewer (H3) and the current deployment context (E4, E6). Nothing
+    /// derived is in it.
     ///
     /// # Errors
     ///

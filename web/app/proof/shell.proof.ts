@@ -53,9 +53,9 @@ test("version skew stops the tab and asks for a reload; the draft survives it", 
   const unsent = "Recommendation summary, unsent";
   await startRename(two, "n_summary", unsent);
   await two.route("**/api/journeys/j_bakeoff/document", async (route) => {
+    // A deployment of another web build: the server stamps another build's digest.
     const response = await route.fetch();
-    const document = (await response.json()) as { engine_version: string };
-    await route.fulfill({ response, json: { ...document, engine_version: "99.0.0" } });
+    await route.fulfill({ response, headers: { ...response.headers(), "cairn-build": "0".repeat(64) } });
   });
   await rename(one, "n_comparison", "Side-by-side comparison, final");
   await expect(syncChip(two)).toHaveAttribute("data-state", "new-version");

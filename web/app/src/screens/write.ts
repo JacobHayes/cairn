@@ -52,7 +52,7 @@ export function useScreenWrite(): ScreenWrite {
   return {
     run,
     pending,
-    disabled: pending || skew !== undefined,
+    disabled: pending || skew,
     rejected,
     dismiss,
     receipt: receipt.receipt,

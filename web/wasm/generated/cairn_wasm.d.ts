@@ -246,12 +246,11 @@ export class Derivation {
      */
     key(): string;
     /**
-     * Reads `document` (refusing another engine version's) and derives it.
+     * Reads `document` and derives it.
      *
      * # Errors
      *
-     * The JSON of a [`HostError`]: version skew, an unreadable document, or an invalid
-     * journey.
+     * The JSON of a [`HostError`]: an unreadable document or an invalid journey.
      */
     constructor(document: string);
     /**
@@ -299,8 +298,7 @@ export class RootSubscription {
  *
  * # Errors
  *
- * The JSON of a [`HostError`]: version skew, unreadable input, the rejection, or a patch to
- * another domain.
+ * The JSON of a [`HostError`]: unreadable input, the rejection, or a patch to another domain.
  */
 export function apply(document: string, request: string): string;
 
@@ -313,12 +311,6 @@ export function apply(document: string, request: string): string;
  * The JSON of a [`HostError`]: unreadable input, the rejection, or a patch to another domain.
  */
 export function applyRoute(request: string): string;
-
-/**
- * The engine version this module was built from: what a host compares a document's with
- * before deriving, previewing, or writing with it.
- */
-export function engineVersion(): string;
 
 /**
  * Exports a route version or draft: `request` is the JSON of an [`ExportRequest`]; the
@@ -346,8 +338,7 @@ export function importRoute(request: string): string;
  *
  * # Errors
  *
- * The JSON of a [`HostError`]: version skew, unreadable input, or a proposal to another
- * domain.
+ * The JSON of a [`HostError`]: unreadable input, or a proposal to another domain.
  */
 export function preview(document: string, request: string): string;
 
@@ -458,7 +449,6 @@ export interface InitOutput {
     readonly derivation_new: (a: number, b: number, c: number) => void;
     readonly derivation_project: (a: number, b: number, c: number, d: number) => void;
     readonly derivation_renderDraft: (a: number, b: number, c: number, d: number) => void;
-    readonly engineVersion: (a: number) => void;
     readonly exportRoute: (a: number, b: number, c: number) => void;
     readonly importRoute: (a: number, b: number, c: number) => void;
     readonly preview: (a: number, b: number, c: number, d: number, e: number) => void;

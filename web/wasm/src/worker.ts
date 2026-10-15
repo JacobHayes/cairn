@@ -1,8 +1,8 @@
 // The derive worker (ARCHITECTURE, Web UI: data flow): its own instance of the module,
 // deriving each domain document the page posts and answering projections, previews, and
-// local applies over the held derivation. Messages are in ./protocol.ts. Once a document
-// from another engine version is posted, or the module traps, the worker drops what it holds
-// and refuses every later request with that reason (version skew; a panic aborts).
+// local applies over the held derivation. Messages are in ./protocol.ts. Once the module
+// traps, the worker drops what it holds and refuses every later request with that reason (a
+// panic aborts).
 import { loadEngine, type DerivedDocument, type Engine } from "./engine.ts";
 import type { Envelope, Reply, WorkerRequest } from "./protocol.ts";
 import { HostFailure, failureOf, stoppedBy, type DerivationKey } from "./types.ts";
@@ -74,7 +74,7 @@ async function answer(request: WorkerRequest): Promise<string> {
   switch (request.op) {
     case "init":
       engine = await loadEngine(request.wasm);
-      return engine.version;
+      return "";
     case "load":
       return load(request.document);
     case "derived":

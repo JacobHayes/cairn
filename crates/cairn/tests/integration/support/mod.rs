@@ -53,7 +53,7 @@ pub fn assets() -> Vec<Asset> {
     vec![
         Asset {
             path: "index.html".to_owned(),
-            bytes: Cow::Borrowed(b"<!doctype html><title>Cairn</title>"),
+            bytes: Cow::Borrowed(b"<!doctype html><head><title>Cairn</title></head>"),
             media_type: "text/html".to_owned(),
         },
         Asset {

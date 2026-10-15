@@ -27,8 +27,8 @@ use std::fmt;
 
 use cairn_schema::limits::NODE_COUNT_MAX;
 use cairn_schema::{
-    AnswerValue, DeriveInputs, DomainDocument, EngineVersion, EntitySet, Journey, KeyRefs,
-    Markdown, Node, NodeKey, State,
+    AnswerValue, DeriveInputs, DomainDocument, EntitySet, Journey, KeyRefs, Markdown, Node,
+    NodeKey, State,
 };
 
 use crate::derive::{Derived, stored_state};
@@ -182,28 +182,13 @@ impl<'a> DerivedJourney<'a> {
     }
 }
 
-/// This engine's version (ARCHITECTURE, Web UI: version skew): what every domain document it
-/// builds carries, and what a host compares a document's with before deriving, previewing,
-/// or writing with it.
-///
-/// # Panics
-///
-/// Never: the crate's version is a valid engine version.
-#[must_use]
-pub fn engine_version() -> EngineVersion {
-    env!("CARGO_PKG_VERSION")
-        .parse()
-        .unwrap_or_else(|error| panic!("the crate version: {error}"))
-}
-
 /// The domain document (ARCHITECTURE, Terms): the journey's graph and state with the derive
-/// inputs (the deployment context included) and the engine version, which the browser
-/// derives and projects locally. Nothing derived is in it.
+/// inputs (the deployment context included), which the browser derives and projects locally.
+/// Nothing derived is in it.
 #[must_use]
 pub fn document(journey: &Journey, inputs: &DeriveInputs) -> DomainDocument {
     DomainDocument {
         journey: journey.clone(),
         inputs: inputs.clone(),
-        engine_version: engine_version(),
     }
 }

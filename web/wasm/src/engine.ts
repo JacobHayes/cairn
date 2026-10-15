@@ -6,7 +6,6 @@ import init, {
   Derivation,
   apply,
   applyRoute,
-  engineVersion,
   exportRoute,
   importRoute,
   preview,
@@ -23,7 +22,6 @@ import type { Schema } from "@cairn/client";
 import {
   hosted,
   parsed,
-  stop,
   stoppedBy,
   type AppliedLocally,
   type ApplyRequest,
@@ -103,23 +101,6 @@ export class DerivedDocument {
 
 /** The engine's calls for every host. */
 export class Engine {
-  /** The engine version this module was built from. */
-  readonly version: string = hosted(() => engineVersion());
-
-  /**
-   * ARCHITECTURE, Web UI: version skew. Whether a document from the server can be derived,
-   * previewed, or written with here. One that cannot stops this module, as a refused
-   * derive, apply, or preview does: every later call (touched sets for the safe retry
-   * included) is refused until the page reloads.
-   */
-  accepts(document: Pick<Schema<"DomainDocument">, "engine_version">): boolean {
-    if (document.engine_version === this.version) {
-      return stoppedBy() === undefined;
-    }
-    stop({ error: "version_skew", document: document.engine_version, engine: this.version });
-    return false;
-  }
-
   /** Reads and derives a domain document's JSON text. */
   derive(documentText: string): DerivedDocument {
     return new DerivedDocument(hosted(() => new Derivation(documentText)));

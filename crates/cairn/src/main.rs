@@ -2,7 +2,7 @@
 //! the assistant when configured, SSE, and the embedded UI on one port; `demo` serves the
 //! sample journeys from memory with nothing to configure; `migrate` brings the database's
 //! schema up to date; `config check` validates a configuration without starting anything;
-//! `version` prints the versions. Every command but `demo` and `version` reads the
+//! `version` prints the version. Every command but `demo` and `version` reads the
 //! configuration file named by `--config` or `CAIRN_CONFIG`, with environment overrides.
 
 #![forbid(unsafe_code)]
@@ -45,7 +45,7 @@ enum Command {
         #[command(subcommand)]
         command: ConfigCommand,
     },
-    /// Print the binary's and the engine's versions.
+    /// Print the binary's version.
     Version,
 }
 
@@ -74,11 +74,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     let outcome = match cli.command {
         Command::Version => {
-            println!(
-                "cairn {} (engine {})",
-                env!("CARGO_PKG_VERSION"),
-                cairn_engine::engine_version().as_str()
-            );
+            println!("cairn {}", env!("CARGO_PKG_VERSION"));
             Ok(())
         }
         Command::Config {

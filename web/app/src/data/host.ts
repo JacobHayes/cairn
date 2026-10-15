@@ -48,6 +48,17 @@ export class Missing extends Error {
   }
 }
 
+/**
+ * ARCHITECTURE, Web UI: version skew. A domain document the server stamped with another build
+ * than this page was loaded from, or with none.
+ */
+export class Skewed extends Error {
+  constructor() {
+    super("the server runs another version of Cairn");
+    this.name = "Skewed";
+  }
+}
+
 /** A read the host could not answer, with why. */
 export class ReadFailed extends Error {
   readonly failure: HttpFailure;
@@ -62,8 +73,6 @@ export class ReadFailed extends Error {
 /** One of the two hosts. */
 export interface Host {
   readonly kind: HostKind;
-  /** The engine version of this page's wasm module (ARCHITECTURE, Web UI: version skew). */
-  readonly engineVersion: string;
   /** H5: the page engine's touched-set overlap check. */
   readonly overlaps: Overlaps;
   capabilities(): Promise<Capabilities>;
@@ -81,7 +90,7 @@ export interface Host {
   viewer(): Promise<Viewer>;
   /** A13: route files as the page's engine reads and writes them (YAML on disk, JSON on the wire). */
   readonly files: RouteFiles;
-  /** A journey's domain document as the host wrote it; `Missing` when there is none. */
+  /** A journey's domain document as the host wrote it; `Missing` when there is none, `Skewed` when another engine wrote it. */
   documentText(journey: string): Promise<string>;
   /** The deployment context (E6). */
   deployment(): Promise<Deployment>;

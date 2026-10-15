@@ -14,6 +14,9 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use axum::Router;
+use axum::http::HeaderValue;
+use axum::middleware::map_response;
+use axum::response::Response;
 use cairn_assistant::Assistant;
 use cairn_assistant::protocol::HttpProvider;
 use cairn_auth::{
@@ -162,7 +165,8 @@ pub fn providers<S: AuthStore + 'static>(
 }
 
 /// The whole server's router: the API with MCP, the assistant when configured, auth's
-/// routes, `/api/metrics` behind the auth layer, and the UI, all behind the `Host` allowlist.
+/// routes, `/api/metrics` behind the auth layer, and the UI, all behind the `Host` allowlist,
+/// every response stamped with the web build's digest (ARCHITECTURE, Web UI: version skew).
 ///
 /// # Errors
 ///
@@ -188,11 +192,21 @@ pub fn app<S: Store + 'static>(
             Arc::new(HttpProvider::new(provider)),
         )
     });
-    let ui = assets::router(&parts.assets).map_err(StartupError::WebBuild)?;
+    let build = assets::digest(&parts.assets);
+    let ui = assets::router(&parts.assets, &build).map_err(StartupError::WebBuild)?;
+    let build = HeaderValue::try_from(build)
+        .unwrap_or_else(|error| unreachable!("hex digits are a header value: {error}"));
     let metrics = auth.protect(telemetry::metrics_router(parts.metrics));
     // Metrics and the UI sit beside the API under its request limits: the in-flight limit
     // is per process, whatever the path. The UI answers every path the API does not keep.
-    let app = cairn_api::router_beside(service, &auth, assistant, metrics, Some(ui));
+    let app = cairn_api::router_beside(service, &auth, assistant, metrics, Some(ui)).layer(
+        map_response(move |mut response: Response| {
+            response
+                .headers_mut()
+                .insert(assets::BUILD_HEADER, build.clone());
+            std::future::ready(response)
+        }),
+    );
     Ok(AllowedHosts::new(&config.public_url, config.listen).guard(app))
 }
 

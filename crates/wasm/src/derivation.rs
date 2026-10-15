@@ -1,6 +1,5 @@
-//! A domain document derived in the browser (ARCHITECTURE, Web UI: data flow): the engine
-//! version checked first (version skew), the journey validated and derived once with the
-//! document's own inputs, and every projection run on that one derivation, as the server's
+//! A domain document derived in the browser (ARCHITECTURE, Web UI: data flow): the journey
+//! validated and derived once with the document's own inputs, and every projection run on that one derivation, as the server's
 //! service runs them on its memoized one. Inputs and outputs are the schema's JSON, so a value
 //! here is the server's value byte for byte.
 //!
@@ -9,53 +8,23 @@
 
 use std::collections::BTreeSet;
 
-use cairn_engine::{
-    Derived, DerivedJourney, DraftContext, Graph, ProjectionError, derive, engine_version,
-};
+use cairn_engine::{Derived, DerivedJourney, DraftContext, Graph, ProjectionError, derive};
 use cairn_schema::{
-    AttachmentKey, Cursor, DomainDocument, EngineVersion, ExplainedField, KindKey, LevelQuery,
-    ListQuery, NextQuery, NodeKey, NodeKind, RenderedDraft, ResourceContent, SnapshotScope, Url,
+    AttachmentKey, Cursor, DomainDocument, ExplainedField, KindKey, LevelQuery, ListQuery,
+    NextQuery, NodeKey, NodeKind, RenderedDraft, ResourceContent, SnapshotScope, Url,
 };
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
 
 use crate::error::{HostError, json, read};
 
-/// The engine version a document carries, read before anything else in it, so a document
-/// from a newer engine with fields this one does not know is refused as skew, not as
-/// unreadable.
-#[derive(Deserialize)]
-struct Versioned {
-    engine_version: EngineVersion,
-}
-
-/// ARCHITECTURE, Web UI: version skew. Reads a domain document, refusing one built by another
-/// engine version before reading the rest of it.
+/// Reads a domain document.
 ///
 /// # Errors
 ///
-/// [`HostError::VersionSkew`] for another engine's document; [`HostError::Unreadable`] when it
-/// is not a domain document.
+/// [`HostError::Unreadable`] when it is not a domain document.
 pub fn read_document(text: &str) -> Result<DomainDocument, HostError> {
-    let Versioned {
-        engine_version: version,
-    } = read("document", text)?;
-    let engine = engine_version();
-    if version != engine {
-        return Err(HostError::VersionSkew {
-            document: version,
-            engine,
-        });
-    }
     read("document", text)
-}
-
-/// The engine version this module was built from: what a host compares a document's with
-/// before deriving, previewing, or writing with it.
-#[wasm_bindgen(js_name = engineVersion)]
-#[must_use]
-pub fn engine_version_text() -> String {
-    engine_version().as_str().to_owned()
 }
 
 /// One projection of a derived journey (ARCHITECTURE, Engine > Projections), as the server's
@@ -261,12 +230,11 @@ impl Derivation {
 
 #[wasm_bindgen]
 impl Derivation {
-    /// Reads `document` (refusing another engine version's) and derives it.
+    /// Reads `document` and derives it.
     ///
     /// # Errors
     ///
-    /// The JSON of a [`HostError`]: version skew, an unreadable document, or an invalid
-    /// journey.
+    /// The JSON of a [`HostError`]: an unreadable document or an invalid journey.
     #[wasm_bindgen(constructor)]
     pub fn new(document: &str) -> Result<Derivation, String> {
         Ok(Self::of(read_document(document)?)?)

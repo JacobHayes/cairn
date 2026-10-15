@@ -6,20 +6,18 @@ import type { DerivationKey, Derived } from "@cairn/wasm";
 
 import type { AssistantHost } from "./assistant.ts";
 import type { ProposalHost } from "./proposals.ts";
-import { Missing, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type RouteFile, type Viewer } from "./host.ts";
-
-export const ENGINE = "1.0.0";
+import { Missing, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type RouteFile, type Viewer } from "./host.ts";
 
 export interface FakeJourney {
   revision: number;
   deployment: number;
   today: string;
-  engine: string;
+  /** Whether its document comes stamped by another engine (version skew). */
+  skewed?: boolean;
 }
 
 export class FakeHost implements Host {
   readonly kind = "server" as const;
-  readonly engineVersion = ENGINE;
   readonly journeysHeld = new Map<string, FakeJourney>();
   readonly fetches = new Map<string, number>();
   deploymentRevision = 1;
@@ -113,8 +111,10 @@ export class FakeHost implements Host {
     if (held === undefined) {
       throw new Missing(journey);
     }
+    if (held.skewed === true) {
+      throw new Skewed();
+    }
     const document = {
-      engine_version: held.engine,
       inputs: { deployment: { revision: held.deployment }, rank: {}, timezone: "UTC", today: held.today },
       journey: { header: { id: journey, name: journey, status: "active" }, revision: held.revision, graph: {} },
     };

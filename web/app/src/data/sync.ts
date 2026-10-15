@@ -7,7 +7,6 @@ import type { StreamStatus, Timers } from "@cairn/client";
 
 import { Emitter } from "./emitter.ts";
 import type { Lag } from "./journeys.ts";
-import type { Skew } from "./skew.ts";
 
 /** A write has to take this long to show SAVING, and a refetch to show UPDATING (no flicker). */
 export const SYNC_SHOW_AFTER_MS = 300;
@@ -54,7 +53,7 @@ export interface SyncInput {
   stream: StreamStatus;
   online: boolean;
   demo: boolean;
-  skew: Skew | undefined;
+  skew: boolean;
   problems: readonly Problem[];
   inFlight: number;
   inFlightSince: number | undefined;
@@ -94,7 +93,7 @@ export function summarize(input: SyncInput): SyncSummary {
   if (refused > 0) {
     return { state: "not-saved", label: `NOT SAVED · ${String(refused)}`, tone: "act", sentence: reason(problems.find((problem) => problem.kind !== "conflict")), announce: "assertive" };
   }
-  if (input.skew !== undefined) {
+  if (input.skew) {
     return { state: "new-version", label: "NEW VERSION · RELOAD", tone: "wait", sentence: "Cairn was updated. Reload to keep saving. Your unsent edits are kept.", announce: "polite" };
   }
   if (!input.online) {
@@ -149,7 +148,7 @@ export class SyncStatus extends Emitter {
       stream: "idle",
       online: true,
       demo,
-      skew: undefined,
+      skew: false,
       inFlight: 0,
       inFlightSince: undefined,
       lag: undefined,
@@ -205,7 +204,7 @@ export class SyncStatus extends Emitter {
     this.#update({ lag, revision });
   }
 
-  setSkew(skew: Skew | undefined): void {
+  setSkew(skew: boolean): void {
     this.#update({ skew });
   }
 

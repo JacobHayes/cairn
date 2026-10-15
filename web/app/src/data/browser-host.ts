@@ -73,7 +73,6 @@ export function browserHost(root: InBrowserHost): Host {
   const engine = root.engine;
   return {
     kind: "browser",
-    engineVersion: engine.version,
     overlaps: (patch, intervening) => engine.touchedOverlaps(patch, intervening),
     capabilities: () => read("the capabilities", () => root.capabilities()),
     journeys: (query) => read("the journey index", () => root.journeyIndex(query ?? {})),

@@ -92,7 +92,7 @@ export function ImportFile({ label = "Import a route file", onImported }: { labe
           type="file"
           accept=".yaml,.yml,.json"
           aria-label={label}
-          disabled={pending || skew !== undefined}
+          disabled={pending || skew}
           onChange={(event) => {
             const chosen = event.target.files?.[0];
             event.target.value = "";

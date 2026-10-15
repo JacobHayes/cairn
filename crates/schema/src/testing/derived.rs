@@ -538,15 +538,7 @@ pub fn arb_derive_inputs() -> BoxedStrategy<DeriveInputs> {
 
 /// A domain document.
 pub fn arb_domain_document() -> BoxedStrategy<DomainDocument> {
-    (
-        arb_journey(),
-        arb_derive_inputs(),
-        "[0-9]\\.[0-9]{1,2}\\.[0-9]{1,2}",
-    )
-        .prop_map(|(journey, inputs, version)| DomainDocument {
-            journey,
-            inputs,
-            engine_version: super::parsed(&version),
-        })
+    (arb_journey(), arb_derive_inputs())
+        .prop_map(|(journey, inputs)| DomainDocument { journey, inputs })
         .boxed()
 }

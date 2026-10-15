@@ -11,7 +11,7 @@
 //! to start rather than serve an API with no UI ([`router`]).
 
 use std::borrow::Cow;
-use std::fmt;
+use std::fmt::{self, Write as _};
 #[cfg(feature = "web-dir")]
 use std::path::Path;
 
@@ -20,6 +20,7 @@ use axum::http::header::{CACHE_CONTROL, CONTENT_TYPE};
 use axum::http::{HeaderName, HeaderValue, Method, StatusCode, Uri};
 use axum::response::{IntoResponse, Response};
 use axum::routing::{MethodRouter, get};
+use sha2::{Digest as _, Sha256};
 
 /// The app's page.
 pub const INDEX: &str = "index.html";
@@ -119,6 +120,32 @@ fn read_folder(directory: &Path, prefix: &str, assets: &mut Vec<Asset>) -> std::
     Ok(())
 }
 
+/// The header every response carries [`digest`] in (ARCHITECTURE, Web UI: version skew).
+pub const BUILD_HEADER: HeaderName = HeaderName::from_static("cairn-build");
+
+/// ARCHITECTURE, Web UI: version skew. The SHA-256, in hex, of the whole web build: every
+/// file's path, size, and bytes, in path order. The page is served with it ([`router`]) and
+/// every response carries it ([`BUILD_HEADER`]), so a tab from another deployment's build sees
+/// a value other than its own. Cost: one pass over the build (a few megabytes) at startup.
+#[must_use]
+pub fn digest(assets: &[Asset]) -> String {
+    let mut sorted: Vec<&Asset> = assets.iter().collect();
+    sorted.sort_by(|a, b| a.path.cmp(&b.path));
+    let mut hasher = Sha256::new();
+    for asset in sorted {
+        hasher.update(asset.path.as_bytes());
+        hasher.update([0]);
+        hasher.update((asset.bytes.len() as u64).to_be_bytes());
+        hasher.update(&asset.bytes);
+    }
+    let mut hex = String::with_capacity(64);
+    for byte in hasher.finalize() {
+        // Writing to a String cannot fail.
+        let _ = write!(hex, "{byte:02x}");
+    }
+    hex
+}
+
 /// Why the server has no web build to serve.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct WebBuildMissing(String);
@@ -136,23 +163,26 @@ impl std::error::Error for WebBuildMissing {}
 /// the server does not keep). Hashed bundles under `assets/` never change at their path, so
 /// browsers keep them, and one missing there is not found rather than answered with the
 /// page; the page is revalidated, so a new deployment's page is fetched at once
-/// (ARCHITECTURE, Web UI: version skew).
+/// (ARCHITECTURE, Web UI: version skew). The page is served stamped with `build`, the
+/// build's [`digest`].
 ///
 /// # Errors
 ///
-/// When `assets` holds no page.
-pub fn router(assets: &[Asset]) -> Result<Router, WebBuildMissing> {
+/// When `assets` holds no page, or one with no `</head>` to stamp.
+pub fn router(assets: &[Asset], build: &str) -> Result<Router, WebBuildMissing> {
     let page = assets
         .iter()
         .find(|asset| asset.path == INDEX)
-        .map(Served::new)
         .ok_or_else(|| {
             WebBuildMissing(format!(
                 "{INDEX} is missing: build it with `mise run build`"
             ))
         })?;
-    let mut router = Router::new().route("/", page.clone().handler());
-    for asset in assets {
+    let page = Served::new(&stamped(page, build)?);
+    let mut router = Router::new()
+        .route("/", page.clone().handler())
+        .route(&format!("/{INDEX}"), page.clone().handler());
+    for asset in assets.iter().filter(|asset| asset.path != INDEX) {
         router = router.route(&format!("/{}", asset.path), Served::new(asset).handler());
     }
     let screen = move |method: Method, uri: Uri| {
@@ -167,6 +197,20 @@ pub fn router(assets: &[Asset]) -> Result<Router, WebBuildMissing> {
         }
     };
     Ok(router.fallback(screen))
+}
+
+/// The page with `build` in a `<meta name="cairn-build">` before `</head>`, where the page
+/// reads the build it was loaded from (web/app/src/boot.ts).
+fn stamped(page: &Asset, build: &str) -> Result<Asset, WebBuildMissing> {
+    let (head, rest) = std::str::from_utf8(&page.bytes)
+        .ok()
+        .and_then(|text| text.split_once("</head>"))
+        .ok_or_else(|| WebBuildMissing(format!("{INDEX} has no </head> to stamp the build in")))?;
+    let text = format!("{head}<meta name=\"cairn-build\" content=\"{build}\" /></head>{rest}");
+    Ok(Asset {
+        bytes: Cow::Owned(text.into_bytes()),
+        ..page.clone()
+    })
 }
 
 /// Where the hashed bundles sit in the build.

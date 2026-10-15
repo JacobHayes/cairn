@@ -191,7 +191,6 @@ export type Taken =
  * the journey than the one posted.
  */
 export type HostError =
-  | { error: "version_skew"; document: string; engine: string }
   | { error: "unreadable"; input: string; message: string }
   | { error: "invalid"; violations: Schema<"Violations"> }
   | { error: "rejected"; rejection: Schema<"Rejection"> }
@@ -219,8 +218,7 @@ export function parsed<T>(text: string): T {
 
 /**
  * Why this realm's module stopped, once it has: a trap (PRACTICES: a panic aborts the
- * module) or a document from another engine version (ARCHITECTURE, Web UI: version skew: the
- * tab stops deriving, previewing, writing, and retrying until it reloads). It never clears.
+ * module). It never clears.
  */
 let stopped: HostError | undefined;
 
@@ -229,14 +227,9 @@ export function stoppedBy(): HostError | undefined {
   return stopped;
 }
 
-/** Stops this realm's module for `reason`; the first reason stays. */
-export function stop(reason: HostError): void {
-  stopped ??= reason;
-}
-
 /**
  * Runs a call into the module, turning what it throws into a `HostFailure`: a string is the
- * JSON of a `HostError`; anything else is a trap. A trap or version skew stops the module,
+ * JSON of a `HostError`; anything else is a trap. A trap stops the module,
  * and every later call is refused with that reason before it reaches the module.
  */
 export function hosted<T>(call: () => T): T {
@@ -247,8 +240,8 @@ export function hosted<T>(call: () => T): T {
     return call();
   } catch (thrown) {
     const failure = failureOf(thrown);
-    if (failure.reason.error === "aborted" || failure.reason.error === "version_skew") {
-      stop(failure.reason);
+    if (failure.reason.error === "aborted") {
+      stopped ??= failure.reason;
     }
     throw failure;
   }

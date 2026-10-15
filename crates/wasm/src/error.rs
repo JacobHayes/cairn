@@ -2,7 +2,7 @@
 //! text; a failure is thrown to JavaScript as the JSON of a [`HostError`], which the
 //! hand-written loader in `web/wasm` parses back into a typed error.
 
-use cairn_schema::{EngineVersion, Rejection, Violations};
+use cairn_schema::{Rejection, Violations};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
 
@@ -10,14 +10,6 @@ use serde::{Deserialize, Serialize};
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "error", rename_all = "snake_case", deny_unknown_fields)]
 pub enum HostError {
-    /// ARCHITECTURE, Web UI: version skew. The document was built by another engine version,
-    /// so this engine does not derive, preview, or write with it; the page reloads instead.
-    VersionSkew {
-        /// The document's engine version.
-        document: EngineVersion,
-        /// This engine's.
-        engine: EngineVersion,
-    },
     /// An input is not the JSON the call reads.
     Unreadable {
         /// Which input.

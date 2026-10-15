@@ -38,7 +38,6 @@ export const derivation_key: (a: number, b: number) => void;
 export const derivation_new: (a: number, b: number, c: number) => void;
 export const derivation_project: (a: number, b: number, c: number, d: number) => void;
 export const derivation_renderDraft: (a: number, b: number, c: number, d: number) => void;
-export const engineVersion: (a: number) => void;
 export const exportRoute: (a: number, b: number, c: number) => void;
 export const importRoute: (a: number, b: number, c: number) => void;
 export const preview: (a: number, b: number, c: number, d: number, e: number) => void;

@@ -3,7 +3,7 @@
 // there, and its derive read back. A view stays current (H6): a journey tick newer than the
 // revision held refetches it, as does a deployment tick newer than the deployment its
 // document was derived with (owners and entities feed rank) and the date passing in the
-// deployment's zone. A document from another engine version latches the tab into skew
+// deployment's zone. A document from another engine (`Skewed`) latches the tab into skew
 // instead of being derived. Revisions only move forward: an older document is never shown.
 import {
   REOPEN_DELAY_FIRST_MS,
@@ -15,10 +15,10 @@ import {
   type Tick,
   type Timers,
 } from "@cairn/client";
-import { HostFailure, type DerivationKey, type Derived } from "@cairn/wasm";
+import type { DerivationKey, Derived } from "@cairn/wasm";
 
 import { Emitter } from "./emitter.ts";
-import { Missing, type Deriver, type DomainDocument, type Host } from "./host.ts";
+import { Missing, Skewed, type Deriver, type DomainDocument, type Host } from "./host.ts";
 import type { SkewLatch } from "./skew.ts";
 import { todayIn } from "./today.ts";
 
@@ -309,14 +309,9 @@ export class JourneyStore extends Emitter {
   }
 
   async #fetch(entry: Entry): Promise<void> {
-    const { host, deriver, skew } = this.#parts;
+    const { host, deriver } = this.#parts;
     const text = await host.documentText(entry.id);
     const document = JSON.parse(text) as DomainDocument;
-    if (document.engine_version !== host.engineVersion) {
-      skew.latch({ document: document.engine_version, engine: host.engineVersion });
-      this.#show(entry, entry.view.status === "ready" ? entry.view : { status: "skew" });
-      return;
-    }
     const revision = document.journey.revision;
     const deployment = document.inputs.deployment.revision;
     const held = entry.held;
@@ -347,9 +342,9 @@ export class JourneyStore extends Emitter {
       this.#gone(entry);
       return;
     }
-    if (thrown instanceof HostFailure && thrown.reason.error === "version_skew") {
-      const { document, engine } = thrown.reason;
-      this.#parts.skew.latch({ document, engine });
+    if (thrown instanceof Skewed) {
+      this.#parts.skew.latch();
+      this.#show(entry, entry.view.status === "ready" ? entry.view : { status: "skew" });
       return;
     }
     this.#tracker.refetchFailed(journeyOf(entry.id));

@@ -148,7 +148,7 @@ export function useAuthorWrite(authored: Authored): AuthorWrite {
     }
     return result.outcome === "landed";
   };
-  return { run, pending, disabled: pending || skew !== undefined, failed, unanswered, dismiss, receipt: receipt.receipt };
+  return { run, pending, disabled: pending || skew, failed, unanswered, dismiss, receipt: receipt.receipt };
 }
 
 /** How long typing settles before a form's preview runs. */

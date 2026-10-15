@@ -137,7 +137,7 @@ export class Session {
       this.sync.setStream(this.subscription.status);
     });
     this.skew.subscribe(() => {
-      this.sync.setSkew(this.skew.current);
+      this.sync.setSkew(this.skew.latched);
     });
     this.journeys.subscribe(lag);
     for (const [event, listener] of Object.entries(this.#online)) {

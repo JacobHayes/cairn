@@ -815,37 +815,8 @@ pub struct DeriveInputs {
     pub deployment: Deployment,
 }
 
-/// The engine version a domain document was produced by.
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct EngineVersion(String);
-
-impl EngineVersion {
-    /// The version.
-    #[must_use]
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl std::str::FromStr for EngineVersion {
-    type Err = String;
-
-    fn from_str(text: &str) -> Result<Self, String> {
-        let allowed = |c: char| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | '+');
-        if text.is_empty()
-            || Limit::IdBytes.check(text.len()).is_err()
-            || !text.chars().all(allowed)
-        {
-            return Err(format!("{text:?} is not a version"));
-        }
-        Ok(Self(text.to_owned()))
-    }
-}
-
-crate::serde_util::string_serde!(EngineVersion, "EngineVersion", "A version, as `0.1.0`.");
-
 /// The domain document (ARCHITECTURE, Terms): a journey's graph and state, the inputs to
-/// derive it, and the engine version. Nothing derived is in it; proposals are not part of it.
+/// derive it. Nothing derived is in it; proposals are not part of it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct DomainDocument {
@@ -853,8 +824,6 @@ pub struct DomainDocument {
     pub journey: Journey,
     /// The derive inputs.
     pub inputs: DeriveInputs,
-    /// The engine version.
-    pub engine_version: EngineVersion,
 }
 
 impl fmt::Display for Relevance {

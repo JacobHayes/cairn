@@ -291,8 +291,7 @@ pub fn preview_locally(
 ///
 /// # Errors
 ///
-/// The JSON of a [`HostError`]: version skew, unreadable input, the rejection, or a patch to
-/// another domain.
+/// The JSON of a [`HostError`]: unreadable input, the rejection, or a patch to another domain.
 #[wasm_bindgen]
 pub fn apply(document: &str, request: &str) -> Result<String, String> {
     let document = read_document(document)?;
@@ -317,8 +316,7 @@ pub fn apply_route(request: &str) -> Result<String, String> {
 ///
 /// # Errors
 ///
-/// The JSON of a [`HostError`]: version skew, unreadable input, or a proposal to another
-/// domain.
+/// The JSON of a [`HostError`]: unreadable input, or a proposal to another domain.
 #[wasm_bindgen]
 pub fn preview(document: &str, request: &str) -> Result<String, String> {
     let document = read_document(document)?;

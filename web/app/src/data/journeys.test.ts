@@ -4,7 +4,7 @@
 import { REOPEN_DELAY_FIRST_MS } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
-import { ENGINE, FakeDeriver, FakeHost, manualTimers, settled } from "./fake.test-support.ts";
+import { FakeDeriver, FakeHost, manualTimers, settled } from "./fake.test-support.ts";
 import { PARKED_JOURNEY_COUNT_MAX } from "./journeys.ts";
 import { Session } from "./session.ts";
 
@@ -13,7 +13,7 @@ const TODAY = "2026-10-06";
 async function started(journeys: Record<string, number> = { j_one: 3 }) {
   const host = new FakeHost();
   for (const [id, revision] of Object.entries(journeys)) {
-    host.journeysHeld.set(id, { revision, deployment: 1, today: TODAY, engine: ENGINE });
+    host.journeysHeld.set(id, { revision, deployment: 1, today: TODAY });
   }
   const deriver = new FakeDeriver();
   const { timers, pending } = manualTimers();
@@ -82,7 +82,7 @@ describe("a shown journey", () => {
     host.open();
     await settled();
     host.deploymentRevision = 2;
-    host.journeysHeld.set("j_one", { revision: 3, deployment: 2, today: TODAY, engine: ENGINE });
+    host.journeysHeld.set("j_one", { revision: 3, deployment: 2, today: TODAY });
     host.tick({ of: { domain: "deployment" }, revision: 2 });
     await settled();
     expect(revisionShown(session, "j_one")).toEqual([3, 2, TODAY]);
@@ -106,7 +106,7 @@ describe("a shown journey over time", () => {
     check();
     expect(host.fetches.get("j_one")).toBe(1);
     setNow("2026-10-07T00:00:30Z");
-    host.journeysHeld.set("j_one", { revision: 3, deployment: 1, today: "2026-10-07", engine: ENGINE });
+    host.journeysHeld.set("j_one", { revision: 3, deployment: 1, today: "2026-10-07" });
     check();
     check();
     await settled();
@@ -116,15 +116,15 @@ describe("a shown journey over time", () => {
 });
 
 describe("a journey's faults", () => {
-  it("from a newer engine latches skew, is not derived, and stops refetching", async () => {
+  it("from another engine latches skew, is not derived, and stops refetching", async () => {
     const { host, session } = await started();
     session.journeys.mount("j_one");
     await settled();
-    host.journeysHeld.set("j_one", { revision: 4, deployment: 1, today: TODAY, engine: "2.0.0" });
+    host.journeysHeld.set("j_one", { revision: 4, deployment: 1, today: TODAY, skewed: true });
     host.open();
     edit(host, "j_one", 4);
     await settled();
-    expect(session.skew.current).toEqual({ document: "2.0.0", engine: ENGINE });
+    expect(session.skew.latched).toBe(true);
     expect(revisionShown(session, "j_one")).toEqual([3, 1, TODAY]);
     edit(host, "j_one", 5);
     await settled();
@@ -194,7 +194,7 @@ describe("review round 1", () => {
     session.journeys.mount("j_one");
     host.deploymentRevision = 2;
     for (const id of ["j_one", "j_two"]) {
-      host.journeysHeld.set(id, { revision: 3, deployment: 2, today: TODAY, engine: ENGINE });
+      host.journeysHeld.set(id, { revision: 3, deployment: 2, today: TODAY });
     }
     host.tick({ of: { domain: "deployment" }, revision: 2 });
     await settled();
@@ -214,7 +214,7 @@ describe("review round 1", () => {
     setNow("2026-10-07T00:00:10Z");
     await check();
     expect(revisionShown(session, "j_one")).toEqual([3, 1, TODAY]);
-    host.journeysHeld.set("j_one", { revision: 3, deployment: 1, today: "2026-10-07", engine: ENGINE });
+    host.journeysHeld.set("j_one", { revision: 3, deployment: 1, today: "2026-10-07" });
     setNow("2026-10-07T00:01:10Z");
     await check();
     expect(revisionShown(session, "j_one")).toEqual([3, 1, "2026-10-07"]);

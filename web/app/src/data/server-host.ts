@@ -1,6 +1,8 @@
 // The server host: the API over HTTP at the page's origin (the binary serves the UI and the
 // API on one port; Vite's dev server proxies the API's paths to a running server), signed in
-// by the session cookie, with ticks over Server-Sent Events.
+// by the session cookie, with ticks over Server-Sent Events. A domain document counts only
+// when the server stamps it with the build this page was loaded from (ARCHITECTURE, Web UI:
+// version skew).
 import {
   type Answered,
   type HttpFailure,
@@ -16,7 +18,7 @@ import type { Engine } from "@cairn/wasm";
 
 import { serverAssistant } from "./assistant.ts";
 import { serverProposals } from "./proposals.ts";
-import { Missing, ReadFailed, type Host, type JourneyIndexQuery, type Markdown, type RouteFiles, type RouteImport } from "./host.ts";
+import { Missing, ReadFailed, Skewed, type Host, type JourneyIndexQuery, type Markdown, type RouteFiles, type RouteImport } from "./host.ts";
 
 interface Reply<T> {
   data?: T;
@@ -24,8 +26,11 @@ interface Reply<T> {
   response: Response;
 }
 
-/** The answer of a read, or why there is none. */
-async function answered<T>(what: string, read: () => Promise<Reply<T>>): Promise<T> {
+/** The header the server stamps every response with: the digest of the web build it serves (crates/cairn/src/assets.rs). */
+const BUILD_HEADER = "cairn-build";
+
+/** The answer of a read with its response, or why there is none. */
+async function replied<T>(what: string, read: () => Promise<Reply<T>>): Promise<{ data: T; response: Response }> {
   let reply: Reply<T>;
   try {
     reply = await read();
@@ -33,12 +38,17 @@ async function answered<T>(what: string, read: () => Promise<Reply<T>>): Promise
     throw new ReadFailed(networkFailure(thrown));
   }
   if (reply.data !== undefined) {
-    return reply.data;
+    return { data: reply.data, response: reply.response };
   }
   if (reply.response.status === 404) {
     throw new Missing(what);
   }
   throw new ReadFailed(answerFailure(reply.response.status, reply.error));
+}
+
+/** The answer of a read, or why there is none. */
+async function answered<T>(what: string, read: () => Promise<Reply<T>>): Promise<T> {
+  return (await replied(what, read)).data;
 }
 
 /** The page engine's route files. */
@@ -80,12 +90,11 @@ async function importOver(client: CairnClient, request: RouteImport): Promise<An
   return { outcome: "failed", error: answerFailure(response.status, error) };
 }
 
-/** The server at `origin`, with this page's engine for touched sets. */
-export function serverHost(origin: string, engine: Engine): Host {
+/** The server at `origin`, with this page's engine for touched sets and the build the page was loaded from (none on a page Vite's dev server served, which is never in skew). */
+export function serverHost(origin: string, engine: Engine, build: string | undefined): Host {
   const client: CairnClient = createCairnClient(origin);
   return {
     kind: "server",
-    engineVersion: engine.version,
     overlaps: (patch, intervening) => engine.touchedOverlaps(patch, intervening),
     capabilities: () => answered("the capabilities", () => client.GET("/api/capabilities")),
     journeys: (query) => answered("the journey index", () => client.GET("/api/journeys", { params: { query: indexParams(query) } })),
@@ -99,10 +108,16 @@ export function serverHost(origin: string, engine: Engine): Host {
     viewer: () => answered("the viewer", () => client.GET("/api/users/me")),
     files: filesOf(engine),
     deployment: () => answered("the deployment", () => client.GET("/api/deployment")),
-    documentText: (journey) =>
-      answered(journey, () =>
+    documentText: async (journey) => {
+      const { data, response } = await replied(journey, () =>
         client.GET("/api/journeys/{id}/document", { params: { path: { id: journey } }, parseAs: "text" }),
-      ),
+      );
+      // A page with no build is one Vite's dev server served: nothing to compare.
+      if (build !== undefined && response.headers.get(BUILD_HEADER) !== build) {
+        throw new Skewed();
+      }
+      return data;
+    },
     route: (route) => answered(route, () => client.GET("/api/routes/{id}", { params: { path: { id: route } } })),
     routeVersion: (route, version) =>
       answered(`${route} version ${String(version)}`, () =>

@@ -139,9 +139,9 @@ mod commands {
         );
     }
 
-    /// `migrate` creates the database file and is idempotent; `version` names the engine's.
+    /// `migrate` creates the database file and is idempotent; `version` names the binary's.
     #[test]
-    fn migrate_creates_the_database_and_version_names_the_engine() {
+    fn migrate_creates_the_database_and_version_names_the_binary() {
         let directory = directory("migrate");
         let path = config_file(&directory, CONFIG);
         for _ in 0..2 {
@@ -154,10 +154,7 @@ mod commands {
         }
         assert!(directory.join("cairn.db").exists());
         let version = String::from_utf8(run(&["version"], &[]).stdout).unwrap();
-        assert!(
-            version.contains(cairn_engine::engine_version().as_str()),
-            "{version}"
-        );
+        assert!(version.contains(env!("CARGO_PKG_VERSION")), "{version}");
     }
 }
 
@@ -274,10 +271,9 @@ mod binary {
         assert_eq!(capabilities["mcp"], true);
         let document = get(address, "localhost", "/api/journeys/j_hiring/document").await;
         assert_eq!(document.status, 200, "{}", document.text());
-        assert_eq!(
-            document.json()["engine_version"],
-            cairn_engine::engine_version().as_str()
-        );
+        let build = cairn::assets::digest(&cairn::assets::load().unwrap());
+        let stamp = format!("cairn-build: {build}");
+        assert!(document.head.contains(&stamp), "{}", document.head);
         let snapshot = get(address, "localhost", "/api/journeys/j_hiring/snapshot").await;
         assert_eq!(snapshot.status, 200, "{}", snapshot.text());
         assert!(

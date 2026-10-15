@@ -1654,11 +1654,9 @@ export interface components {
         } | "deployment";
         /**
          * @description The domain document (ARCHITECTURE, Terms): a journey's graph and state, the inputs to
-         *     derive it, and the engine version. Nothing derived is in it; proposals are not part of it.
+         *     derive it. Nothing derived is in it; proposals are not part of it.
          */
         DomainDocument: {
-            /** @description The engine version. */
-            engine_version: components["schemas"]["EngineVersion"];
             /** @description The derive inputs. */
             inputs: components["schemas"]["DeriveInputs"];
             /** @description The journey. */
@@ -1733,8 +1731,6 @@ export interface components {
             /** @constant */
             status: "turn_timed_out";
         };
-        /** @description A version, as `0.1.0`. */
-        EngineVersion: string;
         /** @description A person or team journeys refer to (PRD glossary, Entity), deployment-scoped. */
         Entity: {
             /**

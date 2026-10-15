@@ -43,7 +43,7 @@ export function useProposalWrite(): ProposalWrite {
   const report = useProblem(key, problem === undefined ? undefined : "rejection" in problem ? unlandedOf(problem.rejection) : { kind: "failed", message: unconfirmed(problem.failure) }, { discard: dismiss });
   useEffect(() => () => { session.sync.resolve(key); }, [session, key]);
   const run = async <A>(call: (proposals: ProposalHost, patchId: string) => Promise<ProposalWritten<A>>, patchId: string = newPatchId()): Promise<A | undefined> => {
-    if (skew !== undefined || session.skew.latched) {
+    if (skew || session.skew.latched) {
       return undefined;
     }
     setPending(true);
@@ -68,5 +68,5 @@ export function useProposalWrite(): ProposalWrite {
         return undefined;
     }
   };
-  return { run, pending, disabled: pending || skew !== undefined, problem, dismiss, receipt: receipt.receipt };
+  return { run, pending, disabled: pending || skew, problem, dismiss, receipt: receipt.receipt };
 }

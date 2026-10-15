@@ -54,7 +54,7 @@ describe("write", () => {
   it("sends nothing once the tab is in version skew, and the chip says the edit was not sent", async () => {
     const host = new FakeHost();
     const skew = new SkewLatch();
-    skew.latch({ document: "2.0.0", engine: "1.0.0" });
+    skew.latch();
     const env = envOf(host, skew);
     expect(await write(env, intent)).toEqual({ outcome: "stopped" });
     expect(host.sent).toEqual([]);

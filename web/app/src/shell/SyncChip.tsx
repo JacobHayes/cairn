@@ -94,7 +94,6 @@ function Recent({ saves }: { saves: readonly SaveEvent[] }) {
 }
 
 function Popover({ summary, problems, anchor, onClose }: { summary: SyncSummary; problems: readonly Problem[]; anchor: Anchor; onClose: () => void }) {
-  const session = useSession();
   const stream = useStreamStatus();
   const saves = useSaves();
   const derivation = useDerivation();
@@ -111,11 +110,11 @@ function Popover({ summary, problems, anchor, onClose }: { summary: SyncSummary;
           <span className="muted"> · live updates {stream === "live" ? "on" : stream === "reconnecting" ? "paused" : "off"}</span>
         </p>
         {derivation === undefined ? null : (
-          <p className="mono small muted" title={`Engine ${session.host.engineVersion}`}>
+          <p className="mono small muted">
             Revision {derivation.revision} · Today {dateWords(derivation.today, derivation.today)}
           </p>
         )}
-        {skew === undefined ? null : (
+        {skew && (
           <p className="stack" data-testid="sync-skew">
             <span>Cairn was updated. Reload to keep saving; your unsent edits are kept.</span>
             <span className="row">

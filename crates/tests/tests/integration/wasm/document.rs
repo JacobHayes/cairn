@@ -1,6 +1,5 @@
-//! A domain document in the browser host (ARCHITECTURE, Web UI: data flow, version skew):
-//! read with its engine version checked first, derived once, and projected; a document from
-//! another engine version is refused before it is read, by every call that reads one.
+//! A domain document in the browser host (ARCHITECTURE, Web UI: data flow): read, derived
+//! once, and projected.
 #![cfg(test)]
 
 use cairn_engine::testing::derive_inputs;
@@ -44,29 +43,4 @@ fn a_document_derives_once_and_answers_each_projection_or_names_what_is_missing(
         thrown(&unreadable.unwrap_err()),
         HostError::Unreadable { .. }
     ));
-}
-
-#[test]
-fn a_document_from_another_engine_version_is_refused_before_it_is_read() {
-    let text = document();
-    let mut value: serde_json::Value = serde_json::from_str(&text).unwrap();
-    value["engine_version"] = "9.0.0".into();
-    // A newer engine's document may carry what this one cannot read; skew is reported first.
-    value["journey"]["unknown_to_this_engine"] = true.into();
-    let newer = value.to_string();
-    let refusals = [
-        Derivation::new(&newer).map(|_| String::new()),
-        cairn_wasm::apply(&newer, "{}"),
-        cairn_wasm::preview(&newer, "{}"),
-    ];
-    for refused in refusals {
-        match thrown(&refused.unwrap_err()) {
-            HostError::VersionSkew { document, engine } => {
-                assert_eq!(document.as_str(), "9.0.0");
-                assert_eq!(engine, cairn_engine::engine_version());
-            }
-            other => panic!("expected version skew, got {other:?}"),
-        }
-    }
-    assert!(Derivation::new(&text).is_ok(), "this engine's own");
 }

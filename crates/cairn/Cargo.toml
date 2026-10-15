@@ -42,6 +42,8 @@ openidconnect.workspace = true
 rust-embed = { workspace = true, features = ["debug-embed"] }
 serde.workspace = true
 serde_json.workspace = true
+# The web build's digest, which the page and every response are stamped with (src/assets.rs).
+sha2.workspace = true
 socket2.workspace = true
 tokio = { workspace = true, features = ["macros", "net", "rt-multi-thread", "signal", "sync", "time"] }
 toml.workspace = true

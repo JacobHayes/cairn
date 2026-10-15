@@ -7,7 +7,6 @@ import type { Derivation, JourneyView } from "./journeys.ts";
 import { LiveRead, type LiveSpec, type LiveView } from "./live.ts";
 import type { SaveEvent, Toast } from "./activity.ts";
 import type { Session } from "./session.ts";
-import type { Skew } from "./skew.ts";
 import type { Problem, SyncSummary } from "./sync.ts";
 import { reasonOf, type Rejection } from "./writes.ts";
 
@@ -55,10 +54,10 @@ export function useDeployment(): Deployment | undefined {
   return useSyncExternalStore(deployment.subscribe, () => deployment.current);
 }
 
-/** The version skew, once latched. */
-export function useSkew(): Skew | undefined {
+/** Whether the tab is in version skew. */
+export function useSkew(): boolean {
   const { skew } = useSession();
-  return useSyncExternalStore(skew.subscribe, () => skew.current);
+  return useSyncExternalStore(skew.subscribe, () => skew.latched);
 }
 
 /** This tab's last saves, newest first. */

@@ -103,7 +103,7 @@ export function useNodeWrite(view: Ready, scope: string, node?: string): NodeWri
     seen: current,
     run,
     pending,
-    disabled: pending || skew !== undefined,
+    disabled: pending || skew,
     failed,
     dismiss,
     receipt: receipt.receipt,

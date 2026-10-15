@@ -1,7 +1,6 @@
 // Brief 4.5, Acceptance, in Node over the wasm32 module: the in-browser root loads
-// each fixture, applies a patch, refuses stale ones, and notifies its subscriber; a document
-// from another engine version, or a trap, stops the module; the worker keeps a journey's
-// newest document and fails loudly.
+// each fixture, applies a patch, refuses stale ones, and notifies its subscriber; a trap
+// stops the module; the worker keeps a journey's newest document and fails loudly.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -12,7 +11,7 @@ import type { Schema } from "@cairn/client";
 import type { Group, IndexEntry } from "./cases.ts";
 import { NOW } from "./cases.ts";
 import { brokenWorker, inProcess, wasmBytes } from "./in-process.ts";
-import type { HostError, PatchRequest, ProjectionRequest } from "./index.ts";
+import type { HostError, PatchRequest } from "./index.ts";
 
 const cases = join(import.meta.dirname, "..", "dist", "cases");
 
@@ -93,38 +92,6 @@ it("the in-browser root loads each fixture, applies a patch, refuses stale ones,
   expect(heard.at(-1)).toMatchObject({ first: false, ticks: [{ of: vendor, revision: base + 2 }] });
   expect(await worker.load(host.documentText("j_vendor_eval"))).toMatchObject({ journey: "j_vendor_eval", revision: base + 2 });
   unsubscribe();
-});
-
-// Version skew latches (ARCHITECTURE, Web UI): once the worker is posted a document from
-// another engine it refuses everything, the journey it held before included; once the page's
-// engine sees one, it refuses touched sets, local applies, previews, and the root's writes.
-// Each side is checked on a module graph of its own, as a page and a worker are realms of
-// their own: one latch would otherwise stand for the other.
-it("a document from another engine version stops the worker deriving, and the page previewing, writing, and retrying", async () => {
-  const worked = await fresh();
-  const host = await worked.host.InBrowserHost.start(wasmBytes, () => NOW);
-  const worker = await worked.worker();
-  const text = host.documentText("j_vendor_eval");
-  const document = JSON.parse(text) as Schema<"DomainDocument">;
-  const newer = JSON.stringify({ ...document, engine_version: "9.0.0" });
-  const request = note("p_skewed", document.journey.revision, "a_skewed");
-  const summary: ProjectionRequest = { projection: "status_summary" };
-  await worker.load(text);
-  expect((await worker.projectText("j_vendor_eval", summary)).length).toBeGreaterThan(0);
-  const refused = { error: "version_skew", document: "9.0.0", engine: host.engine.version };
-  expect(await reasonOf(worked, () => worker.load(newer))).toEqual(refused);
-  expect(await reasonOf(worked, () => worker.projectText("j_vendor_eval", summary))).toEqual(refused);
-  expect(await reasonOf(worked, () => worker.load(text))).toEqual(refused);
-
-  const paged = await fresh();
-  const page = await paged.host.InBrowserHost.start(wasmBytes, () => NOW);
-  expect(page.engine.touchedText(request.patch).length).toBeGreaterThan(0);
-  expect(page.engine.accepts({ engine_version: "9.0.0" })).toBe(false);
-  const actor = { user: "u_local" } as Schema<"Actor">;
-  expect(await reasonOf(paged, () => page.engine.touchedText(request.patch))).toEqual(refused);
-  expect(await reasonOf(paged, () => page.engine.apply(text, { patch: request.patch, at: NOW, actor }))).toEqual(refused);
-  expect(await reasonOf(paged, () => page.engine.preview(text, { proposal: {} as Schema<"Proposal">, at: NOW, actor }))).toEqual(refused);
-  expect(await reasonOf(paged, () => page.patch(request))).toEqual(refused);
 });
 
 it("a trap stops the page's module for every caller", async () => {

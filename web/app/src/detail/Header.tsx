@@ -105,7 +105,7 @@ function RenameForm({ view, node, title, rename }: { view: Ready; node: string; 
             }
           }}
         />
-        <Button primary disabled={saving || skew !== undefined || draft.text.trim() === ""} onClick={() => void save()}>
+        <Button primary disabled={saving || skew || draft.text.trim() === ""} onClick={() => void save()}>
           Save
         </Button>
         <Button onClick={() => { rename.cancel(); setRejection(undefined); }}>Cancel</Button>

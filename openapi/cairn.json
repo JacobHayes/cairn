@@ -2857,12 +2857,8 @@
       },
       "DomainDocument": {
         "additionalProperties": false,
-        "description": "The domain document (ARCHITECTURE, Terms): a journey's graph and state, the inputs to\nderive it, and the engine version. Nothing derived is in it; proposals are not part of it.",
+        "description": "The domain document (ARCHITECTURE, Terms): a journey's graph and state, the inputs to\nderive it. Nothing derived is in it; proposals are not part of it.",
         "properties": {
-          "engine_version": {
-            "$ref": "#/components/schemas/EngineVersion",
-            "description": "The engine version."
-          },
           "inputs": {
             "$ref": "#/components/schemas/DeriveInputs",
             "description": "The derive inputs."
@@ -2874,8 +2870,7 @@
         },
         "required": [
           "journey",
-          "inputs",
-          "engine_version"
+          "inputs"
         ],
         "type": "object"
       },
@@ -3115,10 +3110,6 @@
             "type": "object"
           }
         ]
-      },
-      "EngineVersion": {
-        "description": "A version, as `0.1.0`.",
-        "type": "string"
       },
       "Entity": {
         "additionalProperties": false,

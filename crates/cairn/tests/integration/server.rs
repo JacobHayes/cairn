@@ -5,6 +5,7 @@
 #![cfg(test)]
 
 mod in_process {
+    use std::borrow::Cow;
     use std::sync::Arc;
 
     use cairn::root;
@@ -149,8 +150,19 @@ mod in_process {
                 .head
                 .to_ascii_lowercase()
                 .contains("content-type: text/html");
+            // The page as served carries the build's meta tag (assets::router); the rest is the file.
+            let served = reply.text();
+            let unstamped = match (
+                served.find("<meta name=\"cairn-build\""),
+                served.find("</head>"),
+            ) {
+                (Some(start), Some(end)) => format!("{}{}", &served[..start], &served[end..]),
+                _ => served.clone(),
+            };
             let reached = match reply.status {
-                200 if html && (method == "HEAD" || reply.body == page.as_ref()) => Reached::Page,
+                200 if html && (method == "HEAD" || unstamped.as_bytes() == page.as_ref()) => {
+                    Reached::Page
+                }
                 404 if reply.body.is_empty() => Reached::Missing,
                 404 if reply.json()["error"] == json!("no_such_endpoint") => Reached::NoEndpoint,
                 status => Reached::Endpoint(status),
@@ -266,6 +278,47 @@ mod in_process {
             get(address, PUBLIC_HOST, "/assets/other.js").await.status,
             404
         );
+    }
+
+    /// The page, at each of its addresses, is stamped with the web build's digest, and every
+    /// response, the API's and the UI's, carries it (ARCHITECTURE, Web UI: version skew); a
+    /// bundle changed by one byte changes it.
+    #[tokio::test]
+    async fn the_page_and_every_response_carry_the_build_digest() {
+        let build = cairn::assets::digest(&support::assets());
+        assert_eq!(build.len(), 64);
+        let mut changed = support::assets();
+        changed[1].bytes = Cow::Borrowed(b"export {}!");
+        assert_ne!(cairn::assets::digest(&changed), build);
+        let config = support::config(&support::dev_provider(None));
+        let app = root::app(
+            &config,
+            support::assembly(Arc::new(InProcessNotifier::new())),
+        )
+        .unwrap();
+        let address = support::serve(app).await;
+        for path in ["/", "/index.html", "/journeys/j_one"] {
+            let page = get(address, PUBLIC_HOST, path).await.text();
+            let meta = format!("<meta name=\"cairn-build\" content=\"{build}\" /></head>");
+            assert!(page.contains(&meta), "{path}: {page}");
+        }
+        for path in ["/", "/api/capabilities", "/api/journeys/j_absent/document"] {
+            let reply = get(address, PUBLIC_HOST, path).await;
+            let stamp = format!("cairn-build: {build}");
+            assert!(reply.head.contains(&stamp), "{path}: {}", reply.head);
+        }
+    }
+
+    /// A page with no `</head>` to stamp the build in does not start.
+    #[test]
+    fn a_server_whose_page_has_no_head_does_not_start() {
+        let config = support::config(&support::dev_provider(None));
+        let mut assembly = support::assembly(Arc::new(InProcessNotifier::new()));
+        assembly.assets[0].bytes = Cow::Borrowed(b"<!doctype html><title>Cairn</title>");
+        assert!(matches!(
+            root::app(&config, assembly),
+            Err(root::StartupError::WebBuild(_))
+        ));
     }
 
     /// A binary without a web build does not start.

@@ -1,6 +1,6 @@
 // The page's side of the derive worker (./worker.ts): requests by id, each answered by a
 // promise that resolves to the module's JSON text or parsed value, or rejects with a
-// HostFailure. A document from another engine version is refused at `load` (version skew).
+// HostFailure.
 import type { Schema } from "@cairn/client";
 
 import type { Envelope, Reply, WorkerRequest } from "./protocol.ts";
@@ -28,8 +28,6 @@ export class DeriveWorker {
   readonly #worker: Worker;
   readonly #pending = new Map<number, Pending>();
   #next = 0;
-  /** The worker's engine version, once started. */
-  version = "";
 
   /** Set once the worker failed: every pending and later request rejects with it. */
   #dead: HostFailure | undefined;
@@ -71,7 +69,7 @@ export class DeriveWorker {
     worker: Worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" }),
   ): Promise<DeriveWorker> {
     const started = new DeriveWorker(worker);
-    started.version = await started.#ask({ op: "init", wasm: String(wasm) });
+    await started.#ask({ op: "init", wasm: String(wasm) });
     return started;
   }
 

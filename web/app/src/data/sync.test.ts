@@ -10,7 +10,7 @@ const quiet: SyncInput = {
   stream: "live",
   online: true,
   demo: false,
-  skew: undefined,
+  skew: false,
   problems: [],
   inFlight: 0,
   inFlightSince: undefined,
@@ -31,7 +31,7 @@ describe("summarize", () => {
   it("puts the first state of the precedence on top of the others that hold", () => {
     let held: Partial<SyncInput> = {
       problems: [problem("conflict"), problem("rejected")],
-      skew: { document: "2.0.0", engine: "1.0.0" },
+      skew: true,
       online: false,
       stream: "reconnecting",
       lag: lag(90_000),
@@ -44,7 +44,7 @@ describe("summarize", () => {
     const drops: Partial<SyncInput>[] = [
       { problems: [problem("rejected")] },
       { problems: [] },
-      { skew: undefined },
+      { skew: false },
       { online: true },
       { stream: "live" },
       { lag: undefined },
