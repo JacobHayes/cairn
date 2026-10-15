@@ -23,3 +23,24 @@ test("C10: the frontier list fits a narrow window, the journey's menus open insi
     await page.keyboard.press("Escape");
   }
 });
+
+test("the graph's controls fold into one View menu that holds them all", async ({ page }) => {
+  await openActing(page, "browser", "j_launch", "graph");
+  await page.getByRole("button", { name: "Open map" }).click();
+  const bar = page.getByTestId("view-controls");
+  await expect(bar.getByTestId("view-button")).toBeVisible();
+  await expect(bar.getByTestId("filter-button")).toHaveCount(0);
+  // One row: the button, with the Signal button across from it.
+  expect((await bar.boundingBox())?.height).toBeLessThan(48);
+  await bar.getByTestId("view-button").click();
+  const panel = page.getByTestId("view-button-menu");
+  for (const part of ["ladder", "chip-frontier", "chip-decisions", "toolbar-search"]) {
+    await expect(panel.getByTestId(part)).toBeVisible();
+  }
+  // The panel ends with its last control: no band of empty space under Search.
+  const search = await panel.getByTestId("toolbar-search").boundingBox();
+  const whole = await panel.boundingBox();
+  expect((whole?.y ?? 0) + (whole?.height ?? 0) - ((search?.y ?? 0) + (search?.height ?? 0))).toBeLessThan(32);
+  await panel.getByTestId("chip-frontier").click();
+  await expect(page).toHaveURL(/frontier=1/);
+});

@@ -180,7 +180,8 @@
   gap: var(--space-2);
 }
 
-.toolbar-search {
+/* A fixed width in the row of controls; in a menu's column the same basis would be a height. */
+.view-controls > .toolbar-search {
   flex: 0 0 9rem;
 }
 

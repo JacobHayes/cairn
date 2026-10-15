@@ -16,6 +16,7 @@ import { STEP_WORDS } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
 import { canvasPath, viewFrom } from "../canvas/settings.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
+import { useMedia, PHONE_WIDTH } from "../shell/frame.tsx";
 import { chipApplies, pagePath, withMineFlipped, withParam, type Screen } from "../journeys/address.ts";
 import { DETAILS } from "../timeline/rows.ts";
 import { timelineFrom } from "../timeline/TimelineView.tsx";
@@ -57,6 +58,28 @@ function tip(words: string, badge: Badge | undefined): string {
   return badge === undefined || badge.count === 0 ? words : `${words}. ${badge.words}`;
 }
 
+/** The detail levels as radios, coarse to fine; choosing one closes the menu it is in. */
+function DetailOptions({ choice, close }: { choice: DetailChoice; close: () => void }) {
+  return (
+    <div className="opts" role="radiogroup" aria-label="Detail" data-testid="ladder">
+      {[...choice.steps].reverse().map((each) => (
+        <label key={each} className="opt">
+          <input
+            type="radio"
+            name="detail"
+            checked={each === choice.step}
+            onChange={() => {
+              choice.onStep(each);
+              close();
+            }}
+          />
+          <span>{STEP_WORDS[each]}</span>
+        </label>
+      ))}
+    </div>
+  );
+}
+
 function DetailMenu({ choice, badge }: { choice: DetailChoice; badge: Badge | undefined }) {
   return (
     <Menu
@@ -71,24 +94,7 @@ function DetailMenu({ choice, badge }: { choice: DetailChoice; badge: Badge | un
         </Dotted>
       }
     >
-      {(close) => (
-        <div className="opts" role="radiogroup" aria-label="Detail" data-testid="ladder">
-          {[...choice.steps].reverse().map((each) => (
-            <label key={each} className="opt">
-              <input
-                type="radio"
-                name="detail"
-                checked={each === choice.step}
-                onChange={() => {
-                  choice.onStep(each);
-                  close();
-                }}
-              />
-              <span>{STEP_WORDS[each]}</span>
-            </label>
-          ))}
-        </div>
-      )}
+      {(close) => <DetailOptions choice={choice} close={close} />}
     </Menu>
   );
 }
@@ -238,17 +244,82 @@ function useTimelineDetail(screen: Screen, search: string): DetailChoice | undef
   };
 }
 
-export function ViewControls({ ready, screen, node, detail, badges, onFind, end }: ViewControlsProps) {
+/** The search box: the graph's finds a node (and the menu it is in closes), the others filter by text. Keyed by screen: text typed for the graph's find is not a filter the next view holds. */
+function Find({ screen, onFind, onDone }: { screen: Screen; onFind: ((text: string) => void) | undefined; onDone?: () => void }) {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
-  const params = new URLSearchParams(search);
+  const text = new URLSearchParams(search).get("q") ?? "";
+  return (
+    <Search
+      key={`${screen}:${text}`}
+      text={text}
+      find={screen === "graph"}
+      onSearch={(typed) => {
+        if (screen === "graph") {
+          onFind?.(typed);
+          onDone?.();
+        } else {
+          void navigate(`${pathname}${withParam(search, "q", typed === "" ? undefined : typed)}`);
+        }
+      }}
+    />
+  );
+}
+
+/** The graph's controls on a phone, where the canvas has room for one button: the same controls in a View menu, with the detail and filter badges on it. */
+function PhoneControls({ ready, screen, node, chosen, badges, filter, onFind }: {
+  ready: Ready;
+  screen: Screen;
+  node: string | undefined;
+  chosen: DetailChoice | undefined;
+  badges: ViewControlsProps["badges"];
+  filter: Badge | undefined;
+  onFind: ((text: string) => void) | undefined;
+}) {
+  const { search } = useLocation();
+  const shown = [badges?.detail, filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
+  const total = { count: shown.reduce((sum, badge) => sum + badge.count, 0), words: shown.map((badge) => badge.words).join(". ") };
+  return (
+    <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
+      <Menu
+        label="View"
+        title={tip("Detail, highlights, filter and find", total)}
+        testId="view-button"
+        role="dialog"
+        className="view-control"
+        trigger={
+          <Dotted badge={total} testId="view-badge">
+            View ▾
+          </Dotted>
+        }
+      >
+        {(close) => (
+          <div className="stack" data-testid="view-panel-phone">
+            {chosen === undefined ? null : <DetailOptions choice={chosen} close={close} />}
+            <div className="row">
+              <Highlights ready={ready} screen={screen} />
+            </div>
+            <FilterBody ready={ready} screen={screen} node={node} search={search} />
+            <Find screen={screen} onFind={onFind} onDone={close} />
+          </div>
+        )}
+      </Menu>
+    </div>
+  );
+}
+
+export function ViewControls({ ready, screen, node, detail, badges, onFind, end }: ViewControlsProps) {
+  const { search } = useLocation();
+  // The graph's controls float over the canvas, where a phone has room for one: they fold into a View menu.
+  const phone = useMedia(PHONE_WIDTH);
+  const collapsed = screen === "graph" && phone;
   const timelineDetail = useTimelineDetail(screen, search);
   const chosen = detail ?? timelineDetail;
   const active = activeFilters(ready.journey.header.id, screen, search, node);
   const filter: Badge | undefined = badges?.filter ?? (active.length === 0 ? undefined : { count: active.length, words: `${String(active.length)} on` });
-  const set = (name: string, value: string | undefined) => {
-    void navigate(`${pathname}${withParam(search, name, value)}`);
-  };
+  if (collapsed) {
+    return <PhoneControls ready={ready} screen={screen} node={node} chosen={chosen} badges={badges} filter={filter} onFind={onFind} />;
+  }
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       {chosen === undefined ? null : <DetailMenu choice={chosen} badge={badges?.detail} />}
@@ -271,20 +342,7 @@ export function ViewControls({ ready, screen, node, detail, badges, onFind, end 
           </div>
         )}
       </Menu>
-      {/* Keyed by screen: text typed for the graph's find is not a filter the next view holds. */}
-      <Search
-        key={`${screen}:${params.get("q") ?? ""}`}
-        text={params.get("q") ?? ""}
-        find={screen === "graph"}
-        onSearch={(text) => {
-          // The graph's search finds a node; the others filter by text.
-          if (screen === "graph") {
-            onFind?.(text);
-          } else {
-            set("q", text === "" ? undefined : text);
-          }
-        }}
-      />
+      <Find screen={screen} onFind={onFind} />
       {end === undefined ? null : <div className="view-controls-end">{end}</div>}
     </div>
   );
