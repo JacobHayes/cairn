@@ -1,13 +1,13 @@
 // C2, C4: the detail ladder (5.1). Two rules decide what is open and nothing else does: the
 // step, and the viewer's own expands and collapses since picking it. At Stages, the current
-// stages open to the Work step and every other top-level stage is collapsed; at the other steps
+// stages open to the Deliverables step and every other top-level stage is collapsed; at the other steps
 // every container is open to that step. The level request carries the result (the kinds shown,
 // the containers collapsed), so the engine does the roll-up (5.3). Pure, so a unit test reads
 // the rules without a canvas.
 import type { GraphNode, NodeKind } from "../detail/model.ts";
 import { KINDS, STEPS, type CanvasSettings, type Step } from "./model.ts";
 
-/** The kinds each step draws; Stages draws the Work set inside the open stages, with its other stages collapsed. */
+/** The kinds each step draws; Stages draws the Deliverables set inside the open stages, with its other stages collapsed. */
 const KINDS_AT: Record<Step, NodeKind[]> = {
   stages: ["group", "decision", "deliverable", "milestone"],
   decisions: ["group", "decision", "milestone"],
@@ -15,7 +15,7 @@ const KINDS_AT: Record<Step, NodeKind[]> = {
   all: KINDS,
 };
 
-export const STEP_WORDS: Record<Step, string> = { stages: "Stages", decisions: "Decisions", work: "Work", all: "All" };
+export const STEP_WORDS: Record<Step, string> = { stages: "Stages", decisions: "Decisions", work: "Deliverables", all: "All" };
 
 /** The kinds `step` draws. */
 export function kindsAt(step: Step): NodeKind[] {
@@ -24,7 +24,7 @@ export function kindsAt(step: Step): NodeKind[] {
 
 /**
  * The nodes `step` leaves out (5.1): at Stages, each top-level node that is neither a stage nor a
- * milestone, with everything beneath it. Stages draws the Work set only inside the stages.
+ * milestone, with everything beneath it. Stages draws the Deliverables set only inside the stages.
  */
 export function leftOutAt(step: Step, nodes: readonly GraphNode[]): Set<string> {
   const out = new Set<string>();
@@ -61,7 +61,7 @@ export function routeKindsAt(step: Step): NodeKind[] {
 
 /**
  * The step a route's canvas is at: the one picked, else Stages, or Decisions when the route has no
- * groups, or Work inside a container drilled into; a draft opens as a version does.
+ * groups, or Deliverables inside a container drilled into; a draft opens as a version does.
  */
 export function routeStepOf(view: Pick<CanvasSettings, "step" | "container">, nodes: readonly GraphNode[]): Step {
   // Drilled into a stage, its work is what there is to see: Stages draws only groups and milestones.

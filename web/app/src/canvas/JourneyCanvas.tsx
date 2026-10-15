@@ -4,15 +4,18 @@
 // selected node as an overlay (selecting a node traces it; several selected trace nothing). A card
 // opens the node's detail (5.1) beside the canvas, or joins the selection; an edge opens the
 // edge's card.
+import { Panel } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { nodeDetail, recordOf, titleOf, type Ready } from "../detail/model.ts";
+import { nodeDetail, recordOf, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
 import { contextMenuOf } from "../detail/offers.ts";
 import { pagePath } from "../journeys/address.ts";
+import { ViewControls } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { typing } from "../ui/typing.ts";
-import { CanvasStatus, Ladder, SignalMenu } from "./Chrome.tsx";
+import { RevealBox, SignalMenu } from "./Chrome.tsx";
+import { useFind } from "./find.ts";
 import { GraphCanvas, type Reveal } from "./GraphCanvas.tsx";
 import { useJoinedTrace, useLaidOut, useProjected } from "./hooks.ts";
 import { journeyLooks } from "./journey.ts";
@@ -32,16 +35,15 @@ export function journeyModel(ready: Ready, level: Level, extras: JourneyExtras):
 }
 
 /** What a canvas reads from the address and the page: the step it is at, and the containers it collapses. */
-function useLadder(ready: Ready, view: CanvasView, decisions: boolean) {
+function useLadder(ready: Ready, view: CanvasView) {
   return useMemo(() => {
     const nodes = ready.journey.graph.nodes ?? [];
-    // Editing structure draws every node, so each can be reached; the decisions view raises the step to at least Decisions (5.1).
-    const picked = view.edit && view.step === undefined ? "all" : stepOf(view, nodes);
-    const step: Step = decisions && picked === "stages" ? "decisions" : picked;
+    // Editing structure draws every node, so each can be reached.
+    const step: Step = view.edit && view.step === undefined ? "all" : stepOf(view, nodes);
     const active = nodes.filter((node) => recordOf(ready, node).state === "active").map((node) => node.key);
     const current = currentStages(nodes, ready.derived.acting_frontier, active);
     return { nodes, step, steps: stepsFor(nodes), collapsed: collapsedAt(step, nodes, current, view.open, view.shut) };
-  }, [ready, view, decisions]);
+  }, [ready, view]);
 }
 
 /**
@@ -130,7 +132,7 @@ export interface JourneyCanvasProps {
   selected: string | undefined;
   /** The edge whose card is open, as `<from>~<to>`. */
   edge: string | undefined;
-  /** The toolbar's Decisions chip: the step rises to at least Decisions and non-decision cards fade (5.1). */
+  /** The Decisions highlight: non-decision cards fade; what is drawn does not change. */
   decisions: boolean;
   /** The frontier lens: the nodes kept at full strength while every other card fades; none (or null) fades nothing. */
   emphasis?: ReadonlySet<string> | null | undefined;
@@ -140,10 +142,9 @@ export interface JourneyCanvasProps {
   selection: Selection;
 }
 
-/** What each filter fades: the kinds not kept at full strength, and with the decisions view every other kind. */
-function fadedBy(model: CanvasModel, view: CanvasView, decisions: boolean): ReadonlySet<string> {
-  const kept = view.shown.length < KINDS.length;
-  return new Set(model.cards.filter((card) => (kept && !view.shown.includes(card.kind)) || (decisions && card.kind !== "decision")).map((card) => card.key));
+/** What the Decisions highlight fades: every card that is not a decision. */
+function fadedBy(model: CanvasModel, decisions: boolean): ReadonlySet<string> {
+  return new Set(decisions ? model.cards.filter((card) => card.kind !== "decision").map((card) => card.key) : []);
 }
 
 /**
@@ -162,14 +163,15 @@ function useSelectionTrace(ready: Ready, selected: string | undefined) {
 }
 
 /** What the canvas draws: the ladder's level laid out, the selected node's trace over it, and what Reveal asks for. */
-function useGraph(ready: Ready, view: CanvasView, selected: string | undefined, decisions: boolean) {
+function useGraph(ready: Ready, view: CanvasView, selected: string | undefined, decisions: boolean, emphasis: ReadonlySet<string> | null | undefined) {
   const journey = ready.journey.header.id;
-  const { nodes, step, steps, collapsed } = useLadder(ready, view, decisions);
+  const { nodes, step, steps, collapsed } = useLadder(ready, view);
   const { trace, learn } = useSelectionTrace(ready, selected);
   // Reveal (5.7) is a moment, not an address: it ends when something else is selected.
-  const [revealedFor, setRevealedFor] = useState<string | undefined>(undefined);
+  const [revealedFor, setRevealedFor] = useState<{ node: string | undefined; linked: number } | undefined>(undefined);
   const traced = useMemo(() => (trace === undefined ? undefined : new Set([trace.node, ...trace.upstream, ...trace.downstream])), [trace]);
-  const traceOnly = revealedFor !== undefined && revealedFor === selected ? traced : undefined;
+  const revealed = revealedFor !== undefined && revealedFor.node === selected ? revealedFor : undefined;
+  const traceOnly = revealed === undefined ? undefined : traced;
   const open = useMemo(() => (traceOnly === undefined ? [] : [...traceOnly].flatMap((key) => ancestorsOf(nodes, key))), [traceOnly, nodes]);
   const unfolded = useMemo(() => collapsed.filter((key) => !open.includes(key)), [collapsed, open]);
   const { model, error, layoutView } = useJourneyModel(ready, view, unfolded, step, traceOnly);
@@ -184,12 +186,26 @@ function useGraph(ready: Ready, view: CanvasView, selected: string | undefined, 
     () => (selected !== undefined && trace !== undefined && laidOut !== undefined ? traceOverlay(trace, laidOut.model, titleOf(ready, trace.node)) : undefined),
     [selected, trace, laidOut, ready],
   );
-  const faded = useMemo(() => (laidOut === undefined ? undefined : fadedBy(laidOut.model, view, decisions)), [laidOut, view, decisions]);
-  const hidden = useMemo(() => {
+  const faded = useMemo(() => (laidOut === undefined ? undefined : fadedBy(laidOut.model, decisions)), [laidOut, decisions]);
+  const badges = useMemo(() => {
     const leftOut = leftOutAt(step, nodes);
-    return view.notRelevant ? 0 : hiddenCount(nodes.filter((node) => !leftOut.has(node.key)), (key) => ready.derived.nodes[key]?.display_state === "not_relevant", kindsAt(step), collapsed);
-  }, [view.notRelevant, nodes, ready.derived.nodes, step, collapsed]);
-  return { step, steps, trace, laidOut, overlay, faded, hidden, error: error ?? layoutError, reveal: () => { setRevealedFor(selected); } };
+    const drawn = nodes.filter((node) => !leftOut.has(node.key));
+    const state = (key: string) => ready.derived.nodes[key]?.display_state;
+    const hiding = (words: string, count: number) => (count === 0 ? [] : [{ words: `${String(count)} ${words}`, count }]);
+    const parts = [
+      ...hiding("not relevant hidden", view.notRelevant ? 0 : hiddenCount(drawn, (key) => state(key) === "not_relevant", kindsAt(step), collapsed)),
+      ...hiding("conditional hidden", view.undecided ? 0 : hiddenCount(drawn, (key) => state(key) === "conditional", kindsAt(step), collapsed)),
+    ];
+    const filter = parts.length === 0 ? undefined : { count: parts.reduce((sum, part) => sum + part.count, 0), words: parts.map((part) => part.words).join(", ") };
+    const own = new Set((laidOut?.model.cards ?? []).map((card) => card.key));
+    const kept = (node: GraphNode) => (emphasis === null || emphasis === undefined || emphasis.has(node.key)) && (!decisions || node.kind === "decision");
+    const wanted = (emphasis !== null && emphasis !== undefined) || decisions ? nodes.filter(kept) : [];
+    // Nodes the Filter hides are its to say; a highlight lists the nodes with no card of their own at this detail (one folded into a container lights the container instead).
+    const lost = wanted.filter((node) => !own.has(node.key) && !(state(node.key) === "not_relevant" && !view.notRelevant) && !(state(node.key) === "conditional" && !view.undecided)).length;
+    const detail = lost === 0 ? undefined : { count: lost, words: `${String(lost)} hidden at this detail; choose All to see them` };
+    return { filter, detail };
+  }, [step, nodes, collapsed, view.notRelevant, view.undecided, ready.derived.nodes, laidOut, emphasis, decisions]);
+  return { step, steps, trace, laidOut, overlay, faded, badges, revealed: revealed?.linked, error: error ?? layoutError, reveal: (linked: number) => { setRevealedFor({ node: selected, linked }); }, hide: () => { setRevealedFor(undefined); } };
 }
 
 /** What a card asks of the canvas: open its node, expand or collapse it (and refit to it, 5.1), trace it. */
@@ -265,7 +281,8 @@ export function JourneyCanvas({ ready, view, selected, edge, decisions, emphasis
   // One member is inspected and traced; several are only tinted.
   const [single, ...others] = selection.members;
   const alone = others.length === 0 ? single : undefined;
-  const graph = useGraph(ready, view, alone, decisions);
+  const graph = useGraph(ready, view, alone, decisions, emphasis);
+  const { find, missing } = useFind(ready, view, selection.release);
   const actions = useActions(ready, view, selected, onPick, selection);
   const go = (next: CanvasView, node: string | undefined) => void navigate(canvasPath(journey, next, node));
   useEscapeEdit(view.edit && others.length === 0, useCallback(() => { void navigate(canvasPath(journey, { ...view, edit: false }, selected)); }, [navigate, journey, view, selected]));
@@ -305,10 +322,25 @@ export function JourneyCanvas({ ready, view, selected, edge, decisions, emphasis
         steps={graph.steps}
         onStep={(next) => { go(withStep(view, next), selected); }}
       >
-        <Ladder steps={graph.steps} step={graph.step} onStep={(next) => { go(withStep(view, next), selected); }}>
+        <Panel position="top-left" className="canvas-panel canvas-top">
+          <ViewControls
+            ready={ready}
+            screen="graph"
+            node={selected}
+            detail={{ steps: graph.steps, step: graph.step, onStep: (next) => { go(withStep(view, next), selected); } }}
+            badges={graph.badges}
+            onFind={find}
+          />
+          {missing === undefined ? null : (
+            <p className="callout" role="status" data-testid="find-missing">
+              No node is named like "{missing}".
+            </p>
+          )}
+        </Panel>
+        <Panel position="top-right" className="canvas-panel">
           <SignalMenu lens={view.lens} onLens={(lens) => { go({ ...view, lens }, selected); }} />
-        </Ladder>
-        <CanvasStatus linked={alone === undefined ? 0 : outsideOf(trace, laidOut.model)} notRelevant={graph.hidden} onReveal={graph.reveal} onShow={() => { go({ ...view, notRelevant: true }, selected); }} />
+        </Panel>
+        <RevealBox linked={graph.revealed ?? (alone === undefined ? 0 : outsideOf(trace, laidOut.model))} revealed={graph.revealed !== undefined} onReveal={() => { graph.reveal(outsideOf(trace, laidOut.model)); }} onHide={graph.hide} />
       </GraphCanvas>
   );
 }

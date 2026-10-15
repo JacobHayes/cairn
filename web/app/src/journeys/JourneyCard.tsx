@@ -4,7 +4,7 @@
 // Summary page every fold is open and each list is whole: the status summary's parts, with
 // the print view (C18). Kept current (H6): both read the journey's local derivation.
 // What is still the viewer's to do is one muted line under the progress.
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 
 import { DEFAULT_LIST, listPath, type ListFlag } from "../acting/address.ts";
 import { DetailLink } from "../acting/Parts.tsx";
@@ -19,7 +19,7 @@ import { StatusSummaryView } from "../summary/StatusSummary.tsx";
 import { dateAway, dateWords } from "../timeline/model.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
-import { pagePath } from "./address.ts";
+import { pagePath, switchedSearch } from "./address.ts";
 import { yoursOf } from "./figures-model.ts";
 import { JourneyFlow } from "../proposals/Entries.tsx";
 import { UpgradeMark } from "./JourneyIndex.tsx";
@@ -194,6 +194,7 @@ function Folds({ ready, model, full, selected }: { ready: Ready; model: SummaryM
  */
 export function JourneyCard({ ready, selected, full = false }: { ready: Ready; selected?: string | undefined; full?: boolean }) {
   const journey = ready.journey.header.id;
+  const { search } = useLocation();
   const summary = useProjected(ready, { projection: "status_summary" });
   const model = useMemo(() => (summary.value === undefined ? undefined : summaryModel(ready, summary.value)), [ready, summary.value]);
   const { header } = ready.journey;
@@ -214,7 +215,7 @@ export function JourneyCard({ ready, selected, full = false }: { ready: Ready; s
             <Button className="no-print" onClick={() => { globalThis.print(); }}>
               Print
             </Button>
-            <Link to={pagePath(journey, "graph")} className="no-print" data-testid="summary-close" aria-label="Close the summary">
+            <Link to={pagePath(journey, "graph", undefined, switchedSearch(search, "summary", "graph"))} className="no-print" data-testid="summary-close" aria-label="Close the summary">
               Close
             </Link>
           </>

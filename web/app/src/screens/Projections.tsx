@@ -1,7 +1,7 @@
 // What each view draws on the journey's page: the graph, the list, the timeline and the walk
 // through.
-// The graph with DECISIONS on is the decision view (C12): the same canvas at least at the
-// Decisions step, with everything else faded; its stalled surface and, in edit mode, the
+// The graph with DECISIONS on is the decision view (C12): the same canvas with every card that
+// is not a decision faded; its stalled surface and, in edit mode, the
 // structure's tools (5.6) are the head's (CanvasBars).
 import { lazy, Suspense, useMemo } from "react";
 import { useLocation } from "react-router";
@@ -19,6 +19,7 @@ import type { Selection } from "../canvas/selection.ts";
 import type { Ready } from "../detail/model.ts";
 import type { Screen } from "../journeys/address.ts";
 import { TimelineChart, timelineFrom } from "../timeline/TimelineView.tsx";
+import { ViewBar } from "./ViewControls.tsx";
 
 /** The graph and its library load with the graph alone: the other views open without them. */
 const JourneyCanvas = lazy(() => import("../canvas/JourneyCanvas.tsx").then((module) => ({ default: module.JourneyCanvas })));
@@ -39,7 +40,7 @@ function ProjectedTimeline({ ready, selected }: { ready: Ready; selected: string
   if (timeline.value === undefined) {
     return <p className="muted small">Placing the dates...</p>;
   }
-  return <TimelineChart ready={ready} timeline={timeline.value} narrow={narrow} selected={selected} detail={detail} range={range} />;
+  return <TimelineChart key={detail} ready={ready} timeline={timeline.value} narrow={narrow} selected={selected} detail={detail} range={range} />;
 }
 
 export interface ProjectionProps {
@@ -69,17 +70,28 @@ export function CanvasBars({ ready, authored, drawing }: Pick<ProjectionProps, "
 export function ProjectionBody({ ready, screen, selected, edge, authored, drawing, selection }: ProjectionProps) {
   const { search } = useLocation();
   const params = useMemo(() => new URLSearchParams(search), [search]);
-  // FRONTIER fades the graph's cards that cannot move now, and keeps the structure.
+  // FRONTIER only highlights the graph's cards that can move now: nothing drawn changes.
   const frontier = params.get("frontier") === "1";
   const emphasis = useMemo(() => (frontier ? new Set(ready.derived.acting_frontier) : null), [frontier, ready.derived.acting_frontier]);
+  const bar = <ViewBar ready={ready} screen={screen} node={selected} />;
   if (screen === "walk") {
-    return <TriageBody view={ready} settings={triageFrom(params)} selected={selected} />;
+    return (
+      <>
+        {bar}
+        <TriageBody view={ready} settings={triageFrom(params)} selected={selected} />
+      </>
+    );
   }
   if (screen === "list") {
     return <ListBody view={ready} settings={listFrom(params)} selected={selected} />;
   }
   if (screen === "timeline") {
-    return <ProjectedTimeline ready={ready} selected={selected} />;
+    return (
+      <>
+        {bar}
+        <ProjectedTimeline ready={ready} selected={selected} />
+      </>
+    );
   }
   return (
     <Suspense fallback={<p className="muted small">Drawing the graph...</p>}>

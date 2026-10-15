@@ -78,7 +78,8 @@ export function fitZoom(bounds: { width: number; height: number }, size: { width
   if (bounds.width <= 0 || bounds.height <= 0) {
     return 1;
   }
-  return Math.min((size.width - pad.left - pad.right) / bounds.width, (size.height - pad.top - pad.bottom) / bounds.height);
+  // A viewport smaller than its padding (a short tablet under a sheet) still fits at a tiny positive zoom, never a negative one.
+  return Math.min(Math.max(1, size.width - pad.left - pad.right) / bounds.width, Math.max(1, size.height - pad.top - pad.bottom) / bounds.height);
 }
 
 /** The most the canvas zooms out (5.6): 0.1, or less when the whole graph needs it, so fit-all always fits. */

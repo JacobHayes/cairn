@@ -38,7 +38,7 @@ export function SelectionPanel({ ready, selection, authored }: { ready: Ready; s
       </div>
       <NodePanel testId="selection-members">
         {members.map(({ node, derived }) => (
-          <li key={node.key} className="node-row" data-testid="selection-member" data-node={node.key}>
+          <li key={node.key} className="node-row" data-state={derived.display_state} data-testid="selection-member" data-node={node.key}>
             <div className="node-row-main">
               <Badge tone={statusTone(derived.display_state)}>{statusWord(derived.display_state, node.kind)}</Badge>
               <span className="node-row-text">

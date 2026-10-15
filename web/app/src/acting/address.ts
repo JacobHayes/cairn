@@ -119,7 +119,7 @@ export function listFrom(params: URLSearchParams): ListSettings {
     within: params.get("in") ?? undefined,
     owner: params.get("owner") ?? undefined,
     states: listed(params, "state", STATES),
-    notRelevant: params.get("show") === "notrelevant",
+    notRelevant: (params.get("show") ?? "").split(",").includes("notrelevant"),
     kinds: listed(params, "kind", LIST_KINDS),
     text: params.get("q") ?? "",
     sort: listSortFrom(params),

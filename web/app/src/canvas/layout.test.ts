@@ -200,3 +200,9 @@ describe("edges and the whole graph", () => {
     expect(minZoomOf(fit)).toBeLessThanOrEqual(fit);
   }, 60_000);
 });
+
+describe("fitZoom", () => {
+  test("stays positive when the padding leaves no room", () => {
+    expect(fitZoom({ width: 500, height: 500 }, { width: 800, height: 100 }, { top: 64, right: 24, bottom: 56, left: 56 })).toBeGreaterThan(0);
+  });
+});

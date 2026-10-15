@@ -1,20 +1,16 @@
-// A quiet "?" button at the foot of the rail, on the "You" line. Hovering or focusing it lists the keys in
-// a popover; `?` (on a journey) still opens the full sheet. The popover is fixed, placed from the
-// hint's box, so the rail's scroller does not clip it; it sits beside the rail, or under it when
-// the rail is the phone's top bar, touching the hint so the pointer can cross onto it.
+// A quiet "?" button on the rail's "You" line, present on every screen. Hovering or focusing it
+// lists the keys in a popover; `?` (on a journey) still opens the full sheet. The popover is
+// fixed, placed from the hint's box, so the rail's scroller does not clip it; it sits touching the
+// hint (under it when the rail is the phone's top bar), touching it so the pointer can cross onto it.
 import { useEffect, useState, type CSSProperties } from "react";
 
 import { KeyTable } from "../screens/KeySheet.tsx";
-import { PHONE_WIDTH } from "./frame.tsx";
-
-const WIDTH = 360;
 
 function placeBeside(hint: HTMLElement): CSSProperties {
   const box = hint.getBoundingClientRect();
-  if (globalThis.matchMedia(PHONE_WIDTH).matches) {
-    return { top: box.bottom, left: Math.max(12, Math.min(box.left, globalThis.innerWidth - WIDTH - 12)) };
-  }
-  return { bottom: globalThis.innerHeight - box.bottom, left: box.right };
+  // Beside the hint, slid back inside a narrow window; under it when it sits in the top half.
+  const left = Math.max(12, Math.min(box.right, globalThis.innerWidth - 360 - 12));
+  return box.top < globalThis.innerHeight / 2 ? { top: box.bottom, left } : { bottom: globalThis.innerHeight - box.bottom, left };
 }
 
 export function KeysHint() {
@@ -49,7 +45,7 @@ export function KeysHint() {
         type="button"
         className="ghost keys-hint-button"
         aria-label="Keyboard shortcuts"
-        title="Keyboard shortcuts  ?"
+        title="Keyboard shortcuts (?)"
         aria-describedby={place === undefined ? undefined : "keys-hint-list"}
         onMouseEnter={(event) => { show(event.currentTarget); }}
         onFocus={(event) => { show(event.currentTarget); }}

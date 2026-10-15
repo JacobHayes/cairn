@@ -23,10 +23,4 @@ describe("the active filters under the toolbar", () => {
     expect(chips.map((chip) => chip.label)).toEqual(["next up", "stale"]);
     expect(chips[0]?.without).toBe("/journeys/j_a/list?flag=stale");
   });
-
-  it("makes a chip for the kinds the canvas keeps in focus and for conditional nodes it turns off", () => {
-    const chips = activeFilters("j_a", "graph", "?kind=group,decision&show=notrelevant", undefined);
-    expect(chips.map((chip) => chip.label)).toEqual(["only group, decision", "no conditional"]);
-    expect(chips[1]?.without).toBe("/journeys/j_a/graph?kind=group%2Cdecision&show=notrelevant%2Cconditional");
-  });
 });

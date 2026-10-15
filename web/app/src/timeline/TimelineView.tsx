@@ -42,7 +42,6 @@ const SPAN_DAYS_MAX = 3650;
 /** Past this fraction of the width, a label on the axis reads leftward, so it stays on it. */
 const LABEL_FLIP_AT = 0.75;
 
-const DETAIL_WORDS: Record<Detail, string> = { stages: "Stages", decisions: "Decisions", work: "Work", all: "All" };
 const RANGE_WORDS: Record<Range, string> = { fit: "Fit", month: "Month", quarter: "Quarter" };
 
 /** The timeline's own settings, in the address: the detail step and the range. */
@@ -313,12 +312,11 @@ function Tracks({ chart, axis, selected }: { chart: Chart; axis: Axis; selected:
   );
 }
 
-/** The detail step and the range, and the way back from a pan or a pinch. */
-function Controls({ detail, range, panned, onChoose, onReset }: { detail: Detail; range: Range; panned: boolean; onChoose: (name: string, value: string) => void; onReset: () => void }) {
+/** The range, and the way back from a pan or a pinch. */
+function Controls({ range, panned, onChoose, onReset }: { range: Range; panned: boolean; onChoose: (value: string) => void; onReset: () => void }) {
   return (
     <div className="row timeline-controls">
-      <Segmented label="Detail" value={detail} options={[...DETAILS].reverse().map((each) => ({ value: each, label: DETAIL_WORDS[each] }))} onChange={(value) => { onChoose("detail", value); }} data-testid="timeline-detail" />
-      <Segmented label="Range" value={range} options={RANGES.map((each) => ({ value: each, label: RANGE_WORDS[each] }))} onChange={(value) => { onChoose("range", value); }} data-testid="timeline-range" />
+      <Segmented label="Range" value={range} options={RANGES.map((each) => ({ value: each, label: RANGE_WORDS[each] }))} onChange={onChoose} data-testid="timeline-range" />
       {panned ? (
         <Button ghost data-testid="timeline-reset" onClick={onReset}>
           Back to {RANGE_WORDS[range].toLowerCase()}
@@ -355,16 +353,13 @@ export function TimelineChart({ ready, timeline, narrow, selected, detail, range
     }
     setFlipped(next);
   };
-  const choose = (name: string, value: string) => {
+  const choose = (value: string) => {
     reset();
-    if (name === "detail") {
-      setFlipped(new Set());
-    }
-    void navigate(`${pathname}${withParam(search, name, value === (name === "detail" ? "stages" : "fit") ? undefined : value)}`);
+    void navigate(`${pathname}${withParam(search, "range", value === "fit" ? undefined : value)}`);
   };
   return (
     <section className="stack timeline" aria-label="Timeline" data-testid="timeline" data-end={axis.anchor?.node ?? ""} data-end-date={axis.anchor?.date ?? ""}>
-      <Controls detail={detail} range={range} panned={panned} onChoose={choose} onReset={reset} />
+      <Controls range={range} panned={panned} onChoose={choose} onReset={reset} />
       <span className="muted small" data-testid="timeline-anchor">
         {axis.anchor === undefined ? (
           "No final milestone has a date yet, so the timeline ends after its latest date."

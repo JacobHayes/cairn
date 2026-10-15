@@ -1,6 +1,6 @@
 // C13: the timeline's rows, which follow the containment tree. The detail ladder folds them as
 // it folds the graph: Stages shows the top-level stages (the current ones open to the work in
-// them), Decisions adds decisions and nested groups, Work the deliverables, All the actions. A
+// them), Decisions adds decisions and nested groups, Deliverables adds the deliverables, All the actions. A
 // container that is folded, or whose children the step leaves out, is one bar from its earliest
 // start to its latest due, filled by done over total. Each row says its date in plain words.
 // A selected row also gets its float and its dependency lines; everything else fades. Nodes
@@ -226,7 +226,7 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
     if (node === undefined || derived === undefined || span === undefined) {
       return;
     }
-    // At Stages a current stage opens to the Work step; elsewhere the step is the same all the way down.
+    // At Stages a current stage opens to the Deliverables step; elsewhere the step is the same all the way down.
     const childStep: Detail = step === "stages" ? "work" : step;
     // What the step leaves out hands its dated descendants up to the nearest row that is shown.
     const shown = (keys: readonly string[]): string[] =>

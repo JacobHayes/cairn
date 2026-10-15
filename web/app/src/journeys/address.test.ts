@@ -71,12 +71,20 @@ describe("the journey's views (2.2, 2.3)", () => {
     expect(withMineFlipped("?mine=1&flag=mine")).toBe("");
   });
 
-  it("carries a toolbar chip only to the views that read it", () => {
+  it("carries the shared controls to every view, so a trip through one that ignores them keeps them", () => {
     const search = "?decisions=1&frontier=1&sort=due&mine=1&q=plan&kind=action";
-    expect(switchedSearch(search, "list", "timeline")).toBe("?decisions=1&mine=1&q=plan&frontier=1");
-    expect(switchedSearch(search, "list", "graph")).toBe("?decisions=1&frontier=1");
-    expect(switchedSearch(search, "list", "walk")).toBe("?decisions=1&mine=1&q=plan");
-    expect(switchedSearch(search, "list", "summary")).toBe("");
+    const carried = "?decisions=1&mine=1&q=plan&frontier=1";
+    for (const to of ["timeline", "graph", "walk", "summary"] as const) {
+      expect(switchedSearch(search, "list", to)).toBe(carried);
+    }
+    expect(switchedSearch(switchedSearch(search, "list", "summary"), "summary", "graph")).toBe(carried);
+  });
+
+  it("carries the Filter's not-relevant switch between the graph and the list, keeping the graph's conditional nodes drawn", () => {
+    expect(switchedSearch("?show=notrelevant,conditional&frontier=1", "graph", "list")).toBe("?frontier=1&show=notrelevant");
+    expect(switchedSearch("?show=notrelevant", "list", "graph")).toBe("?show=notrelevant%2Cconditional");
+    expect(switchedSearch("?show=conditional", "graph", "list")).toBe("");
+    expect(switchedSearch("?show=notrelevant", "list", "timeline")).toBe("?show=notrelevant");
   });
 
   it("opens a view with the chips only: its own settings are the stock ones, and the screen already open keeps its query", () => {

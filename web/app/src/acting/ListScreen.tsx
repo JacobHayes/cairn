@@ -18,6 +18,7 @@ import { nodePath, screenPath } from "../detail/parts.tsx";
 import { useMineOf } from "../journeys/mine.ts";
 import { ancestorsOf } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
+import { ViewBar } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { selectionOf } from "./acts.ts";
@@ -158,17 +159,20 @@ function Table({ view, settings, lines, columns, context, chosen, selected, ever
   );
 }
 
-/** What the strip above the table offers: its columns, the tree's fold, and the not-relevant rows. */
-function Strip({ view, settings, total, hidden, tree, all, onAll, selectedNode }: { view: Ready; settings: ListSettings; total: number | undefined; hidden: number; tree: boolean; all: boolean; onAll: () => void; selectedNode: string | undefined }) {
+/** The list's Columns and count, which ride the end of the view controls' row. */
+function RowEnd({ view, settings, total, selectedNode }: { view: Ready; settings: ListSettings; total: number | undefined; selectedNode: string | undefined }) {
   const navigate = useNavigate();
   const journey = view.journey.header.id;
-  const go = (next: ListSettings) => void navigate(listPath(journey, next, selectedNode));
   return (
-    <div className="list-strip row">
+    <>
+      <span className="muted" data-testid="list-total" data-total={total ?? ""}>
+        {total === undefined ? "Reading the list..." : `${String(total)} ${settings.decisions ? "decision" : "item"}${total === 1 ? "" : "s"}`}
+      </span>
       <Menu
         label="Columns"
         testId="columns-button"
         role="dialog"
+        align="end"
         trigger="Columns ▾"
       >
         {() => (
@@ -179,23 +183,35 @@ function Strip({ view, settings, total, hidden, tree, all, onAll, selectedNode }
             words={(column) => columnWords(column, settings.decisions)}
             testId="column"
             stacked
-            onChange={(columns) => { go({ ...settings, columns }); }}
+            onChange={(columns) => { void navigate(listPath(journey, { ...settings, columns }, selectedNode)); }}
           />
         )}
       </Menu>
+    </>
+  );
+}
+
+/** What the strip above the table offers: the tree's fold and the not-relevant rows, when there are any. */
+function Strip({ view, settings, hidden, tree, all, onAll, selectedNode }: { view: Ready; settings: ListSettings; hidden: number; tree: boolean; all: boolean; onAll: () => void; selectedNode: string | undefined }) {
+  const navigate = useNavigate();
+  const journey = view.journey.header.id;
+  const go = (next: ListSettings) => void navigate(listPath(journey, next, selectedNode));
+  const notRelevant = hidden !== 0 || settings.notRelevant;
+  if (!tree && !notRelevant) {
+    return null;
+  }
+  return (
+    <div className="list-strip row">
       {tree ? (
         <Button ghost data-testid="list-fold-all" onClick={onAll}>
           {all ? "Fold to the top level" : "Open every level"}
         </Button>
       ) : null}
-      <span className="muted" data-testid="list-total" data-total={total ?? ""}>
-        {total === undefined ? "Reading the list..." : `${String(total)} ${settings.decisions ? "decision" : "item"}${total === 1 ? "" : "s"}`}
-      </span>
-      {hidden === 0 && !settings.notRelevant ? null : (
+      {notRelevant ? (
         <Button ghost data-testid="list-not-relevant" aria-pressed={settings.notRelevant} onClick={() => { go({ ...settings, notRelevant: !settings.notRelevant }); }}>
           {settings.notRelevant ? `Hide the ${String(hidden)} not relevant` : `Show ${String(hidden)} not relevant`}
         </Button>
-      )}
+      ) : null}
     </div>
   );
 }
@@ -266,11 +282,11 @@ export function ListBody({ view, settings, selected }: { view: Ready; settings: 
   const context: CellContext = { view, tree, decisions, ranks, acting: settings.frontier, sort: settings.sort, onFold: (key) => { setFolds({ ...folds, by: new Map(folds.by).set(key, !isOpen(key)) }); } };
   return (
     <section className="stack list" aria-label="List" data-testid="list">
+      <ViewBar ready={view} screen="list" node={selected} end={<RowEnd view={view} settings={settings} total={rows?.length} selectedNode={selected} />} />
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
       <Strip
         view={view}
         settings={settings}
-        total={rows?.length}
         hidden={ruledOut}
         tree={tree}
         all={open}

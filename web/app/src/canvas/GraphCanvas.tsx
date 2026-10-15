@@ -34,8 +34,8 @@ const edgeTypes = { line: EdgeLine };
 
 /** C3: the most the canvas zooms in; the most it zooms out is computed from the graph (5.6). */
 const ZOOM_MAX = 1.5;
-/** Room kept free round a fitted view (px): the ladder's row above, the zoom controls and the hidden count below. */
-const PAD = { top: 64, left: 56, right: 24, bottom: 56 };
+/** Room kept free round a fitted view (px), under the floating controls: the controls row and Signal above, the zoom stack at the left, Reveal below. */
+const PAD = { top: 56, left: 72, right: 24, bottom: 56 };
 const px = (pixels: number): `${number}px` => `${String(pixels) as `${number}`}px`;
 const FIT_PADDING = { top: px(PAD.top), left: px(PAD.left), right: px(PAD.right), bottom: px(PAD.bottom) };
 /** A small graph fits at 100% rather than blown up to fill the region. */
@@ -86,7 +86,7 @@ export interface GraphCanvasProps {
   /** The ladder's steps, for keys 1 to 4. */
   steps?: readonly Step[];
   onStep?: ((step: Step) => void) | undefined;
-  /** What sits over the canvas: the ladder, the View menu, the hidden count. */
+  /** What sits over the canvas: the view's controls, the Signal button, Reveal. */
   children?: ReactNode;
 }
 
@@ -534,11 +534,13 @@ function cardKeys(toggle: (key: string) => boolean, select: ((key: string) => vo
   };
 }
 
-/** The zoom buttons; Fit pads for the sheet or rail like the other fits. */
+/** The zoom buttons, a stack at the bottom left; Fit pads for the sheet or rail like the other fits. */
 function FitControls() {
   const flow = useReactFlow();
   const padding = useFitPadding();
-  return <Controls showInteractive={false} position="bottom-left" onFitView={() => void flow.fitView({ ...FIT, padding: padding() })} />;
+  return (
+    <Controls showInteractive={false} position="bottom-left" onFitView={() => void flow.fitView({ ...FIT, padding: padding() })} />
+  );
 }
 
 function Flow(props: FlowProps) {

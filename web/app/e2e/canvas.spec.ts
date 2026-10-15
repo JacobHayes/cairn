@@ -6,15 +6,14 @@
 import { expect, test } from "@playwright/test";
 
 import { lineBetween, pointOn, viewportOf, viewportSettled } from "./canvas.ts";
-import { nodeCard, nodePanel, openJourney } from "./shell.ts";
+import { nodeCard, nodePanel, openJourney, setDetail } from "./shell.ts";
 
 test("C2 to C7: the graph opens fitted at every detail, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
   // It opens at the stock view: every detail, fitted to the whole graph, as Fit does.
-  const ladder = page.getByTestId("ladder");
-  await expect(ladder.getByLabel("All")).toBeChecked();
+  await expect(page.getByTestId("detail-button")).toHaveAccessibleName("Detail: All");
   // At Stages the stage holding the work is open and says so, the others fold.
-  await ladder.getByText("Stages", { exact: true }).click();
+  await setDetail(page, "Stages");
   await expect(nodeCard(page, "n_reporting").getByTestId("card-current")).toBeAttached();
   await page.keyboard.press("f");
   await expect(nodeCard(page, "n_setup").getByTestId("card-expand")).toBeVisible();
@@ -33,10 +32,10 @@ test("C2 to C7: the graph opens fitted at every detail, expands in place, traces
   await nodeCard(page, "n_plan").getByTestId("card-open").click();
   await expect(page.getByTestId("card-mark").filter({ hasText: "needs" }).first()).toBeVisible();
   await expect(page.getByTestId("card-mark").filter({ hasText: "unblocks" }).first()).toBeVisible();
-  // What the step folds away is counted, and Reveal draws it.
-  await expect(page.getByTestId("linked-hidden")).toContainText("2 linked nodes hidden");
+  // What the step folds away is counted, and Reveal draws it until Hide takes it off again.
+  await expect(page.getByTestId("trace-reveal")).toHaveText("Reveal 2 linked nodes");
   await page.getByTestId("trace-reveal").click();
-  await expect(page.getByTestId("trace-reveal")).toHaveCount(0);
+  await expect(page.getByTestId("trace-reveal")).toHaveText("Hide revealed nodes");
   // Hovering an edge says what it is; clicking it opens its card, which follows it to either end.
   const edge = lineBetween(page, "n_access", "n_plan");
   await viewportSettled(page);
@@ -138,4 +137,32 @@ test("selection is one set with no mode: click selects, shift-click adds, the in
   await page.keyboard.up("Shift");
   await expect(page.getByTestId("selection-panel")).toBeVisible();
   expect(await members.count()).toBeGreaterThanOrEqual(2);
+});
+
+test("the controls row: Detail redraws, Filter wears a badge for what it hides, Frontier only highlights", async ({ page }) => {
+  await openJourney(page, "browser", "j_vendor_eval", "");
+  const cards = page.getByTestId("node-card");
+  await expect(nodeCard(page, "n_plan")).toBeVisible();
+  const before = await cards.count();
+  // Not-relevant nodes are left out by default, and the badge says how many; showing them removes it.
+  await expect(page.getByTestId("filter-badge")).toBeVisible();
+  await expect(page.getByTestId("filter-button")).toHaveAttribute("title", /not relevant hidden/);
+  await page.getByTestId("filter-button").click();
+  await page.getByTestId("show-not-relevant").click();
+  await expect(page.getByTestId("filter-badge")).toHaveCount(0);
+  await page.getByTestId("filter-button").click();
+  await expect.poll(() => cards.count()).toBeGreaterThan(before);
+  // Frontier highlights what can move now and draws the same cards.
+  const drawn = await cards.count();
+  await page.getByTestId("chip-frontier").click();
+  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
+  expect(await cards.count()).toBe(drawn);
+  await expect(page.getByTestId("detail-badge")).toHaveCount(0);
+  // A coarser Detail draws fewer cards, and the highlighted nodes it has no card for are counted on Detail.
+  await page.getByTestId("chip-frontier").click();
+  await page.getByTestId("chip-decisions").click();
+  await setDetail(page, "Stages");
+  await expect.poll(() => cards.count()).toBeLessThan(drawn);
+  await expect(page.getByTestId("detail-badge")).toBeVisible();
+  await expect(page.getByTestId("detail-button")).toHaveAttribute("title", /hidden at this detail; choose All to see them/);
 });

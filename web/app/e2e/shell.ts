@@ -136,6 +136,13 @@ export async function openFilter(page: Page): Promise<void> {
   await expect(page.getByTestId("filter-panel")).toBeVisible();
 }
 
+/** Picks the detail `word` (All, Deliverables, Decisions, Stages) from the view controls' Detail menu. */
+export async function setDetail(page: Page, word: string): Promise<void> {
+  await page.getByTestId("detail-button").click();
+  await page.getByTestId("ladder").getByText(word, { exact: true }).click();
+  await expect(page.getByTestId("detail-button")).toHaveAccessibleName(`Detail: ${word}`);
+}
+
 /** Goes to the view `view` (`graph`, `list`, `timeline` or `summary`) from the toolbar's segmented control, as a person does. */
 export async function goTo(page: Page, view: string): Promise<void> {
   const switcher = page.getByTestId(`view-${view}`);

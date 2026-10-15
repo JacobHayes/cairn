@@ -49,8 +49,7 @@
   overflow-wrap: anywhere;
 }
 
-/* One row when it fits: the views, the chips, and Walk through at the right end. When the
-   head is narrow it is two rows on purpose: the views and Walk through, then the chips. */
+/* The views and Walk through at the right end; one row, wrapping only when the head is very narrow. */
 .journey-toolbar {
   gap: var(--space-2) var(--space-4);
   padding-bottom: var(--space-2);
@@ -63,9 +62,8 @@
   }
 }
 
-/* A toolbar control is one line, chevron and count inline: a squeezed row overflows or folds the
-   chips under the views, it never wraps a label (min-content then keeps the flex items whole). */
-:is(.journey-toolbar, .list-strip) :is(button, .button, .chip, .journey-switch, label) {
+/* A control is one line, chevron inline: a squeezed row folds under the others, it never wraps a label. */
+:is(.journey-toolbar, .view-controls, .list-strip) :is(button, .button, .chip, .journey-switch, label) {
   white-space: nowrap;
 }
 
@@ -76,25 +74,50 @@
   min-width: 0;
 }
 
-@container (min-width: 48rem) {
-  .journey-toolbar {
-    flex-wrap: nowrap;
-  }
+/* The view's controls: Detail, Frontier, Decisions, Filter, Search. State is a fixed-size badge on
+   the control, never text, so no control changes width. */
+.view-controls {
+  flex-wrap: wrap;
+  gap: var(--space-2);
 }
 
-@container (max-width: 47.99rem) {
-  .journey-toolbar > .button {
-    order: 1;
-  }
+.view-controls :is(.chip, .dropdown-button) {
+  position: relative;
+}
 
-  .journey-chips {
-    order: 2;
-    flex: 1 1 100%;
-  }
+/* Every control in the row, and Signal beside it, is one size: height, font and padding. */
+:is(.view-controls, .canvas-signal) :is(.chip, .dropdown-button, input[type="search"]) {
+  box-sizing: border-box;
+  height: 32px;
+  min-height: 32px;
+  padding: 0 var(--space-3);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1;
+}
 
-  .toolbar-search {
-    flex: 1 1 auto;
-  }
+/* The list's Columns and count ride the end of the row, the count as quiet text. */
+.view-controls-end {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-left: auto;
+  font-size: 14px;
+}
+
+.view-badge {
+  position: absolute;
+  top: -7px;
+  right: -7px;
+  box-sizing: border-box;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--color-text);
+  color: var(--color-surface);
+  font: 600 10px / 16px var(--font-body);
+  font-variant-numeric: tabular-nums;
+  text-align: center;
 }
 
 /* The switcher is one segmented control: the current choice filled with an ink underline. The
@@ -102,6 +125,7 @@
 .journey-switcher {
   display: inline-flex;
   margin-left: auto;
+  font-size: 14px;
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
@@ -157,8 +181,7 @@
 }
 
 .toolbar-search {
-  flex: 0 1 11rem;
-  min-width: 6rem;
+  flex: 0 0 9rem;
 }
 
 .toolbar-search input {
@@ -244,6 +267,7 @@
 
 .route-bar .journey-switcher {
   margin-left: auto;
+  font-size: 14px;
 }
 
 .route-list {

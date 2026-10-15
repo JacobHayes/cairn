@@ -35,16 +35,14 @@
   background: transparent;
 }
 
-/* The controls as square hairline buttons (5.8), in a row along the bottom edge: with the ladder's row at the top, the left edge is clear of them, and a fit keeps its bottom padding clear of the row. */
+/* The controls as square hairline buttons (5.8), a vertical stack at the bottom left; a fit keeps its left padding clear of the stack and the keys hint beside Fit. */
 .canvas .react-flow__controls {
   z-index: 6;
   box-shadow: none;
   gap: 4px;
-  display: flex;
-  flex-direction: row;
 }
 
-/* What floats over the canvas (controls, the ladder, the status bar) is paper with an edge and a shadow, so it reads against the ruling in light too. */
+/* What floats over the canvas (controls, the view's row, Signal, Reveal) is paper with an edge and a shadow, so it reads against the ruling in light too. */
 .canvas .react-flow__controls-button {
   width: 28px;
   height: 28px;
@@ -58,12 +56,37 @@
   margin: var(--space-3);
 }
 
-.canvas-panel {
+/* A panel takes the pointer only where a control is, so a drag or a Shift-drag in the gaps between controls still reaches the canvas. */
+.canvas-panel,
+.canvas-panel .view-controls {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   font-size: 14px;
+  pointer-events: none;
+}
+
+.canvas-panel > *,
+.canvas-panel .view-controls > * {
+  pointer-events: auto;
+}
+
+/* The view's controls on paper, as the other floating controls are. */
+.canvas-panel :is(.chip, .dropdown-button, .toolbar-search input, .button) {
+  background: var(--color-surface);
+  border-color: var(--color-edge);
+  box-shadow: var(--shadow-sm);
+}
+
+.canvas-panel .chip[aria-pressed="true"] {
+  background: var(--color-band);
+}
+
+.canvas-top {
+  flex-direction: column;
+  align-items: flex-start;
+  max-width: calc(100% - 9rem);
 }
 
 /* No overlap onto the group's bottom border: inside the ladder's full border the active underline sits within it. */
@@ -94,158 +117,44 @@
   border-top: 1px solid var(--color-edge);
 }
 
-/* The ladder's row holds the ladder, the Signal button and the Select band, and wraps on a narrow canvas; the top right stays clear of cards' tags. */
-/* The ladder keeps its own paper, so a card panned under it never reads through. */
+/* A route's ladder keeps its own paper, so a card panned under it never reads through. */
 .canvas-top .segmented {
   border: 1px solid var(--color-edge);
   background: var(--color-surface);
   box-shadow: var(--shadow-sm);
 }
 
-/* On a phone the trace bar is a row of its own under the ladder, and a long title is cut short. */
-@media (max-width: 719px) {
-  .canvas .canvas-top {
-    max-width: 100%;
-  }
-
-  .canvas-top > .canvas-trace {
-    flex: 1 1 100%;
-    flex-wrap: wrap;
-  }
-}
-
-/* One line: the title gives way (an ellipsis), the counts and Esc never wrap. */
-.canvas-trace {
-  display: flex;
-  flex-wrap: nowrap;
-  min-width: 0;
-  align-items: center;
-  padding: var(--space-1) var(--space-3);
-  border: 1px solid var(--color-edge);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-  gap: var(--space-3);
-}
-
-.canvas-trace > :not(strong) {
-  flex: none;
-  white-space: nowrap;
-}
-
-.canvas-trace strong {
-  flex: 0 1 auto;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-/* The counts are told apart by a dot, so "10 4" never reads as one number. */
-.canvas-trace > span + span::before {
-  content: "\00b7";
-  margin-right: var(--space-3);
-  color: var(--color-secondary);
-}
-
-.canvas-trace .link {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  text-decoration: underline;
-}
-
-/* The status bar: one line along the canvas's bottom edge, on paper like the other floating controls; the zoom buttons ride above it
-   while it shows. Where the inspector is a sheet over the canvas's lower part (a tablet, or the phone's full-screen map) the bar
-   and the buttons ride above it too (`--status-lift`), so Reveal is never behind it. */
-.canvas {
-  --status-h: 36px;
-}
-
-.canvas .react-flow__panel.canvas-status {
-  right: 0;
-  bottom: var(--status-lift, 0);
-  display: flex;
-  gap: var(--space-4);
-  box-sizing: border-box;
-  height: var(--status-h);
-  margin: 0;
-  padding: 0 var(--space-3);
-  align-items: center;
-  border-top: 1px solid var(--color-edge);
-  background: var(--color-surface);
-  font-size: 14px;
-  white-space: nowrap;
-}
-
-/* Only the words give way (an ellipsis); Show and Reveal stay whole. */
-.canvas-status > span {
-  display: flex;
-  min-width: 0;
-  gap: var(--space-1);
-}
-
-.canvas-status .status-text {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-.canvas-status .link {
-  flex: none;
-}
-
-/* The zoom buttons rise above the sheet or rail always; while the status bar shows they sit in its row, ahead of its text. */
-.canvas .react-flow__controls {
-  margin-bottom: calc(var(--status-lift, 0px) + var(--status-gap, var(--space-3)));
-}
-
-.canvas:has(.canvas-status) .canvas-status {
-  padding-left: 124px;
-}
-
-.canvas:has(.canvas-status) {
-  --status-gap: 4px;
+/* Where the inspector is a sheet over the canvas's lower part (a tablet, or the phone's full-screen map) the bottom controls ride above it (`--lift`). */
+.canvas .react-flow__panel:is(.react-flow__controls, .canvas-reveal) {
+  margin-bottom: calc(var(--lift, 0px) + var(--space-3));
 }
 
 @media (min-width: 720px) and (max-width: 1099px) {
   .frame[data-inspector="folded"] .canvas {
-    --status-lift: 24px;
+    --lift: 24px;
   }
 
   .frame[data-inspector="on"] .canvas {
-    --status-lift: var(--sheet-h, var(--sheet-half));
+    --lift: var(--sheet-h, var(--sheet-half));
   }
 
   .frame[data-inspector="on"]:has(.inspector[data-snap="full"]) .canvas {
-    --status-lift: var(--sheet-h, var(--sheet-full));
+    --lift: var(--sheet-h, var(--sheet-full));
   }
 }
 
 @media (max-width: 719px) {
   .frame[data-map="open"][data-inspector="folded"] .canvas {
-    --status-lift: 24px;
+    --lift: 24px;
   }
 
   .frame[data-map="open"][data-inspector="on"] .canvas {
-    --status-lift: var(--sheet-h, var(--sheet-half));
+    --lift: var(--sheet-h, var(--sheet-half));
   }
 
   .frame[data-map="open"][data-inspector="on"]:has(.inspector[data-snap="full"]) .canvas {
-    --status-lift: var(--sheet-h, var(--sheet-full));
+    --lift: var(--sheet-h, var(--sheet-full));
   }
-}
-
-.canvas-status .link {
-  min-height: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--color-text);
-  font: inherit;
-  text-decoration: underline;
 }
 
 .canvas-key {

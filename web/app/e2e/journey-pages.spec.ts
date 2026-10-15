@@ -45,18 +45,18 @@ test("the Frontier chip turns the lens on for every view", async ({ page }) => {
   await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
   await page.getByTestId("view-list").click();
   await expect(page).toHaveURL(/\/list\?frontier=1$/);
-  // The list is the frontier in rank order, numbered by rank, with as many rows as the chip counts.
+  // The list is the frontier in rank order, numbered by rank, with as many rows as the chip's tooltip counts.
   const places = await page.locator('[data-testid="list-row"] [data-column="rank"]').allTextContents();
   expect(places).toEqual(places.map((_, at) => `#${String(at + 1)}`));
-  const counted = await page.getByTestId("chip-frontier").locator(".chip-count").textContent();
+  const counted = /(\d+) can move now/.exec((await page.getByTestId("chip-frontier").getAttribute("title")) ?? "")?.[1];
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", counted ?? "");
 });
 
 test("a journey opens as the stock view, switching views keeps the chips, and coming back to the journey starts over", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
-  const ladder = page.getByTestId("ladder");
+  const detail = page.getByTestId("detail-button");
   // The stock view: every detail, fitted to the whole graph.
-  await expect(ladder.getByLabel("All")).toBeChecked();
+  await expect(detail).toHaveAccessibleName("Detail: All");
   await expect(nodeCard(page, "n_plan")).toBeVisible();
   await viewportSettled(page);
   const opened = await viewportOf(page);
@@ -83,7 +83,7 @@ test("a journey opens as the stock view, switching views keeps the chips, and co
   });
   await expect(page).toHaveURL(/\/graph$/);
   await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
-  await expect(ladder.getByLabel("All")).toBeChecked();
+  await expect(detail).toHaveAccessibleName("Detail: All");
 });
 
 test("the window does not scroll: the head stays, a popover scrolls inside itself, the toolbar keeps its row with Walk through at one edge, and a canvas fills its region", async ({ page }) => {

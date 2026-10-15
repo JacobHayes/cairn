@@ -1,7 +1,8 @@
-// What sits over the graph (5.8): the detail ladder at the top left, the Signal button beside it (the lens, Key), and the status bar along the bottom for what the
-// picture cannot show (nodes hidden). Quiet by rule: one control each.
+// What sits over the graph (5.8): the Signal button at the top right (the lens, Key) and Reveal at
+// the bottom right. The rest of the controls are the view's own (screens/ViewControls.tsx) and the
+// zoom buttons (GraphCanvas). Quiet by rule: one control each.
 import { Panel } from "@xyflow/react";
-import { useId, type ReactNode } from "react";
+import { useId } from "react";
 
 import { Menu } from "../screens/Menu.tsx";
 import { Segmented } from "../ui/kit.tsx";
@@ -9,15 +10,11 @@ import { STEP_WORDS } from "./ladder.ts";
 import { LENS_MEANING, LENS_WORDS } from "./lens.ts";
 import { LENSES, type Lens, type Step } from "./model.ts";
 
-/**
- * C2: the detail ladder (All, Work, Decisions, Stages: general to specific), which replaces the kind checkboxes. The
- * Signal button shares its row, and wraps under it when the canvas is narrow.
- */
-export function Ladder({ steps, step, onStep, children }: { steps: readonly Step[]; step: Step; onStep: (step: Step) => void; children?: ReactNode }) {
+/** C2: a route's detail ladder (All, Deliverables, Decisions, Stages: general to specific). A journey's is the Detail menu of its view controls. */
+export function Ladder({ steps, step, onStep }: { steps: readonly Step[]; step: Step; onStep: (step: Step) => void }) {
   return (
     <Panel position="top-left" className="canvas-panel canvas-top">
       <Segmented label="Detail" value={step} options={[...steps].reverse().map((each) => ({ value: each, label: STEP_WORDS[each] }))} onChange={onStep} data-testid="ladder" />
-      {children}
     </Panel>
   );
 }
@@ -47,7 +44,7 @@ function Key() {
   );
 }
 
-/** The one canvas button for how the graph is drawn, in the ladder's row so nothing floats over a card's tag at the top right: the signal each card shows, and the other ways the graph is drawn (the key to the lines). */
+/** The one canvas button for how the graph is drawn, at the top right: the signal each card shows, and the other ways the graph is drawn (the key to the lines). */
 export function SignalMenu({ lens, onLens }: { lens: Lens | undefined; onLens: (lens: Lens | undefined) => void }) {
   const group = useId();
   const options: [Lens | undefined, string][] = [[undefined, "Off"], ...LENSES.map((each) => [each, LENS_WORDS[each]] as [Lens, string])];
@@ -57,7 +54,7 @@ export function SignalMenu({ lens, onLens }: { lens: Lens | undefined; onLens: (
       title="Which priority signal each card shows: rank, gravity, unlocks or slack"
       testId="view-menu"
       role="dialog"
-      align="start"
+      align="end"
       className={lens === undefined ? "canvas-signal" : "canvas-signal canvas-signal-on"}
       trigger={`Signal: ${lens === undefined ? "Off" : LENS_WORDS[lens]} \u25be`}
     >
@@ -84,37 +81,25 @@ export function SignalMenu({ lens, onLens }: { lens: Lens | undefined; onLens: (
 }
 
 /**
- * The status bar along the bottom of the canvas: what the picture cannot show, each with its way
- * to show it: the selection's traced nodes that are hidden (Reveal), and the settled not-relevant
- * nodes left out (Show). It is absent when it has nothing to say, and anchored to the canvas's
- * edge, so opening the inspector moves nothing in it.
+ * Reveal, at the bottom right while the selected node's trace has nodes without a card of their own:
+ * it draws them (with the rest of the trace), and Hide takes them off again. `linked` is the count
+ * Reveal was offered for; it stays on screen while they are drawn.
  */
-export function CanvasStatus({ linked, notRelevant, onReveal, onShow }: { linked: number; notRelevant: number; onReveal: (() => void) | undefined; onShow: () => void }) {
-  if (linked === 0 && notRelevant === 0) {
+export function RevealBox({ linked, revealed, onReveal, onHide }: { linked: number; revealed: boolean; onReveal: () => void; onHide: () => void }) {
+  if (linked === 0 && !revealed) {
     return null;
   }
   return (
-    <Panel position="bottom-left" className="canvas-status" data-testid="canvas-status">
-      {notRelevant === 0 ? null : (
-        <span data-testid="hidden-count">
-          <span className="status-text">{notRelevant} not relevant hidden &middot;</span>
-          <button type="button" className="link" data-testid="hidden-show" onClick={onShow}>
-            Show
-          </button>
-        </span>
-      )}
-      {linked === 0 ? null : (
-        <span data-testid="linked-hidden">
-          <span className="status-text">
-            {linked} linked {linked === 1 ? "node" : "nodes"} hidden{onReveal === undefined ? "" : " \u00b7"}
-          </span>
-          {onReveal === undefined ? null : (
-            <button type="button" className="link" data-testid="trace-reveal" onClick={onReveal}>
-              Reveal
-            </button>
-          )}
-        </span>
-      )}
+    <Panel position="bottom-right" className="canvas-panel canvas-reveal">
+      <button
+        type="button"
+        className="button"
+        title={revealed ? "Draw only what the view shows again" : "Draw the nodes the trace reaches that have no card at this detail"}
+        data-testid="trace-reveal"
+        onClick={revealed ? onHide : onReveal}
+      >
+        {revealed ? "Hide revealed nodes" : `Reveal ${String(linked)} linked ${linked === 1 ? "node" : "nodes"}`}
+      </button>
     </Panel>
   );
 }

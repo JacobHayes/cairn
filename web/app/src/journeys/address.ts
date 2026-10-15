@@ -11,8 +11,8 @@
 //   /journeys/<id>/nodes/<key>      deep link: the graph with the node selected (JourneyDeepLink)
 //   /journeys/<id>                  landing: the view last shown, the graph at first (JourneyLanding)
 //
-// The toolbar's chips are in the query on every view: `decisions=1`, `mine=1`, `q=<text>`, and
-// `frontier=1`, the lens on what can move now.
+// The view controls are in the query on every view: `decisions=1`, `mine=1`, `q=<text>`,
+// `frontier=1` (what can move now), and `show=notrelevant` (the Filter).
 import type { Schema } from "@cairn/client";
 
 import type { JourneyIndexQuery } from "../data/host.ts";
@@ -148,26 +148,22 @@ export type Screen = Projection | "summary" | "walk";
 
 export const DEFAULT_PROJECTION: Projection = "graph";
 
-/** `text` as a projection, if it is one. */
-export function projectionOf(text: string | undefined): Projection | undefined {
-  return PROJECTIONS.find((each) => each === text);
-}
-
 /** Key `v`: the projection after `current`, wrapping round. */
 export function nextProjection(current: Projection): Projection {
   return PROJECTIONS[(PROJECTIONS.indexOf(current) + 1) % PROJECTIONS.length] ?? DEFAULT_PROJECTION;
 }
 
 /**
- * Where each toolbar chip means something: the screens that read its parameter. The graph's
+ * Where each carried control means something: the screens that read its parameter. The graph's
  * search finds a node rather than filtering, so it is not carried; the walk through is the
- * frontier already.
+ * frontier already. `show` is the Filter's not-relevant switch, which the graph and the list share.
  */
-const CHIP_APPLIES: Record<"decisions" | "mine" | "q" | "frontier", (screen: Screen) => boolean> = {
+const CHIP_APPLIES: Record<"decisions" | "mine" | "q" | "frontier" | "show", (screen: Screen) => boolean> = {
   decisions: (screen) => screen !== "summary",
   mine: (screen) => screen !== "summary" && screen !== "graph",
   q: (screen) => screen !== "summary" && screen !== "graph",
   frontier: (screen) => screen === "graph" || screen === "list" || screen === "timeline",
+  show: (screen) => screen === "graph" || screen === "list",
 };
 
 /** Whether the chip `name` is a filter on `screen`. */
@@ -175,13 +171,12 @@ export function chipApplies(name: keyof typeof CHIP_APPLIES, screen: Screen): bo
   return CHIP_APPLIES[name](screen);
 }
 
-const CHIPS = ["decisions", "mine", "q", "frontier"] as const;
+const CHIPS = ["decisions", "mine", "q", "frontier", "show"] as const;
 
 /**
- * The query a switch from `from` to `to` opens: the toolbar's chips that mean something on `to`
- * (a chip both screens read follows the screen being left), and nothing else of `from`'s own
- * settings. A chip `to` does not read is left behind, not carried unseen. The screen already
- * open keeps its query.
+ * The query a switch from `from` to `to` opens: the whole shared control set (chips, Filter and
+ * search), and nothing else of `from`'s own settings. A view ignores what it does not read, so
+ * the set survives a trip through one that does not. The screen already open keeps its query.
  */
 export function switchedSearch(search: string, from: Screen, to: Screen): string {
   if (from === to) {
@@ -190,12 +185,23 @@ export function switchedSearch(search: string, from: Screen, to: Screen): string
   const now = new URLSearchParams(search);
   const carried = new URLSearchParams();
   for (const name of CHIPS) {
-    const value = chipApplies(name, from) ? (name === "mine" ? (mineOn(now) ? "1" : null) : now.get(name)) : null;
-    if (value !== null && chipApplies(name, to)) {
+    const value = carriedValue(now, name, to);
+    if (value !== null) {
       carried.set(name, value);
     }
   }
   return searchOf(carried);
+}
+
+/** The value `name` has when carried to `to`: `mine` reads the list's own flag too, and the Filter's `show` keeps only not-relevant (the graph's other half is its own, drawn by default). */
+function carriedValue(params: URLSearchParams, name: (typeof CHIPS)[number], to: Screen): string | null {
+  if (name === "mine") {
+    return mineOn(params) ? "1" : null;
+  }
+  if (name === "show") {
+    return (params.get("show") ?? "").split(",").includes("notrelevant") ? (to === "graph" ? "notrelevant,conditional" : "notrelevant") : null;
+  }
+  return params.get(name);
 }
 
 /** Whether MINE is on in `params`: the chip's, or the list's own `flag=mine`. */

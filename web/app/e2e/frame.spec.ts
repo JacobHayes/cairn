@@ -91,7 +91,7 @@ test("the inspector hides to a rail that shows it again, and selecting a node br
 });
 
 test("the rail's shortcuts hint lists the keys on hover and focus, and goes on leaving", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "graph");
+  await openAt(page, "browser", "j_vendor_eval", "list");
   const hint = page.getByRole("button", { name: "Keyboard shortcuts" });
   await hint.hover();
   await expect(page.getByTestId("keys-hint").locator("kbd").first()).toBeVisible();

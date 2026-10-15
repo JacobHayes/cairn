@@ -1,12 +1,10 @@
-// The toolbar's filters as data (2.3): how many are active, and each as a removable chip
-// under the toolbar (`overdue ×`). Each screen reads its own settings from the address
-// (acting/address.ts, canvas/settings.ts); a chip is one setting taken off, as the address
+// The filters as data (2.3): how many are active, and each as a removable chip under the
+// view's controls (`overdue ×`). The graph has none: its Filter badge counts what it hides. Each screen reads its own settings from the address
+// (acting/address.ts); a chip is one setting taken off, as the address
 // that results. `FRONTIER` and `DECISIONS` are the toolbar's own buttons, so their state is shown there and they
 // make no chip here; `MINE` lives in the filter and does. Pure, so the unit tests check it
 // without a page.
 import { listFrom, listPath, triageFrom, triagePath, type ListFlag } from "../acting/address.ts";
-import { KINDS } from "../canvas/model.ts";
-import { canvasPath, viewFrom } from "../canvas/settings.ts";
 import { pagePath, withMineFlipped, withParam, type Screen } from "../journeys/address.ts";
 import { stateWord } from "../status/words.ts";
 
@@ -49,19 +47,6 @@ function timelineFilters(journey: string, search: string, node: string | undefin
   }
   if (settings.text !== "") {
     filters.push({ id: "text", label: `"${settings.text}"`, without: path("q", undefined) });
-  }
-  return filters;
-}
-
-/** The graph's filters: the kinds kept in focus (the rest fade), and conditional nodes turned off. */
-function graphFilters(journey: string, params: URLSearchParams, node: string | undefined): ActiveFilter[] {
-  const view = viewFrom(params);
-  const filters: ActiveFilter[] = [];
-  if (view.shown.length < KINDS.length) {
-    filters.push({ id: "kinds", label: `only ${view.shown.join(", ") || "no kinds"}`, without: canvasPath(journey, { ...view, shown: KINDS }, node) });
-  }
-  if (!view.undecided) {
-    filters.push({ id: "hide-conditional", label: "no conditional", without: canvasPath(journey, { ...view, undecided: true }, node) });
   }
   return filters;
 }
@@ -115,8 +100,6 @@ export function activeFilters(journey: string, screen: Screen, search: string, n
     }
   } else if (screen === "timeline") {
     filters.push(...timelineFilters(journey, search, node));
-  } else if (screen === "graph") {
-    filters.push(...graphFilters(journey, params, node));
   }
   return filters;
 }

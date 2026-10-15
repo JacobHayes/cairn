@@ -12,11 +12,10 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
 import { journeyAuthored } from "../authoring/target.ts";
-import { ancestorsOf } from "../canvas/ladder.ts";
 import { useSelection, type Selection } from "../canvas/selection.ts";
-import { canvasPath, DEFAULT_VIEW, revealing, viewFrom, type CanvasView } from "../canvas/settings.ts";
+import { canvasPath, DEFAULT_VIEW, viewFrom } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
-import { nodeOf, type Ready } from "../detail/model.ts";
+import type { Ready } from "../detail/model.ts";
 import { EdgeCard } from "../detail/EdgeCard.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
@@ -26,8 +25,6 @@ import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
-import { ActiveFilters } from "./ActiveFilters.tsx";
-import { activeFilters } from "./filters.ts";
 import { JourneyHeader } from "./JourneyHeader.tsx";
 import { JourneyToolbar } from "./JourneyToolbar.tsx";
 import { KeySheet } from "./KeySheet.tsx";
@@ -66,13 +63,6 @@ export function JourneyGate({ id, children }: { id: string; children: (ready: Re
     case "ready":
       return children(journey);
   }
-}
-
-/** The graph's find (2.3): the first node whose title holds `text`. */
-function findNode(ready: Ready, text: string): string | undefined {
-  const wanted = text.trim().toLowerCase();
-  const nodes = ready.journey.graph.nodes ?? [];
-  return (nodes.find((node) => node.title.toLowerCase() === wanted) ?? nodes.find((node) => node.title.toLowerCase().includes(wanted)))?.key;
 }
 
 /** Back from a node opened off the pass to the pass rail, which the cards put in the inspector's place. */
@@ -161,29 +151,6 @@ function Workspace({ ready, screen, selected, edge, authored, drawing, selection
   return <ProjectionBody ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} />;
 }
 
-/** The graph's find: it opens a node on the canvas, its containers expanded, and the canvas centres it once it is drawn (it reads the request from the navigation). `missing` is the search that named no node. */
-function useFind(ready: Ready, view: CanvasView, release: () => void) {
-  const navigate = useNavigate();
-  const [missing, setMissing] = useState<string | undefined>(undefined);
-  const journey = ready.journey.header.id;
-  const centre = (key: string) => {
-    const found = nodeOf(ready, key);
-    if (found !== undefined) {
-      // Opening a node replaces a selection of several, even when it is one of them.
-      release();
-      void navigate(canvasPath(journey, revealing(view, { kind: found.kind, ancestors: ancestorsOf(ready.journey.graph.nodes ?? [], key) }, ready.derived.nodes[key]?.display_state), key), { state: { reveal: { key, how: "centre" } } });
-    }
-  };
-  const find = (text: string) => {
-    const key = text === "" ? undefined : findNode(ready, text);
-    setMissing(text !== "" && key === undefined ? text : undefined);
-    if (key !== undefined) {
-      centre(key);
-    }
-  };
-  return { find, missing };
-}
-
 function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<FrameProps, "id">) {
   const { search } = useLocation();
   const navigate = useNavigate();
@@ -197,10 +164,8 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const inserting = useInserting(`journey:${journey}`);
   const [sheetOpen, setSheetOpen] = useState(false);
   useJourneyKeys({ journey, screen, selected, sheetOpen, setSheetOpen });
-  const { find, missing } = useFind(ready, view, selection.release);
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
   const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(canvasPath(journey, view))} />;
-  const filters = screen === "summary" ? [] : activeFilters(journey, screen, search, selected);
   // The graph is a gesture surface that fills the workspace under the head; the rest scroll.
   const fills = planned || inserting.preview !== undefined;
   // The journey card is the inspector's empty state where the inspector has a column of its own;
@@ -214,14 +179,8 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen}>
         <div className="ws-head stack journey-head">
           <JourneyHeader ready={ready} view={planned ? view : DEFAULT_VIEW} selected={selected} />
-          <JourneyToolbar ready={ready} screen={screen} node={selected} onFind={find} />
-          <ActiveFilters filters={filters} />
+          <JourneyToolbar journey={journey} screen={screen} node={selected} />
           {planned ? <CanvasBars ready={ready} authored={authored} drawing={drawing} /> : null}
-          {missing === undefined ? null : (
-            <p className="muted small" role="status" data-testid="find-missing">
-              No node is named like "{missing}".
-            </p>
-          )}
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>
           <Workspace ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} />
