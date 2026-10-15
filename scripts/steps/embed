@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Step embed: the binary's own build, which embeds the web build (left out of check:fast).
+# PRACTICES, The validation ladder. Every other cargo command of the ladder builds with all
+# features, which turns on the `cairn` crate's `web-dir` feature and reads the web build from
+# disk, so the embedding path (the `rust-embed` folder in crates/cairn/src/assets.rs and the
+# digest in crates/cairn/build.rs) would otherwise first compile in the image build. This is
+# `cargo check` of the crate with its default features: it writes metadata only, never
+# target/debug/cairn, which the binary's tests run, and it reads the web build, so it runs
+# after that build.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+LADDER_STEP=embed
+# shellcheck source=scripts/ladder-lib.sh
+source scripts/ladder-lib.sh
+
+ladder_require_tool cargo cargo --version
+ladder_run "the binary's build with the web build embedded" cargo check -q --locked -p cairn
+ladder_suite "binary embeds the web build" 1 builds
+ladder_step_end

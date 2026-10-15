@@ -6,7 +6,8 @@
 #
 # The steps are the files of scripts/steps/. The fail-early ones run first, one at a time, in
 # order: lint (format, lint, typecheck), then the unit tests (unit: Rust; web-unit: Vitest),
-# then, in the full check, generated (regenerates files the others read, so it runs alone).
+# then, in the full check, generated (regenerates files the others read, so it runs alone)
+# and embed (the binary's build with the web build embedded).
 # Only then do the slow steps that are independent of one another run side by side: property,
 # integration, cost, and browser. A step prints one line when it passes and what a person
 # acts on when it fails, and writes everything else to dist/ladder/<step>.log. The side-by-side
@@ -54,7 +55,7 @@ side=()
 if [ "$rust" = 1 ]; then first+=(unit); fi
 if [ "$rust" = 1 ] || [ "$web" = 1 ]; then first+=(web-unit); fi
 if [ -z "$fast" ]; then
-  first+=(generated)
+  first+=(generated embed)
   side=(property integration cost browser)
 else
   if [ "$rust" = 1 ]; then side+=(property); fi
