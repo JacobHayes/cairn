@@ -2,8 +2,8 @@
 // the edges ELK routed (ARCHITECTURE, Web UI: Canvas), over cards and lines already laid out.
 // Nothing is dragged (layout is automatic, C15; pinned positions are Later), nothing animates
 // (C6), and the view fits when what it shows changes (a step, an expand or a collapse), not on
-// every revision, so a live edit never jumps the viewport. It always opens fitted to the whole
-// drawn graph, as `f` and the Fit button do.
+// every revision, so a live edit never jumps the viewport. It opens fitted to the whole drawn
+// graph, as `f` and the Fit button do, unless it is given nodes to open on (`firstFit`).
 //
 // Input (5.10), 720px and wider: two-finger scroll pans freely, the wheel alone never zooms, a
 // pinch or Ctrl/Cmd+wheel zooms at the pointer, a double-click expands a container. Zoom only
@@ -27,6 +27,7 @@ import { MapFrame } from "./MapFrame.tsx";
 import { STEPS, type CanvasModel, type Line, type Lens, type Step } from "./model.ts";
 import { CardActionsContext, NodeCard, type CardActions, type CardNode } from "./NodeCard.tsx";
 import { standsFor, type CanvasOverlay } from "./overlay.ts";
+import { firstFitCards } from "./refit.ts";
 
 const nodeTypes = { card: NodeCard };
 const edgeTypes = { line: EdgeLine };
@@ -76,6 +77,8 @@ export interface GraphCanvasProps {
   /** The Select mode (5.9): shift-click and shift-drag pick cards. */
   selecting?: { picked: ReadonlySet<string>; onPicked: (keys: string[]) => void } | undefined;
   reveal?: Reveal | undefined;
+  /** The nodes the view first opens fitted to (a proposal's changes), with the whole graph when none is drawn; Fit still fits all. */
+  firstFit?: readonly string[] | undefined;
   /** The ladder's steps, for keys 1 to 4. */
   steps?: readonly Step[];
   onStep?: ((step: Step) => void) | undefined;
@@ -354,8 +357,8 @@ function useZoomRange(props: FlowProps, live: boolean, root: RefObject<HTMLDivEl
   return { minZoom, fit };
 }
 
-/** The first fit, once the canvas has a size and its cards are in: always the whole drawn graph. */
-function useFirstFit(fit: number): void {
+/** The first fit, once the canvas has a size and its cards are in: the `firstFit` nodes when any is drawn, else the whole drawn graph. */
+function useFirstFit(props: FlowProps, fit: number): void {
   const flow = useReactFlow();
   const [initialized, sized] = [useNodesInitialized(), useStore((state) => state.width > 0 && state.height > 0)];
   const sheet = useFrameState()?.inspector?.parentElement;
@@ -367,8 +370,10 @@ function useFirstFit(fit: number): void {
     done.current = true;
     // On a tablet the inspector's sheet lies over the canvas's lower part: fit into what it leaves.
     const covered = coveredBy(sheet);
-    void flow.fitView({ ...FIT, padding: { ...FIT_PADDING, bottom: px(PAD.bottom + covered) }, minZoom: minZoomOf(fit) });
-  }, [initialized, sized, flow, fit]);
+    const padding = { ...FIT_PADDING, bottom: px(PAD.bottom + covered) };
+    const target = firstFitCards(props.firstFit, props.model.cards);
+    void flow.fitView({ ...FIT, padding, minZoom: minZoomOf(fit), ...(target === undefined ? {} : { nodes: target.map((id) => ({ id })) }) });
+  }, [initialized, sized, flow, fit, props.firstFit, props.model.cards]);
 }
 
 /** The zoom, as `--z` on the canvas root, so the far bands can set a title to a readable size on screen without the cards re-rendering. */
@@ -513,7 +518,7 @@ function Flow(props: FlowProps) {
   const { menu, menus, openMenu, closeMenu } = useNodeMenu(props, live);
   const band = useStore((state) => bandOf(state.transform[2]));
   const { minZoom, fit } = useZoomRange(props, live, root);
-  useFirstFit(fit);
+  useFirstFit(props, fit);
   useZoomVariable(root);
   useCenterAboveSheet(props.selected, live);
   useReveal(props.reveal, props.model, live);

@@ -84,6 +84,8 @@ export function ProposalCanvas({ domain, graphs, marks, edges, dim, deployment, 
   }, [answer]);
   const { laidOut, error } = useLaidOut(`proposal:${domain}`, "diff", model);
   const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the proposal changes", marks, laidOut.model, dim, { added: edges.edgesAdded, removed: edges.edgesRemoved })), [laidOut, marks, edges, dim]);
+  // Opens on the changes (a changed requirement frames both its ends), so a small edit to a big journey is readable; Fit still fits the whole graph.
+  const changed = useMemo(() => [...Object.keys(marks), ...[...edges.edgesAdded, ...edges.edgesRemoved].flatMap((edge) => [edge.node, edge.requires])], [marks, edges]);
   const actions = useMemo<CardActions>(
     () => ({
       open: onPick,
@@ -105,6 +107,6 @@ export function ProposalCanvas({ domain, graphs, marks, edges, dim, deployment, 
     return <p className="muted small">Laying out the diff...</p>;
   }
   return (
-    <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={overlay} lens={undefined} selected={selected} actions={actions} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" title="The proposal's diff" />
+    <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={overlay} lens={undefined} selected={selected} actions={actions} firstFit={changed} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" title="The proposal's diff" />
   );
 }
