@@ -12,8 +12,8 @@ import { screenPath, nodePath } from "../detail/parts.tsx";
 import { chipApplies, nextProjection, pagePath, switchedSearch, withMineFlipped, withParam, type Projection, type Screen } from "../journeys/address.ts";
 import { typing } from "../ui/typing.ts";
 
-/** The bindings the sheet lists, each with its words. */
-export const KEY_BINDINGS: { keys: string; words: string }[] = [
+/** The bindings the sheet lists, each with its words; `group` heads the run of rows it starts. The canvas handles its own keys (canvas/GraphCanvas.tsx) and the table lists them. */
+export const KEY_BINDINGS: { keys: string; words: string; group?: string }[] = [
   { keys: "j / k", words: "Next or previous row" },
   { keys: "Enter", words: "The open node's primary action" },
   { keys: "Esc", words: "Close a popover or the sheet, then clear the selection" },
@@ -25,6 +25,8 @@ export const KEY_BINDINGS: { keys: string; words: string }[] = [
   { keys: "/", words: "Search or find" },
   { keys: "p", words: "Pass, in the walk through" },
   { keys: "?", words: "This sheet" },
+  { keys: "f", words: "Fit the selection, or the whole graph with none", group: "Graph" },
+  { keys: "1 - 4", words: "Show Stages, Decisions, Work or All" },
 ];
 
 /** The key `step` rows after `selected` in `keys` (the first when none is selected), or none past an end. */

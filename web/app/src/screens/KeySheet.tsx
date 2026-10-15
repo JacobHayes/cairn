@@ -2,7 +2,7 @@
 // its backdrop and makes the page behind it inert. Escape or Close shuts it. It takes the focus
 // while it is open (Tab stays on its Close button, which is all it holds), so Enter or Space
 // cannot reach the control that had the focus behind it, and gives the focus back on close.
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 
 import { Button } from "../ui/kit.tsx";
 import { KEY_BINDINGS } from "./keys.ts";
@@ -13,12 +13,19 @@ export function KeyTable() {
     <table className="data">
       <tbody>
         {KEY_BINDINGS.map((binding) => (
-          <tr key={binding.keys}>
-            <td>
-              <kbd>{binding.keys}</kbd>
-            </td>
-            <td>{binding.words}</td>
-          </tr>
+          <Fragment key={binding.keys}>
+            {binding.group === undefined ? null : (
+              <tr>
+                <th colSpan={2} scope="colgroup">{binding.group}</th>
+              </tr>
+            )}
+            <tr>
+              <td>
+                <kbd>{binding.keys}</kbd>
+              </td>
+              <td>{binding.words}</td>
+            </tr>
+          </Fragment>
         ))}
       </tbody>
     </table>
