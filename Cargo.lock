@@ -500,6 +500,7 @@ dependencies = [
  "jiff",
  "metrics",
  "metrics-exporter-prometheus",
+ "mime_guess",
  "openidconnect",
  "rust-embed",
  "serde",

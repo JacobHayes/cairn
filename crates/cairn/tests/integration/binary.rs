@@ -2,7 +2,7 @@
 //! database file, one port for the UI and the API, startup failures that name what is
 //! missing, a clean stop, and a patch it acknowledged still in the file after it. `mod
 //! commands` needs only the binary; `mod binary` needs it built with the web build
-//! embedded, so the browser step runs it after `mise run build:web`.
+//! named (`CAIRN_WEB_DIR`), so the browser step runs it after `mise run build:web`.
 #![cfg(test)]
 
 use std::io::{BufRead, BufReader};
@@ -42,14 +42,14 @@ name = "dev"
 user = "Dev"
 "#;
 
-/// `cairn <arguments>`, with none of the caller's `CAIRN_` variables: a developer's
-/// overrides or secrets must not reach the binary a test runs.
+/// `cairn <arguments>`, with none of the caller's `CAIRN_` variables but the web build's
+/// folder: a developer's overrides or secrets must not reach the binary a test runs.
 fn cairn(arguments: &[&str]) -> Command {
     let mut command = Command::new(CAIRN);
     command.args(arguments);
-    for (name, _) in
-        std::env::vars_os().filter(|(name, _)| name.to_string_lossy().starts_with("CAIRN_"))
-    {
+    for (name, _) in std::env::vars_os().filter(|(name, _)| {
+        name.to_string_lossy().starts_with("CAIRN_") && name != cairn::assets::WEB_DIR
+    }) {
         command.env_remove(name);
     }
     command

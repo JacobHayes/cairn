@@ -66,6 +66,8 @@ tracing = { version = "0.1.44", default-features = false, features = ["std"] }
 clap = { version = "4.6.7", features = ["derive"] }
 metrics-exporter-prometheus = { version = "0.18.3", default-features = false }
 rust-embed = { version = "8.13.0", features = ["mime-guess"] }
+# Media types for `cairn`'s `web-dir` feature, the guess rust-embed makes when it embeds.
+mime_guess = { version = "2.0.5", default-features = false }
 socket2 = { version = "0.6.5", features = ["all"] }
 toml = { version = "1.1.6", default-features = false, features = ["parse", "serde", "std"] }
 tracing-subscriber = { version = "0.3.23", default-features = false, features = ["fmt", "json", "std"] }

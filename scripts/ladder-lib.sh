@@ -26,6 +26,9 @@ mkdir -p dist/ladder
 : >"$LADDER_LOG"
 exec 3>&1 >>"$LADDER_LOG" 2>&1
 printf '== %s ==\n' "$ladder_name"
+# Where the binary and its tests read the web build from: the ladder builds them with the
+# `cairn` crate's `web-dir` feature rather than embed it (crates/cairn/src/assets.rs).
+export CAIRN_WEB_DIR=$PWD/web/app/dist/build
 
 # ladder_show [LINE...]: print to the terminal, and to the log, the LINEs, or stdin when there
 # are none. Only for what a person acts on.

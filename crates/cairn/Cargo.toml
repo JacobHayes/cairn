@@ -8,6 +8,11 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+[features]
+# Reads the web build at startup from the folder CAIRN_WEB_DIR names, instead of embedding it
+# (src/assets.rs). The check ladder's builds turn it on; release, demo and image builds embed.
+web-dir = ["dep:mime_guess"]
+
 [dependencies]
 axum = { workspace = true, features = ["matched-path"] }
 cairn-api.workspace = true
@@ -29,6 +34,7 @@ futures-core.workspace = true
 # brings no zone database of its own (DeploymentSettings::new).
 jiff = { workspace = true, features = ["tz-system", "tzdb-zoneinfo"] }
 metrics.workspace = true
+mime_guess = { workspace = true, optional = true }
 metrics-exporter-prometheus.workspace = true
 openidconnect.workspace = true
 # debug-embed: debug builds embed the web build too, rather than read it at run time from an

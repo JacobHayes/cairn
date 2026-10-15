@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# Step browser: the binary with its web build embedded, and in-browser end-to-end of the app
+# Step browser: the binary with its web build served, and in-browser end-to-end of the app
 # against the wasm host and the binary (Playwright in Chromium, one suite per web package with
 # a playwright.config.ts).
-# PRACTICES, The validation ladder. The binary (brief 4.7) embeds the app's build
+# PRACTICES, The validation ladder. The binary (brief 4.7) serves the app's build
 # (web/app/dist/build/): its own tests that start it (`mod binary` in
 # crates/cairn/tests/integration/binary.rs, so `binary::binary::`) are a suite here, and the
 # app's server-host tests run against `cairn demo`, the same binary over the fixtures in
@@ -24,12 +24,12 @@ ladder_require_tool node node --version
 ladder_require_tool playwright node_modules/.bin/playwright --version
 export CARGO_TERM_COLOR=never
 
-# The module and the web build the binary embeds were built before this step (scripts/ladder),
+# The module and the web build the binary serves were built before this step (scripts/ladder),
 # and so were the test binaries. The binary is built here so that Playwright's start of it
 # (the app's server-host tests start it as `cairn demo`) is a run, not a build.
 projects=(--project=chromium)
 if [ "${LADDER_SERVER:-1}" = 1 ]; then
-  ladder_run "the build of the binary" cargo build --locked --quiet -p cairn
+  ladder_run "the build of the binary" cargo build --locked --quiet -p cairn --features web-dir
 
   ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
   ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests

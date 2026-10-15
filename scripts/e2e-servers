@@ -18,11 +18,13 @@ mkdir -p dist/ladder
 exec 2>dist/ladder/servers.log
 : "${CAIRN_SERVER_PORT:?}" "${CAIRN_DEMO_PORT:?}"
 vite=$PWD/node_modules/vite/bin/vite.js
+# The ladder's (scripts/ladder-lib.sh), or the same folder when Playwright runs on its own.
+export CAIRN_WEB_DIR=${CAIRN_WEB_DIR:-$PWD/web/app/dist/build}
 
 pids=()
 urls=("http://127.0.0.1:$CAIRN_DEMO_PORT/")
 if [ "${CAIRN_E2E_BINARY:-1}" != 0 ]; then
-  cargo run --locked --quiet -p cairn -- demo --listen "127.0.0.1:$CAIRN_SERVER_PORT" >/dev/null &
+  cargo run --locked --quiet -p cairn --features web-dir -- demo --listen "127.0.0.1:$CAIRN_SERVER_PORT" >/dev/null &
   pids+=($!)
   urls+=("http://127.0.0.1:$CAIRN_SERVER_PORT/api/capabilities")
 fi

@@ -52,7 +52,7 @@ pub enum StartupError {
     Providers(Vec<Problem>),
     /// The database could not be opened or migrated.
     Store(StoreError),
-    /// The binary holds no web build.
+    /// The server has no web build.
     WebBuild(WebBuildMissing),
     /// The metrics recorder could not be installed.
     Metrics(String),
@@ -215,7 +215,7 @@ pub async fn serve<S: Store + 'static>(
         Assembly {
             store: Arc::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
-            assets: assets::embedded(),
+            assets: assets::load().map_err(StartupError::WebBuild)?,
             metrics,
             clock: Clock::system(),
         },

@@ -1,5 +1,6 @@
 //! Rebuilds the binary when the web build changes, so `cargo build` after `mise run
 //! build:web` always embeds the build it made (rust-embed tracks only the files it saw).
+//! With the `web-dir` feature nothing is embedded, so the web build is no input at all.
 //!
 //! `rerun-if-changed` reruns this script, but a build cache keyed on the compiler's
 //! command and inputs (mbx) does not count it as an input of the crate's compile, and
@@ -16,6 +17,10 @@ use std::path::Path;
 const WEB_BUILD: &str = "../../web/app/dist/build";
 
 fn main() -> io::Result<()> {
+    if std::env::var_os("CARGO_FEATURE_WEB_DIR").is_some() {
+        println!("cargo::rerun-if-changed=build.rs");
+        return Ok(());
+    }
     println!("cargo::rerun-if-changed={WEB_BUILD}");
     let mut hasher = DefaultHasher::new();
     let folder = Path::new(WEB_BUILD);

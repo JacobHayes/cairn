@@ -127,7 +127,7 @@ for file in web/app/e2e/*.spec.ts; do
       package-lock.json -newer "$build" -print -quit)" ]; then
       ladder_run "the app's web build" bash -c 'cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts'
     fi
-    ladder_run "the build of the binary" cargo build --locked --quiet -p cairn
+    ladder_run "the build of the binary" cargo build --locked --quiet -p cairn --features web-dir
     export CAIRN_E2E_BINARY=1
   else
     export CAIRN_E2E_BINARY=0

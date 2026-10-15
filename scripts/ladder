@@ -66,10 +66,10 @@ started=$SECONDS
 failed=
 
 # After lint, which may fix files, and before the tests: the browser step runs the web app's
-# build embedded in the binary, so that build comes first, and then the test binaries every
-# Rust test step picks from (scripts/ladder-tests), built once, because the embedded build is
-# an input of the binary's tests. The browser step needs both only when it runs the binary
-# (server is 1: always in the full check).
+# build the binary serves, so that build comes first, and then the test binaries every
+# Rust test step picks from (scripts/ladder-tests), built once. They read the web build at
+# run time (CAIRN_WEB_DIR), so it is no input of them. The browser step needs both only when
+# it runs the binary (server is 1: always in the full check).
 prepare() {
   local log=dist/ladder/build.log needs_tests=
   : >"$log"
