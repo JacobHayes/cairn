@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # The two servers the app's browser tests run against (web/app/playwright.config.ts), started
 # side by side where Playwright would start its webServer entries one after another: `cairn
-# demo` (the server host: the binary over the fixtures in memory, serving its embedded web
+# demo` (the server host: the binary over the fixtures in memory, serving its web
 # build and the API on one port) and the app's Vite dev server on the in-browser host. Each
 # one's wait (the cargo no-op, Vite's start) overlaps the other's. Prints READY once both
 # answer, which is what Playwright waits for, and exits non-zero when either stops. The ports
 # are the config's, passed in the environment: CAIRN_SERVER_PORT and CAIRN_DEMO_PORT. With
 # CAIRN_E2E_BINARY=0 the binary is left out (`mise run check:fast` does so for a spec with no
-# server-host test, which then needs no web build embedded in it).
+# server-host test, which then needs no web build).
 #
 # usage: scripts/e2e-servers
 set -euo pipefail
@@ -24,7 +24,11 @@ export CAIRN_WEB_DIR=${CAIRN_WEB_DIR:-$PWD/web/app/dist/build}
 pids=()
 urls=("http://127.0.0.1:$CAIRN_DEMO_PORT/")
 if [ "${CAIRN_E2E_BINARY:-1}" != 0 ]; then
-  cargo run --locked --quiet -p cairn --features web-dir -- demo --listen "127.0.0.1:$CAIRN_SERVER_PORT" >/dev/null &
+  # The binary the ladder's one build of the test binaries links (scripts/ladder-tests), by the
+  # same command, so in the ladder it is a no-op: a build of `-p cairn` resolves features
+  # differently, compiling the crates again and replacing the binary the tests run.
+  (cargo test --locked --quiet --workspace --all-features --tests --no-run &&
+    exec "${CARGO_TARGET_DIR:-target}/debug/cairn" demo --listen "127.0.0.1:$CAIRN_SERVER_PORT") >/dev/null &
   pids+=($!)
   urls+=("http://127.0.0.1:$CAIRN_SERVER_PORT/api/capabilities")
 fi

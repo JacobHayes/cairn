@@ -25,12 +25,11 @@ ladder_require_tool playwright node_modules/.bin/playwright --version
 export CARGO_TERM_COLOR=never
 
 # The module and the web build the binary serves were built before this step (scripts/ladder),
-# and so were the test binaries. The binary is built here so that Playwright's start of it
-# (the app's server-host tests start it as `cairn demo`) is a run, not a build.
+# and so were the test binaries, whose build links the binary too: the binary's tests run it,
+# and Playwright's start of it (the app's server-host tests start it as `cairn demo`,
+# scripts/e2e-servers) is a run, not a build.
 projects=(--project=chromium)
 if [ "${LADDER_SERVER:-1}" = 1 ]; then
-  ladder_run "the build of the binary" cargo build --locked --quiet -p cairn --features web-dir
-
   ladder_cargo_test --test integration -- binary::binary:: || ladder_fail "the binary's tests failed"
   ladder_suite "binary" "$(ladder_tests_matching cairn '^binary::binary::')" tests
   projects+=(--project=server)

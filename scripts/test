@@ -116,10 +116,11 @@ for file in web/app/e2e/*.spec.ts; do
   [ -x "$playwright" ] || ladder_fail "$playwright is missing: run npm ci"
   start=$SECONDS
   [ -n "$module_built" ] || { ladder_run "the browser host's module build" mise-tasks/build/wasm; module_built=yes; }
-  # A spec with a server-host test needs the binary, which serves the web build it embeds:
-  # build that when any source it comes from is newer than it (what make would do), before
-  # cargo links the binary around it. Directories count, so a file removed from one does too,
-  # and so do the manifests, for a dependency that changed.
+  # A spec with a server-host test needs the binary, which serves the web build: build that
+  # when any source it comes from is newer than it (what make would do). Directories count, so
+  # a file removed from one does too, and so do the manifests, for a dependency that changed.
+  # The binary comes from the ladder's one build of the test binaries (scripts/ladder-tests),
+  # which the Rust tests below then reuse.
   if grep -q '@server' "$file"; then
     build=web/app/dist/build/index.html
     if [ ! -f "$build" ] || [ -n "$(find web/app/src web/app/index.html web/app/vite.config.ts web/app/package.json \
@@ -127,7 +128,7 @@ for file in web/app/e2e/*.spec.ts; do
       package-lock.json -newer "$build" -print -quit)" ]; then
       ladder_run "the app's web build" bash -c 'cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts'
     fi
-    ladder_run "the build of the binary" cargo build --locked --quiet -p cairn --features web-dir
+    ladder_run "the build of the binary" cargo test --locked --quiet --workspace --all-features --tests --no-run
     export CAIRN_E2E_BINARY=1
   else
     export CAIRN_E2E_BINARY=0
