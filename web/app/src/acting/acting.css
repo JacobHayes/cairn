@@ -78,11 +78,7 @@ summary.node-panel-head {
   gap: 0;
 }
 
-/* A finished row is the pale green, skipped and not relevant hollow (the ground). */
-.node-row[data-state="done"] {
-  --row-paper: var(--color-done);
-}
-
+/* Skipped and not relevant are hollow (the ground). Done work is faded like a done card: see "Done rows" below. */
 .node-row:is([data-state="skipped"], [data-state="not_relevant"]) {
   --row-paper: var(--color-ground);
 }
@@ -351,11 +347,7 @@ table.data.list-table .badge {
   left: 0;
 }
 
-/* A held cell is opaque, so what scrolls under it does not show through; a selected row's tint sits on top. A finished row (done, decided, reached) is the pale green, a ruled-out one muted. */
-.list-table tr[data-state="done"] {
-  --row-paper: var(--color-done);
-}
-
+/* A held cell is opaque, so what scrolls under it does not show through; a selected row's tint sits on top. A ruled-out row is muted. */
 /* Hollow: the ground shows (held cells are opaque, so they take its colour). */
 .list-table tr:is([data-state="skipped"], [data-state="not_relevant"]) {
   --row-paper: var(--color-ground);
@@ -363,6 +355,30 @@ table.data.list-table .badge {
 
 .list-table tr[data-state="not_relevant"] td {
   color: var(--color-muted);
+}
+
+/* Done rows (done, decided, reached) follow the done card: the neutral row fill, muted text, the hollow green chip, and the content at 0.5. The fade is on the content, not the cell or row, so the held cells stay opaque and the hover, selection and focus marks keep full strength; the checkbox column is left out so the checkbox stays at full strength. The lowest opacity wins: no row has a second fade, so none multiplies. */
+.node-row[data-state="done"] > *,
+.list-table tr[data-state="done"] td:not(.list-check) > .list-content {
+  opacity: 0.5;
+}
+
+/* Keyboard focus lifts the fade so the focus ring and the focused row read at full strength. */
+.node-row[data-state="done"] > :has(:focus-visible),
+.list-table tr[data-state="done"] td:not(.list-check) > .list-content:has(:focus-visible) {
+  opacity: 1;
+}
+
+.node-row[data-state="done"] :is(.node-title, .node-fact),
+.list-table tr[data-state="done"] td:not(.list-check) {
+  color: var(--color-muted);
+}
+
+.node-row[data-state="done"] .badge.done,
+.list-table tr[data-state="done"] .badge.done {
+  background: transparent;
+  border-color: var(--color-success);
+  color: var(--color-success);
 }
 
 .list-table td.list-pinned {

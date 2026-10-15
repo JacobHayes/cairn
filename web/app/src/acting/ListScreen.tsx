@@ -113,7 +113,9 @@ function Row({ line, columns, context, selection, current }: { line: Line; colum
       </td>
       {columns.map((column) => (
         <td key={column} data-column={column} data-gives-way={givesWay(column)} className={[column === "title" ? "list-title-cell" : "list-cell", pinned(column, columns)].filter(Boolean).join(" ")}>
-          <Cell column={column} line={line} context={context} />
+          <div className="list-content">
+            <Cell column={column} line={line} context={context} />
+          </div>
         </td>
       ))}
     </tr>

@@ -4,7 +4,7 @@
 // popover taller than the room scrolls inside itself, the toolbar keeps its row, and a canvas
 // fills its region. The addresses, chips and filters behind them are vitest's
 // (journeys/address.test.ts and screens/filters.test.ts).
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 import { journeyName, startJourney } from "./around.ts";
 import { viewportOf, viewportSettled } from "./canvas.ts";
@@ -122,4 +122,27 @@ test("the window does not scroll: the head stays, a popover scrolls inside itsel
   expect(await body.evaluate((region) => region.scrollWidth <= region.clientWidth)).toBe(true);
   await openAt(page, "browser", "j_vendor_eval", "summary", { fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("summary-upcoming")).toBeVisible();
+});
+
+test("a done row fades its content like a done card, lifts the fade under keyboard focus, and leaves the checkbox at full strength", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "list");
+  const done = page.locator('[data-testid="list-row"][data-state="done"]').first();
+  // Computed opacity is not inherited, so the effective one is the product up the ancestors.
+  const effective = (target: Locator) =>
+    target.evaluate((element) => {
+      let product = 1;
+      for (let at: Element | null = element; at !== null; at = at.parentElement) {
+        product *= Number(getComputedStyle(at).opacity);
+      }
+      return product;
+    });
+  const title = done.locator('td[data-column="title"] a').first();
+  expect(await effective(title)).toBe(0.5);
+  // The checkbox shows on hover.
+  await done.hover();
+  expect(await effective(done.locator("td.list-check input"))).toBe(1);
+  await title.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  expect(await effective(title)).toBe(1);
 });

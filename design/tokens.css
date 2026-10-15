@@ -32,7 +32,6 @@
   --color-border: var(--n-4); /* hairlines */
   --color-error: #b8342c;
   --color-success: #1f7a55;
-  --color-done: #e0f0e7; /* the fill of a finished list row (done, decided, reached): a pale wash of the success green */
   --color-warning: #a66a12;
   --radius-none: 0;
   --radius-sm: 0;
@@ -107,7 +106,6 @@
     --color-secondary: var(--n-6);
     --color-primary: var(--n-11);
     --color-error: #c53b32;
-    --color-done: #1b392c;
     --color-band: var(--n-10);
     --color-rule: rgba(255, 255, 255, 0.06);
     --color-tick: var(--n-6);
@@ -143,7 +141,6 @@
   --color-secondary: var(--n-6);
   --color-primary: var(--n-11);
   --color-error: #c53b32;
-  --color-done: #1b392c;
   --color-band: var(--n-10);
   --color-rule: rgba(255, 255, 255, 0.06);
   --color-tick: var(--n-6);
