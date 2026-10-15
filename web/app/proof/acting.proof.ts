@@ -65,7 +65,8 @@ test("a placeholder's card, and what would unblock the next decisions", async ({
   await openActing(page, "server", journey, "list?flag=decisions_needed");
   await expect.poll(() => listKeys(page)).toHaveLength(5);
   await page.getByLabel("Select every row shown").click();
-  await page.getByRole("button", { name: "Skip..." }).click();
+  await page.getByTestId("selection-status").click();
+  await page.getByRole("menuitem", { name: /Skip/ }).click();
   await page.getByLabel("Why skip them").fill("decided elsewhere");
   await page.getByRole("button", { name: "Apply to 5" }).click();
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", "0");

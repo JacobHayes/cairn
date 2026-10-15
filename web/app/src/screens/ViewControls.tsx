@@ -291,11 +291,11 @@ export function ViewControls({ ready, screen, node, detail, badges, onFind, end 
 }
 
 /** The row at the top of a list, timeline or walk pane, with the filters it has on as removable chips. */
-export function ViewBar({ ready, screen, node, end }: { ready: Ready; screen: Screen; node: string | undefined; end?: ReactNode }) {
+export function ViewBar({ ready, screen, node, end, badges }: { ready: Ready; screen: Screen; node: string | undefined; end?: ReactNode; badges?: ViewControlsProps["badges"] }) {
   const { search } = useLocation();
   return (
     <div className="view-bar stack">
-      <ViewControls ready={ready} screen={screen} node={node} end={end} />
+      <ViewControls ready={ready} screen={screen} node={node} end={end} badges={badges} />
       <ActiveFilters filters={activeFilters(ready.journey.header.id, screen, search, node)} />
     </div>
   );

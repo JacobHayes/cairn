@@ -63,7 +63,7 @@
 }
 
 /* A control is one line, chevron inline: a squeezed row folds under the others, it never wraps a label. */
-:is(.journey-toolbar, .view-controls, .list-strip) :is(button, .button, .chip, .journey-switch, label) {
+:is(.journey-toolbar, .view-controls) :is(button, .button, .chip, .journey-switch, label) {
   white-space: nowrap;
 }
 

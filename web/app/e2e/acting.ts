@@ -63,7 +63,10 @@ export async function select(page: Page, node: string): Promise<void> {
   if ((await row.count()) === 0) {
     await page.getByTestId("list-fold-all").click();
   }
-  await row.locator("input[type=checkbox]").check();
+  // One checked row is the open node, which the address says a moment after the click.
+  const box = row.locator("input[type=checkbox]");
+  await box.click();
+  await expect(box).toBeChecked();
 }
 
 /** Waits until the page's derivation is past `revision`, and returns where it is. */

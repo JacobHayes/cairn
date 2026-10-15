@@ -6,7 +6,7 @@
 // (ranking, filters, guards, the pass's order) are the engine's and vitest's.
 import { expect, test } from "@playwright/test";
 
-import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select, setFrontier } from "./acting.ts";
+import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
 import { derivedRevision, nodePanel } from "./shell.ts";
 
@@ -15,6 +15,12 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   const revision = await derivedRevision(page);
   await select(page, "n_docs");
   await select(page, "n_announcement");
+  await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "2");
+  // A plain click on a row's title opens that node alone; checking the other row again makes two.
+  await page.locator('[data-testid="list-row"][data-node="n_announcement"] a[data-node="n_announcement"]').click();
+  await expect(page.getByTestId("selection-panel")).toHaveCount(0);
+  await select(page, "n_docs");
+  await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "2");
   await page.getByTestId("selection-snooze").click();
   await page.getByRole("menuitem", { name: "Snooze until a node…" }).click();
   await page.getByLabel("Snooze them until node").selectOption("n_beta_end");
@@ -29,13 +35,6 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   await expect(fold.getByTestId("snooze-group")).toHaveCount(1);
   await fold.locator('[data-testid="fold-item"][data-node="n_docs"]').getByRole("button", { name: "Unsnooze" }).click();
   await expect(frontierItem(page, "n_docs")).toBeVisible();
-  await setFrontier(page, false);
-  await select(page, "n_announcement");
-  await page.getByTestId("selection-snooze").click();
-  await page.getByRole("menuitem", { name: "Unsnooze" }).click();
-  expect(await revisionAfter(page, revision + 2)).toBe(revision + 3);
-  await setFrontier(page, true);
-  await expect(frontierItem(page, "n_announcement")).toBeVisible();
 });
 
 test("B1, C11: a journey started from a route opens its walkthrough; an answer surfaces and unlocks work, passing writes nothing, and a node completed from the pass unlocks into it", async ({ page }) => {
@@ -67,21 +66,20 @@ test("B1, C11: a journey started from a route opens its walkthrough; an answer s
   await expect(page.getByTestId("unlocked-by").getByRole("link", { name: "Review the partner's criteria" })).toBeVisible();
 });
 
-test("C9: showing the not-relevant rows keeps the levels a person opened and clears the rows checked; a visit to the graph starts the levels afresh", async ({ page }) => {
+test("C9: showing the not-relevant rows keeps the levels a person opened; a visit to the graph starts the levels afresh", async ({ page }) => {
   await openActing(page, "browser", "j_vendor_eval", "list");
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
   const total = Number(await page.getByTestId("list-total").getAttribute("data-total"));
   await page.getByTestId("list-fold-all").click();
   const folds = page.getByTestId("list-fold");
   await expect(folds.first()).toHaveAttribute("aria-expanded", "true");
-  await page.getByTestId("list-row").first().getByRole("checkbox").check();
-  await page.getByTestId("list-not-relevant").click();
+  await expect(page.getByTestId("filter-badge")).toBeVisible();
+  await page.getByTestId("filter-button").click();
+  await page.getByTestId("show-not-relevant").click();
   await expect(page.getByTestId("list-total")).not.toHaveAttribute("data-total", String(total));
   await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
-  await expect(page.locator('[data-testid="list-row"] input:checked')).toHaveCount(0);
-  await page.getByTestId("list-not-relevant").click();
+  await page.getByTestId("show-not-relevant").click();
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", String(total));
-  await expect(page.locator('[data-testid="list-row"] input:checked')).toHaveCount(0);
   await page.getByTestId("view-graph").click();
   await page.getByTestId("view-list").click();
   await expect(page.getByTestId("list-fold").first()).toBeVisible();

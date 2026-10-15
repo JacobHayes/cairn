@@ -1,7 +1,7 @@
 // A quiet "?" button on the rail's "You" line, present on every screen. Hovering or focusing it
 // lists the keys in a popover; `?` (on a journey) still opens the full sheet. The popover is
-// fixed, placed from the hint's box, so the rail's scroller does not clip it; it sits touching the
-// hint (under it when the rail is the phone's top bar), touching it so the pointer can cross onto it.
+// fixed, placed from the hint's box, so the rail's scroller does not clip it; it abuts the
+// hint (under it when the rail is the phone's top bar) so the pointer can cross onto it.
 import { useEffect, useState, type CSSProperties } from "react";
 
 import { KeyTable } from "../screens/KeySheet.tsx";

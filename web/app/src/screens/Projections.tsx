@@ -83,7 +83,7 @@ export function ProjectionBody({ ready, screen, selected, edge, authored, drawin
     );
   }
   if (screen === "list") {
-    return <ListBody view={ready} settings={listFrom(params)} selected={selected} />;
+    return <ListBody view={ready} settings={listFrom(params)} selected={selected} selection={selection} />;
   }
   if (screen === "timeline") {
     return (

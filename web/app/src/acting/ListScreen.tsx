@@ -5,13 +5,14 @@
 // with its owner and primary action, and under the table what needs a look (C10). Not-relevant
 // rows are left out unless asked for, so the list holds what the plan's count does. With
 // DECISIONS on the rows are decisions with their answer, why, and what the answer affects
-// (C12). Hovering a row brings up its checkbox, and a selection turns the header into the
-// bulk actions (SelectionActions.tsx). The journey page (screens/JourneyFrame.tsx) holds its toolbar and
-// the filter it opens (ListFilters).
+// (C12). Hovering a row brings up its checkbox; the rows checked are the graph's one selection
+// (canvas/selection.ts), acted on in the inspector. The journey page (screens/JourneyFrame.tsx)
+// holds its toolbar and the filter it opens (ListFilters).
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
+import type { Selection } from "../canvas/selection.ts";
 import { decisionRows } from "../decisions/model.ts";
 import { type Ready } from "../detail/model.ts";
 import { nodePath, screenPath } from "../detail/parts.tsx";
@@ -21,12 +22,10 @@ import { Menu } from "../screens/Menu.tsx";
 import { ViewBar } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
-import { selectionOf } from "./acts.ts";
 import { listPath, listQueryOf, type ListSettings } from "./address.ts";
 import { Checks } from "./Controls.tsx";
 import { Cell, type CellContext } from "./ListCells.tsx";
 import { Folds } from "./Folds.tsx";
-import { SelectionActions } from "./SelectionActions.tsx";
 import { NextForYou } from "./NextForYou.tsx";
 import { StalledPanel } from "./Stalled.tsx";
 import { addableColumns, columnsOf, columnWords, flatLines, givesWay, rankPositions, SORT_OF, treeLines, type Column, type Line } from "./listModel.ts";
@@ -65,8 +64,9 @@ function Head({ column, columns, settings, onSort }: { column: Column; columns: 
   );
 }
 
-function Row({ line, columns, context, chosen, current, onToggle }: { line: Line; columns: Column[]; context: CellContext; chosen: boolean; current: boolean; onToggle: () => void }) {
+function Row({ line, columns, context, selection, current }: { line: Line; columns: Column[]; context: CellContext; selection: Selection; current: boolean }) {
   const { row } = line;
+  const chosen = selection.members.length > 1 && selection.members.includes(line.key);
   const navigate = useNavigate();
   const frame = useFrameActions();
   const { pathname, search } = useLocation();
@@ -90,7 +90,18 @@ function Row({ line, columns, context, chosen, current, onToggle }: { line: Line
       data-selected={chosen}
       aria-selected={current}
       onClick={(event) => {
-        if (row !== undefined && onRow(event)) {
+        // The row's own title link is the row clicked; any other link or control is its own.
+        const own = event.target instanceof Element && event.target.closest("a")?.getAttribute("data-node") === line.key;
+        if (row === undefined || !(own || onRow(event))) {
+          return;
+        }
+        if (event.shiftKey || event.metaKey || event.ctrlKey) {
+          event.preventDefault();
+          selection.toggle(line.key);
+          return;
+        }
+        selection.release();
+        if (!own) {
           // The selected row clicked again changes no address, so the inspector must be asked to come back.
           frame?.show("inspector");
           void navigate(`${nodePath(screenPath(pathname), line.key)}${search}`);
@@ -98,7 +109,7 @@ function Row({ line, columns, context, chosen, current, onToggle }: { line: Line
       }}
     >
       <td className="list-check list-pinned">
-        {row === undefined ? null : <input type="checkbox" className="list-checkbox" aria-label={`Select ${row.title}`} checked={chosen} onChange={onToggle} />}
+        {row === undefined ? null : <input type="checkbox" className="list-checkbox" aria-label={`Select ${row.title}`} checked={selection.members.includes(line.key)} onChange={() => { selection.toggle(line.key); }} />}
       </td>
       {columns.map((column) => (
         <td key={column} data-column={column} data-gives-way={givesWay(column)} className={[column === "title" ? "list-title-cell" : "list-cell", pinned(column, columns)].filter(Boolean).join(" ")}>
@@ -109,62 +120,51 @@ function Row({ line, columns, context, chosen, current, onToggle }: { line: Line
   );
 }
 
-/** The table: its header (the column labels, or the bulk actions once something is selected) and its lines. */
-function Table({ view, settings, lines, columns, context, chosen, selected, everyLine, onToggle, onClear, onSelectAll }: {
+/** The table: its header (the column labels) and its lines. */
+function Table({ view, settings, lines, columns, context, selection, selected, everyLine }: {
   view: Ready;
   settings: ListSettings;
   lines: Line[];
   columns: Column[];
   context: CellContext;
-  chosen: Set<string>;
+  selection: Selection;
   selected: string | undefined;
   everyLine: string[];
-  onToggle: (key: string) => void;
-  onClear: () => void;
-  onSelectAll: () => void;
 }) {
   const navigate = useNavigate();
-  const picked = selectionOf(view, chosen);
+  const all = everyLine.length > 0 && everyLine.every((key) => selection.members.includes(key));
   return (
-    <table className="data list-table" data-testid="list-table" data-selecting={chosen.size > 0} data-ranked={columns[0] === "rank"}>
+    <table className="data list-table" data-selecting={selection.members.length > 1} data-ranked={columns[0] === "rank"} data-testid="list-table">
       <thead>
-        {picked.length > 0 ? (
-          <tr>
-            <th colSpan={columns.length + 1} className="bulk-head">
-              <div className="panel row bulk-bar" data-testid="bulk-bar" data-count={picked.length}>
-                <strong>{picked.length} selected</strong>
-                {picked.some((facts) => !everyLine.includes(facts.node.key)) ? <span className="muted small" data-testid="selected-elsewhere">({picked.filter((facts) => !everyLine.includes(facts.node.key)).length} not shown)</span> : null}
-                <SelectionActions view={view} selected={picked} onLanded={onClear} />
-                <Button ghost onClick={onClear}>Clear selection</Button>
-              </div>
-            </th>
-          </tr>
-        ) : (
-          <tr>
-            <th scope="col" className="list-check list-pinned">
-              <input type="checkbox" className="list-checkbox" aria-label="Select every row shown" checked={false} onChange={onSelectAll} />
-            </th>
-            {columns.map((column) => (
-              <Head key={column} column={column} columns={columns} settings={settings} onSort={(sort) => void navigate(listPath(view.journey.header.id, { ...settings, sort }, selected))} />
-            ))}
-          </tr>
-        )}
+        <tr>
+          <th scope="col" className="list-check list-pinned">
+            <input type="checkbox" className="list-checkbox" aria-label="Select every row shown" checked={all} onChange={() => { selection.set(all ? [] : everyLine); }} />
+          </th>
+          {columns.map((column) => (
+            <Head key={column} column={column} columns={columns} settings={settings} onSort={(sort) => void navigate(listPath(view.journey.header.id, { ...settings, sort }, selected))} />
+          ))}
+        </tr>
       </thead>
       <tbody>
         {lines.map((line) => (
-          <Row key={line.key} line={line} columns={columns} context={context} chosen={chosen.has(line.key)} current={line.key === selected} onToggle={() => { onToggle(line.key); }} />
+          <Row key={line.key} line={line} columns={columns} context={context} selection={selection} current={line.key === selected} />
         ))}
       </tbody>
     </table>
   );
 }
 
-/** The list's Columns and count, which ride the end of the view controls' row. */
-function RowEnd({ view, settings, total, selectedNode }: { view: Ready; settings: ListSettings; total: number | undefined; selectedNode: string | undefined }) {
+/** The list's tree fold, count and Columns, which ride the end of the view controls' row. */
+function RowEnd({ view, settings, total, selectedNode, fold }: { view: Ready; settings: ListSettings; total: number | undefined; selectedNode: string | undefined; fold: { all: boolean; onAll: () => void } | undefined }) {
   const navigate = useNavigate();
   const journey = view.journey.header.id;
   return (
     <>
+      {fold === undefined ? null : (
+        <Button ghost data-testid="list-fold-all" onClick={fold.onAll}>
+          {fold.all ? "Fold to the top level" : "Open every level"}
+        </Button>
+      )}
       <span className="muted" data-testid="list-total" data-total={total ?? ""}>
         {total === undefined ? "Reading the list..." : `${String(total)} ${settings.decisions ? "decision" : "item"}${total === 1 ? "" : "s"}`}
       </span>
@@ -191,31 +191,6 @@ function RowEnd({ view, settings, total, selectedNode }: { view: Ready; settings
   );
 }
 
-/** What the strip above the table offers: the tree's fold and the not-relevant rows, when there are any. */
-function Strip({ view, settings, hidden, tree, all, onAll, selectedNode }: { view: Ready; settings: ListSettings; hidden: number; tree: boolean; all: boolean; onAll: () => void; selectedNode: string | undefined }) {
-  const navigate = useNavigate();
-  const journey = view.journey.header.id;
-  const go = (next: ListSettings) => void navigate(listPath(journey, next, selectedNode));
-  const notRelevant = hidden !== 0 || settings.notRelevant;
-  if (!tree && !notRelevant) {
-    return null;
-  }
-  return (
-    <div className="list-strip row">
-      {tree ? (
-        <Button ghost data-testid="list-fold-all" onClick={onAll}>
-          {all ? "Fold to the top level" : "Open every level"}
-        </Button>
-      ) : null}
-      {notRelevant ? (
-        <Button ghost data-testid="list-not-relevant" aria-pressed={settings.notRelevant} onClick={() => { go({ ...settings, notRelevant: !settings.notRelevant }); }}>
-          {settings.notRelevant ? `Hide the ${String(hidden)} not relevant` : `Show ${String(hidden)} not relevant`}
-        </Button>
-      ) : null}
-    </div>
-  );
-}
-
 /** C10: under the frontier table, what the viewer holds that cannot be done yet, what needs a look, what is snoozed, and, when nothing can move, why. */
 function FrontierPanels({ view, settings, empty, stalled: held }: { view: Ready; settings: ListSettings; empty: boolean; stalled: boolean }) {
   const { pathname, search } = useLocation();
@@ -232,35 +207,15 @@ function FrontierPanels({ view, settings, empty, stalled: held }: { view: Ready;
   );
 }
 
-/** A set of keys with the one change a click makes: in if out, out if in. They are `scope`'s: in another scope there are none. */
-function useKeys(scope: string): [Set<string>, (key: string) => void, (keys: Iterable<string>) => void] {
-  const [held, setHeld] = useState<{ scope: string; keys: Set<string> }>({ scope, keys: new Set() });
-  if (held.scope !== scope) {
-    // Cleared, not hidden: the old query coming back must not bring its checks back.
-    setHeld({ scope, keys: new Set() });
-  }
-  const keys = held.scope === scope ? held.keys : new Set<string>();
-  const toggle = (key: string) => {
-    const next = new Set(keys);
-    if (!next.delete(key)) {
-      next.add(key);
-    }
-    setHeld({ scope, keys: next });
-  };
-  return [keys, toggle, (replacement) => { setHeld({ scope, keys: new Set(replacement) }); }];
-}
-
 /**
  * PLAN, LIST: the tree keeps its open and folded levels, which are the viewer's, across a
- * filter and a row-set toggle; the rows checked are the query's.
+ * filter and a row-set toggle; the rows checked are the journey's one selection.
  */
-export function ListBody({ view, settings, selected }: { view: Ready; settings: ListSettings; selected?: string | undefined }) {
+export function ListBody({ view, settings, selected, selection }: { view: Ready; settings: ListSettings; selected?: string | undefined; selection: Selection }) {
   const [folds, setFolds] = useState<{ by: ReadonlyMap<string, boolean>; every: boolean | undefined }>({ by: new Map(), every: undefined });
   const query = useMemo(() => listQueryOf(settings), [settings]);
-  // Another query is another list of rows, which the old checks do not name.
-  const [chosen, toggle, choose] = useKeys(JSON.stringify(query));
   const { rows, error } = useRows(view, query);
-  // What Show not relevant would add under the same filters, so the button never promises rows the filters would drop.
+  // What Show not relevant would add under the same filters: the Filter badge says how many rows it leaves out.
   const ruledOut = useRows(view, useMemo(() => ({ ...query, display_states: ["not_relevant" as const] }), [query])).rows?.length ?? 0;
   const needsDecisions = settings.decisions || settings.columns.some((column) => ["answer", "why", "affects"].includes(column));
   const projected = useProjected(view, needsDecisions ? { projection: "decision_view" as const } : undefined);
@@ -282,31 +237,30 @@ export function ListBody({ view, settings, selected }: { view: Ready; settings: 
   const context: CellContext = { view, tree, decisions, ranks, acting: settings.frontier, sort: settings.sort, onFold: (key) => { setFolds({ ...folds, by: new Map(folds.by).set(key, !isOpen(key)) }); } };
   return (
     <section className="stack list" aria-label="List" data-testid="list">
-      <ViewBar ready={view} screen="list" node={selected} end={<RowEnd view={view} settings={settings} total={rows?.length} selectedNode={selected} />} />
+      <ViewBar
+        ready={view}
+        screen="list"
+        node={selected}
+        badges={ruledOut === 0 || settings.notRelevant ? undefined : { filter: { count: ruledOut, words: `${String(ruledOut)} not relevant hidden` } }}
+        end={
+          <RowEnd
+            view={view}
+            settings={settings}
+            total={rows?.length}
+            selectedNode={selected}
+            fold={tree ? { all: open, onAll: () => { setFolds({ by: new Map(), every: !open }); } } : undefined}
+          />
+        } />
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
-      <Strip
-        view={view}
-        settings={settings}
-        hidden={ruledOut}
-        tree={tree}
-        all={open}
-        selectedNode={selected}
-        onAll={() => {
-          setFolds({ by: new Map(), every: !open });
-        }}
-      />
       <Table
         view={view}
         settings={settings}
         lines={lines}
         columns={columns}
         context={context}
-        chosen={chosen}
+        selection={selection}
         selected={selected}
         everyLine={everyLine}
-        onToggle={toggle}
-        onClear={() => { choose([]); }}
-        onSelectAll={() => { choose(everyLine); }}
       />
       {rows !== undefined && lines.length === 0 ? (
         <p className="muted" data-testid="list-empty">

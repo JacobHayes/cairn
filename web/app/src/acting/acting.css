@@ -306,11 +306,6 @@ summary.node-panel-head {
 
 /* C9: the Plan list. Air before lines: tall rows, no vertical rules, a quiet header in plain
    words. A checkbox shows when a row is hovered or focused, or once anything is selected. */
-.list-strip {
-  gap: var(--space-3);
-  align-items: center;
-}
-
 table.data.list-table th,
 table.data.list-table td {
   padding: var(--space-3) var(--space-2);
@@ -617,21 +612,6 @@ button.list-sort {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-}
-
-/* A selection replaces the column labels with the bulk actions: sentence case, not a label. */
-table.data.list-table th.bulk-head {
-  font: inherit;
-  font-weight: 400;
-  color: var(--color-text);
-  background: var(--color-surface);
-  padding: var(--space-3);
-}
-
-/* Padded by the corner ticks' size, so they clear the count. */
-.list-table .bulk-head .bulk-bar {
-  border: 0;
-  padding: var(--space-3);
 }
 
 /* Mine: each journey's group, its rows in that journey's rank. */

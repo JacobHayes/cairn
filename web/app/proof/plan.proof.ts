@@ -32,8 +32,11 @@ test("the list as a tree, flat when sorted, as decisions, and with a selection",
   await expect(page.getByTestId("list-row").nth(1)).toBeVisible();
   await page.getByTestId("list-row").nth(0).locator("input[type=checkbox]").click();
   await page.getByTestId("list-row").nth(1).locator("input[type=checkbox]").click();
-  await expect(page.getByTestId("bulk-bar")).toBeVisible();
+  await expect(page.getByTestId("selection-panel")).toBeVisible();
   await shot(page, "4-selection");
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.waitForTimeout(400);
+  await shot(page, "4-selection-dark");
 });
 
 test("the timeline with a selected row's float, and without a final milestone", async ({ page }) => {

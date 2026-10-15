@@ -19,7 +19,7 @@ import type { Ready } from "../detail/model.ts";
 import { EdgeCard } from "../detail/EdgeCard.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
-import { screenPath } from "../detail/parts.tsx";
+import { nodePath, screenPath } from "../detail/parts.tsx";
 import type { Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
@@ -106,7 +106,7 @@ function InspectorSlot({
       </Inspector>
     );
   }
-  if (screen === "graph" && selection.members.length >= 2) {
+  if ((screen === "graph" || screen === "list") && selection.members.length >= 2) {
     return (
       <Inspector focus={`${journey}:selection`}>
         <SelectionPanel ready={ready} selection={selection} authored={authored} />
@@ -152,7 +152,7 @@ function Workspace({ ready, screen, selected, edge, authored, drawing, selection
 }
 
 function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<FrameProps, "id">) {
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   const navigate = useNavigate();
   const journey = ready.journey.header.id;
   const params = useMemo(() => new URLSearchParams(search), [search]);
@@ -160,7 +160,8 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const planned = screen === "graph";
   const authored = useMemo(() => (planned && view.edit ? journeyAuthored(ready) : undefined), [ready, planned, view.edit]);
   const drawing = useEdgeDrawing(authored);
-  const selection = useSelection(selected, (node) => void navigate(canvasPath(journey, view, node)));
+  // The set is the frame's, so it survives a switch between the graph and the list; each opens a node on its own screen.
+  const selection = useSelection(selected, (node) => void navigate(screen === "graph" ? canvasPath(journey, view, node) : `${node === undefined ? screenPath(pathname) : nodePath(screenPath(pathname), node)}${search}`));
   const inserting = useInserting(`journey:${journey}`);
   const [sheetOpen, setSheetOpen] = useState(false);
   useJourneyKeys({ journey, screen, selected, sheetOpen, setSheetOpen });
