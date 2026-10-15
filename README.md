@@ -81,6 +81,7 @@ saved, so stopping it ends the demo.
 
 ```sh
 mise run demo   # then open http://127.0.0.1:8080/
+mise run workspace name   # a jj workspace in ../cairn-ws/name with this checkout's build outputs copied in
 ```
 
 **The real thing, on your machine.** This builds Cairn and runs it with a local database,
@@ -122,6 +123,7 @@ mise run sim          # simulation campaigns under patina; not part of check
 mise run build        # the release binary, with the web build embedded
 mise run serve        # a local deployment from cairn.dev.toml
 mise run demo         # the sample journeys in memory, nothing to configure
+mise run workspace name   # a jj workspace in ../cairn-ws/name with this checkout's build outputs copied in
 ```
 
 CI runs `mise run check` on every push and nightly, and `mise run sim` nightly.

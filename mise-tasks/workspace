@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+#MISE description="A jj workspace at ../cairn-ws/<name> beside the main checkout, on a new change atop main (or a revision), with the main checkout's build outputs copied in so its first build is incremental"
+# jj writes every file new and cargo judges workspace crates fresh by mtime, so each tracked file
+# identical to the main checkout's gets its mtime. Copies keep mtimes (cargo compares them) and are
+# copy-on-write: APFS clone, else GNU reflink.
+set -euo pipefail
+# The main checkout holds the colocated git repository every workspace shares, from whichever one runs this.
+src=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
+cd "$src"
+dst=../cairn-ws/${1:?usage: mise run workspace <name> [revision]}
+mkdir -p ../cairn-ws
+jj workspace add --revision "${2:-main}" "$dst"
+for p in target node_modules web/{app,client,wasm}/node_modules web/{wasm,client,app}/dist; do
+  if [ -e "$src/$p" ] && [ ! -e "$dst/$p" ]; then
+    cp -c -pR "$src/$p" "$dst/$p" 2>/dev/null || cp -pR --reflink=auto "$src/$p" "$dst/$p"
+  fi
+done
+cd "$dst"
+jj file list | while IFS= read -r f; do
+  if cmp -s "$src/$f" "$f"; then touch -r "$src/$f" "$f"; fi
+done
+echo "workspace: $PWD"
