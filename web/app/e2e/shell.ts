@@ -31,7 +31,7 @@ export async function importIntoLibrary(page: Page, file: string | { name: strin
   await page.getByLabel("Import a file…").setInputFiles(file);
 }
 
-/** The sync dot beside the brand at the top of the rail. */
+/** The sync dot at the right edge of the brand row at the top of the rail. */
 export function syncChip(page: Page): Locator {
   return page.getByTestId("sync");
 }
@@ -44,7 +44,7 @@ export async function derived(page: Page): Promise<void> {
 
 /** Waits until the stream is live and nothing is pending: the chip says "In sync, live". */
 export async function live(page: Page): Promise<void> {
-  await expect(syncChip(page)).toHaveAttribute("title", /^In sync · live/);
+  await expect(syncChip(page)).toHaveAttribute("aria-label", /In sync · live/);
 }
 
 /** The popover's Recent, newest first, once it lists a save; the popover is closed again. */

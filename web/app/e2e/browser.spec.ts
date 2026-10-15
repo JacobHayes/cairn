@@ -46,3 +46,27 @@ test("the in-browser host boots, redirects, derives in the worker, applies a pat
   await goWithin(page, "/journeys");
   await expect(page.getByTestId("load-failure")).toHaveCount(0);
 });
+
+test("the sync dot shows its popover on hover and focus, inside the window, and a click pins it", async ({ page }) => {
+  await visit(page, "browser", "/");
+  const chip = syncChip(page);
+  const popover = page.getByTestId("sync-popover");
+  await chip.hover();
+  await expect(popover).toBeVisible();
+  const box = await popover.boundingBox();
+  const size = page.viewportSize();
+  expect(box !== null && size !== null && box.x >= 0 && box.x + box.width <= size.width).toBe(true);
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+  await page.mouse.move(700, 500);
+  await chip.focus();
+  await page.keyboard.press("Shift+Tab");
+  await page.keyboard.press("Tab");
+  await expect(popover).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(popover).toHaveCount(0);
+  await chip.click();
+  await page.mouse.move(700, 500);
+  await expect(popover).toBeVisible();
+  await expect(chip).toHaveAttribute("aria-expanded", "true");
+});

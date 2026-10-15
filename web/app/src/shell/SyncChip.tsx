@@ -1,6 +1,6 @@
-// The sync dot to the right of the brand at the top of the rail (design 9): one button that is
-// only a mark (its colour and shape, the tooltip and its accessible name carry the words) that says whether what you see is what exists and whether your edits
-// are landing. Hovering shows one sentence; clicking opens the popover with the revision,
+// The sync dot at the right edge of the brand row at the top of the rail (design 9): one button that is
+// only a mark (its colour and shape and its accessible name carry the words) that says whether what you see is what exists and whether your edits
+// are landing. Hovering or focusing it peeks the popover; clicking pins it open. It holds the revision,
 // engine and today, what needs you, and this tab's recent saves. Nothing on it closes itself
 // or needs closing but the popover, which Esc dismisses. A polite and an assertive live
 // region announce the changes that matter.
@@ -137,29 +137,39 @@ function Popover({ summary, problems, anchor, onClose }: { summary: SyncSummary;
   );
 }
 
-/** The popover's open state: Esc and a press outside close it, and focus goes in and back to the chip. */
+/** The popover's state: pinned by a click (open) or peeked by hover or focus. It is visible in either; Esc and a press outside close it, and a pinned one takes focus and gives it back to the chip. */
 function usePopover() {
   const [open, setOpen] = useState(false);
+  const [peek, setPeek] = useState(false);
+  const shown = open || peek;
   const wrap = useRef<HTMLSpanElement>(null);
   const chip = useRef<HTMLButtonElement>(null);
+  const close = () => {
+    setOpen(false);
+    setPeek(false);
+  };
   useEffect(() => {
-    if (!open) {
+    if (!shown) {
       return undefined;
     }
-    wrap.current?.querySelector<HTMLElement>(".sync-popover")?.focus();
+    if (open) {
+      wrap.current?.querySelector<HTMLElement>(".sync-popover")?.focus();
+    }
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
-        setOpen(false);
-        chip.current?.focus();
+        close();
+        if (open) {
+          chip.current?.focus();
+        }
       }
     };
     const onPointer = (event: PointerEvent) => {
       if (event.target instanceof Node && wrap.current?.contains(event.target) !== true) {
-        setOpen(false);
+        close();
       }
     };
     // It is placed from the dot's box when it opens, so a resize closes it rather than leaving it adrift.
-    const onResize = () => { setOpen(false); };
+    const onResize = () => { close(); };
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
     globalThis.addEventListener("resize", onResize);
@@ -168,19 +178,34 @@ function usePopover() {
       document.removeEventListener("pointerdown", onPointer);
       globalThis.removeEventListener("resize", onResize);
     };
-  }, [open]);
-  return { open, setOpen, wrap, chip };
+  }, [open, shown]);
+  return { open, setOpen, setPeek, shown, close, wrap, chip };
 }
 
 export function SyncChip() {
   const session = useSession();
   const { summary, problems } = useSync();
   const derivation = useDerivation();
-  const { open, setOpen, wrap, chip } = usePopover();
+  const { open, setOpen, setPeek, shown, close, wrap, chip } = usePopover();
   const saved = useSavedAnnouncement();
   const [anchor, setAnchor] = useState<Anchor>({ top: 0, left: 0 });
+  // Hover and keyboard focus show the same popover without pinning it: a click pins it (open), and
+  // leaving or blurring lets a peeked one go, after a beat so the pointer can cross into it.
+  const leaving = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const show = () => {
+    clearTimeout(leaving.current);
+    if (chip.current !== null) {
+      setAnchor(anchorBelow(chip.current));
+    }
+    setPeek(true);
+  };
+  const hide = () => {
+    clearTimeout(leaving.current);
+    leaving.current = setTimeout(() => { setPeek(false); }, 150);
+  };
+  useEffect(() => () => { clearTimeout(leaving.current); }, []);
   return (
-    <span className="sync-wrap" ref={wrap}>
+    <span className="sync-wrap" ref={wrap} onPointerEnter={show} onPointerLeave={hide} onFocus={(event) => { if (!open && event.target === chip.current && chip.current.matches(":focus-visible")) { show(); } }} onBlur={(event) => { if (!(event.relatedTarget instanceof Node && wrap.current?.contains(event.relatedTarget) === true)) { hide(); } }}>
       <button
         ref={chip}
         type="button"
@@ -192,10 +217,9 @@ export function SyncChip() {
         data-revision={derivation?.revision}
         data-deployment={derivation?.deployment}
         data-today={derivation?.today}
-        title={summary.sentence}
         aria-label={`${summary.label}. ${summary.sentence}`}
         aria-haspopup="dialog"
-        aria-expanded={open}
+        aria-expanded={shown}
         onClick={(event) => {
           if (summary.state === "new-version") {
             location.reload();
@@ -208,7 +232,7 @@ export function SyncChip() {
           }
         }}
       />
-      {open ? <Popover summary={summary} problems={problems} anchor={anchor} onClose={() => { setOpen(false); }} /> : null}
+      {shown ? <Popover summary={summary} problems={problems} anchor={anchor} onClose={close} /> : null}
       <span className="visually-hidden" role="status" aria-live="polite">
         {saved === undefined ? null : <span key={saved.id}>{saved.text}</span>}
         {summary.announce === "polite" ? summary.sentence : ""}

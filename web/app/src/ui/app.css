@@ -195,7 +195,7 @@ body {
   width: min(360px, calc(100vw - 24px));
 }
 
-/* The sync dot sits beside the brand at the top of the rail; its popover is fixed (placed from the dot's box) so the rail's scroller does not clip it. */
+/* The sync dot sits at the right edge of the brand row at the top of the rail; its popover is fixed (placed from the dot's box) so the rail's scroller does not clip it. */
 .sync-wrap {
   position: relative;
   display: inline-flex;

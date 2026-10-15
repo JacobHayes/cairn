@@ -673,10 +673,11 @@ svg.chart .datum-line {
 
 /* ---- app frame parts (DESIGN amendments 5 and 10) ------------------------------------------- */
 /* Chrome (the rail and the sheet) follows the theme: --chrome-bg. */
-/* Sync dot (to the right of the brand in the rail): one 10px mark and nothing else; the sentence is its tooltip and the popover. The colour rule: green is nothing to do, a steel ring is working on it, amber is it will sort itself out or is safe to wait, red is your change is not landing until you act. Each state has its own shape too (a disc, a ring, a diamond, a square, a "!", a dotted ring for sample data), so colour is never the only signal. */
+/* Sync dot (at the right edge of the brand row in the rail): one 10px mark and nothing else; the sentence is its tooltip and the popover. The colour rule: green is nothing to do, a steel ring is working on it, amber is it will sort itself out or is safe to wait, red is your change is not landing until you act. Each state has its own shape too (a disc, a ring, a diamond, a square, a "!", a dotted ring for sample data), so colour is never the only signal. */
 .rail-head {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: var(--space-2);
 }
 .sync {
@@ -1065,6 +1066,9 @@ svg.chart .datum-line {
     padding: var(--space-2) var(--space-4);
     border-right: 0;
     border-bottom: 1px solid var(--chrome-border);
+  }
+  .rail-head {
+    flex: 1 0 100%;
   }
   .rail nav {
     flex-direction: row;
