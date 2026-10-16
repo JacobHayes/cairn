@@ -101,7 +101,7 @@ out_of_reach=(
   service-proposal-refreshed-against-destination
 )
 rm -rf "$out/campaign"
-cargo patina campaign "$bed" --gens 32 --buggify --faults --fault-scale-permille 30 --swarm \
+cargo patina campaign "$bed" --gens 32 --buggify --faults --fault-scale-permille 100 --swarm \
   --allow-unmet-sometimes --allow-unsupported-symbols "$allow" --out-dir "$out/campaign" \
   --progress-every 0 >"$out/campaign.log" 2>&1 || {
   sed -n '/campaign summary/,$p' "$out/campaign.log" >&2
@@ -199,10 +199,10 @@ done <"$out/crash-errors.runs"
 mapfile -t error_logs < <(awk '{print $2}' "$out/crash-errors.runs")
 # The finding the testbed found
 # (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md), pinned as a
-# regression: seed 2's first failing fsync is a commit's, and the run must end with the store
+# regression: seed 5's first failing fsync is a commit's, and the run must end with the store
 # failed closed. A store that answered on after it (and acknowledged the commit from its
 # receipt) would complete the run instead, and lose that acknowledged commit to a crash.
-run --seed 2 --fs-error-permille 5 >/dev/null 2>"$out/finding.err" ||
+run --seed 5 --fs-error-permille 5 >/dev/null 2>"$out/finding.err" ||
   fail "the pinned failed log sync run broke an invariant: $out/finding.err"
 grep -q '^DURABILITY_RESULT outcome=unavailable .*the store failed closed: .*(sync)' "$out/finding.err" ||
   fail "the pinned run no longer ends with the store failed closed after a failed sync ($out/finding.err): find a new seed"

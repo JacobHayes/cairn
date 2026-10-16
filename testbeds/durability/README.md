@@ -55,7 +55,7 @@ mise run sim     # every leg of sim.sh, from the repository root
    AVX-512 FP16 kernels, which Turso links and Cairn never reaches (6.1's patina entry),
    allowed by name; rustix's raw syscall runs through syscall-user dispatch.
 3. A crash-restart run recorded twice is byte-identical and replays its verdict.
-4. Smoke campaign: 32 generations of buggify, fs errors and short I/O (bands at 30 per
+4. Smoke campaign: 32 generations of buggify, fs errors and short I/O (bands at 100 per
    mille of their default), and swarm. Every generation passes, and every oracle fires but
    a named out-of-reach list (two writers in flight, proposals, imports, derived reads, and
    a failed write retried, which now fires here).
@@ -66,7 +66,7 @@ mise run sim     # every leg of sim.sh, from the repository root
    acknowledged commits.
 6. The same sweep with fs errors at 5 per mille: no invariant breaks. A run whose store
    fails closed ends `unavailable`, as one whose store does not open does. The store
-   finding below is pinned as a regression run (seed 2, no crash point): its first failing
+   finding below is pinned as a regression run (seed 5, no crash point): its first failing
    fsync is a commit's, and the run must end with the store failed closed. A store that
    answered on would complete it, acknowledging the commit from its receipt.
 7. Known gaps still reproduce.
@@ -85,14 +85,18 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
   show the restart reading from disk: the world ends the run when the store fails closed,
   instead of reopening it in-process. Its deterministic tests are
   `crates/tests/tests/integration/store_turso/conformance/conformance/log_sync.rs`; leg 6 pins
-  seed 2. Recorded in
+  seed 5. Recorded in
   [`decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md`](../../decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md),
   which replaced the barrier of
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 - **Patina: a removed directory stops crash points.** Once the guest removes a directory
   (Turso's temporary directory, when a connection that wrote is dropped), no later
-  `--fs-crash-at` point fires and the run ends uncrashed. An in-process reopen drops the
-  pool, so a run that reopens is not crashed after it. Recorded in
+  `--fs-crash-at` point fires and the run ends uncrashed (or the injected crash reaches
+  the guest as `EIO`). An in-process reopen drops the pool, so a run that reopens is not
+  crashed after it. Turso creates and removes a temporary directory for each `DROP TABLE`,
+  and a fresh store runs two (the segments and barrier migrations), so the migrations run
+  with `temp_store = MEMORY`; a later statement that removes a directory would again end the
+  sweep early, which leg 5 catches. Recorded in
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 - **Turso: opens under injected faults.** A log size error at open panics; a short read of
   the log header fails the open; an open retried in-process after a failed one panics in the
