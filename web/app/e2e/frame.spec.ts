@@ -103,17 +103,34 @@ test("the rail's shortcuts hint lists the keys on hover and focus, and goes on l
   await expect(page.getByTestId("keys-hint")).toHaveCount(0);
 });
 
+/**
+ * A finger drawn from `x`,`y` by `dx`,`dy` over a third of a second, resting before it lifts so
+ * nothing flings on after it. Raw touch points, since Chromium's synthesized touch scroll
+ * gesture moves nothing at all in Playwright's browser.
+ */
+async function swipe(page: Page, at: { x: number; y: number }, by: { dx: number; dy: number }): Promise<void> {
+  const finger = await page.context().newCDPSession(page);
+  const steps = 20;
+  const start = Date.now() / 1000;
+  const touch = (type: "touchStart" | "touchMove" | "touchEnd", step: number, seconds: number) =>
+    finger.send("Input.dispatchTouchEvent", {
+      type,
+      touchPoints: type === "touchEnd" ? [] : [{ x: at.x + (by.dx * step) / steps, y: at.y + (by.dy * step) / steps }],
+      timestamp: start + seconds,
+    });
+  await touch("touchStart", 0, 0);
+  for (let step = 1; step <= steps; step += 1) {
+    await touch("touchMove", step, step / 60);
+  }
+  await touch("touchEnd", steps, steps / 60 + 0.2);
+}
+
 test.describe("a phone's map", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
   /** The canvas's pan and zoom, as React Flow writes it. */
   const transform = (page: Page, within: string) => page.locator(`${within} .react-flow__viewport`).evaluate((element) => (element as HTMLElement).style.transform);
   const scrolled = (page: Page) => page.evaluate(() => document.scrollingElement?.scrollTop ?? 0);
-  /** A finger drawn from the middle of `x`,`y` by `dx`,`dy`. */
-  async function swipe(page: Page, at: { x: number; y: number }, by: { dx: number; dy: number }): Promise<void> {
-    const finger = await page.context().newCDPSession(page);
-    await finger.send("Input.synthesizeScrollGesture", { ...at, xDistance: by.dx, yDistance: by.dy, gestureSourceType: "touch", speed: 600 });
-  }
 
   test("is a preview a swipe scrolls past, and opens full screen where a swipe pans", async ({ page }) => {
     await openJourney(page, "browser", "j_vendor_eval");
