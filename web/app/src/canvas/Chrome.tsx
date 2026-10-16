@@ -10,11 +10,11 @@ import { STEP_WORDS } from "./ladder.ts";
 import { LENS_MEANING, LENS_WORDS } from "./lens.ts";
 import { LENSES, type Lens, type Step } from "./model.ts";
 
-/** C2: a route's detail ladder (All, Deliverables, Decisions, Stages: general to specific). A journey's is the Detail menu of its view controls. */
+/** C2: a route's Depth (Stages, Decisions, Deliverables, Actions: coarse to fine, as keys 1 to 4). A journey's is the Depth menu of its view controls. */
 export function Ladder({ steps, step, onStep }: { steps: readonly Step[]; step: Step; onStep: (step: Step) => void }) {
   return (
     <Panel position="top-left" className="canvas-panel canvas-top">
-      <Segmented label="Detail" value={step} options={[...steps].reverse().map((each) => ({ value: each, label: STEP_WORDS[each] }))} onChange={onStep} data-testid="ladder" />
+      <Segmented label="Depth" value={step} options={steps.map((each) => ({ value: each, label: STEP_WORDS[each] }))} onChange={onStep} data-testid="ladder" />
     </Panel>
   );
 }
@@ -69,7 +69,7 @@ export function SignalMenu({ lens, onLens }: { lens: Lens | undefined; onLens: (
             ))}
           </div>
           <span className="muted small">{lens === undefined ? "Put one number on each card." : LENS_MEANING[lens]}</span>
-          <hr className="canvas-signal-rule" />
+          <hr className="menu-rule" />
           <details>
             <summary>Key to the lines</summary>
             <Key />
@@ -94,7 +94,7 @@ export function RevealBox({ linked, revealed, onReveal, onHide }: { linked: numb
       <button
         type="button"
         className="button"
-        title={revealed ? "Draw only what the view shows again" : "Draw the nodes the trace reaches that have no card at this detail"}
+        title={revealed ? "Draw only what the view shows again" : "Draw the nodes the trace reaches that have no card at this depth"}
         data-testid="trace-reveal"
         onClick={revealed ? onHide : onReveal}
       >

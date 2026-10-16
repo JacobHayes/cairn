@@ -10,7 +10,7 @@ import { chartOf, type ChartOptions } from "./rows.ts";
 
 /** The fixture's level at All: every node, each under its parent. */
 const whole = [{ key: "n_stage" }, { key: "n_report", parent: "n_stage" }, { key: "n_findings", parent: "n_stage" }, { key: "n_meeting" }, { key: "n_when" }];
-const options: ChartOptions = { drawn: whole, open: () => true, selected: undefined, lit: undefined };
+const options: ChartOptions = { drawn: whole, open: () => true, selected: undefined, faded: () => false };
 
 const timeline: Timeline = {
   entries: [
@@ -77,13 +77,13 @@ describe("a selection and the highlights fade what they do not reach", () => {
   });
 
   it("fades the rows a highlight does not light and removes none", () => {
-    const lit = chartOf(testView(), timeline, { ...options, lit: new Set(["n_stage", "n_report"]) });
+    const lit = chartOf(testView(), timeline, { ...options, faded: (key) => !["n_stage", "n_report"].includes(key) });
     expect(keys(lit.rows)).toEqual(keys(chartOf(testView(), timeline, options).rows));
     expect(lit.rows.filter((row) => row.faded).map((row) => row.key)).toEqual(["n_findings", "n_meeting"]);
   });
 
   it("keeps an unlit row faded when the trace reaches it: the lowest opacity wins", () => {
-    const chart = chartOf(testView(), timeline, { ...options, selected: "n_report", lit: new Set(["n_stage", "n_report"]) });
+    const chart = chartOf(testView(), timeline, { ...options, selected: "n_report", faded: (key) => !["n_stage", "n_report"].includes(key) });
     expect(chart.rows.find((row) => row.key === "n_findings")?.faded).toBe(true);
     expect(chart.rows.find((row) => row.key === "n_report")?.faded).toBe(false);
   });

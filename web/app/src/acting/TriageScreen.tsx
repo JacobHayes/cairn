@@ -1,8 +1,9 @@
 // C11: the walk through, a queue of cards over the acting frontier, one at a time in rank order,
 // for "act, or move on"; and its decisions-only mode, the decision walkthrough, which starting a
-// journey opens (address.ts, `walkthroughPath`). It is `/walk`, with DECISIONS on for the
+// journey opens (address.ts, `walkthroughPath`). It is `/walk`, at Decisions depth for the
 // walkthrough, under the toolbar every view shares: its cards are the frontier work the level
-// draws that itself matches the Filter and search (journeys/requests.ts). A card is the
+// draws at the depth that itself matches the Filter and search (journeys/requests.ts). It ignores
+// Depth's Fade: one card at a time has nothing to dim. A card is the
 // inspector's own component with Pass on the frame's edge, apart from the node's actions; the
 // inspector column holds the pass rail until a linked node is opened. Triage always reads the
 // current frontier (the engine's list of next-up work in rank order over the tab's derivation,
@@ -14,6 +15,7 @@ import { useLocation, useNavigate } from "react-router";
 
 import { useLevel } from "../canvas/hooks.ts";
 import { stepOf } from "../canvas/ladder.ts";
+import type { Step } from "../canvas/model.ts";
 import { useDraft } from "../data/drafts.ts";
 import { useSaves, useSession } from "../data/react.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
@@ -51,7 +53,7 @@ function Surfaced({ view, keys }: { view: Ready; keys: string[] }) {
 }
 
 /**
- * No card to show: the view's detail, Filter or search draws none of what can be acted on; or, in
+ * No card to show: the view's depth, Filter or search draws none of what can be acted on; or, in
  * the walkthrough, no decision can be made by anyone, so what would unblock the next ones; or the
  * journey is stalled (D5); or nothing is left.
  */
@@ -60,7 +62,7 @@ function Empty({ view, decisions, stalled, onContinue }: { view: Ready; decision
   if (filtered) {
     return (
       <p className="muted row" data-testid="triage-empty" data-status="filtered">
-        Nothing on the frontier is drawn at this detail, filter and search. <ResetView />
+        Nothing on the frontier is drawn at this depth, filter and search. <ResetView />
       </p>
     );
   }
@@ -158,19 +160,19 @@ function PassCard({ view, card, place, by, onPass }: { view: Ready; card: NodeRo
 
 /**
  * C10, C11: the cards: the frontier work in rank order that matches the Filter and search, kept
- * where the level draws it (its detail step); and the badges, Detail's counting the cards the
- * step hides.
+ * where the level draws it (at Depth's step); and the badges, Depth's counting the cards the
+ * step hides. Returns the depth, whose Decisions step is the decision walkthrough.
  */
 function useCards(view: Ready, state: ViewState) {
   const nodes = view.journey.graph.nodes ?? [];
-  const step = stepOf({ step: state.step }, nodes);
-  const request = useMemo(() => levelRequestOf(state, step, []), [state, step]);
+  const depth: Step = stepOf({ step: state.depth }, nodes);
+  const request = useMemo(() => levelRequestOf(state, depth, []), [state, depth]);
   const { level, drawn, error: levelError } = useLevel(view, request);
-  const query = useMemo(() => walkQueryOf(state), [state]);
+  const query = useMemo(() => walkQueryOf(state, depth), [state, depth]);
   const { rows: candidates, error: rowsError } = useRows(view, query);
   const rows = useMemo(() => (candidates ?? []).filter((row) => drawn?.has(row.key) === true), [candidates, drawn]);
-  const badges = useMemo(() => badgesOf("walk", level?.hidden_by_class ?? {}, new Set((candidates ?? []).map((row) => row.key)), stepHides(nodes, step, [])), [level, candidates, nodes, step]);
-  return { rows, read: candidates !== undefined && drawn !== undefined, error: levelError ?? rowsError, badges };
+  const badges = useMemo(() => badgesOf("walk", level?.hidden_by_class ?? {}, new Set((candidates ?? []).map((row) => row.key)), stepHides(nodes, depth, [])), [level, candidates, nodes, depth]);
+  return { depth, rows, read: candidates !== undefined && drawn !== undefined, error: levelError ?? rowsError, badges };
 }
 
 /** The walk through: one card at a time, in the order of this pass. */
@@ -182,7 +184,8 @@ export function TriageBody({ view, state, selected }: { view: Ready; state: View
   const [pass, setPass] = usePass(view);
   useUnlocked(journey, pass, setPass);
   const { onState } = useViewState();
-  const { rows, read, error, badges } = useCards(view, state);
+  const { depth, rows, read, error, badges } = useCards(view, state);
+  const decisions = depth === "decisions";
   const order = passOrder(rows.map((row) => row.key), pass);
   const focus = rows.find((row) => row.key === order[0]);
   const done = passedAll(order, pass);
@@ -203,12 +206,12 @@ export function TriageBody({ view, state, selected }: { view: Ready; state: View
   const passedCount = order.filter((key) => pass.passed.includes(key)).length;
   const rail = <PassRail view={view} order={order} pass={pass} onNewPass={newPass} />;
   const opened = selected !== undefined && selected !== card?.key;
-  const open = state.decisions ? actingDecisions(view).length : 0;
+  const open = decisions ? actingDecisions(view).length : 0;
   return (
     <>
     <ViewBar ready={view} screen="walk" badges={badges} />
-    <section className="stack pass" aria-label={state.decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
-      {state.decisions && view.journey.revision <= 1 && card !== undefined ? (
+    <section className="stack pass" aria-label={decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
+      {decisions && view.journey.revision <= 1 && card !== undefined ? (
         <p className="for-you" data-testid="walkthrough-intro">
           Start with the decisions that shape this journey. {open} open now; each answer can open more.
         </p>
@@ -216,7 +219,7 @@ export function TriageBody({ view, state, selected }: { view: Ready; state: View
       {error === undefined ? null : <p className="callout callout-bad">The frontier could not be read: {error}</p>}
       <Surfaced view={view} keys={surfaced(view.derived.acting_frontier, pass).filter((key) => unlockedBy(pass, key) === undefined || !order.includes(key))} />
       {read ? null : <p className="muted small">Reading the frontier...</p>}
-      {read && rows.length === 0 ? <Empty view={view} decisions={state.decisions} stalled={view.derived.stalled != null} onContinue={() => { onState({ ...state, decisions: false }); }} /> : null}
+      {read && rows.length === 0 ? <Empty view={view} decisions={decisions} stalled={view.derived.stalled != null} onContinue={() => { onState({ ...state, depth: undefined }, true); }} /> : null}
       {done ? (
         <div className="callout stack" data-testid="pass-done">
           <span>Every card has been seen once · {passedCount} passed.</span>

@@ -1,18 +1,19 @@
-// The journey canvas (C1 to C7, C15): the journey's level for the view state (the detail step
+// The journey canvas (C1 to C7, C15): the journey's level for the view state (Depth's step
 // and the containers collapsed, the ladder, 5.1; the relevance classes, the Filter and the
 // search, journeys/requests.ts), read from its local derivation with the next list (rank) and
 // "mine", turned into cards and lines, laid out in the layout worker, and drawn; the trace of the
 // selected node as an overlay (selecting a node traces it; several selected trace nothing), and
-// what Frontier or Decisions lights at full strength with the rest faded. A card opens the
+// what Frontier lights at full strength with the rest faded, as is what Depth's Fade dims (the
+// level is then the Actions one, so nothing moves). A card opens the
 // node's detail (5.1) beside the canvas, or joins the selection; an edge opens the edge's card.
 import { Panel } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { nodeDetail, recordOf, titleOf, type Ready } from "../detail/model.ts";
+import { nodeDetail, titleOf, type Ready } from "../detail/model.ts";
 import { contextMenuOf } from "../detail/offers.ts";
 import { pagePath } from "../journeys/address.ts";
-import { badgesOf, journeyLayoutView, levelRequestOf, litOf, stepHides, type LevelRequest } from "../journeys/requests.ts";
+import { badgesOf, currentStagesOf, depthFaded, journeyLayoutView, levelRequestOf, litOf, stepHides, type LevelRequest } from "../journeys/requests.ts";
 import { ResetView, ViewControls } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { typing } from "../ui/typing.ts";
@@ -20,7 +21,7 @@ import { RevealBox, SignalMenu } from "./Chrome.tsx";
 import { GraphCanvas, type Reveal } from "./GraphCanvas.tsx";
 import { useJoinedTrace, useLaidOut, useProjected } from "./hooks.ts";
 import { journeyLooks } from "./journey.ts";
-import { ancestorsOf, collapsedAt, currentStages, stepOf, withExpanded } from "./ladder.ts";
+import { ancestorsOf, collapsedAt, drawnStep, stepOf, withExpanded } from "./ladder.ts";
 import { KINDS, STRENGTH, cardsOf, linesOf, type CanvasModel, type JourneyExtras, type Level, type Line, type Step } from "./model.ts";
 import type { CardActions } from "./NodeCard.tsx";
 import { standsFor, traceOverlay } from "./overlay.ts";
@@ -35,15 +36,19 @@ export function journeyModel(ready: Ready, level: Level, extras: JourneyExtras):
   return { cards: cardsOf(level, graph, looks), lines: linesOf(level, graph, (key) => looks.finished(key)) };
 }
 
-/** What a canvas reads from the address and the page: the step it is at, and the containers it collapses. */
+/**
+ * What a canvas reads from the address and the page: the depth it is at, the step it draws (the
+ * depth, or Actions under Fade) with the containers that draws collapses, and the containers
+ * Hide at the depth would collapse (what Fade dims is measured against them).
+ */
 function useLadder(ready: Ready, view: GraphView) {
   return useMemo(() => {
     const nodes = ready.journey.graph.nodes ?? [];
-    const step: Step = stepOf({ step: view.state.step }, nodes);
-    const active = nodes.filter((node) => recordOf(ready, node).state === "active").map((node) => node.key);
-    const current = currentStages(nodes, ready.derived.acting_frontier, active);
-    return { nodes, step, collapsed: collapsedAt(step, nodes, current, view.open, view.shut) };
-  }, [ready, view.state.step, view.open, view.shut]);
+    const depth: Step = stepOf({ step: view.state.depth }, nodes);
+    const drawn = drawnStep(depth, view.state.fade);
+    const current = currentStagesOf(ready);
+    return { nodes, depth, drawn, collapsed: collapsedAt(drawn, nodes, current, view.open, view.shut), hidden: collapsedAt(depth, nodes, current, view.open, view.shut) };
+  }, [ready, view.state.depth, view.state.fade, view.open, view.shut]);
 }
 
 /**
@@ -88,8 +93,8 @@ function onlyTraced(model: CanvasModel, traced: ReadonlySet<string>, drawn: Read
 }
 
 /** The view's level (C2), and while Reveal is on, the whole journey's beside it under the same collapse, less what neither draws nor the trace reaches. */
-function useJourneyModel(ready: Ready, view: GraphView, collapsed: string[], step: Step, revealed: ReadonlySet<string> | undefined) {
-  const request = useMemo(() => levelRequestOf(view.state, step, collapsed), [view.state, step, collapsed]);
+function useJourneyModel(ready: Ready, view: GraphView, collapsed: string[], drawn: Step, depth: Step, revealed: ReadonlySet<string> | undefined) {
+  const request = useMemo(() => levelRequestOf(view.state, drawn, collapsed), [view.state, drawn, collapsed]);
   const everything = useMemo<LevelRequest | undefined>(() => (revealed === undefined ? undefined : { projection: "level", shown: KINDS, ...(collapsed.length === 0 ? {} : { collapsed }) }), [revealed, collapsed]);
   const level = useProjected(ready, request);
   const whole = useProjected(ready, everything);
@@ -105,8 +110,8 @@ function useJourneyModel(ready: Ready, view: GraphView, collapsed: string[], ste
     const drawn = journeyModel(ready, shown, { ranked, mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node) });
     return revealed === undefined ? drawn : onlyTraced(drawn, revealed, new Set(level.value.nodes.map((node) => node.key)));
   }, [ready, level.value, whole.value, next.value, mine.value, revealed]);
-  // The highlights and the viewer's expands and collapses keep the layout's positions; the step, the Filter and the search lay it out afresh.
-  return { model, level: level.value, error: level.error ?? whole.error, layoutView: journeyLayoutView(view.state, step) };
+  // Frontier, Fade's dimming and the viewer's expands and collapses keep the layout's positions; the step drawn, the Filter and the search lay it out afresh.
+  return { model, level: level.value, error: level.error ?? whole.error, layoutView: journeyLayoutView(view.state, depth) };
 }
 
 export interface JourneyCanvasProps {
@@ -139,7 +144,7 @@ function useSelectionTrace(ready: Ready, selected: string | undefined) {
 /** What the canvas draws: the view's level laid out, the selected node's trace over it, what the highlights light, and what Reveal asks for. */
 function useGraph(ready: Ready, view: GraphView, selected: string | undefined) {
   const journey = ready.journey.header.id;
-  const { nodes, step, collapsed } = useLadder(ready, view);
+  const { nodes, depth, drawn, collapsed, hidden } = useLadder(ready, view);
   const { trace, learn } = useSelectionTrace(ready, selected);
   // Reveal (5.7) is a moment, not an address: it ends when something else is selected.
   const [revealedFor, setRevealedFor] = useState<{ node: string | undefined; linked: number } | undefined>(undefined);
@@ -148,7 +153,7 @@ function useGraph(ready: Ready, view: GraphView, selected: string | undefined) {
   const traceOnly = revealed === undefined ? undefined : traced;
   const open = useMemo(() => (traceOnly === undefined ? [] : [...traceOnly].flatMap((key) => ancestorsOf(nodes, key))), [traceOnly, nodes]);
   const unfolded = useMemo(() => collapsed.filter((key) => !open.includes(key)), [collapsed, open]);
-  const { model, level, error, layoutView } = useJourneyModel(ready, view, unfolded, step, traceOnly);
+  const { model, level, error, layoutView } = useJourneyModel(ready, view, unfolded, drawn, depth, traceOnly);
   const { laidOut, error: layoutError } = useLaidOut(journey, layoutView, model);
   const rolledUp = laidOut?.model.cards.find((card) => card.key === selected)?.rolledUp;
   useEffect(() => {
@@ -161,8 +166,13 @@ function useGraph(ready: Ready, view: GraphView, selected: string | undefined) {
     [selected, trace, laidOut, ready],
   );
   const lit = useMemo(() => litOf("graph", view.state, ready), [view.state, ready]);
-  const badges = useMemo(() => badgesOf("graph", level?.hidden_by_class ?? {}, lit, stepHides(nodes, step, collapsed)), [level, lit, nodes, step, collapsed]);
-  return { step, trace, laidOut, overlay, lit, badges, revealed: revealed?.linked, error: error ?? layoutError, reveal: (linked: number) => { setRevealedFor({ node: selected, linked }); }, hide: () => { setRevealedFor(undefined); } };
+  // Revealed nodes are drawn beside the level's, and Depth's fade dims them as it does the rest.
+  const faded = useMemo(
+    () => (level === undefined ? undefined : depthFaded(view.state, nodes, depth, hidden, new Set([...level.nodes.map((node) => node.key), ...(traceOnly ?? [])]))),
+    [view.state, level, nodes, depth, hidden, traceOnly],
+  );
+  const badges = useMemo(() => badgesOf("graph", level?.hidden_by_class ?? {}, lit, stepHides(nodes, depth, hidden), view.state.fade), [level, lit, nodes, depth, hidden, view.state.fade]);
+  return { depth, trace, faded, laidOut, overlay, lit, badges, revealed: revealed?.linked, error: error ?? layoutError, reveal: (linked: number) => { setRevealedFor({ node: selected, linked }); }, hide: () => { setRevealedFor(undefined); } };
 }
 
 /** What a card asks of the canvas: open its node, expand or collapse it (and refit to it, 5.1), trace it. */
@@ -266,6 +276,7 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
         overlay={overlay}
         lens={view.lens}
         emphasis={graph.lit}
+        faded={graph.faded}
         selected={alone}
         selectedEdge={edge?.replace("~", "->")}
         actions={actions}
@@ -287,7 +298,7 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
             <ViewControls ready={ready} screen="graph" badges={graph.badges} />
             {laidOut.model.cards.length > 0 ? null : (
               <p className="callout row" role="status" data-testid="nothing-matches">
-                Nothing matches the detail, filter and search. <ResetView />
+                Nothing matches the depth, filter and search. <ResetView />
               </p>
             )}
           </>

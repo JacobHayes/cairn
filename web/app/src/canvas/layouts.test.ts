@@ -19,13 +19,13 @@ test("an edit to a view is hinted by its last positions, and another level is la
     },
   });
   await layouts.place("j_a", "stages", request);
-  await layouts.place("j_a", "work", request);
+  await layouts.place("j_a", "deliverables", request);
   await layouts.place("j_a", "stages", { ...request, edges: [{ from: "n_a", to: "n_b" }] });
   expect(seen.map((asked) => asked.hints)).toEqual([undefined, undefined, { n_a: { x: 5, y: 7 } }]);
 });
 
 test("a route's level is its own view: its step and the container drilled into", () => {
-  const work = layoutViewOf(DEFAULT_VIEW, "work");
-  expect(layoutViewOf(DEFAULT_VIEW, "stages")).not.toBe(work);
-  expect(layoutViewOf({ ...DEFAULT_VIEW, container: "n_setup" }, "work")).not.toBe(work);
+  const deliverables = layoutViewOf(DEFAULT_VIEW, "deliverables");
+  expect(layoutViewOf(DEFAULT_VIEW, "stages")).not.toBe(deliverables);
+  expect(layoutViewOf({ ...DEFAULT_VIEW, container: "n_setup" }, "deliverables")).not.toBe(deliverables);
 });

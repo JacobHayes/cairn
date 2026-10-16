@@ -23,7 +23,7 @@ export async function startJourney(page: Page, host: HostKind, name: string, fro
     await form.getByLabel("Start from").selectOption("");
   }
   await form.getByRole("button", { name: "Start the journey" }).click();
-  await expect(page).toHaveURL(/\/journeys\/j_[a-z0-9_-]+\/walk\?decisions=1$/);
+  await expect(page).toHaveURL(/\/journeys\/j_[a-z0-9_-]+\/walk\?depth=decisions$/);
   return /\/journeys\/(j_[a-z0-9_-]+)\//.exec(page.url())?.[1] ?? "";
 }
 

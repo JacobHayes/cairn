@@ -24,7 +24,7 @@ const level = [{ key: "n_stage" }, { key: "n_report", parent: "n_stage" }, { key
 function drawn(drawnTimeline: Timeline): string {
   return renderToStaticMarkup(
     <MemoryRouter>
-      <TimelineChart ready={view} timeline={drawnTimeline} drawn={level} open={() => true} onFold={() => undefined} lit={undefined} selected={undefined} step="work" range="fit" />
+      <TimelineChart ready={view} timeline={drawnTimeline} drawn={level} open={() => true} onFold={() => undefined} faded={() => false} selected={undefined} step="deliverables" range="fit" />
     </MemoryRouter>,
   );
 }

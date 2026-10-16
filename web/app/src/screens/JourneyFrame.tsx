@@ -164,7 +164,7 @@ function SummaryNote() {
   const { state } = useViewState();
   return isStock(state) ? null : (
     <p className="muted small" data-testid="summary-whole">
-      The summary counts the whole journey. Detail, Filter and search apply to the other views.
+      The summary counts the whole journey. Depth, Filter and search apply to the other views.
     </p>
   );
 }

@@ -4,13 +4,14 @@
 // Esc, v); Frontier highlights without hiding; the search narrows every view; and no view
 // scrolls the window: the head stays, a popover taller than the room scrolls inside itself, the
 // toolbar keeps its row, and a canvas fills its region. The addresses and requests behind them
-// are vitest's (journeys/view.test.ts and journeys/requests.test.ts).
+// are vitest's (journeys/view.test.ts and journeys/requests.test.ts). Depth and its Fade follow
+// every view, Fade moves nothing, and the walk through at Decisions is the decision walkthrough.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
 import { journeyName, startJourney } from "./around.ts";
 import { viewportOf, viewportSettled } from "./canvas.ts";
 import { daysAfter, frontierKeys, listKeys, passOrder, select, setFrontier } from "./acting.ts";
-import { fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDetail } from "./shell.ts";
+import { fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDepth, setFade } from "./shell.ts";
 import { closePopover, filterOf, ownAndPin, search, setCheck, setViewState, VIEWER } from "./view-state.ts";
 import { FIXED_TODAY } from "./views.ts";
 
@@ -53,16 +54,16 @@ async function makeX(page: Page, id: string, x: string): Promise<string> {
   return word;
 }
 
-/** Sets every shared setting from the toolbar: Detail Decisions, Frontier, the whole Filter, and the search for `word`. */
+/** Sets every shared setting from the toolbar: Depth Decisions, Frontier, the whole Filter, and the search for `word`. */
 const setEverything = (page: Page, word: string) => setViewState(page, "Decisions", { mine: true, owner: VIEWER, flags: ["overdue"], notRelevant: true, conditional: false }, word);
 
 /** What `setEverything` writes to the address. */
-const sharedOf = (word: string) => ["detail=decisions", "frontier=1", "mine=1", `owner=${VIEWER}`, "flag=overdue", "show=notrelevant", `q=${word}`];
+const sharedOf = (word: string) => ["depth=decisions", "frontier=1", "mine=1", `owner=${VIEWER}`, "flag=overdue", "show=notrelevant", `q=${word}`];
 
 /** The address carries every shared setting and the controls show each. */
 async function holds(page: Page, view: string, word: string): Promise<void> {
   expect(new URL(page.url()).search.slice(1).split("&"), view).toEqual(expect.arrayContaining(sharedOf(word)));
-  await expect(page.getByTestId("detail-button"), view).toHaveAccessibleName("Detail: Decisions");
+  await expect(page.getByTestId("depth-button"), view).toHaveAccessibleName("Depth: Decisions");
   await expect(page.getByTestId("chip-frontier"), view).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("toolbar-search"), view).toHaveValue(word);
   await openFilter(page);
@@ -85,13 +86,15 @@ async function walkHolds(page: Page, x: string, word: string): Promise<void> {
   await expect(page.getByTestId("chip-frontier")).toBeDisabled();
   const before = page.url();
   await page.locator("main").click({ position: { x: 5, y: 5 } });
-  // Shift F does nothing here; d, which does, shows the keys are heard.
+  // Shift F does nothing here; m, which does, shows the keys are heard.
   await page.keyboard.press("Shift+F");
-  await page.keyboard.press("d");
-  await expect(page.getByTestId("chip-decisions")).toHaveAttribute("aria-pressed", "true");
+  await page.keyboard.press("m");
+  await expect.poll(() => new URL(page.url()).searchParams.get("mine")).toBeNull();
   expect(new URL(page.url()).searchParams.get("frontier")).toBe("1");
-  await page.keyboard.press("d");
-  await expect(page).toHaveURL(before);
+  await expect(async () => {
+    await page.keyboard.press("m");
+    await expect(page).toHaveURL(before, { timeout: 1000 });
+  }).toPass();
   await openFilter(page);
   await expect(filterOf(page).getByTestId("show-conditional").locator("input")).toBeDisabled();
   await expect(filterOf(page).getByTestId("show-not-relevant").locator("input")).toBeDisabled();
@@ -136,14 +139,20 @@ test("C2, C9, C10, C11: the view state set on the graph follows every view, and 
 test("C10, C11: after a click in the page, j opens the next row, Enter its form, Esc leaves it, and v swaps the view", async ({ page }) => {
   const id = await startJourney(page, "browser", journeyName("Keys"), { route: "vendor-evaluation", version: 1 });
   await openAt(page, "browser", id, "list?frontier=1");
-  await page.getByTestId("chip-decisions").click();
-  await expect.poll(() => frontierKeys(page).then((keys) => [...keys].sort())).toEqual(UP_FRONT);
+  await setDepth(page, "Decisions");
+  // Decisions depth draws the milestones too: the frontier is the up-front decisions and the milestones that need nothing.
+  await expect.poll(() => frontierKeys(page).then((keys) => keys.filter((key) => key !== "n_kickoff" && key !== "n_decision_meeting").sort())).toEqual(UP_FRONT);
 
-  // j opens the first row in the inspector, whose form is then the node's only one; Enter opens it.
-  const [first = ""] = await listKeys(page);
-  expect(UP_FRONT).toContain(first);
+  // j opens the row after the selected one in the inspector (the first, with none), whose form is then the node's only one; Enter opens it.
+  const rows = await listKeys(page);
+  const decided = rows.findIndex((key) => UP_FRONT.includes(key));
+  expect(decided).toBeGreaterThanOrEqual(0);
+  const first = rows[decided] ?? "";
   await page.locator("main").click({ position: { x: 5, y: 5 } });
-  await page.keyboard.press("j");
+  for (let at = 0; at <= decided; at += 1) {
+    await page.keyboard.press("j");
+    await expect(nodePanel(page, rows[at] ?? "")).toBeVisible();
+  }
   await expect(nodePanel(page, first)).toBeVisible();
   await expect(listRow(page, first).getByTestId("acts")).toHaveCount(0);
   await page.keyboard.press("Enter");
@@ -153,9 +162,9 @@ test("C10, C11: after a click in the page, j opens the next row, Enter its form,
   await page.locator("main").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("v");
   await expect(page.getByTestId("view-timeline")).toHaveAttribute("aria-current", "page");
-  await expect(page).toHaveURL(/\/timeline\?frontier=1&decisions=1$/);
+  await expect(page).toHaveURL(/\/timeline\?depth=decisions&frontier=1$/);
   await page.keyboard.press("v");
-  await expect(page).toHaveURL(/\/graph\?frontier=1&decisions=1$/);
+  await expect(page).toHaveURL(/\/graph\?depth=decisions&frontier=1$/);
 });
 
 test("C10: Frontier highlights the list: every row stays, the frontier's rows carry their action under the title, and the rest fade", async ({ page }) => {
@@ -176,7 +185,7 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
   const [named, act] = await Promise.all([title.locator("a").first().boundingBox(), acting.boundingBox()]);
   expect(act?.y ?? 0).toBeGreaterThan(named?.y ?? 0);
   // A row the frontier does not light fades its content, and stays faded when selected.
-  const still = page.locator('[data-testid="list-row"][data-lit="false"]').first();
+  const still = page.locator('[data-testid="list-row"][data-faded="true"]').first();
   const content = still.locator('td[data-column="title"] .list-content');
   expect(await effective(content)).toBeCloseTo(0.3);
   await select(page, (await still.getAttribute("data-node")) ?? "");
@@ -194,7 +203,7 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
 });
 
 test("C2, C9: a search keeps the containers of what matches: at Deliverables an action's match keeps its deliverable's row, in the tree and sorted", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "list?detail=work", { fixedToday: FIXED_TODAY });
+  await openAt(page, "browser", "j_vendor_eval", "list?depth=deliverables", { fixedToday: FIXED_TODAY });
   await expect(listRow(page, "n_access")).toBeVisible();
   await search(page, "Draft the plan");
   await expect(listRow(page, "n_access")).toHaveCount(0);
@@ -230,25 +239,25 @@ test("C2, C9: a search narrows the graph to its matches and fits them; nothing m
   await expect(nodeCard(page, "n_access")).toBeVisible();
 });
 
-test("C2: a fold holds until a step is picked: back at All after another step, every level is open again", async ({ page }) => {
+test("C2: a fold holds until a depth is picked: back at Actions after another depth, every level is open again", async ({ page }) => {
   await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   const fold = () => listRow(page, "n_setup").getByTestId("list-fold");
   await expect(fold()).toHaveAttribute("aria-expanded", "true");
   await fold().click();
   await expect(fold()).toHaveAttribute("aria-expanded", "false");
   await expect(listRow(page, "n_access")).toHaveCount(0);
-  await setDetail(page, "Deliverables");
-  await setDetail(page, "All");
+  await setDepth(page, "Deliverables");
+  await setDepth(page, "Actions");
   await expect(fold()).toHaveAttribute("aria-expanded", "true");
   await expect(listRow(page, "n_access")).toBeVisible();
 });
 
-test("C2: picking the step already chosen, or Reset the view, drops the list's and the timeline's folds", async ({ page }) => {
+test("C2: picking the depth already chosen, or Reset the view, drops the list's and the timeline's folds", async ({ page }) => {
   await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   const fold = () => listRow(page, "n_setup").getByTestId("list-fold");
   await fold().click();
   await expect(fold()).toHaveAttribute("aria-expanded", "false");
-  await setDetail(page, "All");
+  await setDepth(page, "Actions");
   await expect(fold()).toHaveAttribute("aria-expanded", "true");
   await fold().click();
   await expect(fold()).toHaveAttribute("aria-expanded", "false");
@@ -257,8 +266,8 @@ test("C2: picking the step already chosen, or Reset the view, drops the list's a
   await expect(fold()).toHaveAttribute("aria-expanded", "true");
 });
 
-test("C9, C12: the list's Decisions with a search no decision matches is empty, and Reset the view brings the rows back", async ({ page }) => {
-  await openAt(page, "browser", "j_vendor_eval", "list?decisions=1&q=Kickoff", { fixedToday: FIXED_TODAY });
+test("C2, C9: the list at Decisions with a search that matches nothing is empty, and Reset the view brings back Actions depth and the rows", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "list?depth=decisions&q=nothing-is-called-this", { fixedToday: FIXED_TODAY });
   const empty = page.getByTestId("list-empty");
   await expect(empty).toBeVisible();
   await expect(page.getByTestId("list-row")).toHaveCount(0);
@@ -269,9 +278,9 @@ test("C9, C12: the list's Decisions with a search no decision matches is empty, 
 
 test("a journey opens as the stock view, switching views keeps the chips, and coming back to the journey starts over", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
-  const detail = page.getByTestId("detail-button");
-  // The stock view: every detail, fitted to the whole graph.
-  await expect(detail).toHaveAccessibleName("Detail: All");
+  const depth = page.getByTestId("depth-button");
+  // The stock view: every depth, fitted to the whole graph.
+  await expect(depth).toHaveAccessibleName("Depth: Actions");
   await expect(nodeCard(page, "n_plan")).toBeVisible();
   await viewportSettled(page);
   const opened = await viewportOf(page);
@@ -298,7 +307,7 @@ test("a journey opens as the stock view, switching views keeps the chips, and co
   });
   await expect(page).toHaveURL(/\/graph$/);
   await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
-  await expect(detail).toHaveAccessibleName("Detail: All");
+  await expect(depth).toHaveAccessibleName("Depth: Actions");
 });
 
 test("the window does not scroll: the head stays, a popover scrolls inside itself, the toolbar keeps its row with Walk through at one edge, and a canvas fills its region", async ({ page }) => {
@@ -326,7 +335,7 @@ test("the window does not scroll: the head stays, a popover scrolls inside itsel
   expect(new Set(Object.values(edges)).size, JSON.stringify(edges)).toBe(1);
   // Between 720 and 1100px the projection keeps the width and a canvas fills its region.
   const body = page.locator(".journey-body");
-  for (const address of ["graph", "graph?decisions=1"]) {
+  for (const address of ["graph", "graph?depth=decisions"]) {
     await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
     await expect(page.getByTestId("canvas")).toBeVisible();
     const [scrolls, shown] = await body.evaluate((region) => [region.scrollHeight, region.clientHeight]);
@@ -351,4 +360,113 @@ test("a done row fades its content like a done card, lifts the fade under keyboa
   await page.keyboard.press("Shift+Tab");
   await page.keyboard.press("Tab");
   expect(await effective(title)).toBe(1);
+});
+
+/** Whether the Depth menu's Fade checkbox is ticked, read from the open menu; none when the menu has no Fade (the walk). */
+async function fadeTicked(page: Page): Promise<boolean | undefined> {
+  await page.getByTestId("depth-button").click();
+  const check = page.getByTestId("depth-fade");
+  const ticked = (await check.count()) === 0 ? undefined : await check.getByRole("checkbox").isChecked();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("depth-panel")).toHaveCount(0);
+  return ticked;
+}
+
+test("C2, C11, C12: the depth and Fade follow every view; the walk through has no Fade and at Decisions walks decisions; the list gains the decision columns", async ({ page }) => {
+  const id = await startJourney(page, "browser", journeyName("Depth"), { route: "vendor-evaluation", version: 1 });
+  await openAt(page, "browser", id, "graph");
+  await setDepth(page, "Decisions");
+  await setFade(page, true);
+  // Fade draws the deliverable and dims it; it is a card on the canvas.
+  await expect(nodeCard(page, "n_plan")).toHaveClass(/node-faded/);
+  await expect(nodeCard(page, "n_plan")).toBeVisible();
+  const depthed = (view: string) => { expect(new URL(page.url()).search, view).toBe("?depth=decisions&fade=1"); };
+  depthed("graph");
+
+  await goTo(page, "list");
+  depthed("list");
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Decisions");
+  expect(await fadeTicked(page)).toBe(true);
+  await expect(page.locator('th[data-column="answer"]')).toBeVisible();
+  await expect(page.locator('[data-testid="list-row"][data-node="n_plan"]')).toHaveAttribute("data-faded", "true");
+  await expect(page.locator('[data-testid="list-row"][data-node="n_partner_runs"]')).not.toHaveAttribute("data-faded", "true");
+
+  await goTo(page, "timeline");
+  depthed("timeline");
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Decisions");
+  expect(await fadeTicked(page)).toBe(true);
+
+  await goTo(page, "summary");
+  depthed("summary");
+  await expect(page.getByTestId("depth-button")).toHaveCount(0);
+
+  await page.getByTestId("walk-through").click();
+  depthed("walk");
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Decisions");
+  expect(await fadeTicked(page)).toBeUndefined();
+  // The decision walkthrough: its card is a decision, and the milestone on the frontier is not walked.
+  await expect(page.getByTestId("triage")).toHaveAttribute("aria-label", "Decision walkthrough");
+  await expect(page.getByTestId("triage-card")).toHaveAttribute("data-kind", "decision");
+  expect(await passOrder(page)).not.toContain("n_kickoff");
+
+  await goTo(page, "graph");
+  depthed("graph again");
+  await expect(nodeCard(page, "n_plan")).toHaveClass(/node-faded/);
+  expect(await fadeTicked(page)).toBe(true);
+});
+
+test("C2: Fade moves nothing: stepping the depth with Fade on keeps every card and the camera where Actions has them, and Hide returns to a layout of its own", async ({ page }) => {
+  await openJourney(page, "browser", "j_vendor_eval", "");
+  await viewportSettled(page);
+  const cards = page.getByTestId("node-card");
+  const place = () => nodeCard(page, "n_kickoff").evaluate((card) => [card.getAttribute("data-x"), card.getAttribute("data-y")]);
+  const [count, there, camera] = [await cards.count(), await place(), await viewportOf(page)];
+  await setFade(page, true);
+  for (const depth of ["Decisions", "Stages", "Deliverables", "Actions"]) {
+    await setDepth(page, depth);
+    await expect(cards, depth).toHaveCount(count);
+    expect(await place(), depth).toEqual(there);
+    await viewportSettled(page);
+    expect(await viewportOf(page), depth).toEqual(camera);
+  }
+  // Hide at a shallower depth draws fewer cards; Fade again draws the Actions layout where it was.
+  await setDepth(page, "Decisions");
+  await setFade(page, false);
+  await expect.poll(() => cards.count()).toBeLessThan(count);
+  await setFade(page, true);
+  await expect(cards).toHaveCount(count);
+  expect(await place()).toEqual(there);
+  // A stage the viewer collapsed stays collapsed under Fade, where it was.
+  await setDepth(page, "Actions");
+  await nodeCard(page, "n_setup").getByTestId("card-collapse").dispatchEvent("click");
+  await expect(page).toHaveURL(/shut=n_setup/);
+  await expect.poll(() => cards.count()).toBeLessThan(count);
+  const collapsed = await cards.count();
+  await setFade(page, false);
+  await setFade(page, true);
+  await expect(cards).toHaveCount(collapsed);
+  // Stepping the depth, by menu or by key, under Fade only dims: the fold stays too.
+  await setDepth(page, "Decisions");
+  await expect(page).toHaveURL(/shut=n_setup/);
+  await page.keyboard.press("3");
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Deliverables");
+  await expect(page).toHaveURL(/shut=n_setup/);
+  await expect(cards).toHaveCount(collapsed);
+});
+
+test("C11: the walk through at Decisions walks the up-front decisions and not the kickoff milestone; at Actions it walks the milestone; with every decision made it says so, and Continue leaves Decisions", async ({ page }) => {
+  const id = await startJourney(page, "browser", journeyName("Walk"), { route: "vendor-evaluation", version: 1 });
+  await expect(page.getByTestId("triage")).toHaveAttribute("data-order", /\bn_purpose\b/);
+  expect(await passOrder(page)).not.toContain("n_kickoff");
+  expect(await passOrder(page)).toEqual(expect.arrayContaining(UP_FRONT.filter((key) => key !== "n_meeting_date")));
+  await setDepth(page, "Actions");
+  await expect.poll(() => passOrder(page)).toContain("n_kickoff");
+  expect(id).toMatch(/^j_/);
+
+  // The seeded vendor evaluation has every decision made: nothing to decide, and Continue goes on to everything.
+  await openAt(page, "browser", "j_vendor_eval", "walk?depth=decisions", { fixedToday: FIXED_TODAY });
+  await expect(page.getByTestId("no-decisions")).toBeVisible();
+  await page.getByRole("button", { name: "Continue with everything" }).click();
+  await expect(page).toHaveURL(/\/walk$/);
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
 });

@@ -23,14 +23,14 @@ import type { NodeRow } from "./why.ts";
 
 type SnoozeTarget = NonNullable<NodeRow["snoozed"]>;
 
-function queryFor(flag: ListFlag, decisions: boolean): ListQuery {
-  return { flags: [flag], sort: "rank", ...(decisions ? { kinds: ["decision" as const] } : {}) };
+function queryFor(flag: ListFlag): ListQuery {
+  return { flags: [flag], sort: "rank" };
 }
 
-/** The rows with `flag` that the view draws (`drawn`, the journey's level: its detail, Filter and search), and how many there are. */
-function useFlagged(view: Ready, flag: ListFlag, decisions: boolean, drawn: ReadonlySet<string> | undefined): { rows: NodeRow[]; total: number } {
+/** The rows with `flag` that the view draws (`drawn`, the journey's level: its depth, Filter and search), and how many there are. */
+function useFlagged(view: Ready, flag: ListFlag, drawn: ReadonlySet<string> | undefined): { rows: NodeRow[]; total: number } {
   // Every page, so a drawn row past the first page is not lost to the level's filter.
-  const query = useMemo(() => queryFor(flag, decisions), [flag, decisions]);
+  const query = useMemo(() => queryFor(flag), [flag]);
   const rows = (useRows(view, query).rows ?? []).filter((row) => drawn?.has(row.key) === true);
   return { rows, total: rows.length };
 }
@@ -199,12 +199,12 @@ function SnoozedGroup({ view, write, held, toOf }: { view: Ready; write: NodeWri
 }
 
 /** The folds under the list, each only while it holds something the view draws. */
-export function Folds({ view, decisions, drawn, toOf }: { view: Ready; decisions: boolean; drawn: ReadonlySet<string> | undefined; toOf: (key: string) => string }) {
+export function Folds({ view, drawn, toOf }: { view: Ready; drawn: ReadonlySet<string> | undefined; toOf: (key: string) => string }) {
   const write = useNodeWrite(view, "folds");
-  const stale = useFlagged(view, "stale", decisions, drawn);
-  const short = useFlagged(view, "shortfall", decisions, drawn);
-  const lapsed = useFlagged(view, "snoozed_and_overdue", decisions, drawn);
-  const snoozed = useFlagged(view, "snoozed", decisions, drawn);
+  const stale = useFlagged(view, "stale", drawn);
+  const short = useFlagged(view, "shortfall", drawn);
+  const lapsed = useFlagged(view, "snoozed_and_overdue", drawn);
+  const snoozed = useFlagged(view, "snoozed", drawn);
   const looks = looksOf(view, stale.rows, short.rows, lapsed.rows);
   const groups = heldBy(view, snoozed.rows);
   return (

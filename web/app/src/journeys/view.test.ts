@@ -1,14 +1,14 @@
 // C1, C2, C9, C10, C11: the view state every journey view shares: it survives the address, a
-// switch of view carries all of it and nothing of the view left, and picking a step drops the
-// viewer's expands and collapses. The chips take one setting off each; Reset keeps Frontier.
+// switch of view carries all of it and nothing of the view left, and picking a depth drops the
+// viewer's expands and collapses. The chips take one setting off each; Reset keeps Frontier and Fade.
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, filterChanged, filterChips, isStock, stockView, switchedSearch, viewStateFrom, viewStateParams, VIEW_PARAMS, withViewState, type ViewState } from "./view.ts";
 
 const narrowed: ViewState = {
-  step: "decisions",
+  depth: "decisions",
+  fade: true,
   frontier: true,
-  decisions: true,
   filter: { mine: true, owner: "e_lead", flags: ["overdue", "stale"], notRelevant: true, conditional: false },
   text: "plan",
 };
@@ -21,14 +21,24 @@ describe("the view state in the address", () => {
     ["every setting moved", narrowed],
     ["only the classes", { ...DEFAULT_VIEW_STATE, filter: { ...DEFAULT_FILTER, notRelevant: true } }],
     ["neither class", { ...DEFAULT_VIEW_STATE, filter: { ...DEFAULT_FILTER, conditional: false } }],
-    ["Stages and a search", { ...DEFAULT_VIEW_STATE, step: "stages", text: "two words" }],
+    ["Stages and a search", { ...DEFAULT_VIEW_STATE, depth: "stages", text: "two words" }],
   ])("round-trips %s", (_, state) => {
     expect(viewStateFrom(viewStateParams(state))).toEqual(state);
   });
 
-  it("leaves the stock view, and the All step, bare", () => {
+  it("leaves the stock view, and the Actions depth, bare", () => {
     expect(viewStateParams(DEFAULT_VIEW_STATE).toString()).toBe("");
-    expect(read("detail=all")).toEqual(DEFAULT_VIEW_STATE);
+    expect(read("depth=actions")).toEqual(DEFAULT_VIEW_STATE);
+  });
+
+  it("writes Fade only when it is on", () => {
+    expect(viewStateParams({ ...DEFAULT_VIEW_STATE, fade: true }).get("fade")).toBe("1");
+    expect(viewStateParams(DEFAULT_VIEW_STATE).has("fade")).toBe(false);
+  });
+
+  it("reads no depth or Decisions from the parameters of the earlier controls: they are not aliases", () => {
+    expect(read("detail=decisions&decisions=1")).toEqual(DEFAULT_VIEW_STATE);
+    expect(read("depth=work")).toEqual(DEFAULT_VIEW_STATE);
   });
 
   it("reads show= absent as the conditional class shown and not relevant hidden, and present as the classes it lists", () => {
@@ -64,16 +74,23 @@ describe("switching views", () => {
 });
 
 describe("changing the view state", () => {
-  it("keeps the view's own parameters and the viewer's folds while the step holds", () => {
-    const next = new URLSearchParams(withViewState("?detail=work&open=n_a&sort=due", { ...DEFAULT_VIEW_STATE, step: "work", frontier: true }));
+  it("keeps the view's own parameters and the viewer's folds while the depth holds", () => {
+    const next = new URLSearchParams(withViewState("?depth=deliverables&open=n_a&sort=due", { ...DEFAULT_VIEW_STATE, depth: "deliverables", frontier: true }));
     expect([next.get("frontier"), next.get("open"), next.get("sort")]).toEqual(["1", "n_a", "due"]);
   });
 
-  it("drops the viewer's expands and collapses when the step changes or a step is picked", () => {
-    const changed = new URLSearchParams(withViewState("?detail=work&open=n_a&shut=n_b", { ...DEFAULT_VIEW_STATE, step: "stages" }));
+  it("drops the viewer's expands and collapses when the depth changes or a depth is picked", () => {
+    const changed = new URLSearchParams(withViewState("?depth=deliverables&open=n_a&shut=n_b", { ...DEFAULT_VIEW_STATE, depth: "stages" }));
     expect([changed.get("open"), changed.get("shut")]).toEqual([null, null]);
-    const picked = new URLSearchParams(withViewState("?detail=work&open=n_a", { ...DEFAULT_VIEW_STATE, step: "work" }, true));
+    const picked = new URLSearchParams(withViewState("?depth=deliverables&open=n_a", { ...DEFAULT_VIEW_STATE, depth: "deliverables" }, true));
     expect(picked.get("open")).toBeNull();
+  });
+
+  it("keeps the viewer's folds when the depth changes under Fade, which only dims, until Reset says picked", () => {
+    const stepped = new URLSearchParams(withViewState("?depth=actions&fade=1&open=n_a&shut=n_b", { ...DEFAULT_VIEW_STATE, depth: "decisions", fade: true }));
+    expect([stepped.get("open"), stepped.get("shut")]).toEqual(["n_a", "n_b"]);
+    const reset = new URLSearchParams(withViewState("?depth=decisions&fade=1&open=n_a", { ...DEFAULT_VIEW_STATE, fade: true }, true));
+    expect(reset.get("open")).toBeNull();
   });
 
   it("makes each chip take exactly its own setting off", () => {
@@ -87,10 +104,15 @@ describe("changing the view state", () => {
     }
   });
 
-  it("resets to the stock view but keeps Frontier, which hides nothing", () => {
+  it("keeps the viewer's folds when Fade is toggled, since the depth holds", () => {
+    const faded = new URLSearchParams(withViewState("?depth=decisions&open=n_a&shut=n_b", { ...DEFAULT_VIEW_STATE, depth: "decisions", fade: true }));
+    expect([faded.get("fade"), faded.get("open"), faded.get("shut")]).toEqual(["1", "n_a", "n_b"]);
+  });
+
+  it("resets to the stock view but keeps Frontier and Fade, which hide nothing", () => {
     const reset = stockView(narrowed);
     expect(isStock(reset)).toBe(true);
-    expect(reset.frontier).toBe(true);
+    expect([reset.frontier, reset.fade]).toEqual([true, true]);
     expect(isStock(narrowed)).toBe(false);
   });
 

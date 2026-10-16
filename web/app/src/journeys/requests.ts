@@ -1,17 +1,17 @@
-// C2, C9, C10, C11, C13: the view state (view.ts) as each view's engine requests and highlights.
-// Hiding is one level request on every view: the ladder's kinds and Stages' top-level rule, the
+// C2, C9, C10, C11, C13: the view state (view.ts) as each view's engine requests and emphasis.
+// Hiding is one level request on every view: Depth's kinds and Stages' top-level rule, the
 // relevance classes, the Filter and the search, so what is hidden rolls up, its edges re-target,
 // and the hidden-prerequisites marker holds wherever it is drawn. The list's table and the walk
-// through read their rows beside it and keep the ones the level draws. Frontier and Decisions
-// light a set of nodes; everything else fades (the list and the walk through also narrow to the
-// decisions under Decisions). Pure, so the unit tests read the rules without a
-// page.
+// through read their rows beside it and keep the ones the level draws. With Fade on the level is
+// the Actions one and Depth dims what it would have hidden. Frontier lights a set of nodes and
+// Fade's depth dims another; a node out of focus for either is dimmed, once. Pure, so the unit
+// tests read the rules without a page.
 import type { ListQuery, ProjectionRequest } from "@cairn/wasm";
 
 import type { SortBy } from "../acting/address.ts";
-import { kindsAt, leftOutAt, STAGES_TOP } from "../canvas/ladder.ts";
+import { currentStages, drawnStep, kindsAt, leftOutAt, STAGES_TOP } from "../canvas/ladder.ts";
 import type { LevelDisplay, Step } from "../canvas/model.ts";
-import type { GraphNode, Ready } from "../detail/model.ts";
+import { recordOf, type GraphNode, type Ready } from "../detail/model.ts";
 import type { Badge } from "../screens/badge.ts";
 import type { Screen } from "./address.ts";
 import { FILTER_FLAGS, type ViewState } from "./view.ts";
@@ -46,44 +46,43 @@ export function levelRequestOf(state: ViewState, step: Step, collapsed: readonly
 }
 
 /**
- * C9, C13: the list table's read: every row, sorted (by rank when no column is), and only the
- * decisions under Decisions. It carries no filter: the table keeps the rows the level draws, so
- * a search or a filter re-reads only the level.
+ * C9, C13: the list table's read: every row, sorted (by rank when no column is). It carries no
+ * kinds and no filter: the table keeps the rows the level draws, so a depth, a search or a filter
+ * re-reads only the level.
  */
-export function tableQueryOf(state: ViewState, sort: SortBy | undefined, cursor?: number): ListQuery {
-  return { sort: sort ?? "rank", ...(state.decisions ? { kinds: ["decision" as const] } : {}), ...(cursor === undefined ? {} : { cursor }) };
+export function tableQueryOf(sort: SortBy | undefined, cursor?: number): ListQuery {
+  return { sort: sort ?? "rank", ...(cursor === undefined ? {} : { cursor }) };
 }
 
 /**
  * C10, C11: the walk through's cards: the acting frontier in rank order (as the next list ranks
- * it), narrowed by the Filter and the search, only the decisions under Decisions.
+ * it), narrowed by the Filter and the search; at Decisions depth only the decisions (the decision
+ * walkthrough: the level there also draws milestones, which a walk of decisions leaves out).
  */
-export function walkQueryOf(state: ViewState): ListQuery {
+export function walkQueryOf(state: ViewState, depth: Step): ListQuery {
   const text = state.text.trim();
   return {
     flags: ["next_up", ...flagsOf(state)],
     sort: "rank",
-    ...(state.decisions ? { kinds: ["decision" as const] } : {}),
+    ...(depth === "decisions" ? { kinds: ["decision" as const] } : {}),
     ...(state.filter.owner === undefined ? {} : { owner: state.filter.owner }),
     ...(text === "" ? {} : { text }),
   };
 }
 
 /**
- * C10, C12: the nodes the highlights light: the acting frontier under Frontier, the decisions
- * under Decisions on the graph and the timeline (the list and the walk show only decisions
- * instead), both at once their intersection. None when nothing is lit, and on the walk through,
- * whose every card is on the frontier.
+ * C10: the nodes Frontier lights: the acting frontier. None when Frontier is off, and on the walk
+ * through and the summary (the walk's every card is on the frontier).
  */
 export function litOf(screen: Screen, state: ViewState, ready: Ready): ReadonlySet<string> | undefined {
-  const decisions = state.decisions && (screen === "graph" || screen === "timeline");
-  if (screen === "walk" || screen === "summary" || (!state.frontier && !decisions)) {
-    return undefined;
-  }
+  return screen === "walk" || screen === "summary" || !state.frontier ? undefined : new Set(ready.derived.acting_frontier);
+}
+
+/** C2, 5.1: the stages that are current in `ready`: those holding an acting-frontier or active node. */
+export function currentStagesOf(ready: Ready): Set<string> {
   const nodes = ready.journey.graph.nodes ?? [];
-  const decided = new Set(nodes.filter((node) => node.kind === "decision").map((node) => node.key));
-  const base = state.frontier ? ready.derived.acting_frontier : [...decided];
-  return new Set(base.filter((key) => !decisions || decided.has(key)));
+  const active = nodes.filter((node) => recordOf(ready, node).state === "active").map((node) => node.key);
+  return currentStages(nodes, ready.derived.acting_frontier, active);
 }
 
 /** `base` with every container above a node in it: a row that holds a lit node is lit too. */
@@ -124,31 +123,65 @@ export function stepHides(nodes: readonly GraphNode[], step: Step, collapsed: re
 const CLASS_WORDS: Record<Exclude<LevelDisplay, "relevant">, string> = { not_relevant: "not relevant", conditional: "conditional" };
 
 /**
- * C1, C2: the badges on Filter and Detail. Filter counts what the classes switched off hide (the
- * level's count): every class on the graph and the list, only conditional on the timeline (which
- * has no dates for work that does not apply), none on the walk (its cards all apply). Detail counts
- * the highlighted nodes (the walk's: its candidate cards) the step hides.
+ * C2: what Depth's Fade dims: the nodes the depth would not draw as their own card (`stepHides`
+ * over `collapsed`, what Hide at `depth` collapses), among those the level draws (`drawn`, its
+ * node keys), less every container above a node the depth does draw: a container holding a node
+ * in focus is not dimmed. A container of a node the level does not draw (a filter or a relevance
+ * class hides it) holds nothing in focus. Empty with Fade off.
  */
-export function badgesOf(screen: Screen, byClass: Partial<Record<LevelDisplay, number>>, base: ReadonlySet<string> | undefined, hides: (key: string) => boolean): { filter?: Badge; detail?: Badge } {
+export function depthFaded(state: ViewState, nodes: readonly GraphNode[], depth: Step, collapsed: readonly string[], drawn: ReadonlySet<string>): ReadonlySet<string> {
+  if (!state.fade) {
+    return new Set();
+  }
+  const hides = stepHides(nodes, depth, collapsed);
+  const parents = new Map(nodes.map((node) => [node.key, node.parent ?? undefined]));
+  const faded = new Set([...drawn].filter(hides));
+  const cleared = new Set<string>();
+  for (const key of drawn) {
+    if (!hides(key)) {
+      // Walked up from a node in focus, every container above it is cleared (once).
+      for (let at = parents.get(key); at !== undefined && !cleared.has(at); at = parents.get(at)) {
+        cleared.add(at);
+        faded.delete(at);
+      }
+    }
+  }
+  return faded;
+}
+
+/** DESIGN, Opacity: whether a node is out of focus for Frontier (`lit`, none when Frontier is off) or for Depth (`faded`). Dimmed once, however many say so. */
+export function outOfFocus(lit: ReadonlySet<string> | undefined, faded: ReadonlySet<string>): (key: string) => boolean {
+  return (key) => faded.has(key) || (lit !== undefined && !lit.has(key));
+}
+
+/**
+ * C1, C2: the badges on Filter and Depth. Filter counts what the classes switched off hide (the
+ * level's count): every class on the graph and the list, only conditional on the timeline (which
+ * has no dates for work that does not apply), none on the walk (its cards all apply). Depth counts
+ * the nodes Frontier lights (the walk's: its candidate cards) that the depth hides; with Fade on
+ * (`fade`) they are drawn, so none.
+ */
+export function badgesOf(screen: Screen, byClass: Partial<Record<LevelDisplay, number>>, base: ReadonlySet<string> | undefined, hides: (key: string) => boolean, fade = false): { filter?: Badge; depth?: Badge } {
   const classes: (keyof typeof CLASS_WORDS)[] = screen === "walk" ? [] : screen === "timeline" ? ["conditional"] : ["not_relevant", "conditional"];
   const parts = classes.flatMap((each) => {
     const count = byClass[each] ?? 0;
     return count === 0 ? [] : [{ count, words: `${String(count)} ${CLASS_WORDS[each]} hidden` }];
   });
-  const lost = base === undefined ? 0 : [...base].filter(hides).length;
+  const lost = base === undefined || fade ? 0 : [...base].filter(hides).length;
   return {
     ...(parts.length === 0 ? {} : { filter: { count: parts.reduce((sum, part) => sum + part.count, 0), words: parts.map((part) => part.words).join(", ") } }),
-    ...(lost === 0 ? {} : { detail: { count: lost, words: `${String(lost)} highlighted ${lost === 1 ? "is" : "are"} hidden at this detail; choose All to see them` } }),
+    ...(lost === 0 ? {} : { depth: { count: lost, words: `${String(lost)} that can move now ${lost === 1 ? "is" : "are"} ${screen === "walk" ? "not walked" : "hidden"} at this depth; choose Actions${screen === "walk" ? "" : " or fade the rest"} to see them` } }),
   };
 }
 
 /**
- * C15: what a journey's canvas is laid out for besides its graph: the step and what the Filter
- * and search keep, so a change to either lays it out (and fits it) afresh. The highlights fade
- * cards and never move one, so they are not part of it; nor are the viewer's expands and
- * collapses, which keep the layout's positions.
+ * C15: what a journey's canvas is laid out for besides its graph: the step it draws at (Actions
+ * under Fade, whatever the depth) and what the Filter and search keep, so a change to any lays it
+ * out (and fits it) afresh. Frontier and Fade's dimming fade cards and never move one, so they
+ * are not part of it; nor are the viewer's expands and collapses, which keep the layout's
+ * positions.
  */
-export function journeyLayoutView(state: ViewState, step: Step): string {
+export function journeyLayoutView(state: ViewState, depth: Step): string {
   const { filter } = state;
-  return JSON.stringify([step, filter.conditional, filter.notRelevant, filter.mine, filter.owner ?? null, FILTER_FLAGS.filter((flag) => filter.flags.includes(flag)), state.text.trim()]);
+  return JSON.stringify([drawnStep(depth, state.fade), filter.conditional, filter.notRelevant, filter.mine, filter.owner ?? null, FILTER_FLAGS.filter((flag) => filter.flags.includes(flag)), state.text.trim()]);
 }

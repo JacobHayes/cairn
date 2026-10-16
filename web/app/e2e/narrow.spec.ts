@@ -1,5 +1,5 @@
 // A screen at a phone's width: the list with Frontier on shows its content with nothing off the
-// side of the window, the journey's menus, the lifecycle chip, Detail and the Filter open inside it. One representative
+// side of the window, the journey's menus, the lifecycle chip, Depth and the Filter open inside it. One representative
 // screen: the page never scrolls sideways. On the in-browser host, fresh on every load.
 import { expect, test } from "@playwright/test";
 
@@ -15,7 +15,7 @@ test("C10: the list with Frontier on fits a narrow window, the journey's menus o
   const title = await page.getByTestId("journey-name").boundingBox();
   const chip = await page.getByTestId("lifecycle-chip").boundingBox();
   expect(chip?.y).toBeLessThan((title?.y ?? 0) + (title?.height ?? 0));
-  for (const trigger of ["journey-menu", "lifecycle-chip", "detail-button", "filter-button"]) {
+  for (const trigger of ["journey-menu", "lifecycle-chip", "depth-button", "filter-button"]) {
     await page.getByTestId(trigger).click();
     const box = await page.getByTestId(`${trigger}-menu`).boundingBox();
     expect(box?.x, trigger).toBeGreaterThanOrEqual(0);
@@ -34,7 +34,7 @@ test("the graph's controls fold into one View menu that holds them all", async (
   expect((await bar.boundingBox())?.height).toBeLessThan(48);
   await bar.getByTestId("view-button").click();
   const panel = page.getByTestId("view-button-menu");
-  for (const part of ["ladder", "chip-frontier", "chip-decisions", "filter-body", "toolbar-search"]) {
+  for (const part of ["ladder", "depth-fade", "chip-frontier", "filter-body", "toolbar-search"]) {
     await expect(panel.getByTestId(part)).toBeVisible();
   }
   // The panel ends with its last control: no band of empty space under Search.

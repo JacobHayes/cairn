@@ -29,8 +29,8 @@ export const RANK_TAG_COUNT = 3;
 /** C6: a due date this many days away or fewer, and not yet late, is marked as coming up. */
 export const DUE_SOON_DAYS = 7;
 
-/** C1: the detail ladder's steps, coarsest first (5.1). */
-export const STEPS = ["stages", "decisions", "work", "all"] as const;
+/** C2: Depth's steps, coarsest first, each named after the deepest kind it draws (5.1). */
+export const STEPS = ["stages", "decisions", "deliverables", "actions"] as const;
 export type Step = (typeof STEPS)[number];
 
 /** C6: what the Signals lens puts on each card (8.2). */
@@ -38,7 +38,7 @@ export const LENSES = ["rank", "gravity", "unlocks", "slack"] as const;
 export type Lens = (typeof LENSES)[number];
 
 /**
- * What a route's canvas shows (C2, C4): `step` is the detail ladder (none is its default), `open`
+ * What a route's canvas shows (C2, C4): `step` is the depth (none is its default), `open`
  * and `shut` the containers the viewer expanded and collapsed since, `container` the one drilled
  * into, and `lens` the Signals lens. A journey's graph reads its step from the journey's view state
  * (journeys/view.ts) and the rest from its own settings (settings.ts).

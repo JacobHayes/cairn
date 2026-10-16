@@ -22,9 +22,9 @@ describe("the list's own settings (C9)", () => {
 });
 
 describe("the walkthrough's address (C11)", () => {
-  it("opens the walk through with DECISIONS on", () => {
+  it("opens the walk through at Decisions depth", () => {
     const [path = "", query = ""] = walkthroughPath("j_new").split("?");
     expect(path).toBe("/journeys/j_new/walk");
-    expect(viewStateFrom(new URLSearchParams(query)).decisions).toBe(true);
+    expect(viewStateFrom(new URLSearchParams(query)).depth).toBe("decisions");
   });
 });

@@ -23,10 +23,11 @@ import { EdgeLine, type LineEdge } from "./EdgeLine.tsx";
 import { NEAR_ZOOM, fitZoom, listenPinch, minZoomOf } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
+import { fadedCards } from "./look.ts";
 import { MapFrame } from "./MapFrame.tsx";
 import { STEPS, type CanvasModel, type Line, type Lens, type Step } from "./model.ts";
 import { CardActionsContext, NodeCard, type CardActions, type CardNode } from "./NodeCard.tsx";
-import { standsFor, type CanvasOverlay } from "./overlay.ts";
+import type { CanvasOverlay } from "./overlay.ts";
 import { firstFitCards } from "./refit.ts";
 
 const nodeTypes = { card: NodeCard };
@@ -54,8 +55,10 @@ export interface GraphCanvasProps {
   layout: Layout;
   overlay: CanvasOverlay | undefined;
   lens: Lens | undefined;
-  /** The nodes lit by a highlight (Frontier, Decisions): every other card fades, a container staying clear while any card in it is lit, even under a trace. None, or null, fades nothing. */
+  /** The nodes lit by Frontier: every other card fades, a container staying clear while any card in it is lit, even under a trace. None, or null, fades nothing. */
   emphasis?: ReadonlySet<string> | null | undefined;
+  /** The nodes Depth's Fade dims (journeys/requests.ts, `depthFaded`); a card out of this or of `emphasis` is dimmed once. */
+  faded?: ReadonlySet<string> | null | undefined;
   selected: string | undefined;
   /** The edge (a line's id) whose card is open. */
   selectedEdge?: string | undefined;
@@ -90,10 +93,9 @@ export interface GraphCanvasProps {
   held?: ReactNode;
 }
 
-/** `inert`: the phone's preview, which takes no gesture and opens nothing (MapFrame). `faded`: the cards `emphasis` leaves unlit. */
+/** `inert`: the phone's preview, which takes no gesture and opens nothing (MapFrame). */
 interface FlowProps extends GraphCanvasProps {
   inert: boolean;
-  faded?: ReadonlySet<string> | undefined;
 }
 
 /** Whether a card is a container drawn open, with children to collapse. */
@@ -101,21 +103,10 @@ function openContainers(model: CanvasModel): Set<string> {
   return new Set(model.cards.flatMap((card) => (card.parent === undefined ? [] : [card.parent])));
 }
 
-/** `props` with the cards `emphasis` leaves unlit faded. */
+/** `props` with `faded` holding every card out of focus for Depth's Fade or for Frontier (`fadedCards`). */
 function withEmphasis(props: FlowProps): FlowProps {
-  const { emphasis, model } = props;
-  if (emphasis === null || emphasis === undefined) {
-    return props;
-  }
-  const parents = new Map(model.cards.map((card) => [card.key, card.parent]));
-  const kept = new Set<string>();
-  // A card stands for the nodes folded into it, so it is kept when any of them is.
-  for (const card of model.cards.filter((each) => standsFor(each).some((key) => emphasis.has(key)))) {
-    for (let at: string | undefined = card.key; at !== undefined && !kept.has(at); at = parents.get(at)) {
-      kept.add(at);
-    }
-  }
-  return { ...props, faded: new Set(model.cards.map((card) => card.key).filter((key) => !kept.has(key))) };
+  const { emphasis, faded, model } = props;
+  return emphasis === null || emphasis === undefined ? props : { ...props, faded: fadedCards(model.cards, faded, emphasis) };
 }
 
 function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {

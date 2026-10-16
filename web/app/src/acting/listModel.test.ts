@@ -7,7 +7,7 @@ import { rollups } from "../plan/tree.ts";
 import type { DisplayState } from "../status/words.ts";
 import { planOrder } from "../plan/tree.ts";
 import type { ListSettings } from "./address.ts";
-import { columnsOf, firstParagraph, flatLines, rankPositions, treeLines } from "./listModel.ts";
+import { addableColumns, columnsOf, firstParagraph, flatLines, rankPositions, treeLines } from "./listModel.ts";
 import type { NodeRow } from "./why.ts";
 
 const view = actingView();
@@ -47,7 +47,14 @@ describe("the columns", () => {
     expect(columnsOf(STOCK, false)).toEqual(["status", "title", "owner", "due"]);
     expect(columnsOf({ sort: "rank", columns: ["rank", "unlocks"] }, false)).toEqual(["rank", "status", "title", "owner", "due", "unlocks"]);
     expect(columnsOf({ ...STOCK, columns: ["rank"] }, false)[0]).toBe("status");
-    expect(columnsOf(STOCK, true)).toContain("answer");
+  });
+
+  it("show the decision columns after Title at Decisions depth, and no longer offer them in Columns; Kind stays, the rows being mixed", () => {
+    expect(columnsOf(STOCK, true)).toEqual(["status", "title", "answer", "why", "affects", "owner", "due"]);
+    expect(columnsOf(STOCK, false).some((column) => ["answer", "why", "affects"].includes(column))).toBe(false);
+    expect(addableColumns(true)).not.toEqual(expect.arrayContaining(["answer"]));
+    expect(addableColumns(true)).toContain("kind");
+    expect(addableColumns(false)).toContain("answer");
   });
 });
 

@@ -94,15 +94,15 @@ function screenOf(address: string): string {
 }
 
 /**
- * A journey's graph, once derived and its canvas drawn. The graph opens at its All
- * step unless `query` says otherwise, so every node has a card to reach (it opens at Stages, with
+ * A journey's graph, once derived and its canvas drawn. The graph opens at its Actions
+ * depth unless `query` says otherwise, so every node has a card to reach (it opens at Stages, with
  * most stages folded, for a person).
  */
-export async function openJourney(page: Page, host: HostKind, journey: string, query = "?detail=all"): Promise<void> {
+export async function openJourney(page: Page, host: HostKind, journey: string, query = "?depth=actions"): Promise<void> {
   await open(page, host, `/journeys/${journey}/graph${query}`);
   await derived(page);
   await expect(page.getByTestId("node-card").first()).toBeVisible();
-  // The default opens the whole graph at every detail, fitted, so a spec reaches any node.
+  // The default opens the whole graph at every depth, fitted, so a spec reaches any node.
   if (query !== "") {
     // After the opening fit has moved the viewport off its start, so it cannot land after this one.
     await page.waitForFunction(() => document.querySelector<HTMLElement>(".react-flow__viewport")?.style.transform !== "translate(0px, 0px) scale(1)");
@@ -136,11 +136,24 @@ export async function openFilter(page: Page): Promise<void> {
   await expect(page.getByTestId("filter-panel")).toBeVisible();
 }
 
-/** Picks the detail `word` (All, Deliverables, Decisions, Stages) from the view controls' Detail menu. */
-export async function setDetail(page: Page, word: string): Promise<void> {
-  await page.getByTestId("detail-button").click();
+/** Picks the depth `word` (Stages, Decisions, Deliverables, Actions) from the view controls' Depth menu. */
+export async function setDepth(page: Page, word: string): Promise<void> {
+  await page.getByTestId("depth-button").click();
   await page.getByTestId("ladder").getByText(word, { exact: true }).click();
-  await expect(page.getByTestId("detail-button")).toHaveAccessibleName(`Detail: ${word}`);
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName(`Depth: ${word}`);
+}
+
+/** Ticks or unticks the Depth menu's Fade checkbox, then closes the menu (it stays open for the checkbox). */
+export async function setFade(page: Page, on: boolean): Promise<void> {
+  await page.getByTestId("depth-button").click();
+  const check = page.getByTestId("depth-fade").getByRole("checkbox");
+  if ((await check.isChecked()) !== on) {
+    await check.click();
+  }
+  // The new state comes back from the address.
+  await expect(check).toBeChecked({ checked: on });
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("depth-fade")).toHaveCount(0);
 }
 
 /** Goes to the view `view` (`graph`, `list`, `timeline` or `summary`) from the toolbar's segmented control, as a person does. */

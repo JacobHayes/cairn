@@ -74,7 +74,7 @@
   min-width: 0;
 }
 
-/* The view's controls: Detail, Frontier, Decisions, Filter, Search. State is a fixed-size badge on
+/* The view's controls: Depth, Frontier, Filter, Search. State is a fixed-size badge on
    the control, never text, so no control changes width. */
 .view-controls {
   flex-wrap: wrap;
@@ -111,6 +111,14 @@
 .dropdown.menu-pressed > .dropdown-button {
   background: var(--color-band);
   box-shadow: inset 0 -2px 0 var(--color-text);
+}
+
+/* A hairline between the groups of a menu (Depth's steps and Fade, Signal's meaning and its key). */
+.menu-rule {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  border-top: 1px solid var(--color-edge);
 }
 
 .view-badge {

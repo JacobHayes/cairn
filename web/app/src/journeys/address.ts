@@ -11,8 +11,8 @@
 //   /journeys/<id>/nodes/<key>      deep link: the graph with the node selected (JourneyDeepLink)
 //   /journeys/<id>                  landing: the view last shown, the graph at first (JourneyLanding)
 //
-// The view state every view shares is in the query on every view (view.ts: `detail`, `frontier`,
-// `decisions`, `mine`, `owner`, `flag`, `show`, `q`), beside the view's own settings.
+// The view state every view shares is in the query on every view (view.ts: `depth`, `fade`, `frontier`,
+// `mine`, `owner`, `flag`, `show`, `q`), beside the view's own settings.
 import type { Schema } from "@cairn/client";
 
 import type { JourneyIndexQuery } from "../data/host.ts";

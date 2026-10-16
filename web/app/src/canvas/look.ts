@@ -4,7 +4,7 @@
 // done work filled green, and an overlay's tags and the one out-of-focus level. Quiet by rule: nothing
 // animates or flashes (C6). Pure, so the unit tests read the same decisions the canvas draws.
 import type { Card, Line, LineKind } from "./model.ts";
-import type { CanvasOverlay } from "./overlay.ts";
+import { standsFor, type CanvasOverlay } from "./overlay.ts";
 
 /** C1: the dash pattern of an implicit edge (dotted), and of a line that only holds dates. */
 export const DOTTED = "2 3";
@@ -79,6 +79,30 @@ export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | und
     classes.push("node-faded");
   }
   return classes;
+}
+
+/**
+ * DESIGN, Opacity: the cards out of focus for Depth's Fade (`faded`, the nodes it dims: its own
+ * rule already clears a container holding a card in its focus) or for Frontier (`emphasis`, the
+ * nodes it lights): a card out of either is dimmed, once. A card stands for the nodes folded into
+ * it, so it is in Frontier's focus when any of them is, and so is every container above it. None
+ * of either dims nothing.
+ */
+export function fadedCards(cards: readonly Card[], faded: ReadonlySet<string> | null | undefined, emphasis: ReadonlySet<string> | null | undefined): Set<string> {
+  const out = new Set(faded === null || faded === undefined ? [] : cards.filter((card) => faded.has(card.key)).map((card) => card.key));
+  if (emphasis !== null && emphasis !== undefined) {
+    const parents = new Map(cards.map((card) => [card.key, card.parent]));
+    const kept = new Set<string>();
+    for (const card of cards.filter((each) => standsFor(each).some((key) => emphasis.has(key)))) {
+      for (let at: string | undefined = card.key; at !== undefined && !kept.has(at); at = parents.get(at)) {
+        kept.add(at);
+      }
+    }
+    for (const card of cards.filter((each) => !kept.has(each.key))) {
+      out.add(card.key);
+    }
+  }
+  return out;
 }
 
 /** C5: the words for why a card is on "I am here", in order. */

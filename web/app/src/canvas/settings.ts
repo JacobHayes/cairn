@@ -4,7 +4,7 @@
 // settings: the containers the viewer expanded and collapsed since picking the step (`open=`,
 // `shut=`, C4), the Signals lens (`lens=`, C6), whether its structure is being edited (5.6), and on
 // a phone whether the full-screen map is open. A route's canvas, which has no journey state,
-// keeps the same own settings beside its step (`detail=`) and names the container it drilled
+// keeps the same own settings beside its step (`depth=`) and names the container it drilled
 // into by `in=`; the parameters it does not own ride along untouched. Every setting at its
 // default leaves the address bare.
 import { drawnAt, type Placed } from "./ladder.ts";
@@ -21,8 +21,8 @@ export interface CanvasView extends CanvasSettings {
   rest: [string, string][];
 }
 
-/** The detail step (C2). */
-const DETAIL = "detail";
+/** Depth's step (C2). */
+const DEPTH = "depth";
 /** The containers the viewer expanded and collapsed since picking the step (C4). */
 const OPEN = "open";
 const SHUT = "shut";
@@ -34,7 +34,7 @@ const EDIT = "edit";
 export const MAP = "map";
 
 /** The parameters a route canvas reads; every other one is left to the page. */
-const OWN = new Set([DETAIL, OPEN, SHUT, IN, LENS, EDIT, MAP]);
+const OWN = new Set([DEPTH, OPEN, SHUT, IN, LENS, EDIT, MAP]);
 
 /** The values of `name`, split on commas, empty when the parameter is there but holds none. */
 function listOf(params: URLSearchParams, name: string): string[] | undefined {
@@ -71,7 +71,7 @@ export function graphQueryFromOld(params: URLSearchParams): URLSearchParams {
 
 /** A route canvas's settings in an address's query. */
 export function viewFrom(params: URLSearchParams): CanvasView {
-  const step = params.get(DETAIL);
+  const step = params.get(DEPTH);
   return {
     container: params.get(IN) ?? undefined,
     step: STEPS.find((each) => each === step),
@@ -88,7 +88,7 @@ export function viewFrom(params: URLSearchParams): CanvasView {
 export function paramsOf(view: CanvasView): URLSearchParams {
   const params = new URLSearchParams();
   if (view.step !== undefined) {
-    params.set(DETAIL, view.step);
+    params.set(DEPTH, view.step);
   }
   if (view.open.length > 0) {
     params.set(OPEN, view.open.join(","));
@@ -195,20 +195,19 @@ function graphSearchOf(view: GraphView): string {
 
 /**
  * C2, 5.7: `view` opened on a node with `ancestors` (its containers, nearest first) and `kind`,
- * with whatever the view hides of it shown: its containers expanded, the least step from the one
- * shown that draws it (its kind, and at Stages its top-level node being a stage or a milestone), its class when it is not relevant or conditional, and no Filter or
- * search narrowing (which may not keep it); for a node that is not a decision, Decisions off.
- * Frontier is kept: it hides nothing.
+ * with whatever the view hides of it shown: its containers expanded, the least depth from the one
+ * chosen that draws it (its kind, and at Stages its top-level node being a stage or a milestone), its class when it is not relevant or conditional, and no Filter or
+ * search narrowing (which may not keep it).
+ * Frontier and Fade are kept: they hide nothing.
  */
 export function revealing(view: GraphView, node: Placed, state: string | undefined): GraphView {
-  const step = view.state.step ?? "all";
+  const depth = view.state.depth ?? "actions";
   const { filter } = view.state;
   return {
     ...view,
     state: {
       ...view.state,
-      step: drawnAt(step, node) ? view.state.step : STEPS.slice(STEPS.indexOf(step)).find((each) => drawnAt(each, node)),
-      decisions: view.state.decisions && node.kind === "decision",
+      depth: drawnAt(depth, node) ? view.state.depth : STEPS.slice(STEPS.indexOf(depth)).find((each) => drawnAt(each, node)),
       filter: { mine: false, owner: undefined, flags: [], notRelevant: filter.notRelevant || state === "not_relevant", conditional: filter.conditional || state === "conditional" },
       text: "",
     },

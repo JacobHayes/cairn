@@ -1,7 +1,8 @@
-// C1, C2, C9, C10, C11: the settings every view of a journey shares, as one value. Detail (the
-// ladder's step), the Filter (only mine, an owner, the flags, the two relevance classes) and the
-// search choose what every view draws, through one engine level request (requests.ts); Frontier
-// and Decisions never change the level (on the list and the walk through, Decisions also narrows the rows). The value lives in the address, is parsed from it once
+// C1, C2, C9, C10, C11: the settings every view of a journey shares, as one value. Depth (the
+// ladder's step, each named after the deepest kind it draws), the Filter (only mine, an owner, the
+// flags, the two relevance classes) and the search choose what every view draws, through one
+// engine level request (requests.ts); Frontier only emphasises, and so does Depth with Fade on
+// (every kind is drawn, those below the depth dimmed). The value lives in the address, is parsed from it once
 // (`viewStateFrom`), and every switch between views carries it whole (`switchedSearch`): a view
 // that cannot honour a setting keeps it, shown disabled, for the next view. Each view's own
 // settings (the graph's open containers, the list's sort and columns, the timeline's range) stay
@@ -43,12 +44,12 @@ export interface ViewFilter {
 
 /** What every journey view shares. */
 export interface ViewState {
-  /** The detail step (C2); none is the default, All. */
-  step: Step | undefined;
+  /** Depth's step (C2); none is the default, Actions. */
+  depth: Step | undefined;
+  /** Depth's Fade (C2): draw every kind and dim those below the depth instead of leaving them out. */
+  fade: boolean;
   /** The Frontier highlight (C10). */
   frontier: boolean;
-  /** The Decisions chip (C11, C12). */
-  decisions: boolean;
   filter: ViewFilter;
   /** The search (C9), as typed. */
   text: string;
@@ -56,15 +57,15 @@ export interface ViewState {
 
 export const DEFAULT_FILTER: ViewFilter = { mine: false, owner: undefined, flags: [], notRelevant: false, conditional: true };
 
-export const DEFAULT_VIEW_STATE: ViewState = { step: undefined, frontier: false, decisions: false, filter: DEFAULT_FILTER, text: "" };
+export const DEFAULT_VIEW_STATE: ViewState = { depth: undefined, fade: false, frontier: false, filter: DEFAULT_FILTER, text: "" };
 
 /** The address parameters the view state is written to, in the order they are written. */
-export const VIEW_PARAMS = ["detail", "frontier", "decisions", "mine", "owner", "flag", "show", "q"] as const;
+export const VIEW_PARAMS = ["depth", "fade", "frontier", "mine", "owner", "flag", "show", "q"] as const;
 
-/** The step `detail=` names; none when it names none, or names the default, All. */
+/** The step `depth=` names; none when it names none, or names the default, Actions. */
 export function stepFrom(params: URLSearchParams): Step | undefined {
-  const step = params.get("detail");
-  return STEPS.find((each) => each === step && each !== "all");
+  const step = params.get("depth");
+  return STEPS.find((each) => each === step && each !== "actions");
 }
 
 /** The search an address names, or none when it is longer than the engine reads one (a title, PRACTICES, Explicit limits). */
@@ -82,9 +83,9 @@ export function viewStateFrom(params: URLSearchParams): ViewState {
   const shown = show === null ? undefined : show.split(",");
   const owner = params.get("owner");
   return {
-    step: stepFrom(params),
+    depth: stepFrom(params),
+    fade: params.get("fade") === "1",
     frontier: params.get("frontier") === "1",
-    decisions: params.get("decisions") === "1",
     filter: {
       mine: params.get("mine") === "1",
       owner: owner === null || owner === "" ? undefined : owner,
@@ -100,14 +101,14 @@ export function viewStateFrom(params: URLSearchParams): ViewState {
 export function viewStateParams(state: ViewState): URLSearchParams {
   const params = new URLSearchParams();
   const { filter } = state;
-  if (state.step !== undefined && state.step !== "all") {
-    params.set("detail", state.step);
+  if (state.depth !== undefined && state.depth !== "actions") {
+    params.set("depth", state.depth);
+  }
+  if (state.fade) {
+    params.set("fade", "1");
   }
   if (state.frontier) {
     params.set("frontier", "1");
-  }
-  if (state.decisions) {
-    params.set("decisions", "1");
   }
   if (filter.mine) {
     params.set("mine", "1");
@@ -135,13 +136,14 @@ function searchOf(params: URLSearchParams): string {
 
 /**
  * `search` with its view state replaced by `next`, every other parameter kept in its order. The
- * viewer's expands and collapses (`open=`, `shut=`) hold until a step is picked (5.1): they are
- * dropped when the step changes or when `picked` says one was picked.
+ * viewer's expands and collapses (`open=`, `shut=`) hold until a depth is picked (5.1): they are
+ * dropped when `picked` says one was picked, or when the depth changes with Fade off (with Fade
+ * on every depth draws the one layout, which a step only dims, so the folds stay).
  */
 export function withViewState(search: string, next: ViewState, picked = false): string {
   const now = new URLSearchParams(search);
   const params = viewStateParams(next);
-  const restart = picked || (stepFrom(now) ?? "all") !== (next.step ?? "all");
+  const restart = picked || (!next.fade && (stepFrom(now) ?? "actions") !== (next.depth ?? "actions"));
   for (const [name, value] of now) {
     if (!(VIEW_PARAMS as readonly string[]).includes(name) && !(restart && (name === "open" || name === "shut"))) {
       params.append(name, value);
@@ -163,14 +165,14 @@ export function filterChanged(filter: ViewFilter): boolean {
   return filter.mine || filter.owner !== undefined || filter.flags.length > 0 || filter.notRelevant !== DEFAULT_FILTER.notRelevant || filter.conditional !== DEFAULT_FILTER.conditional;
 }
 
-/** Whether `state` is the stock view: every setting but Frontier, which hides nothing, at its default. */
+/** Whether `state` is the stock view: every setting but Frontier and Fade, which hide nothing, at its default. */
 export function isStock(state: ViewState): boolean {
-  return (state.step ?? "all") === "all" && !state.decisions && !filterChanged(state.filter) && state.text.trim() === "";
+  return (state.depth ?? "actions") === "actions" && !filterChanged(state.filter) && state.text.trim() === "";
 }
 
-/** Reset the view: back to All, the stock filter, no search and Decisions off; Frontier is kept. */
+/** Reset the view: back to Actions depth, the stock filter and no search; Frontier and Fade are kept (neither hides anything). */
 export function stockView(state: ViewState): ViewState {
-  return { ...DEFAULT_VIEW_STATE, frontier: state.frontier };
+  return { ...DEFAULT_VIEW_STATE, frontier: state.frontier, fade: state.fade };
 }
 
 /** One setting of the Filter or the search as a removable chip: its words and the state without it. */
@@ -206,11 +208,11 @@ export function filterChips(state: ViewState, ownerName: (key: string) => string
   return chips;
 }
 
-/** The journey page's view state, and how a control changes it (`picked`: a step was picked). */
+/** The journey page's view state, and how a control changes it (`picked`: a depth was picked). */
 export interface ViewStateValue {
   state: ViewState;
   onState: (next: ViewState, picked?: boolean) => void;
-  /** How many times a step has been picked or the view reset: the local folds of a list and a timeline start over with each. */
+  /** How many times a depth has been picked or the view reset: the local folds of a list and a timeline start over with each. */
   picks: number;
 }
 

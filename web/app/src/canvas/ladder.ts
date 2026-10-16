@@ -1,4 +1,4 @@
-// C2, C4: the detail ladder (5.1). Two rules decide what is open and nothing else does: the
+// C2, C4: Depth's ladder (5.1). Two rules decide what is open and nothing else does: the
 // step, and the viewer's own expands and collapses since picking it. At Stages, the current
 // stages open to the Deliverables step and every other top-level stage is collapsed; at the other steps
 // every container is open to that step. The level request carries the result (the kinds shown,
@@ -11,11 +11,11 @@ import { KINDS, STEPS, type CanvasSettings, type Step } from "./model.ts";
 const KINDS_AT: Record<Step, NodeKind[]> = {
   stages: ["group", "decision", "deliverable", "milestone"],
   decisions: ["group", "decision", "milestone"],
-  work: ["group", "decision", "deliverable", "milestone"],
-  all: KINDS,
+  deliverables: ["group", "decision", "deliverable", "milestone"],
+  actions: KINDS,
 };
 
-export const STEP_WORDS: Record<Step, string> = { stages: "Stages", decisions: "Decisions", work: "Deliverables", all: "All" };
+export const STEP_WORDS: Record<Step, string> = { stages: "Stages", decisions: "Decisions", deliverables: "Deliverables", actions: "Actions" };
 
 /** C2: the kinds a top-level node must be at Stages for anything beneath it to be drawn. */
 export const STAGES_TOP: NodeKind[] = ["group", "milestone"];
@@ -86,7 +86,7 @@ export function routeKindsAt(step: Step): NodeKind[] {
  */
 export function routeStepOf(view: Pick<CanvasSettings, "step" | "container">, nodes: readonly GraphNode[]): Step {
   // Drilled into a stage, its work is what there is to see: Stages draws only groups and milestones.
-  const picked = view.step ?? (view.container === undefined ? undefined : "work");
+  const picked = view.step ?? (view.container === undefined ? undefined : "deliverables");
   if (picked !== undefined && (picked !== "stages" || hasStages(nodes))) {
     return picked;
   }
@@ -95,7 +95,7 @@ export function routeStepOf(view: Pick<CanvasSettings, "step" | "container">, no
 
 /** `step` when it draws `kind`, else the first step that does: where a node just added is on screen. */
 export function routeStepDrawing(step: Step, kind: NodeKind): Step {
-  return [step, ...STEPS].find((each) => routeKindsAt(each).includes(kind)) ?? "all";
+  return [step, ...STEPS].find((each) => routeKindsAt(each).includes(kind)) ?? "actions";
 }
 
 /** The ladder's rungs for a journey: Stages is left out when it has no top-level groups. */
@@ -103,18 +103,23 @@ export function stepsFor(nodes: readonly GraphNode[]): Step[] {
   return hasStages(nodes) ? [...STEPS] : STEPS.filter((step) => step !== "stages");
 }
 
+/** C2: the step the views draw at: Actions when Depth's Fade is on (the rest is dimmed, not left out), else the depth. */
+export function drawnStep(depth: Step, fade: boolean): Step {
+  return fade ? "actions" : depth;
+}
+
 /** Whether the journey has top-level groups (its stages). */
 export function hasStages(nodes: readonly GraphNode[]): boolean {
   return nodes.some((node) => node.kind === "group" && node.parent == null);
 }
 
-/** The step a view is at: the one picked, else All. */
+/** The step a view is at: the one picked, else Actions. */
 export function stepOf(view: Pick<CanvasSettings, "step">, nodes: readonly GraphNode[]): Step {
   const picked = view.step;
   if (picked !== undefined && (picked !== "stages" || hasStages(nodes))) {
     return picked;
   }
-  return "all";
+  return "actions";
 }
 
 /** Whether `node` is a stage: a top-level group. */

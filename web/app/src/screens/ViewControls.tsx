@@ -1,10 +1,11 @@
-// The controls every view of a journey shares, one row in a fixed order: Detail (how much is
-// drawn), Frontier and Decisions (highlights), Filter, and Search, then the view's own end slot.
-// On the graph the row floats at the canvas's top left (on a phone, folded into one View menu); on
-// the list, the timeline and the walk it sits at the top of the pane. Every control reads and
-// writes the journey's one view state (journeys/view.ts), so it means the same on every view:
-// Detail, Filter and search choose what is drawn, through the engine's level; Frontier and
-// Decisions only light what is there. What a view cannot honour stays, disabled, with its reason
+// The controls every view of a journey shares, one row in a fixed order: Depth (how deep is
+// drawn), Frontier (emphasis), Filter, and Search, then the view's own end slot. On the graph the
+// row floats at the canvas's top left (on a phone, folded into one View menu); on the list, the
+// timeline and the walk it sits at the top of the pane. Every control reads and writes the
+// journey's one view state (journeys/view.ts), so it means the same on every view: Depth, Filter
+// and search choose what is drawn, through the engine's level; Frontier only lights what is
+// there, and so does Depth's Fade, which draws every kind and dims those below the depth instead
+// of leaving them out. What a view cannot honour stays, disabled, with its reason
 // in its title or, inside the Filter, under it. State shows as a fixed-size badge on the control,
 // with the words in its tooltip, so no control changes width; a Filter off its stock settings is
 // pressed.
@@ -15,7 +16,7 @@ import { Check, FlagChecks } from "../acting/Controls.tsx";
 import { overBytes, TITLE_BYTES_MAX } from "../authoring/limits.ts";
 import { STEP_WORDS, stepOf, stepsFor } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
-import { nodeOf, type Ready } from "../detail/model.ts";
+import type { Ready } from "../detail/model.ts";
 import { entityName } from "../detail/sections.tsx";
 import type { Screen } from "../journeys/address.ts";
 import { FILTER_FLAGS, filterChanged, filterChips, isStock, stockView, useViewState, withViewState, type ViewFilter } from "../journeys/view.ts";
@@ -37,10 +38,10 @@ const CLASS_REASON: Partial<Record<Screen, string>> = {
   timeline: "The timeline has no dates for work that does not apply.",
 };
 
-/** What the badges on Filter and Detail say on this view (journeys/requests.ts, `badgesOf`). */
+/** What the badges on Filter and Depth say on this view (journeys/requests.ts, `badgesOf`). */
 export interface Badges {
   filter?: Badge | undefined;
-  detail?: Badge | undefined;
+  depth?: Badge | undefined;
 }
 
 function Dotted({ badge, testId, children }: { badge: Badge | undefined; testId: string; children: ReactNode }) {
@@ -65,50 +66,64 @@ function tip(words: string, badge: Badge | undefined): string {
 function useSteps(ready: Ready): { steps: Step[]; step: Step } {
   const { state } = useViewState();
   const nodes = ready.journey.graph.nodes ?? [];
-  return { steps: stepsFor(nodes), step: stepOf({ step: state.step }, nodes) };
+  return { steps: stepsFor(nodes), step: stepOf({ step: state.depth }, nodes) };
 }
 
-/** C2: the detail levels as radios, coarse to fine; choosing one closes the menu it is in. */
-function DetailOptions({ ready, close }: { ready: Ready; close: () => void }) {
+/**
+ * C2: Depth's steps as radios, coarse to fine (keys 1 to 4), then, on a view that can fade, a
+ * hairline and the Fade checkbox. Choosing a step closes the menu it is in; the checkbox leaves it
+ * open, so the canvas behind can be watched.
+ */
+function DepthOptions({ ready, screen, close }: { ready: Ready; screen: Screen; close: () => void }) {
   const { state, onState } = useViewState();
   const { steps, step } = useSteps(ready);
   return (
-    <div className="opts" role="radiogroup" aria-label="Detail" data-testid="ladder">
-      {[...steps].reverse().map((each) => (
-        <label key={each} className="opt">
-          <input
-            type="radio"
-            name="detail"
-            checked={each === step}
-            readOnly
-            onClick={() => {
-              onState({ ...state, step: each }, true);
-              close();
-            }}
-          />
-          <span>{STEP_WORDS[each]}</span>
-        </label>
-      ))}
+    <div className="stack" data-testid="depth-panel">
+      <div className="opts" role="radiogroup" aria-label="Depth" data-testid="ladder">
+        {steps.map((each) => (
+          <label key={each} className="opt">
+            <input
+              type="radio"
+              name="depth"
+              checked={each === step}
+              readOnly
+              onClick={() => {
+                onState({ ...state, depth: each }, !state.fade);
+                close();
+              }}
+            />
+            <span>{STEP_WORDS[each]}</span>
+          </label>
+        ))}
+      </div>
+      {screen === "walk" ? null : (
+        <>
+          <hr className="menu-rule" />
+          <Check label="Fade the rest instead of hiding it" checked={state.fade} testId="depth-fade" onChange={(fade) => { onState({ ...state, fade }); }} />
+        </>
+      )}
     </div>
   );
 }
 
-function DetailMenu({ ready, badge }: { ready: Ready; badge: Badge | undefined }) {
+function DepthMenu({ ready, screen, badge }: { ready: Ready; screen: Screen; badge: Badge | undefined }) {
+  const { state } = useViewState();
   const { step } = useSteps(ready);
+  const fading = state.fade && screen !== "walk";
   return (
     <Menu
-      label={`Detail: ${STEP_WORDS[step]}`}
-      title={tip("How much of the journey is drawn, 1 to 4", badge)}
-      testId="detail-button"
+      label={`Depth: ${STEP_WORDS[step]}`}
+      title={tip(`How deep the journey is drawn: each step draws down to its kind, 1 to 4${fading ? ". The rest is faded, not hidden" : ""}`, badge)}
+      testId="depth-button"
       role="dialog"
       className="view-control"
       trigger={
-        <Dotted badge={badge} testId="detail-badge">
-          Detail: {STEP_WORDS[step]} ▾
+        <Dotted badge={badge} testId="depth-badge">
+          Depth: {STEP_WORDS[step]} ▾
         </Dotted>
       }
     >
-      {(close) => <DetailOptions ready={ready} close={close} />}
+      {(close) => <DepthOptions ready={ready} screen={screen} close={close} />}
     </Menu>
   );
 }
@@ -223,43 +238,30 @@ function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) 
   );
 }
 
-/** C10, C12: Frontier and Decisions: highlights that never change the level, only what stands out (on the list and the walk through, Decisions also narrows the rows or cards to the decisions). The walk through's every card is on the frontier, so its Frontier is disabled. */
-function Highlights({ ready, screen }: { ready: Ready; screen: Screen }) {
+/** C10: Frontier: an emphasis that never changes what is drawn, only what stands out. The walk through's every card is on the frontier, so its Frontier is disabled. */
+function FrontierChip({ ready, screen }: { ready: Ready; screen: Screen }) {
   const { state, onState } = useViewState();
-  const decisionCount = ready.derived.acting_frontier.filter((key) => nodeOf(ready, key)?.kind === "decision").length;
   const walk = screen === "walk";
   return (
-    <>
-      <button
-        type="button"
-        className="chip"
-        aria-pressed={state.frontier}
-        disabled={walk}
-        title={walk ? WALK_FRONTIER : `Frontier  Shift F. ${String(ready.derived.acting_frontier.length)} can move now. ${FRONTIER_WORDS}`}
-        data-testid="chip-frontier"
-        onClick={() => { onState({ ...state, frontier: !state.frontier }); }}
-      >
-        Frontier
-      </button>
-      <button
-        type="button"
-        className="chip"
-        aria-pressed={state.decisions}
-        title={`Decisions  d. ${String(decisionCount)} can be made now.`}
-        data-testid="chip-decisions"
-        onClick={() => { onState({ ...state, decisions: !state.decisions }); }}
-      >
-        Decisions
-      </button>
-    </>
+    <button
+      type="button"
+      className="chip"
+      aria-pressed={state.frontier}
+      disabled={walk}
+      title={walk ? WALK_FRONTIER : `Frontier  Shift F. ${String(ready.derived.acting_frontier.length)} can move now. ${FRONTIER_WORDS}`}
+      data-testid="chip-frontier"
+      onClick={() => { onState({ ...state, frontier: !state.frontier }); }}
+    >
+      Frontier
+    </button>
   );
 }
 
-/** Reset the view: the way back from an empty view, offered only off the stock view. Frontier stays (it hides nothing). */
+/** Reset the view: the way back from an empty view, offered only off the stock view. Frontier and Fade stay (they hide nothing). */
 export function ResetView() {
   const { state, onState } = useViewState();
   return isStock(state) ? null : (
-    <Button ghost title="Back to All, the stock filter, no search and Decisions off" data-testid="reset-view" onClick={() => { onState(stockView(state), true); }}>
+    <Button ghost title="Back to Actions depth, the stock filter and no search" data-testid="reset-view" onClick={() => { onState(stockView(state), true); }}>
       Reset the view
     </Button>
   );
@@ -268,21 +270,21 @@ export function ResetView() {
 export interface ViewControlsProps {
   ready: Ready;
   screen: Screen;
-  /** What the view's filter and detail hide, as badges. */
+  /** What the view's filter and depth hide, as badges. */
   badges?: Badges | undefined;
   /** What a screen puts at the row's end (the list's Columns and count). */
   end?: ReactNode;
 }
 
-/** The graph's controls on a phone, where the canvas has room for one button: the same controls in a View menu, with the detail and filter badges on it. */
+/** The graph's controls on a phone, where the canvas has room for one button: the same controls in a View menu, with the depth and filter badges on it. */
 function PhoneControls({ ready, screen, badges }: { ready: Ready; screen: Screen; badges: Badges | undefined }) {
-  const shown = [badges?.detail, badges?.filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
+  const shown = [badges?.depth, badges?.filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
   const total = { count: shown.reduce((sum, badge) => sum + badge.count, 0), words: shown.map((badge) => badge.words).join(". ") };
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <Menu
         label="View"
-        title={tip("Detail, highlights, filter and search", total)}
+        title={tip("Depth, Frontier, filter and search", total)}
         testId="view-button"
         role="dialog"
         className="view-control"
@@ -294,9 +296,11 @@ function PhoneControls({ ready, screen, badges }: { ready: Ready; screen: Screen
       >
         {(close) => (
           <div className="stack" data-testid="view-panel-phone">
-            <DetailOptions ready={ready} close={close} />
+            <span className="muted small">Depth</span>
+            <DepthOptions ready={ready} screen={screen} close={close} />
+            <hr className="menu-rule" />
             <div className="row">
-              <Highlights ready={ready} screen={screen} />
+              <FrontierChip ready={ready} screen={screen} />
             </div>
             <FilterBody ready={ready} screen={screen} />
             <Search onDone={close} />
@@ -315,8 +319,8 @@ export function ViewControls({ ready, screen, badges, end }: ViewControlsProps) 
   }
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
-      <DetailMenu ready={ready} badge={badges?.detail} />
-      <Highlights ready={ready} screen={screen} />
+      <DepthMenu ready={ready} screen={screen} badge={badges?.depth} />
+      <FrontierChip ready={ready} screen={screen} />
       <FilterMenu ready={ready} screen={screen} badge={badges?.filter} />
       <Search />
       {end === undefined ? null : <div className="view-controls-end">{end}</div>}

@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 
 import { openJourneyCard } from "./around.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
-import { nodeCard, setDetail } from "./shell.ts";
+import { nodeCard, setDepth } from "./shell.ts";
 
 test("B7, C14: the scenario journey upgraded to version 2, each conflict resolved, then applied", async ({ page }) => {
   await editWhereVersionTwoChanges(page, "browser");
@@ -47,7 +47,7 @@ test("B7, C14: the scenario journey upgraded to version 2, each conflict resolve
   await confirmAndApply(page);
 
   await page.getByTestId("applied-journey").click();
-  await setDetail(page, "All");
+  await setDepth(page, "Actions");
   await expect(nodeCard(page, "n_signoff")).toBeVisible();
   await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Access to the environment");
   await expect(nodeCard(page, "n_workload")).toHaveCount(0);

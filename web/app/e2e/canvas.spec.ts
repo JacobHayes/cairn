@@ -6,14 +6,15 @@
 import { expect, test } from "@playwright/test";
 
 import { lineBetween, pointOn, viewportOf, viewportSettled } from "./canvas.ts";
-import { nodeCard, nodePanel, openJourney, setDetail } from "./shell.ts";
+import { journeyName, startJourney } from "./around.ts";
+import { nodeCard, nodePanel, openJourney, setDepth, setFade } from "./shell.ts";
 
-test("C2 to C7: the graph opens fitted at every detail, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
+test("C2 to C7: the graph opens fitted at every depth, expands in place, traces a selection, follows an edge, and pans and zooms", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
-  // It opens at the stock view: every detail, fitted to the whole graph, as Fit does.
-  await expect(page.getByTestId("detail-button")).toHaveAccessibleName("Detail: All");
+  // It opens at the stock view: every depth, fitted to the whole graph, as Fit does.
+  await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
   // At Stages the stage holding the work is open and says so, the others fold.
-  await setDetail(page, "Stages");
+  await setDepth(page, "Stages");
   await expect(nodeCard(page, "n_reporting").getByTestId("card-current")).toBeAttached();
   await page.keyboard.press("f");
   await expect(nodeCard(page, "n_setup").getByTestId("card-expand")).toBeVisible();
@@ -136,7 +137,7 @@ test("selection is one set with no mode: click selects, shift-click adds, the in
   expect(await members.count()).toBeGreaterThanOrEqual(2);
 });
 
-test("the controls row: Detail redraws, Filter wears a badge for what it hides, Frontier only highlights", async ({ page }) => {
+test("the controls row: Filter wears a badge for what it hides, Frontier only emphasises", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval", "");
   const cards = page.getByTestId("node-card");
   await expect(nodeCard(page, "n_plan")).toBeVisible();
@@ -154,14 +155,7 @@ test("the controls row: Detail redraws, Filter wears a badge for what it hides, 
   await page.getByTestId("chip-frontier").click();
   await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
   expect(await cards.count()).toBe(drawn);
-  await expect(page.getByTestId("detail-badge")).toHaveCount(0);
-  // A coarser Detail draws fewer cards, and the highlighted nodes it has no card for are counted on Detail.
-  await page.getByTestId("chip-frontier").click();
-  await page.getByTestId("chip-decisions").click();
-  await setDetail(page, "Stages");
-  await expect.poll(() => cards.count()).toBeLessThan(drawn);
-  await expect(page.getByTestId("detail-badge")).toBeVisible();
-  await expect(page.getByTestId("detail-button")).toHaveAttribute("title", /hidden at this detail; choose All to see them/);
+  await expect(page.getByTestId("depth-badge")).toHaveCount(0);
 });
 
 test("a card takes the lowest opacity that applies, and a zoomed-out stage head keeps its chip", async ({ page }) => {
@@ -185,4 +179,90 @@ test("a card takes the lowest opacity that applies, and a zoomed-out stage head 
   await expect(nodeCard(page, "n_decision_meeting")).toHaveCSS("opacity", "0.3");
   await expect(nodeCard(page, "n_purpose")).toHaveCSS("opacity", "0.3");
   await expect(nodeCard(page, "n_kickoff")).toHaveCSS("opacity", "0.5");
+});
+
+test("C2: Depth hides what is below it and counts the frontier work that hides; Fade draws every card and dims those below the depth", async ({ page }) => {
+  // A journey just started: its up-front decisions are the frontier, and they sit at its top level, which Stages leaves out.
+  const id = await startJourney(page, "browser", journeyName("Depth"), { route: "vendor-evaluation", version: 1 });
+  await openJourney(page, "browser", id, "?frontier=1");
+  const cards = page.getByTestId("node-card");
+  const drawn = await cards.count();
+  const frontierCards = page.locator('[data-testid="node-card"][data-here*="actionable now"]');
+  const frontier = await frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? ""));
+  expect(frontier.length).toBeGreaterThan(0);
+  await expect(page.getByTestId("depth-badge")).toHaveCount(0);
+  // A shallower Depth draws fewer cards, and the frontier nodes it has no card for are counted on Depth.
+  await setDepth(page, "Stages");
+  await expect.poll(() => cards.count()).toBeLessThan(drawn);
+  const left = await frontierCards.evaluateAll((found) => found.map((card) => card.getAttribute("data-node") ?? ""));
+  const hidden = frontier.filter((key) => !left.includes(key));
+  expect(hidden.length).toBeGreaterThan(0);
+  await expect(page.getByTestId("depth-badge")).toHaveText(String(hidden.length));
+  await expect(page.getByTestId("depth-button")).toHaveAttribute("title", /that can move now are hidden at this depth; choose Actions or fade the rest to see them/);
+  // Fade draws the Actions cards again with those below the depth dimmed, and there is nothing left hidden to count.
+  await setFade(page, true);
+  await expect.poll(() => cards.count()).toBe(drawn);
+  await expect(page.getByTestId("depth-badge")).toHaveCount(0);
+  for (const key of hidden) {
+    await expect(nodeCard(page, key)).toHaveClass(/node-faded/);
+  }
+  // With Frontier off, only Depth dims: what Stages draws (the top-level milestone, the top-level stages) is clear, what it left out is not.
+  await page.getByTestId("chip-frontier").click();
+  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
+  await expect(nodeCard(page, "n_kickoff")).not.toHaveClass(/node-faded/);
+  await expect(page.locator('[data-testid="node-card"][data-kind="group"]:not([data-parent]).node-faded')).toHaveCount(0);
+  for (const key of hidden) {
+    await expect(nodeCard(page, key)).toHaveClass(/node-faded/);
+  }
+});
+
+test("C2, DESIGN opacity: under Fade the cards below the depth are 0.3 whatever their state, a container holding a decision stays clear, and Frontier's dimming joins it without multiplying", async ({ page }) => {
+  await openJourney(page, "browser", "j_vendor_eval", "?depth=decisions&fade=1");
+  await expect(nodeCard(page, "n_plan")).toBeVisible();
+  const read = () =>
+    page.getByTestId("node-card").evaluateAll((found) =>
+      found.map((card) => ({
+        key: card.getAttribute("data-node") ?? "",
+        kind: card.getAttribute("data-kind") ?? "",
+        parent: card.getAttribute("data-parent"),
+        done: card.classList.contains("node-done"),
+        here: card.getAttribute("data-here") ?? "",
+        opacity: Number(getComputedStyle(card).opacity),
+      })),
+    );
+  const cards = await read();
+  const held = new Set(cards.filter((card) => card.kind === "decision").flatMap((card) => {
+    const above: string[] = [];
+    for (let at = card.parent; at !== null; at = cards.find((each) => each.key === at)?.parent ?? null) {
+      above.push(at);
+    }
+    return above;
+  }));
+  const below = (card: (typeof cards)[number]) => (card.kind === "deliverable" || card.kind === "action") && !held.has(card.key);
+  // The fixture has what the rule needs to be seen: work below the depth, done and open, and a deliverable holding a decision or a group in focus.
+  expect(cards.filter((card) => below(card) && card.done).length).toBeGreaterThan(0);
+  expect(cards.filter((card) => below(card) && !card.done).length).toBeGreaterThan(0);
+  for (const card of cards) {
+    expect(card.opacity, `${card.key} (${card.kind}${card.done ? ", done" : ""})`).toBeCloseTo(below(card) ? 0.3 : card.done ? 0.5 : 1);
+  }
+  // With Frontier on as well, a card out of either focus is 0.3, never 0.3 times 0.3.
+  await page.getByTestId("chip-frontier").click();
+  await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
+  await expect.poll(async () => (await read()).some((card) => !below(card) && !card.here.includes("actionable now") && card.opacity < 0.5)).toBe(true);
+  for (const card of await read()) {
+    expect(card.opacity, card.key).toBeGreaterThanOrEqual(0.3 - 1e-9);
+    expect([0.3, 0.5, 1].some((level) => Math.abs(card.opacity - level) < 1e-6), `${card.key} is at a level`).toBe(true);
+  }
+});
+
+test("C2, DESIGN opacity: nodes Reveal draws are dimmed by the depth under Fade as the rest are, never lifted by the trace", async ({ page }) => {
+  await openJourney(page, "browser", "j_vendor_eval", "?depth=decisions&fade=1");
+  await nodeCard(page, "n_partner_runs").getByTestId("card-open").click();
+  await expect(page.getByTestId("trace-reveal")).toBeVisible();
+  await page.getByTestId("trace-reveal").click();
+  await expect(page.getByTestId("trace-reveal")).toHaveText("Hide revealed nodes");
+  for (const key of ["n_criteria", "n_partner_results"]) {
+    await expect(nodeCard(page, key), key).toBeVisible();
+    await expect(nodeCard(page, key), key).toHaveCSS("opacity", "0.3");
+  }
 });

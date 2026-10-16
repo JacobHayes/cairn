@@ -18,10 +18,10 @@ describe("j and k", () => {
 });
 
 describe("1 to 4", () => {
-  it("pick Stages to All, only the steps the journey offers", () => {
-    const every = ["stages", "decisions", "work", "all"] as const;
+  it("pick Stages to Actions, only the steps the journey offers", () => {
+    const every = ["stages", "decisions", "deliverables", "actions"] as const;
     expect(["1", "2", "3", "4"].map((key) => stepForKey(key, every))).toEqual(every);
-    expect(stepForKey("1", ["decisions", "work", "all"])).toBeUndefined();
+    expect(stepForKey("1", ["decisions", "deliverables", "actions"])).toBeUndefined();
     expect(stepForKey("5", every)).toBeUndefined();
     expect(stepForKey("d", every)).toBeUndefined();
   });

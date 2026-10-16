@@ -1,9 +1,9 @@
-// C13: the timeline. Rows are the dated nodes the journey's level draws (the detail step, the
+// C13: the timeline. Rows are the dated nodes the journey's level draws (Depth's step, the
 // Filter and the search every view shares), under the containment tree, folded by the ladder;
 // each has its date in plain words beside a track on one shared time axis with today and the end
 // anchor (the `final` milestone) drawn across it. Selecting a row shows its float and the lines
 // to what it needs and unblocks (a shortfall's chain in error ink) and fades the rest; Frontier
-// and Decisions fade what they do not light. Two-finger horizontal scroll pans time, a pinch
+// fades what it does not light, and Depth's Fade what is below the depth. Two-finger horizontal scroll pans time, a pinch
 // zooms it, vertical scroll moves the rows (the workspace's own). Nodes with no date gather in
 // a folded list. A row's title opens the node's detail (5.1) beside the timeline, which
 // explains its dates (F7).
@@ -11,12 +11,12 @@ import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { useFlips, useLevel, useProjected } from "../canvas/hooks.ts";
-import { currentStages, openAt, stepOf } from "../canvas/ladder.ts";
+import { collapsedAt, drawnStep, openAt, stepOf } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
-import { nodeOf, recordOf, titleOf, type Ready } from "../detail/model.ts";
+import { nodeOf, titleOf, type Ready } from "../detail/model.ts";
 import { NodeLink, nodePath, screenPath } from "../detail/parts.tsx";
 import { withParam } from "../journeys/address.ts";
-import { badgesOf, levelRequestOf, lightsUp, litOf, stepHides } from "../journeys/requests.ts";
+import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
 import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { Button, Segmented } from "../ui/kit.tsx";
@@ -341,13 +341,13 @@ function useAxis(timeline: Timeline, today: string, chart: Chart, key: string, r
 }
 
 /** C13: the timeline of a projected journey: the rows `drawn` holds, open as `open` says. `empty` is what follows the words when nothing dated is drawn. */
-export function TimelineChart({ ready, timeline, drawn, open, onFold, lit, selected, step, range, empty }: {
+export function TimelineChart({ ready, timeline, drawn, open, onFold, faded, selected, step, range, empty }: {
   ready: Ready;
   timeline: Timeline;
   drawn: ChartOptions["drawn"];
   open: ChartOptions["open"];
   onFold: (key: string) => void;
-  lit: ChartOptions["lit"];
+  faded: ChartOptions["faded"];
   selected: string | undefined;
   step: Step;
   range: Range;
@@ -355,7 +355,7 @@ export function TimelineChart({ ready, timeline, drawn, open, onFold, lit, selec
 }) {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
-  const chart = useMemo(() => chartOf(ready, timeline, { drawn, open, selected, lit }), [ready, timeline, drawn, open, selected, lit]);
+  const chart = useMemo(() => chartOf(ready, timeline, { drawn, open, selected, faded }), [ready, timeline, drawn, open, selected, faded]);
   const { axis, panned, window, move, reset } = useAxis(timeline, ready.derived.today, chart, `${range}:${step}`, range);
   const chartRef = useRef<HTMLDivElement>(null);
   useGestures(chartRef, window, move);
@@ -378,7 +378,7 @@ export function TimelineChart({ ready, timeline, drawn, open, onFold, lit, selec
       </span>
       {chart.rows.length === 0 ? (
         <p className="muted" data-testid="timeline-empty">
-          {timeline.entries.length > 0 ? <>Nothing dated is drawn at this detail, filter and search. {empty}</> : "Nothing in scope has a date yet: no milestone date, pin, or due date."}
+          {timeline.entries.length > 0 ? <>Nothing dated is drawn at this depth, filter and search. {empty}</> : "Nothing in scope has a date yet: no milestone date, pin, or due date."}
         </p>
       ) : (
         <div className="timeline-chart" ref={chartRef}>
@@ -412,24 +412,24 @@ export function TimelineChart({ ready, timeline, drawn, open, onFold, lit, selec
   );
 }
 
-/** C13, C2: the timeline view: the toolbar, then the dated nodes of the journey's level, folded by the ladder and the viewer's flips (which hold until another step), lit by Frontier and Decisions. */
+/** C13, C2: the timeline view: the toolbar, then the dated nodes of the journey's level, folded by the ladder and the viewer's flips (which hold until another depth), lit by Frontier and dimmed below the depth by Fade. */
 export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Ready; state: ViewState; picks: number; selected: string | undefined }) {
   const { search } = useLocation();
   const { range } = useMemo(() => timelineSettingsFrom(new URLSearchParams(search)), [search]);
   const nodes = ready.journey.graph.nodes ?? [];
-  const step = stepOf({ step: state.step }, nodes);
+  const depth = stepOf({ step: state.depth }, nodes);
+  const step = drawnStep(depth, state.fade);
   const request = useMemo(() => levelRequestOf(state, step, []), [state, step]);
-  const { level, error: levelError } = useLevel(ready, request);
+  const { level, drawn, error: levelError } = useLevel(ready, request);
   const timeline = useProjected(ready, { projection: "timeline" });
-  const { flipped, flip: onFold } = useFlips(step, picks);
-  const opens = useMemo(() => {
-    const active = nodes.filter((node) => recordOf(ready, node).state === "active").map((node) => node.key);
-    return openAt(step, nodes, currentStages(nodes, ready.derived.acting_frontier, active));
-  }, [ready, nodes, step]);
+  const { flipped, flip: onFold } = useFlips(state.depth, picks);
+  const current = useMemo(() => currentStagesOf(ready), [ready]);
+  const opens = useMemo(() => openAt(step, nodes, current), [nodes, step, current]);
   const open = useMemo(() => (key: string) => opens(key) !== flipped.has(key), [opens, flipped]);
   const base = useMemo(() => litOf("timeline", state, ready), [state, ready]);
   const lit = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);
-  const badges = useMemo(() => badgesOf("timeline", level?.hidden_by_class ?? {}, base, stepHides(nodes, step, [])), [level, base, nodes, step]);
+  const faded = useMemo(() => outOfFocus(lit, drawn === undefined ? new Set() : depthFaded(state, nodes, depth, collapsedAt(depth, nodes, current, [], []), drawn)), [state, nodes, depth, current, drawn, lit]);
+  const badges = useMemo(() => badgesOf("timeline", level?.hidden_by_class ?? {}, base, stepHides(nodes, depth, []), state.fade), [level, base, nodes, depth, state.fade]);
   const error = levelError ?? timeline.error;
   return (
     <>
@@ -439,7 +439,7 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
       ) : timeline.value === undefined || level === undefined ? (
         <p className="muted small">Placing the dates...</p>
       ) : (
-        <TimelineChart ready={ready} timeline={timeline.value} drawn={level.nodes} open={open} onFold={onFold} lit={lit} selected={selected} step={step} range={range} empty={<ResetView />} />
+        <TimelineChart ready={ready} timeline={timeline.value} drawn={level.nodes} open={open} onFold={onFold} faded={faded} selected={selected} step={step} range={range} empty={<ResetView />} />
       )}
     </>
   );

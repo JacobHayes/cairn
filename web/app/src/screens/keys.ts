@@ -2,8 +2,8 @@
 // The bindings that ship with the journey pages move you or change the view: `j` and `k`
 // (next and previous row), `Enter` (the open node's primary action), `Esc` (close a popover,
 // then the sheet, then clear the selection),
-// `v` (next view), `F` (FRONTIER; the canvas has `f` for fit), `w` (walk through), `d` and `m` (DECISIONS and Only mine),
-// `1` to `4` (the detail step), `/` (search), `?` (the sheet). The view-state keys change the journey's one view state
+// `v` (next view), `F` (FRONTIER; the canvas has `f` for fit), `w` (walk through), `m` (Only mine),
+// `1` to `4` (Depth's step), `/` (search), `?` (the sheet). The view-state keys change the journey's one view state
 // (journeys/view.ts) wherever their control is live: none on the Summary, and not `F` on the walk through, whose every card
 // is on the frontier. `p` (pass) is the walk through's own (acting/TriageScreen.tsx). Pure helpers carry the decisions, so
 // they are tested without a page.
@@ -24,16 +24,15 @@ export const KEY_BINDINGS: { keys: string; words: string; group?: string }[] = [
   { keys: "v", words: "Cycle Graph, List and Timeline" },
   { keys: "Shift F", words: "Toggle Frontier" },
   { keys: "w", words: "Walk through the frontier" },
-  { keys: "d", words: "Toggle Decisions" },
   { keys: "m", words: "Toggle Only mine" },
-  { keys: "1 - 4", words: "Detail: Stages, Decisions, Deliverables or All" },
+  { keys: "1 - 4", words: "Depth: Stages, Decisions, Deliverables or Actions" },
   { keys: "/", words: "Search" },
   { keys: "p", words: "Pass, in the walk through" },
   { keys: "?", words: "This sheet" },
   { keys: "f", words: "Fit the selection, or the whole graph with none", group: "Graph" },
 ];
 
-/** The step key `key` picks (`1` Stages to `4` All), when the journey offers it. */
+/** The step key `key` picks (`1` Stages to `4` Actions), when the journey offers it. */
 export function stepForKey(key: string, steps: readonly Step[]): Step | undefined {
   const step = /^[1-4]$/.test(key) ? STEPS[Number(key) - 1] : undefined;
   return step !== undefined && steps.includes(step) ? step : undefined;
@@ -104,7 +103,7 @@ function escape({ selected, sheetOpen, setSheetOpen, pathname, search, go }: Hea
 
 /** The view state's keys: where their control is live, each changes the state (the summary has none). */
 function onViewState(key: string, { screen, state, steps, onState }: Heard): boolean {
-  if (!["F", "d", "m", "1", "2", "3", "4"].includes(key)) {
+  if (!["F", "m", "1", "2", "3", "4"].includes(key)) {
     return false;
   }
   if (screen === "summary") {
@@ -112,11 +111,9 @@ function onViewState(key: string, { screen, state, steps, onState }: Heard): boo
   }
   const step = stepForKey(key, steps);
   if (step !== undefined) {
-    onState({ ...state, step }, true);
+    onState({ ...state, depth: step }, !state.fade);
   } else if (key === "F" && screen !== "walk") {
     onState({ ...state, frontier: !state.frontier });
-  } else if (key === "d") {
-    onState({ ...state, decisions: !state.decisions });
   } else if (key === "m") {
     onState({ ...state, filter: { ...state.filter, mine: !state.filter.mine } });
   }

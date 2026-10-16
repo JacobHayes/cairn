@@ -1,11 +1,11 @@
-// C13: the timeline's rows: the nodes the journey's level draws (journeys/requests.ts: the detail
+// C13: the timeline's rows: the nodes the journey's level draws (journeys/requests.ts: Depth's
 // step, the Filter and the search, as every view draws them) that have dates, each under the
 // drawn node it is drawn under, folded as the ladder says and the viewer flips (at Stages only
 // the current stages open). A container that is folded, or whose children the level leaves out,
 // is one bar from its earliest start to its latest due, filled by done over total. Each row says
 // its date in plain words. A selected row also gets its float and its dependency lines, and
-// what its trace does not reach fades; so does what Frontier or Decisions does not light, the
-// lowest opacity winning. Drawn nodes with no date are not rows: they gather in a list. Pure,
+// what its trace does not reach fades; so does what is out of focus for Frontier or for Depth's
+// Fade, the lowest opacity winning. Drawn nodes with no date are not rows: they gather in a list. Pure,
 // so the unit tests check it without a page.
 //
 // Cost: O(nodes + selected dependencies) per timeline.
@@ -127,8 +127,8 @@ export interface ChartOptions {
   /** Whether a container is open: the step's rule with the viewer's flips (canvas/ladder.ts, `openAt`). */
   open: (key: string) => boolean;
   selected: string | undefined;
-  /** What Frontier or Decisions lights, with the containers above it; none with no highlight. */
-  lit: ReadonlySet<string> | undefined;
+  /** Whether a row is out of focus for Frontier or for Depth's Fade (journeys/requests.ts, `outOfFocus`). */
+  faded: (key: string) => boolean;
 }
 
 /** What the journey dates: each in-scope node's own dates, and what each one's whole subtree spans. */
@@ -311,7 +311,7 @@ export function chartOf(view: Ready, timeline: Timeline, options: ChartOptions):
     traced.add(selected);
   }
   for (const row of rows) {
-    row.faded = (selected !== undefined && !traced.has(row.key)) || (options.lit !== undefined && !options.lit.has(row.key));
+    row.faded = (selected !== undefined && !traced.has(row.key)) || options.faded(row.key);
   }
 
   const drawn = new Set(options.drawn.map((node) => node.key));

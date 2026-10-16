@@ -65,10 +65,10 @@ export function withListSettings(search: string, list: ListSettings): string {
 }
 
 /**
- * C11: the decision walkthrough of `journey`, the walk through with DECISIONS on. Starting a journey
+ * C11: the decision walkthrough of `journey`, the walk through at Decisions depth. Starting a journey
  * opens it here (the creation flow, 5.5, navigates to this address once the journey exists),
  * and it can be launched any time from the journey's pages.
  */
 export function walkthroughPath(journey: string): string {
-  return `/journeys/${journey}/walk?decisions=1`;
+  return `/journeys/${journey}/walk?depth=decisions`;
 }

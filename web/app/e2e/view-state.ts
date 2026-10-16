@@ -1,11 +1,11 @@
-// What the view state's browser tests and proof share: setting Detail, the highlights, the
+// What the view state's browser tests and proof share: setting Depth, the highlights, the
 // Filter and the search from the toolbar the way a person does, and giving a node of a fresh
 // journey an owner, a pin and a title the search can find.
 import { expect, type Locator, type Page } from "@playwright/test";
 
 import { setFrontier } from "./acting.ts";
 import { pin, state } from "./detail.ts";
-import { menuItem, nodePanel, openFilter, openFromCanvas, rename, setDetail } from "./shell.ts";
+import { menuItem, nodePanel, openFilter, openFromCanvas, rename, setDepth } from "./shell.ts";
 
 /** The viewer's entity on the in-browser host, as the vendor evaluation names it. */
 export const VIEWER = "e_lead";
@@ -35,7 +35,7 @@ export async function setCheck(check: Locator, on: boolean): Promise<void> {
   await (on ? expect(box).toBeChecked() : expect(box).not.toBeChecked());
 }
 
-/** On the journey's graph, at every detail: retitles `node` to `title` and pins it to `date`, from its detail as a person does; leaves it closed. */
+/** On the journey's graph, at every depth: retitles `node` to `title` and pins it to `date`, from its detail as a person does; leaves it closed. */
 export async function retitleAndPin(page: Page, node: string, title: string, date: string, assign = false): Promise<void> {
   await rename(page, node, title);
   const panel = await openFromCanvas(page, node);
@@ -74,9 +74,9 @@ export interface FilterSettings {
   conditional?: boolean;
 }
 
-/** Sets Detail to `detail`, Frontier on, the Filter's `filter`, and the search for `text`, from the toolbar. */
-export async function setViewState(page: Page, detail: string, filter: FilterSettings, text: string): Promise<void> {
-  await setDetail(page, detail);
+/** Sets Depth to `depth`, Frontier on, the Filter's `filter`, and the search for `text`, from the toolbar. */
+export async function setViewState(page: Page, depth: string, filter: FilterSettings, text: string): Promise<void> {
+  await setDepth(page, depth);
   await setFrontier(page, true);
   await openFilter(page);
   const panel = filterOf(page);

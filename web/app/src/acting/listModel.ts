@@ -12,9 +12,9 @@ import type { NodeRow } from "./why.ts";
 /** Everything a column can be: the ones every list has, then the ones Columns adds. */
 export type Column = "status" | "title" | "owner" | "due" | ListColumn;
 
-/** What Columns can add: the decision columns are already there with DECISIONS on, and a decision's kind is no news. */
-export function addableColumns(decisions: boolean): readonly ListColumn[] {
-  return decisions ? LIST_COLUMNS.filter((column) => !["kind", "answer", "why", "affects"].includes(column)) : LIST_COLUMNS;
+/** What Columns can add: the decision columns are already there at Decisions depth, and the rows are mixed, so Kind stays. */
+export function addableColumns(decisionColumns: boolean): readonly ListColumn[] {
+  return decisionColumns ? LIST_COLUMNS.filter((column) => !["answer", "why", "affects"].includes(column)) : LIST_COLUMNS;
 }
 
 /** Whether the rows are in rank order, which puts the Rank column first: a sort by rank. */
@@ -22,20 +22,16 @@ export function ranked(list: ListSettings): boolean {
   return list.sort === "rank";
 }
 
-/** C9, C12: the columns shown, left to right; the decision columns with DECISIONS on. */
-export function columnsOf(list: ListSettings, decisions: boolean): Column[] {
-  const chosen = addableColumns(decisions).filter((column) => list.columns.includes(column) && !(column === "rank" && ranked(list)));
-  const own: Column[] = decisions ? ["status", "title", "answer", "why", "affects", "owner", "due"] : ["status", "title", "owner", "due"];
+/** C9, C12: the columns shown, left to right; at Decisions depth (`decisionColumns`) the decision columns after Title. */
+export function columnsOf(list: ListSettings, decisionColumns: boolean): Column[] {
+  const chosen = addableColumns(decisionColumns).filter((column) => list.columns.includes(column) && !(column === "rank" && ranked(list)));
+  const own: Column[] = decisionColumns ? ["status", "title", "answer", "why", "affects", "owner", "due"] : ["status", "title", "owner", "due"];
   return [...(ranked(list) ? (["rank"] as const) : []), ...own, ...chosen];
 }
 
-/** The column words; a decision list says Decision and Decide by. */
-export function columnWords(column: Column, decisions: boolean): string {
+/** The column words. */
+export function columnWords(column: Column): string {
   switch (column) {
-    case "title":
-      return decisions ? "Decision" : "Title";
-    case "due":
-      return decisions ? "Decide by" : "Due";
     case "start_by":
       return "Start by";
     default:

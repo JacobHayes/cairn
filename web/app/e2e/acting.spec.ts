@@ -8,7 +8,7 @@ import { expect, test } from "@playwright/test";
 
 import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { derivedRevision, nodePanel } from "./shell.ts";
+import { derivedRevision, nodePanel, setDepth } from "./shell.ts";
 
 test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an unsnooze returns them", async ({ page }) => {
   await openActing(page, "browser", "j_launch", "list?frontier=1");
@@ -70,8 +70,8 @@ test("B1, C11: a journey started from a route opens its walkthrough; an answer s
   await expect(page.getByTestId("unlocked-by")).toHaveCount(0);
   expect((await passOrder(page)).at(-1)).toBe("n_partner_scope");
   expect(await derivedRevision(page)).toBe(answered);
-  // Every kind: the partner decision's other unlock is next, until a new pass returns to rank order.
-  await page.getByTestId("chip-decisions").click();
+  // Every kind (Actions depth): the partner decision's other unlock is next, until a new pass returns to rank order.
+  await setDepth(page, "Actions");
   await expect(card(page)).toHaveAttribute("data-node", "n_criteria");
   await page.getByTestId("new-pass").click();
   await expect(card(page)).toHaveAttribute("data-node", "n_kickoff");
@@ -84,11 +84,11 @@ test("B1, C11: a journey started from a route opens its walkthrough; an answer s
   await expect(page.getByTestId("unlocked-by").getByRole("link", { name: "Review the partner's criteria" })).toBeVisible();
 });
 
-test("C9: a folded container stays folded across Show not relevant; a trip to the graph and back opens every level at All", async ({ page }) => {
+test("C9: a folded container stays folded across Show not relevant; a trip to the graph and back opens every level at Actions", async ({ page }) => {
   await openActing(page, "browser", "j_vendor_eval", "list");
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
   const total = Number(await page.getByTestId("list-total").getAttribute("data-total"));
-  // At All every level is open; the viewer folds one.
+  // At Actions every level is open; the viewer folds one.
   await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
   const fold = page.getByTestId("list-fold").first();
   const folded = await fold.locator("xpath=ancestor::tr").getAttribute("data-node");

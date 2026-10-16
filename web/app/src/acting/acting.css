@@ -373,15 +373,16 @@ table.data.list-table .badge {
   opacity: 0.5;
 }
 
-/* Out of focus (Frontier or Decisions on, the row not lit) is 0.3 on the content, as an unlit card
-   is, whatever the row's state: later at equal weight, so the lowest wins. */
-.list-table tr[data-lit="false"] td:not(.list-check) > .list-content {
+/* Out of focus (the row not lit by Frontier, or dimmed by Depth's Fade) is 0.3 on the content, as an
+   unlit card is, whatever the row's state: later at equal weight, so the lowest wins, and a row out
+   of both is 0.3 too. */
+.list-table tr[data-faded="true"] td:not(.list-check) > .list-content {
   opacity: 0.3;
 }
 
 /* Keyboard focus lifts the fade so the focus ring and the focused row read at full strength. */
 .node-row[data-state="done"] > :has(:focus-visible),
-.list-table tr:is([data-state="done"], [data-lit="false"]) td:not(.list-check) > .list-content:has(:focus-visible) {
+.list-table tr:is([data-state="done"], [data-faded="true"]) td:not(.list-check) > .list-content:has(:focus-visible) {
   opacity: 1;
 }
 
