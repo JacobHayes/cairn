@@ -32,6 +32,17 @@ export function describeRecord(key: RecordKey): string {
   return typeof value === "string" ? `${name.replaceAll("_", " ")} of node ${value}` : JSON.stringify(key);
 }
 
+type Violations = Extract<Rejection, { rejection: "invalid" }>["violations"];
+
+/** Every rule an invalid change breaks (A15), one line each, in the engine's words. */
+export function ViolationLines({ violations }: { violations: Violations }) {
+  return violations.map((violation, at) => (
+    <span key={at} className="author-problem" role="alert" data-testid="violation" data-code={violation.code}>
+      {violation.message}
+    </span>
+  ));
+}
+
 export function RejectionView({ rejection, onRebase }: { rejection: Rejection; onRebase: () => void }) {
   if (rejection.rejection === "stale") {
     const records = [...new Set(rejection.intervening.map(describeRecord))];

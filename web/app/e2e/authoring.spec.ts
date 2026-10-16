@@ -71,7 +71,20 @@ test("A12, A1a: a route authored by hand from an empty draft, published, exporte
   await expect(nodeCard(page, handbook).getByTestId("card-notice")).toBeVisible();
   await openNode(page, handbook);
   await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
-  await expect(page.getByTestId("drawing-edge")).toHaveAttribute("data-from", handbook);
+  const banner = page.getByTestId("drawing-edge");
+  await expect(banner).toHaveAttribute("data-from", handbook);
+  // Escape in a field belongs to the field: drawing goes on. Outside one it stops the drawing and leaves the node open.
+  const title = nodeForm(page).getByLabel("Title", { exact: true });
+  await title.focus();
+  await expect(title).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(banner).toBeVisible();
+  await banner.getByText("Pick the node").click();
+  await page.keyboard.press("Escape");
+  await expect(banner).toHaveCount(0);
+  await expect(structure(page)).toHaveAttribute("data-node", handbook);
+  await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
+  await expect(banner).toHaveAttribute("data-from", handbook);
   await nodeCard(page, setup).getByTestId("card-open").click();
   await expect(page.getByTestId("edge-refused")).toContainText("A3");
   await nodeCard(page, accounts).getByTestId("card-open").click();
@@ -127,4 +140,30 @@ test("Edit is one state entered from the journey menu: structure tools and the n
   await expect(bar.getByTestId("header-editor")).toBeVisible();
   await page.getByTestId("edit-done").click();
   await expect(bar).toHaveCount(0);
+});
+
+
+test("A3: on a journey's graph in edit mode, Escape stops drawing and keeps edit mode; leaving edit mode or opening another graph stops it too", async ({ page }) => {
+  const banner = page.getByTestId("drawing-edge");
+  const draw = async () => {
+    await openFromCanvas(page, "n_access");
+    await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
+    await expect(banner).toHaveAttribute("data-from", "n_access");
+  };
+  await openEditing(page, "browser", "j_vendor_eval");
+  await draw();
+  await page.keyboard.press("Escape");
+  await expect(banner).toHaveCount(0);
+  await expect(page.getByTestId("authoring-bar")).toBeVisible();
+  await draw();
+  await page.getByTestId("edit-done").click();
+  await expect(page.getByTestId("authoring-bar")).toHaveCount(0);
+  await page.getByTestId("journey-menu").click();
+  await page.getByTestId("menu-edit").click();
+  await expect(page.getByTestId("authoring-bar")).toBeVisible();
+  await expect(banner).toHaveCount(0);
+  await draw();
+  await open(page, "browser", "/journeys/j_launch/graph?edit=on");
+  await expect(page.getByTestId("authoring-bar")).toBeVisible();
+  await expect(banner).toHaveCount(0);
 });

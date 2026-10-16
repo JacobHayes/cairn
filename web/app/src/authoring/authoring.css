@@ -26,7 +26,13 @@
 
 .author-problem {
   color: var(--color-error);
-  font-size: 14px;
+  font-size: 15px;
+}
+
+/* The banner's sentence takes what the button leaves, wrapping within it, so the button stays on the sentence's row. */
+.drawing-words {
+  flex: 1 1 16ch;
+  min-width: 0;
 }
 
 .author-clause {

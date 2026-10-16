@@ -11,7 +11,8 @@ import type { SaveEvent, Toast } from "./activity.ts";
 import { problemsOf, writeOf } from "./edit-manager.ts";
 import { currentAddress, type Session } from "./session.ts";
 import type { Problem, SyncSummary } from "./sync.ts";
-import { writeView, type WriteView } from "./write-machine.ts";
+import type { OperationId } from "./edit-record.ts";
+import { writeView, type WriteSnapshot, type WriteView } from "./write-machine.ts";
 import { reasonOf, type Rejection } from "./writes.ts";
 
 export const SessionContext = createContext<Session | undefined>(undefined);
@@ -95,15 +96,24 @@ export function useProblems(): readonly Problem[] {
   return useMemo(() => problemsOf(writes, reported, skewed), [writes, reported, skewed]);
 }
 
+/** What a control shows of a write: a landed or discarded one is on its way out of the manager and shows nothing. */
+function shownView(snapshot: WriteSnapshot | undefined): WriteView | undefined {
+  const view = snapshot === undefined ? undefined : writeView(snapshot);
+  return view?.state === "landed" || view?.state === "discarded" ? undefined : view;
+}
+
 /** The write of `edit`, if the edit manager holds one: kept across the control that sent it going away. */
 export function useWriteOf(edit: string): WriteView | undefined {
   const { edits } = useSession();
   const snapshot = useSelector(edits, (held) => writeOf(held.context.writes, edit)?.snapshot);
-  return useMemo(() => {
-    const view = snapshot === undefined ? undefined : writeView(snapshot);
-    // A landed or discarded write is on its way out of the manager; a control has nothing to show of it.
-    return view?.state === "landed" || view?.state === "discarded" ? undefined : view;
-  }, [snapshot]);
+  return useMemo(() => shownView(snapshot), [snapshot]);
+}
+
+/** The write with this id, if the edit manager holds one. */
+export function useWrite(id: OperationId | undefined): WriteView | undefined {
+  const { edits } = useSession();
+  const snapshot = useSelector(edits, (held) => (id === undefined ? undefined : held.context.writes[id]?.snapshot));
+  return useMemo(() => shownView(snapshot), [snapshot]);
 }
 
 /** A write that did not land, as the chip counts it. */

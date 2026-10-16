@@ -4,6 +4,8 @@
 import { expect, test } from "@playwright/test";
 
 import { frontierKeys, openActing } from "./acting.ts";
+import { section } from "./authoring.ts";
+import { derived, nodeCard, open } from "./shell.ts";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -55,4 +57,18 @@ test("the graph's controls fold into one Controls menu that holds them all", asy
   expect((whole?.y ?? 0) + (whole?.height ?? 0) - ((search?.y ?? 0) + (search?.height ?? 0))).toBeLessThan(32);
   await panel.getByTestId("chip-frontier").click();
   await expect(page).toHaveURL(/frontier=1/);
+});
+
+test("A3: on a phone the drawing's banner is the open map's, one banner, and Escape stops the drawing and leaves the map open", async ({ page }) => {
+  await open(page, "browser", "/journeys/j_vendor_eval/graph?edit=on&depth=actions");
+  await derived(page);
+  await page.getByTestId("map-open").click();
+  await nodeCard(page, "n_access").getByTestId("card-open").click();
+  await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
+  const banner = page.getByTestId("drawing-edge");
+  await expect(banner).toHaveCount(1);
+  await expect(page.getByTestId("map-full").getByTestId("drawing-edge")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(banner).toHaveCount(0);
+  await expect(page.getByTestId("map-full")).toBeVisible();
 });

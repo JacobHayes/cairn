@@ -82,7 +82,11 @@ export function EdgesEditor({ authored, node }: NodeEditorProps) {
         >
           Add the requirement
         </Button>
-        {connecting === undefined ? null : <Button onClick={() => { connecting.start(node.key); }}>Draw it on the canvas</Button>}
+        {connecting === undefined ? null : (
+          <Button data-testid="draw-edge" disabled={connecting.view.state === "checking" || connecting.view.state === "saving"} onClick={() => { connecting.start(node.key); }}>
+            Draw it on the canvas
+          </Button>
+        )}
       </span>
       {refusal === undefined ? null : <span className="author-problem" role="alert" data-testid="edge-refused">{refusal}</span>}
       {full ? <span className="author-problem">At most {EDGE_COUNT_PER_NODE_MAX} explicit edges touch one node.</span> : null}

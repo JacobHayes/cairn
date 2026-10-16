@@ -11,7 +11,7 @@ import { Link, useNavigate } from "react-router";
 
 import { ancestorsOf, placedAt } from "../canvas/ladder.ts";
 import { canvasPath, revealing, type GraphView } from "../canvas/settings.ts";
-import { DrawingBanner, type useEdgeDrawing } from "./connect.tsx";
+import { DrawingBanner, type EdgeDrawing } from "./connect.tsx";
 import { StructureTools } from "./StructureTools.tsx";
 import { Tombstones } from "./LocalEdits.tsx";
 import { HeaderEditor } from "../journeys/HeaderEditor.tsx";
@@ -24,11 +24,14 @@ export function JourneyAuthoringBar({
   authored,
   view,
   drawing,
+  banner,
 }: {
   ready: Ready;
   authored: Authored;
   view: GraphView;
-  drawing: ReturnType<typeof useEdgeDrawing>;
+  drawing: EdgeDrawing;
+  /** Whether the drawing's banner is shown here: not while a full-screen map carries it. */
+  banner: boolean;
 }) {
   const navigate = useNavigate();
   const journey = "journey" in authored.target ? authored.target.journey : "";
@@ -53,7 +56,7 @@ export function JourneyAuthoringBar({
       </div>
       <HeaderEditor ready={ready} />
       <Tombstones authored={authored} />
-      <DrawingBanner drawing={drawing} />
+      {banner ? <DrawingBanner drawing={drawing} /> : null}
     </section>
   );
 }

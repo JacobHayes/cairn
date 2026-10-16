@@ -54,9 +54,11 @@ export interface AuthorWrite {
   receipt: ReceiptState | undefined;
 }
 
-const LOCAL_USER = "u_local";
+/** Who a preview is made as when the caller is not known yet. */
+export const LOCAL_USER = "u_local";
 
-function patchOf(authored: Authored, mutations: Mutation[], base = authored.revision): Schema<"Patch"> {
+/** A patch of `mutations` for `authored`'s target, drafted against `base`. */
+export function authoredPatchOf(authored: Authored, mutations: Mutation[], base = authored.revision): Schema<"Patch"> {
   const patch: Schema<"Patch"> = { id: newPatchId(), target: authored.target, base_revision: base, mutations };
   return "journey" in authored.target && writesEntities(mutations) ? { ...patch, deployment_revision: authored.deploymentRevision } : patch;
 }
@@ -78,8 +80,8 @@ interface PreviewArgs {
 }
 
 /** The preview of `mutations` against `authored`, applied locally by the derive worker. */
-async function previewOf({ deriver, user, authored, mutations }: PreviewArgs): Promise<Preview> {
-  const patch = patchOf(authored, mutations);
+export async function previewOf({ deriver, user, authored, mutations }: PreviewArgs): Promise<Preview> {
+  const patch = authoredPatchOf(authored, mutations);
   const actor = { user };
   const at = new Date().toISOString();
   try {
@@ -125,7 +127,7 @@ async function publishPreviewOf({ deriver, host, user, authored }: PublishArgs, 
     if (at !== undefined) {
       beforeWork(at);
     }
-    const patch = patchOf(authored, [{ op: "publish_draft" }]);
+    const patch = authoredPatchOf(authored, [{ op: "publish_draft" }]);
     await deriver.applyRoute({ patch, at: new Date().toISOString(), actor: { user }, today: authored.today, deployment: authored.deployment, route, versions });
     return { outcome: "accepted", consequences: undefined };
   } catch (thrown) {
@@ -173,7 +175,7 @@ export function useAuthorWrite(authored: Authored): AuthorWrite {
       setFailed({ sent, rejection: previewed.rejection });
       return false;
     }
-    const patch = patchOf(authored, mutations, base);
+    const patch = authoredPatchOf(authored, mutations, base);
     const result = await session.write({
       target: patch.target,
       baseRevision: patch.base_revision,

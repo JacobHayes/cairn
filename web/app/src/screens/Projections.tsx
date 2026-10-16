@@ -9,7 +9,7 @@ import { listSettingsFrom } from "../acting/address.ts";
 import { ListBody } from "../acting/ListScreen.tsx";
 import { TriageBody } from "../acting/TriageScreen.tsx";
 import { JourneyAuthoringBar } from "../authoring/JourneyAuthoring.tsx";
-import type { useEdgeDrawing } from "../authoring/connect.tsx";
+import type { EdgeDrawing } from "../authoring/connect.tsx";
 import type { Authored } from "../authoring/target.ts";
 import type { GraphView } from "../canvas/settings.ts";
 import { StalledSurface } from "../canvas/Surfaces.tsx";
@@ -33,14 +33,14 @@ export interface ProjectionProps {
   edge: string | undefined;
   /** In edit mode, the journey's structure as authored, and the edge being drawn (5.6). */
   authored: Authored | undefined;
-  drawing: ReturnType<typeof useEdgeDrawing>;
+  drawing: EdgeDrawing;
 }
 
 /** The canvas's own bars, which stay with the head: the structure's tools (edit mode) and the stalled surface. */
-export function CanvasBars({ ready, view, authored, drawing }: Pick<ProjectionProps, "ready" | "view" | "authored" | "drawing">) {
+export function CanvasBars({ ready, view, authored, drawing, banner }: Pick<ProjectionProps, "ready" | "view" | "authored" | "drawing"> & { banner: boolean }) {
   return (
     <>
-      {authored === undefined ? null : <JourneyAuthoringBar ready={ready} authored={authored} view={view} drawing={drawing} />}
+      {authored === undefined ? null : <JourneyAuthoringBar ready={ready} authored={authored} view={view} drawing={drawing} banner={banner} />}
       <StalledSurface ready={ready} view={view} />
     </>
   );

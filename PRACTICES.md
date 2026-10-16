@@ -70,7 +70,7 @@ How `web/app` and `web/client` hold state ([`decisions/2026-10-16-frontend-state
 - **One owner per fact.** Others read a fact from its owner and are never pushed a copy. A component reads state through a tagged selector (`writeView` and the like), never by piecing it together from optional context fields, and never copies a snapshot into React state.
 - **Effects belong to the machine.** A timer is a delayed transition, a request an invoked actor, and a busy state does not accept a new start. Cancelling stops the UI waiting for the answer; it never undoes a commit.
 - **Preferences are not machines.** `useAxis` and `useFrame` keep their independent preferences and keyed overrides, with presentation derived from them.
-- **Actors are tested with controlled promises and a `SimulatedClock`**, with wall time injected separately; Playwright covers focus, navigation, reload recovery, multiple tabs and worker wiring.
+- **Actors are tested with controlled promises and a `SimulatedClock`**, with wall time injected separately; a bounded workflow (the edge drawing) also has every reachable state and transition walked with `@xstate/graph`; Playwright covers focus, navigation, reload recovery, multiple tabs and worker wiring.
 
 ### Not adopted
 

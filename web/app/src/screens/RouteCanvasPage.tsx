@@ -12,10 +12,9 @@ import type { Schema } from "@cairn/client";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
-import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
+import { ConnectContext, DrawingBanner, useEdgeDrawing } from "../authoring/connect.tsx";
 import { ruleFoot } from "../authoring/dates.ts";
 import { treeOf, type GraphNode } from "../authoring/graph.ts";
-import { DrawingBanner } from "../authoring/connect.tsx";
 import { RouteNodePanel } from "../authoring/RouteAuthoring.tsx";
 import { StructureTools } from "../authoring/StructureTools.tsx";
 import { blockedWords, DraftCard, ResultBand, RouteHeader, RouteList, useDraftViolations } from "../authoring/RouteDraft.tsx";
@@ -23,6 +22,7 @@ import { useRouteNotices } from "../authoring/RouteNotices.tsx";
 import { routeAuthored, type Authored } from "../authoring/target.ts";
 import { Ladder } from "../canvas/Chrome.tsx";
 import { GraphCanvas } from "../canvas/GraphCanvas.tsx";
+import { MapBand, useMapOpen } from "../canvas/MapFrame.tsx";
 import { refitKey } from "../canvas/refit.ts";
 import { useLaidOut } from "../canvas/hooks.ts";
 import { routeStepDrawing, routeStepOf, stepsFor, withStep } from "../canvas/ladder.ts";
@@ -300,10 +300,12 @@ function DraftFrame({ shown, authored, view, version, selected, listed, write, r
     />
   );
   const close = routeCanvasPath(id, version, view);
-  // Esc cancels an edge being drawn before it closes the node.
-  useEscapeTo(selected === undefined || drawing.connecting.from !== undefined ? undefined : close);
+  useEscapeTo(selected === undefined ? undefined : close);
+  // A phone's open map covers the head, so the drawing's banner is the map's, not the head's. `map=1` can outlive the canvas (the List keeps it).
+  const onMap = useMapOpen() && (!listed || inserting.preview !== undefined);
   return (
-    <ConnectContext value={drawing.connecting}>
+    <ConnectContext value={drawing}>
+    <MapBand value={<DrawingBanner drawing={drawing} />}>
       <div className="ws-fill journey-frame route-frame" data-testid="route-frame" data-projection={listed ? "list" : "graph"}>
         <div className="ws-head stack journey-head">
           <RouteHeader
@@ -320,7 +322,7 @@ function DraftFrame({ shown, authored, view, version, selected, listed, write, r
           <RouteSwitch id={id} version={version} view={view} listed={listed} selected={selected}>
             <StructureTools authored={authored} container={view.container} onAdded={(node) => void navigate(routeNodePath(id, shownAt(view, authored.graph.nodes ?? [], node), node.key))} onInsert={() => { inserting.start(view.container); }} />
           </RouteSwitch>
-          <DrawingBanner drawing={drawing} />
+          {onMap ? null : <DrawingBanner drawing={drawing} />}
         </div>
         <div className={listed && inserting.preview === undefined ? "journey-body journey-scroll stack" : "ws-canvas journey-body"}>
           {inserting.preview === undefined ? (
@@ -332,6 +334,7 @@ function DraftFrame({ shown, authored, view, version, selected, listed, write, r
         </div>
       </div>
       <DraftInspector authored={authored} selected={selected} card={wide ? card : undefined} close={close} inserting={inserting} />
+    </MapBand>
     </ConnectContext>
   );
 }

@@ -4,7 +4,7 @@
 // over the page, where the gestures belong to the canvas. The address gains `map=1`, so Back
 // closes it; the page behind keeps its scroll position (app.css stops it scrolling while the
 // map is open). From 720px the canvas is drawn as it is, in a region that does not scroll.
-import { useEffect, type ReactNode } from "react";
+import { createContext, useContext, useEffect, type ReactNode } from "react";
 import { useSearchParams } from "react-router";
 
 import { PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
@@ -24,11 +24,26 @@ function MapBar({ title, onClose }: { title: string; onClose: () => void }) {
   );
 }
 
+/**
+ * What the page asks the open map to carry between its bar and the canvas: the full-screen layer
+ * hides the page behind it, so what the person must see while working on the map (a banner) is
+ * shown here instead. The page provides it; only an open map renders it.
+ */
+export const MapBand = createContext<ReactNode>(null);
+
+/** Whether the map is open full screen: a phone, with `map=1` in the address. */
+export function useMapOpen(): boolean {
+  const narrow = useMedia(PHONE_WIDTH);
+  const [params] = useSearchParams();
+  return narrow && params.get(MAP) === "1";
+}
+
 /** `children` draws the canvas; `inert` asks it for the preview, with no gestures. `title` names the map in its bar. */
 export function MapFrame({ title, children }: { title: string; children: (inert: boolean) => ReactNode }) {
   const narrow = useMedia(PHONE_WIDTH);
   const [params, setParams] = useSearchParams();
-  const open = narrow && params.get(MAP) === "1";
+  const open = useMapOpen();
+  const band = useContext(MapBand);
   const setMap = (on: boolean) => {
     const next = new URLSearchParams(params);
     if (on) {
@@ -62,6 +77,7 @@ export function MapFrame({ title, children }: { title: string; children: (inert:
         <div className="map-preview" aria-hidden="true" />
         <div className="map-full" role="dialog" aria-label="Map" data-testid="map-full">
           <MapBar title={title} onClose={() => { setMap(false); }} />
+          {band}
           <div className="map-canvas">{children(false)}</div>
         </div>
       </>
