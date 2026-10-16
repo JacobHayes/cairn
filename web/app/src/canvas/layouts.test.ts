@@ -24,9 +24,8 @@ test("an edit to a view is hinted by its last positions, and another level is la
   expect(seen.map((asked) => asked.hints)).toEqual([undefined, undefined, { n_a: { x: 5, y: 7 } }]);
 });
 
-test("a level is its own view, and expanding a container within it is not", () => {
+test("a route's level is its own view: its step and the container drilled into", () => {
   const work = layoutViewOf(DEFAULT_VIEW, "work");
   expect(layoutViewOf(DEFAULT_VIEW, "stages")).not.toBe(work);
   expect(layoutViewOf({ ...DEFAULT_VIEW, container: "n_setup" }, "work")).not.toBe(work);
-  expect(layoutViewOf({ ...DEFAULT_VIEW, shut: ["n_setup"] }, "work")).toBe(work);
 });

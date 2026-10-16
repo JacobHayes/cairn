@@ -1,10 +1,11 @@
-// C9: the Plan list as data. The engine's list answers which nodes match; this lays them out:
-// the tree by default (plan order, each container with what matches beneath it, folded to the
-// top level), or flat in the sort's order once a column is sorted, which gives each row its
-// container under its title. Also the columns, in the order they sit. Pure, so the unit tests
-// check it without a page.
+// C9: the Plan list as data. The journey's level (journeys/requests.ts) says which nodes are
+// drawn, and under which; the engine's list gives each its row. This lays them out: the tree by
+// default (the level's order, each node under the drawn node it is drawn under, folded as the
+// ladder and the viewer say), or flat in the sort's order once a column is sorted, which gives
+// each row its container under its title. Also the columns, in the order they sit. Pure, so the
+// unit tests check it without a page.
 import type { Ready } from "../detail/model.ts";
-import { ancestorsOf, planOrder, treeOf } from "../plan/tree.ts";
+import { planOrder, treeOf } from "../plan/tree.ts";
 import { LIST_COLUMNS, type ListColumn, type ListSettings, type SortBy } from "./address.ts";
 import type { NodeRow } from "./why.ts";
 
@@ -16,16 +17,16 @@ export function addableColumns(decisions: boolean): readonly ListColumn[] {
   return decisions ? LIST_COLUMNS.filter((column) => !["kind", "answer", "why", "affects"].includes(column)) : LIST_COLUMNS;
 }
 
-/** Whether the rows are in rank order, which puts the Rank column first: the Frontier lens, or a sort by rank. */
-export function ranked(settings: ListSettings): boolean {
-  return settings.frontier || settings.sort === "rank";
+/** Whether the rows are in rank order, which puts the Rank column first: a sort by rank. */
+export function ranked(list: ListSettings): boolean {
+  return list.sort === "rank";
 }
 
-/** C9, C12: the columns shown, left to right. */
-export function columnsOf(settings: ListSettings): Column[] {
-  const chosen = addableColumns(settings.decisions).filter((column) => settings.columns.includes(column) && !(column === "rank" && ranked(settings)));
-  const own: Column[] = settings.decisions ? ["status", "title", "answer", "why", "affects", "owner", "due"] : ["status", "title", "owner", "due"];
-  return [...(ranked(settings) ? (["rank"] as const) : []), ...own, ...chosen];
+/** C9, C12: the columns shown, left to right; the decision columns with DECISIONS on. */
+export function columnsOf(list: ListSettings, decisions: boolean): Column[] {
+  const chosen = addableColumns(decisions).filter((column) => list.columns.includes(column) && !(column === "rank" && ranked(list)));
+  const own: Column[] = decisions ? ["status", "title", "answer", "why", "affects", "owner", "due"] : ["status", "title", "owner", "due"];
+  return [...(ranked(list) ? (["rank"] as const) : []), ...own, ...chosen];
 }
 
 /** The column words; a decision list says Decision and Decide by. */
@@ -57,7 +58,7 @@ export const SORT_OF: Partial<Record<Column, SortBy>> = {
   effort: "effort",
 };
 
-/** One line of the table: a row the engine matched, or a container kept for what matches beneath it. */
+/** One line of the table: a node the level draws, with its row. */
 export interface Line {
   key: string;
   /** How far in the tree it sits; every flat line is 0. */
@@ -74,26 +75,41 @@ export interface Line {
 }
 
 /**
- * C9: the tree of `rows`: every container above a match is there to hold it, shown or folded
- * as `open` says, the top level always.
+ * C2, C9: the tree of the drawn nodes (`drawn`, the level's nodes, each with the drawn node it is
+ * drawn under), siblings in plan order (`order`, each key's place), each container shown open or
+ * folded as `open` says. A drawn node with no row (read at another revision for a moment) is left
+ * out, its children kept under the nearest drawn node above it that has one.
  */
-export function treeLines(view: Ready, rows: readonly NodeRow[], open: (container: string) => boolean): Line[] {
-  const matched = new Map(rows.map((row) => [row.key, row]));
-  const needed = new Set(matched.keys());
-  for (const row of rows) {
-    ancestorsOf(view, row.key).forEach((ancestor) => needed.add(ancestor));
+export function treeLines(drawn: readonly { key: string; parent?: string | null }[], rows: ReadonlyMap<string, NodeRow>, open: (container: string) => boolean, order: ReadonlyMap<string, number>): Line[] {
+  const parents = new Map(drawn.map((node) => [node.key, node.parent ?? undefined]));
+  const shownAbove = (key: string): string | undefined => {
+    let at = parents.get(key);
+    while (at !== undefined && !rows.has(at)) {
+      at = parents.get(at);
+    }
+    return at;
+  };
+  const children = new Map<string | undefined, string[]>();
+  for (const node of drawn) {
+    if (rows.has(node.key)) {
+      const parent = shownAbove(node.key);
+      children.set(parent, [...(children.get(parent) ?? []), node.key]);
+    }
   }
-  const { roots, children } = treeOf(view);
+  const place = (key: string) => order.get(key) ?? Number.MAX_SAFE_INTEGER;
+  for (const kids of children.values()) {
+    kids.sort((left, right) => place(left) - place(right));
+  }
   const lines: Line[] = [];
   const visit = (key: string, depth: number, guides: boolean[]) => {
-    const held = (children.get(key) ?? []).filter((child) => needed.has(child));
+    const held = children.get(key) ?? [];
     const isOpen = held.length > 0 && open(key);
-    lines.push({ key, depth, row: matched.get(key), container: held.length > 0, open: isOpen, guides });
+    lines.push({ key, depth, row: rows.get(key), container: held.length > 0, open: isOpen, guides });
     if (isOpen) {
       held.forEach((child, at) => { visit(child, depth + 1, [...guides, at < held.length - 1]); });
     }
   };
-  roots.filter((root) => needed.has(root)).forEach((root) => { visit(root, 0, []); });
+  (children.get(undefined) ?? []).forEach((root) => { visit(root, 0, []); });
   return lines;
 }
 
@@ -108,8 +124,15 @@ export function flatLines(view: Ready, rows: readonly NodeRow[], sort: SortBy | 
   return [...ordered.filter((row) => !over(row)), ...ordered.filter(over)].map((row) => ({ key: row.key, depth: 0, row, container: false, open: false, guides: [] }));
 }
 
-/** C10: each ranked node's place in the journey's order, by rank, best first (`#1`). */
-export function rankPositions(view: Ready): Map<string, number> {
+/**
+ * C10: each ranked node's place in the journey's order, best first (`#1`). With `frontier` on it
+ * is the acting frontier's own order, which the engine ties by slack, gravity and key; otherwise
+ * every ranked node by rank, then key.
+ */
+export function rankPositions(view: Ready, frontier = false): Map<string, number> {
+  if (frontier) {
+    return new Map(view.derived.acting_frontier.map((key, at) => [key, at + 1]));
+  }
   const ranked = Object.entries(view.derived.nodes).flatMap(([key, derived]) => (derived.rank == null ? [] : [{ key, rank: derived.rank }]));
   ranked.sort((left, right) => right.rank - left.rank || (left.key < right.key ? -1 : 1));
   return new Map(ranked.map(({ key }, at) => [key, at + 1]));

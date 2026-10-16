@@ -9,7 +9,8 @@ import "./authoring.css";
 
 import { Link, useNavigate } from "react-router";
 
-import { canvasPath, type CanvasView } from "../canvas/settings.ts";
+import { ancestorsOf, placedAt } from "../canvas/ladder.ts";
+import { canvasPath, revealing, type GraphView } from "../canvas/settings.ts";
 import { DrawingBanner, type useEdgeDrawing } from "./connect.tsx";
 import { StructureTools } from "./StructureTools.tsx";
 import { Tombstones } from "./LocalEdits.tsx";
@@ -26,7 +27,7 @@ export function JourneyAuthoringBar({
 }: {
   ready: Ready;
   authored: Authored;
-  view: CanvasView;
+  view: GraphView;
   drawing: ReturnType<typeof useEdgeDrawing>;
 }) {
   const navigate = useNavigate();
@@ -40,9 +41,10 @@ export function JourneyAuthoringBar({
         <span className="spacer" />
         <StructureTools
           authored={authored}
-          container={view.container}
+          container={undefined}
           onAdded={(node) => {
-            void navigate(canvasPath(journey, view, node.key));
+            // The node just added is drawn whatever the view hides: its step, and no narrowing that may leave it out.
+            void navigate(canvasPath(journey, revealing(view, placedAt(authored.graph.nodes ?? [], node.kind, node.parent == null ? [] : [node.parent, ...ancestorsOf(authored.graph.nodes ?? [], node.parent)]), undefined), node.key));
           }}
         />
         <Link to={canvasPath(journey, { ...view, edit: false })} className="button" data-testid="edit-done">

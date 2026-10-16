@@ -5,6 +5,7 @@
    which does not scroll) or, where a screen has no such region, a fixed height. */
 
 .canvas {
+  position: relative;
   height: 420px;
   border: 1px solid var(--color-border);
   background: var(--ruling), var(--color-ground);
@@ -79,8 +80,19 @@
   box-shadow: var(--shadow-sm);
 }
 
+/* A pressed chip keeps the toolbar's pressed look (tint and ink underline) under the floating shadow. */
 .canvas-panel .chip[aria-pressed="true"] {
-  background: var(--color-band);
+  background: var(--color-tint);
+  box-shadow: inset 0 -2px 0 var(--color-text), var(--shadow-sm);
+}
+
+/* The view's controls sit over the flow, outside it, so a new view (a refit) keeps an open popover. */
+.canvas-held {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 5;
+  margin: var(--space-3);
 }
 
 .canvas-top {
@@ -98,16 +110,11 @@
   background: var(--color-surface);
 }
 
-/* The Signal button; not Off, it is pressed: the band fill and an ink underline, as the active segment is. */
+/* The Signal button on paper; not Off, it is pressed (screens.css, `.menu-pressed`). */
 .canvas-signal > .dropdown-button {
   background: var(--color-surface);
   border-color: var(--color-edge);
   box-shadow: var(--shadow-sm);
-}
-
-.canvas-signal-on > .dropdown-button {
-  background: var(--color-band);
-  box-shadow: inset 0 -2px 0 var(--color-text);
 }
 
 .canvas-signal-rule {

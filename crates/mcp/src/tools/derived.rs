@@ -3,7 +3,7 @@
 //! at the caller's today with the caller's entities as the viewer (H3), and answers the
 //! revision it was derived at.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
     Annotation, AnswerEffects, AnswerValue, Cursor, Date, DisplayState, ExplainedField,
@@ -152,6 +152,10 @@ pub(crate) struct LevelOutput {
     nodes: Paged<LevelNode>,
     /// The level's edges with an end among this page's nodes.
     edges: Vec<LevelEdge>,
+    /// Per relevance class left out, how many nodes it alone hides (C1); none when every
+    /// class is shown.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    hidden_by_class: BTreeMap<LevelDisplay, u32>,
 }
 
 /// `get_node` (C8).
@@ -443,6 +447,7 @@ impl<S: Store + 'static> ToolSet<S> {
                 display,
                 nodes,
                 edges,
+                hidden_by_class,
             } = level;
             let display = (display.len() < LevelDisplay::ALL.len()).then_some(display);
             let nodes = page(nodes, arguments.cursor);
@@ -458,6 +463,7 @@ impl<S: Store + 'static> ToolSet<S> {
                 display,
                 nodes,
                 edges,
+                hidden_by_class,
             }
         }))
     }

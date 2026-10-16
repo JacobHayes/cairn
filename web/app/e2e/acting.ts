@@ -1,5 +1,5 @@
-// What the acting surfaces' browser tests and proof share: opening the list, the frontier list,
-// and the walk through the way a person does, reading their rows and cards, and starting a fresh journey
+// What the acting surfaces' browser tests and proof share: opening the list, the list with Frontier
+// on, and the walk through the way a person does, reading their rows and cards, and starting a fresh journey
 // from the vendor evaluation's route on the server host (the creation screen is 5.5's).
 import { readFileSync } from "node:fs";
 
@@ -28,9 +28,11 @@ export async function setFrontier(page: Page, on: boolean): Promise<void> {
   await expect(chip).toHaveAttribute("aria-pressed", String(on));
 }
 
-/** The frontier list's rows, in order. */
-export function frontierKeys(page: Page): Promise<string[]> {
-  return keysOf(page, "list-row");
+/** The list's rows on the acting frontier (Frontier on), in order. */
+export async function frontierKeys(page: Page): Promise<string[]> {
+  const rows = page.locator('[data-testid="list-row"][data-frontier="true"]');
+  await expect(rows.first()).toBeVisible();
+  return rows.evaluateAll((each) => each.map((row) => row.getAttribute("data-node") ?? ""));
 }
 
 /** The list's rows, in order. */
@@ -38,9 +40,9 @@ export function listKeys(page: Page): Promise<string[]> {
   return keysOf(page, "list-row");
 }
 
-/** Node `node`'s row on the list. */
+/** Node `node`'s row on the list while it is on the acting frontier (Frontier on). */
 export function frontierItem(page: Page, node: string): Locator {
-  return page.locator(`[data-testid="list-row"][data-node="${node}"]`);
+  return page.locator(`[data-testid="list-row"][data-node="${node}"][data-frontier="true"]`);
 }
 
 /** The cards of the current pass, in its order, once the frontier has been read and holds some. */
@@ -56,13 +58,10 @@ export function card(page: Page): Locator {
   return page.getByTestId("triage-card");
 }
 
-/** Selects node `node`'s row on the list, opening the tree if it is folded away. */
+/** Selects node `node`'s row on the list. */
 export async function select(page: Page, node: string): Promise<void> {
   const row = page.locator(`[data-testid="list-row"][data-node="${node}"]`);
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
-  if ((await row.count()) === 0) {
-    await page.getByTestId("list-fold-all").click();
-  }
   // One checked row is the open node, which the address says a moment after the click.
   const box = row.locator("input[type=checkbox]");
   await box.click();

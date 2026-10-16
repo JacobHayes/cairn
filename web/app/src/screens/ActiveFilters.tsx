@@ -1,9 +1,14 @@
-// The active filters as removable chips under the toolbar (`overdue ×`, 2.3). The row is
-// absent when no filter is active. The chips are the toolbar's filters in words: each one
-// takes its own setting off and leaves the rest as they were (filters.ts).
+// The Filter's settings and the search as removable chips under the toolbar (`overdue ×`, 2.3).
+// The row is absent when nothing is on. Each chip takes its own setting off and leaves the rest
+// as they were (journeys/view.ts, `filterChips`).
 import { Link } from "react-router";
 
-import type { ActiveFilter } from "./filters.ts";
+/** One chip: its words, and the address with its setting off (the open node stays open). */
+export interface ActiveFilter {
+  id: string;
+  label: string;
+  without: string;
+}
 
 export function ActiveFilters({ filters }: { filters: ActiveFilter[] }) {
   if (filters.length === 0) {

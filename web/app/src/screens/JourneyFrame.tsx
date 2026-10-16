@@ -3,17 +3,19 @@
 // it: the open node's detail, or the journey card when nothing is selected. The Summary is the
 // card at full width. The head stays put and the projection and the inspector scroll on
 // their own (screens.css; the frame's slots are shell/frame.tsx). The journey is read and derived in the tab and kept current (H6); what it
-// shows is in the address (journeys/address.ts, canvas/settings.ts), so every link keeps it.
+// shows is in the address (journeys/address.ts, canvas/settings.ts), so every link keeps it: the
+// view state every view shares is parsed here once (journeys/view.ts) and handed to the views.
 // Edit mode (5.6) adds the structure's editors: the node's structure in its detail, and
 // drawing a requirement between two cards.
-import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
 import { journeyAuthored } from "../authoring/target.ts";
+import { stepsFor } from "../canvas/ladder.ts";
 import { useSelection, type Selection } from "../canvas/selection.ts";
-import { canvasPath, DEFAULT_VIEW, viewFrom } from "../canvas/settings.ts";
+import { canvasPath, DEFAULT_GRAPH_VIEW, graphViewFrom, type GraphView } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { EdgeCard } from "../detail/EdgeCard.tsx";
@@ -22,6 +24,7 @@ import { SelectionPanel } from "../detail/SelectionPanel.tsx";
 import { nodePath, screenPath } from "../detail/parts.tsx";
 import type { Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
+import { isStock, useViewState, ViewStateContext, withViewState, type ViewState, type ViewStateValue } from "../journeys/view.ts";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
@@ -137,7 +140,7 @@ function InspectorSlot({
 }
 
 /** The page's body: the segment being placed, drawn as review will draw it, while the stepper has a preview; else the page's own. */
-function Workspace({ ready, screen, selected, edge, authored, drawing, selection, preview }: Pick<FrameProps, "screen" | "selected" | "edge"> & { ready: Ready; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; selection: Selection; preview: InsertPreview | undefined }) {
+function Workspace({ ready, view, screen, selected, edge, authored, drawing, selection, preview }: Pick<FrameProps, "screen" | "selected" | "edge"> & { ready: Ready; view: GraphView; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; selection: Selection; preview: InsertPreview | undefined }) {
   if (preview !== undefined) {
     return (
       <Suspense fallback={<p className="muted small">Drawing the preview...</p>}>
@@ -146,9 +149,24 @@ function Workspace({ ready, screen, selected, edge, authored, drawing, selection
     );
   }
   if (screen === "summary") {
-    return <JourneyCard ready={ready} selected={selected} full />;
+    return (
+      <>
+        <SummaryNote />
+        <JourneyCard ready={ready} selected={selected} full />
+      </>
+    );
   }
-  return <ProjectionBody ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} />;
+  return <ProjectionBody ready={ready} view={view} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} />;
+}
+
+/** C1, C2: off the stock view, the Summary says the view state is not its to apply. */
+function SummaryNote() {
+  const { state } = useViewState();
+  return isStock(state) ? null : (
+    <p className="muted small" data-testid="summary-whole">
+      The summary counts the whole journey. Detail, Filter and search apply to the other views.
+    </p>
+  );
 }
 
 function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<FrameProps, "id">) {
@@ -156,7 +174,19 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const navigate = useNavigate();
   const journey = ready.journey.header.id;
   const params = useMemo(() => new URLSearchParams(search), [search]);
-  const view = useMemo(() => viewFrom(params), [params]);
+  const view = useMemo(() => graphViewFrom(params), [params]);
+  const [picks, setPicks] = useState(0);
+  const onState = useCallback(
+    (next: ViewState, picked = false) => {
+      if (picked) {
+        setPicks((count) => count + 1);
+      }
+      void navigate(`${pathname}${withViewState(search, next, picked)}`);
+    },
+    [navigate, pathname, search],
+  );
+  const viewState = useMemo<ViewStateValue>(() => ({ state: view.state, onState, picks }), [view.state, onState, picks]);
+  const steps = useMemo(() => stepsFor(ready.journey.graph.nodes ?? []), [ready]);
   const planned = screen === "graph";
   const authored = useMemo(() => (planned && view.edit ? journeyAuthored(ready) : undefined), [ready, planned, view.edit]);
   const drawing = useEdgeDrawing(authored);
@@ -164,7 +194,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const selection = useSelection(selected, (node) => void navigate(screen === "graph" ? canvasPath(journey, view, node) : `${node === undefined ? screenPath(pathname) : nodePath(screenPath(pathname), node)}${search}`));
   const inserting = useInserting(`journey:${journey}`);
   const [sheetOpen, setSheetOpen] = useState(false);
-  useJourneyKeys({ journey, screen, selected, sheetOpen, setSheetOpen });
+  useJourneyKeys({ journey, screen, selected, sheetOpen, setSheetOpen, state: view.state, steps, onState });
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
   const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(canvasPath(journey, view))} />;
   // The graph is a gesture surface that fills the workspace under the head; the rest scroll.
@@ -175,16 +205,17 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const phone = useMedia(PHONE_WIDTH);
   const card = selected !== undefined || edge !== undefined || screen === "summary" || screen === "walk" ? "none" : wide ? "column" : fills && !phone ? "none" : "inline";
   return (
+    <ViewStateContext value={viewState}>
     <ConnectContext value={authored === undefined ? undefined : drawing.connecting}>
       <InsertEntryContext value={inserting.start}>
       <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen}>
         <div className="ws-head stack journey-head">
-          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_VIEW} selected={selected} />
+          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_GRAPH_VIEW} selected={selected} />
           <JourneyToolbar journey={journey} screen={screen} node={selected} />
-          {planned ? <CanvasBars ready={ready} authored={authored} drawing={drawing} /> : null}
+          {planned ? <CanvasBars ready={ready} view={view} authored={authored} drawing={drawing} /> : null}
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>
-          <Workspace ready={ready} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} />
+          <Workspace ready={ready} view={view} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} />
           {card === "inline" ? <JourneyCard ready={ready} selected={selected} /> : null}
         </div>
         {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
@@ -193,6 +224,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} />
       </InsertEntryContext>
     </ConnectContext>
+    </ViewStateContext>
   );
 }
 

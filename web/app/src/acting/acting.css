@@ -38,6 +38,12 @@
   white-space: nowrap;
 }
 
+/* A check the view cannot honour stays, at the disabled button's strength, its value kept. */
+.check:has(input:disabled) {
+  opacity: 0.45;
+  cursor: default;
+}
+
 .crumb {
   overflow-wrap: anywhere;
 }
@@ -367,10 +373,22 @@ table.data.list-table .badge {
   opacity: 0.5;
 }
 
+/* Out of focus (Frontier or Decisions on, the row not lit) is 0.3 on the content, as an unlit card
+   is, whatever the row's state: later at equal weight, so the lowest wins. */
+.list-table tr[data-lit="false"] td:not(.list-check) > .list-content {
+  opacity: 0.3;
+}
+
 /* Keyboard focus lifts the fade so the focus ring and the focused row read at full strength. */
 .node-row[data-state="done"] > :has(:focus-visible),
-.list-table tr[data-state="done"] td:not(.list-check) > .list-content:has(:focus-visible) {
+.list-table tr:is([data-state="done"], [data-lit="false"]) td:not(.list-check) > .list-content:has(:focus-visible) {
   opacity: 1;
+}
+
+/* C10: a frontier row's reason and primary action, under its title at every width. */
+.list-acting {
+  gap: var(--space-1);
+  align-items: flex-start;
 }
 
 .node-row[data-state="done"] :is(.node-title, .node-fact),

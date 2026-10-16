@@ -1,50 +1,39 @@
 // C11: the walk through, a queue of cards over the acting frontier, one at a time in rank order,
 // for "act, or move on"; and its decisions-only mode, the decision walkthrough, which starting a
 // journey opens (address.ts, `walkthroughPath`). It is `/walk`, with DECISIONS on for the
-// walkthrough: the journey page (screens/JourneyFrame.tsx) holds its toolbar and the filters it
-// opens (`TriageControls`). A card is the inspector's own component with Pass on the frame's
-// edge, apart from the node's actions; the inspector column holds the pass rail until a linked
-// node is opened. Triage always reads the current frontier (the engine's `next` projection over
-// the tab's derivation, kept current, H6), so an answer that unblocks new nodes surfaces them in
-// the same pass. Pass is client state for this pass only (pass.ts): kept per tab in session
+// walkthrough, under the toolbar every view shares: its cards are the frontier work the level
+// draws that itself matches the Filter and search (journeys/requests.ts). A card is the
+// inspector's own component with Pass on the frame's edge, apart from the node's actions; the
+// inspector column holds the pass rail until a linked node is opened. Triage always reads the
+// current frontier (the engine's list of next-up work in rank order over the tab's derivation,
+// kept current, H6), so an answer that unblocks new nodes surfaces them in the same pass. Pass is client state for this pass only (pass.ts): kept per tab in session
 // storage, never sent. What a write made from the pass unlocked (the patch's consequences, never
 // a diff of the frontier) comes next, each card labeled with the card that unlocked it.
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { useProjected } from "../canvas/hooks.ts";
+import { useLevel } from "../canvas/hooks.ts";
+import { stepOf } from "../canvas/ladder.ts";
 import { useDraft } from "../data/drafts.ts";
 import { useSaves, useSession } from "../data/react.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
-import { titleOf, type Ready } from "../detail/model.ts";
+import type { Ready } from "../detail/model.ts";
 import { screenPath } from "../detail/parts.tsx";
+import { badgesOf, levelRequestOf, stepHides, walkQueryOf } from "../journeys/requests.ts";
+import { useViewState, type ViewState } from "../journeys/view.ts";
+import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { COLUMN, Inspector, useMedia } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { typing } from "../ui/typing.ts";
-import { ACTING_KINDS, WALK_FILTER_FLAGS, triagePath, triageQueryOf, type TriageSettings } from "./address.ts";
-import { Check, Checks, FlagChecks } from "./Controls.tsx";
 import { DetailLink } from "./Parts.tsx";
 import { acted, begin, passedAll, passOn, passOrder, roundAgain, surfaced, unlockedBy, type Pass } from "./pass.ts";
 import { PassRail } from "./PassRail.tsx";
-import { withFlags } from "./rows.ts";
 import { StalledPanel } from "./Stalled.tsx";
 import { WaitingDecisions } from "./Waiting.tsx";
+import { useRows } from "./useRows.ts";
 import type { NodeRow } from "./why.ts";
 import { actingDecisions } from "./waiting.ts";
 import "./acting.css";
-
-/** C11: mine, kinds and flags: what the filter holds on the walk through. */
-export function TriageControls({ settings, onChange }: { settings: TriageSettings; onChange: (next: TriageSettings) => void }) {
-  return (
-    <div className="stack acting-controls" data-testid="triage-controls" data-mode={settings.decisions ? "decisions" : "all"}>
-      <Check label="Only mine" checked={settings.mine} testId="only-mine" onChange={(mine) => { onChange({ ...settings, mine }); }} />
-      {settings.decisions ? null : (
-        <Checks legend="Kinds" options={ACTING_KINDS} chosen={settings.kinds} words={(kind) => kind} testId="kind" stacked onChange={(kinds) => { onChange({ ...settings, kinds }); }} />
-      )}
-      <FlagChecks options={WALK_FILTER_FLAGS} chosen={settings.flags} onChange={(flags) => { onChange({ ...settings, flags }); }} />
-    </div>
-  );
-}
 
 /** What reached the acting frontier since the pass began, other than what the pass's own actions unlocked and its filters still show (the card's band and the rail name those). */
 function Surfaced({ view, keys }: { view: Ready; keys: string[] }) {
@@ -62,20 +51,20 @@ function Surfaced({ view, keys }: { view: Ready; keys: string[] }) {
 }
 
 /**
- * No card to show: the filters hide what can be acted on; or, in the walkthrough, no decision
- * can be made by anyone, so what would unblock the next ones; or the journey is stalled (D5);
- * or nothing is left.
+ * No card to show: the view's detail, Filter or search draws none of what can be acted on; or, in
+ * the walkthrough, no decision can be made by anyone, so what would unblock the next ones; or the
+ * journey is stalled (D5); or nothing is left.
  */
-function Empty({ view, settings, stalled, onContinue }: { view: Ready; settings: TriageSettings; stalled: boolean; onContinue: () => void }) {
-  const filtered = settings.decisions ? actingDecisions(view).length > 0 : view.derived.acting_frontier.length > 0;
+function Empty({ view, decisions, stalled, onContinue }: { view: Ready; decisions: boolean; stalled: boolean; onContinue: () => void }) {
+  const filtered = decisions ? actingDecisions(view).length > 0 : view.derived.acting_frontier.length > 0;
   if (filtered) {
     return (
-      <p className="muted" data-testid="triage-empty" data-status="filtered">
-        Nothing on the acting frontier matches these filters{settings.decisions ? ": the decisions open now are others'" : ""}.
+      <p className="muted row" data-testid="triage-empty" data-status="filtered">
+        Nothing on the frontier is drawn at this detail, filter and search. <ResetView />
       </p>
     );
   }
-  if (settings.decisions) {
+  if (decisions) {
     return <WaitingDecisions view={view} onContinue={onContinue} />;
   }
   return stalled ? (
@@ -167,18 +156,33 @@ function PassCard({ view, card, place, by, onPass }: { view: Ready; card: NodeRo
   );
 }
 
+/**
+ * C10, C11: the cards: the frontier work in rank order that matches the Filter and search, kept
+ * where the level draws it (its detail step); and the badges, Detail's counting the cards the
+ * step hides.
+ */
+function useCards(view: Ready, state: ViewState) {
+  const nodes = view.journey.graph.nodes ?? [];
+  const step = stepOf({ step: state.step }, nodes);
+  const request = useMemo(() => levelRequestOf(state, step, []), [state, step]);
+  const { level, drawn, error: levelError } = useLevel(view, request);
+  const query = useMemo(() => walkQueryOf(state), [state]);
+  const { rows: candidates, error: rowsError } = useRows(view, query);
+  const rows = useMemo(() => (candidates ?? []).filter((row) => drawn?.has(row.key) === true), [candidates, drawn]);
+  const badges = useMemo(() => badgesOf("walk", level?.hidden_by_class ?? {}, new Set((candidates ?? []).map((row) => row.key)), stepHides(nodes, step, [])), [level, candidates, nodes, step]);
+  return { rows, read: candidates !== undefined && drawn !== undefined, error: levelError ?? rowsError, badges };
+}
+
 /** The walk through: one card at a time, in the order of this pass. */
-export function TriageBody({ view, settings, selected }: { view: Ready; settings: TriageSettings; selected: string | undefined }) {
+export function TriageBody({ view, state, selected }: { view: Ready; state: ViewState; selected: string | undefined }) {
   const navigate = useNavigate();
   const { pathname, search } = useLocation();
   const wide = useMedia(COLUMN);
   const journey = view.journey.header.id;
   const [pass, setPass] = usePass(view);
   useUnlocked(journey, pass, setPass);
-  const request = useMemo(() => ({ projection: "next" as const, query: triageQueryOf(settings) }), [settings]);
-  const { value: next, error } = useProjected(view, request);
-  const wanted = settings.text.trim().toLowerCase();
-  const rows = withFlags(next?.items ?? [], settings.flags).filter((row) => wanted === "" || titleOf(view, row.key).toLowerCase().includes(wanted));
+  const { onState } = useViewState();
+  const { rows, read, error, badges } = useCards(view, state);
   const order = passOrder(rows.map((row) => row.key), pass);
   const focus = rows.find((row) => row.key === order[0]);
   const done = passedAll(order, pass);
@@ -199,20 +203,20 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
   const passedCount = order.filter((key) => pass.passed.includes(key)).length;
   const rail = <PassRail view={view} order={order} pass={pass} onNewPass={newPass} />;
   const opened = selected !== undefined && selected !== card?.key;
-  const open = settings.decisions ? actingDecisions(view).length : 0;
+  const open = state.decisions ? actingDecisions(view).length : 0;
   return (
-    <section className="stack pass" aria-label={settings.decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
-      {settings.decisions && view.journey.revision <= 1 && card !== undefined ? (
+    <>
+    <ViewBar ready={view} screen="walk" badges={badges} />
+    <section className="stack pass" aria-label={state.decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
+      {state.decisions && view.journey.revision <= 1 && card !== undefined ? (
         <p className="for-you" data-testid="walkthrough-intro">
           Start with the decisions that shape this journey. {open} open now; each answer can open more.
         </p>
       ) : null}
       {error === undefined ? null : <p className="callout callout-bad">The frontier could not be read: {error}</p>}
       <Surfaced view={view} keys={surfaced(view.derived.acting_frontier, pass).filter((key) => unlockedBy(pass, key) === undefined || !order.includes(key))} />
-      {next === undefined ? <p className="muted small">Reading the frontier...</p> : null}
-      {next !== undefined && rows.length === 0 ? (
-        <Empty view={view} settings={settings} stalled={next.stalled != null} onContinue={() => void navigate(triagePath(journey, { ...settings, decisions: false }, selected))} />
-      ) : null}
+      {read ? null : <p className="muted small">Reading the frontier...</p>}
+      {read && rows.length === 0 ? <Empty view={view} decisions={state.decisions} stalled={view.derived.stalled != null} onContinue={() => { onState({ ...state, decisions: false }); }} /> : null}
       {done ? (
         <div className="callout stack" data-testid="pass-done">
           <span>Every card has been seen once · {passedCount} passed.</span>
@@ -231,5 +235,6 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
       {card === undefined ? null : <PassCard view={view} card={card} place={`${String(Math.min(passedCount + 1, order.length))} of ${String(order.length)}`} by={unlockedBy(pass, card.key)} onPass={onPass} />}
       {wide && !opened ? <Inspector focus={journey} reveal={false}>{rail}</Inspector> : null}
     </section>
+    </>
   );
 }

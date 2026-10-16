@@ -15,11 +15,11 @@ mod cost {
     use cairn_engine::derive::dependencies::EdgeSource;
     use cairn_engine::testing::derive_inputs;
     use cairn_engine::testing::generated::date_limits;
-    use cairn_engine::{DerivedJourney, derive};
+    use cairn_engine::{Derived, DerivedJourney, derive};
     use cairn_schema::limits::{EXPLANATION_ENTRY_COUNT_MAX, NODE_COUNT_MAX, PAGE_ITEM_COUNT_MAX};
     use cairn_schema::{
-        Cursor, Deployment, ExplainedField, LevelQuery, ListQuery, NextQuery, NodeKey, NodeKind,
-        SnapshotScope,
+        Cursor, Deployment, ExplainedField, LevelQuery, ListFlag, ListQuery, NextQuery, NodeKey,
+        NodeKind, SnapshotScope,
     };
 
     fn timed<T>(name: &str, run: impl FnOnce() -> T) -> T {
@@ -32,13 +32,12 @@ mod cost {
         value
     }
 
-    #[test]
-    fn every_projection_stays_within_its_bounds_at_the_limits() {
-        let graph = date_limits();
-        let derived = derive(&graph, None, &derive_inputs(Deployment::default()));
-        let journey = DerivedJourney::new(&graph, &derived);
-        let nodes = graph.document().nodes.len();
-        assert_eq!(nodes, NODE_COUNT_MAX as usize);
+    /// The level, by kinds and filtered, within the nodes and the canvas edges.
+    fn levels_stay_within_their_bounds(
+        journey: &DerivedJourney<'_>,
+        derived: &Derived,
+        nodes: usize,
+    ) {
         let canvas = derived
             .dependencies()
             .edges(EdgeSet::Full)
@@ -56,13 +55,39 @@ mod cost {
                 .collect();
             let level = timed(&format!("level hiding {hidden:?}"), || {
                 journey
-                    .level(&LevelQuery::of_kinds(shown, None), &Deployment::default())
+                    .level(
+                        &LevelQuery::of_kinds(shown, None),
+                        &Deployment::default(),
+                        &BTreeSet::new(),
+                    )
                     .unwrap()
             });
             assert!(level.nodes.len() <= nodes);
             let underlying: usize = level.edges.iter().map(|edge| edge.underlying.len()).sum();
             assert!(level.edges.len() <= underlying && underlying <= canvas);
         }
+        let filtered = timed("level filtered by text and flags", || {
+            let query = LevelQuery {
+                flags: [ListFlag::Unassigned, ListFlag::Blocked].into(),
+                text: "e".parse().ok(),
+                top: [NodeKind::Group, NodeKind::Milestone].into(),
+                ..LevelQuery::of_kinds(NodeKind::ALL.into_iter().collect(), None)
+            };
+            journey
+                .level(&query, &Deployment::default(), &BTreeSet::new())
+                .unwrap()
+        });
+        assert!(filtered.nodes.len() <= nodes);
+    }
+
+    #[test]
+    fn every_projection_stays_within_its_bounds_at_the_limits() {
+        let graph = date_limits();
+        let derived = derive(&graph, None, &derive_inputs(Deployment::default()));
+        let journey = DerivedJourney::new(&graph, &derived);
+        let nodes = graph.document().nodes.len();
+        assert_eq!(nodes, NODE_COUNT_MAX as usize);
+        levels_stay_within_their_bounds(&journey, &derived, nodes);
         let page = PAGE_ITEM_COUNT_MAX as usize;
         let snapshot = timed("snapshot", || {
             journey.snapshot(&SnapshotScope::default()).unwrap()

@@ -7,7 +7,7 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
-import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
+import { canvasPath, DEFAULT_GRAPH_VIEW } from "../canvas/settings.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { Actions } from "./Actions.tsx";
 import { Affects } from "./Affects.tsx";
@@ -90,7 +90,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
   return (
     <FoldedSections value={folded}>
       <aside className="detail-panel panel stack" aria-label={node.title} data-testid="node-detail" data-node={nodeKey}>
-        <Header view={view} detail={detail} position={position} rename={rename} removeTo={canvasPath(journey, { ...DEFAULT_VIEW, edit: true }, nodeKey)} />
+        <Header view={view} detail={detail} position={position} rename={rename} removeTo={canvasPath(journey, { ...DEFAULT_GRAPH_VIEW, edit: true }, nodeKey)} />
         <Sentence view={view} detail={detail} rank={{ position, row }} />
         {node.kind === "decision" || description === "" ? null : <Markdown text={description} data-testid="description" />}
         <Actions view={view} detail={detail} onRename={rename.start} />

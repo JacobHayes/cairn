@@ -35,7 +35,7 @@ impl DerivedJourney<'_> {
     pub fn decision_view(&self) -> DecisionView {
         let query = LevelQuery::of_kinds(BTreeSet::from([NodeKind::Decision]), None);
         let level = self
-            .level_with(&query, None)
+            .level_with(&query, None, &BTreeSet::new())
             .unwrap_or_else(|error| panic!("{error}"));
         let mut affects = self.conditioned_by();
         let decisions = level

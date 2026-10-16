@@ -73,6 +73,13 @@
   min-width: 0;
 }
 
+/* A row is one fixed height: a long title takes one line and ends in an ellipsis rather than run into the next row; the label's title holds it whole. */
+.timeline-text > a {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .timeline-words {
   white-space: nowrap;
 }

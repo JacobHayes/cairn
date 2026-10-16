@@ -3,8 +3,8 @@
 // page".
 import { Link, Navigate, useParams } from "react-router";
 
-import { ancestorsOf } from "../canvas/ladder.ts";
-import { canvasPath, DEFAULT_VIEW, revealing } from "../canvas/settings.ts";
+import { ancestorsOf, placedAt } from "../canvas/ladder.ts";
+import { canvasPath, DEFAULT_GRAPH_VIEW, revealing } from "../canvas/settings.ts";
 import { nodeOf } from "../detail/model.ts";
 import { DEFAULT_PROJECTION, pagePath, type Screen } from "../journeys/address.ts";
 import { JourneyFrame, JourneyGate } from "./JourneyFrame.tsx";
@@ -31,7 +31,7 @@ export function JourneyDeepLink() {
     <JourneyGate id={id}>
       {(ready) => {
         const found = nodeOf(ready, key);
-        const reveal = found === undefined ? DEFAULT_VIEW : revealing(DEFAULT_VIEW, { kind: found.kind, ancestors: ancestorsOf(ready.journey.graph.nodes ?? [], key) }, ready.derived.nodes[key]?.display_state);
+        const reveal = found === undefined ? DEFAULT_GRAPH_VIEW : revealing(DEFAULT_GRAPH_VIEW, placedAt(ready.journey.graph.nodes ?? [], found.kind, ancestorsOf(ready.journey.graph.nodes ?? [], key)), ready.derived.nodes[key]?.display_state);
         return <Navigate replace to={canvasPath(id, reveal, key)} state={{ reveal: { key, how: "centre" } }} />;
       }}
     </JourneyGate>

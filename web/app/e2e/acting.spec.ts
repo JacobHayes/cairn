@@ -1,5 +1,5 @@
 // The acting surfaces in Chromium, the two write paths no unit test reaches: the
-// list's bulk bar (selection, one patch, the frontier list and its folds, C9, B6) and the cards'
+// list's bulk bar (selection, one patch, the frontier rows and the folds under them, C9, B6) and the cards'
 // pass (an answer, what it unlocked, passing, the inspector reached from the rail, a node
 // completed from the pass, C11), over a journey started from a route's form (B1). Every test
 // runs on the in-browser host, whose fixtures are fresh on every load. The rules behind both
@@ -84,22 +84,26 @@ test("B1, C11: a journey started from a route opens its walkthrough; an answer s
   await expect(page.getByTestId("unlocked-by").getByRole("link", { name: "Review the partner's criteria" })).toBeVisible();
 });
 
-test("C9: showing the not-relevant rows keeps the levels a person opened; a visit to the graph starts the levels afresh", async ({ page }) => {
+test("C9: a folded container stays folded across Show not relevant; a trip to the graph and back opens every level at All", async ({ page }) => {
   await openActing(page, "browser", "j_vendor_eval", "list");
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", /\d/);
   const total = Number(await page.getByTestId("list-total").getAttribute("data-total"));
-  await page.getByTestId("list-fold-all").click();
-  const folds = page.getByTestId("list-fold");
-  await expect(folds.first()).toHaveAttribute("aria-expanded", "true");
+  // At All every level is open; the viewer folds one.
+  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
+  const fold = page.getByTestId("list-fold").first();
+  const folded = await fold.locator("xpath=ancestor::tr").getAttribute("data-node");
+  await fold.click();
+  const row = page.locator(`[data-testid="list-row"][data-node="${folded ?? ""}"] [data-testid="list-fold"]`);
+  await expect(row).toHaveAttribute("aria-expanded", "false");
   await expect(page.getByTestId("filter-badge")).toBeVisible();
   await page.getByTestId("filter-button").click();
   await page.getByTestId("show-not-relevant").click();
   await expect(page.getByTestId("list-total")).not.toHaveAttribute("data-total", String(total));
-  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
+  await expect(row).toHaveAttribute("aria-expanded", "false");
   await page.getByTestId("show-not-relevant").click();
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", String(total));
   await page.getByTestId("view-graph").click();
   await page.getByTestId("view-list").click();
   await expect(page.getByTestId("list-fold").first()).toBeVisible();
-  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]').first()).toBeVisible();
+  await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
 });

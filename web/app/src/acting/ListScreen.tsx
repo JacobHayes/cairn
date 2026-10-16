@@ -1,28 +1,30 @@
-// C9: the list. By default the journey as a tree in plan order, folded to its top level,
-// each container saying how far along it is; opening every level is the flat table. Sorting a
-// column (its header) flattens it and puts each row's container under its title. With the
-// Frontier chip on it is the frontier: only what can move now, flat in rank order, each row
-// with its owner and primary action, and under the table what needs a look (C10). Not-relevant
-// rows are left out unless asked for, so the list holds what the plan's count does. With
-// DECISIONS on the rows are decisions with their answer, why, and what the answer affects
-// (C12). Hovering a row brings up its checkbox; the rows checked are the graph's one selection
-// (canvas/selection.ts), acted on in the inspector. The journey page (screens/JourneyFrame.tsx)
-// holds its toolbar and the filter it opens (ListFilters).
-import { useEffect, useMemo, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+// C9: the list. The journey as a tree of the nodes the level draws (journeys/requests.ts: the
+// detail step, the Filter and the search, the same level every view draws from), folded as the
+// ladder says and the viewer flips, each container saying how far along it is. Sorting a column
+// (its header) flattens it and puts each row's container under its title; every drawn node keeps
+// its row. With the Frontier chip on, the rows the frontier does not light fade, the frontier's
+// own rows say why they are there with their primary action under the title (C10), and under
+// the table is what needs a look. With DECISIONS on the rows are decisions with their answer,
+// why, and what the answer affects (C12). Hovering a row brings up its checkbox; the rows checked
+// are the graph's one selection (canvas/selection.ts), acted on in the inspector. The journey
+// page (screens/JourneyFrame.tsx) holds the view state the toolbar changes.
+import { useEffect, useMemo, useRef, type CSSProperties, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { useProjected } from "../canvas/hooks.ts";
+import { useFlips, useLevel, useProjected } from "../canvas/hooks.ts";
+import { currentStages, openAt, stepOf } from "../canvas/ladder.ts";
 import type { Selection } from "../canvas/selection.ts";
 import { decisionRows } from "../decisions/model.ts";
-import { type Ready } from "../detail/model.ts";
+import { recordOf, type Ready } from "../detail/model.ts";
 import { nodePath, screenPath } from "../detail/parts.tsx";
 import { useMineOf } from "../journeys/mine.ts";
-import { ancestorsOf } from "../plan/tree.ts";
+import { badgesOf, levelRequestOf, lightsUp, litOf, stepHides, tableQueryOf } from "../journeys/requests.ts";
+import type { ViewState } from "../journeys/view.ts";
+import { ancestorsOf, planOrder } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
-import { ViewBar } from "../screens/ViewControls.tsx";
+import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
-import { Button } from "../ui/kit.tsx";
-import { listPath, listQueryOf, type ListSettings } from "./address.ts";
+import { withListSettings, type ListSettings } from "./address.ts";
 import { Checks } from "./Controls.tsx";
 import { Cell, type CellContext } from "./ListCells.tsx";
 import { Folds } from "./Folds.tsx";
@@ -31,11 +33,6 @@ import { StalledPanel } from "./Stalled.tsx";
 import { addableColumns, columnsOf, columnWords, flatLines, givesWay, rankPositions, SORT_OF, treeLines, type Column, type Line } from "./listModel.ts";
 import { useRows } from "./useRows.ts";
 import "./acting.css";
-
-/** Whether any filter narrows the list: a narrowed tree opens, so every match is in sight. */
-function narrowed(settings: ListSettings): boolean {
-  return settings.flags.length + settings.states.length + settings.kinds.length > 0 || settings.within !== undefined || settings.owner !== undefined || settings.text.trim() !== "";
-}
 
 /** The columns held at the left while the table scrolls sideways. */
 function pinned(column: Column, columns: readonly Column[]): string | undefined {
@@ -47,13 +44,13 @@ function onRow(event: MouseEvent): boolean {
   return !(event.target instanceof Element && event.target.closest("a, button, select, input, textarea, label"));
 }
 
-function Head({ column, columns, settings, onSort }: { column: Column; columns: readonly Column[]; settings: ListSettings; onSort: (sort: ListSettings["sort"]) => void }) {
+function Head({ column, columns, list, decisions, onSort }: { column: Column; columns: readonly Column[]; list: ListSettings; decisions: boolean; onSort: (sort: ListSettings["sort"]) => void }) {
   const sort = SORT_OF[column];
-  const words = columnWords(column, settings.decisions);
+  const words = columnWords(column, decisions);
   if (sort === undefined) {
     return <th scope="col" data-column={column} data-gives-way={givesWay(column)} className={pinned(column, columns)}>{words}</th>;
   }
-  const active = settings.sort === sort;
+  const active = list.sort === sort;
   return (
     <th scope="col" aria-sort={active ? "descending" : "none"} data-column={column} data-gives-way={givesWay(column)} className={pinned(column, columns)} data-testid={`sort-${column}`}>
       <button type="button" className="list-sort" aria-label={`Sort by ${words.toLowerCase()}`} onClick={() => { onSort(active ? undefined : sort); }}>
@@ -64,7 +61,7 @@ function Head({ column, columns, settings, onSort }: { column: Column; columns: 
   );
 }
 
-function Row({ line, columns, context, selection, current }: { line: Line; columns: Column[]; context: CellContext; selection: Selection; current: boolean }) {
+function Row({ line, columns, context, selection, current, lit }: { line: Line; columns: Column[]; context: CellContext; selection: Selection; current: boolean; lit: ReadonlySet<string> | undefined }) {
   const { row } = line;
   const chosen = selection.members.length > 1 && selection.members.includes(line.key);
   const navigate = useNavigate();
@@ -88,6 +85,8 @@ function Row({ line, columns, context, selection, current }: { line: Line; colum
       style={{ "--depth": line.depth } as CSSProperties}
       data-slack={row?.slack_days ?? ""}
       data-selected={chosen}
+      data-lit={lit === undefined ? undefined : lit.has(line.key)}
+      data-frontier={context.frontier?.has(line.key) === true ? true : undefined}
       aria-selected={current}
       onClick={(event) => {
         // The row's own title link is the row clicked; any other link or control is its own.
@@ -123,17 +122,19 @@ function Row({ line, columns, context, selection, current }: { line: Line; colum
 }
 
 /** The table: its header (the column labels) and its lines. */
-function Table({ view, settings, lines, columns, context, selection, selected, everyLine }: {
-  view: Ready;
-  settings: ListSettings;
+function Table({ list, decisions, lines, columns, context, selection, selected, everyLine, lit }: {
+  list: ListSettings;
+  decisions: boolean;
   lines: Line[];
   columns: Column[];
   context: CellContext;
   selection: Selection;
   selected: string | undefined;
   everyLine: string[];
+  lit: ReadonlySet<string> | undefined;
 }) {
   const navigate = useNavigate();
+  const { pathname, search } = useLocation();
   const all = everyLine.length > 0 && everyLine.every((key) => selection.members.includes(key));
   return (
     <table className="data list-table" data-selecting={selection.members.length > 1} data-ranked={columns[0] === "rank"} data-testid="list-table">
@@ -143,32 +144,27 @@ function Table({ view, settings, lines, columns, context, selection, selected, e
             <input type="checkbox" className="list-checkbox" aria-label="Select every row shown" checked={all} onChange={() => { selection.set(all ? [] : everyLine); }} />
           </th>
           {columns.map((column) => (
-            <Head key={column} column={column} columns={columns} settings={settings} onSort={(sort) => void navigate(listPath(view.journey.header.id, { ...settings, sort }, selected))} />
+            <Head key={column} column={column} columns={columns} list={list} decisions={decisions} onSort={(sort) => void navigate(`${pathname}${withListSettings(search, { ...list, sort })}`)} />
           ))}
         </tr>
       </thead>
       <tbody>
         {lines.map((line) => (
-          <Row key={line.key} line={line} columns={columns} context={context} selection={selection} current={line.key === selected} />
+          <Row key={line.key} line={line} columns={columns} context={context} selection={selection} current={line.key === selected} lit={lit} />
         ))}
       </tbody>
     </table>
   );
 }
 
-/** The list's tree fold, count and Columns, which ride the end of the view controls' row. */
-function RowEnd({ view, settings, total, selectedNode, fold }: { view: Ready; settings: ListSettings; total: number | undefined; selectedNode: string | undefined; fold: { all: boolean; onAll: () => void } | undefined }) {
+/** The list's count and Columns, which ride the end of the view controls' row. */
+function RowEnd({ list, decisions, total }: { list: ListSettings; decisions: boolean; total: number | undefined }) {
   const navigate = useNavigate();
-  const journey = view.journey.header.id;
+  const { pathname, search } = useLocation();
   return (
     <>
-      {fold === undefined ? null : (
-        <Button ghost data-testid="list-fold-all" onClick={fold.onAll}>
-          {fold.all ? "Fold to the top level" : "Open every level"}
-        </Button>
-      )}
       <span className="muted" data-testid="list-total" data-total={total ?? ""}>
-        {total === undefined ? "Reading the list..." : `${String(total)} ${settings.decisions ? "decision" : "item"}${total === 1 ? "" : "s"}`}
+        {total === undefined ? "Reading the list..." : `${String(total)} ${decisions ? "decision" : "item"}${total === 1 ? "" : "s"}`}
       </span>
       <Menu
         label="Columns"
@@ -180,12 +176,12 @@ function RowEnd({ view, settings, total, selectedNode, fold }: { view: Ready; se
         {() => (
           <Checks
             legend="Show"
-            options={addableColumns(settings.decisions)}
-            chosen={settings.columns}
-            words={(column) => columnWords(column, settings.decisions)}
+            options={addableColumns(decisions)}
+            chosen={list.columns}
+            words={(column) => columnWords(column, decisions)}
             testId="column"
             stacked
-            onChange={(columns) => { void navigate(listPath(journey, { ...settings, columns }, selectedNode)); }}
+            onChange={(columns) => { void navigate(`${pathname}${withListSettings(search, { ...list, columns })}`); }}
           />
         )}
       </Menu>
@@ -193,83 +189,79 @@ function RowEnd({ view, settings, total, selectedNode, fold }: { view: Ready; se
   );
 }
 
-/** C10: under the frontier table, what the viewer holds that cannot be done yet, what needs a look, what is snoozed, and, when nothing can move, why. */
-function FrontierPanels({ view, settings, empty, stalled: held }: { view: Ready; settings: ListSettings; empty: boolean; stalled: boolean }) {
+/** C10: under the table while Frontier is on, what the viewer holds that cannot be done yet, what needs a look, what is snoozed, and, when nothing can move, why. */
+function FrontierPanels({ view, decisions, drawn }: { view: Ready; decisions: boolean; drawn: ReadonlySet<string> | undefined }) {
   const { pathname, search } = useLocation();
   const mine = useMineOf(view.journey.header.id);
   // The stalled panel already says what the journey waits on, so the line that says the same is left out.
-  const stalled = empty && held;
-  const mineNarrowing = { mine: settings.flags.includes("mine"), kinds: settings.kinds, decisions: settings.decisions, text: settings.text };
+  const stalled = view.derived.stalled != null;
+  const entries = mine.status === "ready" ? mine.entries.filter((entry) => drawn?.has(entry.node) === true) : [];
   return (
     <>
-      {mine.status === "ready" && !stalled ? <NextForYou view={view} entries={mine.entries} /> : null}
+      {!stalled ? <NextForYou view={view} entries={entries} /> : null}
       {stalled ? <StalledPanel view={view} /> : null}
-      <Folds view={view} settings={mineNarrowing} toOf={(key) => `${nodePath(screenPath(pathname), key)}${search}`} />
+      <Folds view={view} decisions={decisions} drawn={drawn} toOf={(key) => `${nodePath(screenPath(pathname), key)}${search}`} />
     </>
   );
 }
 
+/** The containers the step opens and the viewer's flips since the step was chosen (5.1): a flip holds until another step. */
+function useFolds(view: Ready, step: ViewState["step"], picks: number, selected: string | undefined) {
+  const { flipped, flip } = useFlips(step, picks);
+  const nodes = view.journey.graph.nodes ?? [];
+  const shown = stepOf({ step }, nodes);
+  const opens = useMemo(() => {
+    const active = nodes.filter((node) => recordOf(view, node).state === "active").map((node) => node.key);
+    return openAt(shown, nodes, currentStages(nodes, view.derived.acting_frontier, active));
+  }, [view, nodes, shown]);
+  // The open node's containers stay open, so it is not hidden in a fold.
+  const holding = useMemo(() => new Set(selected === undefined ? [] : ancestorsOf(view, selected)), [view, selected]);
+  const open = useMemo(() => (key: string) => holding.has(key) || opens(key) !== flipped.has(key), [holding, opens, flipped]);
+  return { open, flip };
+}
+
 /**
- * PLAN, LIST: the tree keeps its open and folded levels, which are the viewer's, across a
- * filter and a row-set toggle; the rows checked are the journey's one selection.
+ * PLAN, LIST: the rows the level draws, in the tree or sorted; the tree keeps the viewer's folds
+ * across a filter and a highlight; the rows checked are the journey's one selection.
  */
-export function ListBody({ view, settings, selected, selection }: { view: Ready; settings: ListSettings; selected?: string | undefined; selection: Selection }) {
-  const [folds, setFolds] = useState<{ by: ReadonlyMap<string, boolean>; every: boolean | undefined }>({ by: new Map(), every: undefined });
-  const query = useMemo(() => listQueryOf(settings), [settings]);
-  const { rows, error } = useRows(view, query);
-  // What Show not relevant would add under the same filters: the Filter badge says how many rows it leaves out.
-  const ruledOut = useRows(view, useMemo(() => ({ ...query, display_states: ["not_relevant" as const] }), [query])).rows?.length ?? 0;
-  const needsDecisions = settings.decisions || settings.columns.some((column) => ["answer", "why", "affects"].includes(column));
+export function ListBody({ view, state, picks, list, selected, selection }: { view: Ready; state: ViewState; picks: number; list: ListSettings; selected?: string | undefined; selection: Selection }) {
+  const nodes = view.journey.graph.nodes ?? [];
+  const step = stepOf({ step: state.step }, nodes);
+  const request = useMemo(() => levelRequestOf(state, step, []), [state, step]);
+  const { level, drawn, error: levelError } = useLevel(view, request);
+  const query = useMemo(() => tableQueryOf(state, list.sort), [state, list.sort]);
+  const { rows, error: rowsError } = useRows(view, query);
+  const needsDecisions = state.decisions || list.columns.some((column) => ["answer", "why", "affects"].includes(column));
   const projected = useProjected(view, needsDecisions ? { projection: "decision_view" as const } : undefined);
   const decisions = useMemo(() => new Map((projected.value === undefined ? [] : decisionRows(view, projected.value)).map((decision) => [decision.key, decision])), [view, projected.value]);
-  // Under the Frontier lens the places are the engine's order of the frontier, its ties broken as it breaks them (the graph's strip says them too).
-  const frontier = useProjected(view, settings.frontier ? { projection: "next" as const } : undefined);
-  const ranks = useMemo(() => (settings.frontier ? new Map((frontier.value?.items ?? []).map((row, at) => [row.key, at + 1])) : rankPositions(view)), [view, settings.frontier, frontier.value]);
-  const tree = settings.sort === undefined && !settings.decisions && !settings.frontier;
-  // The open node's containers stay open, so it is not hidden in a fold; a click flips what the rest would do.
-  const holding = useMemo(() => new Set(selected === undefined ? [] : ancestorsOf(view, selected)), [view, selected]);
-  const open = folds.every ?? narrowed(settings);
-  const isOpen = (key: string) => folds.by.get(key) ?? (open || holding.has(key));
+  const ranks = useMemo(() => rankPositions(view, state.frontier), [view, state.frontier]);
+  const order = useMemo(() => new Map(planOrder(view).map((key, at) => [key, at])), [view]);
+  const tree = list.sort === undefined && !state.decisions;
+  const folds = useFolds(view, state.step, picks, selected);
+  const kept = useMemo(() => (rows === undefined || drawn === undefined ? undefined : rows.filter((row) => drawn.has(row.key))), [rows, drawn]);
   const lines = useMemo(
-    () => (rows === undefined ? [] : tree ? treeLines(view, rows, (key) => folds.by.get(key) ?? (open || holding.has(key))) : flatLines(view, rows, settings.sort ?? (settings.frontier ? "rank" : undefined))),
-    [view, rows, tree, settings.sort, open, holding, folds.by],
+    () => (kept === undefined || level === undefined ? [] : tree ? treeLines(level.nodes, new Map(kept.map((row) => [row.key, row])), folds.open, order) : flatLines(view, kept, list.sort)),
+    [view, kept, level, tree, list.sort, folds.open, order],
   );
+  const base = useMemo(() => litOf("list", state, view), [state, view]);
+  const lit = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);
+  const frontier = useMemo(() => (state.frontier ? new Set(view.derived.acting_frontier) : undefined), [state.frontier, view.derived.acting_frontier]);
+  const badges = useMemo(() => badgesOf("list", level?.hidden_by_class ?? {}, base, stepHides(nodes, step, [])), [level, base, nodes, step]);
   const everyLine = lines.flatMap((line) => (line.row === undefined ? [] : [line.row.key]));
-  const columns = columnsOf(settings);
-  const context: CellContext = { view, tree, decisions, ranks, acting: settings.frontier, sort: settings.sort, onFold: (key) => { setFolds({ ...folds, by: new Map(folds.by).set(key, !isOpen(key)) }); } };
+  const columns = columnsOf(list, state.decisions);
+  const context: CellContext = { view, tree, decisions, ranks, frontier, sort: list.sort, onFold: folds.flip };
+  const error = levelError ?? rowsError;
   return (
     <section className="stack list" aria-label="List" data-testid="list">
-      <ViewBar
-        ready={view}
-        screen="list"
-        node={selected}
-        badges={ruledOut === 0 || settings.notRelevant ? undefined : { filter: { count: ruledOut, words: `${String(ruledOut)} not relevant hidden` } }}
-        end={
-          <RowEnd
-            view={view}
-            settings={settings}
-            total={rows?.length}
-            selectedNode={selected}
-            fold={tree ? { all: open, onAll: () => { setFolds({ by: new Map(), every: !open }); } } : undefined}
-          />
-        } />
+      <ViewBar ready={view} screen="list" badges={badges} end={<RowEnd list={list} decisions={state.decisions} total={kept?.length} />} />
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
-      <Table
-        view={view}
-        settings={settings}
-        lines={lines}
-        columns={columns}
-        context={context}
-        selection={selection}
-        selected={selected}
-        everyLine={everyLine}
-      />
-      {rows !== undefined && lines.length === 0 ? (
-        <p className="muted" data-testid="list-empty">
-          {!settings.frontier ? "Nothing matches. Change the filter to see more." : narrowed(settings) || settings.decisions ? "Nothing on the frontier matches these filters." : "Nothing is left to act on in this journey."}
+      <Table list={list} decisions={state.decisions} lines={lines} columns={columns} context={context} selection={selection} selected={selected} everyLine={everyLine} lit={lit} />
+      {kept !== undefined && level !== undefined && lines.length === 0 ? (
+        <p className="muted row" data-testid="list-empty">
+          Nothing matches at this detail, filter and search. <ResetView />
         </p>
       ) : null}
-      {settings.frontier ? <FrontierPanels view={view} settings={settings} empty={rows !== undefined && lines.length === 0} stalled={frontier.value?.stalled != null && frontier.value.items.length === 0} /> : null}
+      {state.frontier ? <FrontierPanels view={view} decisions={state.decisions} drawn={drawn} /> : null}
     </section>
   );
 }

@@ -58,7 +58,7 @@ pub fn route_level_of(request: &RouteLevelRequest) -> Result<Level, HostError> {
     let derived = derive(&graph, None, &inputs);
     let query = LevelQuery::of_kinds(request.shown.clone(), request.container.clone());
     DerivedJourney::new(&graph, &derived)
-        .level(&query, &request.deployment)
+        .level(&query, &request.deployment, &BTreeSet::new())
         .map_err(|error| HostError::Missing {
             message: error.to_string(),
         })

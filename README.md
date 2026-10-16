@@ -43,7 +43,7 @@ decisions that are waiting on someone. Hover a row to act on it.
 Open a decision and pick an answer. Before you save, Cairn shows what it changes: here,
 Yes brings in three steps and frees one to start.
 
-![A decision open beside the Frontier list, with Yes chosen and a preview of what saving does](docs/images/decision.png)
+![A decision open beside the list with Frontier on, Yes chosen and a preview of what saving does](docs/images/decision.png)
 
 ### The graph: what a step needs, and what it unlocks
 

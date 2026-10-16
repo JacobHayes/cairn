@@ -5,10 +5,10 @@ import { Link } from "react-router";
 
 import { titleOf, type Ready } from "../detail/model.ts";
 import type { Stalled } from "./model.ts";
-import { canvasPath, type CanvasView } from "./settings.ts";
+import { canvasPath, type GraphView } from "./settings.ts";
 
 /** One thing a stalled journey waits on (D5), in words, with a link to the node. */
-function Cause({ ready, view, cause }: { ready: Ready; view: CanvasView; cause: Stalled["waiting_on"][number] }) {
+function Cause({ ready, view, cause }: { ready: Ready; view: GraphView; cause: Stalled["waiting_on"][number] }) {
   const journey = ready.journey.header.id;
   const link = (key: string) => (
     <Link to={canvasPath(journey, view, key)} data-node={key}>
@@ -34,7 +34,7 @@ function Cause({ ready, view, cause }: { ready: Ready; view: CanvasView; cause: 
 }
 
 /** C5, D5: when the acting frontier is empty, what the journey is waiting on and why. */
-export function StalledSurface({ ready, view }: { ready: Ready; view: CanvasView }) {
+export function StalledSurface({ ready, view }: { ready: Ready; view: GraphView }) {
   const stalled = ready.derived.stalled;
   if (stalled == null) {
     return null;

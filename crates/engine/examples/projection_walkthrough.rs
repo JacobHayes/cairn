@@ -135,7 +135,11 @@ fn fixture_lines(name: &str, fixture: &Fixture, step: usize, out: &mut String) -
         .into_iter()
         .filter(|kind| *kind != NodeKind::Action)
         .collect();
-    let level = journey.level(&LevelQuery::of_kinds(shown, None), &Deployment::default())?;
+    let level = journey.level(
+        &LevelQuery::of_kinds(shown, None),
+        &Deployment::default(),
+        &BTreeSet::new(),
+    )?;
     let visible: Vec<String> = level
         .nodes
         .iter()
@@ -254,6 +258,7 @@ fn zooms(vendor: &Fixture, out: &mut String) -> Result<()> {
         &journey.level(
             &LevelQuery::of_kinds(BTreeSet::from([NodeKind::Group]), None),
             &Deployment::default(),
+            &BTreeSet::new(),
         )?,
         out,
     )?;
@@ -268,6 +273,7 @@ fn zooms(vendor: &Fixture, out: &mut String) -> Result<()> {
                 Some("n_setup".parse()?),
             ),
             &Deployment::default(),
+            &BTreeSet::new(),
         )?,
         out,
     )?;
@@ -279,7 +285,11 @@ fn zooms(vendor: &Fixture, out: &mut String) -> Result<()> {
         out,
         "Before kickoff (step 1), with groups and milestones hidden, Setup (a root) is hidden and its contents hoist to the top level; each blocked node whose prerequisite no drawn edge stands for carries the hidden-prerequisites marker:\n"
     )?;
-    let level = before.level(&LevelQuery::of_kinds(hoisted, None), &Deployment::default())?;
+    let level = before.level(
+        &LevelQuery::of_kinds(hoisted, None),
+        &Deployment::default(),
+        &BTreeSet::new(),
+    )?;
     let marked: Vec<String> = level
         .nodes
         .iter()

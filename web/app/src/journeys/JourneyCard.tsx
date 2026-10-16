@@ -6,7 +6,7 @@
 // What is still the viewer's to do is one muted line under the progress.
 import { Link, useLocation } from "react-router";
 
-import { DEFAULT_LIST, listPath, type ListFlag } from "../acting/address.ts";
+import type { ListFlag } from "../acting/address.ts";
 import { DetailLink } from "../acting/Parts.tsx";
 import { useProjected } from "../canvas/hooks.ts";
 import { useLive } from "../data/react.ts";
@@ -19,7 +19,8 @@ import { StatusSummaryView } from "../summary/StatusSummary.tsx";
 import { dateAway, dateWords } from "../timeline/model.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
-import { pagePath, switchedSearch } from "./address.ts";
+import { pagePath } from "./address.ts";
+import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, switchedSearch, viewStateParams } from "./view.ts";
 import { yoursOf } from "./figures-model.ts";
 import { JourneyFlow } from "../proposals/Entries.tsx";
 import { UpgradeMark } from "./JourneyIndex.tsx";
@@ -107,7 +108,7 @@ function Flags({ ready, model }: { ready: Ready; model: SummaryModel }) {
       {flags.map((each, at) => (
         <span key={each.flag}>
           {at === 0 ? "" : ", "}
-          <Link to={listPath(journey, { ...DEFAULT_LIST, flags: [each.flag] })} data-testid={`card-flag-${each.flag}`}>
+          <Link to={pagePath(journey, "list", undefined, viewStateParams({ ...DEFAULT_VIEW_STATE, filter: { ...DEFAULT_FILTER, flags: [each.flag] } }).toString())} data-testid={`card-flag-${each.flag}`}>
             {each.count} {each.words}
           </Link>
         </span>

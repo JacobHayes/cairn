@@ -3,6 +3,8 @@
 //! the fixtures and small constructed journeys.
 #![cfg(test)]
 
+use std::collections::BTreeSet;
+
 use crate::engine::support;
 
 use cairn_engine::{Derived, DerivedJourney, Records};
@@ -78,6 +80,7 @@ fn the_level_roll_up_carries_the_subtree_gravity() {
                 Some(key("n_onsite")),
             ),
             &Deployment::default(),
+            &BTreeSet::new(),
         )
         .unwrap_or_else(|error| panic!("{error:?}"));
     let debrief = level

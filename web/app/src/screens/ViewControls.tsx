@@ -1,43 +1,46 @@
-// The controls every view of a journey shares, one row: Detail (how much is drawn), Frontier and
-// Decisions (highlights), Filter, and Search. On the graph the row floats at the canvas's top
-// left; on the list, the timeline and the walk it sits at the top of the pane. The chips are the
-// address's `frontier`, `decisions`, `mine` and `q`, wired to each view's own filters
-// (acting/address.ts, canvas/settings.ts). Detail and Filter choose which cards are drawn;
-// Frontier and Decisions only highlight cards already there. State shows as a fixed-size badge on
-// the control, with the words in its tooltip, so no control changes width.
+// The controls every view of a journey shares, one row in a fixed order: Detail (how much is
+// drawn), Frontier and Decisions (highlights), Filter, and Search, then the view's own end slot.
+// On the graph the row floats at the canvas's top left (on a phone, folded into one View menu); on
+// the list, the timeline and the walk it sits at the top of the pane. Every control reads and
+// writes the journey's one view state (journeys/view.ts), so it means the same on every view:
+// Detail, Filter and search choose what is drawn, through the engine's level; Frontier and
+// Decisions only light what is there. What a view cannot honour stays, disabled, with its reason
+// in its title or, inside the Filter, under it. State shows as a fixed-size badge on the control,
+// with the words in its tooltip, so no control changes width; a Filter off its stock settings is
+// pressed.
 import { useState, type ReactNode } from "react";
-import { useLocation, useNavigate } from "react-router";
+import { useLocation } from "react-router";
 
-import { ACTING_KINDS, listFrom, listPath, triageFrom, triagePath } from "../acting/address.ts";
-import { Check, Checks } from "../acting/Controls.tsx";
-import { ListFilters } from "../acting/ListFilters.tsx";
-import { TriageControls } from "../acting/TriageScreen.tsx";
-import { STEP_WORDS } from "../canvas/ladder.ts";
+import { Check, FlagChecks } from "../acting/Controls.tsx";
+import { overBytes, TITLE_BYTES_MAX } from "../authoring/limits.ts";
+import { STEP_WORDS, stepOf, stepsFor } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
-import { canvasPath, viewFrom } from "../canvas/settings.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
+import { entityName } from "../detail/sections.tsx";
+import type { Screen } from "../journeys/address.ts";
+import { FILTER_FLAGS, filterChanged, filterChips, isStock, stockView, useViewState, withViewState, type ViewFilter } from "../journeys/view.ts";
 import { useMedia, PHONE_WIDTH } from "../shell/frame.tsx";
-import { chipApplies, pagePath, withMineFlipped, withParam, type Screen } from "../journeys/address.ts";
-import { DETAILS } from "../timeline/rows.ts";
-import { timelineFrom } from "../timeline/TimelineView.tsx";
+import { Button } from "../ui/kit.tsx";
 import { ActiveFilters } from "./ActiveFilters.tsx";
-import { activeFilters } from "./filters.ts";
+import type { Badge } from "./badge.ts";
 import { Menu } from "./Menu.tsx";
 
 /** The jargon term's words, in its tooltip. */
 const FRONTIER_WORDS = "What can move now: work that is ready and decisions that can be made, ranked by what they unlock and how soon they are due.";
 
-/** A state shown as a small count on a control, with the words that go in its tooltip. */
-export interface Badge {
-  count: number;
-  words: string;
-}
+/** Why the walk through's Frontier is disabled. */
+const WALK_FRONTIER = "Every card here is on the frontier. Frontier applies on the other views.";
 
-/** The detail levels on offer (coarse to fine), the one chosen, and what choosing does. */
-export interface DetailChoice {
-  steps: readonly Step[];
-  step: Step;
-  onStep: (step: Step) => void;
+/** Why a view's class switches are disabled, under them in the Filter. */
+const CLASS_REASON: Partial<Record<Screen, string>> = {
+  walk: "Every card here is work that applies.",
+  timeline: "The timeline has no dates for work that does not apply.",
+};
+
+/** What the badges on Filter and Detail say on this view (journeys/requests.ts, `badgesOf`). */
+export interface Badges {
+  filter?: Badge | undefined;
+  detail?: Badge | undefined;
 }
 
 function Dotted({ badge, testId, children }: { badge: Badge | undefined; testId: string; children: ReactNode }) {
@@ -58,18 +61,28 @@ function tip(words: string, badge: Badge | undefined): string {
   return badge === undefined || badge.count === 0 ? words : `${words}. ${badge.words}`;
 }
 
-/** The detail levels as radios, coarse to fine; choosing one closes the menu it is in. */
-function DetailOptions({ choice, close }: { choice: DetailChoice; close: () => void }) {
+/** The steps on offer for the journey and the one chosen. */
+function useSteps(ready: Ready): { steps: Step[]; step: Step } {
+  const { state } = useViewState();
+  const nodes = ready.journey.graph.nodes ?? [];
+  return { steps: stepsFor(nodes), step: stepOf({ step: state.step }, nodes) };
+}
+
+/** C2: the detail levels as radios, coarse to fine; choosing one closes the menu it is in. */
+function DetailOptions({ ready, close }: { ready: Ready; close: () => void }) {
+  const { state, onState } = useViewState();
+  const { steps, step } = useSteps(ready);
   return (
     <div className="opts" role="radiogroup" aria-label="Detail" data-testid="ladder">
-      {[...choice.steps].reverse().map((each) => (
+      {[...steps].reverse().map((each) => (
         <label key={each} className="opt">
           <input
             type="radio"
             name="detail"
-            checked={each === choice.step}
-            onChange={() => {
-              choice.onStep(each);
+            checked={each === step}
+            readOnly
+            onClick={() => {
+              onState({ ...state, step: each }, true);
               close();
             }}
           />
@@ -80,79 +93,99 @@ function DetailOptions({ choice, close }: { choice: DetailChoice; close: () => v
   );
 }
 
-function DetailMenu({ choice, badge }: { choice: DetailChoice; badge: Badge | undefined }) {
+function DetailMenu({ ready, badge }: { ready: Ready; badge: Badge | undefined }) {
+  const { step } = useSteps(ready);
   return (
     <Menu
-      label={`Detail: ${STEP_WORDS[choice.step]}`}
+      label={`Detail: ${STEP_WORDS[step]}`}
       title={tip("How much of the journey is drawn, 1 to 4", badge)}
       testId="detail-button"
       role="dialog"
       className="view-control"
       trigger={
         <Dotted badge={badge} testId="detail-badge">
-          Detail: {STEP_WORDS[choice.step]} ▾
+          Detail: {STEP_WORDS[step]} ▾
         </Dotted>
       }
     >
-      {(close) => <DetailOptions choice={choice} close={close} />}
+      {(close) => <DetailOptions ready={ready} close={close} />}
     </Menu>
   );
 }
 
-/** What the filter holds on this screen (each screen's own controls, mounted as they were). */
-function FilterBody({ ready, screen, node, search }: { ready: Ready; screen: Screen; node: string | undefined; search: string }) {
-  const navigate = useNavigate();
-  const journey = ready.journey.header.id;
-  const params = new URLSearchParams(search);
-  if (screen === "walk") {
-    // The walk through does not read Frontier or the Filter's switch, but the views it returns to do: keep them.
-    const dormant = (path: string) => {
-      const [base = path, query = ""] = path.split("?");
-      const kept = new URLSearchParams(query);
-      for (const name of ["frontier", "show"]) {
-        const value = params.get(name);
-        if (value !== null) {
-          kept.set(name, value);
-        }
-      }
-      return kept.size === 0 ? base : `${base}?${kept.toString()}`;
-    };
-    return <TriageControls settings={triageFrom(params)} onChange={(next) => void navigate(dormant(triagePath(journey, next, node)))} />;
-  }
-  if (screen === "timeline") {
-    const { kinds, decisions, flags } = listFrom(params);
-    return (
-      <>
-        <Check label="Mine" checked={flags.includes("mine")} testId="mine" onChange={() => { void navigate(pagePath(journey, screen, node, withMineFlipped(search))); }} />
-        {decisions ? (
-          <p className="muted small">Only decisions are shown. Turn Decisions off to filter by kind.</p>
-        ) : (
-          <Checks
-            legend="Kinds"
-            options={ACTING_KINDS}
-            chosen={kinds}
-            words={(kind) => kind}
-            testId="kind"
-            stacked
-            onChange={(chosen) => { void navigate(pagePath(journey, screen, node, withParam(search, "kind", chosen.length === 0 ? undefined : chosen.join(",")))); }}
-          />
-        )}
-      </>
-    );
-  }
-  if (screen === "list") {
-    return <ListFilters view={ready} settings={listFrom(params)} onChange={(next) => void navigate(listPath(journey, next, node))} />;
-  }
-  const view = viewFrom(params);
+/** C9, C1: the one Filter body: only mine, the owner, the flags, then the relevance classes, those this view cannot draw disabled with the reason under them. */
+function FilterBody({ ready, screen }: { ready: Ready; screen: Screen }) {
+  const { state, onState } = useViewState();
+  const { filter } = state;
+  const set = (changed: Partial<ViewFilter>) => {
+    onState({ ...state, filter: { ...filter, ...changed } });
+  };
+  const owners = (ready.inputs.deployment.entities ?? []).map((entity) => ({ key: entity.key, text: entityName(ready, entity.key) }));
+  const reason = CLASS_REASON[screen];
   return (
-    <div className="stack" role="group" aria-label="What the graph shows">
-      <Check label="Show conditional" checked={view.undecided} testId="show-conditional" onChange={(undecided) => { void navigate(canvasPath(journey, { ...view, undecided }, node)); }} />
-      <Check label="Show not relevant" checked={view.notRelevant} testId="show-not-relevant" onChange={(notRelevant) => { void navigate(canvasPath(journey, { ...view, notRelevant }, node)); }} />
+    <div className="stack" role="group" aria-label="Filter" data-testid="filter-body">
+      <Check label="Only mine" checked={filter.mine} testId="flag-mine" onChange={(mine) => { set({ mine }); }} />
+      <select aria-label="Owner" data-testid="filter-owner" value={filter.owner ?? ""} onChange={(event) => { set({ owner: event.target.value === "" ? undefined : event.target.value }); }}>
+        <option value="">Owner: any</option>
+        {owners.map((owner) => (
+          <option key={owner.key} value={owner.key}>
+            {owner.text}
+          </option>
+        ))}
+      </select>
+      <FlagChecks options={FILTER_FLAGS} chosen={filter.flags} onChange={(flags) => { set({ flags }); }} />
+      <hr />
+      <Check label="Show conditional" checked={filter.conditional} testId="show-conditional" disabled={screen === "walk"} onChange={(conditional) => { set({ conditional }); }} />
+      <Check label="Show not relevant" checked={filter.notRelevant} testId="show-not-relevant" disabled={reason !== undefined} onChange={(notRelevant) => { set({ notRelevant }); }} />
+      {reason === undefined ? null : (
+        <span className="muted small" data-testid="filter-disabled-reason">
+          {reason}
+        </span>
+      )}
     </div>
   );
 }
 
-function Search({ text, find, onSearch }: { text: string; find: boolean; onSearch: (text: string) => void }) {
+function FilterMenu({ ready, screen, badge }: { ready: Ready; screen: Screen; badge: Badge | undefined }) {
+  const { state } = useViewState();
+  return (
+    <Menu
+      label="Filter"
+      title={tip("Filter what is drawn", badge)}
+      testId="filter-button"
+      role="dialog"
+      className={filterChanged(state.filter) ? "view-control menu-pressed" : "view-control"}
+      trigger={
+        <Dotted badge={badge} testId="filter-badge">
+          Filter ▾
+        </Dotted>
+      }
+    >
+      {() => (
+        <div className="stack" data-testid="filter-panel">
+          <FilterBody ready={ready} screen={screen} />
+        </div>
+      )}
+    </Menu>
+  );
+}
+
+/** C2, C9: the search, which narrows every view to the engine's text matches. Keyed by the text, so a change from outside (a chip, Reset) shows. */
+function Search({ onDone }: { onDone?: () => void }) {
+  const { state, onState } = useViewState();
+  return (
+    <SearchBox
+      key={state.text}
+      text={state.text}
+      onSearch={(text) => {
+        onState({ ...state, text });
+        onDone?.();
+      }}
+    />
+  );
+}
+
+function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) => void }) {
   const [typed, setTyped] = useState(text);
   return (
     <form
@@ -160,55 +193,61 @@ function Search({ text, find, onSearch }: { text: string; find: boolean; onSearc
       role="search"
       onSubmit={(event) => {
         event.preventDefault();
-        onSearch(typed.trim());
+        // The engine reads the search as a title (PRACTICES, Explicit limits): a longer one never leaves the box.
+        const problem = overBytes(typed.trim(), TITLE_BYTES_MAX, "The search");
+        const input = event.currentTarget.elements.namedItem("q");
+        if (input instanceof HTMLInputElement) {
+          input.setCustomValidity(problem ?? "");
+          input.reportValidity();
+        }
+        if (problem === undefined) {
+          onSearch(typed.trim());
+        }
       }}
     >
       <input
         type="search"
         aria-label="Search"
         placeholder="Search"
-        title={find ? "Find a node by title, then Enter  /" : "Filter by text, then Enter  /"}
+        title="Search titles, descriptions, notes and resources, then Enter  /"
         data-testid="toolbar-search"
         data-search-input=""
+        name="q"
         value={typed}
-        onChange={(event) => { setTyped(event.target.value); }}
+        onChange={(event) => {
+          event.target.setCustomValidity("");
+          setTyped(event.target.value);
+        }}
       />
     </form>
   );
 }
 
-/** Frontier and Decisions: highlights that change nothing drawn, only what stands out. */
+/** C10, C12: Frontier and Decisions: highlights that never change the level, only what stands out (on the list and the walk through, Decisions also narrows the rows or cards to the decisions). The walk through's every card is on the frontier, so its Frontier is disabled. */
 function Highlights({ ready, screen }: { ready: Ready; screen: Screen }) {
-  const { pathname, search } = useLocation();
-  const navigate = useNavigate();
-  const params = new URLSearchParams(search);
-  const decisions = params.get("decisions") === "1";
-  const frontier = params.get("frontier") === "1";
+  const { state, onState } = useViewState();
   const decisionCount = ready.derived.acting_frontier.filter((key) => nodeOf(ready, key)?.kind === "decision").length;
-  const set = (name: string, value: string | undefined) => {
-    void navigate(`${pathname}${withParam(search, name, value)}`);
-  };
+  const walk = screen === "walk";
   return (
     <>
-      {chipApplies("frontier", screen) ? (
-        <button
-          type="button"
-          className="chip"
-          aria-pressed={frontier}
-          title={`Frontier  Shift F. ${String(ready.derived.acting_frontier.length)} can move now. ${FRONTIER_WORDS}`}
-          data-testid="chip-frontier"
-          onClick={() => { set("frontier", frontier ? undefined : "1"); }}
-        >
-          Frontier
-        </button>
-      ) : null}
       <button
         type="button"
         className="chip"
-        aria-pressed={decisions}
+        aria-pressed={state.frontier}
+        disabled={walk}
+        title={walk ? WALK_FRONTIER : `Frontier  Shift F. ${String(ready.derived.acting_frontier.length)} can move now. ${FRONTIER_WORDS}`}
+        data-testid="chip-frontier"
+        onClick={() => { onState({ ...state, frontier: !state.frontier }); }}
+      >
+        Frontier
+      </button>
+      <button
+        type="button"
+        className="chip"
+        aria-pressed={state.decisions}
         title={`Decisions  d. ${String(decisionCount)} can be made now.`}
         data-testid="chip-decisions"
-        onClick={() => { set("decisions", decisions ? undefined : "1"); }}
+        onClick={() => { onState({ ...state, decisions: !state.decisions }); }}
       >
         Decisions
       </button>
@@ -216,74 +255,34 @@ function Highlights({ ready, screen }: { ready: Ready; screen: Screen }) {
   );
 }
 
+/** Reset the view: the way back from an empty view, offered only off the stock view. Frontier stays (it hides nothing). */
+export function ResetView() {
+  const { state, onState } = useViewState();
+  return isStock(state) ? null : (
+    <Button ghost title="Back to All, the stock filter, no search and Decisions off" data-testid="reset-view" onClick={() => { onState(stockView(state), true); }}>
+      Reset the view
+    </Button>
+  );
+}
+
 export interface ViewControlsProps {
   ready: Ready;
   screen: Screen;
-  node: string | undefined;
-  /** The graph's detail levels; the timeline's are read from the address. */
-  detail?: DetailChoice | undefined;
-  /** What the graph's filter and detail hide, as badges. */
-  badges?: { filter?: Badge | undefined; detail?: Badge | undefined } | undefined;
-  /** The graph's find: the node a search names, opened on the canvas. */
-  onFind?: ((text: string) => void) | undefined;
+  /** What the view's filter and detail hide, as badges. */
+  badges?: Badges | undefined;
   /** What a screen puts at the row's end (the list's Columns and count). */
   end?: ReactNode;
 }
 
-/** The timeline's detail levels, read from and written to the address. */
-function useTimelineDetail(screen: Screen, search: string): DetailChoice | undefined {
-  const navigate = useNavigate();
-  const { pathname } = useLocation();
-  if (screen !== "timeline") {
-    return undefined;
-  }
-  return {
-    steps: DETAILS,
-    step: timelineFrom(new URLSearchParams(search)).detail,
-    onStep: (step) => void navigate(`${pathname}${withParam(search, "detail", step === "stages" ? undefined : step)}`),
-  };
-}
-
-/** The search box: the graph's finds a node (and the menu it is in closes), the others filter by text. Keyed by screen: text typed for the graph's find is not a filter the next view holds. */
-function Find({ screen, onFind, onDone }: { screen: Screen; onFind: ((text: string) => void) | undefined; onDone?: () => void }) {
-  const { pathname, search } = useLocation();
-  const navigate = useNavigate();
-  const text = new URLSearchParams(search).get("q") ?? "";
-  return (
-    <Search
-      key={`${screen}:${text}`}
-      text={text}
-      find={screen === "graph"}
-      onSearch={(typed) => {
-        if (screen === "graph") {
-          onFind?.(typed);
-          onDone?.();
-        } else {
-          void navigate(`${pathname}${withParam(search, "q", typed === "" ? undefined : typed)}`);
-        }
-      }}
-    />
-  );
-}
-
 /** The graph's controls on a phone, where the canvas has room for one button: the same controls in a View menu, with the detail and filter badges on it. */
-function PhoneControls({ ready, screen, node, chosen, badges, filter, onFind }: {
-  ready: Ready;
-  screen: Screen;
-  node: string | undefined;
-  chosen: DetailChoice | undefined;
-  badges: ViewControlsProps["badges"];
-  filter: Badge | undefined;
-  onFind: ((text: string) => void) | undefined;
-}) {
-  const { search } = useLocation();
-  const shown = [badges?.detail, filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
+function PhoneControls({ ready, screen, badges }: { ready: Ready; screen: Screen; badges: Badges | undefined }) {
+  const shown = [badges?.detail, badges?.filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
   const total = { count: shown.reduce((sum, badge) => sum + badge.count, 0), words: shown.map((badge) => badge.words).join(". ") };
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <Menu
         label="View"
-        title={tip("Detail, highlights, filter and find", total)}
+        title={tip("Detail, highlights, filter and search", total)}
         testId="view-button"
         role="dialog"
         className="view-control"
@@ -295,12 +294,12 @@ function PhoneControls({ ready, screen, node, chosen, badges, filter, onFind }: 
       >
         {(close) => (
           <div className="stack" data-testid="view-panel-phone">
-            {chosen === undefined ? null : <DetailOptions choice={chosen} close={close} />}
+            <DetailOptions ready={ready} close={close} />
             <div className="row">
               <Highlights ready={ready} screen={screen} />
             </div>
-            <FilterBody ready={ready} screen={screen} node={node} search={search} />
-            <Find screen={screen} onFind={onFind} onDone={close} />
+            <FilterBody ready={ready} screen={screen} />
+            <Search onDone={close} />
           </div>
         )}
       </Menu>
@@ -308,53 +307,32 @@ function PhoneControls({ ready, screen, node, chosen, badges, filter, onFind }: 
   );
 }
 
-export function ViewControls({ ready, screen, node, detail, badges, onFind, end }: ViewControlsProps) {
-  const { search } = useLocation();
+export function ViewControls({ ready, screen, badges, end }: ViewControlsProps) {
   // The graph's controls float over the canvas, where a phone has room for one: they fold into a View menu.
   const phone = useMedia(PHONE_WIDTH);
-  const collapsed = screen === "graph" && phone;
-  const timelineDetail = useTimelineDetail(screen, search);
-  const chosen = detail ?? timelineDetail;
-  const active = activeFilters(ready.journey.header.id, screen, search, node);
-  const filter: Badge | undefined = badges?.filter ?? (active.length === 0 ? undefined : { count: active.length, words: `${String(active.length)} on` });
-  if (collapsed) {
-    return <PhoneControls ready={ready} screen={screen} node={node} chosen={chosen} badges={badges} filter={filter} onFind={onFind} />;
+  if (screen === "graph" && phone) {
+    return <PhoneControls ready={ready} screen={screen} badges={badges} />;
   }
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
-      {chosen === undefined ? null : <DetailMenu choice={chosen} badge={badges?.detail} />}
+      <DetailMenu ready={ready} badge={badges?.detail} />
       <Highlights ready={ready} screen={screen} />
-      <Menu
-        label="Filter"
-        title={tip("Filter what is drawn", filter)}
-        testId="filter-button"
-        role="dialog"
-        className="view-control"
-        trigger={
-          <Dotted badge={filter} testId="filter-badge">
-            Filter ▾
-          </Dotted>
-        }
-      >
-        {() => (
-          <div className="stack" data-testid="filter-panel">
-            <FilterBody ready={ready} screen={screen} node={node} search={search} />
-          </div>
-        )}
-      </Menu>
-      <Find screen={screen} onFind={onFind} />
+      <FilterMenu ready={ready} screen={screen} badge={badges?.filter} />
+      <Search />
       {end === undefined ? null : <div className="view-controls-end">{end}</div>}
     </div>
   );
 }
 
-/** The row at the top of a list, timeline or walk pane, with the filters it has on as removable chips. */
-export function ViewBar({ ready, screen, node, end, badges }: { ready: Ready; screen: Screen; node: string | undefined; end?: ReactNode; badges?: ViewControlsProps["badges"] }) {
-  const { search } = useLocation();
+/** The row at the top of a list, timeline or walk pane, with the Filter's settings and the search as removable chips. */
+export function ViewBar({ ready, screen, end, badges }: { ready: Ready; screen: Screen; end?: ReactNode; badges?: Badges | undefined }) {
+  const { pathname, search } = useLocation();
+  const { state } = useViewState();
+  const chips = filterChips(state, (key) => entityName(ready, key)).map((chip) => ({ id: chip.id, label: chip.label, without: `${pathname}${withViewState(search, chip.without)}` }));
   return (
     <div className="view-bar stack">
-      <ViewControls ready={ready} screen={screen} node={node} end={end} badges={badges} />
-      <ActiveFilters filters={activeFilters(ready.journey.header.id, screen, search, node)} />
+      <ViewControls ready={ready} screen={screen} end={end} badges={badges} />
+      <ActiveFilters filters={chips} />
     </div>
   );
 }

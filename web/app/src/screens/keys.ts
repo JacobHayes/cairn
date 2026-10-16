@@ -2,14 +2,18 @@
 // The bindings that ship with the journey pages move you or change the view: `j` and `k`
 // (next and previous row), `Enter` (the open node's primary action), `Esc` (close a popover,
 // then the sheet, then clear the selection),
-// `v` (next view), `F` (FRONTIER; the canvas has `f` for fit), `w` (walk through), `d` and `m` (DECISIONS and MINE), `/` (search),
-// `?` (the sheet). `p` (pass) is the walk through's own (acting/TriageScreen.tsx). Pure helpers carry the decisions, so they
-// are tested without a page.
+// `v` (next view), `F` (FRONTIER; the canvas has `f` for fit), `w` (walk through), `d` and `m` (DECISIONS and Only mine),
+// `1` to `4` (the detail step), `/` (search), `?` (the sheet). The view-state keys change the journey's one view state
+// (journeys/view.ts) wherever their control is live: none on the Summary, and not `F` on the walk through, whose every card
+// is on the frontier. `p` (pass) is the walk through's own (acting/TriageScreen.tsx). Pure helpers carry the decisions, so
+// they are tested without a page.
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 
+import { STEPS, type Step } from "../canvas/model.ts";
 import { screenPath, nodePath } from "../detail/parts.tsx";
-import { chipApplies, nextProjection, pagePath, switchedSearch, withMineFlipped, withParam, type Projection, type Screen } from "../journeys/address.ts";
+import { nextProjection, pagePath, type Projection, type Screen } from "../journeys/address.ts";
+import { switchedSearch, type ViewState } from "../journeys/view.ts";
 import { typing } from "../ui/typing.ts";
 
 /** The bindings the sheet lists, each with its words; `group` heads the run of rows it starts. The canvas handles its own keys (canvas/GraphCanvas.tsx) and the table lists them. */
@@ -21,13 +25,19 @@ export const KEY_BINDINGS: { keys: string; words: string; group?: string }[] = [
   { keys: "Shift F", words: "Toggle Frontier" },
   { keys: "w", words: "Walk through the frontier" },
   { keys: "d", words: "Toggle Decisions" },
-  { keys: "m", words: "Toggle Mine, where the projection has it" },
-  { keys: "/", words: "Search or find" },
+  { keys: "m", words: "Toggle Only mine" },
+  { keys: "1 - 4", words: "Detail: Stages, Decisions, Deliverables or All" },
+  { keys: "/", words: "Search" },
   { keys: "p", words: "Pass, in the walk through" },
   { keys: "?", words: "This sheet" },
   { keys: "f", words: "Fit the selection, or the whole graph with none", group: "Graph" },
-  { keys: "1 - 4", words: "Show Stages, Decisions, Work or All" },
 ];
+
+/** The step key `key` picks (`1` Stages to `4` All), when the journey offers it. */
+export function stepForKey(key: string, steps: readonly Step[]): Step | undefined {
+  const step = /^[1-4]$/.test(key) ? STEPS[Number(key) - 1] : undefined;
+  return step !== undefined && steps.includes(step) ? step : undefined;
+}
 
 /** The key `step` rows after `selected` in `keys` (the first when none is selected), or none past an end. */
 export function rowAfter(keys: readonly string[], selected: string | undefined, step: 1 | -1): string | undefined {
@@ -67,6 +77,10 @@ export interface KeysProps {
   selected: string | undefined;
   sheetOpen: boolean;
   setSheetOpen: (open: boolean) => void;
+  /** The view state, the steps the journey offers, and how a key changes the state. */
+  state: ViewState;
+  steps: readonly Step[];
+  onState: (next: ViewState, picked?: boolean) => void;
 }
 
 /** What one key press acts on: the props, and where the page is now. */
@@ -88,10 +102,33 @@ function escape({ selected, sheetOpen, setSheetOpen, pathname, search, go }: Hea
   }
 }
 
-/** The chips and the views: keys that exist where a journey screen has them. */
+/** The view state's keys: where their control is live, each changes the state (the summary has none). */
+function onViewState(key: string, { screen, state, steps, onState }: Heard): boolean {
+  if (!["F", "d", "m", "1", "2", "3", "4"].includes(key)) {
+    return false;
+  }
+  if (screen === "summary") {
+    return true;
+  }
+  const step = stepForKey(key, steps);
+  if (step !== undefined) {
+    onState({ ...state, step }, true);
+  } else if (key === "F" && screen !== "walk") {
+    onState({ ...state, frontier: !state.frontier });
+  } else if (key === "d") {
+    onState({ ...state, decisions: !state.decisions });
+  } else if (key === "m") {
+    onState({ ...state, filter: { ...state.filter, mine: !state.filter.mine } });
+  }
+  return true;
+}
+
+/** The views and the rows: keys that exist where a journey screen has them. */
 function onChips(key: string, heard: Heard): boolean {
   const { journey, screen, selected, pathname, search, go } = heard;
-  const toggle = (name: string) => { go(`${pathname}${withParam(search, name, new URLSearchParams(search).get(name) === "1" ? undefined : "1")}`); };
+  if (onViewState(key, heard)) {
+    return true;
+  }
   switch (key) {
     case "v": {
       if (screen !== "graph" && screen !== "list" && screen !== "timeline") {
@@ -103,21 +140,6 @@ function onChips(key: string, heard: Heard): boolean {
     }
     case "w":
       go(pagePath(journey, "walk", undefined, switchedSearch(search, screen, "walk")));
-      return true;
-    case "F":
-      if (chipApplies("frontier", screen)) {
-        toggle("frontier");
-      }
-      return true;
-    case "d":
-      if (chipApplies("decisions", screen)) {
-        toggle("decisions");
-      }
-      return true;
-    case "m":
-      if (chipApplies("mine", screen)) {
-        go(`${pathname}${withMineFlipped(search)}`);
-      }
       return true;
     case "/":
       return focusSearch();
@@ -160,14 +182,14 @@ function heardKey(event: KeyboardEvent, heard: Heard): void {
 export function useJourneyKeys(props: KeysProps): void {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
-  const { journey, screen, selected, sheetOpen, setSheetOpen } = props;
+  const { journey, screen, selected, sheetOpen, setSheetOpen, state, steps, onState } = props;
   useEffect(() => {
     const heard = (event: KeyboardEvent) => {
-      heardKey(event, { journey, screen, selected, sheetOpen, setSheetOpen, pathname, search, go: (to) => void navigate(to) });
+      heardKey(event, { journey, screen, selected, sheetOpen, setSheetOpen, state, steps, onState, pathname, search, go: (to) => void navigate(to) });
     };
     document.addEventListener("keydown", heard);
     return () => {
       document.removeEventListener("keydown", heard);
     };
-  }, [journey, screen, selected, sheetOpen, setSheetOpen, pathname, search, navigate]);
+  }, [journey, screen, selected, sheetOpen, setSheetOpen, state, steps, onState, pathname, search, navigate]);
 }

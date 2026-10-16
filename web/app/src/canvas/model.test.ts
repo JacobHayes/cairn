@@ -9,7 +9,6 @@ import { lensChips } from "./lens.ts";
 import { DOTTED, hereWords, lineLook, nodeClasses } from "./look.ts";
 import { cardsOf, linesOf, type CanvasModel, type Card, type Level } from "./model.ts";
 import { TRACE_LABELS, traceOverlay } from "./overlay.ts";
-import { DEFAULT_VIEW, levelRequest } from "./settings.ts";
 
 const view = canvasView();
 const graph = view.journey.graph.nodes ?? [];
@@ -139,17 +138,6 @@ describe("C1: lines", () => {
     const [line] = linesOf(level, graph);
     expect([line?.kind, line?.count]).toEqual(["requires", 2]);
     expect(line && lineLook(line).dash).toBeUndefined();
-  });
-
-});
-
-describe("C1, C2: the level request", () => {
-  test.each([
-    ["conditional left out", { undecided: false }, ["relevant"]],
-    ["not relevant shown", { notRelevant: true }, undefined],
-    ["the defaults hide only the settled not-relevant", {}, ["relevant", "conditional"]],
-  ])("%s", (_, settings, display) => {
-    expect(levelRequest({ ...DEFAULT_VIEW, ...settings }, { kinds: ["group"], collapsed: [] }).display).toEqual(display);
   });
 
 });

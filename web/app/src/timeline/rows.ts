@@ -1,11 +1,12 @@
-// C13: the timeline's rows, which follow the containment tree. The detail ladder folds them as
-// it folds the graph: Stages shows the top-level stages (the current ones open to the work in
-// them), Decisions adds decisions and nested groups, Deliverables adds the deliverables, All the actions. A
-// container that is folded, or whose children the step leaves out, is one bar from its earliest
-// start to its latest due, filled by done over total. Each row says its date in plain words.
-// A selected row also gets its float and its dependency lines; everything else fades. Nodes
-// with no date are not rows: they gather in a list. Pure, so the unit tests check it without
-// a page.
+// C13: the timeline's rows: the nodes the journey's level draws (journeys/requests.ts: the detail
+// step, the Filter and the search, as every view draws them) that have dates, each under the
+// drawn node it is drawn under, folded as the ladder says and the viewer flips (at Stages only
+// the current stages open). A container that is folded, or whose children the level leaves out,
+// is one bar from its earliest start to its latest due, filled by done over total. Each row says
+// its date in plain words. A selected row also gets its float and its dependency lines, and
+// what its trace does not reach fades; so does what Frontier or Decisions does not light, the
+// lowest opacity winning. Drawn nodes with no date are not rows: they gather in a list. Pure,
+// so the unit tests check it without a page.
 //
 // Cost: O(nodes + selected dependencies) per timeline.
 import { nodeOf, recordOf, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
@@ -13,18 +14,6 @@ import { ancestorsOf, planOrder, rollups, treeOf } from "../plan/tree.ts";
 import { daysWords, dueWords, daysUntil } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
 import { dateWords, type DateOrigin, type Timeline, type TimelineEntry } from "./model.ts";
-
-/** The detail ladder's steps, coarsest first (5.1). */
-export const DETAILS = ["stages", "decisions", "work", "all"] as const;
-export type Detail = (typeof DETAILS)[number];
-
-/** The kinds each step shows. A top-level node is shown whatever its kind, except at Stages, where only stages and milestones are. */
-const STEP_KINDS: Record<Detail, readonly NodeKind[]> = {
-  stages: ["group", "milestone"],
-  decisions: ["group", "milestone", "decision"],
-  work: ["group", "milestone", "decision", "deliverable"],
-  all: ["group", "milestone", "decision", "deliverable", "action"],
-};
 
 /** How a row is drawn. */
 export type Shape = "span" | "bar" | "tick" | "decision" | "milestone";
@@ -55,7 +44,7 @@ export interface ChartRow {
   open: boolean;
   /** The selected row's float: earliest to latest start. */
   float: { from: string; to: string } | undefined;
-  /** Faded: a filter excludes it, or the selection's trace does not reach it. */
+  /** Faded: the selection's trace does not reach it, or a highlight does not light it. */
   faded: boolean;
 }
 
@@ -73,34 +62,6 @@ export interface Chart {
   dependencies: Dependency[];
   /** Every date the rows and the selected row's float lie on, for the axis. */
   dates: string[];
-}
-
-/** What the toolbar narrows the timeline to (2.3: it fades what does not match, and FRONTIER leaves it out). */
-export interface Narrowing {
-  decisions: boolean;
-  kinds: readonly NodeKind[];
-  text: string;
-  /** The nodes the viewer holds, when MINE is on. */
-  mine: ReadonlySet<string> | undefined;
-  /** The nodes on the acting frontier, when FRONTIER is on: only they and what holds them are shown. */
-  frontier: ReadonlySet<string> | undefined;
-}
-
-/** Whether a toolbar chip is narrowing the timeline at all. */
-export function narrowing(narrow: Narrowing): boolean {
-  return narrow.decisions || narrow.kinds.length > 0 || narrow.text.trim() !== "" || narrow.mine !== undefined || narrow.frontier !== undefined;
-}
-
-/** Whether `node` is full strength under the toolbar's chips. */
-export function keeps(narrow: Narrowing, node: Pick<GraphNode, "key" | "kind" | "title">): boolean {
-  const wanted = narrow.text.trim().toLowerCase();
-  return (
-    (!narrow.decisions || node.kind === "decision") &&
-    (narrow.decisions || narrow.kinds.length === 0 || narrow.kinds.includes(node.kind)) &&
-    (wanted === "" || node.title.toLowerCase().includes(wanted)) &&
-    (narrow.mine === undefined || narrow.mine.has(node.key)) &&
-    (narrow.frontier === undefined || narrow.frontier.has(node.key))
-  );
 }
 
 interface Extent {
@@ -161,11 +122,13 @@ function wordsOf(view: Ready, node: GraphNode, own: Own | undefined, progress: C
 }
 
 export interface ChartOptions {
-  detail: Detail;
-  /** Containers the person has flipped from what the step would do. */
-  flipped: ReadonlySet<string>;
+  /** The level's nodes, each with the drawn node it is drawn under. */
+  drawn: readonly { key: string; parent?: string | null }[];
+  /** Whether a container is open: the step's rule with the viewer's flips (canvas/ladder.ts, `openAt`). */
+  open: (key: string) => boolean;
   selected: string | undefined;
-  narrow: Narrowing;
+  /** What Frontier or Decisions lights, with the containers above it; none with no highlight. */
+  lit: ReadonlySet<string> | undefined;
 }
 
 /** What the journey dates: each in-scope node's own dates, and what each one's whole subtree spans. */
@@ -207,36 +170,51 @@ function datedOf(view: Ready, timeline: Timeline): Dated {
   return { entries, owns, spans, inScope, scopedChildren, roots };
 }
 
-/** The rows the step shows, a folded or step-limited container as one bar. */
+/** The drawn nodes that are rows (those with dates), each under the nearest of them it is drawn beneath, siblings in plan order. */
+function treeOfRows(view: Ready, dated: Dated, drawn: ChartOptions["drawn"]): Map<string | undefined, string[]> {
+  const parents = new Map(drawn.map((node) => [node.key, node.parent ?? undefined]));
+  const dates = (key: string) => dated.spans.get(key) !== undefined;
+  const above = (key: string): string | undefined => {
+    let at = parents.get(key);
+    while (at !== undefined && !dates(at)) {
+      at = parents.get(at);
+    }
+    return at;
+  };
+  const order = new Map(planOrder(view).map((key, at) => [key, at]));
+  const place = (key: string) => order.get(key) ?? Number.MAX_SAFE_INTEGER;
+  const children = new Map<string | undefined, string[]>();
+  for (const { key } of drawn) {
+    if (dates(key)) {
+      const parent = above(key);
+      children.set(parent, [...(children.get(parent) ?? []), key]);
+    }
+  }
+  for (const kids of children.values()) {
+    kids.sort((left, right) => place(left) - place(right));
+  }
+  return children;
+}
+
+/** The rows the level draws, a folded or step-limited container as one bar. */
 function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
-  const { entries, owns, spans, scopedChildren, roots } = dated;
+  const { entries, owns, spans, scopedChildren } = dated;
   const rolls = rollups(view);
   const today = view.derived.today;
-  // Current stages hold what is happening now: an acting-frontier or active node.
-  const frontier = new Set(view.derived.acting_frontier);
-  const current = (key: string): boolean => frontier.has(key) || view.derived.nodes[key]?.display_state === "active" || scopedChildren(key).some(current);
-  // The selected row is always shown, under open containers; its own fold stays its own.
+  const children = treeOfRows(view, dated, options.drawn);
+  // The selected row, or the row standing for it, is always in sight: the containers above it are held open.
   const revealing = new Set(options.selected === undefined ? [] : ancestorsOf(view, options.selected));
-  const forced = new Set(options.selected === undefined ? [] : [options.selected, ...revealing]);
   const rows: ChartRow[] = [];
-  const visit = (key: string, depth: number, step: Detail) => {
+  const visit = (key: string, depth: number) => {
     const node = nodeOf(view, key);
     const span = spans.get(key);
     const derived = view.derived.nodes[key];
     if (node === undefined || derived === undefined || span === undefined) {
       return;
     }
-    // At Stages a current stage opens to the Deliverables step; elsewhere the step is the same all the way down.
-    const childStep: Detail = step === "stages" ? "work" : step;
-    // What the step leaves out hands its dated descendants up to the nearest row that is shown.
-    const shown = (keys: readonly string[]): string[] =>
-      keys.flatMap((child) => {
-        const kind = nodeOf(view, child)?.kind;
-        return forced.has(child) || (kind !== undefined && STEP_KINDS[childStep].includes(kind)) ? [child] : shown(scopedChildren(child));
-      });
-    const kids = shown(scopedChildren(key)).filter((child) => spans.get(child) !== undefined);
+    const kids = children.get(key) ?? [];
     const container = scopedChildren(key).length > 0;
-    const open = kids.length > 0 && (revealing.has(key) || (options.detail !== "stages" || current(key)) !== options.flipped.has(key));
+    const open = kids.length > 0 && (revealing.has(key) || options.open(key));
     const own = container ? undefined : owns.get(key);
     const progress = container ? rolls.get(key) : undefined;
     const late = entries.get(key)?.overdue === true && own !== undefined ? Math.max(0, -daysUntil(own.to, today)) : 0;
@@ -262,15 +240,10 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
       faded: false,
     });
     if (open) {
-      kids.forEach((child) => { visit(child, depth + 1, childStep); });
+      kids.forEach((child) => { visit(child, depth + 1); });
     }
   };
-  // Stages is the calm view: top-level stages and milestones, the decisions arriving with their step.
-  const wanted = (root: string) => {
-    const kind = nodeOf(view, root)?.kind;
-    return options.detail !== "stages" || forced.has(root) || (kind !== undefined && STEP_KINDS.stages.includes(kind));
-  };
-  roots.filter((root) => spans.get(root) !== undefined && wanted(root)).forEach((root) => { visit(root, 0, options.detail); });
+  (children.get(undefined) ?? []).forEach((root) => { visit(root, 0); });
   return rows;
 }
 
@@ -326,44 +299,30 @@ function selectionOf(view: Ready, rows: ChartRow[], selected: string): { row: st
   return { row, dependencies };
 }
 
+/** C13: the chart of the drawn nodes: their rows, the selection's float and lines, what fades, and the drawn work with no date. */
 export function chartOf(view: Ready, timeline: Timeline, options: ChartOptions): Chart {
   const dated = datedOf(view, timeline);
   const rows = rowsOf(view, dated, options);
   const { row: selected, dependencies } = options.selected === undefined ? { row: undefined, dependencies: [] } : selectionOf(view, rows, options.selected);
 
-  // Fading (2.3): with a selection the trace decides; otherwise the toolbar's chips do.
+  // Out of focus (2.3) is outside the selection's trace or outside the highlight: the lowest opacity wins.
   const traced = new Set(dependencies.flatMap((each) => [each.from, each.to]));
   if (selected !== undefined) {
     traced.add(selected);
   }
-  const matches = new Map<string, boolean>();
-  const matched = (key: string): boolean => {
-    let found = matches.get(key);
-    if (found === undefined) {
-      const node = nodeOf(view, key);
-      found = (node !== undefined && keeps(options.narrow, node)) || dated.scopedChildren(key).some(matched);
-      matches.set(key, found);
-    }
-    return found;
-  };
-  const narrowed = narrowing(options.narrow);
   for (const row of rows) {
-    row.faded = selected === undefined ? narrowed && !matched(row.key) : !traced.has(row.key);
+    row.faded = (selected !== undefined && !traced.has(row.key)) || (options.lit !== undefined && !options.lit.has(row.key));
   }
 
+  const drawn = new Set(options.drawn.map((node) => node.key));
   const undated = planOrder(view).filter((key) => {
     const state = view.derived.nodes[key]?.display_state;
-    return dated.inScope(key) && dated.spans.get(key) === undefined && dated.scopedChildren(key).length === 0 && state !== "done" && state !== "skipped";
+    return drawn.has(key) && dated.inScope(key) && dated.spans.get(key) === undefined && dated.scopedChildren(key).length === 0 && state !== "done" && state !== "skipped";
   });
-  // FRONTIER shows only what can move now, and the stages that hold it, selected or not; a link to a row left out is left out.
-  const lens = options.narrow.frontier;
-  const onFrontier = (key: string): boolean => lens === undefined || lens.has(key) || dated.scopedChildren(key).some(onFrontier);
-  const shown = lens === undefined ? rows : rows.filter((row) => onFrontier(row.key));
-  const keys = new Set(shown.map((row) => row.key));
   return {
-    rows: shown,
-    undated: lens === undefined ? undated : undated.filter((key) => lens.has(key)),
-    dependencies: lens === undefined ? dependencies : dependencies.filter((each) => keys.has(each.from) && keys.has(each.to)),
-    dates: shown.flatMap((row) => [row.from, row.to, ...(row.float === undefined ? [] : [row.float.from, row.float.to])]),
+    rows,
+    undated,
+    dependencies,
+    dates: rows.flatMap((row) => [row.from, row.to, ...(row.float === undefined ? [] : [row.float.from, row.float.to])]),
   };
 }

@@ -188,8 +188,8 @@ impl<S: Store> Service<S> {
         id: &JourneyId,
         query: &LevelQuery,
     ) -> Result<Projected<Level>, ReadError> {
-        self.project_in(call, id, |journey, deployment| {
-            journey.level(query, deployment)
+        self.project_in(call, id, |journey, deployment, viewer| {
+            journey.level(query, deployment, viewer)
         })
         .await
     }
@@ -308,7 +308,7 @@ impl<S: Store> Service<S> {
         id: &JourneyId,
         key: &NodeKey,
     ) -> Result<Projected<NodeDetail>, ReadError> {
-        self.project_in(call, id, |journey, deployment| {
+        self.project_in(call, id, |journey, deployment, _| {
             detail(journey, key, deployment)
         })
         .await
@@ -373,18 +373,22 @@ impl<S: Store> Service<S> {
         })
     }
 
-    /// Runs `projection` over the journey derived for `call` and the deployment it was
-    /// derived over.
+    /// Runs `projection` over the journey derived for `call`, the deployment it was derived
+    /// over, and the caller's entities.
     async fn project_in<T>(
         &self,
         call: &Call,
         id: &JourneyId,
-        projection: impl FnOnce(&DerivedJourney<'_>, &Deployment) -> Result<T, ProjectionError>,
+        projection: impl FnOnce(
+            &DerivedJourney<'_>,
+            &Deployment,
+            &BTreeSet<EntityKey>,
+        ) -> Result<T, ProjectionError>,
     ) -> Result<Projected<T>, ReadError> {
         let derivation = self.derivation(call, id).await?;
         let value = engine(&Domain::Journey(id.clone()), || {
             let journey = DerivedJourney::new(&derivation.graph, &derivation.derived);
-            projection(&journey, &derivation.deployment)
+            projection(&journey, &derivation.deployment, &derivation.key.viewer)
         })?
         .map_err(ReadError::Projection)?;
         Ok(Projected {

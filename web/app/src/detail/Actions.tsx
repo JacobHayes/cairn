@@ -10,8 +10,8 @@ import { useLocation, useNavigate } from "react-router";
 
 import { useFrameActions } from "../shell/frame.tsx";
 import { assignOwner, missingEvidence, type EvidenceDraft } from "../acting/acts.ts";
-import { ancestorsOf } from "../canvas/ladder.ts";
-import { canvasPath, DEFAULT_VIEW, revealing } from "../canvas/settings.ts";
+import { ancestorsOf, placedAt } from "../canvas/ladder.ts";
+import { canvasPath, DEFAULT_GRAPH_VIEW, revealing } from "../canvas/settings.ts";
 import { mayNotApply } from "../data/activity.ts";
 import { deepLinkPath } from "../journeys/address.ts";
 import { BreakDown } from "../proposals/Entries.tsx";
@@ -211,16 +211,16 @@ function runnersOf({ view, detail, write, onRename, forms, openPanel, onCopied, 
     weight: () => { openPanel("weight"); },
     pin: () => { setFold(foldKey(detail.node.kind, "dates"), true); },
     "break-down": () => { openPanel("break-down"); },
-    "show-in-graph": () => { navigate(canvasPath(journey, DEFAULT_VIEW, key)); },
+    "show-in-graph": () => { navigate(canvasPath(journey, DEFAULT_GRAPH_VIEW, key)); },
     "insert-segment": () => { insertHere?.(key); },
     "show-insertion": () => {
       const root = (origin === undefined ? undefined : insertionRoot(view.journey.graph, origin.insertion)) ?? key;
       const at = nodeOf(view, root);
-      // As Find does, with the ancestors expanded; at the All step, which draws every branch whatever its kind.
-      const shown = at === undefined ? DEFAULT_VIEW : { ...revealing(DEFAULT_VIEW, { kind: at.kind, ancestors: ancestorsOf(view.journey.graph.nodes ?? [], root) }, view.derived.nodes[root]?.display_state), step: "all" as const };
+      // The stock view, at the All step, which draws every branch whatever its kind, with the ancestors expanded.
+      const shown = at === undefined ? DEFAULT_GRAPH_VIEW : revealing(DEFAULT_GRAPH_VIEW, placedAt(view.journey.graph.nodes ?? [], at.kind, ancestorsOf(view.journey.graph.nodes ?? [], root)), view.derived.nodes[root]?.display_state);
       navigate(canvasPath(journey, shown, root), { reveal: { key: root, how: "centre" } });
     },
-    "edit-node": () => { navigate(canvasPath(journey, { ...DEFAULT_VIEW, edit: true }, key)); },
+    "edit-node": () => { navigate(canvasPath(journey, { ...DEFAULT_GRAPH_VIEW, edit: true }, key)); },
     "copy-link": () => { globalThis.navigator.clipboard.writeText(link).then(onCopied, () => undefined); },
   };
 }

@@ -1,6 +1,9 @@
 //! Property tests for the projections (ARCHITECTURE, Engine > Projections). Over
 //! generated journeys: a level's visible set is exactly the nodes within the container whose
-//! kind and relevance class are shown and that no collapsed container above them hides, each
+//! kind and relevance class are shown, whose top-level ancestor's kind the top-level rule
+//! keeps, that the list's filters match or that hold a match, and that no collapsed container
+//! above them hides; showing a class left out draws exactly the count the level gives for it
+//! and hides nothing; each
 //! node sits under its nearest visible ancestor, every drawn edge stands for at least one
 //! underlying edge between its ends' stand-ins and every edge with two distinct stand-ins is
 //! drawn, no edge is drawn twice or onto one node, the marker only sits on blocked nodes (or
@@ -23,8 +26,8 @@ mod property {
     use cairn_engine::{Derived, DerivedJourney, Graph, derive, history};
     use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
     use cairn_schema::{
-        Cursor, Deployment, Event, Level, LevelDisplay, LevelQuery, NextQuery, NodeKey, NodeKind,
-        PatchId, SnapshotScope, Trace,
+        Cursor, Deployment, Event, Level, LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery,
+        NodeKey, NodeKind, PatchId, SnapshotScope, Title, Trace,
     };
     use patina_dst_proptest::prelude::*;
 
@@ -42,12 +45,77 @@ mod property {
             .collect()
     }
 
+    /// The list's flags a five-bit mask filters by.
+    fn flags(mask: u8) -> BTreeSet<ListFlag> {
+        [
+            ListFlag::Unassigned,
+            ListFlag::NextUp,
+            ListFlag::Blocked,
+            ListFlag::Active,
+            ListFlag::DecisionsNeeded,
+        ]
+        .into_iter()
+        .enumerate()
+        .filter(|(bit, _)| mask & (1 << bit) != 0)
+        .map(|(_, flag)| flag)
+        .collect()
+    }
+
+    /// The filters of a level request, and the nodes the list matches for them.
+    struct Filters {
+        flags: BTreeSet<ListFlag>,
+        text: Option<Title>,
+        /// The list's matches, every page; none when nothing filters.
+        matches: Option<BTreeSet<NodeKey>>,
+    }
+
+    impl Filters {
+        fn of(
+            journey: &DerivedJourney<'_>,
+            flags: BTreeSet<ListFlag>,
+            text: Option<Title>,
+        ) -> Self {
+            let matches = (!flags.is_empty() || text.is_some()).then(|| {
+                let mut query = ListQuery {
+                    flags: flags.clone(),
+                    text: text.clone(),
+                    ..ListQuery::default()
+                };
+                let mut keys = BTreeSet::new();
+                loop {
+                    let page = journey.list(&query, &BTreeSet::new()).unwrap();
+                    keys.extend(page.rows.into_iter().map(|row| row.key));
+                    match page.next {
+                        Some(cursor) => query.cursor = cursor,
+                        None => break keys,
+                    }
+                }
+            });
+            Self {
+                flags,
+                text,
+                matches,
+            }
+        }
+
+        /// Kept by its definition: no filter, or the node or one beneath it matches.
+        fn keeps(&self, graph: &Graph, key: &NodeKey) -> bool {
+            self.matches.as_ref().is_none_or(|matches| {
+                matches
+                    .iter()
+                    .any(|found| found == key || graph.tree().is_ancestor(key, found))
+            })
+        }
+    }
+
     /// What a level request asks for, with each node's relevance class shown or not.
     struct Rules {
         shown: BTreeSet<NodeKind>,
         container: Option<NodeKey>,
         collapsed: BTreeSet<NodeKey>,
         class_shown: BTreeMap<NodeKey, bool>,
+        top: BTreeSet<NodeKind>,
+        filters: Filters,
     }
 
     impl Rules {
@@ -57,11 +125,26 @@ mod property {
                 container: self.container.clone(),
                 collapsed: self.collapsed.clone(),
                 display: display.clone(),
+                top: self.top.clone(),
+                flags: self.filters.flags.clone(),
+                owner: None,
+                text: self.filters.text.clone(),
             }
         }
 
+        /// Left out by the top-level rule, by its definition: its root's kind is not kept.
+        fn left_out(&self, graph: &Graph, key: &NodeKey) -> bool {
+            let tree = graph.tree();
+            let mut root = key;
+            while let Some(parent) = tree.parent(root) {
+                root = parent;
+            }
+            !self.top.is_empty() && !self.top.contains(&graph.node(root).unwrap().kind())
+        }
+
         /// A node is visible by its definition: within the container, its kind and class
-        /// shown, and no collapsed container between it and the container above it.
+        /// shown, not left out at the top, kept by the filters, and no collapsed container
+        /// between it and the container above it.
         fn visible(&self, graph: &Graph, key: &NodeKey) -> bool {
             let tree = graph.tree();
             let within = |key: &NodeKey| {
@@ -76,7 +159,10 @@ mod property {
                 }
                 above = tree.parent(node);
             }
-            self.shown.contains(&graph.node(key).unwrap().kind()) && self.class_shown[key]
+            self.shown.contains(&graph.node(key).unwrap().kind())
+                && self.class_shown[key]
+                && !self.left_out(graph, key)
+                && self.filters.keeps(graph, key)
         }
 
         /// A node's stand-in by its definition: walking up from it within the container, the
@@ -285,6 +371,37 @@ mod property {
             .collect()
     }
 
+    /// C1: showing each class the level leaves out draws exactly the count it gives for that
+    /// class, and hides nothing it drew.
+    fn class_counts_hold(journey: &DerivedJourney<'_>, level: &Level, rules: &Rules) {
+        if LevelDisplay::is_every(&level.display) {
+            assert!(level.hidden_by_class.is_empty(), "nothing hidden by class");
+        }
+        let drawn: BTreeSet<&NodeKey> = level.nodes.iter().map(|node| &node.key).collect();
+        for class in LevelDisplay::ALL
+            .into_iter()
+            .filter(|class| !level.display.contains(class))
+        {
+            let mut display = level.display.clone();
+            display.insert(class);
+            let wider = journey
+                .level(
+                    &rules.query(&display),
+                    &Deployment::default(),
+                    &BTreeSet::new(),
+                )
+                .unwrap();
+            let shown: BTreeSet<&NodeKey> = wider.nodes.iter().map(|node| &node.key).collect();
+            assert!(drawn.is_subset(&shown), "showing {class:?} hides nothing");
+            let added = u32::try_from(shown.len() - drawn.len()).unwrap();
+            assert_eq!(
+                level.hidden_by_class.get(&class).copied().unwrap_or(0),
+                added,
+                "{class:?} count"
+            );
+        }
+    }
+
     proptest! {
         /// C2: a level holds its rules, and showing one more kind never hides a node.
         #[test]
@@ -295,22 +412,35 @@ mod property {
             drill in prop::option::of(0_usize..80),
             collapse in prop::collection::vec(0_usize..80, 0..4),
             class_mask in 1_u8..8,
+            top_mask in prop::option::of(1_u8..32),
+            flag_mask in 0_u8..32,
+            search in prop::option::of((0_usize..80, 0_usize..3)),
         ) {
             let derived = derived(&graph);
             let journey = DerivedJourney::new(&graph, &derived);
             let keys: Vec<&NodeKey> = graph.document().nodes.as_map().keys().collect();
             let (display, class_shown) = displays(&graph, class_mask);
+            // A search for a few letters of a node's title, so it matches something.
+            let text = search.map(|(at, start)| {
+                let title = graph.node(keys[at % keys.len()]).unwrap().title.as_str().to_owned();
+                let from = start.min(title.len().saturating_sub(1));
+                let end = (from + 3).min(title.len());
+                title.get(from..end).filter(|part| !part.trim().is_empty()).unwrap_or("a").parse::<Title>().unwrap()
+            });
             let rules = Rules {
                 shown: kinds(mask),
                 container: drill.map(|at| keys[at % keys.len()].clone()),
                 collapsed: collapse.iter().map(|at| keys[at % keys.len()].clone()).collect(),
                 class_shown,
+                top: top_mask.map(kinds).unwrap_or_default(),
+                filters: Filters::of(&journey, flags(flag_mask), text),
             };
-            let level = journey.level(&rules.query(&display), &Deployment::default()).unwrap();
+            let level = journey.level(&rules.query(&display), &Deployment::default(), &BTreeSet::new()).unwrap();
             level_holds(&graph, &derived, &level, &rules);
+            class_counts_hold(&journey, &level, &rules);
             let mut wider_rules = Rules { shown: rules.shown.clone(), ..rules };
             wider_rules.shown.insert(NodeKind::ALL[extra]);
-            let wider = journey.level(&wider_rules.query(&display), &Deployment::default()).unwrap();
+            let wider = journey.level(&wider_rules.query(&display), &Deployment::default(), &BTreeSet::new()).unwrap();
             let visible: BTreeSet<&NodeKey> = wider.nodes.iter().map(|node| &node.key).collect();
             prop_assert!(level.nodes.iter().all(|node| visible.contains(&node.key)));
         }

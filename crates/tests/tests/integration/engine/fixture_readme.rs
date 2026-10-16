@@ -350,7 +350,11 @@ fn the_projection_lines_are_what_the_engine_projects() {
             .filter(|kind| *kind != NodeKind::Action)
             .collect();
         let level = projected
-            .level(&LevelQuery::of_kinds(shown, None), &Deployment::default())
+            .level(
+                &LevelQuery::of_kinds(shown, None),
+                &Deployment::default(),
+                &BTreeSet::new(),
+            )
             .unwrap();
         let value = match label {
             "visible with actions hidden" => {

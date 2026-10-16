@@ -7,7 +7,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 
 import { AssistantDock, journeyTitles } from "../assistant/AssistantPanel.tsx";
-import { canvasPath, type CanvasView } from "../canvas/settings.ts";
+import { canvasPath, type GraphView } from "../canvas/settings.ts";
 import type { Ready } from "../detail/model.ts";
 import { DeleteJourney } from "../journeys/DeleteJourney.tsx";
 import { statusActions } from "../journeys/lifecycle.ts";
@@ -81,7 +81,7 @@ function copyLink(): void {
 }
 
 /** The journey's `⋯`, in groups: Edit and the structure flows, and its link. */
-function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: CanvasView; selected: string | undefined; onPanel: (panel: Panel) => void }) {
+function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: GraphView; selected: string | undefined; onPanel: (panel: Panel) => void }) {
   const { header } = ready.journey;
   const insert = useInsertEntry();
   const archived = header.status === "archived";
@@ -119,7 +119,7 @@ function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: C
 }
 
 /** `view` is the canvas as the page shows it, or the canvas's defaults off the graph: Edit structure keeps it. */
-export function JourneyHeader({ ready, view, selected }: { ready: Ready; view: CanvasView; selected: string | undefined }) {
+export function JourneyHeader({ ready, view, selected }: { ready: Ready; view: GraphView; selected: string | undefined }) {
   const { header, revision } = ready.journey;
   const write = useScreenWrite();
   const suggested = useSuggested(ready);

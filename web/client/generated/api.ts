@@ -2355,6 +2355,15 @@ export interface components {
             display?: components["schemas"]["LevelDisplay"][];
             /** @description The edges, sorted by their ends. */
             edges: components["schemas"]["LevelEdge"][];
+            /**
+             * @description C1's count, per relevance class left out: the nodes hidden only for their class (of a
+             *     kind shown, within the level, under no collapse, not left out by `top`, and kept by the
+             *     filters), so showing a class draws exactly that many more. Empty when every class is
+             *     shown.
+             */
+            hidden_by_class?: {
+                [key: string]: number;
+            };
             /** @description The visible nodes, in tree order. */
             nodes: components["schemas"]["LevelNode"][];
             /** @description The kinds shown. */
@@ -6088,6 +6097,14 @@ export interface operations {
                 collapsed?: components["schemas"]["NodeKey"][];
                 /** @description The relevance classes shown: `relevant`, `conditional` (undecided, or waiting on a          decision that cannot be answered yet), `not_relevant` (settled). Every class when none.          A node of a class left out rolls up like a hidden kind's. */
                 display?: components["schemas"]["LevelDisplay"][];
+                /** @description The kinds a top-level node must be for its subtree to be drawn; any kind when none. The rest are left out: no stand-in, and their edges left off. */
+                top?: components["schemas"]["NodeKind"][];
+                /** @description The list's filters with no argument; with any filter, `owner` or `text`, a node is drawn only when it matches every one or holds a node that does. */
+                flag?: components["schemas"]["ListFlag"][];
+                /** @description Only nodes this entity owns, and what holds them. */
+                owner?: components["schemas"]["EntityKey"];
+                /** @description Text found in the title, description, notes, or resources, ignoring ASCII case; nodes holding a match are kept too. */
+                text?: components["schemas"]["Title"];
             };
             header?: never;
             path: {

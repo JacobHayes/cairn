@@ -54,9 +54,7 @@ export interface GraphCanvasProps {
   layout: Layout;
   overlay: CanvasOverlay | undefined;
   lens: Lens | undefined;
-  /** Cards a filter fades; the trace decides instead while there is one. */
-  faded?: ReadonlySet<string> | undefined;
-  /** The cards to keep at full strength (the frontier lens): every other card fades, a container staying clear while any card in it is kept. None, or null, fades nothing. */
+  /** The nodes lit by a highlight (Frontier, Decisions): every other card fades, a container staying clear while any card in it is lit, even under a trace. None, or null, fades nothing. */
   emphasis?: ReadonlySet<string> | null | undefined;
   selected: string | undefined;
   /** The edge (a line's id) whose card is open. */
@@ -86,13 +84,16 @@ export interface GraphCanvasProps {
   /** The ladder's steps, for keys 1 to 4. */
   steps?: readonly Step[];
   onStep?: ((step: Step) => void) | undefined;
-  /** What sits over the canvas: the view's controls, the Signal button, Reveal. */
+  /** What sits over the canvas: the Signal button, Reveal. A new view mounts it afresh. */
   children?: ReactNode;
+  /** What sits over the canvas's top left and outlives a new view: the view's controls, whose open popover a refit must not close. */
+  held?: ReactNode;
 }
 
-/** `inert`: the phone's preview, which takes no gesture and opens nothing (MapFrame). */
+/** `inert`: the phone's preview, which takes no gesture and opens nothing (MapFrame). `faded`: the cards `emphasis` leaves unlit. */
 interface FlowProps extends GraphCanvasProps {
   inert: boolean;
+  faded?: ReadonlySet<string> | undefined;
 }
 
 /** Whether a card is a container drawn open, with children to collapse. */
@@ -100,7 +101,7 @@ function openContainers(model: CanvasModel): Set<string> {
   return new Set(model.cards.flatMap((card) => (card.parent === undefined ? [] : [card.parent])));
 }
 
-/** `props` with the cards `emphasis` leaves out added to those faded. */
+/** `props` with the cards `emphasis` leaves unlit faded. */
 function withEmphasis(props: FlowProps): FlowProps {
   const { emphasis, model } = props;
   if (emphasis === null || emphasis === undefined) {
@@ -114,7 +115,7 @@ function withEmphasis(props: FlowProps): FlowProps {
       kept.add(at);
     }
   }
-  return { ...props, faded: new Set([...(props.faded ?? []), ...model.cards.map((card) => card.key).filter((key) => !kept.has(key))]) };
+  return { ...props, faded: new Set(model.cards.map((card) => card.key).filter((key) => !kept.has(key))) };
 }
 
 function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {
@@ -619,6 +620,7 @@ export function GraphCanvas(props: GraphCanvasProps) {
           <ReactFlowProvider key={props.viewKey}>
             <Flow {...props} inert={inert} />
           </ReactFlowProvider>
+          {inert || props.held === undefined ? null : <div className="canvas-panel canvas-top canvas-held">{props.held}</div>}
         </div>
       )}
     </MapFrame>

@@ -1,13 +1,14 @@
-// The controls the acting surfaces share: a set of checkboxes, a single checkbox, and the flags
-// a filter offers.
+// The controls the toolbar's popovers and the acting surfaces share: a set of checkboxes, a
+// single checkbox, and the flags a filter offers.
 import type { ReactNode } from "react";
 
 import type { ListFlag } from "./address.ts";
 
-export function Check({ label, checked, onChange, testId }: { label: ReactNode; checked: boolean; onChange: (checked: boolean) => void; testId: string }) {
+/** One checkbox; `disabled` where the view cannot honour it, keeping the value it carries (DESIGN, disabled controls). */
+export function Check({ label, checked, onChange, testId, disabled = false }: { label: ReactNode; checked: boolean; onChange: (checked: boolean) => void; testId: string; disabled?: boolean }) {
   return (
     <label className="check" data-testid={testId} data-status={checked ? "on" : "off"}>
-      <input type="checkbox" checked={checked} onChange={(event) => { onChange(event.target.checked); }} /> {label}
+      <input type="checkbox" checked={checked} disabled={disabled} onChange={(event) => { onChange(event.target.checked); }} /> {label}
     </label>
   );
 }

@@ -4,14 +4,14 @@
 // next arrives, so a live edit swaps the canvas once rather than blanking it.
 import type { Schema } from "@cairn/client";
 import type { ProjectionAnswer, ProjectionRequest } from "@cairn/wasm";
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useMemo, useState } from "react";
 
 import { useSession } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { layoutRequestOf } from "./cards.ts";
 import type { Layout } from "./layout.ts";
 import type { Layouts } from "./layouts.ts";
-import type { CanvasModel } from "./model.ts";
+import type { CanvasModel, Step } from "./model.ts";
 
 export const LayoutsContext = createContext<Layouts | undefined>(undefined);
 
@@ -73,6 +73,16 @@ export function useProjected<R extends ProjectionRequest>(view: Ready, request: 
     // `asked` names the request and the derivation it is read from, so it alone is the key.
   }, [deriver, journey, asked]);
   return heldFor(answered, requested);
+}
+
+/**
+ * C2: the level `request` asks for (journeys/requests.ts), and the keys it draws, for a view that
+ * keeps its own rows where the level draws them (the list, the timeline, the walk through).
+ */
+export function useLevel(view: Ready, request: Extract<ProjectionRequest, { projection: "level" }> | undefined): { level: Schema<"Level"> | undefined; drawn: ReadonlySet<string> | undefined; error: string | undefined } {
+  const { value, error } = useProjected(view, request);
+  const drawn = useMemo(() => (value === undefined ? undefined : new Set(value.nodes.map((node) => node.key))), [value]);
+  return { level: value, drawn, error };
 }
 
 /**
@@ -152,4 +162,29 @@ export function useLaidOut(domain: string, view: string, model: CanvasModel | un
     };
   }, [layouts, domain, view, model]);
   return { laidOut, error };
+}
+
+const NO_FLIPS: ReadonlySet<string> = new Set();
+
+/**
+ * C2, 5.1: the containers the viewer has flipped (opened against the ladder, or folded) since
+ * `step` was chosen, for a view that folds for display. A pick (`picks` counts them, a repeated
+ * pick of the same step and Reset included) drops them, so a flip made before never comes back.
+ */
+export function useFlips(step: Step | undefined, picks: number): { flipped: ReadonlySet<string>; flip: (key: string) => void } {
+  const [folds, setFolds] = useState<{ step: Step | undefined; picks: number; flipped: ReadonlySet<string> }>({ step, picks, flipped: NO_FLIPS });
+  const held = folds.step === step && folds.picks === picks;
+  if (!held) {
+    // Adjusting state while rendering: React renders again at once with the flips dropped.
+    setFolds({ step, picks, flipped: NO_FLIPS });
+  }
+  const flipped = held ? folds.flipped : NO_FLIPS;
+  const flip = (key: string) => {
+    const next = new Set(flipped);
+    if (!next.delete(key)) {
+      next.add(key);
+    }
+    setFolds({ step, picks, flipped: next });
+  };
+  return { flipped, flip };
 }

@@ -10,9 +10,9 @@ use std::sync::Arc;
 use cairn_engine::{ApplyInputs, Graph, Records, consequences, derive};
 use cairn_schema::{
     Actor, Consequences, Cursor, Domain, DomainDocument, ExplainedField, JourneyId, KeyRefs,
-    LevelDisplay, LevelQuery, ListQuery, NextQuery, Node, NodeKey, NodeKind, Patch, PatchId,
-    ProposalDraft, RankConstants, RouteFile, SnapshotScope, State, Timestamp, VersionNumber,
-    from_yaml, to_yaml,
+    LevelDisplay, LevelQuery, ListFlag, ListQuery, NextQuery, Node, NodeKey, NodeKind, Patch,
+    PatchId, ProposalDraft, RankConstants, RouteFile, SnapshotScope, State, Timestamp,
+    VersionNumber, from_yaml, to_yaml,
 };
 use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, Written};
 use cairn_store::{InProcessNotifier, MemoryStore};
@@ -151,6 +151,44 @@ fn server_projection(
     }
 }
 
+/// C2, C9: levels under the Stages rule and the list's filters: the top-level kinds, a search
+/// for part of a title with a flag, the first entity as owner, and the viewer's own.
+fn filtered_levels(document: &DomainDocument, shown: &BTreeSet<NodeKind>) -> Vec<Projection> {
+    let every = || LevelQuery::of_kinds(shown.clone(), None);
+    let mut requests = vec![
+        Projection::Level(LevelQuery {
+            top: BTreeSet::from([NodeKind::Group, NodeKind::Milestone]),
+            ..every()
+        }),
+        Projection::Level(LevelQuery {
+            flags: BTreeSet::from([ListFlag::Mine]),
+            ..every()
+        }),
+    ];
+    let title = document
+        .journey
+        .graph
+        .nodes
+        .values()
+        .next()
+        .map(|node| node.title.as_str());
+    let part: Option<String> = title.map(|title| title.chars().take(4).collect());
+    if let Some(text) = part.and_then(|part| part.parse().ok()) {
+        requests.push(Projection::Level(LevelQuery {
+            text: Some(text),
+            flags: BTreeSet::from([ListFlag::Unassigned]),
+            ..every()
+        }));
+    }
+    if let Some(entity) = document.inputs.deployment.entities.values().next() {
+        requests.push(Projection::Level(LevelQuery {
+            owner: Some(entity.key.clone()),
+            ..every()
+        }));
+    }
+    requests
+}
+
 /// Every projection over the document: every level (the top and each container), every
 /// node's trace and explanation lists, and each view and list at its default query.
 fn projections(document: &DomainDocument) -> Vec<Projection> {
@@ -182,6 +220,7 @@ fn projections(document: &DomainDocument) -> Vec<Projection> {
             ..LevelQuery::of_kinds(shown.clone(), None)
         }));
     }
+    requests.extend(filtered_levels(document, &shown));
     requests.extend([
         Projection::DecisionView,
         Projection::Timeline,

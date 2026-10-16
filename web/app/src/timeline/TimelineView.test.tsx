@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 
 import { testView } from "../detail/view.test-support.ts";
 import type { Timeline } from "./model.ts";
-import type { Narrowing } from "./rows.ts";
 import { TimelineChart } from "./TimelineView.tsx";
 
 const view = testView();
@@ -20,12 +19,12 @@ const timeline: Timeline = {
   end: "n_meeting",
 };
 
-const narrow: Narrowing = { decisions: false, kinds: [], text: "", mine: undefined, frontier: undefined };
+const level = [{ key: "n_stage" }, { key: "n_report", parent: "n_stage" }, { key: "n_findings", parent: "n_stage" }, { key: "n_meeting" }, { key: "n_when" }];
 
 function drawn(drawnTimeline: Timeline): string {
   return renderToStaticMarkup(
     <MemoryRouter>
-      <TimelineChart ready={view} timeline={drawnTimeline} narrow={narrow} selected={undefined} detail="work" range="fit" />
+      <TimelineChart ready={view} timeline={drawnTimeline} drawn={level} open={() => true} onFold={() => undefined} lit={undefined} selected={undefined} step="work" range="fit" />
     </MemoryRouter>,
   );
 }

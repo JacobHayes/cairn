@@ -15,14 +15,44 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_schema::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_schema::{
     Annotation, AnnotationContent, EntityKey, KindKey, ListFlag, ListPage, ListQuery, MineEntry,
-    Next, NextQuery, NodeKey, NodeKind, ResourceContent, State,
+    Next, NextQuery, NodeKey, NodeKind, ResourceContent, State, Title,
 };
 
 use super::rows::{count, page};
 use super::{DerivedJourney, ProjectionError};
 use crate::derive::Ranking;
 
-impl DerivedJourney<'_> {
+/// C9: the list's flag, owner, and text filters over one journey: whether a node matches every
+/// one given. The viewer and the owner are read through aliases (E6).
+pub(super) struct Matcher<'q, 'a> {
+    journey: &'q DerivedJourney<'a>,
+    flags: &'q BTreeSet<ListFlag>,
+    owner: Option<&'q EntityKey>,
+    /// The search, in lower case.
+    text: Option<String>,
+    viewer: BTreeSet<EntityKey>,
+    next_up: BTreeSet<&'a NodeKey>,
+    notes: BTreeMap<&'q NodeKey, Vec<&'q Annotation>>,
+}
+
+impl Matcher<'_, '_> {
+    /// Whether the node matches every filter given; every node does when none is.
+    pub(super) fn holds(&self, key: &NodeKey) -> bool {
+        let journey = self.journey;
+        self.flags
+            .iter()
+            .all(|flag| journey.flag(*flag, key, &self.viewer, &self.next_up))
+            && self
+                .owner
+                .is_none_or(|owner| journey.owners(key).contains(owner))
+            && self
+                .text
+                .as_ref()
+                .is_none_or(|text| journey.mentions(key, &self.notes, text))
+    }
+}
+
+impl<'a> DerivedJourney<'a> {
     /// C10: the acting frontier ordered by rank (the viewer's, for "prioritize for me") or by
     /// one signal, filtered to the viewer's items, to kinds, or to a subtree, each item with
     /// its breadcrumb and rank terms; with what the journey waits on when it is stalled (C5).
@@ -78,14 +108,13 @@ impl DerivedJourney<'_> {
         if let Some(within) = &query.within {
             self.known(within)?;
         }
-        let viewer = &self.canonical_viewer(viewer);
         let ranking = self.derived.ranking();
-        let next_up: BTreeSet<&NodeKey> = ranking.acting_frontier().iter().collect();
-        let notes = self.annotations_by_node();
-        let text = query
-            .text
-            .as_ref()
-            .map(|text| text.as_str().to_ascii_lowercase());
+        let matcher = self.matcher(
+            &query.flags,
+            query.owner.as_ref(),
+            query.text.as_ref(),
+            viewer,
+        );
         let matching: Vec<NodeKey> = self
             .graph
             .document()
@@ -93,18 +122,7 @@ impl DerivedJourney<'_> {
             .as_map()
             .keys()
             .filter(|key| self.within(key, query.within.as_ref()))
-            .filter(|key| {
-                query
-                    .flags
-                    .iter()
-                    .all(|flag| self.flag(*flag, key, viewer, &next_up))
-            })
-            .filter(|key| {
-                query
-                    .owner
-                    .as_ref()
-                    .is_none_or(|owner| self.owners(key).contains(self.canonical(owner)))
-            })
+            .filter(|key| matcher.holds(key))
             .filter(|key| query.states.is_empty() || query.states.contains(&self.state(key)))
             .filter(|key| {
                 query.display_states.is_empty()
@@ -113,10 +131,6 @@ impl DerivedJourney<'_> {
                         .contains(&self.derived.display_state(self.graph, key))
             })
             .filter(|key| query.kinds.is_empty() || query.kinds.contains(&self.node(key).kind()))
-            .filter(|key| {
-                text.as_ref()
-                    .is_none_or(|text| self.mentions(key, &notes, text))
-            })
             .cloned()
             .collect();
         let sorted = self.sorted(&matching, query.sort, ranking);
@@ -126,6 +140,30 @@ impl DerivedJourney<'_> {
             next,
             total: count(sorted.len()),
         })
+    }
+
+    /// C9: the list's flag, owner, and text filters, read once over the journey, so the list
+    /// and the level (C2) test a node the same way.
+    pub(super) fn matcher<'q>(
+        &'q self,
+        flags: &'q BTreeSet<ListFlag>,
+        owner: Option<&'q EntityKey>,
+        text: Option<&Title>,
+        viewer: &BTreeSet<EntityKey>,
+    ) -> Matcher<'q, 'a> {
+        Matcher {
+            journey: self,
+            flags,
+            owner: owner.map(|owner| self.canonical(owner)),
+            text: text.map(|text| text.as_str().to_ascii_lowercase()),
+            viewer: self.canonical_viewer(viewer),
+            next_up: self.derived.ranking().acting_frontier().iter().collect(),
+            notes: if text.is_some() {
+                self.annotations_by_node()
+            } else {
+                BTreeMap::new()
+            },
+        }
     }
 
     /// E4: the nodes the viewer's entities participate in, with the kinds they hold, only

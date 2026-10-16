@@ -10,7 +10,7 @@ import { useUserWords } from "../data/react.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import type { Graph } from "../authoring/graph.ts";
-import { canvasPath, DEFAULT_VIEW } from "../canvas/settings.ts";
+import { canvasPath, DEFAULT_GRAPH_VIEW } from "../canvas/settings.ts";
 import { overviewPath } from "../journeys/address.ts";
 import { routeDetailPath } from "../routes/address.ts";
 import {
@@ -93,7 +93,7 @@ export function ReviewHeader({ proposal, itemCount, conflictCount, blockers, dis
           </Badge>
         )}
         {proposal.status === "applied" && journey !== undefined ? (
-          <Link to={canvasPath(journey, DEFAULT_VIEW)} data-testid="applied-journey">
+          <Link to={canvasPath(journey, DEFAULT_GRAPH_VIEW)} data-testid="applied-journey">
             Open the journey
           </Link>
         ) : null}

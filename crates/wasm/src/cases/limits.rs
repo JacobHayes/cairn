@@ -17,7 +17,7 @@ use cairn_engine::testing::{derive_inputs, journey_id};
 use cairn_engine::{Graph, project};
 use cairn_schema::{
     Cursor, Deployment, DomainDocument, ExplainedField, Journey, LevelDisplay, LevelQuery,
-    ListQuery, NextQuery, NodeKey, NodeKind, Revision, SnapshotScope, from_yaml,
+    ListFlag, ListQuery, NextQuery, NodeKey, NodeKind, Revision, SnapshotScope, from_yaml,
 };
 
 use super::{Case, CaseCall, Group, run};
@@ -189,6 +189,12 @@ pub fn budget_group(nodes: usize) -> Group {
             }))
         })
         .collect();
+    // The list's filters on the level: a search every node's title holds, and two flags.
+    calls.push(projection_call(Projection::Level(LevelQuery {
+        flags: [ListFlag::Unassigned, ListFlag::Blocked].into(),
+        text: "e".parse().ok(),
+        ..LevelQuery::of_kinds(NodeKind::ALL.into_iter().collect(), None)
+    })));
     calls.push(projection_call(Projection::Trace {
         key: deepest(&document),
     }));

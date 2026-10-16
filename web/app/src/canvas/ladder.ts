@@ -17,9 +17,30 @@ const KINDS_AT: Record<Step, NodeKind[]> = {
 
 export const STEP_WORDS: Record<Step, string> = { stages: "Stages", decisions: "Decisions", work: "Deliverables", all: "All" };
 
+/** C2: the kinds a top-level node must be at Stages for anything beneath it to be drawn. */
+export const STAGES_TOP: NodeKind[] = ["group", "milestone"];
+
 /** The kinds `step` draws. */
 export function kindsAt(step: Step): NodeKind[] {
   return KINDS_AT[step];
+}
+
+/** A node as the ladder places it: its kind, its containers (nearest first) and the kind of the top-level node it sits under (its own when it is top-level). */
+export interface Placed {
+  kind: NodeKind;
+  ancestors: readonly string[];
+  top: NodeKind;
+}
+
+/** `kind` placed under `ancestors` (nearest first) among `nodes`. */
+export function placedAt(nodes: readonly GraphNode[], kind: NodeKind, ancestors: readonly string[]): Placed {
+  const root = ancestors.at(-1);
+  return { kind, ancestors, top: nodes.find((node) => node.key === root)?.kind ?? kind };
+}
+
+/** C2: whether `step` draws a node: its kind is drawn, and at Stages its top-level node is a stage or a milestone. */
+export function drawnAt(step: Step, node: Placed): boolean {
+  return kindsAt(step).includes(node.kind) && (step !== "stages" || STAGES_TOP.includes(node.top));
 }
 
 /**
@@ -43,7 +64,7 @@ export function leftOutAt(step: Step, nodes: readonly GraphNode[]): Set<string> 
   };
   for (const node of nodes) {
     const top = topOf(node);
-    if (top.parent == null && top.kind !== "group" && top.kind !== "milestone") {
+    if (top.parent == null && !STAGES_TOP.includes(top.kind)) {
       out.add(node.key);
     }
   }
@@ -141,6 +162,17 @@ export function collapsedAt(step: Step, nodes: readonly GraphNode[], current: Re
   return [...collapsed].sort();
 }
 
+/**
+ * C4, 5.1: whether the step opens container `key` before the viewer flips it: at Stages only the
+ * current stages (`current`, as `currentStages` reads them) of the top-level ones, every other
+ * container at every step. The list and the timeline fold by it as the graph collapses by
+ * `collapsedAt`.
+ */
+export function openAt(step: Step, nodes: readonly GraphNode[], current: ReadonlySet<string>): (key: string) => boolean {
+  const stages = new Set(nodes.filter(isStage).map((node) => node.key));
+  return (key) => step !== "stages" || !stages.has(key) || current.has(key);
+}
+
 /** `view` after the viewer expands or collapses `key`: the click is remembered until a step is picked. */
 export function withExpanded<T extends Pick<CanvasSettings, "open" | "shut">>(view: T, key: string, expanded: boolean): T {
   const without = (list: readonly string[]) => list.filter((each) => each !== key);
@@ -162,12 +194,4 @@ export function ancestorsOf(nodes: readonly GraphNode[], key: string): string[] 
     at = byKey.get(at)?.parent ?? undefined;
   }
   return ancestors;
-}
-
-/**
- * How many settled not-relevant nodes the view leaves out by default (5.2): those of a kind the
- * step draws that no collapsed container already rolls up. Conditional nodes never count.
- */
-export function hiddenCount(nodes: readonly GraphNode[], notRelevant: (key: string) => boolean, kinds: readonly NodeKind[], collapsed: readonly string[]): number {
-  return nodes.filter((node) => kinds.includes(node.kind) && notRelevant(node.key) && !ancestorsOf(nodes, node.key).some((key) => collapsed.includes(key))).length;
 }

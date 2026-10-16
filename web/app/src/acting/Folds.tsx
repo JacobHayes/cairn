@@ -1,6 +1,6 @@
-// C10, B6, D3: the two folds under the frontier list, closed with their counts showing, each a
-// bordered panel with a band header and the list's own row look. "Needs a
-// look" holds the work that is wrong rather than next (stale, snoozed and overdue, short of its
+// C10, B6, D3: the two folds under the list while Frontier is on, closed with their counts
+// showing, each a bordered panel with a band header and the list's own row look, holding only
+// what the journey's level draws (Detail, the Filter and the search). "Needs a look" holds the work that is wrong rather than next (stale, snoozed and overdue, short of its
 // plan), each with its fix beside it. "Snoozed" holds the work set aside, grouped by the
 // snooze that holds it: a container's, once for all it holds, or each node's own target. A
 // node a container holds sits under the container only, even when it has a later snooze of its
@@ -9,7 +9,6 @@ import type { ListQuery } from "@cairn/wasm";
 import { useMemo, type ReactNode } from "react";
 import { Link } from "react-router";
 
-import { useProjected } from "../canvas/hooks.ts";
 import { newAttachmentKey } from "../detail/Attachments.tsx";
 import { namer } from "../detail/explain.ts";
 import { titleOf, type Ready, type Mutation } from "../detail/model.ts";
@@ -17,28 +16,23 @@ import { Rejected } from "../detail/Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { dateWords, dayOf } from "../timeline/model.ts";
 import { Button } from "../ui/kit.tsx";
-import type { ListFlag, ListSettings } from "./address.ts";
+import type { ListFlag } from "./address.ts";
 import { NodeItem } from "./NodeItem.tsx";
+import { useRows } from "./useRows.ts";
 import type { NodeRow } from "./why.ts";
 
 type SnoozeTarget = NonNullable<NodeRow["snoozed"]>;
 
-/** What the folds are narrowed by: the frontier list's Mine, kinds, DECISIONS and search. */
-export type FoldSettings = Pick<ListSettings, "kinds" | "decisions" | "text"> & { mine: boolean };
-
-function queryFor(flag: ListFlag, settings: FoldSettings): ListQuery {
-  return { flags: settings.mine ? ["mine", flag] : [flag], states: [], kinds: settings.decisions ? ["decision"] : settings.kinds, sort: "rank" };
+function queryFor(flag: ListFlag, decisions: boolean): ListQuery {
+  return { flags: [flag], sort: "rank", ...(decisions ? { kinds: ["decision" as const] } : {}) };
 }
 
-/** The rows with `flag`, narrowed as the next list is (not-relevant nodes never appear), and how many there are in all. */
-function useFlagged(view: Ready, flag: ListFlag, settings: FoldSettings): { rows: NodeRow[]; total: number } {
-  const request = useMemo(() => ({ projection: "list" as const, query: queryFor(flag, settings) }), [flag, settings]);
-  const { value } = useProjected(view, request);
-  const wanted = settings.text.trim().toLowerCase();
-  const live = (value?.rows ?? []).filter((row) => row.relevance !== "not_relevant");
-  const rows = live.filter((row) => wanted === "" || row.title.toLowerCase().includes(wanted));
-  const dropped = (value?.rows.length ?? 0) - live.length;
-  return { rows, total: wanted === "" ? Math.max((value?.total ?? 0) - dropped, 0) : rows.length };
+/** The rows with `flag` that the view draws (`drawn`, the journey's level: its detail, Filter and search), and how many there are. */
+function useFlagged(view: Ready, flag: ListFlag, decisions: boolean, drawn: ReadonlySet<string> | undefined): { rows: NodeRow[]; total: number } {
+  // Every page, so a drawn row past the first page is not lost to the level's filter.
+  const query = useMemo(() => queryFor(flag, decisions), [flag, decisions]);
+  const rows = (useRows(view, query).rows ?? []).filter((row) => drawn?.has(row.key) === true);
+  return { rows, total: rows.length };
 }
 
 function Fold({ testId, title, count, children }: { testId: string; title: string; count: number; children: ReactNode }) {
@@ -204,13 +198,13 @@ function SnoozedGroup({ view, write, held, toOf }: { view: Ready; write: NodeWri
   );
 }
 
-/** The folds under the list, each only while it holds something. */
-export function Folds({ view, settings, toOf }: { view: Ready; settings: FoldSettings; toOf: (key: string) => string }) {
+/** The folds under the list, each only while it holds something the view draws. */
+export function Folds({ view, decisions, drawn, toOf }: { view: Ready; decisions: boolean; drawn: ReadonlySet<string> | undefined; toOf: (key: string) => string }) {
   const write = useNodeWrite(view, "folds");
-  const stale = useFlagged(view, "stale", settings);
-  const short = useFlagged(view, "shortfall", settings);
-  const lapsed = useFlagged(view, "snoozed_and_overdue", settings);
-  const snoozed = useFlagged(view, "snoozed", settings);
+  const stale = useFlagged(view, "stale", decisions, drawn);
+  const short = useFlagged(view, "shortfall", decisions, drawn);
+  const lapsed = useFlagged(view, "snoozed_and_overdue", decisions, drawn);
+  const snoozed = useFlagged(view, "snoozed", decisions, drawn);
   const looks = looksOf(view, stale.rows, short.rows, lapsed.rows);
   const groups = heldBy(view, snoozed.rows);
   return (

@@ -3,7 +3,8 @@
 // (detail, highlights, filter, search) are the view's own (ViewControls.tsx).
 import { Link, useLocation } from "react-router";
 
-import { pagePath, switchedSearch, type Screen } from "../journeys/address.ts";
+import { pagePath, type Screen } from "../journeys/address.ts";
+import { switchedSearch } from "../journeys/view.ts";
 
 const VIEWS: { screen: Screen; words: string }[] = [
   { screen: "graph", words: "Graph" },
@@ -12,7 +13,7 @@ const VIEWS: { screen: Screen; words: string }[] = [
   { screen: "summary", words: "Summary" },
 ];
 
-/** The views, one segmented control: the page's own address stays as it is, the others carry the chips they read. */
+/** The views, one segmented control: the page's own address stays as it is, the others carry the whole view state. */
 function Views({ journey, screen, node }: { journey: string; screen: Screen; node: string | undefined }) {
   const { search } = useLocation();
   return (

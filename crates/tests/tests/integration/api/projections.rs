@@ -164,6 +164,20 @@ mod in_process {
             format!("{JOURNEY}/level?collapsed=n_setup&display=relevant&display=conditional");
         let answered: serde_json::Value = get(&ann, &target).await;
         assert_eq!(answered, expected);
+        let filtered = LevelQuery {
+            top: [NodeKind::Group].into(),
+            flags: [ListFlag::Unassigned].into(),
+            text: Some("plan".parse().unwrap()),
+            ..LevelQuery::of_kinds(NodeKind::ALL.into_iter().collect(), None)
+        };
+        let expected = same(world.service.level(call, id, &filtered).await.unwrap());
+        assert_ne!(expected["value"]["nodes"], serde_json::json!([]));
+        let target = format!("{JOURNEY}/level?top=group&flag=unassigned&text=plan");
+        let answered: serde_json::Value = get(&ann, &target).await;
+        assert_eq!(
+            answered, expected,
+            "the top-level rule and the filters parse"
+        );
 
         let partner: &NodeKey = &"n_partner_runs".parse().unwrap();
         let detail = world.service.node_detail(call, id, partner).await.unwrap();

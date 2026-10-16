@@ -165,7 +165,7 @@ impl Derivation {
         Ok(match request {
             Projection::Level(query) => json(
                 &journey
-                    .level(query, &self.document.inputs.deployment)
+                    .level(query, &self.document.inputs.deployment, viewer)
                     .map_err(missing)?,
             ),
             Projection::AnswerEffects { key } => {

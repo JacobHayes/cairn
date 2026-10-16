@@ -30,7 +30,7 @@ export interface LineLook {
  * C1: a line solid when a requirement stands behind it and dotted otherwise (a condition gate,
  * a stage opening, a link that holds dates only), steel, waiting or satisfied,
  * lit by an overlay in the colour of its direction, and faded to the one level when an overlay
- * dims what it does not light (or when `faded`, a filter's).
+ * dims what it does not light (or, with no overlay, when `faded`: both its cards are unlit).
  */
 export function lineLook(line: Line, options: { overlay?: CanvasOverlay | undefined; satisfied?: boolean; faded?: boolean } = {}): LineLook {
   const { overlay, satisfied = false, faded = false } = options;
@@ -47,7 +47,8 @@ export function lineLook(line: Line, options: { overlay?: CanvasOverlay | undefi
 /**
  * C1, C5, C7: a card's classes: its kind, its display state's look (hollow when not relevant,
  * ghosted when conditional, green when done, hollow when skipped), "I am here" (the frontier and active work
- * outlined in ink), the overlay's tone, and the one out-of-focus level.
+ * outlined in ink), the overlay's tone, and the one out-of-focus level: outside the overlay's trace,
+ * or `faded`, outside what Frontier or Decisions lights.
  */
 export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | undefined; faded?: boolean } = {}): string[] {
   const { overlay, faded = false } = options;
@@ -71,7 +72,10 @@ export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | und
     if (mark.ghost === true) {
       classes.push("node-ghost");
     }
-  } else if (overlay?.dim === true || (overlay === undefined && faded)) {
+  }
+  // Out of focus is outside the trace or outside the highlight: the lowest opacity wins, so a
+  // trace never lifts a card the highlight left unlit (it keeps its mark at 0.3).
+  if (faded || (mark === undefined && overlay?.dim === true)) {
     classes.push("node-faded");
   }
   return classes;

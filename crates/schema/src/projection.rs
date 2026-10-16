@@ -238,7 +238,9 @@ impl LevelDisplay {
 }
 
 /// C2: what a level request asks for: the kinds shown, the container drilled into, the
-/// containers collapsed into their cards, and the relevance classes shown.
+/// containers collapsed into their cards, the relevance classes shown, the top-level kinds
+/// whose subtrees are drawn, and C9's filters and text search, which keep a node only when it
+/// matches or holds a match.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LevelQuery {
@@ -259,10 +261,33 @@ pub struct LevelQuery {
         skip_serializing_if = "LevelDisplay::is_every"
     )]
     pub display: BTreeSet<LevelDisplay>,
+    /// C2's Stages rule: the kinds a journey's top-level node must be for its subtree to be
+    /// drawn; any kind when none is given. A node whose top-level ancestor (or itself, at the
+    /// top level) is of another kind is left out: it has no stand-in, so its edges are left off
+    /// and a node waiting on it shows the hidden-prerequisites marker. Drilled into a
+    /// container, the rule reads the container's own top-level ancestor.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub top: BTreeSet<NodeKind>,
+    /// C9's filters with no argument, as the list reads them; every one given must hold. With
+    /// any filter or text given, a node is drawn only when it matches all of them or holds a
+    /// node that does; the rest are hidden like a kind left out (they roll up and their edges
+    /// re-target). A container's roll-ups stay whole-container values, not totals of what the
+    /// filters keep.
+    #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
+    pub flags: BTreeSet<ListFlag>,
+    /// Only nodes this entity owns, as the list reads it (aliases followed), and what holds
+    /// them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub owner: Option<EntityKey>,
+    /// Text found in the title, description, notes, or resources, ignoring ASCII case, as the
+    /// list's search reads it; nodes holding a match are kept too.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text: Option<Title>,
 }
 
 impl LevelQuery {
-    /// The kinds `shown` within `container`, nothing collapsed, every class shown.
+    /// The kinds `shown` within `container`, nothing collapsed, every class shown, no top-level
+    /// rule and no filters.
     #[must_use]
     pub fn of_kinds(shown: BTreeSet<NodeKind>, container: Option<NodeKey>) -> Self {
         Self {
@@ -270,7 +295,18 @@ impl LevelQuery {
             container,
             collapsed: BTreeSet::new(),
             display: LevelDisplay::every(),
+            top: BTreeSet::new(),
+            flags: BTreeSet::new(),
+            owner: None,
+            text: None,
         }
+    }
+
+    /// Whether the query keeps only the nodes its filters or text match and those holding
+    /// them.
+    #[must_use]
+    pub fn filters(&self) -> bool {
+        !self.flags.is_empty() || self.owner.is_some() || self.text.is_some()
     }
 
     /// What a request asks for: an empty `shown` is every kind and an empty `display` every
@@ -320,6 +356,12 @@ pub struct Level {
     pub nodes: Vec<LevelNode>,
     /// The edges, sorted by their ends.
     pub edges: Vec<LevelEdge>,
+    /// C1's count, per relevance class left out: the nodes hidden only for their class (of a
+    /// kind shown, within the level, under no collapse, not left out by `top`, and kept by the
+    /// filters), so showing a class draws exactly that many more. Empty when every class is
+    /// shown.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub hidden_by_class: BTreeMap<LevelDisplay, u32>,
 }
 
 /// Some nodes an answer's effect names: how many in all, and the first

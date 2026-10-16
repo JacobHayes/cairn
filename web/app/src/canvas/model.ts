@@ -38,32 +38,24 @@ export const LENSES = ["rank", "gravity", "unlocks", "slack"] as const;
 export type Lens = (typeof LENSES)[number];
 
 /**
- * What the canvas shows (C1, C2, C4, C6). On a journey: `step` is the detail ladder (none is its
- * default), `open` and `shut` are the containers the viewer expanded and collapsed since, `shown`
- * the kinds kept at full strength (the others fade), `notRelevant` and `undecided` whether settled
- * not-relevant and conditional nodes are drawn, and `lens` the Signals lens. On a route's canvas,
- * which has no ladder, `shown` is the kinds drawn and `container` the one drilled into.
+ * What a route's canvas shows (C2, C4): `step` is the detail ladder (none is its default), `open`
+ * and `shut` the containers the viewer expanded and collapsed since, `container` the one drilled
+ * into, and `lens` the Signals lens. A journey's graph reads its step from the journey's view state
+ * (journeys/view.ts) and the rest from its own settings (settings.ts).
  */
 export interface CanvasSettings {
-  shown: NodeKind[];
   container: string | undefined;
   step: Step | undefined;
   open: string[];
   shut: string[];
-  notRelevant: boolean;
-  undecided: boolean;
   lens: Lens | undefined;
 }
 
-/** Q3: conditional nodes are drawn ghosted; only the settled not-relevant ones are hidden. */
 export const DEFAULT_SETTINGS: CanvasSettings = {
-  shown: KINDS,
   container: undefined,
   step: undefined,
   open: [],
   shut: [],
-  notRelevant: false,
-  undecided: true,
   lens: undefined,
 };
 

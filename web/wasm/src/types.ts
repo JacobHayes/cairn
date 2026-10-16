@@ -9,7 +9,17 @@ export type NodeKey = Schema<"NodeKey">;
 
 /** `crates/wasm` `Projection`: one projection of a derived journey, as the API's queries. */
 export type ProjectionRequest =
-  | { projection: "level"; shown: Schema<"NodeKind">[]; container?: NodeKey; collapsed?: NodeKey[]; display?: Schema<"LevelDisplay">[] }
+  | {
+      projection: "level";
+      shown: Schema<"NodeKind">[];
+      container?: NodeKey;
+      collapsed?: NodeKey[];
+      display?: Schema<"LevelDisplay">[];
+      top?: Schema<"NodeKind">[];
+      flags?: Schema<"ListFlag">[];
+      owner?: Schema<"EntityKey">;
+      text?: string;
+    }
   | { projection: "trace"; key: NodeKey }
   | { projection: "decision_view" }
   | { projection: "timeline" }

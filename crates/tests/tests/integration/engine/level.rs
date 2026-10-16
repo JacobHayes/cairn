@@ -31,7 +31,7 @@ fn level_of(records: &Records, journey: &str, query: &LevelQuery) -> Level {
     let graph = support::journey_graph(records, journey);
     let derived = support::derived(records, journey);
     DerivedJourney::new(&graph, &derived)
-        .level(query, &records.deployment)
+        .level(query, &records.deployment, &BTreeSet::new())
         .unwrap()
 }
 
@@ -350,7 +350,8 @@ fn drilling_in_shows_the_containers_contents() {
     assert_eq!(
         DerivedJourney::new(&graph, &derived).level(
             &LevelQuery::of_kinds(BTreeSet::new(), Some(key("n_nowhere"))),
-            &records.deployment
+            &records.deployment,
+            &BTreeSet::new()
         ),
         Err(ProjectionError::UnknownNode(key("n_nowhere")))
     );

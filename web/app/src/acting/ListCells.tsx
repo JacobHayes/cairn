@@ -1,13 +1,13 @@
 // C9, C12: what each of the list's columns says about a row, in plain words: a status, a
 // title with at most one thing under it, who owns it, when it is due. The columns Columns adds
 // say a signal in words beside its number. A row with nothing to say in a column leaves it blank.
-// Under the Frontier lens the title says why the row is here (C10) and the owner column is
-// where the row's actions are (RowActions).
+// With Frontier on, a row on the acting frontier says why it is there and carries its primary
+// action under its title (C10, RowActions), at every width.
 import type { CSSProperties } from "react";
 import { Link, useLocation } from "react-router";
 
-import { ancestorsOf } from "../canvas/ladder.ts";
-import { DEFAULT_VIEW, canvasPath, revealing } from "../canvas/settings.ts";
+import { ancestorsOf, placedAt } from "../canvas/ladder.ts";
+import { DEFAULT_GRAPH_VIEW, canvasPath, revealing } from "../canvas/settings.ts";
 import type { DecisionRow } from "../decisions/model.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
 import { nodePath, screenPath } from "../detail/parts.tsx";
@@ -32,8 +32,8 @@ export interface CellContext {
   decisions: Map<string, DecisionRow>;
   /** Each ranked node's place in the journey's rank order. */
   ranks: Map<string, number>;
-  /** The Frontier lens: rows say why they are here and carry their actions. */
-  acting: boolean;
+  /** The acting frontier while Frontier is on: its rows say why they are there and carry their actions. */
+  frontier: ReadonlySet<string> | undefined;
   sort: ListSettings["sort"];
   onFold: (container: string) => void;
 }
@@ -85,8 +85,20 @@ function Guides({ line }: { line: Line }) {
   );
 }
 
+/** C10: under a frontier row's title, why it is there and its primary action; the Owner column says who, so the action leaves the owner out unless there is none. */
+function Acting({ line, context }: { line: Line; context: CellContext }) {
+  const { pathname, search } = useLocation();
+  return line.row === undefined ? null : (
+    <span className="list-acting stack" data-testid="list-acting">
+      <Fact line={line} context={context} />
+      <RowActions view={context.view} row={line.row} to={`${nodePath(screenPath(pathname), line.key)}${search}`} owner={false} />
+    </span>
+  );
+}
+
 function Title({ line, context }: { line: Line; context: CellContext }) {
   const { view, tree } = context;
+  const acting = context.frontier?.has(line.key) === true;
   return (
     <div className="list-title" style={{ paddingInlineStart: `calc(${String(line.depth)} * var(--space-5))` }}>
       {tree ? (
@@ -105,7 +117,7 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
       ) : null}
       <div className="list-node">
         <DetailLink view={view} node={line.key} />
-        {tree ? (line.container ? <Progress view={view} line={line} /> : null) : context.acting ? <Fact line={line} context={context} /> : <Under view={view} line={line} />}
+        {acting ? <Acting line={line} context={context} /> : tree ? (line.container ? <Progress view={view} line={line} /> : null) : <Under view={view} line={line} />}
       </div>
     </div>
   );
@@ -124,7 +136,7 @@ function Affects({ context, node }: { context: CellContext; node: string }) {
       ? `Decides ${String(decision.affects.length)} ${decision.affects.length === 1 ? "item" : "items"}`
       : [brought > 0 ? `brings in ${String(brought)}` : "", out > 0 ? `drops ${String(out)}` : ""].filter(Boolean).join(", ");
   const kind = nodeOf(context.view, node);
-  const to = kind === undefined ? undefined : canvasPath(context.view.journey.header.id, revealing(DEFAULT_VIEW, { kind: kind.kind, ancestors: ancestorsOf(context.view.journey.graph.nodes ?? [], node) }, context.view.derived.nodes[node]?.display_state), node);
+  const to = kind === undefined ? undefined : canvasPath(context.view.journey.header.id, revealing(DEFAULT_GRAPH_VIEW, placedAt(context.view.journey.graph.nodes ?? [], kind.kind, ancestorsOf(context.view.journey.graph.nodes ?? [], node)), context.view.derived.nodes[node]?.display_state), node);
   return to === undefined ? <>{words}</> : <Link to={to} data-testid="affects-link">{words}</Link>;
 }
 
@@ -139,7 +151,6 @@ function Weight({ count, weighted }: { count: number; weighted: number }) {
 /** The cell of `column` for `line`. */
 export function Cell({ column, line, context }: { column: Column; line: Line; context: CellContext }) {
   const { view } = context;
-  const { pathname, search } = useLocation();
   const { row } = line;
   const derived = view.derived.nodes[line.key];
   const node = nodeOf(view, line.key);
@@ -157,7 +168,7 @@ export function Cell({ column, line, context }: { column: Column; line: Line; co
   }
   switch (column) {
     case "owner":
-      return context.acting ? <RowActions view={view} row={row} to={`${nodePath(screenPath(pathname), line.key)}${search}`} /> : (row.owners ?? []).length > 0 ? (row.owners ?? []).map((key) => entityName(view, key)).join(", ") : row.unassigned === true ? <span className="list-unassigned">Unassigned</span> : null;
+      return (row.owners ?? []).length > 0 ? (row.owners ?? []).map((key) => entityName(view, key)).join(", ") : row.unassigned === true ? <span className="list-unassigned">Unassigned</span> : null;
     case "due":
       return row.due == null || !open ? null : <span className={row.overdue === true ? "list-late" : ""} data-testid="list-due">{dueWords(row.due, today, node.kind === "decision")}</span>;
     case "rank": {

@@ -2,12 +2,18 @@
 //! authored:
 //!
 //! - A node is visible when its kind is shown, its relevance class is shown, no ancestor
-//!   within the level is collapsed, and it is within the drilled-in container (a proper
-//!   descendant; every node when none is drilled into). The relevance classes are
-//!   `relevant`, `conditional` (undecided, or not relevant only because the decision it
-//!   reads is undecided itself, [`crate::derive::pending`]), and `not_relevant` (settled).
+//!   within the level is collapsed, it is within the drilled-in container (a proper
+//!   descendant; every node when none is drilled into), it is not left out by the top-level
+//!   rule, and, when the query filters (C9's flags, owner, or text), it matches them or holds
+//!   a node that does. The relevance classes are `relevant`, `conditional` (undecided, or not
+//!   relevant only because the decision it reads is undecided itself,
+//!   [`crate::derive::pending`]), and `not_relevant` (settled). The top-level rule (Stages)
+//!   leaves out every node whose top-level ancestor, or itself at the top level, is of a kind
+//!   the query's `top` lacks; drilled into a container, the container's top-level ancestor
+//!   decides for everything within it.
 //! - Each node within the container has a stand-in: itself when visible, else its nearest
-//!   visible ancestor within the container, else none. A visible node is drawn under the
+//!   visible ancestor within the container, else none; a node left out by the top-level rule
+//!   has none. A visible node is drawn under the
 //!   stand-in of its parent, or at the top level; a hidden one rolls up into its stand-in. A
 //!   collapsed container rolls its whole subtree into its own card (or its stand-in's).
 //! - Edges are the explicit requirements, condition gates, and stage openings of the full
@@ -24,7 +30,9 @@
 //!   could be drawn for it). So hiding a kind, a class, or a stage never makes blocked work
 //!   look free.
 //! - Each visible container carries its roll-ups (C2's badges), each node its display state
-//!   (D8), and each group its legacy group state (D1).
+//!   (D8), and each group its legacy group state (D1). The level counts, per class left out,
+//!   the nodes hidden for their class alone (C1's count): showing that class draws exactly
+//!   those.
 //!
 //! Cost at `node_count_max` (2,000 nodes, about 110,000 edges): the relevance classes, only
 //! when a class is hidden, are two relevance passes ([`crate::derive::pending`], about 34,000
@@ -32,13 +40,17 @@
 //! sorted map, O(edges log edges); the marker walks a blocked node's entry chains (at most
 //! about 1,300 edges each, 2.6 million in all, each node once whether it is visible or rolled
 //! up); a group's state reads its descendants (2,000 x 2,000 at worst) and a container's
-//! roll-up its children, O(nodes) in all.
+//! roll-up its children, O(nodes) in all. With filters, the list's matcher reads each node's
+//! text fields once (bounded by the text limits), and the matches are closed over their
+//! ancestors with an early stop, at most 2,000 x 16 (`containment_depth_max`) parent steps;
+//! the kept set and the class counts are B-tree sets and maps of at most 2,000 keys. The
+//! top-level rule walks the drilled container's ancestors once, then reads each node's parent.
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    DependencyVia, Deployment, EdgeOrigin, Level, LevelDisplay, LevelEdge, LevelNode, LevelQuery,
-    NodeKey, NodeKind, Relevance, RollUp, State, UnderlyingEdge,
+    DependencyVia, Deployment, EdgeOrigin, EntityKey, Level, LevelDisplay, LevelEdge, LevelNode,
+    LevelQuery, NodeKey, NodeKind, Relevance, RollUp, State, UnderlyingEdge,
 };
 
 use super::{DerivedJourney, ProjectionError};
@@ -54,6 +66,8 @@ struct StandIns<'a> {
     of: BTreeMap<&'a NodeKey, Option<&'a NodeKey>>,
     /// The collapsed containers within the level.
     collapsed: BTreeSet<&'a NodeKey>,
+    /// The nodes hidden for their relevance class alone, per class (C1's count).
+    hidden_by_class: BTreeMap<LevelDisplay, u32>,
 }
 
 impl<'a> StandIns<'a> {
@@ -70,8 +84,10 @@ impl<'a> DerivedJourney<'a> {
     /// C2: the level the query asks for: the visible nodes, each under its nearest visible
     /// ancestor, with what rolls up into it, its hidden-prerequisites marker, and for a
     /// container its roll-ups; the edges re-targeted to visible stand-ins, duplicates
-    /// collapsed and self-edges dropped. `deployment` is the one the journey was derived
-    /// over; it is read only when a relevance class is left out.
+    /// collapsed and self-edges dropped; and C1's count of what each class left out hides.
+    /// `deployment` is the one the journey was derived over; it is read only when a relevance
+    /// class is left out. `viewer` is the caller's entities, read only by the `mine` filter
+    /// (C9).
     ///
     /// # Errors
     ///
@@ -80,10 +96,11 @@ impl<'a> DerivedJourney<'a> {
         &self,
         query: &LevelQuery,
         deployment: &Deployment,
+        viewer: &BTreeSet<EntityKey>,
     ) -> Result<Level, ProjectionError> {
         let classes = (query.display.len() < LevelDisplay::ALL.len())
             .then(|| classify(self.graph, deployment));
-        self.level_with(query, classes.as_ref())
+        self.level_with(query, classes.as_ref(), viewer)
     }
 
     /// The level for the query, given the relevance classes when it leaves one out.
@@ -91,6 +108,7 @@ impl<'a> DerivedJourney<'a> {
         &self,
         query: &LevelQuery,
         classes: Option<&Relevances>,
+        viewer: &BTreeSet<EntityKey>,
     ) -> Result<Level, ProjectionError> {
         if let Some(key) = &query.container {
             self.known(key)?;
@@ -102,7 +120,8 @@ impl<'a> DerivedJourney<'a> {
             classes.is_some() || query.display.len() == LevelDisplay::ALL.len(),
             "a level that leaves a class out has the classes"
         );
-        let stand_ins = self.stand_ins(query, classes);
+        let kept = query.filters().then(|| self.kept(query, viewer));
+        let stand_ins = self.stand_ins(query, classes, kept.as_ref());
         let mut rolled_up: BTreeMap<&NodeKey, Vec<NodeKey>> = BTreeMap::new();
         for key in &stand_ins.within {
             match stand_ins.get(key) {
@@ -146,11 +165,66 @@ impl<'a> DerivedJourney<'a> {
             display: query.display.clone(),
             nodes,
             edges: self.level_edges(&stand_ins),
+            hidden_by_class: stand_ins.hidden_by_class,
         })
     }
 
-    /// Each node within the level and its stand-in, in one pass in tree order.
-    fn stand_ins(&self, query: &LevelQuery, classes: Option<&Relevances>) -> StandIns<'a> {
+    /// C2, C9: the nodes the query's filters match, and every node holding one: what a level
+    /// that filters keeps. Each match walks up its ancestors until one is already kept.
+    fn kept(&self, query: &LevelQuery, viewer: &BTreeSet<EntityKey>) -> BTreeSet<&'a NodeKey> {
+        let matcher = self.matcher(
+            &query.flags,
+            query.owner.as_ref(),
+            query.text.as_ref(),
+            viewer,
+        );
+        let tree = self.graph.tree();
+        let mut kept: BTreeSet<&'a NodeKey> = BTreeSet::new();
+        for key in self.graph.document().nodes.as_map().keys() {
+            if !matcher.holds(key) {
+                continue;
+            }
+            let mut at = Some(key);
+            while let Some(key) = at {
+                if !kept.insert(key) {
+                    break;
+                }
+                at = tree.parent(key);
+            }
+        }
+        assert!(
+            kept.len() <= self.graph.document().nodes.as_map().len(),
+            "each node is kept once"
+        );
+        kept
+    }
+
+    /// C2's top-level rule for the nodes directly within the drilled container (or at the
+    /// top level when none): whether `key`, a node there, is left out.
+    fn left_out_at_top(&self, query: &LevelQuery, key: &NodeKey) -> bool {
+        if query.top.is_empty() {
+            return false;
+        }
+        let root = match &query.container {
+            Some(container) => self
+                .ancestors(container)
+                .into_iter()
+                .next()
+                .unwrap_or_else(|| container.clone()),
+            None => key.clone(),
+        };
+        !query.top.contains(&self.node(&root).kind())
+    }
+
+    /// Each node within the level and its stand-in, in one pass in tree order, with C1's count
+    /// of the nodes hidden for their class alone. `kept` is what the filters keep, when the
+    /// query filters.
+    fn stand_ins(
+        &self,
+        query: &LevelQuery,
+        classes: Option<&Relevances>,
+        kept: Option<&BTreeSet<&'a NodeKey>>,
+    ) -> StandIns<'a> {
         let within = self.tree_order(query.container.as_ref());
         let collapsed: BTreeSet<&NodeKey> = within
             .iter()
@@ -159,37 +233,46 @@ impl<'a> DerivedJourney<'a> {
             .collect();
         let mut of: BTreeMap<&NodeKey, Option<&NodeKey>> = BTreeMap::new();
         let mut inside: BTreeSet<&NodeKey> = BTreeSet::new();
+        let mut left_out: BTreeSet<&NodeKey> = BTreeSet::new();
+        let mut hidden_by_class: BTreeMap<LevelDisplay, u32> = BTreeMap::new();
         let tree = self.graph.tree();
-        // Tree order puts each parent first, so its stand-in and collapse are known.
+        // Tree order puts each parent first, so its stand-in, collapse, and rule are known.
         for key in &within {
-            let under_collapse = tree
-                .parent(key)
-                .is_some_and(|parent| inside.contains(parent) || collapsed.contains(parent));
+            let parent = tree.parent(key).filter(|parent| of.contains_key(parent));
+            let under_collapse =
+                parent.is_some_and(|parent| inside.contains(parent) || collapsed.contains(parent));
             if under_collapse {
                 inside.insert(key);
             }
-            let shown_class = classes.is_none_or(|classes| {
-                query.display.contains(&match classes.class(key) {
-                    RelevanceClass::Relevant => LevelDisplay::Relevant,
-                    RelevanceClass::Undecided | RelevanceClass::Pending => {
-                        LevelDisplay::Conditional
-                    }
-                    RelevanceClass::Settled => LevelDisplay::NotRelevant,
-                })
-            });
-            let stand_in =
-                if !under_collapse && shown_class && query.shown.contains(&self.node(key).kind()) {
-                    Some(*key)
-                } else {
-                    tree.parent(key)
-                        .and_then(|parent| of.get(parent).copied().flatten())
-                };
+            let left = match parent {
+                Some(parent) => left_out.contains(parent),
+                None => self.left_out_at_top(query, key),
+            };
+            if left {
+                left_out.insert(key);
+                of.insert(key, None);
+                continue;
+            }
+            let class = classes.map(|classes| display_of(classes.class(key)));
+            let drawable = !under_collapse
+                && query.shown.contains(&self.node(key).kind())
+                && kept.is_none_or(|kept| kept.contains(key));
+            let shown_class = class.is_none_or(|class| query.display.contains(&class));
+            if let (true, false, Some(class)) = (drawable, shown_class, class) {
+                *hidden_by_class.entry(class).or_default() += 1;
+            }
+            let stand_in = if drawable && shown_class {
+                Some(*key)
+            } else {
+                parent.and_then(|parent| of.get(parent).copied().flatten())
+            };
             of.insert(key, stand_in);
         }
         StandIns {
             within,
             of,
             collapsed,
+            hidden_by_class,
         }
     }
 
@@ -335,5 +418,14 @@ impl<'a> DerivedJourney<'a> {
                 .cloned()
                 .collect(),
         }
+    }
+}
+
+/// The level class a node's relevance class reads as (C1).
+fn display_of(class: RelevanceClass) -> LevelDisplay {
+    match class {
+        RelevanceClass::Relevant => LevelDisplay::Relevant,
+        RelevanceClass::Undecided | RelevanceClass::Pending => LevelDisplay::Conditional,
+        RelevanceClass::Settled => LevelDisplay::NotRelevant,
     }
 }

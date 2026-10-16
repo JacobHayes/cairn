@@ -9,6 +9,8 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ReactNo
 
 /** The space a popover keeps from the window's edge (px). */
 const EDGE_PX = 16;
+/** The tallest a popover's body grows before it scrolls (DESIGN, Popover and menu). */
+const BODY_PX_MAX = 480;
 
 /** The vertical span a popover can show in: the nearest ancestor that clips or scrolls it, or the window. */
 function roomOf(popover: HTMLElement): { top: number; bottom: number } {
@@ -43,7 +45,9 @@ function useInWindow(popover: RefObject<HTMLDivElement | null>, body: RefObject<
     const above = button.top - room.top - EDGE_PX;
     const flip = box.height > below && above > below;
     popover.current.dataset["side"] = flip ? "top" : "bottom";
-    body.current?.style.setProperty("max-height", `${String(Math.max(flip ? above : below, 0))}px`);
+    // DESIGN, Popover and menu: the body scrolls within the room, and never past min(60dvh, 480px).
+    const cap = Math.min(window.innerHeight * 0.6, BODY_PX_MAX);
+    body.current?.style.setProperty("max-height", `${String(Math.max(Math.min(flip ? above : below, cap), 0))}px`);
   }, [popover, body, open]);
 }
 

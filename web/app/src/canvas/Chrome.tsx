@@ -55,7 +55,7 @@ export function SignalMenu({ lens, onLens }: { lens: Lens | undefined; onLens: (
       testId="view-menu"
       role="dialog"
       align="end"
-      className={lens === undefined ? "canvas-signal" : "canvas-signal canvas-signal-on"}
+      className={lens === undefined ? "canvas-signal" : "canvas-signal menu-pressed"}
       trigger={`Signal: ${lens === undefined ? "Off" : LENS_WORDS[lens]} \u25be`}
     >
       {() => (

@@ -320,6 +320,7 @@ fn counts_agree_everywhere_and_by_state_is_unchanged() {
             .level(
                 &LevelQuery::of_kinds(all.into_iter().collect(), None),
                 &Deployment::default(),
+                &BTreeSet::new(),
             )
             .unwrap();
         for node in &level.nodes {

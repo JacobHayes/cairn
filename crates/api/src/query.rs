@@ -180,6 +180,22 @@ pub const LEVEL_PARAMS: &[ParamSpec] = &[
         "display",
         "The relevance classes shown: `relevant`, `conditional` (undecided, or waiting on a          decision that cannot be answered yet), `not_relevant` (settled). Every class when none.          A node of a class left out rolls up like a hidden kind's.",
     ),
+    ParamSpec::many::<NodeKind>(
+        "top",
+        "The kinds a top-level node must be for its subtree to be drawn; any kind when none. The \
+         rest are left out: no stand-in, and their edges left off.",
+    ),
+    ParamSpec::many::<ListFlag>(
+        "flag",
+        "The list's filters with no argument; with any filter, `owner` or `text`, a node is \
+         drawn only when it matches every one or holds a node that does.",
+    ),
+    ParamSpec::one::<EntityKey>("owner", "Only nodes this entity owns, and what holds them."),
+    ParamSpec::one::<Title>(
+        "text",
+        "Text found in the title, description, notes, or resources, ignoring ASCII case; nodes \
+         holding a match are kept too.",
+    ),
 ];
 
 /// `GET /api/journeys/{id}/next` (C10).
@@ -421,19 +437,25 @@ pub fn snapshot(params: &Params) -> Result<SnapshotScope, ApiError> {
 }
 
 /// C2: a level's query: the kinds shown (every kind when none is given), the container
-/// drilled into, the containers collapsed, and the relevance classes shown (every class when
-/// none is given).
+/// drilled into, the containers collapsed, the relevance classes shown (every class when
+/// none is given), the top-level kinds drawn, and the list's filters and text (C9).
 ///
 /// # Errors
 ///
 /// A bad request for a parameter that does not parse.
 pub fn level(params: &Params) -> Result<LevelQuery, ApiError> {
-    Ok(LevelQuery::requested(
-        params.all("kind")?.into_iter().collect(),
-        params.one("container")?,
-        params.all("collapsed")?.into_iter().collect(),
-        params.all("display")?.into_iter().collect(),
-    ))
+    Ok(LevelQuery {
+        top: params.all("top")?.into_iter().collect(),
+        flags: params.all("flag")?.into_iter().collect(),
+        owner: params.one("owner")?,
+        text: params.one("text")?,
+        ..LevelQuery::requested(
+            params.all("kind")?.into_iter().collect(),
+            params.one("container")?,
+            params.all("collapsed")?.into_iter().collect(),
+            params.all("display")?.into_iter().collect(),
+        )
+    })
 }
 
 /// C10: the next list's query.

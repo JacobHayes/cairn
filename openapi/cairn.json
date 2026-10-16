@@ -5189,6 +5189,15 @@
             },
             "type": "array"
           },
+          "hidden_by_class": {
+            "additionalProperties": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "description": "C1's count, per relevance class left out: the nodes hidden only for their class (of a\nkind shown, within the level, under no collapse, not left out by `top`, and kept by the\nfilters), so showing a class draws exactly that many more. Empty when every class is\nshown.",
+            "type": "object"
+          },
           "nodes": {
             "description": "The visible nodes, in tree order.",
             "items": {
@@ -15857,6 +15866,56 @@
                 "$ref": "#/components/schemas/LevelDisplay"
               },
               "type": "array"
+            },
+            "style": "form"
+          },
+          {
+            "description": "The kinds a top-level node must be for its subtree to be drawn; any kind when none. The rest are left out: no stand-in, and their edges left off.",
+            "explode": true,
+            "in": "query",
+            "name": "top",
+            "required": false,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/NodeKind"
+              },
+              "type": "array"
+            },
+            "style": "form"
+          },
+          {
+            "description": "The list's filters with no argument; with any filter, `owner` or `text`, a node is drawn only when it matches every one or holds a node that does.",
+            "explode": true,
+            "in": "query",
+            "name": "flag",
+            "required": false,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/ListFlag"
+              },
+              "type": "array"
+            },
+            "style": "form"
+          },
+          {
+            "description": "Only nodes this entity owns, and what holds them.",
+            "explode": true,
+            "in": "query",
+            "name": "owner",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/EntityKey"
+            },
+            "style": "form"
+          },
+          {
+            "description": "Text found in the title, description, notes, or resources, ignoring ASCII case; nodes holding a match are kept too.",
+            "explode": true,
+            "in": "query",
+            "name": "text",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/Title"
             },
             "style": "form"
           }
