@@ -1,14 +1,14 @@
 // A host and a deriver for the data layer's unit tests: journeys held in memory at the
 // revisions a test sets, documents that count their fetches, and a tick stream the test
 // drives by hand. Shapes are the API's, cut to what the data layer reads.
-import type { Answered, HttpFailure, Patch, PatchAnswer, Tick, TickHandlers } from "@cairn/client";
+import type { Answered, HttpFailure, Patch, Tick, TickHandlers } from "@cairn/client";
 import type { DerivationHandle, Derived, Loaded } from "@cairn/wasm";
 import { SimulatedClock } from "xstate";
 
 import type { AssistantHost } from "./assistant.ts";
-import type { Command } from "./edit-record.ts";
-import type { ProposalHost } from "./proposals.ts";
-import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteVersion, type Viewer } from "./host.ts";
+import type { Answer, Command } from "./edit-record.ts";
+import type { ProposalHost, ProposalWritten } from "./proposals.ts";
+import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Viewer } from "./host.ts";
 import type { Timers } from "./sync.ts";
 import type { WriteEnv } from "./write-machine.ts";
 
@@ -103,8 +103,15 @@ export class FakeHost implements Host {
     return Promise.reject(new Missing(route));
   }
 
-  importRoute(): Promise<Answered<HttpFailure>> {
-    return Promise.resolve({ outcome: "failed", error: { status: 0, message: "no imports in the fake" } });
+  /** The answers `importRoute` gives, in turn; a promise holds the answer until the test settles it. */
+  imports: (Answered<HttpFailure> | Promise<Answered<HttpFailure>>)[] = [];
+  /** The imports sent. */
+  readonly imported: RouteImport[] = [];
+
+  importRoute(request: RouteImport): Promise<Answered<HttpFailure>> {
+    this.imported.push(request);
+    const answer = this.imports.shift();
+    return answer === undefined ? Promise.resolve({ outcome: "failed", error: { status: 0, message: "no imports in the fake" } }) : Promise.resolve(answer);
   }
 
   /** How many times the caller was read. */
@@ -177,19 +184,41 @@ export class FakeHost implements Host {
     stream.handlers.tick({ of: { domain: "deployment" }, revision: this.deploymentRevision });
   }
 
-  /** No proposals: each is missing, and each write fails. */
-  readonly proposals: ProposalHost = noProposals();
+  /** The proposal writes sent, in order, as the calls a write holds. */
+  readonly called: string[] = [];
+  /** The answers the proposal writes give, in turn, whichever is called; a promise holds the answer until the test settles it. */
+  proposed: (ProposalWritten<Answer> | Promise<ProposalWritten<Answer>>)[] = [];
+
+  /** No proposals are held (each is missing); each write is recorded in `called` and answered from `proposed`. */
+  readonly proposals: ProposalHost = scriptedProposals(this);
 
   tick(tick: Tick): void {
     this.streams.at(-1)?.handlers.tick(tick);
   }
 }
 
-/** A host with no proposals: each is missing, and each write fails. */
-function noProposals(): ProposalHost {
+/** A host with no proposals held, whose writes answer from the fake's script. */
+function scriptedProposals(host: FakeHost): ProposalHost {
   const missing = (id: string) => Promise.reject(new Missing(id));
-  const failed = () => Promise.resolve({ outcome: "failed" as const, error: { status: 0, message: "no proposals in the fake" } });
-  return { get: missing, preview: missing, create: failed, edit: failed, discard: failed, refresh: failed, apply: failed, upgrade: failed, saveAsRoute: failed, relink: failed };
+  const write = (call: string) => {
+    host.called.push(call);
+    const answer = host.proposed.shift();
+    return Promise.resolve(answer ?? { outcome: "failed" as const, error: { status: 0, message: "no proposal answer scripted" } });
+  };
+  // The scripted answer is whatever the test needs the write to give: a proposal's, or an apply's.
+  const written = write as unknown as <A>(call: string) => Promise<ProposalWritten<A>>;
+  return {
+    get: missing,
+    preview: missing,
+    create: () => written("create"),
+    edit: () => written("edit"),
+    discard: () => written("discard"),
+    refresh: () => written("refresh"),
+    apply: () => written("apply"),
+    upgrade: () => written("upgrade"),
+    saveAsRoute: () => written("save_as_route"),
+    relink: () => written("relink"),
+  };
 }
 
 /**
@@ -351,12 +380,11 @@ export function memoryStorage(): Storage {
 /** What a write reads, over `host`: the connection and the build can be switched, and the saves are logged. */
 export function writeEnv(host: FakeHost) {
   const switches = { connected: true, compatible: true };
-  const saves: { command: Command; answer: PatchAnswer; began: number }[] = [];
+  const saves: { command: Command; answer: Answer; began: number }[] = [];
   let began = 0;
   // What the session root supplies is the build check; a write alone is given it here.
   const parts: Omit<WriteEnv, "compatible"> = {
-    send: (patch) => host.send(patch),
-    overlaps: host.overlaps,
+    host,
     began: () => ++began,
     saved: (command, answer, at) => {
       saves.push({ command, answer, began: at });

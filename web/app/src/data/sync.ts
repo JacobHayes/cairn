@@ -90,7 +90,7 @@ export interface EditsReading {
   subscribe(listener: () => void): () => void;
 }
 
-/** What `SyncStatus` is told, as opposed to what it reads (the edits, the tracked work) or reads off the clock (now). */
+/** What `SyncStatus` is told, as opposed to what it reads (the edits) or reads off the clock (now). */
 type Reported = Omit<SyncInput, "now" | "problems" | "inFlight" | "inFlightSince">;
 
 export interface SyncSummary {
@@ -161,9 +161,7 @@ export class SyncStatus extends Emitter {
   readonly #clock: () => number;
   readonly #edits: EditsReading;
   #input: Reported;
-  /** Work counted by `track`: the writes that are not edits yet (proposals, an import). */
-  #tracked = 0;
-  /** When (monotonic ms) the work in flight, tracked or an edit, first became more than none. */
+  /** When (monotonic ms) the writes in flight first became more than none. */
   #since: number | undefined;
   #wake: unknown;
   #snapshot: SyncSummary;
@@ -202,18 +200,6 @@ export class SyncStatus extends Emitter {
     return this.#snapshot;
   }
 
-  /** Counts the work `work` as in flight until it settles. Transitional: proposals and the import move onto the edit manager in the remaining-writes step, which removes this. */
-  async track<T>(work: Promise<T>): Promise<T> {
-    this.#tracked += 1;
-    this.#refresh();
-    try {
-      return await work;
-    } finally {
-      this.#tracked -= 1;
-      this.#refresh();
-    }
-  }
-
   /** A save landed. */
   saved(time: string): void {
     this.#update({ saved: { at: this.#clock(), time } });
@@ -241,7 +227,7 @@ export class SyncStatus extends Emitter {
   }
 
   #compute(): SyncSummary {
-    const inFlight = this.#tracked + this.#edits.inFlight();
+    const inFlight = this.#edits.inFlight();
     this.#since = inFlight === 0 ? undefined : (this.#since ?? this.#clock());
     return summarize({ ...this.#input, now: this.#clock(), problems: this.#edits.problems(), inFlight, inFlightSince: this.#since });
   }

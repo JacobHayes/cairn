@@ -15,12 +15,13 @@ import { PREVIEW_SETTLE_MS } from "../authoring/write.ts";
 import type { Deployment, Deriver, Host, RouteVersion } from "../data/host.ts";
 import { beforeWork, HOST_READ, previewPolicy, valueOf, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
 import { useDraft } from "../data/drafts.ts";
+import type { Answer } from "../data/edit-record.ts";
 import type { ProposalReview } from "../data/proposals.ts";
 import { useDeployment, useJourney, useKeyedRead, useLive, useSession, useViewer } from "../data/react.ts";
+import { isPatchAnswer } from "../data/writes.ts";
 import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
 import { ShortfallView } from "../detail/ShortfallView.tsx";
-import { RejectionView } from "../screens/RejectionView.tsx";
 import { addedRoles, insertionMembers, noteOrigins } from "../segments/model.ts";
 import { useSegmentNames } from "../segments/read.ts";
 import { Inspector } from "../shell/frame.tsx";
@@ -29,6 +30,7 @@ import { Badge, Button, Panel } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { ChangeList } from "./Changes.tsx";
+import { Problem } from "./Entries.tsx";
 import { ItemList } from "./Items.tsx";
 import {
   applyBlockers,
@@ -55,7 +57,7 @@ import { proposalReview } from "./read.ts";
 import { BeforeAfter, BLOCKER_WORDS, FilterChips, ItemEditor, ProposalOrigin, ReviewHeader, ReviewList } from "./ReviewFrame.tsx";
 import { StalePanel } from "./Stale.tsx";
 import { itemHeading, mutationNode, namesOf, type Names } from "./words.ts";
-import { useProposalWrite, type ProposalWrite, type WriteProblem } from "./write.ts";
+import { useProposalWrite, type ProposalWrite } from "./write.ts";
 import "./proposals.css";
 
 /** The reviewer's edits not yet saved, and the proposal revision they started from (H5). */
@@ -187,20 +189,6 @@ function Violations({ preview, ready, names, onMove }: { preview: ProposalPrevie
   );
 }
 
-function Problem({ problem, onDismiss }: { problem: WriteProblem | undefined; onDismiss: () => void }) {
-  if (problem === undefined) {
-    return null;
-  }
-  if ("failure" in problem) {
-    return (
-      <p className="callout callout-bad" role="alert" data-testid="proposal-problem">
-        Not done: {problem.failure.message} <Button onClick={onDismiss}>Dismiss</Button>
-      </p>
-    );
-  }
-  return <RejectionView rejection={problem.rejection} onRebase={onDismiss} />;
-}
-
 interface BodyProps {
   review: ProposalReview;
   refetch: () => void;
@@ -235,18 +223,24 @@ function useInvalidEditors() {
 function useReviewing(review: ProposalReview, refetch: () => void) {
   const proposal = review.proposal;
   const id = proposal.id;
-  const write = useProposalWrite();
+  const write = useProposalWrite(`proposal:${id}`, proposal.draft.title);
   const [kept, setKept] = useDraft<Kept>(`proposal:${id}`);
   const [reviewed, setReviewed] = useDraft<number>(`proposal-reviewed:${id}`);
   const { invalid, setInvalid } = useInvalidEditors();
-  const saved = (answer: Schema<"ProposalAnswer"> | undefined, event: "saved" | "refreshed") => {
-    if (answer === undefined) {
+  /** Reads the proposal again once a write landed, if the review is still there to read it. */
+  const reread = () => {
+    if (write.mounted()) {
+      refetch();
+    }
+  };
+  const saved = (answer: Answer | undefined, event: "saved" | "refreshed") => {
+    if (answer === undefined || isPatchAnswer(answer)) {
       return;
     }
     if (answer.outcome !== "already_saved") {
       setReviewed(reviewedAfter(reviewed, { event, proposal: answer.proposal }));
     }
-    refetch();
+    reread();
   };
   return {
     write,
@@ -273,7 +267,7 @@ function useReviewing(review: ProposalReview, refetch: () => void) {
     },
     save: () => {
       if (kept !== undefined && invalid.size === 0) {
-        void write.run((proposals, patchId) => proposals.edit(id, { patch_id: patchId, base_revision: kept.base, draft: kept.draft })).then((answer) => {
+        void write.run({ op: "edit", proposal: id, request: { base_revision: kept.base, draft: kept.draft } }).then((answer) => {
           if (answer !== undefined) {
             setKept(undefined);
           }
@@ -282,17 +276,17 @@ function useReviewing(review: ProposalReview, refetch: () => void) {
       }
     },
     refresh: () => {
-      void write.run((proposals, patchId) => proposals.refresh(id, { patch_id: patchId, base_revision: proposal.revision })).then((answer) => {
+      void write.run({ op: "refresh", proposal: id, request: { base_revision: proposal.revision } }).then((answer) => {
         saved(answer, "refreshed");
       });
     },
     apply: () => {
       if (reviewed !== undefined) {
-        void write.run((proposals, patchId) => proposals.apply(id, { patch_id: patchId, reviewed_revision: reviewed })).then(refetch);
+        void write.run({ op: "apply", proposal: id, request: { reviewed_revision: reviewed } }).then(reread);
       }
     },
     discard: () => {
-      void write.run((proposals, patchId) => proposals.discard(id, { patch_id: patchId, base_revision: proposal.revision })).then(refetch);
+      void write.run({ op: "discard", proposal: id, request: { base_revision: proposal.revision } }).then(reread);
     },
   };
 }
@@ -554,7 +548,7 @@ function ReviewBody(props: BodyProps) {
         <div className="ws-head stack journey-head">
           <ReviewHeader proposal={proposal} itemCount={model.counts.all} conflictCount={(model.draft.items ?? []).filter((item) => item.item === "conflict").length} blockers={reviewing.blockers} disabled={reviewing.write.disabled} onApply={reviewing.apply} onDiscard={reviewing.discard} />
           <StalePanel review={review} disabled={!model.editable} onRefresh={reviewing.refresh} />
-          <Problem problem={reviewing.write.problem} onDismiss={reviewing.rebase} />
+          <Problem write={reviewing.write} onRebase={reviewing.rebase} />
           <Receipt receipt={reviewing.write.receipt} />
           <PreviewNotes model={model} kept={kept} ready={ready} />
           <Unsaved proposal={proposal} kept={kept} editing={reviewing.editing} write={reviewing.write} onSave={reviewing.save} onDrop={reviewing.drop} />

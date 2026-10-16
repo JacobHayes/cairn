@@ -1,24 +1,27 @@
 // Authoring's write path: every edit is previewed with the wasm engine before it is sent
 // (ARCHITECTURE, Web UI: Previews), so a rejection shows at the field without a round trip,
-// then sent through the shell's write path (4.6: H5's safe retry, D7's notice, nothing sent
-// under version skew). A journey's patch is applied to the document the derive worker holds;
-// a route's to the route as read. Committed state always comes from the host. The preview of
-// what a form would send also runs as the author types, so its fields show what the engine
-// would say before Save.
+// then sent through the edit manager (H5's safe retry, D7's notice, nothing sent under version
+// skew). The preview is the write's first phase: a refusal is a rejected write like the
+// server's, kept in the manager and counted on the chip, and nothing is sent. A journey's patch
+// is applied to the document the derive worker holds; a route's to the route as read. Committed
+// state always comes from the host. The preview of what a form would send also runs as the
+// author types, so its fields show what the engine would say before Save.
 import type { Schema } from "@cairn/client";
 import { HostFailure } from "@cairn/wasm";
-import { useEffect, useId, useState } from "react";
 
+import type { Command } from "../data/edit-record.ts";
+import { unansweredOf } from "../data/edit-manager.ts";
 import type { Deriver, Host } from "../data/host.ts";
 import { Skewed } from "../data/host.ts";
 import { beforeWork, DERIVE, previewPolicy, type ReadAt, type ReadKey, type ReadPolicy, type ReadSource } from "../data/keyed-read.ts";
-import { unlandedOf, useKeyedRead, useProblem, useSession, useSkew, useViewer } from "../data/react.ts";
+import { useEdit, useKeyedRead, useSession, useSkew, useViewer } from "../data/react.ts";
+import type { WriteView } from "../data/write-machine.ts";
 import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
-import { newPatchId, type Rejection } from "../data/writes.ts";
+import { landedWarning, newPatchId, type Rejection } from "../data/writes.ts";
 import { writesEntities } from "../detail/write.ts";
 import type { Mutation } from "./graph.ts";
-import type { Authored } from "./target.ts";
-import type { Place } from "./violations.ts";
+import { domainOf, type Authored } from "./target.ts";
+import { placesOf, type Place } from "./violations.ts";
 
 /** What the engine says of a patch before it is sent. */
 export type Preview =
@@ -29,7 +32,7 @@ export type Preview =
 /** A patch and the form places its mutations came from, by position (A15). */
 export interface Sent {
   mutations: Mutation[];
-  places: Place[];
+  places: (Place | undefined)[];
 }
 
 export interface AuthorWrite {
@@ -38,7 +41,7 @@ export interface AuthorWrite {
    * revision their author started from, H5; the one held by default) unless the preview
    * rejects them; true when they landed.
    */
-  run: (mutations: Mutation[], places?: Place[], base?: number) => Promise<boolean>;
+  run: (mutations: Mutation[], base?: number) => Promise<boolean>;
   pending: boolean;
   /** Version skew or a write in flight: no new write starts. */
   disabled: boolean;
@@ -49,6 +52,8 @@ export interface AuthorWrite {
    * (`stopped`: the app was updated), or found what it names removed (`gone`), until a later attempt.
    */
   unanswered: "failed" | "stopped" | "gone" | undefined;
+  /** What the write is doing when it is not rejected: still resending, not sent, or its subject gone. */
+  status: WriteView | undefined;
   dismiss: () => void;
   /** What the last landed write leaves under the form, for a few seconds. */
   receipt: ReceiptState | undefined;
@@ -57,9 +62,9 @@ export interface AuthorWrite {
 /** Who a preview is made as when the caller is not known yet. */
 export const LOCAL_USER = "u_local";
 
-/** A patch of `mutations` for `authored`'s target, drafted against `base`. */
-export function authoredPatchOf(authored: Authored, mutations: Mutation[], base = authored.revision): Schema<"Patch"> {
-  const patch: Schema<"Patch"> = { id: newPatchId(), target: authored.target, base_revision: base, mutations };
+/** The patch `mutations` make of `authored`'s graph, drafted against `base` and named `id`. */
+export function authoredPatchOf(authored: Authored, mutations: Mutation[], base = authored.revision, id = newPatchId()): Schema<"Patch"> {
+  const patch: Schema<"Patch"> = { id, target: authored.target, base_revision: base, mutations };
   return "journey" in authored.target && writesEntities(mutations) ? { ...patch, deployment_revision: authored.deploymentRevision } : patch;
 }
 
@@ -95,13 +100,6 @@ export async function previewOf({ deriver, user, authored, mutations }: PreviewA
   } catch (thrown) {
     return failedPreview(thrown);
   }
-}
-
-/** The preview of `mutations` against `authored`, applied locally by the derive worker. */
-export function usePreviewer(authored: Authored): (mutations: Mutation[]) => Promise<Preview> {
-  const { deriver } = useSession();
-  const { viewer } = useViewer();
-  return (mutations) => previewOf({ deriver, user: viewer?.user ?? LOCAL_USER, authored, mutations });
 }
 
 /** What a publish preview is made from. */
@@ -150,47 +148,53 @@ export function usePublishPreviewRead(authored: Authored): Preview | undefined {
   return view.status === "current" ? view.value : undefined;
 }
 
-/** Authoring's write path for `authored`'s graph. */
-export function useAuthorWrite(authored: Authored): AuthorWrite {
-  const session = useSession();
+/** The edit an authoring control's writes are, as the `scope` it names (the control and its node): stable, so a remounted control finds its write. */
+export function authorEdit(authored: Authored, scope: string): string {
+  return `author:${domainOf(authored)}:${scope}`;
+}
+
+/** The patch authoring sends for `mutations`, drafted against `base` under the patch id `id`. */
+export function authorCommand(authored: Authored, mutations: Mutation[], base: number, id: string = newPatchId()): Command {
+  return { kind: "patch", patch: authoredPatchOf(authored, mutations, base, id) };
+}
+
+/** The write's first phase: what the engine says of `mutations`, as the rejection that stops it, or none. */
+async function checkOf(args: PreviewArgs): Promise<Rejection | undefined> {
+  const previewed = await previewOf(args);
+  return previewed.outcome === "rejected" ? previewed.rejection : undefined;
+}
+
+/**
+ * Authoring's write path for `authored`'s graph, as the edit `scope` names within it. The
+ * write is the manager's: the control reads its rejection (the engine's preview or the host's)
+ * and its status from the manager, so one view answers for both.
+ */
+export function useAuthorWrite(authored: Authored, scope: string, label?: string): AuthorWrite {
+  const { deriver, titleOf } = useSession();
   const skew = useSkew();
-  const preview = usePreviewer(authored);
-  const [pending, setPending] = useState(false);
-  const [failed, setFailed] = useState<AuthorWrite["failed"]>();
-  const [unanswered, setUnanswered] = useState<AuthorWrite["unanswered"]>();
+  const { viewer } = useViewer();
+  const edit = useEdit(authorEdit(authored, scope));
   const receipt = useReceipt();
-  const key = `author:${useId()}`;
-  const dismiss = () => {
-    setFailed(undefined);
-  };
-  useProblem(key, failed === undefined ? undefined : unlandedOf(failed.rejection), { discard: dismiss });
-  useEffect(() => () => { session.edits.send({ type: "resolve", key }); }, [session, key]);
-  const run = async (mutations: Mutation[], places: Place[] = [], base = authored.revision): Promise<boolean> => {
-    const sent = { mutations, places };
-    setPending(true);
+  const run = async (mutations: Mutation[], base = authored.revision): Promise<boolean> => {
     receipt.clear();
-    const previewed = await preview(mutations);
-    if (previewed.outcome === "rejected") {
-      setPending(false);
-      setFailed({ sent, rejection: previewed.rejection });
-      return false;
+    const check = () => checkOf({ deriver, user: viewer?.user ?? LOCAL_USER, authored, mutations });
+    const answer = await edit.submit(authorCommand(authored, mutations, base), { label }, check);
+    if (answer !== undefined) {
+      receipt.show(landedWarning(answer, titleOf));
     }
-    const patch = authoredPatchOf(authored, mutations, base);
-    const result = await session.write({
-      target: patch.target,
-      baseRevision: patch.base_revision,
-      mutations,
-      ...(patch.deployment_revision === undefined || patch.deployment_revision === null ? {} : { deploymentRevision: patch.deployment_revision }),
-    });
-    setPending(false);
-    setFailed(result.outcome === "rejected" ? { sent, rejection: result.rejection } : undefined);
-    setUnanswered(result.outcome === "failed" || result.outcome === "stopped" || result.outcome === "gone" ? result.outcome : undefined);
-    if (result.outcome === "landed") {
-      receipt.show(result.warning);
-    }
-    return result.outcome === "landed";
+    return answer !== undefined;
   };
-  return { run, pending, disabled: pending || skew, failed, unanswered, dismiss, receipt: receipt.receipt };
+  const sent = edit.write?.command.kind === "patch" ? edit.write.command.patch.mutations : undefined;
+  return {
+    run,
+    pending: edit.busy,
+    disabled: edit.busy || skew,
+    failed: edit.rejection === undefined || sent === undefined ? undefined : { sent: { mutations: sent, places: placesOf(sent) }, rejection: edit.rejection },
+    unanswered: unansweredOf(edit.write),
+    status: edit.status,
+    dismiss: edit.dismiss,
+    receipt: receipt.receipt,
+  };
 }
 
 /** How long typing settles before a form's preview runs. */

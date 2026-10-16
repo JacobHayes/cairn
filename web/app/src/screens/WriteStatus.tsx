@@ -9,9 +9,12 @@ import type { WriteView } from "../data/write-machine.ts";
 import { Button } from "../ui/kit.tsx";
 import { ViolationLines } from "./RejectionView.tsx";
 
-export function WriteStatus({ view, layout = "callout" }: { view: WriteView; layout?: "callout" | "line" }) {
+export function WriteStatus({ view, layout = "callout" }: { view: WriteView | undefined; layout?: "callout" | "line" }) {
   const { edits } = useSession();
   const skew = useSkew();
+  if (view === undefined) {
+    return null;
+  }
   if (view.state === "unconfirmed" && view.retrying) {
     return (
       <span className="muted small" data-testid="write-retrying">

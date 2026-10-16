@@ -15,6 +15,7 @@ import { openDraft } from "../routes/model.ts";
 import { routeDetailPath } from "../routes/address.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Refused } from "../screens/Refused.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import type { ScreenWrite } from "../screens/write.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { ruleFoot } from "./dates.ts";
@@ -86,7 +87,7 @@ export function RouteHeader({ route, of, write, blocked, onPublish, onImported, 
               <button type="button" role="menuitem" className="menu-item" onClick={() => { close(); void exporting(drafting ? undefined : of); }}>
                 {drafting ? "Export the draft" : "Export this version"}
               </button>
-              <ImportFile label="Import into draft" onImported={(file, notices) => { close(); onImported(file, notices); }} />
+              <ImportFile edit={`import:draft:${id}`} label="Import into draft" onImported={(file, notices) => { close(); onImported(file, notices); }} />
               {drafting ? (
                 <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="discard-draft" onClick={() => { close(); send({ op: "discard_draft" }); }}>
                   Discard draft
@@ -96,7 +97,7 @@ export function RouteHeader({ route, of, write, blocked, onPublish, onImported, 
           )}
         </Menu>
       </div>
-      {write.rejected === undefined ? null : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
     </section>
   );
 }

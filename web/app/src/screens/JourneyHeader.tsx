@@ -20,6 +20,7 @@ import { Receipt } from "../ui/Receipt.tsx";
 import { Menu } from "./Menu.tsx";
 import { ViewPicker } from "./ViewPicker.tsx";
 import { Refused } from "./Refused.tsx";
+import { WriteStatus } from "./WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
 
 type Panel = JourneyFlowName | "delete";
@@ -147,7 +148,7 @@ function JourneyMenu({ ready, view, selected, write, onPanel }: { ready: Ready; 
 /** `view` is the canvas as the page shows it, or the canvas's defaults off the graph: Edit structure keeps it. */
 export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready; view: GraphView; screen: Screen; selected: string | undefined }) {
   const { header, revision } = ready.journey;
-  const write = useScreenWrite();
+  const write = useScreenWrite(`journey-status:${header.id}`, header.name);
   const suggested = useSuggested(ready);
   const [panel, setPanel] = useState<Panel | undefined>(undefined);
   return (
@@ -176,6 +177,7 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
           </Button>
         </div>
       ) : null}
+      <WriteStatus view={write.status} />
       {write.rejected === undefined ? <Receipt receipt={write.receipt} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
       {panel === "delete" ? <DeleteJourney ready={ready} onCancel={() => { setPanel(undefined); }} /> : null}
       {panel === "save" || panel === "relink" ? (

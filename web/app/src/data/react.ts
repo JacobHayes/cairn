@@ -1,19 +1,19 @@
 // The data layer as React hooks: every screen reads through these, never the host directly.
 import { streamStatus, type StreamStatus } from "@cairn/client";
 import { useActorRef, useSelector } from "@xstate/react";
-import { createContext, useCallback, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react";
 
 import type { Capabilities, Deployment, Viewer } from "./host.ts";
 import { derivationOf, journeyView, sameDerivation, type Derivation, type JourneyView } from "./journeys.ts";
 import { heldValue, keyedRead, readView, type ReadKey, type ReadSnapshot, type ReadSource, type ReadView } from "./keyed-read.ts";
 import { liveSource, type LiveSpec } from "./live.ts";
 import type { SaveEvent, Toast } from "./activity.ts";
-import { problemsOf, writeOf } from "./edit-manager.ts";
+import { aboutOf, problemsOf, submitWrite, writeOf } from "./edit-manager.ts";
+import { idOf, type Answer, type Command, type OperationId } from "./edit-record.ts";
 import { currentAddress, type Session } from "./session.ts";
 import type { Problem, SyncSummary } from "./sync.ts";
-import type { OperationId } from "./edit-record.ts";
-import { writeView, type WriteSnapshot, type WriteView } from "./write-machine.ts";
-import { reasonOf, type Rejection } from "./writes.ts";
+import { writeView, type Check, type WriteSnapshot, type WriteView } from "./write-machine.ts";
+import type { Rejection } from "./writes.ts";
 
 export const SessionContext = createContext<Session | undefined>(undefined);
 
@@ -92,8 +92,7 @@ export function useProblems(): readonly Problem[] {
   const { edits } = useSession();
   const skewed = useSkew();
   const writes = useSelector(edits, (snapshot) => snapshot.context.writes);
-  const reported = useSelector(edits, (snapshot) => snapshot.context.reported);
-  return useMemo(() => problemsOf(writes, reported, skewed), [writes, reported, skewed]);
+  return useMemo(() => problemsOf(writes, skewed), [writes, skewed]);
 }
 
 /** What a control shows of a write: a landed or discarded one is on its way out of the manager and shows nothing. */
@@ -103,7 +102,7 @@ function shownView(snapshot: WriteSnapshot | undefined): WriteView | undefined {
 }
 
 /** The write of `edit`, if the edit manager holds one: kept across the control that sent it going away. */
-export function useWriteOf(edit: string): WriteView | undefined {
+function useWriteOf(edit: string): WriteView | undefined {
   const { edits } = useSession();
   const snapshot = useSelector(edits, (held) => writeOf(held.context.writes, edit)?.snapshot);
   return useMemo(() => shownView(snapshot), [snapshot]);
@@ -116,44 +115,76 @@ export function useWrite(id: OperationId | undefined): WriteView | undefined {
   return useMemo(() => shownView(snapshot), [snapshot]);
 }
 
-/** A write that did not land, as the chip counts it. */
-export interface Unlanded {
-  kind: Problem["kind"];
-  message: string;
-}
-
-/** A rejection as the chip counts it: a stale one is a conflict, any other is not saved. */
-export function unlandedOf(rejection: Rejection): Unlanded {
-  return { kind: rejection.rejection === "stale" ? "conflict" : "rejected", message: reasonOf(rejection) };
+/** What a control reads of its edit, and does with it. */
+export interface Edit {
+  /** The write the manager holds for this edit, if any: out, in need of the person, or refused. */
+  write: WriteView | undefined;
+  /** A write is out, or may have committed and is being resent or waits for Retry: no new write starts. */
+  busy: boolean;
+  /** The write's rejection, until a later write of the edit or a discard. */
+  rejection: Rejection | undefined;
+  /** The held write when it is not a rejection (resending, not sent, gone), for `WriteStatus`. */
+  status: WriteView | undefined;
+  /**
+   * Sends `command` as this edit's write, `check` run before it goes out. Answers the write's
+   * answer once it lands; none once it needs the person, is refused for another write of the
+   * edit still out, or was discarded. What the control does next belongs to this promise: the
+   * write never depends on it, and does not wait for it.
+   */
+  submit(command: Command, about?: { label?: string | undefined }, check?: Check): Promise<Answer | undefined>;
+  /** Drops a write that needs the person (a rejection, a stop, a gone subject); one still out or unconfirmed is left. */
+  dismiss: () => void;
+  /** Discards the edit's write, whatever its state: the person's decision on Discard. */
+  discard: () => void;
+  /** Whether the control that sent the write is still mounted, for the follow-ups that move the person. */
+  mounted: () => boolean;
 }
 
 /**
- * Keeps a control's unlanded write on the sync chip while it stands, under `key`: it counts
- * as NOT SAVED (CONFLICT when stale) and is listed in the popover with Go to it, which returns
- * to the screen it happened on, until the control clears it or Discard drops it. A control
- * whose result outlives it (a draft kept across screens) also calls the returned `report` when
- * its write settles, since its effect no longer runs once it is gone.
+ * The control's way to an edit (ARCHITECTURE, Web UI: edits): every write is the edit
+ * manager's, found again by `edit`, a key that is stable for the control, so a control that
+ * remounts after navigation or a reload shows its write's rejection or status where it was.
  */
-export function useProblem(
-  key: string,
-  unlanded: Unlanded | undefined,
-  about: { label?: string | undefined; discard: () => void },
-): (settled: Unlanded | undefined) => void {
+export function useEdit(edit: string): Edit {
   const { edits } = useSession();
-  const { label, discard } = about;
-  const report = (settled: Unlanded | undefined) => {
-    if (settled === undefined) {
-      edits.send({ type: "resolve", key });
-      return;
-    }
-    // The manager runs the control's own discard, then drops the entry, whether or not the control is still mounted.
-    edits.send({ type: "report", key, problem: { kind: settled.kind, message: settled.message, label, address: currentAddress() }, discard });
+  const write = useWriteOf(edit);
+  const present = useRef(true);
+  useLayoutEffect(() => {
+    present.current = true;
+    return () => {
+      present.current = false;
+    };
+  }, []);
+  const send = (event: { type: "discard"; id: string }) => {
+    edits.send(event);
   };
-  useEffect(() => {
-    report(unlanded);
-    // What the chip says changes with the problem, not with the callbacks.
-  }, [edits, key, unlanded?.kind, unlanded?.message]);
-  return report;
+  return {
+    write,
+    busy: write?.state === "sending" || write?.state === "unconfirmed",
+    rejection: write?.state === "rejected" ? write.rejection : undefined,
+    status: write?.state === "rejected" ? undefined : write,
+    submit: (command, about, check) => {
+      const address = currentAddress();
+      const label = about?.label;
+      return submitWrite(edits, {
+        id: idOf(command),
+        command,
+        about: aboutOf(edit, label, address),
+        check,
+      });
+    },
+    dismiss: () => {
+      if (write?.state === "rejected" || write?.state === "stopped" || write?.state === "gone") {
+        send({ type: "discard", id: write.id });
+      }
+    },
+    discard: () => {
+      if (write !== undefined) {
+        send({ type: "discard", id: write.id });
+      }
+    },
+    mounted: () => present.current,
+  };
 }
 
 /** The tick stream's state. */

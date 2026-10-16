@@ -53,6 +53,11 @@ export function newProposalId(): string {
   return `pr_${crypto.randomUUID().replaceAll("-", "")}`;
 }
 
+/** C14: a proposal's review screen. */
+export function proposalPath(id: string): string {
+  return `/proposals/${id}`;
+}
+
 /** The proposal a write answered, or none when it was answered from an earlier receipt. */
 export function proposalOf(answer: ProposalAnswer): Proposal | undefined {
   return answer.outcome === "already_saved" ? undefined : answer.proposal;

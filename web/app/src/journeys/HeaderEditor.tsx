@@ -3,6 +3,7 @@
 import type { Ready } from "../detail/model.ts";
 import { useFormDraft } from "../detail/write.ts";
 import { Refused } from "../screens/Refused.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
 
@@ -15,7 +16,7 @@ interface HeaderDraft {
 export function HeaderEditor({ ready }: { ready: Ready }) {
   const { header, revision } = ready.journey;
   const seen = { base: revision, deployment: ready.key.deployment_revision };
-  const write = useScreenWrite();
+  const write = useScreenWrite(`journey-header:${header.id}`, header.name);
   const form = useFormDraft<HeaderDraft>(header.id, "journey", "header");
   const archived = header.status === "archived";
   const start = { name: header.name, description: header.description ?? "" };
@@ -44,7 +45,9 @@ export function HeaderEditor({ ready }: { ready: Ready }) {
         <Button primary disabled={write.disabled || value.name.trim() === ""} onClick={() => void save()}>Save</Button>
         <Button onClick={() => { form.close(); write.dismiss(); }}>Cancel</Button>
       </span>
-      {write.rejected === undefined ? null : (
+      {write.rejected === undefined ? (
+        <WriteStatus view={write.status} />
+      ) : (
         <Refused rejection={write.rejected} onDismiss={() => { form.open(value, seen); write.dismiss(); }} />
       )}
     </div>

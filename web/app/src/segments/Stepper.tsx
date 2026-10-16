@@ -7,17 +7,18 @@
 // route or segment draft, since both are an `Authored` graph.
 import "./segments.css";
 
+import { useActorRef, useSelector } from "@xstate/react";
 import { useEffect, useMemo, useState } from "react";
 
 import { canHoldChildren, nodesByPath, pathOf, type Graph } from "../authoring/graph.ts";
-import { mintKey } from "../authoring/keys.ts";
 import { Picker } from "../authoring/parts.tsx";
 import { domainOf, type Authored } from "../authoring/target.ts";
-import { useDraft } from "../data/drafts.ts";
+import { readDraft, writeDraft } from "../data/drafts.ts";
 import { Problem, useDraftAndOpen } from "../proposals/Entries.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { stepperDraftKey } from "./entry.ts";
-import { insertionMembers, NO_CHOICES, planInsertion, sizeWords, type Choices, type Mapping, type PeopleRow, type Plan } from "./model.ts";
+import { heldOf, insertion, stepOf } from "./insertion.ts";
+import { insertionMembers, planInsertion, sizeWords, type Choices, type Mapping, type PeopleRow, type Plan } from "./model.ts";
 import { useCandidate, type Candidate } from "./preview.ts";
 import { useSegmentNames, useSegmentOffers, useSegmentVersion, type SegmentOffer, type SegmentVersion } from "./read.ts";
 
@@ -27,8 +28,6 @@ export interface InsertPreview {
   after: Graph;
   members: Record<string, string>;
 }
-
-type Step = 1 | 2 | 3;
 
 /** One segment of the list: its name, a line of what it is, and its size; the latest version is chosen, the others folded. */
 function Offer({ offer, onChoose }: { offer: SegmentOffer; onChoose: (version: number) => void }) {
@@ -168,26 +167,27 @@ export interface InsertStepperProps {
   onPreview: (preview: InsertPreview | undefined) => void;
 }
 
-/** What the stepper keeps of an insertion not yet reviewed: the step, the segment and version, the choices, and the key it will mint. */
-interface Held {
-  step: Step;
-  picked: { id: string; version: number } | undefined;
-  choices: Choices;
-  insertion: string;
-}
-
 /** The stepper's state: kept across a reload, and what it plans and previews as. */
 function useInsertion(authored: Authored, parent: string | undefined, onPreview: InsertStepperProps["onPreview"]) {
-  const [kept, keep] = useDraft<Held>(stepperDraftKey(domainOf(authored)));
-  // Minted once: the preview and the apply write the same keys (B13).
-  const [fresh] = useState<Held>(() => ({ step: 1, picked: undefined, choices: { ...NO_CHOICES, parent }, insertion: mintKey("i_") }));
-  const { step, picked, choices, insertion } = kept ?? fresh;
+  const draftKey = stepperDraftKey(domainOf(authored));
+  // Corrected on the way in, once: the machine is the draft's owner from then on.
+  const [held] = useState(() => heldOf(readDraft(draftKey), authored.tree, parent));
+  const flow = useActorRef(insertion, { input: { held, keep: (next) => { writeDraft(draftKey, next); } } });
+  const step = useSelector(flow, stepOf);
+  const { picked, choices, insertion: key } = useSelector(flow, (snapshot) => snapshot.context);
   const loaded = useSegmentVersion(picked?.id, picked?.version);
   const nameOf = useSegmentNames();
   const plan = useMemo(
-    () => (picked === undefined || loaded === undefined ? undefined : planInsertion(authored.graph, authored.tree, loaded.version.graph, { route: picked.id, version: picked.version }, insertion, choices)),
-    [authored, picked, loaded, insertion, choices],
+    () => (picked === undefined || loaded === undefined ? undefined : planInsertion(authored.graph, authored.tree, loaded.version.graph, { route: picked.id, version: picked.version }, key, choices)),
+    [authored, picked, loaded, key, choices],
   );
+  // Whether the segment has people to map is known once its plan is: a people step restored from a reload waits for that.
+  const people = plan !== undefined && plan.rows.length > 0;
+  useEffect(() => {
+    if (plan !== undefined) {
+      flow.send({ type: "planned", people });
+    }
+  }, [flow, plan === undefined, people]);
   const candidate = useCandidate(authored, step === 1 ? undefined : plan?.mutation, loaded);
   // The last placed preview stays while the next settles, so the canvas does not flicker between the graph and the proposal.
   useEffect(() => {
@@ -198,34 +198,27 @@ function useInsertion(authored: Authored, parent: string | undefined, onPreview:
     }
   }, [step, candidate, nameOf, onPreview]);
   useEffect(() => () => { onPreview(undefined); }, [onPreview]);
-  const held = kept ?? fresh;
   return {
     step,
-    setStep: (next: Step) => { keep({ ...held, step: next }); },
     loaded,
     plan,
+    people,
     candidate,
     choices,
-    change: (next: Partial<Choices>) => { keep({ ...held, choices: { ...choices, ...next } }); },
-    choose: (id: string, version: number) => { keep({ ...held, step: 2, picked: { id, version }, choices: { ...NO_CHOICES, parent: choices.parent } }); },
+    next: () => { flow.send({ type: "next", people }); },
+    back: () => { flow.send({ type: "back" }); },
+    change: (next: Partial<Choices>) => { flow.send({ type: "change", next }); },
+    choose: (id: string, version: number) => { flow.send({ type: "choose", id, version }); },
   };
 }
 
 export function InsertStepper({ authored, parent, onClose, onPreview }: InsertStepperProps) {
-  const { step, setStep, loaded, plan, candidate, choices, change, choose } = useInsertion(authored, parent, onPreview);
-  const people = plan !== undefined && plan.rows.length > 0;
-  const { write, start } = useDraftAndOpen();
+  const { step, loaded, plan, people, candidate, choices, next, back, change, choose } = useInsertion(authored, parent, onPreview);
+  const { write, start } = useDraftAndOpen(`insert:${domainOf(authored)}`);
   const review = (segment: SegmentVersion, mutation: Plan["mutation"]) => {
     const draft = { title: `Insert ${segment.segment.header.name}`, destination_revision: authored.revision, mutations: [mutation] };
     // Drafted, the insertion is no longer unsent: the stepper and its choices go with it.
-    start(["insert", authored.target, authored.revision, mutation], (proposals, patchId, id) =>
-      proposals.create(authored.target, { patch_id: patchId, id, draft }).then((written) => {
-        if (written.outcome === "answered") {
-          onClose();
-        }
-        return written;
-      }),
-    );
+    start((id) => ({ op: "create", destination: authored.target, request: { id, draft } }), onClose);
   };
   const last = step === 3 || (step === 2 && !people);
   return (
@@ -249,10 +242,10 @@ export function InsertStepper({ authored, parent, onClose, onPreview }: InsertSt
         />
       ) : null}
       {step === 1 ? null : <Refusal candidate={candidate} />}
-      <Problem problem={write.problem} onDismiss={write.dismiss} />
+      <Problem write={write} onRebase={write.dismiss} />
       <span className="row">
         {step === 1 ? null : (
-          <Button ghost onClick={() => { setStep(step === 3 ? 2 : 1); }}>
+          <Button ghost onClick={back}>
             Back
           </Button>
         )}
@@ -265,7 +258,7 @@ export function InsertStepper({ authored, parent, onClose, onPreview }: InsertSt
             Review
           </Button>
         ) : (
-          <Button primary disabled={plan === undefined} onClick={() => { setStep(3); }} data-testid="insert-next">
+          <Button primary disabled={plan === undefined} onClick={next} data-testid="insert-next">
             Next
           </Button>
         )}

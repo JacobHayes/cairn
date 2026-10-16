@@ -6,7 +6,6 @@ import { describe, expect, it } from "vitest";
 import type { Graph, Mutation } from "../authoring/graph.ts";
 import {
   applyBlockers,
-  attemptFor,
   DIFF_LABELS,
   DIFF_NOTES,
   diffMarks,
@@ -274,19 +273,5 @@ describe("withFieldValue", () => {
   it("leaves a cleared field out rather than writing null", () => {
     const node = withFieldValue({ key: "n_a", id: "a", kind: "action", title: "A", estimate: 2 }, { estimate: null });
     expect("estimate" in node).toBe(false);
-  });
-});
-
-describe("attemptFor (I6, H5)", () => {
-  const fresh = () => ({ id: "pr_new", patchId: "p_new" });
-  const lost = { asked: "upgrade to 2", id: "pr_lost", patchId: "p_lost" };
-
-  it("sends a draft whose answer never came again under the same ids", () => {
-    expect(attemptFor(lost, "upgrade to 2", fresh)).toEqual(lost);
-  });
-
-  it("sends anything else under fresh ids", () => {
-    expect(attemptFor(lost, "upgrade to 3", fresh)).toEqual({ asked: "upgrade to 3", id: "pr_new", patchId: "p_new" });
-    expect(attemptFor(undefined, "upgrade to 2", fresh)).toEqual({ asked: "upgrade to 2", id: "pr_new", patchId: "p_new" });
   });
 });

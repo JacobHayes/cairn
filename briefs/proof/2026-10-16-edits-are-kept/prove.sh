@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Regenerates the media of briefs/proof/2026-10-16-edits-are-kept/: a screenshot of each state of
 # a rejected rename (on its screen, away from it, after a reload, brought back, discarded) and of
-# a rename that got no answer, and a short video of the first. Runs the proof's pictures
+# a rename that got no answer, an authoring edit the engine refuses (before and after a reload),
+# and a short video of the first. Runs the proof's pictures
 # (web/app/proof/edits.proof.ts) on the server host: it builds the web app and the binary
 # first. Exits non-zero if the run fails or a picture is missing. The README is written by hand.
 #
@@ -17,7 +18,7 @@ mkdir -p "$work"
 mise run build:web
 cargo test --locked --quiet --workspace --all-features --tests --no-run
 
-pictures=(1-rejected 2-away 3-after-reload 4-back 5-discarded 6-could-not-confirm)
+pictures=(1-rejected 2-away 3-after-reload 4-back 5-discarded 6-could-not-confirm 7-authoring-refused 8-authoring-after-reload)
 rm -f "$proof"/*.png "$proof"/*.webm
 (cd web/app && CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/edits.proof.ts --reporter=line)
 missing=0

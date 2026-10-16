@@ -173,7 +173,7 @@ export function Rejected({ view, write, onResolved, onResent }: Resolving) {
   if (failed === undefined) {
     return (
       <>
-        {write.status === undefined ? null : <WriteStatus view={write.status} />}
+        <WriteStatus view={write.status} />
         <Receipt receipt={write.receipt} />
       </>
     );

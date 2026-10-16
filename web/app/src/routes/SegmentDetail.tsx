@@ -15,6 +15,7 @@ import { overviewPath } from "../journeys/address.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Refused } from "../screens/Refused.tsx";
 import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { dateWords } from "../timeline/model.ts";
 import { Badge, Button } from "../ui/kit.tsx";
@@ -66,7 +67,7 @@ function Uses({ uses, hostOf }: { uses: readonly InsertionUse[]; hostOf: ReturnT
 function Header({ read }: { read: RouteRead }) {
   const { route } = read;
   const id = route.header.id;
-  const write = useScreenWrite();
+  const write = useScreenWrite(`segment:${id}`, route.header.name);
   const navigate = useNavigate();
   const exporting = useExport(id);
   const moves = routeMoves(route);
@@ -90,7 +91,7 @@ function Header({ read }: { read: RouteRead }) {
               <button type="button" role="menuitem" className="menu-item" onClick={() => { close(); void exporting(drafting ? undefined : Math.max(0, ...(route.versions ?? []))); }}>
                 {drafting ? "Export the draft" : "Export"}
               </button>
-              <ImportFile label="Import into draft" onImported={close} />
+              <ImportFile edit={`import:segment:${id}`} label="Import into draft" onImported={close} />
               <button type="button" role="menuitem" className="menu-item" disabled={write.disabled} data-testid="retire" onClick={() => { close(); void write.run({ target: { route: id }, baseRevision: route.revision, mutations: [retireMutation(moves.retire)] }); }}>
                 {moves.retire ? "Retire" : "Bring back"}
               </button>
@@ -98,7 +99,7 @@ function Header({ read }: { read: RouteRead }) {
           )}
         </Menu>
       </DetailHeader>
-      {write.rejected === undefined ? null : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
     </>
   );
 }

@@ -243,7 +243,7 @@ describe("an earlier write can never close a later drawing (H5)", () => {
     first.resolve({ outcome: "rejected", rejection: invalid });
     await settled();
     expect(d.view()).toMatchObject({ state: "saving", from: "n_b", to: "n_d" });
-    expect(problemsOf(d.writes(), {}, false).map((problem) => problem.id)).toEqual([firstId]);
+    expect(problemsOf(d.writes(), false).map((problem) => problem.id)).toEqual([firstId]);
   });
 });
 

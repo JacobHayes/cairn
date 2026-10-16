@@ -124,6 +124,8 @@ export interface SaveEvent {
   warning: string | undefined;
   /** What the write acted on and unlocked, for a pass over the acting frontier (never shown as a warning). */
   unlocked: Unlocked | undefined;
+  /** Where the save left something to look at (a proposal it drafted), for a link in Recent. */
+  address: string | undefined;
 }
 
 /** The saves the popover lists. */

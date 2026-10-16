@@ -10,6 +10,7 @@ import { useDraft } from "../data/drafts.ts";
 import { useDeployment, useViewer } from "../data/react.ts";
 import type { Rejection } from "../data/writes.ts";
 import { Refused } from "../screens/Refused.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "../screens/write.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { MergeEntities } from "./MergeEntities.tsx";
@@ -50,6 +51,7 @@ function EntityEditor({ entity, deployment, draft, setDraft, write }: { entity: 
         <Button primary type="submit" disabled={write.disabled || draft.name.trim() === ""}>Save</Button>
         <Button onClick={() => { setDraft(undefined); write.dismiss(); }}>Cancel</Button>
       </form>
+      <WriteStatus view={write.status} />
       {write.rejected === undefined ? null : (
         <Refused rejection={write.rejected} onDismiss={write.dismiss}>
           {write.rejected.rejection === "stale" ? (
@@ -65,7 +67,7 @@ function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: 
   const [draft, setDraft] = useDraft<EntityDraft>(`entity:${entity.key}`);
   // The row holds the write, so a save in flight keeps Edit closed until it settles: its
   // landing closes the draft it sent, never one opened after it.
-  const write = useScreenWrite();
+  const write = useScreenWrite(`entity:${entity.key}`, entity.name);
   const aliases = aliasesOf(deployment, entity.key);
   return (
     <li className="stack" data-testid="entity" data-entity={entity.key}>
@@ -86,7 +88,7 @@ function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: 
 }
 
 function CreateEntity({ deployment }: { deployment: Deployment }) {
-  const write = useScreenWrite();
+  const write = useScreenWrite("new-entity");
   const [draft, setDraft] = useDraft<{ name: string; emails: string }>("entity:new");
   const { name, emails } = draft ?? { name: "", emails: "" };
   const create = async () => {
@@ -100,7 +102,7 @@ function CreateEntity({ deployment }: { deployment: Deployment }) {
       <Field aria-label="New entity's name" placeholder="Name" value={name} onChange={(event) => { setDraft({ name: event.target.value, emails }); }} />
       <Field aria-label="New entity's emails" placeholder="Emails (optional)" value={emails} onChange={(event) => { setDraft({ name, emails: event.target.value }); }} />
       <Button primary type="submit" disabled={write.disabled || name.trim() === ""}>Add an entity</Button>
-      {write.rejected === undefined ? null : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
     </form>
   );
 }

@@ -14,7 +14,7 @@
 import { streamStatus, subscription, type OpenTicks, type StreamStatus, type SubscriptionEvent } from "@cairn/client";
 import { assign, enqueueActions, sendTo, setup, type ActorRefFrom, type AnyActorRef } from "xstate";
 
-import { editManager, type EditsInput } from "./edit-manager.ts";
+import { editManager, type EditsInput, type EditsRef } from "./edit-manager.ts";
 import type { Deriver, Host } from "./host.ts";
 import { journeyManager } from "./journeys.ts";
 import { keyedRead, type ReadEnv } from "./keyed-read.ts";
@@ -127,7 +127,7 @@ export const sessionRoot = setup({
 });
 
 export type SessionRootRef = ActorRefFrom<typeof sessionRoot>;
-export type EditsRef = ActorRefFrom<typeof editManager>;
+export type { EditsRef };
 export type JourneysRef = ActorRefFrom<typeof journeyManager>;
 export type SubscriptionRef = ActorRefFrom<typeof subscription>;
 export type ReadRef = ActorRefFrom<typeof keyedRead>;

@@ -1,19 +1,14 @@
 // Node detail's writes: each action one patch through the edit manager (4.6: the safe retry,
 // D7's consequences notice, nothing sent under version skew), drafted against the revision its
-// author saw. The write is the manager's, keyed by the section's edit: a rejection waits there
-// across a screen left and a reload, and the section shows it inline when it is on screen (A15)
-// and the sync chip counts it wherever the person is.
-import { waitFor } from "xstate";
-
-import { consequenceLines, warningOf } from "../data/activity.ts";
-import { held, submitPatch } from "../data/edit-manager.ts";
-import { useSession, useSkew, useWriteOf } from "../data/react.ts";
-import { currentAddress } from "../data/session.ts";
+// author saw. The write is the manager's, found again by the section's edit key: a rejection
+// waits there across a screen left and a reload, and the section shows it inline when it is on
+// screen (A15) and the sync chip counts it wherever the person is. Each section holds its own.
 import { useDraft } from "../data/drafts.ts";
-import type { Patch } from "../data/host.ts";
-import type { OperationId } from "../data/edit-record.ts";
-import { writeView, type WriteView } from "../data/write-machine.ts";
-import { newPatchId, patchOf, type Rejection } from "../data/writes.ts";
+import type { Command, OperationId } from "../data/edit-record.ts";
+import { held } from "../data/edit-manager.ts";
+import { useEdit, useSession, useSkew } from "../data/react.ts";
+import type { WriteView } from "../data/write-machine.ts";
+import { landedWarning, newPatchId, patchOf, type Rejection } from "../data/writes.ts";
 import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
 import { titleOf, type Mutation, type Ready } from "./model.ts";
 
@@ -78,79 +73,66 @@ export function writesEntities(mutations: Mutation[]): boolean {
   );
 }
 
-/** What `patch` was drafted against; a patch that names no deployment revision was drafted against `deployment`. */
-export function attemptOf(patch: Patch, deployment: number): Attempt {
-  return { mutations: patch.mutations, base: patch.base_revision, deployment: patch.deployment_revision ?? deployment };
-}
-
-/** The edit a section's writes share: one write of it is out at a time. */
+/** The edit a section's writes are, found again by it wherever the section is shown: one write of it is out at a time. */
 export function nodeEdit(journey: string, scope: string): string {
   return `node:${journey}:${scope}`;
 }
 
+/** The patch a section sends: `mutations` of `journey` drafted against `seen`, under the patch id `id`. */
+export function nodeCommand(journey: string, mutations: Mutation[], seen: Seen, id: OperationId = newPatchId()): Command {
+  const patch = patchOf({ target: { journey }, baseRevision: seen.base, mutations, ...(writesEntities(mutations) ? { deploymentRevision: seen.deployment } : {}) }, id);
+  return { kind: "patch", patch };
+}
+
+/** What a held write drafted: its mutations and the revisions they were drafted against (the view's deployment when it named none). */
+export function attemptOf(command: Command, deployment: number): Attempt | undefined {
+  if (command.kind !== "patch") {
+    return undefined;
+  }
+  const { patch } = command;
+  return { mutations: patch.mutations, base: patch.base_revision, deployment: patch.deployment_revision ?? deployment };
+}
+
 /**
- * A section's write path for the journey `view` shows. Its writes are the edit manager's, under
- * the edit `scope` names (the section and its node), so a rejection and the resolution being
- * chosen survive a reload, and the sync chip counts it, named by `node`'s title (the one the
- * section is about), wherever the person is.
+ * A section's write path for the journey `view` shows, as the edit `scope` (the section and
+ * its node) names. Its writes are the edit manager's, so a rejection and the resolution being
+ * chosen survive leaving the screen and a reload, and the sync chip counts it, named by
+ * `node`'s title (the one the section is about), wherever the person is.
  */
 export function useNodeWrite(view: Ready, scope: string, node?: string): NodeWrite {
   const session = useSession();
   const { edits } = session;
   const skew = useSkew();
   const journey = view.journey.header.id;
-  const edit = nodeEdit(journey, scope);
-  const written = useWriteOf(edit);
+  const edit = useEdit(nodeEdit(journey, scope));
   const revision = view.journey.revision;
   const deployment = view.key.deployment_revision;
   const current: Seen = { base: revision, deployment };
   const label = node === undefined ? view.journey.header.name : titleOf(view, node);
   const receipt = useReceipt();
-  const pending = written?.state === "sending" || written?.state === "unconfirmed";
   const run = async (mutations: Mutation[], seen: Seen = current, id: OperationId = newPatchId()): Promise<boolean> => {
     if (skew) {
       return false;
     }
-    const patch = patchOf(
-      { target: { journey }, baseRevision: seen.base, mutations, ...(writesEntities(mutations) ? { deploymentRevision: seen.deployment } : {}) },
-      id,
-    );
-    // Where the edit was made, taken before the wait: the user may be elsewhere when the answer comes.
-    const address = currentAddress();
-    const ref = submitPatch(edits, patch, { edit, label, ...(address === undefined ? {} : { address }) });
-    if (ref === undefined) {
-      return false;
-    }
     receipt.clear();
-    let snapshot;
-    try {
-      snapshot = await waitFor(ref, (each) => each.status === "done" || each.hasTag("needsYou"), { timeout: Infinity });
-    } catch {
-      // The session closed.
-      return false;
+    const answer = await edit.submit(nodeCommand(journey, mutations, seen, id), { label });
+    if (answer !== undefined) {
+      receipt.show(landedWarning(answer, session.titleOf));
     }
-    const result = writeView(snapshot);
-    if (result.state !== "landed") {
-      return false;
-    }
-    receipt.show(warningOf(consequenceLines(result.answer), session.titleOf));
-    return true;
+    return answer !== undefined;
   };
+  const attempt = edit.write === undefined ? undefined : attemptOf(edit.write.command, deployment);
   return {
     journey,
     revision,
     seen: current,
     run,
     holds: (id) => held(edits, id),
-    status: written?.state === "rejected" ? undefined : written,
-    pending,
-    disabled: pending || skew,
-    failed: written?.state === "rejected" ? { id: written.id, attempt: attemptOf(written.command.patch, deployment), rejection: written.rejection } : undefined,
-    dismiss: () => {
-      if (written?.state === "rejected" || written?.state === "stopped" || written?.state === "gone") {
-        edits.send({ type: "discard", id: written.id });
-      }
-    },
+    status: edit.status,
+    pending: edit.busy,
+    disabled: edit.busy || skew,
+    failed: edit.write?.state === "rejected" && attempt !== undefined ? { id: edit.write.id, attempt, rejection: edit.write.rejection } : undefined,
+    dismiss: edit.dismiss,
     receipt: receipt.receipt,
   };
 }

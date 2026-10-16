@@ -41,7 +41,7 @@ export function useLineageVersion(lineage: Lineage | undefined): RouteVersion | 
 
 /** B4: the node's markers, each with its reset to the route. */
 export function LocalEdits({ authored, node }: { authored: Authored; node: GraphNode }) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, `local-edits:${node.key}`, node.title);
   const version = useLineageVersion(authored.lineage);
   const record = authored.graph.state?.nodes?.[node.key];
   const markers = authored.graph.state?.local_edits?.[node.key] ?? [];
@@ -77,7 +77,7 @@ export function LocalEdits({ authored, node }: { authored: Authored; node: Graph
 
 /** B4: the route nodes the journey removed, each restorable as a local copy. */
 export function Tombstones({ authored }: { authored: Authored }) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, "tombstones");
   const version = useLineageVersion(authored.lineage);
   if (authored.lineage === undefined || (authored.graph.state?.tombstones ?? []).length === 0) {
     return null;

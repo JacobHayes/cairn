@@ -19,7 +19,7 @@ import { RouteNodePanel } from "../authoring/RouteAuthoring.tsx";
 import { StructureTools } from "../authoring/StructureTools.tsx";
 import { blockedWords, DraftCard, ResultBand, RouteHeader, RouteList, useDraftViolations } from "../authoring/RouteDraft.tsx";
 import { useRouteNotices } from "../authoring/RouteNotices.tsx";
-import { routeAuthored, type Authored } from "../authoring/target.ts";
+import { domainOf, routeAuthored, type Authored } from "../authoring/target.ts";
 import { Ladder } from "../canvas/Chrome.tsx";
 import { GraphCanvas } from "../canvas/GraphCanvas.tsx";
 import { MapBand, useMapOpen } from "../canvas/MapFrame.tsx";
@@ -251,7 +251,7 @@ function DraftInspector({ authored, selected, card, close, inserting }: { author
   if (inserting.at !== undefined) {
     return (
       <Inspector focus="insert-segment">
-        <InsertStepper key={inserting.at.parent ?? ""} authored={authored} parent={inserting.at.parent} onClose={inserting.close} onPreview={inserting.setPreview} />
+        <InsertStepper key={`${domainOf(authored)}:${inserting.at.parent ?? ""}`} authored={authored} parent={inserting.at.parent} onClose={inserting.close} onPreview={inserting.setPreview} />
       </Inspector>
     );
   }
@@ -408,7 +408,7 @@ export function RouteCanvasPage() {
   const read = useKeyedRead(ROUTE_GRAPH, routeGraphKey(host, id, version)).view;
   const found = valueOf(read);
   const deployment = useDeployment();
-  const write = useScreenWrite();
+  const write = useScreenWrite(`route-draft:${id}`);
   const navigate = useNavigate();
   const [result, setResult] = useState<Result | undefined>(undefined);
   // The file names its route: when that is not this one, or a version is shown, its draft is where the result belongs.

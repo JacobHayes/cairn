@@ -91,3 +91,17 @@ test("drafts an older build kept for several forms open one, the first the old s
   const kept = await page.evaluate(() => Object.keys(sessionStorage).filter((key) => key.startsWith("cairn:draft:")));
   expect(kept).toEqual(["cairn:draft:actions:j_launch:n_announcement"]);
 });
+
+test("Discard on the chip clears a section's rejection on its screen, and it does not come back after a reload", async ({ page }) => {
+  const panel = await openNode(page, "browser", "j_vendor_eval", "n_final_report");
+  await pin(panel, "2026-11-25");
+  await expect(panel.getByTestId("date-conflict")).toBeVisible();
+  await syncChip(page).click();
+  await page.getByTestId("sync-popover").getByTestId("sync-problem").getByRole("button", { name: "Discard" }).click();
+  await expect(panel.getByTestId("date-conflict")).toHaveCount(0);
+  await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
+  await page.reload();
+  await expect(page.getByTestId("node-detail")).toBeVisible();
+  await expect(page.getByTestId("date-conflict")).toHaveCount(0);
+  await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
+});

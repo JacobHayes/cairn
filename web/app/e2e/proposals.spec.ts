@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 
 import { openJourneyCard } from "./around.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
-import { nodeCard, setDepth } from "./shell.ts";
+import { nodeCard, setDepth, syncChip } from "./shell.ts";
 
 test("B7, C14: the scenario journey upgraded to version 2, each conflict resolved, then applied", async ({ page }) => {
   await editWhereVersionTwoChanges(page, "browser");
@@ -18,6 +18,11 @@ test("B7, C14: the scenario journey upgraded to version 2, each conflict resolve
   await flow.getByRole("button", { name: "Propose the upgrade" }).click();
   await page.setViewportSize({ width: 1440, height: 768 });
   await reviewOpen(page);
+  // The drafted proposal is also one click away in Recent, for when the screen that opened it is gone.
+  await syncChip(page).click();
+  await expect(page.getByTestId("sync-popover").getByTestId("sync-recent").filter({ hasText: "Drafted a proposal" }).getByRole("button", { name: "Review it" })).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("sync-popover")).toHaveCount(0);
   // Reviewed, and still a conflict to decide: Apply stays off, for that reason alone.
   await page.getByTestId("reviewed").check();
   await expect.poll(() => blockers(page)).toEqual(["unresolved"]);

@@ -90,7 +90,8 @@ function NeedsYou({ problems, onGo }: { problems: readonly Problem[]; onGo: () =
   );
 }
 
-function Recent({ saves }: { saves: readonly SaveEvent[] }) {
+function Recent({ saves, onGo }: { saves: readonly SaveEvent[]; onGo: () => void }) {
+  const navigate = useNavigate();
   return (
     <section className="sync-section" aria-label="Recent">
       <h3>Recent</h3>
@@ -102,6 +103,19 @@ function Recent({ saves }: { saves: readonly SaveEvent[] }) {
             <li key={save.id} data-testid="sync-recent">
               <span className="mono small muted">{save.at.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", hour12: false })}</span> {save.text}
               {save.warning === undefined ? null : <span className="small muted sync-warning">{save.warning}</span>}
+              {save.address === undefined ? null : (
+                <>
+                  {" "}
+                  <Button
+                    onClick={() => {
+                      void navigate(save.address ?? "/");
+                      onGo();
+                    }}
+                  >
+                    Review it
+                  </Button>
+                </>
+              )}
             </li>
           ))}
         </ul>
@@ -148,7 +162,7 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
           </p>
         )}
         {problems.length === 0 ? null : <NeedsYou problems={problems} onGo={onClose} />}
-        <Recent saves={saves} />
+        <Recent saves={saves} onGo={onClose} />
       </div>
     </div>
   );

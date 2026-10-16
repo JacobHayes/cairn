@@ -1,13 +1,15 @@
 // The write path for the screens around a journey (the index, the overview, the route
-// screens, entities): one patch through the shell's write path (H5's safe retry, D7's
-// save, nothing sent under version skew), with the rejection kept to show inline (A15) and
-// counted on the sync chip until it is dismissed or the screen goes.
+// screens, entities): one patch through the edit manager (H5's safe retry, D7's save, nothing
+// sent under version skew). The write is the manager's, found again by the screen's edit key:
+// its rejection shows inline (A15) and is counted on the sync chip until it is discarded or
+// the next write of the edit replaces it, wherever the person has gone since.
 import type { Schema } from "@cairn/client";
-import { useEffect, useId, useState } from "react";
 
 import { noticesOf } from "../data/activity.ts";
-import { unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
-import type { Rejection, WriteIntent } from "../data/writes.ts";
+import type { Command } from "../data/edit-record.ts";
+import { useEdit, useSession, useSkew } from "../data/react.ts";
+import type { WriteView } from "../data/write-machine.ts";
+import { isPatchAnswer, landedWarning, newPatchId, patchOf, type Rejection, type WriteIntent } from "../data/writes.ts";
 import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
 
 export interface ScreenWrite {
@@ -18,42 +20,41 @@ export interface ScreenWrite {
   disabled: boolean;
   /** The last attempt's rejection, until dismissed or a later attempt. */
   rejected: Rejection | undefined;
+  /** What the write is doing when it is not rejected: still resending, not sent, or its subject gone. */
+  status: WriteView | undefined;
   dismiss: () => void;
   /** What the last landed write leaves under the control, for a few seconds. */
   receipt: ReceiptState | undefined;
 }
 
-export function useScreenWrite(): ScreenWrite {
+/** The patch a screen sends for `intent`, under the patch id `id`. */
+export function screenCommand(intent: WriteIntent, id: string = newPatchId()): Command {
+  const patch = patchOf(intent, id);
+  return intent.note === undefined ? { kind: "patch", patch } : { kind: "patch", patch, note: intent.note };
+}
+
+/** The screen's write path as the edit `edit` (a key stable for the control), named `label` on the chip. */
+export function useScreenWrite(edit: string, label?: string): ScreenWrite {
   const session = useSession();
   const skew = useSkew();
-  const [pending, setPending] = useState(false);
-  const [rejected, setRejected] = useState<Rejection | undefined>();
-  const key = `screen:${useId()}`;
-  const dismiss = () => {
-    setRejected(undefined);
-  };
-  useProblem(key, rejected === undefined ? undefined : unlandedOf(rejected), { discard: dismiss });
-  // What this screen's state held goes with it, so the chip does not keep a rejection nobody can see.
-  useEffect(() => () => { session.edits.send({ type: "resolve", key }); }, [session, key]);
+  const held = useEdit(edit);
   const receipt = useReceipt();
   const run = async (intent: WriteIntent, onLanded?: (notices: Schema<"Notice">[]) => void): Promise<boolean> => {
-    setPending(true);
     receipt.clear();
-    const result = await session.write(intent);
-    setPending(false);
-    setRejected(result.outcome === "rejected" ? result.rejection : undefined);
-    if (result.outcome === "landed") {
-      receipt.show(result.warning);
-      onLanded?.(noticesOf(result.answer));
+    const answer = await held.submit(screenCommand(intent), { label });
+    if (answer !== undefined) {
+      receipt.show(landedWarning(answer, session.titleOf));
+      onLanded?.(isPatchAnswer(answer) ? noticesOf(answer) : []);
     }
-    return result.outcome === "landed";
+    return answer !== undefined;
   };
   return {
     run,
-    pending,
-    disabled: pending || skew,
-    rejected,
-    dismiss,
+    pending: held.busy,
+    disabled: held.busy || skew,
+    rejected: held.rejection,
+    status: held.status,
+    dismiss: held.dismiss,
     receipt: receipt.receipt,
   };
 }

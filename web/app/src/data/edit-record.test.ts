@@ -66,6 +66,47 @@ describe("the tab's edit records", () => {
   });
 });
 
+const proposalRecord = (id: string, delivery: EditRecord["delivery"] = { state: "unconfirmed" }): EditRecord => ({
+  ...record(id, delivery),
+  command: { kind: "proposal", call: { op: "apply", proposal: "pr_one", request: { patch_id: id, reviewed_revision: 4 } } },
+});
+const importRecord = (id: string): EditRecord => ({
+  ...record(id),
+  command: { kind: "import", request: { patch_id: id, file: { format: 1, route: "r_one", name: "One", nodes: [] } as never } },
+});
+
+describe("the records of proposal writes and imports", () => {
+  it("come back as they were kept, with the call or the file a resend needs", () => {
+    const held = memoryStorage();
+    const kept = tabEditStore(() => held);
+    const records = [proposalRecord("p_a"), proposalRecord("p_b", { state: "rejected", rejection: { rejection: "invalid", violations: [] } }), importRecord("p_c")];
+    for (const each of records) {
+      expect(kept.keep(each)).toBe(true);
+    }
+    expect(kept.read().records).toEqual(expect.arrayContaining(records));
+    expect(kept.read().records).toHaveLength(records.length);
+  });
+
+  it("are dropped when their request is not the one the record is named by, or lacks what it needs", () => {
+    const apply = proposalRecord("p_a");
+    const cases: unknown[] = [
+      { ...apply, command: { kind: "proposal", call: { op: "apply", proposal: "pr_one", request: { patch_id: "p_other", reviewed_revision: 4 } } } },
+      { ...apply, command: { kind: "proposal", call: { op: "apply", request: { patch_id: "p_a", reviewed_revision: 4 } } } },
+      { ...apply, command: { kind: "proposal", call: { op: "explode", proposal: "pr_one", request: { patch_id: "p_a" } } } },
+      { ...apply, command: { kind: "proposal", call: { op: "apply", proposal: "pr_one" } } },
+      { ...importRecord("p_a"), command: { kind: "import", request: { patch_id: "p_a" } } },
+      { ...importRecord("p_a"), command: { kind: "import", request: { patch_id: "p_other", file: {} } } },
+    ];
+    expect(cases.map(readRecord)).toEqual(cases.map(() => undefined));
+  });
+
+  it("are not read from a record of the version before them", () => {
+    const held = memoryStorage();
+    held.setItem("cairn:edit:p_a", JSON.stringify({ ...proposalRecord("p_a"), version: EDIT_RECORD_VERSION - 1 }));
+    expect(tabEditStore(() => held).read()).toEqual({ records: [], dropped: 1 });
+  });
+});
+
 describe("readRecord", () => {
   it("accepts only the one version, and a delivery and command of a known shape", () => {
     expect(readRecord(record("p_a"))).toEqual(record("p_a"));

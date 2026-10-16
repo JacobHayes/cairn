@@ -30,6 +30,7 @@ export function RemoveSelected({ authored, keys }: { authored: Authored; keys: r
     <CascadeDialog
       key={first}
       authored={authored}
+      scope="remove-selected"
       title={`Remove ${authored.tree.byKey.get(first)?.title ?? first}`}
       plan={plan}
       dangling={plan.dangling}

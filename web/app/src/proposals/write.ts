@@ -1,72 +1,62 @@
-// Proposal writes from a screen (I6): each names a fresh patch id (H5), is refused before
-// anything is sent under version skew (ARCHITECTURE, Web UI), records an apply as a save with what it caused (D7),
-// and keeps its rejection for the control that sent it. Nothing retries on its own: a stale
-// proposal is refreshed and reviewed again by a person, never rebased behind their back.
-import type { HttpFailure } from "@cairn/client";
-import { useEffect, useId, useState } from "react";
-
-import { consequenceLines } from "../data/activity.ts";
-import { unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
-import type { PatchAnswer, ProposalHost, ProposalWritten, Rejection } from "../data/proposals.ts";
-import { newPatchId, unconfirmed } from "../data/writes.ts";
+// Proposal writes from a screen (I6): each is a serializable command the edit manager owns
+// (a write to a proposal, or one that drafts it), named by a fresh patch id (H5) and refused
+// before anything is sent under version skew (ARCHITECTURE, Web UI). An apply records a save
+// with what it caused (D7). The write is the manager's, found again by the control's edit key,
+// so its rejection survives leaving the screen and a reload. A stale proposal is never rebased
+// behind a person's back: it is rejected, and refreshed and reviewed again by them.
+import type { Answer, ProposalCall, ProposalCommand } from "../data/edit-record.ts";
+import { useEdit, useSession, useSkew } from "../data/react.ts";
+import type { WriteView } from "../data/write-machine.ts";
+import { isPatchAnswer, landedWarning, newPatchId, type Rejection } from "../data/writes.ts";
 import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
 
-/** What went wrong with the last write: the rejection, or why there was no answer. */
-export type WriteProblem = { rejection: Rejection } | { failure: HttpFailure };
+/** A proposal call before it has a patch id: what a control asks for. */
+export type ProposalAsk = ProposalCall extends infer C ? (C extends { request: infer R } ? Omit<C, "request"> & { request: Omit<R, "patch_id"> } : never) : never;
+
+/** The proposal command for `ask`, named by the patch id `id`. */
+export function proposalCommand(ask: ProposalAsk, id: string = newPatchId()): ProposalCommand {
+  // The ask is the call less the patch id its request is named by; the spread puts it back.
+  return { kind: "proposal", call: { ...ask, request: { ...ask.request, patch_id: id } } as ProposalCall };
+}
 
 export interface ProposalWrite {
-  /** Runs `call` with `patchId`, a fresh one by default; its answer when it was answered. */
-  run: <A>(call: (proposals: ProposalHost, patchId: string) => Promise<ProposalWritten<A>>, patchId?: string) => Promise<A | undefined>;
+  /** Runs `ask` under a fresh patch id; its answer when it landed. */
+  run: (ask: ProposalAsk) => Promise<Answer | undefined>;
   pending: boolean;
   disabled: boolean;
-  problem: WriteProblem | undefined;
+  /** The last write's rejection, until dismissed or a later write. */
+  rejection: Rejection | undefined;
+  /** What the write is doing when it is not rejected: still resending, not sent, or its subject gone. */
+  status: WriteView | undefined;
   dismiss: () => void;
+  /** Whether the control that sent the write is still mounted, for follow-ups that move the person. */
+  mounted: () => boolean;
   /** What an apply leaves under its control, for a few seconds. */
   receipt: ReceiptState | undefined;
 }
 
-/** True for an apply's answer, which notes what it caused (D7). */
-function isPatchAnswer(answer: unknown): answer is PatchAnswer {
-  return typeof answer === "object" && answer !== null && "outcome" in answer && (answer.outcome === "applied" || answer.outcome === "already_applied");
-}
-
-export function useProposalWrite(): ProposalWrite {
+/** The proposal writes of the control `edit` names (a key stable for it), under the chip label `label`. */
+export function useProposalWrite(edit: string, label?: string): ProposalWrite {
   const session = useSession();
   const skew = useSkew();
-  const [pending, setPending] = useState(false);
-  const [problem, setProblem] = useState<WriteProblem | undefined>();
+  const held = useEdit(edit);
   const receipt = useReceipt();
-  const key = `proposal:${useId()}`;
-  const dismiss = () => {
-    setProblem(undefined);
-  };
-  const report = useProblem(key, problem === undefined ? undefined : "rejection" in problem ? unlandedOf(problem.rejection) : { kind: "failed", message: unconfirmed(problem.failure) }, { discard: dismiss });
-  useEffect(() => () => { session.edits.send({ type: "resolve", key }); }, [session, key]);
-  const run = async <A>(call: (proposals: ProposalHost, patchId: string) => Promise<ProposalWritten<A>>, patchId: string = newPatchId()): Promise<A | undefined> => {
-    if (skew || session.skewed) {
-      return undefined;
-    }
-    setPending(true);
-    setProblem(undefined);
+  const run = async (ask: ProposalAsk): Promise<Answer | undefined> => {
     receipt.clear();
-    const written = await session.sync.track(call(session.host.proposals, patchId));
-    setPending(false);
-    switch (written.outcome) {
-      case "answered":
-        if (isPatchAnswer(written.answer)) {
-          receipt.show(session.recordSave("Applied a proposal", consequenceLines(written.answer)));
-        }
-        return written.answer;
-      // The chip hears of an unlanded write when it settles: the control may be gone by then.
-      case "rejected":
-        setProblem({ rejection: written.rejection });
-        report(unlandedOf(written.rejection));
-        return undefined;
-      case "failed":
-        setProblem({ failure: written.error });
-        report({ kind: "failed", message: unconfirmed(written.error) });
-        return undefined;
+    const answer = await held.submit(proposalCommand(ask), { label });
+    if (answer !== undefined && isPatchAnswer(answer)) {
+      receipt.show(landedWarning(answer, session.titleOf));
     }
+    return answer;
   };
-  return { run, pending, disabled: pending || skew, problem, dismiss, receipt: receipt.receipt };
+  return {
+    run,
+    pending: held.busy,
+    disabled: held.busy || skew,
+    rejection: held.rejection,
+    status: held.status,
+    dismiss: held.dismiss,
+    mounted: held.mounted,
+    receipt: receipt.receipt,
+  };
 }

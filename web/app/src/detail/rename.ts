@@ -5,10 +5,9 @@
 // discarded. Text typed after a rejection is a newer draft beside the write, and Keep my edit
 // takes that, else what the write sent.
 import { useDraft } from "../data/drafts.ts";
-import { useSession, useSkew, useWriteOf } from "../data/react.ts";
-import { currentAddress } from "../data/session.ts";
+import { useEdit, useSkew } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
-import { newPatchId, patchOf } from "../data/writes.ts";
+import { patchOf } from "../data/writes.ts";
 import type { Ready } from "./model.ts";
 
 interface TitleDraft {
@@ -40,21 +39,25 @@ export interface Rename {
   save: () => void;
 }
 
+/** The patch a rename write sent. */
+function sentPatch(write: WriteView | undefined) {
+  return write?.command.kind === "patch" ? write.command.patch : undefined;
+}
+
 /** The title a rename write sent. */
 function sentTitle(write: WriteView | undefined): string | undefined {
-  const [first] = write?.command.patch.mutations ?? [];
+  const [first] = sentPatch(write)?.mutations ?? [];
   return first?.op === "set_node_field" && "title" in first.value ? first.value.title : undefined;
 }
 
 /** The node's rename: its draft and the write the edit manager holds for it. */
 export function useRename(view: Ready, node: string, title: string): Rename {
-  const { edits } = useSession();
   const skew = useSkew();
   const journey = view.journey.header.id;
-  const edit = `title:${journey}:${node}`;
-  const [draft, setDraft] = useDraft<TitleDraft>(edit);
-  const write = useWriteOf(edit);
-  const busy = write?.state === "sending" || write?.state === "unconfirmed";
+  const key = `title:${journey}:${node}`;
+  const [draft, setDraft] = useDraft<TitleDraft>(key);
+  const edit = useEdit(key);
+  const { write, busy } = edit;
   const open = draft !== undefined || write !== undefined;
   const text = draft?.text ?? sentTitle(write) ?? "";
   return {
@@ -70,28 +73,24 @@ export function useRename(view: Ready, node: string, title: string): Rename {
       }
     },
     change: (next) => {
-      setDraft({ text: next, base: draft?.base ?? write?.command.patch.base_revision ?? view.journey.revision });
+      setDraft({ text: next, base: draft?.base ?? sentPatch(write)?.base_revision ?? view.journey.revision });
     },
     keep: (base) => {
       setDraft({ text, base });
-      if (write !== undefined) {
-        edits.send({ type: "discard", id: write.id });
-      }
+      edit.discard();
     },
     cancel: () => {
       setDraft(undefined);
-      if (write !== undefined && !busy) {
-        edits.send({ type: "discard", id: write.id });
+      if (!busy) {
+        edit.discard();
       }
     },
     save: () => {
       if (draft === undefined || draft.text.trim() === "" || busy || skew) {
         return;
       }
-      const id = newPatchId();
-      const patch = patchOf({ target: { journey }, baseRevision: draft.base, mutations: [{ op: "set_node_field", node, value: { title: draft.text } }] }, id);
-      const address = currentAddress();
-      edits.send({ type: "submit", id, command: { kind: "patch", patch }, about: { edit, label: title, ...(address === undefined ? {} : { address }) } });
+      const patch = patchOf({ target: { journey }, baseRevision: draft.base, mutations: [{ op: "set_node_field", node, value: { title: draft.text } }] });
+      void edit.submit({ kind: "patch", patch }, { label: title });
       setDraft(undefined);
     },
   };

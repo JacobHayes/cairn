@@ -109,7 +109,7 @@ interface Editing {
 }
 
 function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorProps & { editing: Editing; setEditing: (next: Editing | undefined) => void }) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, `resource-form:${node.key}`, node.title);
   const { form, base } = editing;
   const setForm = (next: ResourceForm) => {
     setEditing({ form: next, base });
@@ -126,7 +126,7 @@ function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorPro
       setEditing({ form, base: from });
     }
     const mutation: Schema<"Mutation"> = form.key === undefined ? { op: "add_resource", node: node.key, resource: made.resource } : { op: "edit_resource", node: node.key, resource: made.resource };
-    void write.run([mutation], [], from).then((landed) => {
+    void write.run([mutation], from).then((landed) => {
       if (landed) {
         onClose();
       }
@@ -148,7 +148,7 @@ function ResourceFormView({ authored, node, editing, setEditing }: NodeEditorPro
 }
 
 export function ResourceEditor({ authored, node }: NodeEditorProps) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, `resources:${node.key}`, node.title);
   const [editing, setEditing] = useDraft<Editing>(`resource-form:${domainOf(authored)}:${node.key}`);
   const resources = node.resources ?? [];
   const full = resources.length >= RESOURCE_COUNT_PER_NODE_MAX;

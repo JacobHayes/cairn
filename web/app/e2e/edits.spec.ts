@@ -5,9 +5,15 @@
 // A node's actions form that sent its write stays until that write ends: text typed since is
 // never lost to the landing, closing it never drops the write, and a rejection that came after
 // the screen was left waits under the form (D1, H5).
+// The other write paths hold their refusals the same way: a screen's write, an authoring edit,
+// and an import that replaces an open draft.
+import { readFileSync } from "node:fs";
+import { fileURLToPath } from "node:url";
+
 import { expect, test, type Page } from "@playwright/test";
 
-import { fresh, menuItem, nodeCard, nodePanel, openFromCanvas, openJourney, recentSaves, rename, renameOf, save, startRename, syncChip } from "./shell.ts";
+import { addNode, formField, newRoute, nodeForm, routeName, saveForm, structure } from "./authoring.ts";
+import { fresh, goWithin, menuItem, nodeCard, nodePanel, open, openFromCanvas, openJourney, recentSaves, rename, renameOf, save, startRename, syncChip } from "./shell.ts";
 
 const PATCHES = "**/api/journeys/*/patches";
 
@@ -201,4 +207,82 @@ test("a node action rejected after its screen was left waits under its form, acr
   const restored = nodePanel(two, "n_launch");
   await expect(restored.getByTestId("skip-form").getByLabel("Why skip it")).toHaveValue(mine);
   await expect(restored.locator('[data-testid="conflict"], [data-testid="invalid"]')).toBeVisible();
+});
+
+test("a new route refused for an id in use stays under its control and on the chip, across a reload, until discarded", async ({ page }) => {
+  await open(page, "browser", "/library");
+  const form = page.getByTestId("new-route");
+  await form.getByTestId("new-menu").click();
+  await form.getByTestId("new-process").click();
+  // The name's slug is the id of a route the fixtures already hold.
+  await form.getByLabel("New route name").fill("Hiring loop");
+  await form.getByTestId("new-create").click();
+  await expect(form.getByTestId("refused")).toBeVisible();
+  await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
+  // Away from the control it is still counted, and a reload keeps it under the control.
+  await goWithin(page, "/");
+  await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
+  await goWithin(page, "/library");
+  await expect(form.getByTestId("refused")).toBeVisible();
+  await page.reload();
+  await expect(form.getByTestId("refused")).toBeVisible();
+  await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
+  // Discard on the chip clears it here too, and it does not come back.
+  await syncChip(page).click();
+  await problems(page).getByRole("button", { name: "Discard" }).click();
+  await expect(form.getByTestId("refused")).toHaveCount(0);
+  await page.reload();
+  await expect(form.getByTestId("refused")).toHaveCount(0);
+  await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
+});
+
+test("an import refused for an open draft keeps its file across a reload, and imports over the draft", async ({ page }) => {
+  const buffer = readFileSync(fileURLToPath(new URL("../../../fixtures/hiring-loop/route.yaml", import.meta.url)));
+  const file = { name: "hiring-loop.yaml", mimeType: "text/yaml", buffer };
+  await open(page, "browser", "/routes/hiring-loop/versions");
+  const actions = page.getByTestId("route-actions");
+  const importing = actions.getByTestId("import");
+  const choose = () => actions.getByLabel("Import a file as a new draft").setInputFiles(file);
+  await choose();
+  await expect(page.getByTestId("draft")).toHaveAttribute("data-status", "open");
+  // Another draft is open now: the file is refused, and the option is to replace it.
+  await choose();
+  await expect(importing.locator('[data-testid="violation"][data-code="draft_exists"]')).toBeVisible();
+  await importing.getByRole("button", { name: "Discard the open draft and import" }).click();
+  await expect(importing.getByTestId("refused")).toHaveCount(0);
+  await expect(page.getByTestId("draft")).toHaveAttribute("data-status", "open");
+  // Refused again, the file is kept with the refusal across a reload, which also drops the draft the page held.
+  await choose();
+  await expect(importing.getByTestId("refused")).toBeVisible();
+  await page.reload();
+  await expect(importing.getByTestId("refused")).toBeVisible();
+  await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
+  await importing.getByRole("button", { name: "Discard the open draft and import" }).click();
+  await expect(importing.getByTestId("refused")).toHaveCount(0);
+  await expect(page.getByTestId("draft")).toHaveAttribute("data-status", "open");
+  await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
+});
+
+test("an authoring edit the engine refuses stays at its field across a reload, until discarded", { tag: "@server" }, async ({ page }) => {
+  await newRoute(page, "server", routeName("Refusal"));
+  const first = await addNode(page, "milestone", "Kickoff");
+  await addNode(page, "milestone", "Launch");
+  await formField(page, "final").getByRole("checkbox").check();
+  await saveForm(page);
+  // A second final milestone is one too many: the engine's preview says so, and Save sends it anyway.
+  await nodeCard(page, first).getByTestId("card-open").click();
+  await expect(structure(page)).toHaveAttribute("data-node", first);
+  await formField(page, "final").getByRole("checkbox").check();
+  await nodeForm(page).getByTestId("node-form-save").click();
+  const refused = formField(page, "final").locator('[data-testid="violation"][data-code="several_final_milestones"]');
+  await expect(refused).toBeVisible();
+  await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
+  await page.reload();
+  await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
+  await expect(structure(page)).toHaveAttribute("data-node", first);
+  await expect(refused).toBeVisible();
+  // Discard on the chip drops the refused edit, and the form with it.
+  await syncChip(page).click();
+  await problems(page).getByRole("button", { name: "Discard" }).click();
+  await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
 });

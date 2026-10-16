@@ -9,13 +9,12 @@
 // Nothing is discovered through XState's system registry: the writes are an explicit keyed
 // map, each with the last snapshot it relayed (a selector reads that, never `getSnapshot()` of
 // a child, so a change of a write is a change of the manager's snapshot).
-import { assign, enqueueActions, sendTo, setup } from "xstate";
+import { assign, enqueueActions, fromPromise, sendTo, setup, waitFor, type ActorRefFrom } from "xstate";
 
-import { EDIT_RECORD_VERSION, type About, type Command, type EditStore, type OperationId } from "./edit-record.ts";
+import { EDIT_RECORD_VERSION, idOf, type About, type Answer, type Command, type EditStore, type OperationId } from "./edit-record.ts";
 import type { Markdown, Patch } from "./host.ts";
-import type { EditsRef } from "./session-root.ts";
 import type { Problem } from "./sync.ts";
-import { writeMachine, writeView, recordOf, type WriteEnv, type WriteRef, type WriteSnapshot, type WriteView } from "./write-machine.ts";
+import { writeMachine, writeView, recordOf, type Check, type WriteEnv, type WriteRef, type WriteSnapshot, type WriteView } from "./write-machine.ts";
 import { reasonOf, unconfirmed } from "./writes.ts";
 
 /** What the manager tells the person about the records, in words the session supplies. */
@@ -38,15 +37,8 @@ export interface Entry {
   snapshot: WriteSnapshot;
 }
 
-/** A problem a control still reports itself, until its write moves onto the manager (see the remaining-writes step). */
-interface Reported {
-  problem: Omit<Problem, "id" | "retry">;
-  discard: () => void;
-}
-
 export interface EditsContext extends EditsInput {
   writes: Record<OperationId, Entry>;
-  reported: Record<string, Reported>;
   /** Whether storage has refused a record (said once). */
   unstored: boolean;
   /** Whether the kept records have been put back: once per manager. */
@@ -56,13 +48,11 @@ export interface EditsContext extends EditsInput {
 export type EditsEvent =
   /** Puts the kept records back as writes. Sent once, after the session root has started. */
   | { type: "restore" }
-  | { type: "submit"; id: OperationId; command: Command; about: About }
+  | { type: "submit"; id: OperationId; command: Command; about: About; check?: Check }
   | { type: "discard"; id: string }
   | { type: "retry"; id: OperationId }
   /** The connection came back or the tab went into skew: every write looks again. */
   | { type: "wake" }
-  | { type: "report"; key: string; problem: Reported["problem"]; discard: () => void }
-  | { type: "resolve"; key: string }
   /** A write's snapshot, relayed by XState on each change of an active write. */
   | { type: `xstate.snapshot.${string}`; snapshot: WriteSnapshot }
   /** A write ended: it landed or was discarded. */
@@ -84,7 +74,7 @@ export const editManager = setup({
     free: ({ context, event }) => {
       const sent = event as Extract<EditsEvent, { type: "submit" }>;
       return (
-        sent.command.patch.id === sent.id &&
+        idOf(sent.command) === sent.id &&
         context.writes[sent.id] === undefined &&
         !Object.values(context.writes).some((entry) => entry.snapshot.context.about.edit === sent.about.edit && busy(entry))
       );
@@ -168,17 +158,16 @@ export const editManager = setup({
         throw new Error(`the write ${sent.id} was not started`);
       }
       return entry.ref;
-    }, { type: "submit" }),
+    }, ({ event }) => {
+      const sent = event as Extract<EditsEvent, { type: "submit" }>;
+      return sent.check === undefined ? { type: "submit" as const } : { type: "submit" as const, check: sent.check };
+    }),
     forwardDiscard: enqueueActions(({ context, event, enqueue }) => {
       const sent = event as Extract<EditsEvent, { type: "discard" }>;
       const entry = context.writes[sent.id];
       if (entry !== undefined) {
         enqueue.sendTo(entry.ref, { type: "discard" });
-        return;
       }
-      // A problem a control reports itself drops with the control's own discard.
-      context.reported[sent.id]?.discard();
-      enqueue.assign({ reported: without(context.reported, sent.id) });
     }),
     forwardRetry: enqueueActions(({ context, event, enqueue }) => {
       const sent = event as Extract<EditsEvent, { type: "retry" }>;
@@ -192,27 +181,22 @@ export const editManager = setup({
         enqueue.sendTo(entry.ref, { type: "wake" });
       }
     }),
-    report: assign(({ context, event }) => {
-      const sent = event as Extract<EditsEvent, { type: "report" }>;
-      return { reported: { ...context.reported, [sent.key]: { problem: sent.problem, discard: sent.discard } } };
-    }),
-    resolve: assign(({ context, event }) => ({ reported: without(context.reported, (event as Extract<EditsEvent, { type: "resolve" }>).key) })),
   },
 }).createMachine({
   id: "edits",
-  context: ({ input }) => ({ ...input, writes: {}, reported: {}, unstored: false, restored: false }),
+  context: ({ input }) => ({ ...input, writes: {}, unstored: false, restored: false }),
   on: {
     restore: { guard: "notRestored", actions: "restoreWrites" },
     submit: { guard: "free", actions: ["dropSettled", "startWrite", "startSent"] },
     discard: { actions: "forwardDiscard" },
     retry: { actions: "forwardRetry" },
     wake: { actions: "forwardWake" },
-    report: { actions: "report" },
-    resolve: { actions: "resolve" },
     "xstate.snapshot.*": { actions: "relay" },
     "xstate.done.actor.*": { actions: "finish" },
   },
 });
+
+export type EditsRef = ActorRefFrom<typeof editManager>;
 
 /**
  * Sends `patch` to the manager as the write of `about.edit` and answers the write it started,
@@ -277,8 +261,8 @@ export function unlandedWords(view: WriteView, skewed: boolean): { kind: Problem
   }
 }
 
-/** The problems on the chip: the writes that need the person in the order they were sent, then those a control still reports. */
-export function problemsOf(writes: EditsContext["writes"], reported: EditsContext["reported"], skewed: boolean): Problem[] {
+/** The problems on the chip: the writes that need the person, in the order they were sent. */
+export function problemsOf(writes: EditsContext["writes"], skewed: boolean): Problem[] {
   const found: Problem[] = [];
   for (const [id, { snapshot }] of Object.entries(writes)) {
     const view = writeView(snapshot);
@@ -287,8 +271,66 @@ export function problemsOf(writes: EditsContext["writes"], reported: EditsContex
       found.push({ id, kind: words.kind, message: words.message, label: view.about.label, address: view.state === "gone" ? undefined : view.about.address, retry: words.retry });
     }
   }
-  for (const [key, { problem }] of Object.entries(reported)) {
-    found.push({ ...problem, id: key, retry: false });
-  }
   return found;
+}
+
+/**
+ * What a control sent through the manager: the edit's command, what it is about, and the
+ * check to run first. `id` is the command's own (`idOf`).
+ */
+export interface Sent {
+  id: OperationId;
+  command: Command;
+  about: About;
+  check?: Check | undefined;
+}
+
+/**
+ * Sends `sent` to the manager and waits for it to land: its answer, or none once the write
+ * needs the person (rejected, stopped, gone, or out of automatic resends), was discarded, was
+ * refused for another write of the edit still out, or the session closed. The write is the
+ * manager's, not the caller's: aborting `signal` stops the waiting and never the write, and a
+ * write that lands after the caller stopped waiting is still recorded as a save. A repeat of
+ * a write already out waits on that write.
+ */
+export async function submitWrite(edits: EditsRef, sent: Sent, signal?: AbortSignal): Promise<Answer | undefined> {
+  edits.send({ type: "submit", id: sent.id, command: sent.command, about: sent.about, ...(sent.check === undefined ? {} : { check: sent.check }) });
+  // The manager processed the submit synchronously: it holds the write unless another of the edit was out.
+  const ref = edits.getSnapshot().context.writes[sent.id]?.ref;
+  if (ref === undefined) {
+    return undefined;
+  }
+  try {
+    const snapshot = await waitFor(ref, (each) => each.status === "done" || each.hasTag("needsYou"), { timeout: Infinity, ...(signal === undefined ? {} : { signal }) });
+    const view = writeView(snapshot);
+    return view.state === "landed" ? view.answer : undefined;
+  } catch {
+    // The root stopped, or the caller stopped waiting.
+    return undefined;
+  }
+}
+
+/** What an edit is about, without the fields it has none of. */
+export function aboutOf(edit: string, label: string | undefined, address: string | undefined): About {
+  return { edit, ...(label === undefined ? {} : { label }), ...(address === undefined ? {} : { address }) };
+}
+
+/**
+ * A workflow's delivery step: `submitWrite` as an actor, whose abort signal is the workflow's
+ * own stopping (an unmount): the step stops waiting for the answer, and the write goes on.
+ */
+export const deliverWrite = fromPromise<Answer | undefined, { edits: EditsRef; sent: Sent }>(({ input, signal }) => submitWrite(input.edits, input.sent, signal));
+
+/** Why a write that did not land needs the person, for a control that has no more to say than that. */
+export function unansweredOf(view: WriteView | undefined): "failed" | "stopped" | "gone" | undefined {
+  switch (view?.state) {
+    case "unconfirmed":
+      return view.retrying ? undefined : "failed";
+    case "stopped":
+      return "stopped";
+    case "gone":
+      return "gone";
+    default:
+      return undefined;
+  }
 }

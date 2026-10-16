@@ -87,7 +87,7 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
     if (from !== base) {
       setEditing({ slot, base: from });
     }
-    void write.run([isNew ? kind.add(slot) : kind.edit(slot)], [], from).then((landed) => {
+    void write.run([isNew ? kind.add(slot) : kind.edit(slot)], from).then((landed) => {
       if (landed) {
         onClose();
       }
@@ -116,7 +116,7 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
 }
 
 function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKind; slots: readonly Slot[] }) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, `slots:${kind.name}`);
   const [editing, setEditing] = useDraft<Editing>(`slot-form:${domainOf(authored)}:${kind.name}`);
   const [removing, setRemoving] = useState<Slot | undefined>(undefined);
   const plan = removing === undefined ? [] : kind.name === "role" ? planRoleRemoval(authored.tree, removing.key) : planKindRemoval(authored.tree, removing.key);
@@ -135,6 +135,7 @@ function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKin
       {removing === undefined ? null : (
         <CascadeDialog
           authored={authored}
+          scope={`remove-${kind.name}`}
           title={`Remove the ${kind.words} ${named(removing)}`}
           dangling={plan}
           mutations={[...plan.map((each) => each.mutation), kind.remove(removing.key)]}
@@ -155,7 +156,7 @@ function SlotList({ authored, kind, slots }: { authored: Authored; kind: SlotKin
 
 /** A6: the role that owns nodes no ancestor gives an owner; single valued only. */
 function DefaultOwner({ authored }: { authored: Authored }) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, "default-owner");
   const single = (authored.graph.roles ?? []).filter((role) => role.multi !== true);
   return (
     <span className="row" data-testid="default-owner">

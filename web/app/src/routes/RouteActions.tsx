@@ -9,6 +9,7 @@ import type { Mutation } from "../data/writes.ts";
 import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { Refused, violates } from "../screens/Refused.tsx";
 import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { ImportFile } from "./ImportFile.tsx";
@@ -17,7 +18,7 @@ import { useExport } from "./exporting.ts";
 
 export function RouteActions({ route }: { route: Schema<"Route"> }) {
   const id = route.header.id;
-  const write = useScreenWrite();
+  const write = useScreenWrite(`route:${id}`, route.header.name);
   const exportDraft = useExport(id);
   const moves = routeMoves(route);
   const send = (mutation: Mutation) => void write.run({ target: { route: id }, baseRevision: route.revision, mutations: [mutation] });
@@ -43,8 +44,9 @@ export function RouteActions({ route }: { route: Schema<"Route"> }) {
         <Button disabled={write.disabled} onClick={() => { send(retireMutation(moves.retire)); }}>
           {moves.retire ? "Retire" : "Bring back"}
         </Button>
-        <ImportFile label="Import a file as a new draft" />
+        <ImportFile edit={`import:route:${id}`} label="Import a file as a new draft" />
       </span>
+      <WriteStatus view={write.status} />
       {write.rejected === undefined ? null : (
         <Refused rejection={write.rejected} onDismiss={write.dismiss}>
           {violates(write.rejected, "draft_exists") ? <Button onClick={() => { send({ op: "discard_draft" }); }}>Discard the open draft</Button> : null}

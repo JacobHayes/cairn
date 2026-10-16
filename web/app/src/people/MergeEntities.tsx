@@ -2,17 +2,20 @@
 // either (any status, archived among them) is read first and named at the revision seen, so
 // the host checks each as it would derive after the merge and rechecks the set when it
 // commits; a merge that would break a journey is refused naming it and its violations.
-import { useState } from "react";
+import { useActorRef, useSelector } from "@xstate/react";
+import { useEffect, useState } from "react";
 
 import type { Deployment } from "../data/host.ts";
 import { allPages } from "../data/live.ts";
 import type { JourneySummary } from "../data/reads.ts";
-import { useSession } from "../data/react.ts";
+import { useEdit, useSession, useSkew } from "../data/react.ts";
+import { landedWarning } from "../data/writes.ts";
 import { Refused } from "../screens/Refused.tsx";
-import { useScreenWrite } from "../screens/write.ts";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button } from "../ui/kit.tsx";
-import { Receipt } from "../ui/Receipt.tsx";
-import { mergeMutation, type Entity } from "./model.ts";
+import { Receipt, useReceipt } from "../ui/Receipt.tsx";
+import { mergeFlow } from "./merge.ts";
+import type { Entity } from "./model.ts";
 
 function EntitySelect({ label, value, entities, onChange }: { label: string; value: string; entities: readonly Entity[]; onChange: (key: string) => void }) {
   return (
@@ -31,26 +34,31 @@ function EntitySelect({ label, value, entities, onChange }: { label: string; val
 }
 
 export function MergeEntities({ deployment, entities, asked }: { deployment: Deployment; entities: readonly Entity[]; asked: string[] }) {
-  const { host, activity } = useSession();
-  const write = useScreenWrite();
+  const { host, edits, titleOf } = useSession();
+  const skew = useSkew();
+  const flow = useActorRef(mergeFlow, {
+    input: {
+      edits,
+      key: "merge-entities",
+      referencing: (keys) => allPages<JourneySummary, string>((after) => host.journeys({ referencing: [...keys], ...(after === undefined ? {} : { after }) })),
+    },
+  });
+  const working = useSelector(flow, (snapshot) => snapshot.hasTag("busy"));
+  const failure = useSelector(flow, (snapshot) => snapshot.context.failure);
+  const write = useEdit("merge-entities");
+  const receipt = useReceipt();
   const [survivor, setSurvivor] = useState(asked[0] ?? "");
   const [merged, setMerged] = useState(asked[1] ?? "");
-  const [reading, setReading] = useState(false);
-  const merge = async () => {
-    setReading(true);
-    let referencing: JourneySummary[];
-    try {
-      referencing = await allPages<JourneySummary, string>((after) => host.journeys({ referencing: [survivor, merged], ...(after === undefined ? {} : { after }) }));
-    } catch (thrown) {
-      activity.confirm(`Not merged: ${thrown instanceof Error ? thrown.message : String(thrown)}`, "problem");
-      return;
-    } finally {
-      setReading(false);
-    }
-    if (await write.run({ target: "deployment", baseRevision: deployment.revision, mutations: [mergeMutation(survivor, merged, referencing)] })) {
+  // Told of a landing only while this control is on screen.
+  useEffect(() => {
+    const subscription = flow.on("merged", ({ answer }) => {
       setMerged("");
-    }
-  };
+      receipt.show(landedWarning(answer, titleOf));
+    });
+    return () => {
+      subscription.unsubscribe();
+    };
+  });
   const ready = survivor !== "" && merged !== "" && survivor !== merged;
   return (
     <section className="stack panel" aria-label="Merge two entities" data-testid="merge-entities">
@@ -59,9 +67,26 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
       <span className="row">
         <EntitySelect label="Keep" value={survivor} entities={entities} onChange={setSurvivor} />
         <EntitySelect label="Merge into it" value={merged} entities={entities} onChange={setMerged} />
-        <Button primary disabled={!ready || reading || write.disabled} onClick={() => void merge()}>Merge</Button>
+        <Button
+          primary
+          disabled={!ready || working || write.busy || skew}
+          onClick={() => {
+            receipt.clear();
+            flow.send({ type: "merge", survivor, merged, deployment: deployment.revision });
+          }}
+        >
+          Merge
+        </Button>
       </span>
-      {write.rejected === undefined ? <Receipt receipt={write.receipt} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {failure === undefined ? null : <p className="callout callout-bad" role="alert" data-testid="merge-failed">Not merged: {failure}</p>}
+      {write.rejection === undefined ? (
+        <>
+          <WriteStatus view={write.status} />
+          <Receipt receipt={receipt.receipt} />
+        </>
+      ) : (
+        <Refused rejection={write.rejection} onDismiss={write.dismiss} />
+      )}
     </section>
   );
 }

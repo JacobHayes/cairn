@@ -6,6 +6,7 @@
 import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { CascadeDialog } from "./CascadeDialog.tsx";
 import { planRemoval, removalMutations } from "./cascade.ts";
@@ -29,7 +30,7 @@ export interface NodeEditorProps {
 export function Refusal({ write, onRetry }: { write: AuthorWrite; onRetry?: (() => void) | undefined }) {
   const failed = write.failed;
   if (failed === undefined) {
-    return null;
+    return <WriteStatus view={write.status} />;
   }
   const lines = failed.rejection.rejection === "invalid" ? failed.rejection.violations.map((violation) => violation.message) : ["The graph changed since; try again."];
   return (
@@ -54,7 +55,7 @@ function edgeCount(authored: Authored, key: string): number {
 
 /** A3: what the node requires, removable, and a requirement added by picking or drawing it. */
 export function EdgesEditor({ authored, node }: NodeEditorProps) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, `edges:${node.key}`, node.title);
   const connecting = useConnecting();
   const [picked, setPicked] = useState("");
   const requires = node.requires ?? [];
@@ -97,7 +98,7 @@ export function EdgesEditor({ authored, node }: NodeEditorProps) {
 
 /** A2: where the node sits; moving it into another container, or to the top level. */
 export function PlaceEditor({ authored, node }: NodeEditorProps) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, `place:${node.key}`, node.title);
   const targets = moveTargets(authored.tree, node.key);
   return (
     <div className="stack" data-testid="place-editor">
@@ -109,7 +110,7 @@ export function PlaceEditor({ authored, node }: NodeEditorProps) {
           none="The top level"
           options={targets.map((each) => ({ value: each.key, label: `${each.title} (${pathOf(authored.tree, each.key)})` }))}
           disabled={write.disabled}
-          onChange={(event) => void write.run([{ op: "set_node_field", node: node.key, value: { parent: event.target.value === "" ? null : event.target.value } }], ["parent"])}
+          onChange={(event) => void write.run([{ op: "set_node_field", node: node.key, value: { parent: event.target.value === "" ? null : event.target.value } }])}
         />
       </span>
       <Refusal write={write} />
@@ -119,7 +120,7 @@ export function PlaceEditor({ authored, node }: NodeEditorProps) {
 
 /** A6, A7, E2: each participation kind wired to a role, inherited, or (a journey's) explicit people. */
 export function ParticipationWiring({ authored, node }: NodeEditorProps) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, `participation:${node.key}`, node.title);
   const roles = authored.graph.roles ?? [];
   const kinds = [{ key: "k_owner", id: "owner", title: "Owner", multi: false }, ...(authored.graph.participation_kinds ?? [])];
   return (
@@ -169,7 +170,7 @@ export function breakdownMutations(authored: Authored, parent: string, pieces: r
 
 /** B10: breaking the node down by hand into children, and a journey's placeholder marked atomic. */
 export function Breakdown({ authored, node }: NodeEditorProps) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, `breakdown:${node.key}`, node.title);
   const [kept, setPieces] = useDraft<Piece[]>(`breakdown:${domainOf(authored)}:${node.key}`);
   const pieces = kept ?? [{ kind: "action", title: "" }];
   const filled = pieces.filter((piece) => piece.title.trim() !== "");
@@ -225,6 +226,7 @@ export function RemoveNode({ authored, node, onRemoved }: NodeEditorProps & { on
   return (
     <CascadeDialog
       authored={authored}
+      scope={`remove-node:${node.key}`}
       title={`Remove ${node.title}`}
       plan={plan}
       dangling={plan.dangling}

@@ -11,10 +11,13 @@ import type { Dangling, RemovalPlan } from "./cascade.ts";
 import type { Mutation } from "./graph.ts";
 import { titleIn } from "./graph.ts";
 import type { Authored } from "./target.ts";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useAuthorWrite, useDialogPreview, type Preview } from "./write.ts";
 
 export interface CascadeDialogProps {
   authored: Authored;
+  /** Which removal this is, so its write is its own beside another dialog's. */
+  scope: string;
   /** What is removed, in words ("Remove Testing"). */
   title: string;
   /** A node removal's plan; none for a role or a kind. */
@@ -92,8 +95,8 @@ function PreviewLine({ preview }: { preview: Preview | undefined }) {
   );
 }
 
-export function CascadeDialog({ authored, title, plan, dangling, mutations, onDone, onCancel }: CascadeDialogProps) {
-  const write = useAuthorWrite(authored);
+export function CascadeDialog({ authored, scope, title, plan, dangling, mutations, onDone, onCancel }: CascadeDialogProps) {
+  const write = useAuthorWrite(authored, `cascade:${scope}`);
   const preview = useDialogPreview(authored, mutations);
   return (
     <div className="callout stack" role="dialog" aria-label={title} data-testid="cascade-dialog">
@@ -122,6 +125,7 @@ export function CascadeDialog({ authored, title, plan, dangling, mutations, onDo
         </Button>
         <Button onClick={onCancel}>Cancel</Button>
       </span>
+      <WriteStatus view={write.status} />
       {write.failed === undefined ? null : (
         <span className="callout callout-bad" role="alert" data-testid="cascade-refused">
           Not removed: {write.failed.rejection.rejection === "invalid" ? write.failed.rejection.violations.map((violation) => violation.message).join("; ") : "the graph changed since; review it again."}

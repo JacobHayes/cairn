@@ -40,7 +40,7 @@ describe("restoring the kept edits", () => {
     expect(fake.sent.map((patch) => patch.id)).toEqual(["p_sent"]);
     expect(saves).toHaveLength(1);
     expect(Object.keys(writes())).toEqual(["p_refused"]);
-    expect(problemsOf(writes(), {}, false).map((problem) => problem.id)).toEqual(["p_refused"]);
+    expect(problemsOf(writes(), false).map((problem) => problem.id)).toEqual(["p_refused"]);
     expect(store.read().records.map((each) => each.id)).toEqual(["p_refused"]);
   });
 });
@@ -53,7 +53,7 @@ describe("version skew", () => {
     await settled();
     expect(host.sent).toEqual([]);
     expect(writeView(writes().p_a?.snapshot as WriteSnapshot)).toMatchObject({ state: "stopped", failure: undefined });
-    expect(problemsOf(writes(), {}, true)).toEqual([expect.objectContaining({ id: "p_a", kind: "failed", retry: true, message: expect.stringContaining("Reload") as string })]);
+    expect(problemsOf(writes(), true)).toEqual([expect.objectContaining({ id: "p_a", kind: "failed", retry: true, message: expect.stringContaining("Reload") as string })]);
   });
 
   it("gives up on a write waiting for the connection at once, without advancing time", async () => {

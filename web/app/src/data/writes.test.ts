@@ -3,7 +3,8 @@
 import { describe, expect, it } from "vitest";
 
 import { consequenceLines, warningOf } from "./activity.ts";
-import { newPatchId, patchOf, unlockedOf, type WriteIntent } from "./writes.ts";
+import type { Command } from "./edit-record.ts";
+import { landedWarning, newPatchId, patchOf, saveOf, unlockedOf, type WriteIntent } from "./writes.ts";
 
 const intent: WriteIntent = {
   target: { journey: "j_one" },
@@ -87,5 +88,54 @@ describe("consequenceLines (D7)", () => {
       },
     };
     expect(consequenceLines(answer)).toEqual([{ kind: "undecided", journey: "j_one", nodes: ["n_a", "n_b"], unanswered: ["n_flag", "n_other"] }]);
+  });
+});
+
+describe("saveOf", () => {
+  const titleOf = (_journey: string, node: string) => titles[node] ?? node;
+  const applied = { outcome: "applied" as const, receipt, consequences: { j_one: { overdue: ["n_b"] } } };
+  const call = (op: "apply" | "discard"): Command => ({
+    kind: "proposal",
+    call: op === "apply" ? { op, proposal: "pr_one", request: { patch_id: "p_x", reviewed_revision: 4 } } : { op, proposal: "pr_one", request: { patch_id: "p_x", base_revision: 4 } },
+  });
+
+  it("records a patch as what it did, with the consequences and the work it unlocked", () => {
+    const patch = patchOf(intent, "p_x");
+    const save = saveOf({ kind: "patch", patch }, applied, 5, titleOf);
+    expect(save?.text).toContain("Draft the plan");
+    expect(save?.lines).toEqual(consequenceLines(applied));
+    expect(save?.unlocked).toEqual(unlockedOf(intent, applied, 5));
+  });
+
+  it("records an imported file and an applied proposal, with their consequences", () => {
+    const file = { format: 1, route: "r_one", name: "One", nodes: [] } as never;
+    expect(saveOf({ kind: "import", request: { patch_id: "p_x", file } }, applied, 5, titleOf)).toMatchObject({ text: expect.stringContaining("One") as string, lines: consequenceLines(applied) });
+    expect(saveOf(call("apply"), applied, 5, titleOf)).toMatchObject({ lines: consequenceLines(applied) });
+  });
+
+  it("records the drafting of a proposal with the way to it, whichever way it was drafted, so it stays reachable", () => {
+    const drafting: Command[] = [
+      { kind: "proposal", call: { op: "create", destination: { journey: "j_one" }, request: { id: "pr_new", patch_id: "p_x", draft: {} as never } } },
+      { kind: "proposal", call: { op: "upgrade", journey: "j_one", request: { proposal: "pr_new", patch_id: "p_x", to: 2 } } },
+      { kind: "proposal", call: { op: "save_as_route", journey: "j_one", request: { proposal: "pr_new", patch_id: "p_x", route: "r", name: "R" } } },
+      { kind: "proposal", call: { op: "relink", journey: "j_one", request: { proposal: "pr_new", patch_id: "p_x", route: "r", version: 2 } as never } },
+    ];
+    for (const command of drafting) {
+      expect(saveOf(command, { outcome: "already_saved" } as never, 5, titleOf)?.address).toBe("/proposals/pr_new");
+    }
+  });
+
+  it("records nothing for the proposal writes that change nothing yet, nor for an apply answered as a proposal", () => {
+    expect(saveOf(call("discard"), applied, 5, titleOf)).toBeUndefined();
+    expect(saveOf(call("discard"), { outcome: "already_saved" } as never, 5, titleOf)).toBeUndefined();
+    expect(saveOf(call("apply"), { outcome: "already_saved" } as never, 5, titleOf)).toBeUndefined();
+  });
+});
+
+describe("landedWarning", () => {
+  const titleOf = (_journey: string, node: string) => titles[node] ?? node;
+  it("is the warning of a patch's consequences, and none for a proposal's answer", () => {
+    expect(landedWarning({ outcome: "applied", receipt, consequences: { j_one: { overdue: ["n_b"] } } }, titleOf)).toBe("Kickoff is now overdue.");
+    expect(landedWarning({ outcome: "already_saved" } as never, titleOf)).toBeUndefined();
   });
 });

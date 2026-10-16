@@ -7,6 +7,7 @@
 import type { Schema } from "@cairn/client";
 
 import type { FormField } from "./fields.ts";
+import type { Mutation } from "./graph.ts";
 
 export type Violation = Schema<"Violation">;
 
@@ -50,7 +51,7 @@ export function isAbout(violation: Violation, node: string): boolean {
  * Where a violation about the form's node shows: the field the engine names, else the field
  * whose mutation it rejected (`sent` is each sent mutation's field, by position), else its code's.
  */
-export function placeOf(violation: Violation, sent: readonly Place[] = []): Place {
+export function placeOf(violation: Violation, sent: readonly (Place | undefined)[] = []): Place {
   if (violation.at.field != null) {
     return violation.at.field;
   }
@@ -60,11 +61,33 @@ export function placeOf(violation: Violation, sent: readonly Place[] = []): Plac
 }
 
 /** A15: the violations about `node`, by where each shows; the rest under "form". */
-export function byPlace(violations: readonly Violation[], node: string | undefined, sent: readonly Place[] = []): Map<Place, Violation[]> {
+export function byPlace(violations: readonly Violation[], node: string | undefined, sent: readonly (Place | undefined)[] = []): Map<Place, Violation[]> {
   const places = new Map<Place, Violation[]>();
   for (const violation of violations) {
     const place = node !== undefined && isAbout(violation, node) ? placeOf(violation, sent) : "form";
     places.set(place, [...(places.get(place) ?? []), violation]);
   }
   return places;
+}
+
+/**
+ * Where each mutation of a patch shows when the engine rejects it (A15), by position: the field
+ * a `set_node_field` writes, the answer type a node replacement changes, a node's requirements
+ * for an edge; none for the rest, which a violation's code places instead. Worked out from the
+ * patch itself, so a rejection restored after a reload lands at the same fields.
+ */
+export function placesOf(mutations: readonly Mutation[]): (Place | undefined)[] {
+  return mutations.map((mutation): Place | undefined => {
+    switch (mutation.op) {
+      case "set_node_field":
+        return Object.keys(mutation.value)[0] as FormField | undefined;
+      case "replace_node":
+        return "answer_type";
+      case "add_edge":
+      case "remove_edge":
+        return "requires";
+      default:
+        return undefined;
+    }
+  });
 }

@@ -535,19 +535,3 @@ export function withFieldValue(node: GraphNode, value: Record<string, unknown>):
   const kept = Object.entries({ ...node, ...value }).filter(([field]) => !cleared.has(field));
   return Object.fromEntries(kept) as GraphNode;
 }
-
-/** One drafting attempt: what it asked for, and the ids it was sent under (I6, H5). */
-export interface Attempt {
-  asked: string;
-  id: string;
-  patchId: string;
-}
-
-/**
- * I6, H5: the ids to send a draft under: those of an attempt whose answer never came, when it
- * asked the same, so a draft that was saved after all is found rather than made twice; fresh
- * ones otherwise.
- */
-export function attemptFor(unanswered: Attempt | undefined, asked: string, fresh: () => Omit<Attempt, "asked">): Attempt {
-  return unanswered?.asked === asked ? unanswered : { asked, ...fresh() };
-}

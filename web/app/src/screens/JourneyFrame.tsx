@@ -12,7 +12,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 
 import { ConnectContext, DrawingBanner, useEdgeDrawing } from "../authoring/connect.tsx";
 import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
-import { journeyAuthored } from "../authoring/target.ts";
+import { domainOf, journeyAuthored } from "../authoring/target.ts";
 import { stepsFor } from "../canvas/ladder.ts";
 import { MapBand, useMapOpen } from "../canvas/MapFrame.tsx";
 import { useSelection, type Selection } from "../canvas/selection.ts";
@@ -105,7 +105,7 @@ function InspectorSlot({
   if (inserting.at !== undefined && insertable !== undefined) {
     return (
       <Inspector focus="insert-segment">
-        <InsertStepper key={inserting.at.parent ?? ""} authored={insertable} parent={inserting.at.parent} onClose={inserting.close} onPreview={inserting.setPreview} />
+        <InsertStepper key={`${domainOf(insertable)}:${inserting.at.parent ?? ""}`} authored={insertable} parent={inserting.at.parent} onClose={inserting.close} onPreview={inserting.setPreview} />
       </Inspector>
     );
   }

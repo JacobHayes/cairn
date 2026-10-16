@@ -129,15 +129,15 @@ function setup() {
 }
 
 describe("SyncStatus", () => {
-  it("shows SAVING only for a write still out after 300ms, then SAVED for 2s", async () => {
-    const { status, advance } = setup();
-    let finish: () => void = () => undefined;
-    const sending = status.track(new Promise<void>((resolve) => { finish = resolve; }));
+  it("shows SAVING only for a write still out after 300ms, then SAVED for 2s", () => {
+    const { status, advance, edits } = setup();
+    edits.state.inFlight = 1;
+    edits.changed();
     expect(status.summary.state).toBe("in-sync");
     advance(SYNC_SHOW_AFTER_MS);
     expect(status.summary.state).toBe("saving");
-    finish();
-    await sending;
+    edits.state.inFlight = 0;
+    edits.changed();
     status.saved("14:02:11");
     expect(status.summary.state).toBe("saved");
     advance(SYNC_SAVED_MS);

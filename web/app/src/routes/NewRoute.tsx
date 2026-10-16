@@ -14,6 +14,7 @@ import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { Refused } from "../screens/Refused.tsx";
 import { Menu } from "../screens/Menu.tsx";
 import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { routeDetailPath } from "./address.ts";
@@ -58,13 +59,13 @@ function NewChoices({ disabled, onStart, close }: { disabled: boolean; onStart: 
           {each === "process" ? "Route" : "Segment"}
         </button>
       ))}
-      <ImportFile label="Import a file…" onImported={(file) => { close(); void navigate(routeDetailPath(file.route)); }} />
+      <ImportFile edit="import:new-route" label="Import a file…" onImported={(file) => { close(); void navigate(routeDetailPath(file.route)); }} />
     </>
   );
 }
 
 export function NewRoute() {
-  const write = useScreenWrite();
+  const write = useScreenWrite("new-route");
   const navigate = useNavigate();
   const start = async (kind: Kind, name: string, routeId: string) => {
     const landed = await write.run({ target: { route: routeId }, baseRevision: 0, mutations: [{ op: "create_route", name, kind }, openDraft()] });
@@ -80,7 +81,7 @@ export function NewRoute() {
           {(close) => <NewChoices disabled={write.disabled} onStart={(kind, name, id) => { void start(kind, name, id); }} close={close} />}
         </Menu>
       </span>
-      {write.rejected === undefined ? null : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
     </div>
   );
 }

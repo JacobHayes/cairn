@@ -46,7 +46,7 @@ function OneRoot({ root, disabled, onUnder, onWrap }: { root: GraphNode; disable
 }
 
 export function AddNode({ authored, container, onAdded }: AddNodeProps) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, `add-node:${container ?? "top"}`);
   // The palette's choices are kept across reloads like any unsent form (ARCHITECTURE, Web UI).
   const [kept, setKept] = useDraft<{ kind: NodeKind; title: string; parent: string }>(`add-node:${domainOf(authored)}`);
   const { kind, title, parent } = kept ?? { kind: "deliverable", title: "", parent: container ?? "" };

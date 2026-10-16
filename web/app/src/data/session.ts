@@ -1,21 +1,19 @@
 // The tab's one data layer over either host (ARCHITECTURE, Web UI): the capabilities, the
 // session root and what it owns (version skew, the tick stream that keeps reads current (H6),
 // the deployment context, the caller, the derived journeys, and the edit manager that owns
-// every write), what the tab did (activity), what the sync chip says (sync), and the write
-// path (H5, D7).
-import { networkFailure, streamStatus } from "@cairn/client";
+// every write), what the tab did (activity), and what the sync chip says (sync).
+import { streamStatus } from "@cairn/client";
 import { createActor, waitFor, type ActorOptions, type Subscription } from "xstate";
 
-import { Activity, consequenceLines, warningOf, type ConsequenceLine, type TitleOf } from "./activity.ts";
-import { inFlightOf, problemsOf } from "./edit-manager.ts";
+import { Activity, type TitleOf } from "./activity.ts";
+import { inFlightOf, problemsOf, type EditsRef } from "./edit-manager.ts";
 import { tabEditStore, type EditStore } from "./edit-record.ts";
 import type { Capabilities, Deriver, Host } from "./host.ts";
 import { derivationOf, journeyView, lagOf, type JourneysRef } from "./journeys.ts";
 import { readLag, settledRead, worstLag, type ReadEnv, type ReadRef } from "./keyed-read.ts";
-import { deploymentOf, editsOf, journeysOf, readEnvOf, sessionRoot, subscriptionOf, viewerOf, type EditsRef, type SessionRootRef, type SubscriptionRef } from "./session-root.ts";
+import { deploymentOf, editsOf, journeysOf, readEnvOf, sessionRoot, subscriptionOf, viewerOf, type SessionRootRef, type SubscriptionRef } from "./session-root.ts";
 import { SyncStatus, realTimers, type EditsReading, type Problem, type Timers } from "./sync.ts";
-import { unlockedOf, describe, newPatchId, patchOf, recordSave, type WriteIntent, type WriteResult } from "./writes.ts";
-import { writeView } from "./write-machine.ts";
+import { recordSave, saveOf } from "./writes.ts";
 
 /** The clock the session root's delays run on. */
 type Clock = NonNullable<ActorOptions<typeof sessionRoot>["clock"]>;
@@ -105,60 +103,9 @@ export class Session {
     return (view.status === "ready" ? view.journey.graph.nodes?.find((each) => each.key === node)?.title : undefined) ?? node;
   };
 
-  /** Records a save that did not go through `write` (an apply, an import); its receipt warning, if any. */
-  recordSave(text: string, lines: ConsequenceLine[]): string | undefined {
-    return recordSave({ activity: this.activity, sync: this.sync, titleOf: this.titleOf }, text, lines);
-  }
-
   /** Whether the tab is in version skew, which never lifts until a reload. */
   get skewed(): boolean {
     return this.root.getSnapshot().matches("skewed");
-  }
-
-  /**
-   * The shared write path for the controls not yet on the edit manager (a later step moves
-   * them): submits `intent` as a write with a fresh patch id and waits until it landed or
-   * needs the person. A write that lost its answer is resent by the manager meanwhile, so a
-   * control stays busy rather than failing at the first silence.
-   */
-  async write(intent: WriteIntent): Promise<WriteResult> {
-    const id = newPatchId();
-    const patch = patchOf(intent, id);
-    const address = currentAddress();
-    this.edits.send({
-      type: "submit",
-      id,
-      command: intent.note === undefined ? { kind: "patch", patch } : { kind: "patch", patch, note: intent.note },
-      about: address === undefined ? { edit: id } : { edit: id, address },
-    });
-    const ref = this.edits.getSnapshot().context.writes[id]?.ref;
-    if (ref === undefined) {
-      return { outcome: "failed", failure: { status: 0, message: "the write was not started" } };
-    }
-    let snapshot;
-    try {
-      snapshot = await waitFor(ref, (each) => each.status === "done" || each.hasTag("needsYou"), { timeout: Infinity });
-    } catch (thrown) {
-      return { outcome: "failed", failure: networkFailure(thrown) };
-    }
-    const view = writeView(snapshot);
-    switch (view.state) {
-      case "landed":
-        return { outcome: "landed", answer: view.answer, resubmitted: view.resubmitted, warning: warningOf(consequenceLines(view.answer), this.titleOf) };
-      case "rejected":
-        // The control shows a rejection and reports it itself.
-        this.edits.send({ type: "discard", id });
-        return { outcome: "rejected", rejection: view.rejection, resubmitted: view.resubmitted };
-      case "gone":
-        return { outcome: "gone" };
-      case "unconfirmed":
-        return { outcome: "failed", failure: view.failure ?? { status: 0, message: "no answer came" } };
-      case "stopped":
-      case "idle":
-      case "sending":
-      case "discarded":
-        return { outcome: "stopped" };
-    }
   }
 
   /** Stops the session root and what it owns (the stream, the reads, the derivations held), and the network listeners. */
@@ -186,11 +133,13 @@ export class Session {
         edits: {
           store: parts.store ?? tabEditStore(),
           env: {
-            send: (patch, note) => parts.host.send(patch, note),
-            overlaps: parts.host.overlaps,
+            host: parts.host,
             began: () => this.activity.begin(),
             saved: (command, answer, began) => {
-              recordSave(this, describe(command.patch, this.titleOf), consequenceLines(answer), unlockedOf(command.patch, answer, began));
+              const save = saveOf(command, answer, began, this.titleOf);
+              if (save !== undefined) {
+                recordSave(this, save.text, save.lines, save.unlocked, save.address);
+              }
             },
             connected: () => (page?.navigator.onLine ?? true) && streamStatus(this.subscription.getSnapshot()) === "live",
           },
@@ -217,7 +166,7 @@ export class Session {
         const snapshot = this.edits.getSnapshot();
         const skewed = this.skewed;
         if (seen?.snapshot !== snapshot || seen.skewed !== skewed) {
-          seen = { snapshot, skewed, problems: problemsOf(snapshot.context.writes, snapshot.context.reported, skewed) };
+          seen = { snapshot, skewed, problems: problemsOf(snapshot.context.writes, skewed) };
         }
         return seen.problems;
       },

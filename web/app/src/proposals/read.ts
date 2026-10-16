@@ -8,11 +8,6 @@ import type { LiveSpec } from "../data/live.ts";
 import type { Domain, ProposalReview } from "../data/proposals.ts";
 import type { Session } from "../data/session.ts";
 
-/** C14: a proposal's review screen. */
-export function proposalPath(id: string): string {
-  return `/proposals/${id}`;
-}
-
 /** The watch name of a destination (`journey:<id>`, `route:<id>`, `deployment`). */
 export function watchOf(destination: Domain): string {
   if (destination === "deployment") {

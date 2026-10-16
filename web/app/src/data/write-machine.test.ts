@@ -5,7 +5,7 @@ import { RESUBMISSION_COUNT_MAX, backoffDelayMs, type Answered, type HttpFailure
 import { SimulatedClock, createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
-import type { Delivery } from "./edit-record.ts";
+import type { Command, Delivery } from "./edit-record.ts";
 import { FakeHost, deferred, settled, writeEnv } from "./fake.test-support.ts";
 import { RESEND_COUNT_MAX, recordOf, writeMachine, writeView, type WriteView } from "./write-machine.ts";
 import { patchOf } from "./writes.ts";
@@ -26,12 +26,12 @@ const patch: Patch = patchOf({ target: { journey: "j_one" }, baseRevision: 3, mu
 const about = { edit: "title:j_one:n_a", label: "Draft the plan", address: "/journeys/j_one/n_a" };
 
 /** A write over a fake host and a simulated clock, started with `restored` when given. */
-function setup(restored?: { delivery: Delivery; resubmitted: number }, answers: Answered<HttpFailure>[] = []) {
+function setup(restored?: { delivery: Delivery; resubmitted: number }, answers: Answered<HttpFailure>[] = [], command: Command = { kind: "patch", patch }) {
   const host = new FakeHost();
   host.answers = answers;
   const { env, switches, saves } = writeEnv(host);
   const clock = new SimulatedClock();
-  const actor = createActor(writeMachine, { input: { id: patch.id, command: { kind: "patch", patch }, about, env, restored }, clock });
+  const actor = createActor(writeMachine, { input: { id: patch.id, command, about, env, restored }, clock });
   actor.start();
   const view = (): WriteView => writeView(actor.getSnapshot());
   /** Advances the clock, then lets the answers that came back run. */
@@ -76,7 +76,7 @@ describe("a write's delivery", () => {
     expect(host.sent.map((sent) => [sent.id, sent.base_revision])).toEqual([["p_one", 3], ["p_one", 5]]);
     expect(view()).toMatchObject({ state: "landed", resubmitted: 1 });
     expect(saves).toHaveLength(1);
-    expect(saves[0]?.command.patch.base_revision).toBe(5);
+    expect(saves[0]?.command).toMatchObject({ kind: "patch", patch: { base_revision: 5 } });
   });
 
   it("resends a lost write with its id and content after the first wait, and settles on already_applied", async () => {
@@ -295,5 +295,156 @@ describe("shutdown", () => {
     actor.stop();
     await advance(60_000);
     expect(host.sent).toHaveLength(1);
+  });
+});
+
+const applyCommand: Command = {
+  kind: "proposal",
+  call: { op: "apply", proposal: "pr_one", request: { patch_id: "p_one", reviewed_revision: 4 } },
+};
+const createCommand: Command = {
+  kind: "proposal",
+  call: { op: "create", destination: { journey: "j_one" }, request: { id: "pr_one", patch_id: "p_one", draft: { mutations: [], base_revision: 3 } as never } },
+};
+const importCommand: Command = {
+  kind: "import",
+  request: { patch_id: "p_one", file: { format: 1, route: "r_one", name: "One", nodes: [] } as never },
+};
+const saved = { outcome: "already_saved" } as never;
+const proposalLanded = { outcome: "answered", answer: saved } as const;
+
+describe("a proposal write or an import", () => {
+  it("is never rebased: a stale answer is a rejection even where a patch would be resent on the new revision", async () => {
+    const { host, actor, view } = setup(undefined, [], applyCommand);
+    host.overlaps = () => true;
+    host.proposed = [{ outcome: "rejected", rejection: { rejection: "stale", conflicts: [], intervening: [] } }];
+    actor.send({ type: "submit" });
+    await settled();
+    expect(host.called).toEqual(["apply"]);
+    expect(view()).toMatchObject({ state: "rejected", rejection: { rejection: "stale" } });
+    actor.send({ type: "submit" });
+    await settled();
+    expect(host.called).toEqual(["apply"]);
+  });
+
+  it("is resent as the same request when its answer was lost, and settles on the answer it gets then", async () => {
+    const { host, actor, view, advance } = setup(undefined, [], createCommand);
+    host.proposed = [lost, proposalLanded];
+    actor.send({ type: "submit" });
+    await settled();
+    expect(view()).toMatchObject({ state: "unconfirmed", retrying: true });
+    await advance(backoffDelayMs(0));
+    expect(host.called).toEqual(["create", "create"]);
+    expect(view()).toMatchObject({ state: "landed" });
+  });
+
+  it("sends an import once, resends it when lost, and stops on a refusal before anything committed", async () => {
+    const resent = setup(undefined, [], importCommand);
+    resent.host.imports = [lost, alreadyApplied];
+    resent.actor.send({ type: "submit" });
+    await settled();
+    await resent.advance(backoffDelayMs(0));
+    expect(resent.host.imported.map((each) => each.patch_id)).toEqual(["p_one", "p_one"]);
+    expect(resent.view().state).toBe("landed");
+
+    const refused = setup(undefined, [], importCommand);
+    refused.host.imports = [unauthorized];
+    refused.actor.send({ type: "submit" });
+    await settled();
+    expect(refused.view()).toMatchObject({ state: "stopped", failure: { status: 401 } });
+    await refused.advance(60_000);
+    expect(refused.host.imported).toHaveLength(1);
+  });
+
+  it("is not a patch: it sends nothing through the patch call and keeps what it was asked", async () => {
+    const { host, actor, view } = setup(undefined, [], importCommand);
+    host.imports = [{ outcome: "rejected", rejection: { rejection: "invalid", violations: [] } }];
+    actor.send({ type: "submit" });
+    await settled();
+    expect(host.sent).toEqual([]);
+    expect(view()).toMatchObject({ state: "rejected", command: importCommand });
+  });
+});
+
+describe("a check before the first send", () => {
+  const refusal: Rejection = { rejection: "invalid", violations: [] };
+
+  it("refuses the write without sending anything, and keeps the refusal with the command", async () => {
+    const { host, actor, view } = setup();
+    actor.send({ type: "submit", check: () => Promise.resolve(refusal) });
+    await settled();
+    expect(host.sent).toEqual([]);
+    expect(view()).toMatchObject({ state: "rejected", rejection: refusal, command: { patch } });
+    expect(recordOf(view())?.delivery).toEqual({ state: "rejected", rejection: refusal });
+  });
+
+  it("says the subject is gone when the check's refusal is the shape of a missing one", async () => {
+    const { actor, view } = setup();
+    const missing: Rejection = { rejection: "stale", conflicts: [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 0 }], intervening: [] };
+    actor.send({ type: "submit", check: () => Promise.resolve(missing) });
+    await settled();
+    expect(view()).toMatchObject({ state: "gone", removed: { journey: "j_one" } });
+  });
+
+  it.each([
+    ["passes", () => Promise.resolve(undefined)],
+    ["throws", () => Promise.reject(new Error("the engine is not there"))],
+  ])("sends the write once when the check %s", async (_, check) => {
+    const { host, actor, view } = setup();
+    host.answers = [applied];
+    actor.send({ type: "submit", check });
+    await settled();
+    expect(host.sent).toHaveLength(1);
+    expect(view().state).toBe("landed");
+  });
+
+  it("is busy while it runs and takes no second submit, which would be a second check", async () => {
+    const { host, actor, view } = setup();
+    const held = deferred<Rejection | undefined>();
+    let checks = 0;
+    const check = () => {
+      checks += 1;
+      return held.promise;
+    };
+    host.answers = [applied];
+    actor.send({ type: "submit", check });
+    actor.send({ type: "submit", check });
+    await settled();
+    expect(view().state).toBe("sending");
+    held.resolve(undefined);
+    await settled();
+    expect(checks).toBe(1);
+    expect(host.sent).toHaveLength(1);
+  });
+
+});
+
+describe("a check that is overtaken", () => {
+  it("stops the write, sending nothing, when the tab went into skew while it ran", async () => {
+    const { host, switches, actor, view } = setup();
+    const held = deferred<Rejection | undefined>();
+    actor.send({ type: "submit", check: () => held.promise });
+    await settled();
+    switches.compatible = false;
+    held.resolve(undefined);
+    await settled();
+    expect(host.sent).toEqual([]);
+    expect(view()).toMatchObject({ state: "stopped" });
+  });
+
+  it("is not run again by a Retry of a write it let through", async () => {
+    const { host, actor, view } = setup();
+    let checks = 0;
+    host.answers = [{ outcome: "failed", error: { status: 401, message: "sign in" } }, applied];
+    actor.send({ type: "submit", check: () => {
+      checks += 1;
+      return Promise.resolve(undefined);
+    } });
+    await settled();
+    expect(view().state).toBe("stopped");
+    actor.send({ type: "retry" });
+    await settled();
+    expect(checks).toBe(1);
+    expect(view().state).toBe("landed");
   });
 });

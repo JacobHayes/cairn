@@ -1,13 +1,15 @@
 // The proof's media for kept edits (briefs/proof/2026-10-16-edits-are-kept/prove.sh): a
 // rename the server rejects, still on the chip after leaving its screen and after a reload,
 // brought back with Go to it and cleared with Discard (one flow, a screenshot of each state and
-// a short video of it), and a rename whose answer never comes, resent until it asks for Retry.
+// a short video of it), a rename whose answer never comes, resent until it asks for Retry, and
+// an authoring edit the engine refuses, still at its field after a reload.
 // Written to CAIRN_PROOF_OUT. Steps only wait for the state they picture; the e2e specs assert
 // it. Runs on the server host, over the fixtures the binary starts with.
 import { join } from "node:path";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { addNode, formField, newRoute, nodeForm, routeName, saveForm, structure } from "../e2e/authoring.ts";
 import { fresh, nodeCard, openJourney, rename, renameOf, save, startRename, syncChip } from "../e2e/shell.ts";
 
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
@@ -77,4 +79,30 @@ test("a rename that gets no answer is resent, then asks for Retry", { tag: "@ser
   await expect(problems(page).getByRole("button", { name: "Retry" })).toBeVisible();
   await beat(page);
   await shot(page, "6-could-not-confirm");
+});
+
+test("an authoring edit the engine refuses is still at its field after a reload", { tag: "@server" }, async ({ page }) => {
+  await newRoute(page, "server", routeName("Onboarding"));
+  const kickoff = await addNode(page, "milestone", "Kickoff");
+  await addNode(page, "milestone", "Launch");
+  await formField(page, "final").getByRole("checkbox").check();
+  await saveForm(page);
+  // Kickoff is made final too: the engine allows one final milestone, and Save sends the edit anyway.
+  await nodeCard(page, kickoff).getByTestId("card-open").click();
+  await expect(structure(page)).toHaveAttribute("data-node", kickoff);
+  await formField(page, "final").getByRole("checkbox").check();
+  await nodeForm(page).getByTestId("node-form-save").click();
+  const refused = formField(page, "final").locator('[data-testid="violation"][data-code="several_final_milestones"]');
+  await expect(refused).toBeVisible();
+  await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
+  await beat(page);
+  await shot(page, "7-authoring-refused");
+  await page.reload();
+  await expect(structure(page)).toHaveAttribute("data-node", kickoff);
+  await expect(refused).toBeVisible();
+  await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
+  await syncChip(page).click();
+  await expect(problems(page)).toBeVisible();
+  await beat(page);
+  await shot(page, "8-authoring-after-reload");
 });

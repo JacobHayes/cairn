@@ -39,6 +39,15 @@ commit is not applied twice).
 
 ![Could not confirm the save, with Retry and Discard](6-could-not-confirm.png)
 
+## An authoring edit, too
+
+Every other way of saving works the same. Here a second milestone is marked final, which the
+engine refuses (a route has one). The form says so at the field, and the chip counts the edit; a
+reload brings back the same refusal at the same field, with the edit still on the chip.
+
+![The refused final milestone at its field, the chip in the rail marked](7-authoring-refused.png)
+![After a reload: the same refusal at the same field, the chip listing the edit by its node](8-authoring-after-reload.png)
+
 [Video of the main flow](main-flow.webm)
 
 `prove.sh` regenerates the media.
@@ -48,3 +57,5 @@ commit is not applied twice).
 - The browser host's failures all count as unconfirmed (it has no status to tell a refusal
   from a lost answer).
 - Duplicating a tab duplicates its kept edits.
+- In the browser, a refused proposal or import is resent a few times before it asks for Retry
+  (the in-browser host reports no status).

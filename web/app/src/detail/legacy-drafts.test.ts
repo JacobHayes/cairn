@@ -142,7 +142,7 @@ describe("an old rejected draft", () => {
     drafts(storage, { "rejected:j_one:assign:n_a": attempt([assign]), "rejected:j_one:dates:n_a": attempt([skip]) });
     migrate(storage);
     const kept = tabEditStore(() => storage).read().records;
-    const byEdit = Object.fromEntries(kept.map((record) => [record.about.edit, record.command.patch.deployment_revision]));
+    const byEdit = Object.fromEntries(kept.map((record) => [record.about.edit, record.command.kind === "patch" ? record.command.patch.deployment_revision : "not a patch"]));
     expect(byEdit).toEqual({ "node:j_one:assign:n_a": 1, "node:j_one:dates:n_a": undefined });
   });
 

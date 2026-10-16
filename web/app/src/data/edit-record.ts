@@ -4,13 +4,14 @@
 // A record is plain data, never an XState snapshot: one integer version, bumped by hand when a
 // record's shape or a command's meaning changes, and exactly one version is accepted. A record
 // of another version is dropped and counted, for the tab to say so.
-import type { HttpFailure } from "@cairn/client";
+import type { HttpFailure, Schema } from "@cairn/client";
 
-import type { Markdown, Patch } from "./host.ts";
+import type { Markdown, Patch, RouteImport } from "./host.ts";
+import type { Domain, ProposalAnswer } from "./proposals.ts";
 import type { Rejection } from "./writes.ts";
 
 /** The record schema version; the only one `readRecord` accepts. */
-export const EDIT_RECORD_VERSION = 1;
+export const EDIT_RECORD_VERSION = 2;
 
 /** What names one edit's delivery: its patch id (H5), the same on every resend. */
 export type OperationId = string;
@@ -22,8 +23,67 @@ export interface PatchCommand {
   note?: Markdown;
 }
 
-/** What a control asks the edit manager to deliver. Proposal commands join when their controls move here. */
-export type Command = PatchCommand;
+/**
+ * A write to a proposal, or one that drafts one (I6, B7, B8, B9, C14): plain data, tagged by
+ * `op`, each `request` the API's body with its patch id (H5). The id of the proposal it is
+ * about is in the call, so a record restored after a reload resends exactly what was sent.
+ */
+export type ProposalCall =
+  | { op: "create"; destination: Domain; request: Schema<"ProposalCreate"> }
+  | { op: "edit"; proposal: string; request: Schema<"ProposalEdit"> }
+  | { op: "discard"; proposal: string; request: Schema<"ProposalStep"> }
+  | { op: "refresh"; proposal: string; request: Schema<"ProposalStep"> }
+  | { op: "apply"; proposal: string; request: Schema<"ProposalApply"> }
+  | { op: "upgrade"; journey: string; request: Schema<"UpgradeRequest"> }
+  | { op: "save_as_route"; journey: string; request: Schema<"SaveAsRouteRequest"> }
+  | { op: "relink"; journey: string; request: Schema<"RelinkRequest"> };
+
+/** A proposal write. Never rebased: a stale proposal needs a person's renewed review. */
+export interface ProposalCommand {
+  kind: "proposal";
+  call: ProposalCall;
+}
+
+/** A route file imported as a new route or a new draft (A13). */
+export interface ImportCommand {
+  kind: "import";
+  request: RouteImport;
+}
+
+/** What a control asks the edit manager to deliver. */
+export type Command = PatchCommand | ProposalCommand | ImportCommand;
+
+/** What a landed write was answered: a patch's answer, or a proposal's. */
+export type Answer = Schema<"PatchAnswer"> | ProposalAnswer;
+
+/** The operation id of a command: its patch id, which the API is idempotent on (H5). */
+export function idOf(command: Command): OperationId {
+  switch (command.kind) {
+    case "patch":
+      return command.patch.id;
+    case "proposal":
+      return command.call.request.patch_id;
+    case "import":
+      return command.request.patch_id;
+  }
+}
+
+/** The id of the proposal a call is about: the one it creates, edits, applies or drafts. */
+export function proposalIdOf(call: ProposalCall): string {
+  switch (call.op) {
+    case "create":
+      return call.request.id;
+    case "upgrade":
+    case "save_as_route":
+    case "relink":
+      return call.request.proposal;
+    case "edit":
+    case "discard":
+    case "refresh":
+    case "apply":
+      return call.proposal;
+  }
+}
 
 /** What the edit is about, for the chip and for Go to it. */
 export interface About {
@@ -105,12 +165,48 @@ function readDelivery(value: unknown): boolean {
   }
 }
 
-function readCommand(value: unknown, id: string): boolean {
-  if (!isPlain(value) || value.kind !== "patch" || !isOptionalText(value.note) || !isPlain(value.patch)) {
+/** The op of a proposal call, with the field naming the thing it is about. */
+const CALL_SUBJECT: Record<ProposalCall["op"], "proposal" | "journey" | "destination"> = {
+  create: "destination",
+  edit: "proposal",
+  discard: "proposal",
+  refresh: "proposal",
+  apply: "proposal",
+  upgrade: "journey",
+  save_as_route: "journey",
+  relink: "journey",
+};
+
+function readCall(value: unknown, id: string): boolean {
+  if (!isPlain(value) || !isText(value.op) || !Object.hasOwn(CALL_SUBJECT, value.op) || !isPlain(value.request) || value.request.patch_id !== id) {
+    return false;
+  }
+  const subject = CALL_SUBJECT[value.op as ProposalCall["op"]];
+  return subject === "destination" ? isPlain(value.destination) || value.destination === "deployment" : isText(value[subject]);
+}
+
+function readPatchCommand(value: Plain, id: string): boolean {
+  if (!isOptionalText(value.note) || !isPlain(value.patch)) {
     return false;
   }
   const { patch } = value;
   return patch.id === id && typeof patch.base_revision === "number" && Array.isArray(patch.mutations) && (patch.target === "deployment" || isPlain(patch.target));
+}
+
+function readCommand(value: unknown, id: string): boolean {
+  if (!isPlain(value)) {
+    return false;
+  }
+  switch (value.kind) {
+    case "patch":
+      return readPatchCommand(value, id);
+    case "proposal":
+      return readCall(value.call, id);
+    case "import":
+      return isPlain(value.request) && value.request.patch_id === id && isPlain(value.request.file);
+    default:
+      return false;
+  }
 }
 
 function readAbout(value: unknown): boolean {
@@ -120,7 +216,8 @@ function readAbout(value: unknown): boolean {
 /**
  * The record `value` is, or none when it is not one this build can resume: another version, a
  * shape it does not know, or a command whose patch carries another id than the record. The
- * mutations are not checked here (the server does), and a change to what they mean bumps the version.
+ * mutations and the proposal bodies are not checked here (the server does), and a change to
+ * what they mean bumps the version.
  */
 export function readRecord(value: unknown): EditRecord | undefined {
   if (!isPlain(value) || value.version !== EDIT_RECORD_VERSION || !isText(value.id)) {

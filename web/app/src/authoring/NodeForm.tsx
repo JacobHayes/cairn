@@ -6,6 +6,7 @@
 // route-copied fields carry their local-edit marker (B4).
 import { useDraft } from "../data/drafts.ts";
 import { Button } from "../ui/kit.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { ConditionEditor } from "./ConditionEditor.tsx";
 import { conditionProblem } from "./condition.ts";
@@ -51,7 +52,7 @@ function editedFields(authored: Authored, node: string): Set<string> {
 }
 
 /** The violations the form shows: the live preview's, or the last attempt's when it is about these fields. */
-function shownViolations(preview: ReturnType<typeof useLivePreview>, write: AuthorWrite): { violations: Violation[]; places: Place[] } {
+function shownViolations(preview: ReturnType<typeof useLivePreview>, write: AuthorWrite): { violations: Violation[]; places: (Place | undefined)[] } {
   if (preview?.outcome === "rejected" && preview.rejection.rejection === "invalid") {
     return { violations: preview.rejection.violations, places: [] };
   }
@@ -139,7 +140,7 @@ export interface NodeFormProps {
 }
 
 export function NodeForm({ authored, node }: NodeFormProps) {
-  const write = useAuthorWrite(authored);
+  const write = useAuthorWrite(authored, `node-form:${node.key}`, node.title);
   const [kept, setKept] = useDraft<Kept>(`node-form:${domainOf(authored)}:${node.key}`);
   const edits = kept?.edits ?? {};
   const draft: NodeDraft = { ...draftOf(node), ...edits };
@@ -156,7 +157,7 @@ export function NodeForm({ authored, node }: NodeFormProps) {
     write.dismiss();
   };
   const save = async (base = kept?.base) => {
-    if (await write.run(changes.map((each) => each.mutation), changes.map((each) => each.field), base)) {
+    if (await write.run(changes.map((each) => each.mutation), base)) {
       setKept(undefined);
     }
   };
@@ -170,6 +171,7 @@ export function NodeForm({ authored, node }: NodeFormProps) {
     <form className="stack" data-testid="node-form" data-node={node.key} onSubmit={(event) => { event.preventDefault(); void save(); }}>
       <Fields props={props} />
       <FormViolations places={places} />
+      <WriteStatus view={write.status} />
       {write.failed === undefined ? <Receipt receipt={write.receipt} /> : <StaleRejection rejection={write.failed.rejection} onRetry={() => void save(authored.revision)} onDismiss={discard} />}
       {kept === undefined && changes.length === 0 ? null : (
         <span className="row">

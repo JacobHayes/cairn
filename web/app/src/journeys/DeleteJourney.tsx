@@ -7,6 +7,7 @@ import { useNavigate } from "react-router";
 
 import type { Ready } from "../detail/model.ts";
 import { Refused } from "../screens/Refused.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { indexPath } from "./address.ts";
@@ -15,7 +16,7 @@ import { deleteConfirmed } from "./lifecycle.ts";
 export function DeleteJourney({ ready, onCancel }: { ready: Ready; onCancel: () => void }) {
   const { header, revision } = ready.journey;
   const navigate = useNavigate();
-  const write = useScreenWrite();
+  const write = useScreenWrite(`delete-journey:${header.id}`, header.name);
   const [typed, setTyped] = useState("");
   const remove = async () => {
     if (await write.run({ target: { journey: header.id }, baseRevision: revision, mutations: [{ op: "delete_journey" }] })) {
@@ -33,7 +34,7 @@ export function DeleteJourney({ ready, onCancel }: { ready: Ready; onCancel: () 
         </Button>
         <Button onClick={onCancel}>Cancel</Button>
       </span>
-      {write.rejected === undefined ? null : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
     </div>
   );
 }

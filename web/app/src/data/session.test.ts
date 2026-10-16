@@ -1,18 +1,18 @@
-// The session over a fake host: the write adapter the controls not yet on the edit manager
-// still use, and the wiring of the connection to the manager's waiting writes (H5).
+// The session over a fake host: what a landed write records, how a control waits on a write,
+// and the wiring of the connection to the manager's waiting writes (H5).
 import { backoffDelayMs, type Answered, type HttpFailure, type Rejection, type RevisionOf } from "@cairn/client";
 import { SimulatedClock, createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
 import { aboutNode, renaming } from "./edits.test-support.ts";
-import { problemsOf } from "./edit-manager.ts";
+import { problemsOf, submitWrite } from "./edit-manager.ts";
 import { EDIT_RECORD_VERSION, tabEditStore } from "./edit-record.ts";
 import { FakeDeriver, FakeHost, deferred, manualTimers, memoryStorage, settled } from "./fake.test-support.ts";
 import { ReadFailed } from "./host.ts";
 import { HOST_READ, keyedRead, type ReadSource } from "./keyed-read.ts";
 import { Session } from "./session.ts";
 import { RESEND_COUNT_MAX } from "./write-machine.ts";
-import type { WriteIntent } from "./writes.ts";
+import { landedWarning, patchOf, type WriteIntent } from "./writes.ts";
 
 const receipt = { patch_id: "p_x", domain: { journey: "j_one" }, content_hash: "h", revision: 4 };
 const applied: Answered<HttpFailure> = { outcome: "answered", answer: { outcome: "applied", receipt, consequences: { j_one: { overdue: ["n_b"] } } } };
@@ -42,58 +42,74 @@ async function started(storage = memoryStorage()) {
   return { host, session, storage, advance };
 }
 
-const problems = (session: Session) => {
-  const { writes, reported } = session.edits.getSnapshot().context;
-  return problemsOf(writes, reported, session.skewed);
-};
+const problems = (session: Session) => problemsOf(session.edits.getSnapshot().context.writes, session.skewed);
 
-describe("session.write", () => {
-  it("answers a landed write with its warning and leaves nothing held", async () => {
+/** Sends the test's patch as the edit `title:j_one:n_a` and waits as a control does. */
+const send = (session: Session) => submitWrite(session.edits, { id: "p_one", command: { kind: "patch", patch: patchOf(intent, "p_one") }, about: aboutNode() });
+
+describe("a control waiting on its write", () => {
+  it("is answered with the landed write, whose save carries the warning the receipt shows, and nothing is held", async () => {
     const { host, session } = await started();
     host.answers = [applied];
-    const result = await session.write(intent);
-    expect(result).toMatchObject({ outcome: "landed", resubmitted: 0 });
-    expect(result.outcome === "landed" ? result.warning : undefined).toBe(session.activity.saves[0]?.warning);
-    expect(result.outcome === "landed" ? result.warning : undefined).toBeDefined();
+    const answer = await send(session);
+    expect(answer).toMatchObject({ outcome: "applied" });
+    const warning = answer === undefined ? undefined : landedWarning(answer, session.titleOf);
+    expect(warning).toBe(session.activity.saves[0]?.warning);
+    expect(warning).toBeDefined();
     expect(session.edits.getSnapshot().context.writes).toEqual({});
     expect(session.sync.summary.state).toBe("saved");
   });
 
-  it("answers a rejection to the control that reports it, and keeps no write or problem of its own", async () => {
+  it("leaves a drafted proposal's link in Recent even when nobody was waiting for the write", async () => {
+    const { host, session } = await started();
+    host.proposed = [{ outcome: "answered", answer: { outcome: "already_saved" } as never }];
+    session.edits.send({
+      type: "submit",
+      id: "p_one",
+      command: { kind: "proposal", call: { op: "upgrade", journey: "j_one", request: { patch_id: "p_one", proposal: "pr_new", to: 2 } } },
+      about: aboutNode(),
+    });
+    await settled();
+    expect(session.activity.saves.map((save) => save.address)).toEqual(["/proposals/pr_new"]);
+    expect(session.edits.getSnapshot().context.writes).toEqual({});
+  });
+
+  it("is answered none for a rejection, which the manager keeps, counts on the chip, and stores", async () => {
     const { host, session, storage } = await started();
     const rejection: Rejection = { rejection: "invalid", violations: [] };
     host.answers = [{ outcome: "rejected", rejection }];
-    expect(await session.write(intent)).toMatchObject({ outcome: "rejected", rejection });
+    expect(await send(session)).toBeUndefined();
     await settled();
-    expect(session.edits.getSnapshot().context.writes).toEqual({});
-    expect(problems(session)).toEqual([]);
-    expect(storage.length).toBe(0);
+    expect(Object.keys(session.edits.getSnapshot().context.writes)).toEqual(["p_one"]);
+    expect(problems(session)).toEqual([expect.objectContaining({ id: "p_one", kind: "rejected" })]);
+    expect(storage.length).toBe(1);
+    expect(session.sync.summary.state).toBe("not-saved");
   });
 
   it("stays pending while a lost answer is resent, then lands on already_applied", async () => {
     const { host, session, advance } = await started();
     host.answers = [lost, alreadyApplied];
-    let result: unknown;
-    void session.write(intent).then((each) => { result = each; });
+    let result: unknown = "waiting";
+    void send(session).then((each) => { result = each; });
     await settled();
-    expect(result).toBeUndefined();
+    expect(result).toBe("waiting");
     await advance(backoffDelayMs(0));
-    expect(result).toMatchObject({ outcome: "landed" });
+    expect(result).toMatchObject({ outcome: "already_applied" });
     expect(host.sent.map((patch) => patch.id)).toHaveLength(2);
     expect(new Set(host.sent.map((patch) => patch.id)).size).toBe(1);
     expect(problems(session)).toEqual([]);
   });
 
-  it("answers failed once the resends are used up, and leaves one problem with Retry", async () => {
+  it("is answered none once the resends are used up, and leaves one problem with Retry", async () => {
     const { host, session, advance } = await started();
     host.answers = Array.from({ length: RESEND_COUNT_MAX + 1 }, () => lost);
-    let result: unknown;
-    void session.write(intent).then((each) => { result = each; });
+    let result: unknown = "waiting";
+    void send(session).then((each) => { result = each; });
     await settled();
     for (let resend = 0; resend < RESEND_COUNT_MAX; resend += 1) {
       await advance(15_000);
     }
-    expect(result).toMatchObject({ outcome: "failed", failure: { status: 0 } });
+    expect(result).toBeUndefined();
     expect(problems(session)).toEqual([expect.objectContaining({ kind: "failed", retry: true })]);
     expect(session.sync.summary.state).toBe("not-saved");
   });
@@ -128,7 +144,7 @@ describe("the connection", () => {
     const held = deferred<Answered<HttpFailure>>();
     const { host, session, advance } = await started();
     host.answers = [held.promise];
-    void session.write(intent);
+    void send(session);
     await settled();
     session.close();
     held.resolve(lost);

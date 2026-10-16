@@ -6,17 +6,15 @@
 import type { HttpFailure, Schema } from "@cairn/client";
 
 import type { Markdown, Patch } from "./host.ts";
-import { warningOf, type Activity, type ConsequenceLine, type TitleOf, type Unlocked } from "./activity.ts";
+import { consequenceLines, warningOf, type Activity, type ConsequenceLine, type TitleOf, type Unlocked } from "./activity.ts";
+import { proposalIdOf, type Answer, type Command } from "./edit-record.ts";
+import { proposalPath } from "./proposals.ts";
 import type { SyncStatus } from "./sync.ts";
 
 export type Mutation = Schema<"Mutation">;
 export type Rejection = Schema<"Rejection">;
 
-/**
- * A write as a screen asks for it. Transitional with `WriteResult` and `Session.write`: the
- * controls that still await a result move onto the edit manager in the remaining-writes step,
- * which removes them.
- */
+/** A write as a screen asks for it: what `patchOf` makes a patch of. */
 export interface WriteIntent {
   target: Patch["target"];
   /** The target's revision the author saw when they started this edit. */
@@ -26,13 +24,6 @@ export interface WriteIntent {
   mutations: Mutation[];
   note?: Markdown;
 }
-
-export type WriteResult =
-  | { outcome: "landed"; answer: Schema<"PatchAnswer">; resubmitted: number; warning: string | undefined }
-  | { outcome: "rejected"; rejection: Rejection; resubmitted: number }
-  | { outcome: "failed"; failure: HttpFailure }
-  | { outcome: "stopped" }
-  | { outcome: "gone" };
 
 /** A fresh patch id (H5): `p_` and 32 hex digits from the browser's random UUID. */
 export function newPatchId(): string {
@@ -144,10 +135,55 @@ export interface SaveEnv {
  * Records a save of this tab: in Recent with the warning sentence its consequences call for
  * (D7), and on the chip as SAVED. The warning is what a receipt shows.
  */
-export function recordSave(env: SaveEnv, text: string, lines: ConsequenceLine[], unlocked?: Unlocked): string | undefined {
+export function recordSave(env: SaveEnv, text: string, lines: ConsequenceLine[], unlocked?: Unlocked, address?: string): string | undefined {
   const warning = warningOf(lines, env.titleOf);
   const at = new Date();
-  env.activity.saved({ at, text, warning, unlocked });
+  env.activity.saved({ at, text, warning, unlocked, address });
   env.sync.saved(at.toLocaleTimeString([], { hour12: false }));
   return warning;
 }
+
+/** Whether `answer` is a patch's (an apply, an import), which notes what it caused (D7); a proposal's does not. */
+export function isPatchAnswer(answer: Answer): answer is Schema<"PatchAnswer"> {
+  return answer.outcome === "applied" || answer.outcome === "already_applied";
+}
+
+/** The sentence a receipt shows for a landed write's consequences (D7), if it has any. */
+export function landedWarning(answer: Answer, titleOf: TitleOf): string | undefined {
+  return isPatchAnswer(answer) ? warningOf(consequenceLines(answer), titleOf) : undefined;
+}
+
+/** A landed write as the save it records (D7). */
+export interface Save {
+  text: string;
+  lines: ConsequenceLine[];
+  unlocked: Unlocked | undefined;
+  /** The proposal a drafting write left, so it stays reachable when the control that asked is gone. */
+  address: string | undefined;
+}
+
+/**
+ * The save a landed `command` records, or none for one that is not a save: a patch as what it
+ * did, an imported route file, an applied proposal, a proposal drafted (with the way to it,
+ * since the screen that would have opened it may be gone). Editing, discarding or refreshing a
+ * proposal changes nothing yet, so it records nothing.
+ */
+export function saveOf(command: Command, answer: Answer, began: number, titleOf: TitleOf): Save | undefined {
+  if (command.kind === "proposal" && !isPatchAnswer(answer)) {
+    return DRAFTING.has(command.call.op) ? { text: "Drafted a proposal", lines: [], unlocked: undefined, address: proposalPath(proposalIdOf(command.call)) } : undefined;
+  }
+  if (!isPatchAnswer(answer)) {
+    return undefined;
+  }
+  switch (command.kind) {
+    case "patch":
+      return { text: describe(command.patch, titleOf), lines: consequenceLines(answer), unlocked: unlockedOf(command.patch, answer, began), address: undefined };
+    case "import":
+      return { text: `Imported ${command.request.file.name} as a draft of ${command.request.file.route}`, lines: consequenceLines(answer), unlocked: undefined, address: undefined };
+    case "proposal":
+      return command.call.op === "apply" ? { text: "Applied a proposal", lines: consequenceLines(answer), unlocked: undefined, address: undefined } : undefined;
+  }
+}
+
+/** The proposal writes that make a proposal. */
+const DRAFTING: ReadonlySet<string> = new Set(["create", "upgrade", "save_as_route", "relink"]);
