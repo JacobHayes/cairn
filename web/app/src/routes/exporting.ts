@@ -4,14 +4,14 @@ import { useSession } from "../data/react.ts";
 import { download, exportName } from "./model.ts";
 
 export function useExport(route: string) {
-  const { host, activity } = useSession();
+  const { host, toasts } = useSession();
   return async (version: number | undefined) => {
     try {
       const file = await host.exportRoute(route, version);
       download(exportName(route, version), host.files.text(file));
-      activity.confirm("Route file exported");
+      toasts.send({ type: "show", text: "Route file exported", tone: "confirm" });
     } catch (thrown) {
-      activity.confirm(`Not exported: ${thrown instanceof Error ? thrown.message : String(thrown)}`, "problem");
+      toasts.send({ type: "show", text: `Not exported: ${thrown instanceof Error ? thrown.message : String(thrown)}`, tone: "problem" });
     }
   };
 }

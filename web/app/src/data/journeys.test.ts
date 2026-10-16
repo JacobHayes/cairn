@@ -4,7 +4,7 @@
 import { REOPEN_DELAY_FIRST_MS } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
-import { CountingClock, FakeDeriver, FakeHost, deferred, manualTimers, settled } from "./fake.test-support.ts";
+import { CountingClock, FakeDeriver, FakeHost, deferred, settled } from "./fake.test-support.ts";
 import { PARKED_JOURNEY_COUNT_MAX, journeyView, lagOf } from "./journeys.ts";
 import { Session } from "./session.ts";
 import { ROLLOVER_CHECK_MS } from "./today.ts";
@@ -19,7 +19,7 @@ async function started(journeys: Record<string, number> = { j_one: 3 }) {
   const deriver = new FakeDeriver();
   const clock = new CountingClock();
   let now = new Date(`${TODAY}T12:00:00Z`);
-  const session = await Session.start({ host, deriver, timers: manualTimers().timers, clock, now: () => now });
+  const session = await Session.start({ host, deriver, clock, now: () => now });
   const setNow = (at: string) => {
     now = new Date(at);
   };

@@ -99,8 +99,8 @@ function usePass(view: Ready): [Pass, (pass: Pass) => void] {
  */
 function useUnlocked(journey: string, pass: Pass, setPass: (pass: Pass) => void): void {
   const saves = useSaves();
-  const { activity } = useSession();
-  const opened = useRef(activity.began);
+  const session = useSession();
+  const opened = useRef(session.began);
   const heard = useRef(0);
   useEffect(() => {
     const fresh = saves.filter((save) => save.id > heard.current).reverse();

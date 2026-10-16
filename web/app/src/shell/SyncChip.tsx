@@ -4,38 +4,18 @@
 // engine and today, what needs you, and this tab's recent saves. Nothing on it closes itself
 // or needs closing but the popover, which Esc dismisses. A polite and an assertive live
 // region announce the changes that matter.
-import { useEffect, useId, useRef, useState } from "react";
+import { useActorRef, useSelector } from "@xstate/react";
+import { useEffect, useId, useRef } from "react";
 import { useNavigate } from "react-router";
 
 import type { SaveEvent } from "../data/activity.ts";
-import { useDerivation, useProblems, useSaves, useSession, useSkew, useStreamStatus, useSync } from "../data/react.ts";
+import { useDerivation, useProblems, useSaves, useSavedAnnouncement, useSession, useSkew, useStreamStatus, useSync } from "../data/react.ts";
 import { dateWords } from "../timeline/model.ts";
-import { SYNC_SAVED_MS, type Problem, type SyncSummary } from "../data/sync.ts";
+import type { Problem, SyncSummary } from "../data/sync.ts";
 import { Button } from "../ui/kit.tsx";
-
-/** A save is announced as it lands, whatever the chip says at the moment: "Saved", and the receipt's warning. */
-function useSavedAnnouncement(): { id: number; text: string } | undefined {
-  const latest = useSaves()[0];
-  const id = latest?.id;
-  const [spoken, setSpoken] = useState<{ id: number; text: string } | undefined>();
-  useEffect(() => {
-    if (id === undefined) {
-      return undefined;
-    }
-    setSpoken({ id, text: ["Saved", latest?.warning].filter(Boolean).join(". ") });
-    const timer = setTimeout(() => {
-      setSpoken(undefined);
-    }, SYNC_SAVED_MS);
-    return () => {
-      clearTimeout(timer);
-    };
-    // A new save is a new id; its warning comes with it.
-  }, [id]);
-  return spoken;
-}
+import { popoverAnchor, popoverPinned, popoverShown, syncPopover, type Anchor } from "./sync-popover.ts";
 
 /** Where the popover opens: just below the dot, kept inside the window (it is fixed, so the rail's scroller does not clip it). */
-type Anchor = { top: number; left: number };
 const anchorBelow = (dot: HTMLElement): Anchor => {
   const box = dot.getBoundingClientRect();
   return { top: box.bottom + 8, left: Math.max(12, Math.min(box.left, globalThis.innerWidth - 372)) };
@@ -168,28 +148,33 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
   );
 }
 
-/** The popover's state: pinned by a click (open) or peeked by hover or focus. It is visible in either; Esc and a press outside close it, and a pinned one takes focus and gives it back to the chip. */
+/**
+ * The popover's state, the machine's (sync-popover.ts): pinned by a click or peeked by hover or
+ * focus, visible in either. The document listeners stay here: Esc, a press outside and a resize
+ * close it, and a pinned one takes focus and gives it back to the chip.
+ */
 function usePopover() {
-  const [open, setOpen] = useState(false);
-  const [peek, setPeek] = useState(false);
-  const shown = open || peek;
+  const ref = useActorRef(syncPopover);
+  const shown = useSelector(ref, popoverShown);
+  const pinned = useSelector(ref, popoverPinned);
+  const anchor = useSelector(ref, popoverAnchor);
   const wrap = useRef<HTMLSpanElement>(null);
   const chip = useRef<HTMLButtonElement>(null);
-  const close = () => {
-    setOpen(false);
-    setPeek(false);
-  };
   useEffect(() => {
     if (!shown) {
       return undefined;
     }
-    if (open) {
+    if (pinned) {
       wrap.current?.querySelector<HTMLElement>(".sync-popover")?.focus();
     }
+    const close = () => {
+      ref.send({ type: "close" });
+    };
     const onKey = (event: KeyboardEvent) => {
       if (event.key === "Escape") {
+        const wasPinned = popoverPinned(ref.getSnapshot());
         close();
-        if (open) {
+        if (wasPinned) {
           chip.current?.focus();
         }
       }
@@ -200,43 +185,36 @@ function usePopover() {
       }
     };
     // It is placed from the dot's box when it opens, so a resize closes it rather than leaving it adrift.
-    const onResize = () => { close(); };
     document.addEventListener("keydown", onKey);
     document.addEventListener("pointerdown", onPointer);
-    globalThis.addEventListener("resize", onResize);
+    globalThis.addEventListener("resize", close);
     return () => {
       document.removeEventListener("keydown", onKey);
       document.removeEventListener("pointerdown", onPointer);
-      globalThis.removeEventListener("resize", onResize);
+      globalThis.removeEventListener("resize", close);
     };
-  }, [open, shown]);
-  return { open, setOpen, setPeek, shown, close, wrap, chip };
+  }, [ref, shown, pinned]);
+  return { ref, shown, pinned, anchor, wrap, chip };
 }
 
 export function SyncChip() {
   const session = useSession();
   const summary = useSync();
   const derivation = useDerivation();
-  const { open, setOpen, setPeek, shown, close, wrap, chip } = usePopover();
+  const { ref, shown, pinned, anchor, wrap, chip } = usePopover();
   const saved = useSavedAnnouncement();
-  const [anchor, setAnchor] = useState<Anchor>({ top: 0, left: 0 });
-  // Hover and keyboard focus show the same popover without pinning it: a click pins it (open), and
+  // Hover and keyboard focus show the same popover without pinning it: a click pins it, and
   // leaving or blurring lets a peeked one go, after a beat so the pointer can cross into it.
-  const leaving = useRef<ReturnType<typeof setTimeout>>(undefined);
   const show = () => {
-    clearTimeout(leaving.current);
     if (chip.current !== null) {
-      setAnchor(anchorBelow(chip.current));
+      ref.send({ type: "peek", anchor: anchorBelow(chip.current) });
     }
-    setPeek(true);
   };
   const hide = () => {
-    clearTimeout(leaving.current);
-    leaving.current = setTimeout(() => { setPeek(false); }, 150);
+    ref.send({ type: "unpeek" });
   };
-  useEffect(() => () => { clearTimeout(leaving.current); }, []);
   return (
-    <span className="sync-wrap" ref={wrap} onPointerEnter={show} onPointerLeave={hide} onFocus={(event) => { if (!open && event.target === chip.current && chip.current.matches(":focus-visible")) { show(); } }} onBlur={(event) => { if (!(event.relatedTarget instanceof Node && wrap.current?.contains(event.relatedTarget) === true)) { hide(); } }}>
+    <span className="sync-wrap" ref={wrap} onPointerEnter={show} onPointerLeave={hide} onFocus={(event) => { if (!pinned && event.target === chip.current && chip.current.matches(":focus-visible")) { show(); } }} onBlur={(event) => { if (!(event.relatedTarget instanceof Node && wrap.current?.contains(event.relatedTarget) === true)) { hide(); } }}>
       <button
         ref={chip}
         type="button"
@@ -258,12 +236,19 @@ export function SyncChip() {
             // A refetch failed or is slow: the stream's current revisions ask every view again.
             session.root.send({ type: "reopen" });
           } else {
-            setAnchor(anchorBelow(event.currentTarget));
-            setOpen(!open);
+            ref.send({ type: "pin", anchor: anchorBelow(event.currentTarget) });
           }
         }}
       />
-      {shown ? <Popover summary={summary} anchor={anchor} onClose={close} /> : null}
+      {shown ? (
+        <Popover
+          summary={summary}
+          anchor={anchor}
+          onClose={() => {
+            ref.send({ type: "close" });
+          }}
+        />
+      ) : null}
       <span className="visually-hidden" role="status" aria-live="polite">
         {saved === undefined ? null : <span key={saved.id}>{saved.text}</span>}
         {summary.announce === "polite" ? summary.sentence : ""}

@@ -10,7 +10,8 @@ import type { Command } from "../data/edit-record.ts";
 import { useEdit, useSession, useSkew } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
 import { isPatchAnswer, landedWarning, newPatchId, patchOf, type Rejection, type WriteIntent } from "../data/writes.ts";
-import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
+import { useReceipt } from "../ui/Receipt.tsx";
+import type { ReceiptState } from "../ui/receipt.ts";
 
 export interface ScreenWrite {
   /** Sends `intent`; true when it landed, in which case `onLanded` is told the advisory notices (A20) its answer carried. */

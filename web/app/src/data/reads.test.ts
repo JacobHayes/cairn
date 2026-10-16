@@ -5,7 +5,7 @@ import { describe, expect, it } from "vitest";
 
 import { createActor } from "xstate";
 
-import { CountingClock, FakeDeriver, FakeHost, manualTimers, settled } from "./fake.test-support.ts";
+import { CountingClock, FakeDeriver, FakeHost, settled } from "./fake.test-support.ts";
 import type { JourneyIndexQuery } from "./host.ts";
 import { keyedRead, valueOf, readView } from "./keyed-read.ts";
 import { liveSource } from "./live.ts";
@@ -34,7 +34,7 @@ class RouteHost extends FakeHost {
 async function reading(query: JourneyIndexQuery) {
   const host = new RouteHost();
   const clock = new CountingClock();
-  const session = await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers, clock });
+  const session = await Session.start({ host, deriver: new FakeDeriver(), clock });
   const read = createActor(keyedRead, { clock, input: { source: liveSource<JourneySummary[]>(), env: session.readEnv } }).start();
   read.send({ type: "want", key: { identity: [indexKey(query)], freshness: [], args: { spec: journeyIndex(query)(session) } } });
   clock.increment(0);

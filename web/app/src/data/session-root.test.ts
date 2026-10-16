@@ -1,12 +1,16 @@
 // ARCHITECTURE, Web UI: the session root. Restoring the kept edits once it runs, version skew
-// stopping new work, and shutdown leaving nothing running.
+// stopping new work, what the sync chip is told (the saves, the writes in flight), and shutdown
+// leaving nothing running.
 import { backoffDelayMs, type Answered, type HttpFailure, type Rejection } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
-import { aboutNode, renaming, startRoot } from "./edits.test-support.ts";
+import { SAVE_COUNT_MAX } from "./activity.ts";
+import { aboutNode, chipOf, renaming, startRoot } from "./edits.test-support.ts";
 import { problemsOf } from "./edit-manager.ts";
 import { EDIT_RECORD_VERSION, tabEditStore, type EditRecord } from "./edit-record.ts";
 import { FakeHost, deferred, memoryStorage, settled } from "./fake.test-support.ts";
+import { syncOf } from "./session-root.ts";
+import { SYNC_SAVED_MS, SYNC_SHOW_AFTER_MS } from "./sync.ts";
 import { writeView, type WriteSnapshot } from "./write-machine.ts";
 
 const receipt = { patch_id: "p_x", domain: { journey: "j_one" }, content_hash: "h", revision: 4 };
@@ -84,6 +88,91 @@ describe("version skew", () => {
     await settled();
     expect(host.sent).toHaveLength(1);
     expect(writeView(writes().p_a?.snapshot as WriteSnapshot).state).toBe("rejected");
+  });
+});
+
+describe("what the sync chip is told", () => {
+  const timing = (root: Parameters<typeof syncOf>[0]) => syncOf(root).getSnapshot().context.timing;
+
+  it("keeps each landed write as a save, newest first and no more than the maximum, and says SAVED for a while", async () => {
+    const { host, root, submit, advance } = await startRoot();
+    host.answers = Array.from({ length: SAVE_COUNT_MAX + 1 }, () => applied);
+    for (let write = 1; write <= SAVE_COUNT_MAX + 1; write += 1) {
+      submit(renaming(`p_${String(write)}`));
+      await settled();
+    }
+    const { saves } = root.getSnapshot().context.recent;
+    expect(saves.map((save) => save.id)).toEqual(Array.from({ length: SAVE_COUNT_MAX }, (_, at) => SAVE_COUNT_MAX + 1 - at));
+    expect(chipOf(root, { latest: saves[0] }).state).toBe("saved");
+    await advance(SYNC_SAVED_MS);
+    expect(chipOf(root).state).toBe("in-sync");
+  });
+
+  it("says SAVING for writes still out after 300ms, and not before", async () => {
+    const { host, root, submit, advance } = await startRoot();
+    host.answers = [deferred<Answered<HttpFailure>>().promise];
+    submit(renaming("p_a"));
+    await advance(SYNC_SHOW_AFTER_MS - 1);
+    expect(chipOf(root).state).toBe("in-sync");
+    await advance(1);
+    expect(chipOf(root)).toMatchObject({ state: "saving", sentence: "Sending 1 change" });
+  });
+
+  it("leaves the scheduler as it is for a write that joins the writes in flight", async () => {
+    const { host, root, submit, advance } = await startRoot();
+    host.answers = [deferred<Answered<HttpFailure>>().promise, deferred<Answered<HttpFailure>>().promise];
+    submit(renaming("p_a", "n_a"), aboutNode("n_a"));
+    await advance(100);
+    const before = timing(root);
+    submit(renaming("p_b", "n_b"), aboutNode("n_b"));
+    await settled();
+    expect(timing(root)).toBe(before);
+    await advance(SYNC_SHOW_AFTER_MS - 100);
+    expect(chipOf(root)).toMatchObject({ state: "saving", sentence: "Sending 2 changes" });
+  });
+
+});
+
+describe("the writes in flight the sync chip is told of", () => {
+  it("counts a write sent after the others landed from its own start", async () => {
+    const { host, root, submit, advance } = await startRoot();
+    const first = deferred<Answered<HttpFailure>>();
+    const second = deferred<Answered<HttpFailure>>();
+    host.answers = [first.promise, second.promise];
+    submit(renaming("p_a", "n_a"), aboutNode("n_a"));
+    await advance(100);
+    first.resolve(applied);
+    await settled();
+    await advance(50);
+    submit(renaming("p_b", "n_b"), aboutNode("n_b"));
+    await advance(SYNC_SHOW_AFTER_MS - 1);
+    // Counted from the first write's start it would show SAVING by now.
+    expect(chipOf(root).state).toBe("saved");
+    await advance(1);
+    expect(chipOf(root).state).toBe("saving");
+  });
+
+  it("counts a write restored in flight from the restore", async () => {
+    const storage = memoryStorage();
+    tabEditStore(() => storage).keep(record("p_sent", { state: "sending" }));
+    const fake = new FakeHost();
+    fake.answers = [deferred<Answered<HttpFailure>>().promise];
+    const { root, advance } = await startRoot({ host: fake, storage, restore: false });
+    await advance(1000);
+    root.send({ type: "restore" });
+    await settled();
+    await advance(SYNC_SHOW_AFTER_MS - 1);
+    expect(chipOf(root).state).toBe("in-sync");
+    await advance(1);
+    expect(chipOf(root).state).toBe("saving");
+  });
+
+  it("says NOT SAVED, not NEW VERSION, for a write that skew stopped", async () => {
+    const { root, submit } = await startRoot();
+    root.send({ type: "skew" });
+    submit(renaming("p_a"));
+    await settled();
+    expect(chipOf(root).state).toBe("not-saved");
   });
 });
 

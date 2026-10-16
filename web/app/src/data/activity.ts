@@ -1,9 +1,7 @@
-// What this tab did and what it caused (D7): the saves it made, newest first, for the sync
-// chip's popover (in memory only), the warning sentence a save's receipt shows at its
-// control, and the one toast kept for confirmations that are not about syncing.
+// What this tab did and what it caused (D7): the consequences of a write in words, the
+// warning sentence a save's receipt shows at its control, and the saves the tab made, newest
+// first, for the sync chip's popover (in memory only; the session root holds them).
 import type { Schema } from "@cairn/client";
-
-import { Emitter } from "./emitter.ts";
 
 export type Consequences = Schema<"Consequences">;
 export type PatchAnswer = Schema<"PatchAnswer">;
@@ -74,7 +72,7 @@ export interface Unlocked {
   journey: string;
   by: string;
   nodes: string[];
-  /** When the write was sent, as `Activity.begin` counted it: a save sent before a screen opened is not that screen's. */
+  /** When the write was sent, as `Session.begin` counted it: a save sent before a screen opened is not that screen's. */
   began: number;
 }
 
@@ -131,56 +129,16 @@ export interface SaveEvent {
 /** The saves the popover lists. */
 export const SAVE_COUNT_MAX = 10;
 
-/** A confirmation that is not about syncing ("Imported a file"): shown briefly, replaced by the next. */
-export interface Toast {
-  id: number;
-  tone: "confirm" | "problem";
-  text: string;
+/** The saves this tab made, newest first, at most `SAVE_COUNT_MAX`, and how many it has made. */
+export interface Recent {
+  saves: readonly SaveEvent[];
+  count: number;
 }
 
-export class Activity extends Emitter {
-  #saves: readonly SaveEvent[] = [];
-  #toast: Toast | undefined;
-  #next = 0;
-  #began = 0;
+export const NO_SAVES: Recent = { saves: [], count: 0 };
 
-  /** How many writes have been sent: a later write has a higher count. */
-  get began(): number {
-    return this.#began;
-  }
-
-  /** Counts a write being sent, and returns its count. */
-  begin(): number {
-    return ++this.#began;
-  }
-
-  /** This tab's last saves, newest first. */
-  get saves(): readonly SaveEvent[] {
-    return this.#saves;
-  }
-
-  get toast(): Toast | undefined {
-    return this.#toast;
-  }
-
-  saved(event: Omit<SaveEvent, "id">): SaveEvent {
-    const saved = { ...event, id: ++this.#next };
-    this.#saves = [saved, ...this.#saves].slice(0, SAVE_COUNT_MAX);
-    this.emit();
-    return saved;
-  }
-
-  /** Shows `text` as the toast, replacing the one on screen. */
-  confirm(text: string, tone: Toast["tone"] = "confirm"): void {
-    this.#toast = { id: ++this.#next, tone, text };
-    this.emit();
-  }
-
-  /** Takes the toast `id` down, unless a newer one replaced it. */
-  clearToast(id: number): void {
-    if (this.#toast?.id === id) {
-      this.#toast = undefined;
-      this.emit();
-    }
-  }
+/** `recent` with `save` first (D7): it takes the next id, and the oldest save past the maximum drops. */
+export function recorded(recent: Recent, save: Omit<SaveEvent, "id">): Recent {
+  const count = recent.count + 1;
+  return { saves: [{ ...save, id: count }, ...recent.saves].slice(0, SAVE_COUNT_MAX), count };
 }

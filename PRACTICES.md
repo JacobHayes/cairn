@@ -64,11 +64,12 @@ Do as much as necessary and as little as possible. The rules above say how to be
 
 How `web/app` and `web/client` hold state ([`decisions/2026-10-16-frontend-state-is-machines-for-lifecycles-and-functions-for-the-rest.md`](decisions/2026-10-16-frontend-state-is-machines-for-lifecycles-and-functions-for-the-rest.md)).
 
-- **Machines for lifecycles.** An owned, mutually exclusive workflow mode is an XState v5 machine, a small one too. A workflow mode is a state that decides which async work exists, when it expires, or which events may proceed while work is outstanding: a write, a read, the subscription, a form that is open, a toast.
+- **Machines for lifecycles.** An owned, mutually exclusive workflow mode is an XState v5 machine, a small one too. A workflow mode is a state that decides which async work exists, when it expires, or which events may proceed while work is outstanding: a write, a read, the subscription, a form that is open, a toast, a receipt, the sync chip's popover, a conversation with the assistant.
 - **Pure functions for derived values.** Anything derivable is computed by a pure function and never stored beside its source. The sync chip's display state is `summarize`, a projection, not a machine.
 - **Plain data for payloads.** What a machine carries, and what is kept in storage, is data a person could read, never a snapshot.
 - **One owner per fact.** Others read a fact from its owner and are never pushed a copy. A component reads state through a tagged selector (`writeView` and the like), never by piecing it together from optional context fields, and never copies a snapshot into React state.
 - **Effects belong to the machine.** A timer is a delayed transition, a request an invoked actor, and a busy state does not accept a new start. Cancelling stops the UI waiting for the answer; it never undoes a commit.
+- **Owners.** The shared actors are the session root's children; a component owns its transient actors (`useActorRef`: a keyed read, a receipt, the chip's popover, an open form, a workflow) and reads shared ones through `useSelector`. A manager keeps an explicit keyed map, stops what it spawns, and finds nothing through XState's system registry. Apart from preferences and browser sources (`useMedia`, the network, the theme), there is no hand-written store with listeners, and no flag, attempt count or generation counter standing in for a state; one that stays says why in a line where it is.
 - **Preferences are not machines.** `useAxis` and `useFrame` keep their independent preferences and keyed overrides, with presentation derived from them.
 - **Actors are tested with controlled promises and a `SimulatedClock`**, with wall time injected separately; a bounded workflow (the edge drawing) also has every reachable state and transition walked with `@xstate/graph`; Playwright covers focus, navigation, reload recovery, multiple tabs and worker wiring.
 
@@ -151,6 +152,7 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | automatic resends of a write with no answer | 5, waiting 250 ms, doubling, at most 15 s | Five resends cover about eight seconds of a server that answers nothing; time offline uses none, since each waits for the connection. Past five the person retries by hand ([`decisions/2026-10-16-a-write-is-an-operation-the-edit-manager-owns.md`](decisions/2026-10-16-a-write-is-an-operation-the-edit-manager-owns.md)). |
 | journeys a tab keeps derived after their view closes | 8 | Going back to a recent journey shows it at once; each one holds its derivation in the tab's worker, so the least recently shown beyond this are released. |
 | canvas layouts a tab keeps | 32 views, 4 per view | Toggling a setting back and forth lays out nothing; the least recently laid out beyond this are forgotten and laid out again when shown. |
+| saves the sync chip lists as Recent | 10 | What this tab did lately, newest first; past ten the popover is a log, which the journey's history already is. |
 | assistant turns a tab keeps per conversation | 50 | The newest turns; a long conversation never grows the tab without bound. |
 | CI check part duration | 45 min | The slowest cold part measured 23 minutes; on main a run in flight is never cancelled, so a hung part would hold the next run (`timeout-minutes` in `check.yml`). |
 

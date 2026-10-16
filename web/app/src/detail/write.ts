@@ -9,7 +9,8 @@ import { held } from "../data/edit-manager.ts";
 import { useEdit, useSession, useSkew } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
 import { landedWarning, newPatchId, patchOf, type Rejection } from "../data/writes.ts";
-import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
+import { useReceipt } from "../ui/Receipt.tsx";
+import type { ReceiptState } from "../ui/receipt.ts";
 import { titleOf, type Mutation, type Ready } from "./model.ts";
 
 /**

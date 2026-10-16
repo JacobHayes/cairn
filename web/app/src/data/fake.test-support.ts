@@ -5,11 +5,12 @@ import type { Answered, HttpFailure, Patch, Tick, TickHandlers } from "@cairn/cl
 import type { DerivationHandle, Derived, Loaded } from "@cairn/wasm";
 import { SimulatedClock } from "xstate";
 
+import type { KeptTurn } from "../assistant/model.ts";
+import type { KeptTurns } from "../assistant/conversation.ts";
 import type { AssistantHost } from "./assistant.ts";
 import type { Answer, Command } from "./edit-record.ts";
 import type { ProposalHost, ProposalWritten } from "./proposals.ts";
 import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Viewer } from "./host.ts";
-import type { Timers } from "./sync.ts";
 import type { WriteEnv } from "./write-machine.ts";
 
 export interface FakeJourney {
@@ -299,14 +300,15 @@ export class FakeDeriver implements Deriver {
   }
 }
 
-/** Timers the test fires by hand (the sync chip's). */
-export function manualTimers() {
-  const pending: { callback: () => void; ms: number }[] = [];
-  const timers: Timers = {
-    set: (callback, ms) => pending.push({ callback, ms }),
-    clear: () => undefined,
+/** The tab's kept assistant turns, in memory. */
+export function memoryTurns(): KeptTurns {
+  const kept = new Map<string, KeptTurn[]>();
+  return {
+    read: (conversation) => kept.get(conversation) ?? [],
+    write: (conversation, turns) => {
+      kept.set(conversation, turns);
+    },
   };
-  return { timers, pending };
 }
 
 /**

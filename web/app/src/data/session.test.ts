@@ -4,13 +4,16 @@ import { backoffDelayMs, type Answered, type HttpFailure, type Rejection, type R
 import { SimulatedClock, createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
-import { aboutNode, renaming } from "./edits.test-support.ts";
+import { aboutNode, chipOf, renaming } from "./edits.test-support.ts";
 import { problemsOf, submitWrite } from "./edit-manager.ts";
 import { EDIT_RECORD_VERSION, tabEditStore } from "./edit-record.ts";
-import { FakeDeriver, FakeHost, deferred, manualTimers, memoryStorage, settled } from "./fake.test-support.ts";
+import { HandHost, replied, target } from "../assistant/hand-host.test-support.ts";
+import { sendTurn } from "../assistant/conversation.ts";
+import { CountingClock, FakeDeriver, FakeHost, deferred, memoryStorage, settled } from "./fake.test-support.ts";
 import { ReadFailed } from "./host.ts";
 import { HOST_READ, keyedRead, type ReadSource } from "./keyed-read.ts";
 import { Session } from "./session.ts";
+import { toastOf } from "./toasts.ts";
 import { RESEND_COUNT_MAX } from "./write-machine.ts";
 import { landedWarning, patchOf, type WriteIntent } from "./writes.ts";
 
@@ -29,8 +32,7 @@ async function started(storage = memoryStorage()) {
   const host = new FakeHost();
   host.journeysHeld.set("j_one", { revision: 3, deployment: 1, today: "2026-10-06" });
   const clock = new SimulatedClock();
-  const { timers } = manualTimers();
-  const session = await Session.start({ host, deriver: new FakeDeriver(), timers, clock, store: tabEditStore(() => storage) });
+  const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now(), store: tabEditStore(() => storage) });
   // The stream opens once the batch of watches is reconciled.
   clock.increment(0);
   host.open();
@@ -54,10 +56,10 @@ describe("a control waiting on its write", () => {
     const answer = await send(session);
     expect(answer).toMatchObject({ outcome: "applied" });
     const warning = answer === undefined ? undefined : landedWarning(answer, session.titleOf);
-    expect(warning).toBe(session.activity.saves[0]?.warning);
+    expect(warning).toBe(session.root.getSnapshot().context.recent.saves[0]?.warning);
     expect(warning).toBeDefined();
     expect(session.edits.getSnapshot().context.writes).toEqual({});
-    expect(session.sync.summary.state).toBe("saved");
+    expect(chipOf(session.root).state).toBe("saved");
   });
 
   it("leaves a drafted proposal's link in Recent even when nobody was waiting for the write", async () => {
@@ -70,7 +72,7 @@ describe("a control waiting on its write", () => {
       about: aboutNode(),
     });
     await settled();
-    expect(session.activity.saves.map((save) => save.address)).toEqual(["/proposals/pr_new"]);
+    expect(session.root.getSnapshot().context.recent.saves.map((save) => save.address)).toEqual(["/proposals/pr_new"]);
     expect(session.edits.getSnapshot().context.writes).toEqual({});
   });
 
@@ -83,7 +85,7 @@ describe("a control waiting on its write", () => {
     expect(Object.keys(session.edits.getSnapshot().context.writes)).toEqual(["p_one"]);
     expect(problems(session)).toEqual([expect.objectContaining({ id: "p_one", kind: "rejected" })]);
     expect(storage.length).toBe(1);
-    expect(session.sync.summary.state).toBe("not-saved");
+    expect(chipOf(session.root).state).toBe("not-saved");
   });
 
   it("stays pending while a lost answer is resent, then lands on already_applied", async () => {
@@ -111,7 +113,7 @@ describe("a control waiting on its write", () => {
     }
     expect(result).toBeUndefined();
     expect(problems(session)).toEqual([expect.objectContaining({ kind: "failed", retry: true })]);
-    expect(session.sync.summary.state).toBe("not-saved");
+    expect(chipOf(session.root).state).toBe("not-saved");
   });
 });
 
@@ -129,7 +131,7 @@ describe("the connection", () => {
     const host = new FakeHost();
     host.answers = [alreadyApplied];
     const clock = new SimulatedClock();
-    const session = await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers, clock, store: tabEditStore(() => storage) });
+    const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now(), store: tabEditStore(() => storage) });
     clock.increment(0);
     await settled();
     expect(host.sent).toEqual([]);
@@ -137,7 +139,7 @@ describe("the connection", () => {
     await settled();
     expect(host.sent.map((patch) => patch.id)).toEqual(["p_kept"]);
     expect(storage.length).toBe(0);
-    expect(session.activity.saves).toHaveLength(1);
+    expect(session.root.getSnapshot().context.recent.saves).toHaveLength(1);
   });
 
   it("is not listened to once the session is closed", async () => {
@@ -178,11 +180,11 @@ describe("a read the sync chip counts", () => {
     await advance(0);
     host.open();
     await settled();
-    expect(session.sync.summary.state).not.toBe("behind");
+    expect(chipOf(session.root).state).not.toBe("behind");
     state.failing = true;
     host.tick({ of: route, revision: 2 });
     await settled();
-    expect(session.sync.summary.state).toBe("behind");
+    expect(chipOf(session.root).state).toBe("behind");
     expect(actor.getSnapshot().context.held?.value).toEqual({ revision: 1 });
     // The server recovers: the retry lands the newer revision and the chip clears.
     state.failing = false;
@@ -190,7 +192,7 @@ describe("a read the sync chip counts", () => {
     clock.increment(backoffDelayMs(0));
     await settled();
     expect(actor.getSnapshot().context.held?.value).toEqual({ revision: 2 });
-    expect(session.sync.summary.state).not.toBe("behind");
+    expect(chipOf(session.root).state).not.toBe("behind");
     actor.stop();
   });
 
@@ -205,10 +207,10 @@ describe("a read the sync chip counts", () => {
     state.failing = true;
     host.tick({ of: route, revision: 2 });
     await settled();
-    expect(session.sync.summary.state).toBe("behind");
+    expect(chipOf(session.root).state).toBe("behind");
     actor.stop();
     await settled();
-    expect(session.sync.summary.state).not.toBe("behind");
+    expect(chipOf(session.root).state).not.toBe("behind");
   });
 });
 
@@ -219,7 +221,7 @@ describe("the caller", () => {
     const host = new FakeHost();
     host.deploymentFails = true;
     const clock = new SimulatedClock();
-    const session = await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers, clock, store: tabEditStore(() => memoryStorage()) });
+    const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now(), store: tabEditStore(() => memoryStorage()) });
     clock.increment(0);
     host.open();
     await settled();
@@ -236,5 +238,51 @@ describe("the caller", () => {
     await settled();
     expect(host.viewerFetches).toBe(2);
     session.close();
+  });
+});
+
+describe("the chip and the toast", () => {
+  it("says NEW VERSION once the tab is in version skew", async () => {
+    const { session } = await started();
+    expect(chipOf(session.root).state).toBe("in-sync");
+    session.root.send({ type: "skew" });
+    expect(chipOf(session.root).state).toBe("new-version");
+  });
+
+  it("raises a problem toast for the unsent edits of an earlier version it could not keep", async () => {
+    const storage = memoryStorage();
+    storage.setItem("cairn:edit:p_old", JSON.stringify({ version: EDIT_RECORD_VERSION + 1, id: "p_old" }));
+    const { session } = await started(storage);
+    expect(toastOf(session.toasts.getSnapshot())).toMatchObject({ tone: "problem", text: expect.stringContaining("unsent edit") as string });
+  });
+
+  it("leaves no timer or turn running once closed: a toast shown, SAVED pending, and a turn out", async () => {
+    const assistant = new HandHost();
+    const host = new FakeHost();
+    host.journeysHeld.set("j_one", { revision: 3, deployment: 1, today: "2026-10-06" });
+    host.offersAssistant = true;
+    host.assistant = assistant;
+    const clock = new CountingClock();
+    const storage = memoryStorage();
+    const session = await Session.start({ host, deriver: new FakeDeriver(), clock, monotonic: () => clock.now(), store: tabEditStore(() => storage) });
+    clock.increment(0);
+    host.open();
+    await settled();
+    host.answers = [applied];
+    await send(session);
+    session.toasts.send({ type: "show", text: "Route file exported", tone: "confirm" });
+    session.conversations.send({ type: "open", target });
+    await settled();
+    const turn = session.conversations.getSnapshot().context.conversations["journey:j_one"];
+    if (turn === undefined) {
+      throw new Error("the conversation was not started");
+    }
+    const sent = sendTurn(turn, "Hello?");
+    session.close();
+    expect(clock.pending).toEqual([]);
+    assistant.turns[0]?.answer(replied("Hi."));
+    await settled();
+    expect(await sent).toBe(false);
+    expect(assistant.reads).toHaveLength(1);
   });
 });

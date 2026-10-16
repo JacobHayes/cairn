@@ -1,9 +1,31 @@
-// What the sync chip says (design 9): the precedence among its states, and the time thresholds
-// that keep it from flickering.
+// What the sync chip says (design 9): the precedence among its states and the data each case
+// carries (summarize), the words and colour of a case (syncWords), and the scheduler that wakes
+// at each time threshold that keeps the chip from flickering (syncMachine, on a simulated clock).
+import { createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
+import type { SaveEvent } from "./activity.ts";
+import { CountingClock } from "./fake.test-support.ts";
 import type { Lag } from "./keyed-read.ts";
-import { SYNC_BEHIND_AFTER_MS, SYNC_SAVED_MS, SYNC_SHOW_AFTER_MS, SyncStatus, summarize, type Problem, type SyncInput, type SyncState } from "./sync.ts";
+import {
+  SYNC_BEHIND_AFTER_MS,
+  SYNC_SAVED_MS,
+  SYNC_SHOW_AFTER_MS,
+  nextDeadline,
+  savedAnnouncement,
+  summarize,
+  syncInputOf,
+  syncMachine,
+  syncSummary,
+  syncWords,
+  type Problem,
+  type SyncEvent,
+  type SyncInput,
+  type SyncReading,
+  type SyncState,
+  type SyncTiming,
+  type SyncTone,
+} from "./sync.ts";
 
 const quiet: SyncInput = {
   now: 100_000,
@@ -12,22 +34,17 @@ const quiet: SyncInput = {
   demo: false,
   skew: false,
   problems: [],
-  inFlight: 0,
-  inFlightSince: undefined,
+  inFlight: undefined,
   lag: undefined,
   saved: undefined,
   revision: 42,
 };
 
-const problem = (kind: Problem["kind"]): Problem => ({ id: "p_a", kind, message: "no", label: "Draft test plan", address: undefined, retry: false });
+const problem = (kind: Problem["kind"], label = "Draft test plan"): Problem => ({ id: `p_${kind}_${label}`, kind, message: "no", label, address: undefined, retry: false });
 const lag = (since: number, failed = false): Lag => ({ subject: "journey:j_one", shown: 42, announced: 43, since, failed });
+const save = (id: number, warning?: string): SaveEvent => ({ id, at: new Date("2026-10-06T14:02:11"), text: "Renamed", warning, unlocked: undefined, address: undefined });
 
 describe("summarize", () => {
-  it("names the revision a view is behind, and the one it shows", () => {
-    const summary = summarize({ ...quiet, lag: lag(99_000, true) });
-    expect(summary.label).toBe("BEHIND · REV 43");
-  });
-
   it("puts the first state of the precedence on top of the others that hold", () => {
     let held: Partial<SyncInput> = {
       problems: [problem("conflict"), problem("rejected")],
@@ -35,8 +52,7 @@ describe("summarize", () => {
       online: false,
       stream: "reconnecting",
       lag: lag(90_000),
-      inFlight: 1,
-      inFlightSince: 90_000,
+      inFlight: { count: 1, since: 90_000 },
       saved: { at: 99_500, time: "14:02:11" },
       demo: true,
     };
@@ -48,7 +64,7 @@ describe("summarize", () => {
       { online: true },
       { stream: "live" },
       { lag: undefined },
-      { inFlight: 0 },
+      { inFlight: undefined },
       { saved: undefined },
     ];
     const states: SyncState[] = [];
@@ -60,16 +76,26 @@ describe("summarize", () => {
     expect(states).toEqual(["conflict", "not-saved", "new-version", "offline", "reconnecting", "behind", "saving", "saved", "demo"]);
   });
 
-  it("counts every rejection that is not a conflict as not saved", () => {
-    expect(summarize({ ...quiet, problems: [problem("rejected"), problem("failed")] }).label).toBe("NOT SAVED · 2");
+  it("lets a conflict or a refused write outrank version skew, so a write skew stopped is red and never amber", () => {
+    expect(summarize({ ...quiet, skew: true, problems: [problem("failed")] }).state).toBe("not-saved");
+    expect(summarize({ ...quiet, skew: true, problems: [problem("conflict")] }).state).toBe("conflict");
+    expect(summarize({ ...quiet, skew: true }).state).toBe("new-version");
   });
 
-  it("says a view behind only on its deployment is behind, without naming a revision", () => {
-    expect(summarize({ ...quiet, lag: { ...lag(99_000, true), announced: 42 } })).toMatchObject({ state: "behind", label: "BEHIND" });
+  it("carries each case's data", () => {
+    const first = problem("rejected", "First");
+    expect(summarize({ ...quiet, problems: [problem("conflict"), first, problem("failed", "Second")] })).toMatchObject({ state: "conflict", count: 1 });
+    expect(summarize({ ...quiet, problems: [first, problem("failed", "Second")] })).toEqual({ state: "not-saved", count: 2, first });
+    expect(summarize({ ...quiet, lag: lag(99_000, true) })).toEqual({ state: "behind", shown: 42, announced: 43 });
+    expect(summarize({ ...quiet, lag: lag(quiet.now - SYNC_SHOW_AFTER_MS) })).toEqual({ state: "updating", shown: 42, announced: 43 });
+    expect(summarize({ ...quiet, inFlight: { count: 3, since: 0 } })).toEqual({ state: "saving", count: 3 });
+    expect(summarize({ ...quiet, saved: { at: quiet.now, time: "14:02:11" } })).toEqual({ state: "saved", time: "14:02:11" });
+    expect(summarize({ ...quiet, stream: "idle" })).toEqual({ state: "in-sync", live: false, revision: 42 });
   });
 
   it("is quiet before a thing has taken long enough to matter", () => {
-    expect(summarize({ ...quiet, inFlight: 1, inFlightSince: quiet.now - SYNC_SHOW_AFTER_MS + 1 }).state).toBe("in-sync");
+    expect(summarize({ ...quiet, inFlight: { count: 1, since: quiet.now - SYNC_SHOW_AFTER_MS + 1 } }).state).toBe("in-sync");
+    expect(summarize({ ...quiet, inFlight: { count: 1, since: quiet.now - SYNC_SHOW_AFTER_MS } }).state).toBe("saving");
     expect(summarize({ ...quiet, lag: lag(quiet.now - SYNC_SHOW_AFTER_MS + 1) }).state).toBe("in-sync");
     expect(summarize({ ...quiet, lag: lag(quiet.now - SYNC_BEHIND_AFTER_MS + 1) }).state).toBe("updating");
     expect(summarize({ ...quiet, lag: lag(quiet.now - SYNC_BEHIND_AFTER_MS) }).state).toBe("behind");
@@ -77,92 +103,185 @@ describe("summarize", () => {
   });
 });
 
-/** An edit manager that says what a test sets, and tells the chip when it changes. */
-function fakeEdits() {
-  const listeners = new Set<() => void>();
-  const state = { problems: [] as readonly Problem[], inFlight: 0 };
+describe("syncWords", () => {
+  it("colours each state by what it asks of the person (9.2)", () => {
+    const first = problem("rejected");
+    const cases: [Parameters<typeof syncWords>[0], SyncTone][] = [
+      [{ state: "conflict", count: 1, first }, "act"],
+      [{ state: "not-saved", count: 1, first }, "act"],
+      [{ state: "new-version" }, "wait"],
+      [{ state: "offline" }, "wait"],
+      [{ state: "reconnecting" }, "wait"],
+      [{ state: "behind", shown: 1, announced: 2 }, "wait"],
+      [{ state: "saving", count: 1 }, "working"],
+      [{ state: "updating", shown: 1, announced: 2 }, "working"],
+      [{ state: "saved", time: "14:02:11" }, "good"],
+      [{ state: "in-sync", live: true, revision: 1 }, "good"],
+      [{ state: "demo" }, "hollow"],
+    ];
+    expect(cases.map(([shown]) => syncWords(shown).tone)).toEqual(cases.map(([, tone]) => tone));
+    expect(cases.map(([shown]) => syncWords(shown).state)).toEqual(cases.map(([shown]) => shown.state));
+  });
+
+  it("announces what asks for action assertively and what waits politely", () => {
+    const first = problem("rejected");
+    expect(syncWords({ state: "conflict", count: 1, first }).announce).toBe("assertive");
+    expect(syncWords({ state: "not-saved", count: 1, first }).announce).toBe("assertive");
+    expect(syncWords({ state: "offline" }).announce).toBe("polite");
+    expect(syncWords({ state: "behind", shown: 1, announced: 2 }).announce).toBe("polite");
+    expect(syncWords({ state: "saving", count: 1 }).announce).toBeUndefined();
+    expect(syncWords({ state: "in-sync", live: true, revision: 1 }).announce).toBeUndefined();
+  });
+
+  it("names the revision a view is behind, and says nothing of one when only its deployment is behind", () => {
+    expect(syncWords({ state: "behind", shown: 42, announced: 43 }).label).toBe("BEHIND · REV 43");
+    expect(syncWords({ state: "behind", shown: 43, announced: 43 }).label).toBe("BEHIND");
+  });
+
+  it("counts the refused writes, and names the first one's subject", () => {
+    const shown = syncWords(summarize({ ...quiet, problems: [problem("rejected", "Draft test plan"), problem("failed", "Other")] }));
+    expect(shown.label).toBe("NOT SAVED · 2");
+    expect(shown.sentence).toContain("Draft test plan");
+  });
+});
+
+describe("what the chip reads of its owners", () => {
+  const timing: SyncTiming = { now: 1000, lag: undefined, inFlightSince: undefined, saved: undefined };
+  const read: SyncReading = { stream: "live", online: true, demo: false, skew: false, revision: 7, count: 0, problems: [], latest: undefined };
+
+  it("makes the in-flight fact from the edit manager's count and the scheduler's stamp together", () => {
+    expect(syncInputOf(timing, { ...read, count: 2 }).inFlight).toBeUndefined();
+    expect(syncInputOf({ ...timing, inFlightSince: 500 }, read).inFlight).toBeUndefined();
+    expect(syncInputOf({ ...timing, inFlightSince: 500 }, { ...read, count: 2 }).inFlight).toEqual({ count: 2, since: 500 });
+  });
+
+  it("says the wall time of the latest save, and nothing of a save until one is held", () => {
+    expect(syncInputOf({ ...timing, saved: 900 }, read).saved).toBeUndefined();
+    expect(syncInputOf({ ...timing, saved: 900 }, { ...read, latest: save(1) }).saved).toMatchObject({ at: 900 });
+    expect(syncInputOf(timing, { ...read, latest: save(1) }).saved).toBeUndefined();
+  });
+
+  it("finds the earliest deadline still to come, and none once all passed or with nothing timed", () => {
+    expect(nextDeadline(timing)).toBeUndefined();
+    const timed: SyncTiming = { now: 1000, lag: lag(800), inFlightSince: 900, saved: 700 };
+    // The lag shows at 1100 and is behind at 5800, the writes in flight show at 1200, SAVED ends at 2700.
+    expect(nextDeadline(timed)).toBe(1100);
+    expect(nextDeadline({ ...timed, now: 1100 })).toBe(1200);
+    expect(nextDeadline({ ...timed, now: 5800 })).toBeUndefined();
+  });
+
+  it("announces a save for its SAVED time and each save separately, with its warning", () => {
+    const saved: SyncTiming = { now: 1000, lag: undefined, inFlightSince: undefined, saved: 1000 };
+    expect(savedAnnouncement(save(2, "Kickoff is now overdue."), saved)).toEqual({ id: 2, text: "Saved. Kickoff is now overdue." });
+    expect(savedAnnouncement(save(3), saved)).toEqual({ id: 3, text: "Saved" });
+    expect(savedAnnouncement(save(3), { ...saved, now: 1000 + SYNC_SAVED_MS })).toBeUndefined();
+    expect(savedAnnouncement(undefined, saved)).toBeUndefined();
+    expect(savedAnnouncement(save(3), { ...saved, saved: undefined })).toBeUndefined();
+  });
+});
+
+/** A running scheduler on a simulated clock, and the chip's state as the session reads it. */
+function scheduler() {
+  const clock = new CountingClock();
+  const actor = createActor(syncMachine, { clock, input: { monotonic: () => clock.now() } }).start();
+  const read: SyncReading = { stream: "live", online: true, demo: false, skew: false, revision: 7, count: 0, problems: [], latest: save(1) };
   return {
-    state,
-    reading: {
-      problems: () => state.problems,
-      inFlight: () => state.inFlight,
-      subscribe: (listener: () => void) => {
-        listeners.add(listener);
-        return () => listeners.delete(listener);
-      },
+    clock,
+    actor,
+    send: (event: SyncEvent) => {
+      actor.send(event);
     },
-    changed: () => {
-      listeners.forEach((listener) => { listener(); });
+    advance: (ms: number) => {
+      clock.increment(ms);
     },
+    /** What the chip says now, with `count` writes in flight in the edit manager. */
+    state: (count = 0): SyncState => syncSummary(syncInputOf(actor.getSnapshot().context.timing, { ...read, count })).state,
   };
 }
 
-function setup() {
-  const edits = fakeEdits();
-  let now = 0;
-  const timers = new Map<number, { at: number; callback: () => void }>();
-  let next = 0;
-  const status = new SyncStatus(
-    {
-      set: (callback, ms) => {
-        timers.set(++next, { at: now + ms, callback });
-        return next;
-      },
-      clear: (handle) => {
-        timers.delete(handle as number);
-      },
-    },
-    () => now,
-    false,
-    edits.reading,
-  );
-  const advance = (ms: number) => {
-    now += ms;
-    for (const [handle, timer] of [...timers]) {
-      if (timer.at <= now) {
-        timers.delete(handle);
-        timer.callback();
-      }
-    }
-  };
-  return { status, advance, edits };
-}
+describe("the scheduler wakes at each threshold with no event sent", () => {
+  it("shows SAVING once a write has been out for 300ms and not a millisecond before", () => {
+    const { send, advance, state } = scheduler();
+    advance(1000);
+    send({ type: "inFlight", count: 1 });
+    advance(SYNC_SHOW_AFTER_MS - 1);
+    expect(state(1)).toBe("in-sync");
+    advance(1);
+    expect(state(1)).toBe("saving");
+  });
 
-describe("SyncStatus", () => {
-  it("shows SAVING only for a write still out after 300ms, then SAVED for 2s", () => {
-    const { status, advance, edits } = setup();
-    edits.state.inFlight = 1;
-    edits.changed();
-    expect(status.summary.state).toBe("in-sync");
-    advance(SYNC_SHOW_AFTER_MS);
-    expect(status.summary.state).toBe("saving");
-    edits.state.inFlight = 0;
-    edits.changed();
-    status.saved("14:02:11");
-    expect(status.summary.state).toBe("saved");
+  it("shows UPDATING at 300ms of lag and BEHIND at 5s, and clears with the lag", () => {
+    const { send, advance, state } = scheduler();
+    advance(1000);
+    send({ type: "lag", lag: lag(1000) });
+    advance(SYNC_SHOW_AFTER_MS - 1);
+    expect(state()).toBe("in-sync");
+    advance(1);
+    expect(state()).toBe("updating");
+    advance(SYNC_BEHIND_AFTER_MS - SYNC_SHOW_AFTER_MS - 1);
+    expect(state()).toBe("updating");
+    advance(1);
+    expect(state()).toBe("behind");
+    send({ type: "lag", lag: undefined });
+    expect(state()).toBe("in-sync");
+  });
+
+  it("shows SAVED for 2s after a save, and a second save restarts the time", () => {
+    const { send, advance, state } = scheduler();
+    advance(1000);
+    send({ type: "saved" });
+    expect(state()).toBe("saved");
+    advance(1500);
+    send({ type: "saved" });
+    advance(SYNC_SAVED_MS - 1);
+    expect(state()).toBe("saved");
+    advance(1);
+    expect(state()).toBe("in-sync");
+  });
+
+});
+
+describe("the scheduler's writes in flight and its quiet", () => {
+  it("keeps the start of the writes in flight while there are some, and starts it afresh after none", () => {
+    const { send, advance, state } = scheduler();
+    advance(1000);
+    send({ type: "inFlight", count: 1 });
+    advance(200);
+    send({ type: "inFlight", count: 2 });
+    advance(100);
+    expect(state(2)).toBe("saving");
+    send({ type: "inFlight", count: 0 });
+    expect(state(0)).toBe("in-sync");
+    advance(700);
+    send({ type: "inFlight", count: 1 });
+    advance(SYNC_SHOW_AFTER_MS - 1);
+    expect(state(1)).toBe("in-sync");
+    advance(1);
+    expect(state(1)).toBe("saving");
+  });
+
+  it("takes no step for an event that changes nothing it holds", () => {
+    const { actor, send, advance } = scheduler();
+    advance(1000);
+    send({ type: "inFlight", count: 1 });
+    send({ type: "lag", lag: lag(900) });
+    const before = actor.getSnapshot().context.timing;
+    advance(10);
+    send({ type: "inFlight", count: 4 });
+    send({ type: "lag", lag: lag(900) });
+    expect(actor.getSnapshot().context.timing).toBe(before);
+  });
+
+  it("waits for nothing when nothing is due, and leaves no timer once stopped", () => {
+    const { clock, actor, send, advance } = scheduler();
+    expect(clock.pending).toEqual([]);
+    send({ type: "saved" });
+    expect(clock.pending).toEqual([SYNC_SAVED_MS]);
     advance(SYNC_SAVED_MS);
-    expect(status.summary.state).toBe("in-sync");
-  });
-
-  it("counts the edit manager's writes in flight as saving, once one has been out for 300ms", () => {
-    const { status, advance, edits } = setup();
-    edits.state.inFlight = 1;
-    edits.changed();
-    expect(status.summary.state).toBe("in-sync");
-    advance(SYNC_SHOW_AFTER_MS);
-    expect(status.summary.state).toBe("saving");
-    edits.state.inFlight = 0;
-    edits.changed();
-    expect(status.summary.state).toBe("in-sync");
-  });
-
-  it("shows what the edit manager says did not land, and stops when it says it did", () => {
-    const { status, edits } = setup();
-    edits.state.problems = [problem("conflict")];
-    edits.changed();
-    expect(status.summary).toMatchObject({ state: "conflict", tone: "act" });
-    edits.state.problems = [];
-    edits.changed();
-    expect(status.summary.state).toBe("in-sync");
+    expect(clock.pending).toEqual([]);
+    send({ type: "lag", lag: lag(clock.now()) });
+    expect(clock.pending).not.toEqual([]);
+    actor.stop();
+    expect(clock.pending).toEqual([]);
   });
 });

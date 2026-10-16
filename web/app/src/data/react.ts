@@ -7,11 +7,11 @@ import type { Capabilities, Deployment, Viewer } from "./host.ts";
 import { derivationOf, journeyView, sameDerivation, type Derivation, type JourneyView } from "./journeys.ts";
 import { heldValue, keyedRead, readView, type ReadKey, type ReadSnapshot, type ReadSource, type ReadView } from "./keyed-read.ts";
 import { liveSource, type LiveSpec } from "./live.ts";
-import type { SaveEvent, Toast } from "./activity.ts";
-import { aboutOf, problemsOf, submitWrite, writeOf } from "./edit-manager.ts";
+import type { SaveEvent } from "./activity.ts";
+import { aboutOf, inFlightOf, problemsOf, submitWrite, writeOf } from "./edit-manager.ts";
 import { idOf, type Answer, type Command, type OperationId } from "./edit-record.ts";
 import { currentAddress, type Session } from "./session.ts";
-import type { Problem, SyncSummary } from "./sync.ts";
+import { savedAnnouncement, syncInputOf, syncSummary, type Problem, type SyncSummary } from "./sync.ts";
 import { writeView, type Check, type WriteSnapshot, type WriteView } from "./write-machine.ts";
 import type { Rejection } from "./writes.ts";
 
@@ -71,20 +71,49 @@ export function useSkew(): boolean {
 
 /** This tab's last saves, newest first. */
 export function useSaves(): readonly SaveEvent[] {
-  const { activity } = useSession();
-  return useSyncExternalStore(activity.subscribe, () => activity.saves);
+  return useSelector(useSession().root, (snapshot) => snapshot.context.recent.saves);
 }
 
-/** The toast on screen, if any. */
-export function useToast(): Toast | undefined {
-  const { activity } = useSession();
-  return useSyncExternalStore(activity.subscribe, () => activity.toast);
+/** Whether the browser says the network is up: a browser source, read as it changes. */
+export function useOnline(): boolean {
+  return useSyncExternalStore(
+    (notify) => {
+      globalThis.addEventListener("online", notify);
+      globalThis.addEventListener("offline", notify);
+      return () => {
+        globalThis.removeEventListener("online", notify);
+        globalThis.removeEventListener("offline", notify);
+      };
+    },
+    () => globalThis.navigator.onLine,
+    () => true,
+  );
 }
 
-/** What the sync chip says (design 9). */
+/**
+ * What the sync chip says (design 9): the scheduler's deadline facts and what the other owners
+ * say now (the stream, skew, the network, the edit manager's problems and count of writes in
+ * flight, the revision shown), put through the pure rule. Nothing here is stored.
+ */
 export function useSync(): SyncSummary {
-  const { sync } = useSession();
-  return useSyncExternalStore(sync.subscribe, () => sync.summary);
+  const { sync, edits, host } = useSession();
+  const timing = useSelector(sync, (snapshot) => snapshot.context.timing);
+  const count = useSelector(edits, (snapshot) => inFlightOf(snapshot.context.writes));
+  const stream = useStreamStatus();
+  const online = useOnline();
+  const skew = useSkew();
+  const problems = useProblems();
+  const revision = useDerivation()?.revision;
+  const latest = useSaves()[0];
+  const demo = host.kind === "browser";
+  return useMemo(() => syncSummary(syncInputOf(timing, { stream, online, demo, skew, revision, count, problems, latest })), [timing, stream, online, demo, skew, revision, count, problems, latest]);
+}
+
+/** The save the chip announces as it lands, for as long as its SAVED time runs. */
+export function useSavedAnnouncement(): { id: number; text: string } | undefined {
+  const timing = useSelector(useSession().sync, (snapshot) => snapshot.context.timing);
+  const latest = useSaves()[0];
+  return useMemo(() => savedAnnouncement(latest, timing), [latest, timing]);
 }
 
 /** The writes that did not land, as the edit manager holds them (the chip's Needs you). */

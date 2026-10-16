@@ -1,10 +1,13 @@
 // ARCHITECTURE, Web UI: the session root. Started once at boot, outside React and StrictMode,
 // it holds what the whole tab shares and its children: whether the tab is compatible with the
-// server's build or in version skew (which absorbs the old latch), the tick stream (the
-// subscription), the deployment and the caller (keyed reads), the journeys (the journey manager),
-// and the edit manager, which owns every write. The root forwards what reads send the stream, and
-// keeps the shown reads (the ones the sync chip counts when they fall behind). The other owners
-// (the activity, the sync status) join as their steps land.
+// server's build or in version skew (which absorbs the old latch), the saves the tab made
+// (plain data, newest first), the tick stream (the subscription), the deployment and the
+// caller (keyed reads), the journeys (the journey manager), the edit manager, which owns every
+// write, the sync scheduler (the facts that carry a deadline, and a wake at the next), the
+// toast, and the conversation manager (one conversation per assistant target). The root
+// forwards what reads send the stream, tells the scheduler what only it sees (a save landed,
+// the count of writes in flight), and keeps the shown reads (the ones the sync chip counts
+// when they fall behind).
 //
 // Skew never lifts, so `skewed` is not final: a final root would stop its children, and the
 // kept writes with them. In skew the tab derives, previews, writes and retries nothing (the
@@ -14,11 +17,15 @@
 import { streamStatus, subscription, type OpenTicks, type StreamStatus, type SubscriptionEvent } from "@cairn/client";
 import { assign, enqueueActions, sendTo, setup, type ActorRefFrom, type AnyActorRef } from "xstate";
 
-import { editManager, type EditsInput, type EditsRef } from "./edit-manager.ts";
+import { conversationManager, type ConversationsInput, type ConversationsRef } from "../assistant/conversations.ts";
+import { NO_SAVES, recorded, type Recent, type SaveEvent } from "./activity.ts";
+import { editManager, inFlightOf, type EditsInput, type EditsRef } from "./edit-manager.ts";
 import type { Deriver, Host } from "./host.ts";
 import { journeyManager } from "./journeys.ts";
 import { keyedRead, type ReadEnv } from "./keyed-read.ts";
 import { DEPLOYMENT_KEY, deploymentSource, viewerKey, viewerSource } from "./session-reads.ts";
+import { syncMachine, type SyncRef } from "./sync.ts";
+import { toastMachine, type ToastsRef } from "./toasts.ts";
 import type { WriteEnv } from "./write-machine.ts";
 
 /** What the root is started with: the host, and the manager's input less what the root itself answers. */
@@ -28,12 +35,15 @@ export interface RootInput {
   open: OpenTicks;
   /** The page's clock, for date rollover. */
   today: () => Date;
-  /** Monotonic milliseconds. */
+  /** Monotonic milliseconds: the clock reads measure their lag on, and the sync scheduler counts its thresholds on. */
   now: () => number;
+  conversations: ConversationsInput;
   edits: Omit<EditsInput, "env"> & { env: Omit<WriteEnv, "compatible"> };
 }
 
 export interface RootContext extends RootInput {
+  /** The saves this tab made, newest first. */
+  recent: Recent;
   /** The reads the sync chip counts when they fall behind, by registration. */
   shown: Readonly<Record<string, AnyActorRef>>;
   /** The stream's state as last seen, so a change wakes the waiting writes. */
@@ -46,12 +56,15 @@ export type RootEvent =
   | { type: "wake" }
   /** Puts the kept edits back, once the root is running. */
   | { type: "restore" }
+  /** A write landed and left this save. */
+  | { type: "saved"; save: Omit<SaveEvent, "id"> }
   | SubscriptionEvent
   /** A shown read is keyed; `hidden` when it stops or changes identity. */
   | { type: "shown"; id: string; read: AnyActorRef }
   | { type: "hidden"; id: string }
   | { type: "xstate.snapshot.subscription"; snapshot: SubscriptionSnapshot }
-  | { type: "xstate.snapshot.deployment"; snapshot: DeploymentSnapshot };
+  | { type: "xstate.snapshot.deployment"; snapshot: DeploymentSnapshot }
+  | { type: "xstate.snapshot.edits"; snapshot: ReturnType<EditsRef["getSnapshot"]> };
 
 type SubscriptionSnapshot = ReturnType<ActorRefFrom<typeof subscription>["getSnapshot"]>;
 type DeploymentSnapshot = ReturnType<ActorRefFrom<typeof keyedRead>["getSnapshot"]>;
@@ -60,7 +73,7 @@ const without = <T>(record: Readonly<Record<string, T>>, key: string): Record<st
 
 export const sessionRoot = setup({
   types: { context: {} as RootContext, events: {} as RootEvent, input: {} as RootInput },
-  actors: { subscription, read: keyedRead, journeys: journeyManager, edits: editManager },
+  actors: { subscription, read: keyedRead, journeys: journeyManager, edits: editManager, sync: syncMachine, toasts: toastMachine, conversations: conversationManager },
   actions: {
     // The reads and the manager send the stream through the root, which forwards to the subscription.
     forward: sendTo("subscription", ({ event }) => event as SubscriptionEvent),
@@ -69,6 +82,10 @@ export const sessionRoot = setup({
       return { shown: { ...context.shown, [shown.id]: shown.read } };
     }),
     hideRead: assign(({ context, event }) => ({ shown: without(context.shown, (event as Extract<RootEvent, { type: "hidden" }>).id) })),
+    // A save landed: the tab keeps it.
+    keepSave: assign({ recent: ({ context, event }) => recorded(context.recent, (event as Extract<RootEvent, { type: "saved" }>).save) }),
+    // The edit manager moved: the scheduler hears how many writes are in flight (and ignores a repeat).
+    countInFlight: sendTo("sync", ({ event }) => ({ type: "inFlight" as const, count: inFlightOf((event as Extract<RootEvent, { type: "xstate.snapshot.edits" }>).snapshot.context.writes) })),
     wantDeployment: sendTo("deployment", { type: "want", key: DEPLOYMENT_KEY }),
     // The deployment moved: the caller is read once its first read settled, and again for each newer one held.
     keyViewer: sendTo("viewer", ({ event }) => ({ type: "want" as const, key: viewerKey((event as Extract<RootEvent, { type: "xstate.snapshot.deployment" }>).snapshot) })),
@@ -83,8 +100,11 @@ export const sessionRoot = setup({
   },
 }).createMachine({
   id: "session",
-  context: ({ input }) => ({ ...input, shown: {}, stream: "idle" }),
+  context: ({ input }) => ({ ...input, recent: NO_SAVES, shown: {}, stream: "idle" }),
+  // The scheduler and the toast are first: the others' relays and notes reach them.
   invoke: [
+    { id: "sync", src: "sync", input: ({ context }) => ({ monotonic: context.now }) },
+    { id: "toasts", src: "toasts" },
     { id: "subscription", src: "subscription", input: ({ context }) => ({ open: context.open }), onSnapshot: { actions: "streamMoved" } },
     {
       id: "deployment",
@@ -105,7 +125,9 @@ export const sessionRoot = setup({
         ...context.edits,
         env: { ...context.edits.env, compatible: () => self.getSnapshot().matches("compatible") },
       }),
+      onSnapshot: { actions: "countInFlight" },
     },
+    { id: "conversations", src: "conversations", input: ({ context }) => context.conversations },
   ],
   initial: "starting",
   states: {
@@ -118,6 +140,8 @@ export const sessionRoot = setup({
   on: {
     wake: { actions: sendTo("edits", { type: "wake" }) },
     restore: { actions: sendTo("edits", { type: "restore" }) },
+    // The scheduler counts the save's SAVED time from now.
+    saved: { actions: ["keepSave", sendTo("sync", { type: "saved" })] },
     watch: { actions: "forward" },
     unwatch: { actions: "forward" },
     reopen: { actions: "forward" },
@@ -130,6 +154,7 @@ export type SessionRootRef = ActorRefFrom<typeof sessionRoot>;
 export type { EditsRef };
 export type JourneysRef = ActorRefFrom<typeof journeyManager>;
 export type SubscriptionRef = ActorRefFrom<typeof subscription>;
+export type { ConversationsRef, SyncRef, ToastsRef };
 export type ReadRef = ActorRefFrom<typeof keyedRead>;
 
 /** The part of the root a read's environment uses. */
@@ -154,7 +179,7 @@ export function readEnvOf(root: RootPort, now: () => number): ReadEnv {
   };
 }
 
-function childOf<K extends "edits" | "journeys" | "subscription" | "deployment" | "viewer">(root: SessionRootRef, id: K) {
+function childOf<K extends "edits" | "journeys" | "subscription" | "deployment" | "viewer" | "sync" | "toasts" | "conversations">(root: SessionRootRef, id: K) {
   const child = root.getSnapshot().children[id];
   if (child === undefined) {
     throw new Error(`the session root is not running its ${id}`);
@@ -172,3 +197,9 @@ export const subscriptionOf = (root: SessionRootRef): SubscriptionRef => childOf
 export const deploymentOf = (root: SessionRootRef): ReadRef => childOf(root, "deployment");
 /** The root's caller read. */
 export const viewerOf = (root: SessionRootRef): ReadRef => childOf(root, "viewer");
+/** The root's sync scheduler. */
+export const syncOf = (root: SessionRootRef): SyncRef => childOf(root, "sync");
+/** The root's toast. */
+export const toastsOf = (root: SessionRootRef): ToastsRef => childOf(root, "toasts");
+/** The root's conversation manager. */
+export const conversationsOf = (root: SessionRootRef): ConversationsRef => childOf(root, "conversations");

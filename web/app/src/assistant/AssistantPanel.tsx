@@ -7,10 +7,11 @@
 // capabilities say there is an assistant (the in-browser host never has one). The panel opens
 // from a toggle in the screen's header or the tab, and stays open across screens in this tab; the message
 // being typed is a draft that survives a reload (ARCHITECTURE, Web UI).
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { useSelector } from "@xstate/react";
+import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Link } from "react-router";
 
-import { targetKey, type AssistantAction, type AssistantHost, type AssistantTarget } from "../data/assistant.ts";
+import { targetKey, type AssistantAction, type AssistantTarget } from "../data/assistant.ts";
 import { useDraft } from "../data/drafts.ts";
 import { linesOf, mayNotApply } from "../data/activity.ts";
 import { useSession } from "../data/react.ts";
@@ -19,7 +20,7 @@ import { AssistantSlot, useAssistantDock } from "../shell/frame.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import { aboutWords, assistantOffered, becauseWords, endedWords, shown, toolWords, type Entry } from "./model.ts";
-import { conversationOf } from "./conversation.ts";
+import { conversationView, sendTurn, type ConversationRef } from "./conversation.ts";
 import "./assistant.css";
 
 /** A node's title, when the screen knows it. */
@@ -167,15 +168,16 @@ export function Transcript({ entries, titleOf }: { entries: readonly Entry[]; ti
   );
 }
 
-/** I5: `target`'s conversation as the tab holds it, read again as the panel opens. */
-function useConversation(assistant: AssistantHost, target: AssistantTarget) {
-  const conversation = conversationOf(assistant, target);
-  useEffect(() => {
-    conversation.refresh();
-  }, [conversation]);
-  const view = useSyncExternalStore(conversation.subscribe, () => conversation.view);
-  const entries = view.read.status === "ready" ? shown(view.read.conversation.messages, view.kept, view.unsaved) : shown([], [], view.unsaved);
-  return { ...view, entries, send: (text: string) => conversation.send(text) };
+/** I5: `target`'s conversation as the tab holds it (the session's conversation manager), read again as the panel opens; none until the manager has started it. */
+function useConversation(target: AssistantTarget): ConversationRef | undefined {
+  const { conversations } = useSession();
+  const key = targetKey(target);
+  // Before paint, so the panel never shows a frame without its conversation.
+  useLayoutEffect(() => {
+    conversations.send({ type: "open", target });
+    // `key` names the target.
+  }, [conversations, key]);
+  return useSelector(conversations, (snapshot) => snapshot.context.conversations[key]);
 }
 
 /** The message being typed (a draft kept across reloads), and sending it. */
@@ -236,9 +238,17 @@ function Empty({ target }: { target: AssistantTarget }) {
 }
 
 /** The panel itself: the conversation, and the message being typed. */
-function AssistantPanel({ assistant, target, titleOf, onClose }: { assistant: AssistantHost; target: AssistantTarget; titleOf: TitleOf | undefined; onClose: () => void }) {
+function AssistantPanel({ target, titleOf, onClose }: { target: AssistantTarget; titleOf: TitleOf | undefined; onClose: () => void }) {
+  const conversation = useConversation(target);
+  return conversation === undefined ? null : <Conversing conversation={conversation} target={target} titleOf={titleOf} onClose={onClose} />;
+}
+
+function Conversing({ conversation, target, titleOf, onClose }: { conversation: ConversationRef; target: AssistantTarget; titleOf: TitleOf | undefined; onClose: () => void }) {
   const key = targetKey(target);
-  const { read, entries, sending, failure, send } = useConversation(assistant, target);
+  const snapshot = useSelector(conversation, (each) => each);
+  const { read, kept, unsaved, sending, failure } = useMemo(() => conversationView(snapshot), [snapshot]);
+  const entries = useMemo(() => shown(read.status === "ready" ? read.conversation.messages : [], kept, unsaved), [read, kept, unsaved]);
+  const send = (text: string) => sendTurn(conversation, text);
   const scroller = useRef<HTMLDivElement>(null);
   // The newest turn in view: the transcript scrolls itself, never the page around it.
   useEffect(() => {
@@ -307,7 +317,6 @@ export function AssistantDock({ target, titleOf }: { target: AssistantTarget; ti
     <AssistantSlot>
       <AssistantPanel
         key={targetKey(target)}
-        assistant={assistant}
         target={target}
         titleOf={titleOf}
         onClose={() => {

@@ -1,7 +1,7 @@
 // The frame's state: which of the inspector column's panes have something in them, which tab
 // is in view, whether the viewer hid the column (`]`), and where Esc takes the sheet.
 // The screens report through `FrameActions` (frame.tsx); the shell reads the result.
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import type { SheetSnap } from "./InspectorColumn.tsx";
@@ -27,47 +27,33 @@ export interface Frame {
   setAssistant: (element: HTMLElement | null) => void;
 }
 
-/** What Esc closes: the sheet in view, which is the node's (back to the screen it is open on, `address`) or the assistant's. */
-interface Closable {
-  tab: InspectorTab;
-  dock: AssistantDock | undefined;
-}
-
-/** `]` hides and shows the inspector; Esc closes the tablet's sheet, unless a field has focus. */
-function useFrameKeys(onClose: { current: () => void }, fold: () => void): void {
-  const toggle = useRef(fold);
-  toggle.current = fold;
+/**
+ * `]` hides and shows the inspector; Esc closes the tablet's sheet, unless a field has focus:
+ * the assistant when its tab is in view, else the open node by going back to the screen it is
+ * open on (`closeTo`).
+ */
+function useFrameKeys({ tab, dock, closeTo }: { tab: InspectorTab; dock: AssistantDock | undefined; closeTo: string | undefined }, fold: () => void): void {
+  const navigate = useNavigate();
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) {
         return;
       }
       if (event.key === "]") {
-        toggle.current();
+        fold();
       } else if (event.key === "Escape" && globalThis.matchMedia(SHEET).matches) {
-        onClose.current();
+        if (tab === "assistant") {
+          dock?.close();
+        } else if (closeTo !== undefined) {
+          void navigate(closeTo);
+        }
       }
     };
     globalThis.addEventListener("keydown", onKey);
     return () => {
       globalThis.removeEventListener("keydown", onKey);
     };
-  }, [onClose]);
-}
-
-/** Closes what the column shows: the assistant, or the open node by going back to the screen it is open on. */
-function useCloseShown(address: { current: string | undefined }, closable: { current: Closable }): { current: () => void } {
-  const navigate = useNavigate();
-  const closeShown = useRef(() => {});
-  closeShown.current = () => {
-    const { tab, dock } = closable.current;
-    if (tab === "assistant") {
-      dock?.close();
-    } else if (address.current !== undefined) {
-      void navigate(address.current);
-    }
-  };
-  return closeShown;
+  }, [tab, dock, closeTo, navigate, fold]);
 }
 
 export function useFrame(): Frame {
@@ -78,7 +64,7 @@ export function useFrame(): Frame {
   const [dock, setDock] = useState<AssistantDock | undefined>(undefined);
   const [hidden, setHidden] = useState(false);
   const [snap, setSnap] = useState<SheetSnap>("half");
-  const close = useRef<string | undefined>(undefined);
+  const [closeTo, setCloseTo] = useState<string | undefined>(undefined);
   const actions = useMemo<FrameActions>(
     () => ({
       mount: (slot) => {
@@ -97,9 +83,7 @@ export function useFrame(): Frame {
           setDock((now) => (now === next ? undefined : now));
         };
       },
-      closeTo: (address) => {
-        close.current = address;
-      },
+      closeTo: setCloseTo,
     }),
     [],
   );
@@ -109,12 +93,10 @@ export function useFrame(): Frame {
   const present = counts.inspector > 0 || counts.assistant > 0 || dock !== undefined;
   // A phone stacks the inspector under the page, except over the full-screen map, where it is a sheet that can be hidden.
   const stacked = useMedia(PHONE_WIDTH) && new URLSearchParams(useLocation().search).get("map") !== "1";
-  const closable = useRef<Closable>({ tab: "inspector", dock: undefined });
-  closable.current = { tab: shown, dock };
-  const closeShown = useCloseShown(close, closable);
-  useFrameKeys(closeShown, () => {
+  const toggleFolded = useCallback(() => {
     setHidden((now) => !now);
-  });
+  }, []);
+  useFrameKeys({ tab: shown, dock, closeTo }, toggleFolded);
   const state = useMemo<FrameState>(() => ({ inspector, assistant, tab: shown }), [inspector, assistant, shown]);
   return {
     state,
@@ -123,9 +105,7 @@ export function useFrame(): Frame {
     open: present && (!hidden || stacked),
     present,
     folded: present && hidden && !stacked,
-    toggleFolded: () => {
-      setHidden((now) => !now);
-    },
+    toggleFolded,
     snap,
     setSnap,
     dock,

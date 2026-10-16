@@ -6,10 +6,9 @@
 import type { HttpFailure, Schema } from "@cairn/client";
 
 import type { Markdown, Patch } from "./host.ts";
-import { consequenceLines, warningOf, type Activity, type ConsequenceLine, type TitleOf, type Unlocked } from "./activity.ts";
+import { consequenceLines, warningOf, type ConsequenceLine, type SaveEvent, type TitleOf, type Unlocked } from "./activity.ts";
 import { proposalIdOf, type Answer, type Command } from "./edit-record.ts";
 import { proposalPath } from "./proposals.ts";
-import type { SyncStatus } from "./sync.ts";
 
 export type Mutation = Schema<"Mutation">;
 export type Rejection = Schema<"Rejection">;
@@ -124,25 +123,6 @@ export function describe(intent: Pick<WriteIntent, "target" | "mutations">, titl
   }
 }
 
-/** The stores a save is recorded in. */
-export interface SaveEnv {
-  activity: Activity;
-  sync: SyncStatus;
-  titleOf: TitleOf;
-}
-
-/**
- * Records a save of this tab: in Recent with the warning sentence its consequences call for
- * (D7), and on the chip as SAVED. The warning is what a receipt shows.
- */
-export function recordSave(env: SaveEnv, text: string, lines: ConsequenceLine[], unlocked?: Unlocked, address?: string): string | undefined {
-  const warning = warningOf(lines, env.titleOf);
-  const at = new Date();
-  env.activity.saved({ at, text, warning, unlocked, address });
-  env.sync.saved(at.toLocaleTimeString([], { hour12: false }));
-  return warning;
-}
-
 /** Whether `answer` is a patch's (an apply, an import), which notes what it caused (D7); a proposal's does not. */
 export function isPatchAnswer(answer: Answer): answer is Schema<"PatchAnswer"> {
   return answer.outcome === "applied" || answer.outcome === "already_applied";
@@ -187,3 +167,11 @@ export function saveOf(command: Command, answer: Answer, began: number, titleOf:
 
 /** The proposal writes that make a proposal. */
 const DRAFTING: ReadonlySet<string> = new Set(["create", "upgrade", "save_as_route", "relink"]);
+
+/**
+ * A save as the event Recent lists (D7), made at `at`: its words, and the warning sentence its
+ * consequences call for, which is what a receipt shows.
+ */
+export function saveEventOf(save: Save, titleOf: TitleOf, at: Date): Omit<SaveEvent, "id"> {
+  return { at, text: save.text, warning: warningOf(save.lines, titleOf), unlocked: save.unlocked, address: save.address };
+}

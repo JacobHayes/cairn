@@ -8,7 +8,8 @@ import type { Answer, ProposalCall, ProposalCommand } from "../data/edit-record.
 import { useEdit, useSession, useSkew } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
 import { isPatchAnswer, landedWarning, newPatchId, type Rejection } from "../data/writes.ts";
-import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
+import { useReceipt } from "../ui/Receipt.tsx";
+import type { ReceiptState } from "../ui/receipt.ts";
 
 /** A proposal call before it has a patch id: what a control asks for. */
 export type ProposalAsk = ProposalCall extends infer C ? (C extends { request: infer R } ? Omit<C, "request"> & { request: Omit<R, "patch_id"> } : never) : never;

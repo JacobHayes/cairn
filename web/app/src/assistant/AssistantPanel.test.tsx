@@ -9,7 +9,7 @@ import { describe, expect, it } from "vitest";
 import { seeded } from "../authoring/engine.test-support.ts";
 import type { AssistantAction, AssistantHost } from "../data/assistant.ts";
 import { browserHost } from "../data/browser-host.ts";
-import { FakeDeriver, FakeHost, manualTimers } from "../data/fake.test-support.ts";
+import { FakeDeriver, FakeHost } from "../data/fake.test-support.ts";
 import type { Host } from "../data/host.ts";
 import { Session } from "../data/session.ts";
 import { Transcript } from "./AssistantPanel.tsx";
@@ -22,7 +22,7 @@ const anAssistant: AssistantHost = {
 
 /** Whether the rail offers the assistant over `host`, once the session has started. */
 async function offeredOver(host: Host): Promise<boolean> {
-  return assistantOffered(await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers }));
+  return assistantOffered(await Session.start({ host, deriver: new FakeDeriver() }));
 }
 
 function serverHost({ offers, assistant }: { offers: boolean; assistant: AssistantHost | undefined }): FakeHost {
