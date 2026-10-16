@@ -78,7 +78,8 @@ export async function follow(page: Page, path: string): Promise<void> {
 /**
  * Moves the tab to the screen at `path` without loading the page again, as the app's links do,
  * and returns once the router has rendered it (the shell's `data-screen`). Data the screen
- * derives may still be on its way; read it with a web-first assertion.
+ * derives may still be on its way; read it with a web-first assertion. Not for `/`, which
+ * redirects on its own once its data is read and would replace a later move.
  */
 export async function goWithin(page: Page, path: string): Promise<void> {
   await follow(page, path);
