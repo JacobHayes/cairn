@@ -10,7 +10,7 @@
 // storage, never sent. What a write made from the pass unlocked (the patch's consequences, never
 // a diff of the frontier) comes next, each card labeled with the card that unlocked it.
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
 import { useDraft } from "../data/drafts.ts";
@@ -21,7 +21,6 @@ import { screenPath } from "../detail/parts.tsx";
 import { COLUMN, Inspector, useMedia } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { typing } from "../ui/typing.ts";
-import { pagePath, switchedSearch } from "../journeys/address.ts";
 import { ACTING_KINDS, WALK_FILTER_FLAGS, triagePath, triageQueryOf, type TriageSettings } from "./address.ts";
 import { Check, Checks, FlagChecks } from "./Controls.tsx";
 import { DetailLink } from "./Parts.tsx";
@@ -203,9 +202,6 @@ export function TriageBody({ view, settings, selected }: { view: Ready; settings
   const open = settings.decisions ? actingDecisions(view).length : 0;
   return (
     <section className="stack pass" aria-label={settings.decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
-      <Link className="back-to-graph" to={pagePath(journey, "graph", undefined, switchedSearch(search, "walk", "graph"))} data-testid="back-to-graph">
-        ‹ Back to graph
-      </Link>
       {settings.decisions && view.journey.revision <= 1 && card !== undefined ? (
         <p className="for-you" data-testid="walkthrough-intro">
           Start with the decisions that shape this journey. {open} open now; each answer can open more.

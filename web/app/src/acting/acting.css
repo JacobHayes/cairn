@@ -266,9 +266,13 @@ summary.node-panel-head {
 }
 
 /* NEXT, CARDS: the card is the inspector's own panel at a readable width, Pass on the frame's
-   edge below it. */
-.pass-frame {
+   edge above it. The walkthrough is one centered column in the canvas area, the card and
+   whatever speaks to it (the introduction, the end of the pass, the stalled diagnostic) in the
+   same measure; a narrow area fills it, to the screen's own gutter. */
+.pass > * {
+  width: 100%;
   max-width: 560px;
+  margin-inline: auto;
 }
 
 /* On the frame's top edge with the card's place in the pass, apart from the node's own actions

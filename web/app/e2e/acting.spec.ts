@@ -37,6 +37,24 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   await expect(frontierItem(page, "n_docs")).toBeVisible();
 });
 
+test("C11: the walkthrough's card sits in the middle of the canvas area at every width and has no way back to the graph", async ({ page }) => {
+  for (const width of [1440, 900, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await openActing(page, "browser", "j_launch", "walk");
+    await card(page).waitFor();
+    const area = await page.locator(".journey-scroll").boundingBox();
+    const frame = await card(page).boundingBox();
+    if (area === null || frame === null) {
+      throw new Error("the canvas area and the card are both drawn");
+    }
+    const [before, after] = [frame.x - area.x, area.x + area.width - (frame.x + frame.width)];
+    expect(Math.abs(before - after), `the gaps either side of the card at ${String(width)}px`).toBeLessThanOrEqual(1);
+    expect(frame.width).toBeLessThanOrEqual(560);
+    expect(frame.x, "the card keeps the standard gutter from the window's edge").toBeGreaterThanOrEqual(16);
+  }
+  await expect(page.getByRole("link", { name: /back to graph/i })).toHaveCount(0);
+});
+
 test("B1, C11: a journey started from a route opens its walkthrough; an answer surfaces and unlocks work, passing writes nothing, and a node completed from the pass unlocks into it", async ({ page }) => {
   const route = await publishFollowUpRoute(page);
   await startJourney(page, "browser", journeyName("Follow-up"), { route, version: 1 });
