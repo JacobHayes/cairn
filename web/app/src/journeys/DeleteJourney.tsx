@@ -1,7 +1,7 @@
 // A19: hard deletion of an archived journey, which removes the journey and its history and is
 // sent only with the journey's name typed back. One patch on the revision shown. The status
-// changes themselves (complete, reopen, archive, un-archive: B11) are the lifecycle chip's
-// menu in the journey header (screens/JourneyHeader.tsx).
+// changes themselves (complete, reopen, archive, un-archive: B11) are under the journey header's
+// `⋯`, Status (screens/JourneyHeader.tsx).
 import { useState } from "react";
 import { useNavigate } from "react-router";
 

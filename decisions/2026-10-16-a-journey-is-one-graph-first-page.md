@@ -4,7 +4,7 @@
 
 Question (from making every journey view share one view state): the two-pages record (Next and Plan, each with its own projections) no longer describes the app. Since then a journey has opened on its graph, Frontier became a chip, and the walk through became a button. What is a journey's page now?
 
-Call: one page, graph first. Its views are Graph, List, Timeline and Summary in one segmented control at the left of the toolbar, with Walk through at the toolbar's right end. The view controls (Detail, Frontier, Decisions, Filter and search) are one view state that every view shares and every switch carries ([`2026-10-16-every-journey-view-shares-one-view-state.md`](2026-10-16-every-journey-view-shares-one-view-state.md)). Frontier is a highlight on every view, not a page or a scope. The summary keeps its own address for reports and printing.
+Call: one page, graph first. Its views are Graph, List, Timeline, Summary and the Walkthrough, picked from the header's View picker ([`2026-10-16-the-journey-header-holds-the-view-picker-and-status.md`](2026-10-16-the-journey-header-holds-the-view-picker-and-status.md)). The view controls (Detail, Frontier, Decisions, Filter and search) are one view state that every view shares and every switch carries ([`2026-10-16-every-journey-view-shares-one-view-state.md`](2026-10-16-every-journey-view-shares-one-view-state.md)). Frontier is a highlight on every view, not a page or a scope. The summary keeps its own address for reports and printing.
 
 Alternatives:
 

@@ -3,7 +3,7 @@
 // viewer's expands and collapses. The chips take one setting off each; Reset keeps Frontier and Fade.
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, filterChanged, filterChips, isStock, stockView, switchedSearch, viewStateFrom, viewStateParams, VIEW_PARAMS, withViewState, type ViewState } from "./view.ts";
+import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, filterChanged, filterChips, isStock, stockView, switchedSearch, viewPath, viewStateFrom, viewStateParams, VIEW_PARAMS, withViewState, type ViewState } from "./view.ts";
 
 const narrowed: ViewState = {
   depth: "decisions",
@@ -70,6 +70,25 @@ describe("switching views", () => {
 
   it("keeps the query of the view already open", () => {
     expect(switchedSearch(search, "list", "list")).toBe(search);
+  });
+});
+
+describe("picking a view", () => {
+  const search = "?sort=title&frontier=1&open=g1";
+  const node = "n_a";
+
+  it.each([
+    { name: "the open view keeps its whole query and node", from: "list", to: "list", path: `/journeys/j_1/list/nodes/n_a${search}` },
+    { name: "the Walkthrough picked on the Walkthrough is a no-op", from: "walk", to: "walk", path: `/journeys/j_1/walk/nodes/n_a${search}` },
+    { name: "another view keeps the node and only the shared settings", from: "graph", to: "list", path: "/journeys/j_1/list/nodes/n_a?frontier=1" },
+    { name: "a node is not carried into the Walkthrough", from: "list", to: "walk", path: "/journeys/j_1/walk?frontier=1" },
+    { name: "the node is kept coming back from the Walkthrough", from: "walk", to: "graph", path: "/journeys/j_1/graph/nodes/n_a?frontier=1" },
+  ] as const)("$name", ({ from, to, path }) => {
+    expect(viewPath("j_1", from, to, node, search)).toBe(path);
+  });
+
+  it("has no node to carry when none is open", () => {
+    expect(viewPath("j_1", "graph", "summary", undefined, search)).toBe("/journeys/j_1/summary?frontier=1");
   });
 });
 

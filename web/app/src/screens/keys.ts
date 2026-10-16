@@ -2,18 +2,18 @@
 // The bindings that ship with the journey pages move you or change the view: `j` and `k`
 // (next and previous row), `Enter` (the open node's primary action), `Esc` (close a popover,
 // then the sheet, then clear the selection),
-// `v` (next view), `F` (FRONTIER; the canvas has `f` for fit), `w` (walk through), `m` (Only mine),
+// `v` (next view), `F` (FRONTIER; the canvas has `f` for fit), `w` (the Walkthrough), `m` (Only mine),
 // `1` to `4` (Depth's step), `/` (search), `?` (the sheet). The view-state keys change the journey's one view state
-// (journeys/view.ts) wherever their control is live: none on the Summary, and not `F` on the walk through, whose every card
-// is on the frontier. `p` (pass) is the walk through's own (acting/TriageScreen.tsx). Pure helpers carry the decisions, so
+// (journeys/view.ts) wherever their control is live: none on the Summary, and not `F` on the Walkthrough, whose every card
+// is on the frontier. `p` (pass) is the Walkthrough's own (acting/TriageScreen.tsx). Pure helpers carry the decisions, so
 // they are tested without a page.
 import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { STEPS, type Step } from "../canvas/model.ts";
 import { screenPath, nodePath } from "../detail/parts.tsx";
-import { nextProjection, pagePath, type Projection, type Screen } from "../journeys/address.ts";
-import { switchedSearch, type ViewState } from "../journeys/view.ts";
+import { nextProjection, type Projection, type Screen } from "../journeys/address.ts";
+import { viewPath, type ViewState } from "../journeys/view.ts";
 import { typing } from "../ui/typing.ts";
 
 /** The bindings the sheet lists, each with its words; `group` heads the run of rows it starts. The canvas handles its own keys (canvas/GraphCanvas.tsx) and the table lists them. */
@@ -23,11 +23,11 @@ export const KEY_BINDINGS: { keys: string; words: string; group?: string }[] = [
   { keys: "Esc", words: "Close a popover or the sheet, then clear the selection" },
   { keys: "v", words: "Cycle Graph, List and Timeline" },
   { keys: "Shift F", words: "Toggle Frontier" },
-  { keys: "w", words: "Walk through the frontier" },
+  { keys: "w", words: "Open the Walkthrough" },
   { keys: "m", words: "Toggle Only mine" },
   { keys: "1 - 4", words: "Depth: Stages, Decisions, Deliverables or Actions" },
   { keys: "/", words: "Search" },
-  { keys: "p", words: "Pass, in the walk through" },
+  { keys: "p", words: "Pass, in the Walkthrough" },
   { keys: "?", words: "This sheet" },
   { keys: "f", words: "Fit the selection, or the whole graph with none", group: "Graph" },
 ];
@@ -132,11 +132,11 @@ function onChips(key: string, heard: Heard): boolean {
         return false;
       }
       const to: Projection = nextProjection(screen);
-      go(pagePath(journey, to, selected, switchedSearch(search, screen, to)));
+      go(viewPath(journey, screen, to, selected, search));
       return true;
     }
     case "w":
-      go(pagePath(journey, "walk", undefined, switchedSearch(search, screen, "walk")));
+      go(viewPath(journey, screen, "walk", selected, search));
       return true;
     case "/":
       return focusSearch();

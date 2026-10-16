@@ -1,6 +1,6 @@
 // The controls every view of a journey shares, one row in a fixed order: Depth (how deep is
 // drawn), Frontier (emphasis), Filter, and Search, then the view's own end slot. On the graph the
-// row floats at the canvas's top left (on a phone, folded into one View menu); on the list, the
+// row floats at the canvas's top left (on a phone, folded into one Controls menu); on the list, the
 // timeline and the walk it sits at the top of the pane. Every control reads and writes the
 // journey's one view state (journeys/view.ts), so it means the same on every view: Depth, Filter
 // and search choose what is drawn, through the engine's level; Frontier only lights what is
@@ -276,26 +276,26 @@ export interface ViewControlsProps {
   end?: ReactNode;
 }
 
-/** The graph's controls on a phone, where the canvas has room for one button: the same controls in a View menu, with the depth and filter badges on it. */
+/** The graph's controls on a phone, where the canvas has room for one button: the same controls in a Controls menu, with the depth and filter badges on it. */
 function PhoneControls({ ready, screen, badges }: { ready: Ready; screen: Screen; badges: Badges | undefined }) {
   const shown = [badges?.depth, badges?.filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
   const total = { count: shown.reduce((sum, badge) => sum + badge.count, 0), words: shown.map((badge) => badge.words).join(". ") };
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <Menu
-        label="View"
+        label="Controls"
         title={tip("Depth, Frontier, filter and search", total)}
-        testId="view-button"
+        testId="controls-button"
         role="dialog"
         className="view-control"
         trigger={
-          <Dotted badge={total} testId="view-badge">
-            View ▾
+          <Dotted badge={total} testId="controls-badge">
+            Controls ▾
           </Dotted>
         }
       >
         {(close) => (
-          <div className="stack" data-testid="view-panel-phone">
+          <div className="stack" data-testid="controls-panel-phone">
             <span className="muted small">Depth</span>
             <DepthOptions ready={ready} screen={screen} close={close} />
             <hr className="menu-rule" />
@@ -312,7 +312,7 @@ function PhoneControls({ ready, screen, badges }: { ready: Ready; screen: Screen
 }
 
 export function ViewControls({ ready, screen, badges, end }: ViewControlsProps) {
-  // The graph's controls float over the canvas, where a phone has room for one: they fold into a View menu.
+  // The graph's controls float over the canvas, where a phone has room for one: they fold into a Controls menu.
   const phone = useMedia(PHONE_WIDTH);
   if (screen === "graph" && phone) {
     return <PhoneControls ready={ready} screen={screen} badges={badges} />;

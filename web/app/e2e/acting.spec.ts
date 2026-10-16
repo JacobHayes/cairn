@@ -8,7 +8,7 @@ import { expect, test } from "@playwright/test";
 
 import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { derivedRevision, nodePanel, setDepth } from "./shell.ts";
+import { derivedRevision, goTo, nodePanel, setDepth } from "./shell.ts";
 
 test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an unsnooze returns them", async ({ page }) => {
   await openActing(page, "browser", "j_launch", "list?frontier=1");
@@ -102,8 +102,8 @@ test("C9: a folded container stays folded across Show not relevant; a trip to th
   await expect(row).toHaveAttribute("aria-expanded", "false");
   await page.getByTestId("show-not-relevant").click();
   await expect(page.getByTestId("list-total")).toHaveAttribute("data-total", String(total));
-  await page.getByTestId("view-graph").click();
-  await page.getByTestId("view-list").click();
+  await goTo(page, "graph");
+  await goTo(page, "list");
   await expect(page.getByTestId("list-fold").first()).toBeVisible();
   await expect(page.locator('[data-testid="list-fold"][aria-expanded="false"]')).toHaveCount(0);
 });

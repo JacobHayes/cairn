@@ -3,7 +3,8 @@
 // index is shareable and follows the back button. Every filter at its default leaves the
 // address bare.
 //
-// A journey has one page, graph first, with views of its nodes and a walk through its frontier:
+// A journey has one page, graph first, with views of its nodes and the Walkthrough of its frontier,
+// all picked in the header (screens/ViewPicker.tsx):
 //
 //   /journeys/<id>/{graph|list|timeline}[/nodes/<key>]   (graph: also /edges/<from>~<to>)
 //   /journeys/<id>/summary[/nodes/<key>]
@@ -140,11 +141,17 @@ export function newJourneyPath(route?: string, version?: number): string {
 /** How a journey is drawn: the three projections of its nodes. */
 export type Projection = "graph" | "list" | "timeline";
 
-/** The projections in the order the toolbar lists them and `v` cycles them. */
+/** The projections in the order the View picker lists them and `v` cycles them. */
 export const PROJECTIONS: readonly Projection[] = ["graph", "list", "timeline"];
 
-/** A journey's screens: a projection, the Summary, or the walk through the frontier. */
+/** A journey's screens: a projection, the Summary, or the Walkthrough of the frontier. */
 export type Screen = Projection | "summary" | "walk";
+
+/** C11: the screens in the order the View picker lists them: the Walkthrough is one more view. */
+export const SCREENS: readonly Screen[] = ["graph", "list", "timeline", "summary", "walk"];
+
+/** Each screen's name as the View picker says it. */
+export const SCREEN_WORDS: Record<Screen, string> = { graph: "Graph", list: "List", timeline: "Timeline", summary: "Summary", walk: "Walkthrough" };
 
 export const DEFAULT_PROJECTION: Projection = "graph";
 

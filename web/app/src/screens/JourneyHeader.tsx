@@ -1,8 +1,8 @@
-// The journey header (4.1): the name, the lifecycle chip (`● ACTIVE ▾`: only the moves the
-// status allows, B11) and, on the right, the journey's `⋯` (Edit, insert a segment, save it as a
-// route, re-link it, copy its link: the flows the overview held, B7 to B9, A19).
-// What the journey is (progress, next milestone, route) is on the journey card in the inspector.
-// When completion is suggested, a band under the header offers it.
+// The journey header (4.1): one line with the name, the status when the journey is not active (a
+// read-only chip), the View picker and the journey's `⋯` (Edit, insert a segment, save it as a
+// route, re-link it, copy its link, and its Status: the moves the status allows, B11, and
+// deletion once archived, A19). What the journey is (progress, next milestone, route) is on the
+// journey card in the inspector. When completion is suggested, a band under the header offers it.
 import { useState } from "react";
 import { Link } from "react-router";
 
@@ -11,34 +11,58 @@ import { canvasPath, type GraphView } from "../canvas/settings.ts";
 import type { Ready } from "../detail/model.ts";
 import { DeleteJourney } from "../journeys/DeleteJourney.tsx";
 import { statusActions } from "../journeys/lifecycle.ts";
+import type { JourneyStatus, Screen } from "../journeys/address.ts";
 import { useInsertEntry } from "../segments/entry.ts";
 import { useSuggested } from "../journeys/suggested.ts";
 import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { Menu } from "./Menu.tsx";
+import { ViewPicker } from "./ViewPicker.tsx";
 import { Refused } from "./Refused.tsx";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
 
 type Panel = JourneyFlowName | "delete";
 
-/** The lifecycle chip (B11): only the moves the status allows, and deletion once archived (A19). */
-function LifecycleMenu({ ready, write, onDelete }: { ready: Ready; write: ScreenWrite; onDelete: () => void }) {
+/** What a status other than active means, said on its chip. */
+const STATUS_MEANING: Record<Exclude<JourneyStatus, "active">, string> = {
+  completed: "Completed: it has left mine and the cross-journey lists. Reopen it under the menu, Status.",
+  archived: "Archived: it accepts only un-archiving or deletion. Both are under the menu, Status.",
+};
+
+/** The status as the Status row says it. */
+const STATUS_WORDS: Record<JourneyStatus, string> = { active: "Active", completed: "Completed", archived: "Archived" };
+
+/** B11: the journey's status beside its name, read-only, and only when it is not active. */
+function JourneyStatusChip({ status }: { status: JourneyStatus }) {
+  return status === "active" ? null : (
+    <Badge data-status={status} data-testid="journey-status" title={STATUS_MEANING[status]}>
+      {status}
+    </Badge>
+  );
+}
+
+/** B11, A19: the `⋯` menu's Status row, which opens in place to the moves the status allows, and deletion once archived. */
+function StatusItems({ ready, write, onDelete, close }: { ready: Ready; write: ScreenWrite; onDelete: () => void; close: () => void }) {
   const { header, revision } = ready.journey;
+  const [open, setOpen] = useState(false);
   return (
-    <Menu
-      label={`Status: ${header.status}`}
-      testId="lifecycle-chip"
-      align="end"
-      className="no-print"
-      trigger={
-        <span className="lifecycle-label">
-          <Badge data-status={header.status} data-testid="overview-status">{header.status}</Badge> ▾
-        </span>
-      }
-    >
-      {(close) => (
-        <>
+    <>
+      <button
+        type="button"
+        role="menuitem"
+        className="menu-item"
+        aria-expanded={open}
+        data-testid="menu-status"
+        data-status={header.status}
+        title="The journey's status: open it to change it"
+        onClick={() => { setOpen(!open); }}
+      >
+        Status
+        <small>{STATUS_WORDS[header.status]} {open ? "▾" : "▸"}</small>
+      </button>
+      {open ? (
+        <div role="group" aria-label="Status" className="menu-sub" data-testid="status-choices">
           {statusActions(header.status).map((action) => (
             <button
               key={action.to}
@@ -60,9 +84,9 @@ function LifecycleMenu({ ready, write, onDelete }: { ready: Ready; write: Screen
               Delete...
             </button>
           ) : null}
-        </>
-      )}
-    </Menu>
+        </div>
+      ) : null}
+    </>
   );
 }
 
@@ -80,8 +104,8 @@ function copyLink(): void {
   }
 }
 
-/** The journey's `⋯`, in groups: Edit and the structure flows, and its link. */
-function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: GraphView; selected: string | undefined; onPanel: (panel: Panel) => void }) {
+/** The journey's `⋯`, in groups: Edit and the structure flows, its link, and its status. */
+function JourneyMenu({ ready, view, selected, write, onPanel }: { ready: Ready; view: GraphView; selected: string | undefined; write: ScreenWrite; onPanel: (panel: Panel) => void }) {
   const { header } = ready.journey;
   const insert = useInsertEntry();
   const archived = header.status === "archived";
@@ -111,6 +135,8 @@ function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: G
             <button type="button" role="menuitem" className="menu-item" data-testid="menu-copy-link" onClick={() => { close(); copyLink(); }}>
               Copy link
             </button>
+            <hr />
+            <StatusItems ready={ready} write={write} onDelete={() => { onPanel("delete"); }} close={close} />
           </>
         );
       }}
@@ -119,7 +145,7 @@ function JourneyMenu({ ready, view, selected, onPanel }: { ready: Ready; view: G
 }
 
 /** `view` is the canvas as the page shows it, or the canvas's defaults off the graph: Edit structure keeps it. */
-export function JourneyHeader({ ready, view, selected }: { ready: Ready; view: GraphView; selected: string | undefined }) {
+export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready; view: GraphView; screen: Screen; selected: string | undefined }) {
   const { header, revision } = ready.journey;
   const write = useScreenWrite();
   const suggested = useSuggested(ready);
@@ -127,11 +153,15 @@ export function JourneyHeader({ ready, view, selected }: { ready: Ready; view: G
   return (
     <section className="stack journey-header" aria-label={header.name} data-testid="journey-header">
       <div className="row">
-        <h1 data-testid="journey-name">{header.name}</h1>
-        <LifecycleMenu ready={ready} write={write} onDelete={() => { setPanel("delete"); }} />
-        <span className="spacer" />
+        <div className="journey-header-title">
+          <h1 data-testid="journey-name">{header.name}</h1>
+          <JourneyStatusChip status={header.status} />
+        </div>
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
-        <JourneyMenu ready={ready} view={view} selected={selected} onPanel={setPanel} />
+        <div className="journey-header-actions">
+          <ViewPicker journey={header.id} screen={screen} node={selected} />
+          <JourneyMenu ready={ready} view={view} selected={selected} write={write} onPanel={setPanel} />
+        </div>
       </div>
       {header.status === "active" && suggested ? (
         <div className="callout row" data-testid="completion-suggested">
@@ -146,7 +176,6 @@ export function JourneyHeader({ ready, view, selected }: { ready: Ready; view: G
           </Button>
         </div>
       ) : null}
-      {header.status === "archived" ? <span className="muted small">Archived: it accepts only un-archiving or deletion.</span> : null}
       {write.rejected === undefined ? <Receipt receipt={write.receipt} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
       {panel === "delete" ? <DeleteJourney ready={ready} onCancel={() => { setPanel(undefined); }} /> : null}
       {panel === "save" || panel === "relink" ? (

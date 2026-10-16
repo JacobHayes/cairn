@@ -13,7 +13,7 @@ import { createContext, useContext } from "react";
 import type { ListFlag } from "../acting/address.ts";
 import { overBytes, TITLE_BYTES_MAX } from "../authoring/limits.ts";
 import { STEPS, type Step } from "../canvas/model.ts";
-import type { Screen } from "./address.ts";
+import { pagePath, type Screen } from "./address.ts";
 
 /** C9: the flags the Filter offers, in the order it lists them. */
 export const FILTER_FLAGS: readonly ListFlag[] = ["overdue", "stale", "unassigned", "shortfall", "snoozed"];
@@ -158,6 +158,16 @@ export function withViewState(search: string, next: ViewState, picked = false): 
  */
 export function switchedSearch(search: string, from: Screen, to: Screen): string {
   return from === to ? search : searchOf(viewStateParams(viewStateFrom(new URLSearchParams(search))));
+}
+
+/**
+ * C9, C11: where picking view `to` in the View picker from view `from` goes. The open node stays
+ * open, except into the Walkthrough from another view: there a node's address means "opened from a
+ * card", and a node opened elsewhere is no card of this pass. The view already open keeps its
+ * query; any other gets the shared view state (`switchedSearch`).
+ */
+export function viewPath(journey: string, from: Screen, to: Screen, node: string | undefined, search: string): string {
+  return pagePath(journey, to, to === "walk" && from !== "walk" ? undefined : node, switchedSearch(search, from, to));
 }
 
 /** Whether `filter` differs from the stock filter: the Filter's pressed look. */

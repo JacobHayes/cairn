@@ -1,5 +1,4 @@
-/* The journey's page: the head (the header, the toolbar with the views, the chips and Walk
-   through, the active filters) over the projection, with the inspector column beside it. The
+/* The journey's page: the head (the header line, the active filters) over the projection, with the inspector column beside it. The
    workspace (.ws-body) and the inspector are the only scrollers, so the window itself never
    scrolls and nothing sits below the fold (2.1); the graph fills what the head leaves and the
    other projections scroll with the head. Below 720px the frame is one column the document
@@ -35,12 +34,33 @@
   gap: var(--space-2);
 }
 
-/* The title, the lifecycle chip and the menu stay on one row, the title wrapping instead. */
+/* The title with its status chip, and the View picker with the menu, stay on one row, the title wrapping instead. */
 .journey-header > .row {
   flex-wrap: nowrap;
 }
 
-.lifecycle-label {
+/* The title and its chip are one group; the View picker and the menu another, at the row's right end. */
+.journey-header-title {
+  display: flex;
+  flex: 1 1 auto;
+  align-items: baseline;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.journey-header-title > h1 {
+  margin: 0;
+}
+
+.journey-header-actions {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.view-picker > .dropdown-button {
   white-space: nowrap;
 }
 
@@ -49,21 +69,24 @@
   overflow-wrap: anywhere;
 }
 
-/* The views and Walk through at the right end; one row, wrapping only when the head is very narrow. */
-.journey-toolbar {
-  gap: var(--space-2) var(--space-4);
-  padding-bottom: var(--space-2);
-}
-
-/* The head's own rule closes the toolbar from 720px; the flowing page below has none. */
+/* On a phone the title takes its own line; the picker and the menu drop under it, at the right, and the head's rule closes the header (the flowing page has none of its own). */
 @media (max-width: 719px) {
-  .journey-toolbar {
+  .journey-header > .row {
+    flex-wrap: wrap;
+  }
+
+  .journey-header-title {
+    flex-basis: 100%;
+  }
+
+  .journey-frame > .journey-head {
+    margin-bottom: var(--space-3);
     border-bottom: 1px solid var(--color-border);
   }
 }
 
 /* A control is one line, chevron inline: a squeezed row folds under the others, it never wraps a label. */
-:is(.journey-toolbar, .view-controls) :is(button, .button, .chip, .journey-switch, label) {
+.view-controls :is(button, .button, .chip, label) {
   white-space: nowrap;
 }
 
@@ -136,8 +159,8 @@
   text-align: center;
 }
 
-/* The switcher is one segmented control: the current choice filled with an ink underline. The
-   toolbar's views sit at its left; a route's and a proposal's own switchers at the right. */
+/* The switcher is one segmented control: the current choice filled with an ink underline. A
+   route's and a proposal's projection switchers sit at the right of their bars. */
 .journey-switcher {
   display: inline-flex;
   margin-left: auto;
@@ -145,10 +168,6 @@
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
   overflow: hidden;
-}
-
-.journey-toolbar .journey-switcher {
-  margin-left: 0;
 }
 
 .journey-switch {

@@ -7,6 +7,8 @@
 import { useEffect, useLayoutEffect, useRef, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import { createPortal } from "react-dom";
 
+import { menuFocusTarget } from "./menuKeys.ts";
+
 /** The space a menu keeps from the window's edge (px). */
 const EDGE_PX = 8;
 
@@ -78,11 +80,10 @@ export function ContextMenu({ at, groups, label, onChoose, onClose }: { at: { x:
   }, [onClose]);
   const onKeyDown = (event: ReactKeyboardEvent) => {
     const all = items();
-    const current = all.indexOf(document.activeElement as HTMLElement);
-    const to = { ArrowDown: current + 1, ArrowUp: current - 1, Home: 0, End: all.length - 1 }[event.key];
+    const to = menuFocusTarget(event.key, all.indexOf(document.activeElement as HTMLElement), all.length);
     if (to !== undefined) {
       event.preventDefault();
-      all[(to + all.length) % all.length]?.focus();
+      all[to]?.focus();
     } else if (event.key === "Escape") {
       event.preventDefault();
       onClose();

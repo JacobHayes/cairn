@@ -86,6 +86,32 @@ test("a click on the empty canvas deselects and a drag that pans does not", asyn
   await expect(page.getByTestId("card-mark")).toHaveCount(0);
 });
 
+test("a menu's arrow keys move over the items that can take the focus, never stalling at a disabled one", async ({ page }) => {
+  await openJourney(page, "browser", "j_bakeoff");
+  await nodeCard(page, "n_trial_a").getByTestId("card-open").click();
+  await nodeCard(page, "n_wrap_up").click({ modifiers: ["Shift"] });
+  await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "2");
+  // The trial is already active, so Start is disabled; the other items of the Status menu are not.
+  const button = page.getByTestId("selection-status");
+  await button.focus();
+  await page.keyboard.press("Enter");
+  const menu = page.getByTestId("selection-status-menu");
+  await expect(menu.getByRole("menuitem", { name: "Start" })).toBeDisabled();
+  const enabled = menu.locator('[role="menuitem"]:not(:disabled)');
+  const count = await enabled.count();
+  expect(count).toBeGreaterThan(1);
+  // Opened from the keyboard, the focus is on the first enabled item; down all the way round returns to it.
+  for (let step = 0; step <= count; step += 1) {
+    await expect(menu.locator('[role="menuitem"]:focus')).toHaveCount(1);
+    await expect(menu.locator('[role="menuitem"]:disabled:focus')).toHaveCount(0);
+    await expect(menu.locator('[role="menuitem"]:focus')).toHaveText(await enabled.nth(step % count).innerText());
+    await page.keyboard.press("ArrowDown");
+  }
+  await page.keyboard.press("Escape");
+  await expect(menu).toHaveCount(0);
+  await expect(button).toBeFocused();
+});
+
 test("selection is one set with no mode: click selects, shift-click adds, the inspector lists the members and the actions that fit them all", async ({ page }) => {
   await openJourney(page, "browser", "j_vendor_eval");
   const members = page.getByTestId("selection-member");

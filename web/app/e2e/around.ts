@@ -1,5 +1,5 @@
 // What the browser tests of the screens around a journey share (brief 5.5): starting a
-// journey from the form, the lifecycle chip, route detail's versions and actions,
+// journey from the form, the journey's status under its `⋯`, route detail's versions and actions,
 // a file exported from it as the browser saves it, and the entities screen's merge.
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
@@ -38,16 +38,17 @@ export async function openJourneyCard(page: Page, host: HostKind, id: string): P
   return card;
 }
 
-/** Chooses `item` in the header's menu `menu` (`lifecycle-chip` or `journey-menu`). */
-export async function chooseFromMenu(page: Page, menu: "lifecycle-chip" | "journey-menu", item: string): Promise<void> {
-  await page.getByTestId(menu).click();
-  await page.getByTestId(item).click();
-}
-
-/** Moves the journey to `to` (B11) from its lifecycle chip, waiting for the status to show it. */
+/** Moves the journey to `to` (B11) from the header's `⋯`, Status, waiting for the status to show it: the chip is there while it is not active. */
 export async function setStatus(page: Page, to: "active" | "completed" | "archived"): Promise<void> {
-  await chooseFromMenu(page, "lifecycle-chip", `status-${to}`);
-  await expect(page.getByTestId("overview-status")).toHaveAttribute("data-status", to);
+  await page.getByTestId("journey-menu").click();
+  await page.getByTestId("menu-status").click();
+  await page.getByTestId(`status-${to}`).click();
+  const chip = page.getByTestId("journey-status");
+  if (to === "active") {
+    await expect(chip).toHaveCount(0);
+  } else {
+    await expect(chip).toHaveAttribute("data-status", to);
+  }
 }
 
 /** Route `route`'s detail, once read. */

@@ -876,6 +876,16 @@ svg.chart .datum-line {
   font: 400 11px / 1.6 var(--font-mono);
   color: var(--color-muted);
 }
+/* Where you are in a menu of places (the View picker): the active-nav marker, turned vertical. */
+.menu-item[aria-current="page"] {
+  background: var(--color-band);
+  box-shadow: inset 2px 0 0 var(--color-text);
+  font-weight: 600;
+}
+/* A submenu opened in place under its row, one step in, as a tree's levels. */
+.menu-sub > .menu-item {
+  padding-left: calc(var(--space-3) + var(--space-5));
+}
 
 /* Option list: a bordered stack of choices with a hairline between; the chosen one is banded and ringed in ink, its effect right-aligned in mono steel. */
 .opts {

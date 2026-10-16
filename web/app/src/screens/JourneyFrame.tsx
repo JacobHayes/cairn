@@ -1,4 +1,4 @@
-// A journey's page (2.2): the header, the toolbar with its views and chips, the active
+// A journey's page (2.2): the header (title, status, the View picker, `⋯`), the active
 // filters, and the view the address names (the graph first), with the inspector column beside
 // it: the open node's detail, or the journey card when nothing is selected. The Summary is the
 // card at full width. The head stays put and the projection and the inspector scroll on
@@ -29,7 +29,6 @@ import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
 import { JourneyHeader } from "./JourneyHeader.tsx";
-import { JourneyToolbar } from "./JourneyToolbar.tsx";
 import { KeySheet } from "./KeySheet.tsx";
 import { useJourneyKeys } from "./keys.ts";
 import { CanvasBars, ProjectionBody, type ProjectionProps } from "./Projections.tsx";
@@ -210,8 +209,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       <InsertEntryContext value={inserting.start}>
       <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen}>
         <div className="ws-head stack journey-head">
-          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_GRAPH_VIEW} selected={selected} />
-          <JourneyToolbar journey={journey} screen={screen} node={selected} />
+          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_GRAPH_VIEW} screen={screen} selected={selected} />
           {planned ? <CanvasBars ready={ready} view={view} authored={authored} drawing={drawing} /> : null}
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>

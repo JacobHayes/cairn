@@ -156,13 +156,14 @@ export async function setFade(page: Page, on: boolean): Promise<void> {
   await expect(page.getByTestId("depth-fade")).toHaveCount(0);
 }
 
-/** Goes to the view `view` (`graph`, `list`, `timeline` or `summary`) from the toolbar's segmented control, as a person does. */
+/** Goes to the view `view` (`graph`, `list`, `timeline`, `summary` or `walk`) from the header's View picker, as a person does. */
 export async function goTo(page: Page, view: string): Promise<void> {
-  const switcher = page.getByTestId(`view-${view}`);
-  if ((await switcher.getAttribute("aria-current")) !== "page") {
-    await switcher.click();
+  const frame = page.getByTestId("journey-frame");
+  if ((await frame.getAttribute("data-screen")) !== view) {
+    await page.getByTestId("view-picker").click();
+    await page.getByTestId(`view-${view}`).click();
   }
-  await expect(switcher).toHaveAttribute("aria-current", "page");
+  await expect(frame).toHaveAttribute("data-screen", view);
 }
 
 /** Node `node`'s card on the journey's canvas. */

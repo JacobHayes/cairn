@@ -3,12 +3,13 @@
 // draws the same node from it; the keys act on the view the pointer left them on (j, Enter,
 // Esc, v); Frontier highlights without hiding; the search narrows every view; and no view
 // scrolls the window: the head stays, a popover taller than the room scrolls inside itself, the
-// toolbar keeps its row, and a canvas fills its region. The addresses and requests behind them
+// View picker keeps its place in the header, and a canvas fills its region. The View picker lands
+// on each view, by pointer and by keys, and the journey's status moves from its `⋯`. The addresses and requests behind them
 // are vitest's (journeys/view.test.ts and journeys/requests.test.ts). Depth and its Fade follow
 // every view, Fade moves nothing, and the walk through at Decisions is the decision walkthrough.
 import { expect, test, type Locator, type Page } from "@playwright/test";
 
-import { journeyName, startJourney } from "./around.ts";
+import { journeyName, setStatus, startJourney } from "./around.ts";
 import { viewportOf, viewportSettled } from "./canvas.ts";
 import { daysAfter, frontierKeys, listKeys, passOrder, select, setFrontier } from "./acting.ts";
 import { fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDepth, setFade } from "./shell.ts";
@@ -76,11 +77,11 @@ async function holds(page: Page, view: string, word: string): Promise<void> {
   await closePopover(page);
 }
 
-/** The walk through, reached with w: X is its one card, and what it cannot honour keeps its setting, disabled. */
+/** The Walkthrough, reached with w: X is its one card, and what it cannot honour keeps its setting, disabled. */
 async function walkHolds(page: Page, x: string, word: string): Promise<void> {
   await page.locator("main").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("w");
-  await expect(page.getByTestId("walk-through")).toHaveAttribute("aria-current", "page");
+  await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "walk");
   expect(await passOrder(page)).toEqual([x]);
   await holds(page, "walk", word);
   await expect(page.getByTestId("chip-frontier")).toBeDisabled();
@@ -161,8 +162,9 @@ test("C10, C11: after a click in the page, j opens the next row, Enter its form,
 
   await page.locator("main").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("v");
-  await expect(page.getByTestId("view-timeline")).toHaveAttribute("aria-current", "page");
   await expect(page).toHaveURL(/\/timeline\?depth=decisions&frontier=1$/);
+  // The next v acts on the view drawn, so wait for it.
+  await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "timeline");
   await page.keyboard.press("v");
   await expect(page).toHaveURL(/\/graph\?depth=decisions&frontier=1$/);
 });
@@ -292,9 +294,9 @@ test("a journey opens as the stock view, switching views keeps the chips, and co
   await page.mouse.move(600, 500);
   await page.mouse.wheel(0, 150);
   await viewportSettled(page);
-  await page.getByTestId("view-list").click();
+  await goTo(page, "list");
   await expect(page).toHaveURL(/\/list\?frontier=1$/);
-  await page.getByTestId("view-graph").click();
+  await goTo(page, "graph");
   await expect(page).toHaveURL(/\/graph\?frontier=1$/);
   await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("node-card").first()).toBeVisible();
@@ -310,11 +312,11 @@ test("a journey opens as the stock view, switching views keeps the chips, and co
   await expect(depth).toHaveAccessibleName("Depth: Actions");
 });
 
-test("the window does not scroll: the head stays, a popover scrolls inside itself, the toolbar keeps its row with Walk through at one edge, and a canvas fills its region", async ({ page }) => {
+test("the window does not scroll: the head stays, a popover scrolls inside itself, the View picker keeps its place on the title's row, and a canvas fills its region", async ({ page }) => {
   await page.setViewportSize({ width: 1280, height: 800 });
   for (const address of ["list?frontier=1", "list"]) {
     await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
-    await expect(page.getByTestId("journey-toolbar")).toBeVisible();
+    await expect(page.getByTestId("journey-header")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollHeight), address).toBe(800);
   }
   // A popover taller than the room below it scrolls inside itself, not the window.
@@ -322,15 +324,15 @@ test("the window does not scroll: the head stays, a popover scrolls inside itsel
   await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   await openFilter(page);
   expect(await page.evaluate(() => document.documentElement.scrollHeight)).toBe(500);
-  // Walk through sits on the views' row, at the same right edge on every view, between 720 and 1100px.
+  // The View picker sits on the title's row, at the same right edge on every view, between 720 and 1100px.
   await page.setViewportSize({ width: 1024, height: 700 });
   const edges: Record<string, number> = {};
-  for (const address of ["walk", "graph", "list", "timeline"]) {
+  for (const address of ["walk", "graph", "list", "timeline", "summary"]) {
     await openAt(page, "browser", "j_vendor_eval", address, { fixedToday: FIXED_TODAY });
-    const views = await page.getByTestId("journey-views").boundingBox();
-    const walk = await page.getByTestId("walk-through").boundingBox();
-    expect(walk?.y, address).toBeLessThan((views?.y ?? 0) + (views?.height ?? 0));
-    edges[address] = Math.round((walk?.x ?? 0) + (walk?.width ?? 0));
+    const title = await page.getByTestId("journey-name").boundingBox();
+    const picker = await page.getByTestId("view-picker").boundingBox();
+    expect(picker?.y, address).toBeLessThan((title?.y ?? 0) + (title?.height ?? 0));
+    edges[address] = Math.round((picker?.x ?? 0) + (picker?.width ?? 0));
   }
   expect(new Set(Object.values(edges)).size, JSON.stringify(edges)).toBe(1);
   // Between 720 and 1100px the projection keeps the width and a canvas fills its region.
@@ -400,7 +402,7 @@ test("C2, C11, C12: the depth and Fade follow every view; the walk through has n
   depthed("summary");
   await expect(page.getByTestId("depth-button")).toHaveCount(0);
 
-  await page.getByTestId("walk-through").click();
+  await goTo(page, "walk");
   depthed("walk");
   await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Decisions");
   expect(await fadeTicked(page)).toBeUndefined();
@@ -469,4 +471,114 @@ test("C11: the walk through at Decisions walks the up-front decisions and not th
   await page.getByRole("button", { name: "Continue with everything" }).click();
   await expect(page).toHaveURL(/\/walk$/);
   await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
+});
+
+/** The view root each screen draws, which is there even when the view has no rows. */
+const ROOTS: Record<string, string> = { graph: "canvas", list: "list-total", timeline: "timeline", summary: "summary", walk: "triage" };
+
+test("C9-C13: the View picker lands on each view, keeps the shared settings, and says which one is open", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "graph?frontier=1", { fixedToday: FIXED_TODAY });
+  for (const view of ["list", "timeline", "summary", "walk", "graph"]) {
+    await page.getByTestId("view-picker").click();
+    await page.getByTestId(`view-${view}`).click();
+    await expect(page).toHaveURL(new RegExp(`/journeys/j_vendor_eval/${view}\\?frontier=1$`));
+    await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", view);
+    await expect(page.getByTestId(ROOTS[view] ?? "")).toBeVisible();
+    // Opened again, exactly one item is marked as where you are, and it is this view's.
+    await page.getByTestId("view-picker").click();
+    const current = page.getByTestId("view-picker-menu").locator('[aria-current="page"]');
+    await expect(current).toHaveCount(1);
+    await expect(current).toHaveAttribute("data-testid", `view-${view}`);
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("view-picker-menu")).toHaveCount(0);
+  }
+});
+
+test("C9, C11: the View picker works from the keyboard: it opens on the current view, the arrows wrap, and Esc, Enter and Tab hand the focus back", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "graph", { fixedToday: FIXED_TODAY });
+  const button = page.getByTestId("view-picker");
+  await button.focus();
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("view-graph")).toBeFocused();
+  // Up from the first item wraps to the last, the Walkthrough; down twice from there is the List.
+  await page.keyboard.press("ArrowUp");
+  await expect(page.getByTestId("view-walk")).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("view-list")).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/list$/);
+  // The router's transition may still be pending at the address: the picker names the view once it has landed.
+  await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "list");
+  await expect(button).toBeFocused();
+  // Esc closes it and keeps the view.
+  await page.keyboard.press("Enter");
+  await expect(page.getByTestId("view-list")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("view-picker-menu")).toHaveCount(0);
+  await expect(button).toBeFocused();
+  // Choosing the view already open changes nothing and keeps the focus on the button.
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Enter");
+  await expect(page).toHaveURL(/\/list$/);
+  await expect(page.getByTestId("view-picker-menu")).toHaveCount(0);
+  await expect(button).toBeFocused();
+  // Tab closes it and moves on to the next control, the journey's menu.
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("Tab");
+  await expect(page.getByTestId("view-picker-menu")).toHaveCount(0);
+  await expect(page.getByTestId("journey-menu")).toBeFocused();
+});
+
+test("B11: the menu's Status opens from the keyboard, and Esc leaves the status as it was", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "graph", { fixedToday: FIXED_TODAY });
+  await page.getByTestId("journey-menu").focus();
+  await page.keyboard.press("Enter");
+  await page.keyboard.press("End");
+  const status = page.getByTestId("menu-status");
+  await expect(status).toBeFocused();
+  await page.keyboard.press("Enter");
+  await expect(status).toHaveAttribute("aria-expanded", "true");
+  await expect(status).toBeFocused();
+  await page.keyboard.press("ArrowDown");
+  await expect(page.getByTestId("status-completed")).toBeFocused();
+  await page.keyboard.press("Escape");
+  await expect(page.getByTestId("journey-menu-menu")).toHaveCount(0);
+  await expect(page.getByTestId("journey-menu")).toBeFocused();
+  await expect(page.getByTestId("journey-status")).toHaveCount(0);
+});
+
+test("B11, A19, C16: the status moves from the menu's Status, and the header says when the journey is not active", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "graph", { fixedToday: FIXED_TODAY });
+  const menu = page.getByTestId("journey-menu");
+  const status = page.getByTestId("menu-status");
+  const chip = page.getByTestId("journey-status");
+  // Active says nothing beside the name; the Status row says so, closed, and opens to the moves.
+  await expect(chip).toHaveCount(0);
+  await menu.click();
+  await expect(status).toHaveAttribute("data-status", "active");
+  await expect(status).toHaveAttribute("aria-expanded", "false");
+  await expect(page.getByTestId("status-completed")).toHaveCount(0);
+  await status.click();
+  await expect(page.getByTestId("status-completed")).toBeVisible();
+  await expect(page.getByTestId("status-archived")).toBeVisible();
+  await expect(page.getByTestId("status-delete")).toHaveCount(0);
+  await page.getByTestId("status-archived").click();
+  await expect(chip).toHaveAttribute("data-status", "archived");
+  // Archived: no Edit, a way back, and deletion.
+  await menu.click();
+  await expect(page.getByTestId("menu-edit")).toHaveCount(0);
+  await status.click();
+  await expect(page.getByTestId("status-completed")).toBeVisible();
+  await expect(page.getByTestId("status-delete")).toBeVisible();
+  await page.getByTestId("status-completed").click();
+  await expect(chip).toHaveAttribute("data-status", "completed");
+  await setStatus(page, "active");
+  await expect(chip).toHaveCount(0);
+  // Deletion is asked for once archived.
+  await setStatus(page, "archived");
+  await menu.click();
+  await status.click();
+  await page.getByTestId("status-delete").click();
+  await expect(page.getByTestId("delete-journey")).toBeVisible();
 });

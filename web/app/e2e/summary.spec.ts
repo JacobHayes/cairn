@@ -3,11 +3,14 @@
 // held to fixtures/README.md by the engine's tests and read by summary/model.test.ts.
 import { expect, test } from "@playwright/test";
 
+import { setStatus } from "./around.ts";
 import { nodePanel, openAt } from "./shell.ts";
 import { FIXED_TODAY } from "./views.ts";
 
 test("C18: a print of the Summary page leaves out navigation and the panel, and paints black on white", async ({ page }) => {
   await openAt(page, "browser", "j_bakeoff", "summary", { node: "n_winner", fixedToday: FIXED_TODAY });
+  await expect(page.getByTestId("view-picker")).toBeVisible();
+  await expect(page.getByTestId("journey-menu")).toBeVisible();
   await page.emulateMedia({ media: "print", colorScheme: "dark" });
   await expect(page.getByTestId("summary")).toBeVisible();
   // Paper has no dark theme: a dark screen prints its panels in black on white, and muted text in
@@ -24,7 +27,16 @@ test("C18: a print of the Summary page leaves out navigation and the panel, and 
     };
   });
   expect(painted).toEqual(["rgb(255, 255, 255) rgb(0, 0, 0)", `rgba(0, 0, 0, 0) ${muted}`, "rgba(0, 0, 0, 0) rgb(0, 0, 0)"]);
-  await expect(page.getByTestId("journey-toolbar")).toBeHidden();
+  await expect(page.getByTestId("view-picker")).toBeHidden();
+  await expect(page.getByTestId("journey-menu")).toBeHidden();
   await expect(nodePanel(page, "n_winner")).toBeHidden();
   await expect(page.getByRole("button", { name: "Print" })).toBeHidden();
+});
+
+test("B11, C18: a completed journey prints its status beside its name, and not the controls", async ({ page }) => {
+  await openAt(page, "browser", "j_bakeoff", "summary", { fixedToday: FIXED_TODAY });
+  await setStatus(page, "completed");
+  await page.emulateMedia({ media: "print" });
+  await expect(page.getByTestId("journey-status")).toBeVisible();
+  await expect(page.getByTestId("view-picker")).toBeHidden();
 });
