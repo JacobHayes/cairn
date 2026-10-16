@@ -22,9 +22,9 @@ test("the in-browser host boots, derives in the worker, applies a patch, and sur
     window.addEventListener("error", (event) => seen.push(event.message));
   });
   await visit(page, "browser", "/");
-  await expect(page).toHaveURL(/\/journeys$/);
+  await expect(page.getByTestId("journey-row")).toHaveCount(4);
+  expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe("/");
 
-  await open(page, "browser", "/journeys");
   await expect(page.getByTestId("journey-row")).toHaveCount(4);
   await page.getByRole("link", { name: "Hire a platform engineer" }).click();
   await expect(page.getByTestId("journey-name")).toHaveText("Hire a platform engineer");
@@ -46,7 +46,7 @@ test("the in-browser host boots, derives in the worker, applies a patch, and sur
   await page.getByRole("navigation", { name: "Screens", exact: true }).getByRole("link", { name: "Entities" }).click();
   await expect(page.getByTestId("load-failure").getByRole("button", { name: "Reload" })).toBeVisible();
   await expect(syncChip(page)).toBeVisible();
-  await goWithin(page, "/journeys");
+  await goWithin(page, "/");
   await expect(page.getByTestId("load-failure")).toHaveCount(0);
 });
 
@@ -71,7 +71,23 @@ test("opening `/` shows the journey index first and the page never moves after",
   const painted = await page.evaluate(() => (window as unknown as { painted: string[] }).painted);
   const address = new URL(page.url()).pathname + new URL(page.url()).search;
   expect(painted).toEqual([`${address} @ ${address}`]);
-  expect(address).toBe("/journeys");
+  expect(address).toBe("/");
+});
+
+test("the rail marks the journey index current at `/` and only there", async ({ page }) => {
+  await visit(page, "browser", "/");
+  const rail = page.getByRole("navigation", { name: "Screens", exact: true });
+  const current = rail.locator("[aria-current=page]");
+  await expect(current).toHaveText(["Journeys"]);
+  await rail.getByRole("link", { name: "Library" }).click();
+  await expect(current).toHaveText(["Library"]);
+  await rail.getByRole("link", { name: "Journeys" }).click();
+  await expect(page.getByTestId("journey-row").first()).toBeVisible();
+  await expect(current).toHaveText(["Journeys"]);
+  expect(new URL(page.url()).pathname).toBe("/");
+  await page.goto(`${new URL(page.url()).origin}/?status=any`);
+  await expect(page.getByTestId("journey-row").first()).toBeVisible();
+  await expect(current).toHaveText(["Journeys"]);
 });
 
 test("the sync dot shows its popover on hover and focus, inside the window, and a click pins it", async ({ page }) => {

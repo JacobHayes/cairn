@@ -6,6 +6,7 @@
 import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
+import { indexPath } from "../journeys/address.ts";
 import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
 import { InspectorColumn } from "./InspectorColumn.tsx";
 import { KeysHint } from "./KeysHint.tsx";
@@ -18,14 +19,14 @@ import { useFrame } from "./useFrame.ts";
 function Rail({ pathname }: { pathname: string }) {
   const screens = [
     { to: "/mine", label: "Mine", on: pathname.startsWith("/mine") },
-    { to: "/journeys", label: "Journeys", on: pathname === "/" || /^\/(journeys|new|proposals)(\/|$)/.test(pathname) },
+    { to: indexPath(), label: "Journeys", on: pathname === "/" || /^\/(journeys|new|proposals)(\/|$)/.test(pathname) },
     { to: "/library", label: "Library", on: /^\/(library|routes)(\/|$)/.test(pathname) },
     { to: "/entities", label: "Entities", on: pathname.startsWith("/entities") },
   ];
   return (
     <aside className="rail">
       <div className="rail-head">
-        <Link to="/" className="brand">
+        <Link to={indexPath()} className="brand">
           Cairn
         </Link>
         <SyncChip />

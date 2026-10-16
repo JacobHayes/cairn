@@ -6,7 +6,7 @@ import { Link, Navigate, useParams } from "react-router";
 import { ancestorsOf, placedAt } from "../canvas/ladder.ts";
 import { canvasPath, DEFAULT_GRAPH_VIEW, revealing } from "../canvas/settings.ts";
 import { nodeOf } from "../detail/model.ts";
-import { DEFAULT_PROJECTION, pagePath, type Screen } from "../journeys/address.ts";
+import { DEFAULT_PROJECTION, indexPath, pagePath, type Screen } from "../journeys/address.ts";
 import { JourneyFrame, JourneyGate } from "./JourneyFrame.tsx";
 
 /** `/journeys/<id>/{graph|list|timeline|summary|walk}[/nodes/<key>|/edges/<from>~<to>]`. */
@@ -42,7 +42,7 @@ export function JourneyDeepLink() {
 export function NoSuchPage() {
   return (
     <p className="callout" data-testid="no-such-page">
-      There is no such page. <Link to="/journeys">All journeys</Link>
+      There is no such page. <Link to={indexPath()}>All journeys</Link>
     </p>
   );
 }

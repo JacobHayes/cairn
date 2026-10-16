@@ -220,7 +220,7 @@ test("a new route refused for an id in use stays under its control and on the ch
   await expect(form.getByTestId("refused")).toBeVisible();
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
   // Away from the control it is still counted, and a reload keeps it under the control.
-  await goWithin(page, "/journeys");
+  await goWithin(page, "/");
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
   await goWithin(page, "/library");
   await expect(form.getByTestId("refused")).toBeVisible();

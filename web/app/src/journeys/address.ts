@@ -113,9 +113,9 @@ function searchOf(params: URLSearchParams): string {
   return text === "" ? "" : `?${text}`;
 }
 
-/** C16: the journey index. `/` goes straight here. */
+/** C16: the journey index, which is `/` with its filters in the query. */
 export function indexPath(filters: IndexFilters = DEFAULT_FILTERS): string {
-  return `/journeys${searchOf(filterParams(filters))}`;
+  return `/${searchOf(filterParams(filters))}`;
 }
 
 /** C16: a journey's landing, where its journey card shows and nothing is selected. */

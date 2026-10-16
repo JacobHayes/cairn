@@ -65,7 +65,7 @@ mod oidc {
     }
 
     async fn start(setup: &Setup, browser_cookies: &str) -> Started {
-        let uri = "/api/auth/oidc/sign-in?return_to=/journeys";
+        let uri = "/api/auth/oidc/sign-in?return_to=/mine";
         let request = with_cookie(request(uri, LOCAL), browser_cookies);
         let response = send(&setup.router, request.body(Body::empty()).unwrap()).await;
         assert_eq!(response.status(), StatusCode::SEE_OTHER);
@@ -117,7 +117,7 @@ mod oidc {
             );
             return Err(response.status());
         }
-        assert_eq!(response.headers()[LOCATION], "/journeys");
+        assert_eq!(response.headers()[LOCATION], "/mine");
         let set = cookies_set(&response);
         let session = set
             .iter()

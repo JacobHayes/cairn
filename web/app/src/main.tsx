@@ -8,14 +8,13 @@ import "./ui/app.css";
 
 import { lazy, StrictMode } from "react";
 import { createRoot } from "react-dom/client";
-import { BrowserRouter, Navigate, Route, Routes } from "react-router";
+import { BrowserRouter, Route, Routes } from "react-router";
 
 import { boot } from "./boot.ts";
 import { LayoutsContext } from "./canvas/hooks.ts";
 import { Layouts, LayoutWorker } from "./canvas/layouts.ts";
 import { SessionContext } from "./data/react.ts";
 import type { Session } from "./data/session.ts";
-import { indexPath } from "./journeys/address.ts";
 import { JourneyIndex } from "./journeys/JourneyIndex.tsx";
 import { JourneyDeepLink, JourneyLanding, JourneyPageRoute, NoSuchPage } from "./screens/JourneyRoutes.tsx";
 import { Shell } from "./shell/Shell.tsx";
@@ -35,10 +34,8 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
       <LayoutsContext value={layouts}>
         <BrowserRouter>
           <Routes>
-            {/* `/` reads nothing: it is the journey index at once, outside the shell so no frame is painted for it. */}
-            <Route index element={<Navigate replace to={indexPath()} />} />
             <Route element={<Shell />}>
-              <Route path="journeys" element={<JourneyIndex />} />
+              <Route index element={<JourneyIndex />} />
               <Route path="mine" element={<MineScreen />} />
               <Route path="mine/:id/nodes/:key" element={<MineScreen />} />
               <Route path="new" element={<NewJourney />} />

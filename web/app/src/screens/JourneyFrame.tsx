@@ -23,7 +23,7 @@ import { EdgeCard } from "../detail/EdgeCard.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
 import { nodePath, screenPath } from "../detail/parts.tsx";
-import type { Screen } from "../journeys/address.ts";
+import { indexPath, type Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { isStock, useViewState, ViewStateContext, withViewState, type ViewState, type ViewStateValue } from "../journeys/view.ts";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
@@ -58,7 +58,7 @@ export function JourneyGate({ id, children }: { id: string; children: (ready: Re
     case "loading":
       return <p className="muted small">Deriving the journey...</p>;
     case "missing":
-      return <p className="callout" data-testid="journey-missing">This journey does not exist. <Link to="/journeys">All journeys</Link></p>;
+      return <p className="callout" data-testid="journey-missing">This journey does not exist. <Link to={indexPath()}>All journeys</Link></p>;
     case "failed":
       return <p className="callout callout-bad">The journey could not be read: {journey.message}</p>;
     case "skew":
