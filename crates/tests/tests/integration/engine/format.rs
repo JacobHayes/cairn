@@ -73,23 +73,12 @@ fn a_segment_file_keeps_its_kind_and_insertions_are_not_written() {
     assert!(back.document().insertions.is_empty() && !draft.document().insertions.is_empty());
 }
 
-/// A generated journey's structure as a route graph, with no state; none when its pins were
-/// what kept its plan free of contradictory chains.
-fn as_route(graph: &Graph) -> Option<Graph> {
-    let mut document = graph.document().clone();
-    document.state = cairn_schema::JourneyState::default();
-    Graph::new(document, &cairn_schema::Deployment::default()).ok()
-}
-
 proptest! {
     #![proptest_config(ProptestConfig::with_cases(32))]
 
     /// A13: export then import is the identity, and two exports are byte-identical.
     #[test]
-    fn export_then_import_is_identity(graph in cairn_engine::testing::generated::arb_journey(1..=60)) {
-        let route = as_route(&graph);
-        prop_assume!(route.is_some());
-        let route = route.unwrap();
+    fn export_then_import_is_identity(route in cairn_engine::testing::generated::arb_route(1..=60)) {
         let (back, first, second) = round_trip(&route);
         prop_assert_eq!(back.document(), route.document());
         prop_assert_eq!(first, second);

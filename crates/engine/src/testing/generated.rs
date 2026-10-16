@@ -146,6 +146,13 @@ pub fn arb_journey(nodes: RangeInclusive<usize>) -> impl Strategy<Value = Graph>
     prop::collection::vec(arb_seed(), nodes).prop_map(|seeds| build(&seeds))
 }
 
+/// A generated route graph of `nodes` nodes: a journey's structure with no state, valid by
+/// construction. The seeds and structures are [`arb_journey`]'s; without state every node is
+/// in scope, so [`build_route`] holds the plan over all of them rather than the journey's.
+pub fn arb_route(nodes: RangeInclusive<usize>) -> impl Strategy<Value = Graph> {
+    prop::collection::vec(arb_seed(), nodes).prop_map(|seeds| build_route(&seeds))
+}
+
 /// Builds the graph the seeds describe.
 ///
 /// # Panics
@@ -153,6 +160,25 @@ pub fn arb_journey(nodes: RangeInclusive<usize>) -> impl Strategy<Value = Graph>
 /// When the built document breaks an invariant: a bug in this generator.
 #[must_use]
 pub fn build(seeds: &[NodeSeed]) -> Graph {
+    plan_held(document(seeds))
+}
+
+/// Builds the route the seeds describe: [`build`]'s structure with no state. A journey's
+/// stored state takes skipped and unchosen nodes out of scope, which drops their dates from
+/// the plan; with no state they are back in, so the plan is held over the route itself.
+///
+/// # Panics
+///
+/// When the built document breaks an invariant: a bug in this generator.
+#[must_use]
+pub fn build_route(seeds: &[NodeSeed]) -> Graph {
+    let mut document = document(seeds);
+    document.state = cairn_schema::JourneyState::default();
+    plan_held(document)
+}
+
+/// The document the seeds describe, its plan not yet held.
+fn document(seeds: &[NodeSeed]) -> Document {
     let shape = Shape::new(seeds);
     let mut document = people();
     let mut edges = vec![0_u32; seeds.len()];
@@ -164,7 +190,7 @@ pub fn build(seeds: &[NodeSeed]) -> Graph {
         shape.state(&mut document, index, seed);
         shape.dates(&mut document, index, &seed.dates);
     }
-    plan_held(document)
+    document
 }
 
 /// A graph at the limits (PRACTICES, Explicit limits: costed and tested at the limits):
