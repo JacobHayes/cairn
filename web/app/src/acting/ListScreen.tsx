@@ -13,6 +13,7 @@ import { useEffect, useMemo, useRef, type CSSProperties, type MouseEvent } from 
 import { useLocation, useNavigate } from "react-router";
 
 import { useFlips, useLevel, useProjected } from "../canvas/hooks.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { collapsedAt, drawnStep, openAt, stepOf } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
 import type { Selection } from "../canvas/selection.ts";
@@ -232,8 +233,8 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const { rows, error: rowsError } = useRows(view, query);
   const decisionColumns = depth === "decisions";
   const needsDecisions = decisionColumns || list.columns.some((column) => ["answer", "why", "affects"].includes(column));
-  const projected = useProjected(view, needsDecisions ? { projection: "decision_view" as const } : undefined);
-  const decisions = useMemo(() => new Map((projected.value === undefined ? [] : decisionRows(view, projected.value)).map((decision) => [decision.key, decision])), [view, projected.value]);
+  const projected = valueOf(useProjected(view, needsDecisions ? { projection: "decision_view" as const } : undefined));
+  const decisions = useMemo(() => new Map((projected === undefined ? [] : decisionRows(view, projected)).map((decision) => [decision.key, decision])), [view, projected]);
   const ranks = useMemo(() => rankPositions(view, state.frontier), [view, state.frontier]);
   const order = useMemo(() => new Map(planOrder(view).map((key, at) => [key, at])), [view]);
   const tree = list.sort === undefined;

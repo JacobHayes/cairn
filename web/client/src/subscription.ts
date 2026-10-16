@@ -1,9 +1,13 @@
-// H6's subscription helper: one tick stream per page, watching the union of what its views
-// watch, reopened when that union changes and again after a drop. Views listen for the
-// stream opening (its first ticks are the current revisions, so each view's Tracker forgets
-// what it asked for) and for each tick, which they compare with the revision they hold
-// (tracker.ts). The stream itself is a transport: Server-Sent Events from the API
-// (`eventSourceTicks`) or the in-browser host's subscriptions, behind `OpenTicks`.
+// H6's subscription: one tick stream per page, watching the union of what its views watch,
+// reopened when that union changes and again after a drop. It is one machine (ARCHITECTURE,
+// Web UI): the stream is an invoked callback over the transport, the wait before reopening a
+// closed stream is a delayed transition, and a batch of watch changes opens one stream (the
+// reconcile it raises). Views watch with their own actor ref and are sent every tick and
+// every open; each compares a tick with the revision it holds (tracker.ts), and the stream's
+// opening is when each forgets what it asked for. The transport is Server-Sent Events from the
+// API (`eventSourceTicks`) or the in-browser host's subscriptions, behind `OpenTicks`.
+import { assign, enqueueActions, fromCallback, setup, type ActorRefFrom, type AnyActorRef, type SnapshotFrom } from "xstate";
+
 import type { Tick } from "./tracker.ts";
 
 /** What a tick stream tells whoever opened it. */
@@ -18,12 +22,6 @@ export interface TickHandlers {
 /** Opens a stream watching `watching`; answers a function that closes it. */
 export type OpenTicks = (watching: readonly string[], handlers: TickHandlers) => () => void;
 
-/** What a view hears from the stream. */
-export interface TickListener {
-  opened(): void;
-  tick(tick: Tick): void;
-}
-
 export type StreamStatus = "idle" | "connecting" | "live" | "reconnecting";
 
 /**
@@ -36,185 +34,154 @@ export const REOPEN_DELAY_MAX_MS = 15_000;
 
 /**
  * The wait before retry number `attempt` (counted from 0) of anything that backs off: the
- * first wait, doubling, at most the longest. The stream's reopening, the journeys' refetches
+ * first wait, doubling, at most the longest. The stream's reopening, the reads' retries
  * and a write's resends share it, so there is one backoff.
  */
 export function backoffDelayMs(attempt: number): number {
   return Math.min(REOPEN_DELAY_FIRST_MS * 2 ** Math.min(attempt, 16), REOPEN_DELAY_MAX_MS);
 }
 
-/** The timer the helper waits with (a test passes its own). */
-export interface Timers {
-  set(callback: () => void, ms: number): unknown;
-  clear(handle: unknown): void;
+/** What a watcher is sent: the stream opened (its first ticks are the current revisions), and each tick. */
+export type StreamEvent = { type: "stream.opened" } | { type: "stream.tick"; tick: Tick };
+
+/** What the subscription is asked: to follow `names` for the watcher `id`, to stop, or to reopen now. */
+export type SubscriptionEvent =
+  | { type: "watch"; id: string; names: readonly string[]; to: AnyActorRef }
+  | { type: "unwatch"; id: string }
+  /** Reopens the stream now, so its current revisions ask every view again (a refetch failed). */
+  | { type: "reopen" };
+
+/** What the stream callback sends back, and the reconcile the subscription raises for itself. */
+type Internal = StreamEvent | { type: "stream.dropped"; closed: boolean } | { type: "reconcile" };
+
+interface Watcher {
+  names: readonly string[];
+  to: AnyActorRef;
 }
 
-const realTimers: Timers = {
-  set: (callback, ms) => setTimeout(callback, ms),
-  clear: (handle) => {
-    clearTimeout(handle as ReturnType<typeof setTimeout>);
+export interface SubscriptionContext {
+  open: OpenTicks;
+  watchers: Readonly<Record<string, Watcher>>;
+  /** What the stream now open (or being waited for) was opened with: the sorted union of the watchers' names. */
+  watching: readonly string[];
+  /** Closed streams in a row since one last opened; the wait before the next reopening grows with it. */
+  attempt: number;
+}
+
+const namesOf = (watchers: SubscriptionContext["watchers"]): string[] =>
+  [...new Set(Object.values(watchers).flatMap((watcher) => watcher.names))].sort();
+
+const without = <T>(record: Readonly<Record<string, T>>, key: string): Record<string, T> =>
+  Object.fromEntries(Object.entries(record).filter(([each]) => each !== key));
+
+export const subscription = setup({
+  types: {
+    context: {} as SubscriptionContext,
+    events: {} as SubscriptionEvent | Internal,
+    input: {} as { open: OpenTicks },
   },
-};
-
-/** The page's tick stream. */
-export class Subscription {
-  readonly #open: OpenTicks;
-  readonly #timers: Timers;
-  readonly #names = new Map<string, number>();
-  readonly #listeners = new Set<TickListener>();
-  readonly #statusListeners = new Set<() => void>();
-  #close: (() => void) | undefined;
-  #watching = "";
-  #reopenTimer: unknown;
-  #reopenScheduled = false;
-  #reopenAttempt = 0;
-  status: StreamStatus = "idle";
-
-  constructor(open: OpenTicks, timers: Timers = realTimers) {
-    this.#open = open;
-    this.#timers = timers;
-  }
-
-  /** Watches `names` until the returned function is called. */
-  watch(names: readonly string[]): () => void {
-    for (const name of names) {
-      this.#names.set(name, (this.#names.get(name) ?? 0) + 1);
-    }
-    this.#schedule();
-    let released = false;
-    return () => {
-      if (released) {
-        return;
+  actors: {
+    // A transport that refuses to open (the in-browser host throws for a name it cannot watch)
+    // is a closed stream: tried again after the wait, never an uncaught error. Stopping the
+    // callback closes the transport, and what it sends after that is dropped.
+    stream: fromCallback<Internal, { open: OpenTicks; watching: readonly string[] }>(({ sendBack, input }) => {
+      try {
+        return input.open(input.watching, {
+          opened: () => {
+            sendBack({ type: "stream.opened" });
+          },
+          tick: (tick) => {
+            sendBack({ type: "stream.tick", tick });
+          },
+          dropped: (closed) => {
+            sendBack({ type: "stream.dropped", closed });
+          },
+        });
+      } catch {
+        sendBack({ type: "stream.dropped", closed: true });
+        return () => undefined;
       }
-      released = true;
-      for (const name of names) {
-        const count = (this.#names.get(name) ?? 1) - 1;
-        if (count === 0) {
-          this.#names.delete(name);
-        } else {
-          this.#names.set(name, count);
-        }
+    }),
+  },
+  delays: { reopen: ({ context }) => backoffDelayMs(context.attempt) },
+  guards: {
+    watched: ({ context }) => namesOf(context.watchers).length > 0,
+    unwatched: ({ context }) => namesOf(context.watchers).length === 0,
+    // The union is not what the stream was opened with.
+    moved: ({ context }) => namesOf(context.watchers).join("\n") !== context.watching.join("\n"),
+    closed: ({ event }) => event.type === "stream.dropped" && event.closed,
+  },
+  actions: {
+    watch: assign(({ context, event }) => {
+      const sent = event as Extract<SubscriptionEvent, { type: "watch" }>;
+      return { watchers: { ...context.watchers, [sent.id]: { names: sent.names, to: sent.to } } };
+    }),
+    unwatch: assign(({ context, event }) => ({ watchers: without(context.watchers, (event as Extract<SubscriptionEvent, { type: "unwatch" }>).id) })),
+    // A batch of changes in one turn opens one stream.
+    reconcileSoon: enqueueActions(({ enqueue }) => {
+      enqueue.cancel("reconcile");
+      enqueue.raise({ type: "reconcile" }, { delay: 0, id: "reconcile" });
+    }),
+    opening: assign(({ context }) => ({ watching: namesOf(context.watchers) })),
+    reset: assign({ attempt: 0 }),
+    waited: assign({ attempt: ({ context }) => context.attempt + 1 }),
+    broadcast: enqueueActions(({ context, event, enqueue }) => {
+      for (const { to } of Object.values(context.watchers)) {
+        enqueue.sendTo(to, event);
       }
-      this.#schedule();
-    };
-  }
-
-  /** Hears the stream until the returned function is called. */
-  listen(listener: TickListener): () => void {
-    this.#listeners.add(listener);
-    return () => this.#listeners.delete(listener);
-  }
-
-  /** Hears status changes until the returned function is called. */
-  onStatus(listener: () => void): () => void {
-    this.#statusListeners.add(listener);
-    return () => this.#statusListeners.delete(listener);
-  }
-
-  /** Reopens the stream now, so its current revisions ask every view again (a refetch failed). */
-  reopen(): void {
-    this.#restart(true);
-  }
-
-  /** Closes the stream for good. */
-  close(): void {
-    this.#names.clear();
-    this.#restart(false);
-  }
-
-  /** Reopens on the next microtask, so a batch of watch changes opens one stream. */
-  #schedule(): void {
-    if (this.#reopenScheduled) {
-      return;
-    }
-    this.#reopenScheduled = true;
-    queueMicrotask(() => {
-      this.#reopenScheduled = false;
-      const watching = [...this.#names.keys()].sort().join("\n");
-      if (watching !== this.#watching || this.#close === undefined) {
-        this.#restart(true);
-      }
-    });
-  }
-
-  #restart(open: boolean): void {
-    this.#timers.clear(this.#reopenTimer);
-    this.#reopenTimer = undefined;
-    this.#close?.();
-    this.#close = undefined;
-    const names = [...this.#names.keys()].sort();
-    this.#watching = names.join("\n");
-    if (!open || names.length === 0) {
-      this.#setStatus("idle");
-      return;
-    }
-    this.#setStatus(this.status === "idle" ? "connecting" : "reconnecting");
-    let current = true;
-    const handlers: TickHandlers = {
-      opened: () => {
-        if (current) {
-          this.#opened();
-        }
+    }),
+  },
+}).createMachine({
+  id: "subscription",
+  context: ({ input }) => ({ open: input.open, watchers: {}, watching: [], attempt: 0 }),
+  initial: "closed",
+  on: {
+    watch: { actions: ["watch", "reconcileSoon"] },
+    unwatch: { actions: ["unwatch", "reconcileSoon"] },
+  },
+  states: {
+    closed: {
+      on: { reconcile: { guard: "watched", target: "open.connecting" } },
+    },
+    open: {
+      initial: "connecting",
+      entry: "opening",
+      invoke: { src: "stream", input: ({ context }) => ({ open: context.open, watching: namesOf(context.watchers) }) },
+      on: {
+        "stream.opened": { target: ".live", actions: ["reset", "broadcast"] },
+        "stream.tick": { actions: "broadcast" },
+        "stream.dropped": [{ guard: "closed", target: "waiting" }, { target: ".reconnecting" }],
+        reconcile: [
+          { guard: "unwatched", target: "closed" },
+          { guard: "moved", target: ".reconnecting", reenter: true },
+        ],
+        reopen: [{ guard: "unwatched", target: "closed" }, { target: ".reconnecting", reenter: true }],
       },
-      tick: (tick) => {
-        if (current) {
-          this.#listeners.forEach((listener) => {
-            listener.tick(tick);
-          });
-        }
+      states: { connecting: {}, reconnecting: {}, live: {} },
+    },
+    // The stream closed by itself: it reopens after a wait that grows with each close in a row.
+    waiting: {
+      after: { reopen: "open.reconnecting" },
+      exit: "waited",
+      on: {
+        reconcile: [{ guard: "unwatched", target: "closed" }, { guard: "moved", target: "open.reconnecting" }],
+        reopen: [{ guard: "unwatched", target: "closed" }, { target: "open.reconnecting" }],
       },
-      dropped: (closed) => {
-        if (current) {
-          this.#dropped(closed);
-        }
-      },
-    };
-    let close: () => void;
-    try {
-      close = this.#open(names, handlers);
-    } catch {
-      // A transport that refuses to open (the in-browser host throws for a name it cannot
-      // watch) is a closed stream: tried again after the wait, never an uncaught error.
-      close = () => undefined;
-      this.#close = close;
-      this.#dropped(true);
-      return;
-    }
-    this.#close = () => {
-      current = false;
-      close();
-    };
-  }
+    },
+  },
+});
 
-  #opened(): void {
-    this.#reopenAttempt = 0;
-    this.#setStatus("live");
-    this.#listeners.forEach((listener) => {
-      listener.opened();
-    });
-  }
+export type SubscriptionRef = ActorRefFrom<typeof subscription>;
 
-  #dropped(closed: boolean): void {
-    this.#setStatus("reconnecting");
-    if (!closed) {
-      return;
-    }
-    const delay = backoffDelayMs(this.#reopenAttempt);
-    this.#reopenAttempt += 1;
-    this.#reopenTimer = this.#timers.set(() => {
-      this.#reopenTimer = undefined;
-      this.#restart(true);
-    }, delay);
+/** The state of the stream, as the sync chip words it (a closed stream being waited for is reconnecting). */
+export function streamStatus(snapshot: SnapshotFrom<typeof subscription>): StreamStatus {
+  if (snapshot.matches("closed")) {
+    return "idle";
   }
-
-  #setStatus(status: StreamStatus): void {
-    if (status !== this.status) {
-      this.status = status;
-      this.#statusListeners.forEach((listener) => {
-        listener();
-      });
-    }
+  if (snapshot.matches({ open: "live" })) {
+    return "live";
   }
+  return snapshot.matches({ open: "connecting" }) ? "connecting" : "reconnecting";
 }
 
 /** The part of the browser's EventSource the stream uses. */

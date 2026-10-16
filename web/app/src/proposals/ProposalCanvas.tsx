@@ -14,36 +14,32 @@ import { useLaidOut } from "../canvas/hooks.ts";
 import { KINDS, cardsOf, linesOf, type CanvasModel, type Level } from "../canvas/model.ts";
 import type { CardActions } from "../canvas/NodeCard.tsx";
 import { marksOverlay } from "../canvas/overlay.ts";
-import type { Deployment } from "../data/host.ts";
-import { useSession } from "../data/react.ts";
+import type { Deployment, Deriver } from "../data/host.ts";
+import { errorWords, PROJECTION, valueOf, type ReadSource } from "../data/keyed-read.ts";
+import { useKeyedRead, useSession } from "../data/react.ts";
 import type { DiffMark, GraphDiff } from "./model.ts";
 
-/** C2: the level of `graph` with every kind shown, or why there is none. */
-function useLevel(graph: Graph | undefined, deployment: Deployment, today: string): { level: Level; graph: Graph } | { error: string } | undefined {
+/** What a proposal canvas's level is derived from. */
+interface LevelArgs {
+  deriver: Deriver;
+  graph: Graph;
+  deployment: Deployment;
+  today: string;
+}
+
+const LEVEL: ReadSource<LevelArgs, { level: Level; graph: Graph }> = {
+  policy: PROJECTION,
+  read: async ({ deriver, graph, deployment, today }) => ({ level: await deriver.routeLevel({ graph, deployment, today, shown: KINDS }), graph }),
+};
+
+/** C2: the level of `graph` with every kind shown, or why there is none; `tried` is which of the canvas's graphs this is. */
+function useLevel(domain: string, tried: number, graph: Graph | undefined, deployment: Deployment, today: string): { level: Level; graph: Graph } | { error: string } | undefined {
   const { deriver } = useSession();
-  const [answer, setAnswer] = useState<{ level: Level; graph: Graph } | { error: string } | undefined>();
-  useEffect(() => {
-    if (graph === undefined) {
-      return;
-    }
-    let live = true;
-    deriver.routeLevel({ graph, deployment, today, shown: KINDS }).then(
-      (level) => {
-        if (live) {
-          setAnswer({ level, graph });
-        }
-      },
-      (thrown: unknown) => {
-        if (live) {
-          setAnswer({ error: thrown instanceof Error ? thrown.message : String(thrown) });
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [deriver, graph, deployment, today]);
-  return answer;
+  const { view } = useKeyedRead(LEVEL, graph === undefined ? undefined : { identity: [domain, tried], freshness: [graph, deployment.revision, today], args: { deriver, graph, deployment, today } });
+  if (view.status === "failed" || view.status === "behind") {
+    return { error: view.error.message };
+  }
+  return valueOf(view);
 }
 
 export interface ProposalCanvasProps {
@@ -69,7 +65,7 @@ export function ProposalCanvas({ domain, graphs, marks, edges, dim, deployment, 
     setTried(0);
   }, [graphs]);
   const graph = graphs[tried];
-  const answer = useLevel(graph, deployment, today);
+  const answer = useLevel(domain, tried, graph, deployment, today);
   useEffect(() => {
     if (answer !== undefined && "error" in answer && tried + 1 < graphs.length) {
       setTried(tried + 1);
@@ -82,7 +78,9 @@ export function ProposalCanvas({ domain, graphs, marks, edges, dim, deployment, 
     const nodes = answer.graph.nodes ?? [];
     return { cards: cardsOf(answer.level, nodes), lines: linesOf(answer.level, nodes) };
   }, [answer]);
-  const { laidOut, error } = useLaidOut(`proposal:${domain}`, "diff", model);
+  const laid = useLaidOut(`proposal:${domain}`, "diff", model);
+  const laidOut = valueOf(laid);
+  const error = errorWords(laid);
   const overlay = useMemo(() => (laidOut === undefined ? undefined : marksOverlay("What the proposal changes", marks, laidOut.model, dim, { added: edges.edgesAdded, removed: edges.edgesRemoved })), [laidOut, marks, edges, dim]);
   // Opens on the changes (a changed requirement frames both its ends), so a small edit to a big journey is readable; Fit still fits the whole graph.
   const changed = useMemo(() => [...Object.keys(marks), ...[...edges.edgesAdded, ...edges.edgesRemoved].flatMap((edge) => [edge.node, edge.requires])], [marks, edges]);

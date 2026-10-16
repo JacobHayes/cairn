@@ -1,13 +1,15 @@
 // The session over a fake host: the write adapter the controls not yet on the edit manager
 // still use, and the wiring of the connection to the manager's waiting writes (H5).
-import { backoffDelayMs, type Answered, type HttpFailure, type Rejection } from "@cairn/client";
-import { SimulatedClock } from "xstate";
+import { backoffDelayMs, type Answered, type HttpFailure, type Rejection, type RevisionOf } from "@cairn/client";
+import { SimulatedClock, createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
 import { aboutNode, renaming } from "./edits.test-support.ts";
 import { problemsOf } from "./edit-manager.ts";
 import { EDIT_RECORD_VERSION, tabEditStore } from "./edit-record.ts";
 import { FakeDeriver, FakeHost, deferred, manualTimers, memoryStorage, settled } from "./fake.test-support.ts";
+import { ReadFailed } from "./host.ts";
+import { HOST_READ, keyedRead, type ReadSource } from "./keyed-read.ts";
 import { Session } from "./session.ts";
 import { RESEND_COUNT_MAX } from "./write-machine.ts";
 import type { WriteIntent } from "./writes.ts";
@@ -29,6 +31,8 @@ async function started(storage = memoryStorage()) {
   const clock = new SimulatedClock();
   const { timers } = manualTimers();
   const session = await Session.start({ host, deriver: new FakeDeriver(), timers, clock, store: tabEditStore(() => storage) });
+  // The stream opens once the batch of watches is reconciled.
+  clock.increment(0);
   host.open();
   await settled();
   const advance = async (ms: number) => {
@@ -108,7 +112,9 @@ describe("the connection", () => {
     });
     const host = new FakeHost();
     host.answers = [alreadyApplied];
-    const session = await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers, clock: new SimulatedClock(), store: tabEditStore(() => storage) });
+    const clock = new SimulatedClock();
+    const session = await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers, clock, store: tabEditStore(() => storage) });
+    clock.increment(0);
     await settled();
     expect(host.sent).toEqual([]);
     host.open();
@@ -131,5 +137,88 @@ describe("the connection", () => {
     await settled();
     expect(host.sent).toHaveLength(1);
     expect(session.root.getSnapshot().status).toBe("stopped");
+  });
+});
+
+describe("a read the sync chip counts", () => {
+  const route: RevisionOf = { domain: { route: "r_a" } };
+  /** A read of a route that reports its lag, answering the revision the test sets or failing while it is told to. */
+  function routeRead() {
+    const state = { revision: 1, failing: false };
+    const source: ReadSource<undefined, { revision: number }> = {
+      policy: HOST_READ,
+      read: () => (state.failing ? Promise.reject(new ReadFailed({ status: 500, message: "the server broke" })) : Promise.resolve({ revision: state.revision })),
+      ticks: () => ({ watching: ["route:r_a"], about: (of) => JSON.stringify(of) === JSON.stringify(route), holds: (value) => [{ of: route, revision: value.revision }], subject: route, reportsLag: true }),
+    };
+    return { state, source };
+  }
+
+  it("turns the chip BEHIND when its refetch fails, keeps what it shows, and clears once the read ends", async () => {
+    const { host, session, advance } = await started();
+    const { state, source } = routeRead();
+    const clock = new SimulatedClock();
+    const actor = createActor(keyedRead, { clock, input: { source, env: session.readEnv } }).start();
+    actor.send({ type: "want", key: { identity: ["r_a"], freshness: [], args: undefined } });
+    await advance(0);
+    host.open();
+    await settled();
+    expect(session.sync.summary.state).not.toBe("behind");
+    state.failing = true;
+    host.tick({ of: route, revision: 2 });
+    await settled();
+    expect(session.sync.summary.state).toBe("behind");
+    expect(actor.getSnapshot().context.held?.value).toEqual({ revision: 1 });
+    // The server recovers: the retry lands the newer revision and the chip clears.
+    state.failing = false;
+    state.revision = 2;
+    clock.increment(backoffDelayMs(0));
+    await settled();
+    expect(actor.getSnapshot().context.held?.value).toEqual({ revision: 2 });
+    expect(session.sync.summary.state).not.toBe("behind");
+    actor.stop();
+  });
+
+  it("clears the chip when the screen that showed the read goes away", async () => {
+    const { host, session, advance } = await started();
+    const { state, source } = routeRead();
+    const actor = createActor(keyedRead, { input: { source, env: session.readEnv } }).start();
+    actor.send({ type: "want", key: { identity: ["r_a"], freshness: [], args: undefined } });
+    await advance(0);
+    host.open();
+    await settled();
+    state.failing = true;
+    host.tick({ of: route, revision: 2 });
+    await settled();
+    expect(session.sync.summary.state).toBe("behind");
+    actor.stop();
+    await settled();
+    expect(session.sync.summary.state).not.toBe("behind");
+  });
+});
+
+describe("the caller", () => {
+  const deployment: RevisionOf = { domain: "deployment" };
+
+  it("is read once even when the deployment could not be read, and again for each newer deployment held", async () => {
+    const host = new FakeHost();
+    host.deploymentFails = true;
+    const clock = new SimulatedClock();
+    const session = await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers, clock, store: tabEditStore(() => memoryStorage()) });
+    clock.increment(0);
+    host.open();
+    await settled();
+    expect(host.viewerFetches).toBe(1);
+    // The deployment recovers at a newer revision: it is held, and the caller is read for it.
+    host.deploymentFails = false;
+    host.deploymentRevision = 2;
+    host.tick({ of: deployment, revision: 2 });
+    await settled();
+    expect(session.deployment.getSnapshot().context.held?.value).toEqual({ revision: 2 });
+    expect(host.viewerFetches).toBe(2);
+    // The same revision again asks for nothing.
+    host.tick({ of: deployment, revision: 2 });
+    await settled();
+    expect(host.viewerFetches).toBe(2);
+    session.close();
   });
 });

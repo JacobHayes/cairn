@@ -47,7 +47,7 @@ it.each(index)("the browser host agrees with the server: $label", async (entry) 
   const started = await fresh();
   const worker = await started.worker();
   const engine = await started.host.loadEngine(wasmBytes);
-  const journey = group.document === undefined ? "" : (await worker.load(group.document)).journey;
+  const journey = group.document === undefined ? "" : (await worker.load(group.document)).key.journey;
   const differing: string[] = [];
   for (const found of group.cases) {
     const answered = await Promise.resolve(answer(worker, engine, journey, found.call)).catch((thrown: unknown) => `error: ${String(thrown)}`);

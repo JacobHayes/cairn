@@ -4,10 +4,11 @@
 // nothing here blocks an edit or publishing. They show on the card of each node (a hollow
 // chip), in the draft card, and in an import or publish result, always apart from violations.
 import type { Schema } from "@cairn/client";
-import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
-import { useSession } from "../data/react.ts";
+import type { Deriver } from "../data/host.ts";
+import { PROJECTION, type ReadSource } from "../data/keyed-read.ts";
+import { useKeyedRead, useSession } from "../data/react.ts";
 import { Badge } from "../ui/kit.tsx";
 
 type Notice = Schema<"Notice">;
@@ -17,32 +18,16 @@ interface Found {
   failed: string | undefined;
 }
 
+const NOTICES: ReadSource<{ deriver: Deriver; graph: Schema<"Graph"> }, Notice[]> = { policy: PROJECTION, read: ({ deriver, graph }) => deriver.routeNotices({ graph }) };
+
 /** The draft's notices as the engine lists them now; none while they are being read, or when they cannot be. */
 export function useRouteNotices(graph: Schema<"Graph"> | undefined): Found {
   const { deriver } = useSession();
-  const [found, setFound] = useState<(Found & { graph: Schema<"Graph"> }) | undefined>(undefined);
-  useEffect(() => {
-    if (graph === undefined) {
-      return undefined;
-    }
-    let live = true;
-    deriver.routeNotices({ graph }).then(
-      (notices) => {
-        if (live) {
-          setFound({ graph, notices, failed: undefined });
-        }
-      },
-      (thrown: unknown) => {
-        if (live) {
-          setFound({ graph, notices: [], failed: thrown instanceof Error ? thrown.message : String(thrown) });
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [deriver, graph]);
-  return found !== undefined && found.graph === graph ? found : { notices: [], failed: undefined };
+  const { view } = useKeyedRead(NOTICES, graph === undefined ? undefined : { identity: ["route-notices"], freshness: [graph], args: { deriver, graph } });
+  if (view.status === "current") {
+    return { notices: view.value, failed: undefined };
+  }
+  return { notices: [], failed: view.status === "failed" || view.status === "behind" ? view.error.message : undefined };
 }
 
 /** The notices under their own steel label, each with a way to open its node; nothing when there are none. */

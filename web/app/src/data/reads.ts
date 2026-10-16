@@ -13,9 +13,9 @@ export type RouteSummary = Schema<"RouteSummary">;
 export type RouteDetail = Schema<"RouteDetail">;
 
 const isJourney = (of: RevisionOf): boolean => "domain" in of && typeof of.domain === "object" && "journey" in of.domain;
-const isRoute = (of: RevisionOf, id?: string): boolean =>
+export const isRoute = (of: RevisionOf, id?: string): boolean =>
   "domain" in of && typeof of.domain === "object" && "route" in of.domain && (id === undefined || of.domain.route === id);
-const routeOf = (id: string): RevisionOf => ({ domain: { route: id } });
+export const routeOf = (id: string): RevisionOf => ({ domain: { route: id } });
 
 /** The key a journey index read is made afresh for. */
 export function indexKey(query: JourneyIndexQuery | undefined): string {

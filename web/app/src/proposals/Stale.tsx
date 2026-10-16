@@ -4,46 +4,44 @@
 // destination as it stands, the reviewer's choices carried over, at a new revision, so it is
 // reviewed again before it can be applied.
 import type { Schema } from "@cairn/client";
-import { useEffect, useState } from "react";
-
+import type { Host } from "../data/host.ts";
+import { HOST_READ, type ReadSource } from "../data/keyed-read.ts";
 import { allPages } from "../data/live.ts";
 import type { ProposalReview } from "../data/proposals.ts";
-import { useSession } from "../data/react.ts";
+import { useKeyedRead, useSession } from "../data/react.ts";
 import { describeRecord } from "../screens/RejectionView.tsx";
 import { Button } from "../ui/kit.tsx";
 import { intervening } from "./model.ts";
 
 type PatchEvents = Schema<"PatchEvents">;
 
+/** What the intervening patches are read from. */
+interface InterveningArgs {
+  host: Host;
+  journey: string;
+  expected: number;
+  current: number;
+}
+
+const INTERVENING: ReadSource<InterveningArgs, PatchEvents[]> = {
+  policy: HOST_READ,
+  read: async ({ host, journey, expected, current }) => {
+    const patches = await allPages<PatchEvents, number>(async (after) => {
+      const page = await host.history(journey, undefined, after);
+      return { items: page.patches, next: page.next ?? null };
+    });
+    return intervening(joined(patches), expected, current);
+  },
+};
+
 /** I6: journey `journey`'s patches between `expected` and `current`, read from its history. */
 function useIntervening(journey: string | undefined, expected: number, current: number): PatchEvents[] | { failed: string } | undefined {
   const { host } = useSession();
-  const [read, setRead] = useState<PatchEvents[] | { failed: string } | undefined>();
-  useEffect(() => {
-    if (journey === undefined) {
-      return;
-    }
-    let live = true;
-    allPages<PatchEvents, number>(async (after) => {
-      const page = await host.history(journey, undefined, after);
-      return { items: page.patches, next: page.next ?? null };
-    }).then(
-      (patches) => {
-        if (live) {
-          setRead(intervening(joined(patches), expected, current));
-        }
-      },
-      (thrown: unknown) => {
-        if (live) {
-          setRead({ failed: thrown instanceof Error ? thrown.message : String(thrown) });
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [host, journey, expected, current]);
-  return read;
+  const { view } = useKeyedRead(INTERVENING, journey === undefined ? undefined : { identity: [journey], freshness: [expected, current], args: { host, journey, expected, current } });
+  if (view.status === "current") {
+    return view.value;
+  }
+  return view.status === "failed" || view.status === "behind" ? { failed: view.error.message } : undefined;
 }
 
 /** Pages joined back into whole patches: one split across two pages is one patch. */

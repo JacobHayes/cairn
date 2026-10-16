@@ -4,10 +4,9 @@
 // (decisions/2026-10-07-restoring-a-tombstone-adds-a-local-copy-under-fresh-keys.md). Both
 // read the route version the journey follows, which never changes once published, so it is
 // fetched once per tab.
-import { useEffect, useState } from "react";
-
-import type { RouteVersion } from "../data/host.ts";
-import { useSession } from "../data/react.ts";
+import type { Host, RouteVersion } from "../data/host.ts";
+import { HOST_READ, valueOf, type ReadSource } from "../data/keyed-read.ts";
+import { useKeyedRead, useSession } from "../data/react.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import type { GraphNode } from "./graph.ts";
 import { editWords, resetMutations, restoreMutations, tombstonesOf } from "./local-edits.ts";
@@ -18,36 +17,26 @@ import { useAuthorWrite } from "./write.ts";
 /** Published versions read in this tab: immutable (A11), so each is fetched once. */
 const VERSIONS = new Map<string, Promise<RouteVersion>>();
 
-/** The route version a journey follows, once read; none for an empty journey. */
-export function useLineageVersion(lineage: Lineage | undefined): RouteVersion | undefined {
-  const { host } = useSession();
-  const [version, setVersion] = useState<RouteVersion | undefined>(undefined);
-  const name = lineage === undefined ? undefined : `${lineage.route}@${String(lineage.version)}`;
-  useEffect(() => {
-    if (lineage === undefined || name === undefined) {
-      return;
-    }
-    let live = true;
+/** The route version a lineage names: published versions never change (A11). */
+const LINEAGE_VERSION: ReadSource<{ host: Host; route: string; version: number }, RouteVersion> = {
+  policy: HOST_READ,
+  read: ({ host, route, version }) => {
+    const name = `${route}@${String(version)}`;
     let read = VERSIONS.get(name);
     if (read === undefined) {
-      read = host.routeVersion(lineage.route, lineage.version);
+      read = host.routeVersion(route, version);
       VERSIONS.set(name, read);
       read.catch(() => VERSIONS.delete(name));
     }
-    read.then(
-      (found) => {
-        if (live) {
-          setVersion(found);
-        }
-      },
-      () => undefined,
-    );
-    return () => {
-      live = false;
-    };
-    // `name` names the lineage.
-  }, [host, name]);
-  return version?.route === lineage?.route && version?.version === lineage?.version ? version : undefined;
+    return read;
+  },
+};
+
+/** The route version a journey follows, once read; none for an empty journey. */
+export function useLineageVersion(lineage: Lineage | undefined): RouteVersion | undefined {
+  const { host } = useSession();
+  const { view } = useKeyedRead(LINEAGE_VERSION, lineage === undefined ? undefined : { identity: [lineage.route, lineage.version], freshness: [], args: { host, route: lineage.route, version: lineage.version } });
+  return valueOf(view);
 }
 
 /** B4: the node's markers, each with its reset to the route. */

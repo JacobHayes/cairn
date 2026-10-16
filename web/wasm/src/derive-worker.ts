@@ -9,9 +9,10 @@ import {
   parsed,
   type AppliedLocally,
   type ApplyRequest,
-  type DerivationKey,
+  type DerivationHandle,
   type Derived,
   type DraftRequest,
+  type Loaded,
   type PreviewRequest,
   type ProjectionAnswer,
   type ProjectionRequest,
@@ -86,9 +87,12 @@ export class DeriveWorker {
     });
   }
 
-  /** Derives a domain document's text and holds it for its journey. */
-  async load(document: string): Promise<DerivationKey> {
-    return parsed<DerivationKey>(await this.#ask({ op: "load", document }));
+  /**
+   * Derives a domain document's text and holds it for its journey: what it was derived from,
+   * and the handle of this load, which `release` takes.
+   */
+  async load(document: string): Promise<Loaded> {
+    return parsed<Loaded>(await this.#ask({ op: "load", document }));
   }
 
   /** The held journey's derive, as the module wrote it. */
@@ -151,9 +155,9 @@ export class DeriveWorker {
     return parsed<Schema<"Notice">[]>(await this.#ask({ op: "route_notices", request }));
   }
 
-  /** Drops the held journey. */
-  async release(journey: string): Promise<void> {
-    await this.#ask({ op: "release", journey });
+  /** Drops the derivation `handle`'s load made, unless a later load has replaced it. */
+  async release(handle: DerivationHandle): Promise<void> {
+    await this.#ask({ op: "release", handle });
   }
 
   /** The worker module's linear memory in bytes: its peak so far. */

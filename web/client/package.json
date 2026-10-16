@@ -8,7 +8,8 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "openapi-fetch": "0.17.0"
+    "openapi-fetch": "0.17.0",
+    "xstate": "5.33.2"
   },
   "devDependencies": {
     "openapi-typescript": "7.13.0"

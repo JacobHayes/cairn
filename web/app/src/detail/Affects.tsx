@@ -5,6 +5,7 @@
 import type { Schema } from "@cairn/client";
 
 import { useProjected } from "../canvas/hooks.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge } from "../ui/kit.tsx";
 import { foldKey } from "./folds.ts";
@@ -52,8 +53,7 @@ function Group({ view, label, keys, total }: { view: Ready; label: string; keys:
 
 export function Affects({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { node } = detail;
-  const projected = useProjected(view, { projection: "answer_effects", key: node.key });
-  const effects = projected.value;
+  const effects = valueOf(useProjected(view, { projection: "answer_effects", key: node.key }));
   if (effects == null) {
     return null;
   }

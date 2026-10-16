@@ -1,12 +1,15 @@
 // The canvas's reads as React hooks: a projection of the journey's local derivation (the
 // level, the next list, "mine", the trace), answered by the derive worker per revision, and a
-// canvas's layout, answered by the layout worker. Each keeps showing its last answer until the
-// next arrives, so a live edit swaps the canvas once rather than blanking it.
+// canvas's layout, answered by the layout worker. Each is a keyed read (data/keyed-read.ts) that
+// keeps showing its last answer until the next arrives, so a live edit swaps the canvas once
+// rather than blanking it. The key functions beside the hooks name everything each read uses.
 import type { Schema } from "@cairn/client";
 import type { ProjectionAnswer, ProjectionRequest } from "@cairn/wasm";
-import { createContext, useContext, useEffect, useMemo, useState } from "react";
+import { createContext, useContext, useMemo, useState } from "react";
 
-import { useSession } from "../data/react.ts";
+import type { Deriver } from "../data/host.ts";
+import { PROJECTION, errorWords, valueOf, type ReadKey, type ReadSource, type ReadView } from "../data/keyed-read.ts";
+import { useKeyedRead, useSession } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { layoutRequestOf } from "./cards.ts";
 import type { Layout } from "./layout.ts";
@@ -24,55 +27,40 @@ export function useLayouts(): Layouts {
   return layouts;
 }
 
-/** What a read answered, for which request (the journey and the projection, not the revision). */
-export type Answered<T> = { request: string; value: T } | { request: string; error: string };
+/** What a projection is asked of the worker. */
+interface ProjectArgs {
+  deriver: Deriver;
+  journey: string;
+  request: ProjectionRequest;
+}
+
+const PROJECT: ReadSource<ProjectArgs, unknown> = {
+  policy: PROJECTION,
+  read: ({ deriver, journey, request }) => deriver.project(journey, request),
+};
 
 /**
- * What `answered` holds for `request`, if it answered that request: an answer from an earlier
- * revision of the same request is shown until the next arrives, but never one for another
- * request (another level is another graph, and laying it out under this view would hint the
- * view's first layout with a different graph's positions).
+ * The key of one projection of `view`'s journey: it is the same read for the same journey and
+ * request, read again when the journey's derivation moves; another request, or another journey,
+ * is another read (another level is another graph, and laying it out under this view would hint
+ * the view's first layout with a different graph's positions). None for no request or no view.
  */
-export function heldFor<T>(answered: Answered<T> | undefined, request: string | undefined): { value: T | undefined; error: string | undefined } {
-  if (request === undefined || answered === undefined || answered.request !== request) {
-    return { value: undefined, error: undefined };
+export function projectedKey(deriver: Deriver, view: Ready | undefined, request: ProjectionRequest | undefined): ReadKey<ProjectArgs> | undefined {
+  if (request === undefined || view === undefined) {
+    return undefined;
   }
-  return "value" in answered ? { value: answered.value, error: undefined } : { value: undefined, error: answered.error };
+  const journey = view.key.journey;
+  return { identity: [journey, JSON.stringify(request)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, request } };
 }
 
 /**
  * One projection of `view`'s journey from its local derivation, read again when the journey's
- * derivation or the request changes; none until the first answer, or for no request.
+ * derivation or the request changes; the answer of an earlier revision of the same request is
+ * shown until the next arrives. Nothing for no request.
  */
-export function useProjected<R extends ProjectionRequest>(view: Ready, request: R | undefined): { value: ProjectionAnswer<R> | undefined; error: string | undefined } {
+export function useProjected<R extends ProjectionRequest>(view: Ready | undefined, request: R | undefined): ReadView<ProjectionAnswer<R>> {
   const { deriver } = useSession();
-  const journey = view.key.journey;
-  const requested = request === undefined ? undefined : JSON.stringify([journey, request]);
-  const asked = request === undefined ? "" : JSON.stringify([view.key, request]);
-  const [answered, setAnswered] = useState<Answered<ProjectionAnswer<R>> | undefined>(undefined);
-  useEffect(() => {
-    if (request === undefined) {
-      return;
-    }
-    let live = true;
-    deriver.project(journey, request).then(
-      (value) => {
-        if (live) {
-          setAnswered({ request: requested ?? "", value });
-        }
-      },
-      (thrown: unknown) => {
-        if (live) {
-          setAnswered({ request: requested ?? "", error: thrown instanceof Error ? thrown.message : String(thrown) });
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-    // `asked` names the request and the derivation it is read from, so it alone is the key.
-  }, [deriver, journey, asked]);
-  return heldFor(answered, requested);
+  return useKeyedRead(PROJECT, projectedKey(deriver, view, request)).view as ReadView<ProjectionAnswer<R>>;
 }
 
 /**
@@ -80,47 +68,47 @@ export function useProjected<R extends ProjectionRequest>(view: Ready, request: 
  * keeps its own rows where the level draws them (the list, the timeline, the walk through).
  */
 export function useLevel(view: Ready, request: Extract<ProjectionRequest, { projection: "level" }> | undefined): { level: Schema<"Level"> | undefined; drawn: ReadonlySet<string> | undefined; error: string | undefined } {
-  const { value, error } = useProjected(view, request);
-  const drawn = useMemo(() => (value === undefined ? undefined : new Set(value.nodes.map((node) => node.key))), [value]);
-  return { level: value, drawn, error };
+  const answer = useProjected(view, request);
+  const level = valueOf(answer);
+  const drawn = useMemo(() => (level === undefined ? undefined : new Set(level.nodes.map((node) => node.key))), [level]);
+  return { level, drawn, error: errorWords(answer) };
+}
+
+/** What a joined trace asks of the worker: each node's own trace, less the nodes the card stands for. */
+interface TraceArgs {
+  deriver: Deriver;
+  journey: string;
+  keys: readonly string[];
+}
+
+const TRACE: ReadSource<TraceArgs, Schema<"Trace">> = {
+  policy: PROJECTION,
+  read: async ({ deriver, journey, keys }) => {
+    const own = new Set(keys);
+    const traces = await Promise.all(keys.map((each) => deriver.project(journey, { projection: "trace", key: each })));
+    const joined = (pick: (trace: Schema<"Trace">) => string[]) => [...new Set(traces.flatMap(pick))].filter((each) => !own.has(each)).sort();
+    return { node: keys[0] ?? "", upstream: joined((trace) => trace.upstream), downstream: joined((trace) => trace.downstream), gravity_contributors: joined((trace) => trace.gravity_contributors) };
+  },
+};
+
+/** The key of a joined trace: none for no keys. It is shown only for the derivation it was read from. */
+export function joinedTraceKey(deriver: Deriver, view: Ready, keys: readonly string[]): ReadKey<TraceArgs> | undefined {
+  const journey = view.key.journey;
+  return keys.length === 0 ? undefined : { identity: [journey, JSON.stringify(keys)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, keys } };
 }
 
 /**
  * The trace of a card that stands for hidden nodes (C2, C7): each node's own trace, joined, less
  * the nodes the card itself stands for. A collapsed stage has no edges of its own that the line
- * drawn from it comes from, so tracing it alone would find nothing downstream. None for no keys.
+ * drawn from it comes from, so tracing it alone would find nothing downstream. None for no keys,
+ * and none while the derivation it was read from is not the view's; a failure falls back to the
+ * node's own trace, which the canvas already shows.
  */
 export function useJoinedTrace(view: Ready, key: string | undefined, standing: readonly string[]): Schema<"Trace"> | undefined {
   const { deriver } = useSession();
-  const journey = view.key.journey;
   const keys = key === undefined || standing.length === 0 ? [] : [key, ...standing];
-  const asked = JSON.stringify([view.key, keys]);
-  const [answered, setAnswered] = useState<{ asked: string; value: Schema<"Trace"> } | undefined>(undefined);
-  useEffect(() => {
-    if (keys.length === 0) {
-      return;
-    }
-    let live = true;
-    const own = new Set(keys);
-    const joined = (traces: Schema<"Trace">[], pick: (trace: Schema<"Trace">) => string[]) => [...new Set(traces.flatMap(pick))].filter((each) => !own.has(each)).sort();
-    Promise.all(keys.map((each) => deriver.project(journey, { projection: "trace", key: each }))).then(
-      (traces) => {
-        if (live) {
-          setAnswered({
-            asked,
-            value: { node: keys[0] ?? "", upstream: joined(traces, (trace) => trace.upstream), downstream: joined(traces, (trace) => trace.downstream), gravity_contributors: joined(traces, (trace) => trace.gravity_contributors) },
-          });
-        }
-      },
-      // The node's own trace, which the canvas already shows, stands in.
-      () => undefined,
-    );
-    return () => {
-      live = false;
-    };
-    // `asked` names the keys and the derivation they are read from, so it alone is the key.
-  }, [deriver, journey, asked]);
-  return answered?.asked === asked ? answered.value : undefined;
+  const answer = useKeyedRead(TRACE, joinedTraceKey(deriver, view, keys)).view;
+  return answer.status === "current" ? answer.value : undefined;
 }
 
 /** A canvas, where its layout put each card, and the routes it left for each line. */
@@ -131,37 +119,36 @@ export interface LaidOut {
   view: string;
 }
 
+/** What a layout asks of the layout worker. */
+interface LayoutArgs {
+  layouts: Layouts;
+  domain: string;
+  view: string;
+  model: CanvasModel;
+}
+
+const LAYOUT: ReadSource<LayoutArgs, LaidOut> = {
+  policy: PROJECTION,
+  // The model and its layout are one answer: they always belong together.
+  read: async ({ layouts, domain, view, model }) => ({ model, layout: await layouts.place(domain, view, layoutRequestOf(model)), view }),
+};
+
+/**
+ * The key of a canvas's layout: the domain is the identity (another domain's positions never hint
+ * this one's), the view and the model are what it is laid out from. None before there is a model.
+ */
+export function laidOutKey(layouts: Layouts, domain: string, view: string, model: CanvasModel | undefined): ReadKey<LayoutArgs> | undefined {
+  return model === undefined ? undefined : { identity: [domain], freshness: [view, model], args: { layouts, domain, view, model } };
+}
+
 /**
  * C15: `model` laid out for `view` of `domain`: the last canvas whose layout has arrived, so
- * cards and positions always belong together; none before the first.
+ * cards and positions always belong together; none before the first. A new model keeps the last
+ * canvas shown until its layout arrives, and an error is shown only for the model it came from.
  */
-export function useLaidOut(domain: string, view: string, model: CanvasModel | undefined): { laidOut: LaidOut | undefined; error: string | undefined } {
+export function useLaidOut(domain: string, view: string, model: CanvasModel | undefined): ReadView<LaidOut> {
   const layouts = useLayouts();
-  const [laidOut, setLaidOut] = useState<LaidOut | undefined>(undefined);
-  const [error, setError] = useState<string | undefined>(undefined);
-  useEffect(() => {
-    if (model === undefined) {
-      return;
-    }
-    let live = true;
-    layouts.place(domain, view, layoutRequestOf(model)).then(
-      (layout) => {
-        if (live) {
-          setLaidOut({ model, layout, view });
-          setError(undefined);
-        }
-      },
-      (thrown: unknown) => {
-        if (live) {
-          setError(thrown instanceof Error ? thrown.message : String(thrown));
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [layouts, domain, view, model]);
-  return { laidOut, error };
+  return useKeyedRead(LAYOUT, laidOutKey(layouts, domain, view, model), [domain]).view;
 }
 
 const NO_FLIPS: ReadonlySet<string> = new Set();

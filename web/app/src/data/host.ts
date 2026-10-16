@@ -5,7 +5,7 @@ import type { Answered, HttpFailure, OpenTicks, Overlaps, Schema } from "@cairn/
 import type {
   AppliedLocally,
   ApplyRequest,
-  DerivationKey,
+  DerivationHandle,
   JourneyIndexQuery,
   Derived,
   DraftRequest,
@@ -16,6 +16,7 @@ import type {
   RouteApplyRequest,
   RouteLevelRequest,
   RouteNoticesRequest,
+  Loaded,
   PreviewRequest,
 } from "@cairn/wasm";
 
@@ -118,9 +119,12 @@ export interface RouteFiles {
   text(file: RouteFile): string;
 }
 
-/** What derives the documents: the derive worker (4.5), holding one derivation per journey. */
+/**
+ * What derives the documents: the derive worker, holding one derivation per journey. A derivation
+ * is owned by the load that made it: `load` answers the handle that `release` takes.
+ */
 export interface Deriver {
-  load(document: string): Promise<DerivationKey>;
+  load(document: string): Promise<Loaded>;
   derived(journey: string): Promise<Derived>;
   project<R extends ProjectionRequest>(journey: string, request: R): Promise<ProjectionAnswer<R>>;
   /** A10, G3: a message draft rendered with the held journey's context. */
@@ -135,5 +139,6 @@ export interface Deriver {
   preview(journey: string, request: PreviewRequest): Promise<Schema<"ProposalPreview">>;
   /** A draft patch applied to a route, committing nothing: the route as it would leave it. */
   applyRoute(request: RouteApplyRequest): Promise<Route>;
-  release(journey: string): Promise<void>;
+  /** Frees the derivation `handle`'s load made, unless a later load of the journey replaced it. */
+  release(handle: DerivationHandle): Promise<void>;
 }

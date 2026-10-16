@@ -8,6 +8,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 
 import { startVendorJourney } from "./acting.ts";
 import { addEntity, mergeEntities } from "./around.ts";
+import { addNode, newRoute, routeName } from "./authoring.ts";
 import { section } from "./detail.ts";
 import {
   countDocumentFetches,
@@ -144,4 +145,30 @@ test("an identity signed in with the stub issuer links to the user, and its veri
   await expect(page.locator('[data-testid="identity"][data-provider="stub"]').getByTestId("identity-emails")).toContainText(email);
   await expect(page.locator('[data-testid="identity"][data-provider="dev"]')).toBeVisible();
   await expect(page.locator(`[data-testid="your-entity"][data-entity="${entity}"]`)).toBeVisible();
+});
+
+test("a route's canvas keeps its graph while its reads fail, says BEHIND, and catches up once they recover", { tag: "@server" }, async ({ context }) => {
+  const [one, two] = [await context.newPage(), await context.newPage()];
+  const id = await newRoute(one, "server", routeName("Behind"));
+  await addNode(one, "decision", "First choice");
+  await open(two, "server", `/routes/${id}/draft`);
+  await live(two);
+  await expect(two.locator("[data-testid=node-card]")).toHaveCount(1);
+  // The server cannot answer this route's reads for the page showing it.
+  let failing = true;
+  await two.route(`**/api/routes/${id}`, async (route) => {
+    if (failing) {
+      await route.fulfill({ status: 500, body: "the route could not be read" });
+    } else {
+      await route.continue();
+    }
+  });
+  await addNode(one, "decision", "Second choice");
+  await expect(syncChip(two)).toHaveAttribute("data-state", "behind");
+  // What it showed stays: the canvas is not replaced by an error.
+  await expect(two.locator("[data-testid=node-card]")).toHaveCount(1);
+  await expect(two.getByText("The route could not be read")).toHaveCount(0);
+  failing = false;
+  await expect(two.locator("[data-testid=node-card]")).toHaveCount(2);
+  await expect(syncChip(two)).not.toHaveAttribute("data-state", "behind");
 });

@@ -1,11 +1,11 @@
 // The derive worker's messages (ARCHITECTURE, Web UI: derive and projections run in a web
 // worker, so a dense journey never blocks input). The page keeps each domain document's text
 // as fetched and posts it once per revision; the worker derives it once and holds the
-// derivation by journey until a newer revision replaces it, answering projections, previews,
+// derivation by journey until a newer revision replaces it or the load that made it is released, answering projections, previews,
 // and local applies over it as the module's JSON text, which the page parses. A route's graph,
 // which has no state, is answered its canvas level, or a draft patch applied to it, in
 // passing, holding nothing.
-import type { ApplyRequest, DraftRequest, HostError, PreviewRequest, ProjectionRequest, RouteApplyRequest, RouteLevelRequest, RouteNoticesRequest } from "./types.ts";
+import type { ApplyRequest, DerivationHandle, DraftRequest, HostError, PreviewRequest, ProjectionRequest, RouteApplyRequest, RouteLevelRequest, RouteNoticesRequest } from "./types.ts";
 
 /** What the page asks the worker. */
 export type WorkerRequest =
@@ -16,7 +16,7 @@ export type WorkerRequest =
   | { op: "render_draft"; journey: string; request: DraftRequest }
   | { op: "preview"; journey: string; request: PreviewRequest }
   | { op: "apply"; journey: string; request: ApplyRequest }
-  | { op: "release"; journey: string }
+  | { op: "release"; handle: DerivationHandle }
   | { op: "route_level"; request: RouteLevelRequest }
   | { op: "route_notices"; request: RouteNoticesRequest }
   | { op: "apply_route"; request: RouteApplyRequest }

@@ -16,6 +16,7 @@ import type { NodeKind } from "../authoring/graph.ts";
 import { isSegment, routeIndex } from "../data/reads.ts";
 import { newProposalId, proposalOf, type ProposalWritten } from "../data/proposals.ts";
 import { newPatchId } from "../data/writes.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
 import type { ProposalHost } from "../data/proposals.ts";
 import type { Ready } from "../detail/model.ts";
@@ -139,7 +140,7 @@ export type JourneyFlowName = "upgrade" | "save" | "relink";
  */
 export function JourneyFlow({ ready, flow, onClose }: { ready: Ready; flow: JourneyFlowName; onClose: () => void }) {
   const routes = useLive("routes", routeIndex).view;
-  const list = routes.status === "ready" ? routes.value : [];
+  const list = valueOf(routes) ?? [];
   const lineage = ready.journey.header.lineage ?? undefined;
   const latest = lineage === undefined ? undefined : (list.find((each) => each.header.id === lineage.route)?.latest_version ?? undefined);
   return (

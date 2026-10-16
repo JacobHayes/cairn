@@ -242,7 +242,7 @@ export function SyncChip() {
             location.reload();
           } else if (summary.state === "behind") {
             // A refetch failed or is slow: the stream's current revisions ask every view again.
-            session.subscription.reopen();
+            session.root.send({ type: "reopen" });
           } else {
             setAnchor(anchorBelow(event.currentTarget));
             setOpen(!open);

@@ -41,7 +41,7 @@ async function median(work: () => Promise<unknown>, runs: number): Promise<numbe
 const { worker: start } = await inProcess();
 const worker = await start();
 const limits = group("at the limits").document ?? "";
-const journey = (await worker.load(limits)).journey;
+const journey = (await worker.load(limits)).key.journey;
 const level: ProjectionRequest = { projection: "level", shown: ["group", "action", "deliverable", "decision", "milestone"] };
 const found = {
   derivedBytes: (await worker.derivedText(journey)).length,
@@ -54,7 +54,7 @@ const found = {
 // The size figures (design 5.11): the level with containers collapsed and a relevance class
 // left out, and the trace on selection, over the generated 2,000-node journey's own cases.
 const big = group("2000 generated nodes");
-const bigJourney = (await worker.load(big.document ?? "")).journey;
+const bigJourney = (await worker.load(big.document ?? "")).key.journey;
 const timedCalls = async (select: (request: ProjectionRequest) => boolean): Promise<number[]> => {
   const times: number[] = [];
   for (const { call } of big.cases) {

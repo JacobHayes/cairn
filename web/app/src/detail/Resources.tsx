@@ -4,9 +4,11 @@
 // is out of scope. The draft re-renders whenever the journey's derivation moves.
 import type { Schema } from "@cairn/client";
 import type { RenderedDraft } from "@cairn/wasm";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
-import { useSession } from "../data/react.ts";
+import type { Deriver } from "../data/host.ts";
+import { PROJECTION, valueOf, type ReadSource } from "../data/keyed-read.ts";
+import { useKeyedRead, useSession } from "../data/react.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { Markdown, safeHref } from "../ui/markdown.tsx";
 import { foldKey } from "./folds.ts";
@@ -25,27 +27,20 @@ export function journeyUrl(journey: string, origin: string): string {
   return `${origin}/journeys/${journey}`;
 }
 
+/** A message draft rendered in the derive worker. */
+const DRAFT: ReadSource<{ deriver: Deriver; journey: string; node: string; resource: string }, RenderedDraft> = {
+  policy: PROJECTION,
+  read: ({ deriver, journey, node, resource }) => deriver.renderDraft(journey, { key: node, resource, url: journeyUrl(journey, location.origin) }),
+};
+
 function MessageDraft({ view, node, resource }: { view: Ready; node: string; resource: string }) {
   const { deriver } = useSession();
   const journey = view.journey.header.id;
-  const [rendered, setRendered] = useState<RenderedDraft | { failed: string } | undefined>();
   const [copied, setCopied] = useState(false);
-  const derivation = `${String(view.key.revision)}:${String(view.key.deployment_revision)}:${view.key.today}`;
-  useEffect(() => {
-    let live = true;
-    deriver.renderDraft(journey, { key: node, resource, url: journeyUrl(journey, location.origin) }).then(
-      (draft) => { if (live) setRendered(draft); },
-      (thrown: unknown) => { if (live) setRendered({ failed: thrown instanceof Error ? thrown.message : String(thrown) }); },
-    );
-    return () => {
-      live = false;
-    };
-  }, [deriver, journey, node, resource, derivation]);
+  const read = useKeyedRead(DRAFT, { identity: [journey, node, resource], freshness: [JSON.stringify(view.key)], args: { deriver, journey, node, resource } }).view;
+  const rendered = valueOf(read);
   if (rendered === undefined) {
-    return <span className="muted small">Rendering...</span>;
-  }
-  if ("failed" in rendered) {
-    return <span className="callout callout-bad">The draft could not be rendered: {rendered.failed}</span>;
+    return read.status === "failed" ? <span className="callout callout-bad">The draft could not be rendered: {read.error.message}</span> : <span className="muted small">Rendering...</span>;
   }
   const copy = () => {
     void navigator.clipboard.writeText(draftText(rendered)).then(() => { setCopied(true); });

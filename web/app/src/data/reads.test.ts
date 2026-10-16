@@ -3,10 +3,13 @@
 // revision, since a newer one may bring it in.
 import { describe, expect, it } from "vitest";
 
-import { FakeDeriver, FakeHost, manualTimers, settled } from "./fake.test-support.ts";
+import { createActor } from "xstate";
+
+import { CountingClock, FakeDeriver, FakeHost, manualTimers, settled } from "./fake.test-support.ts";
 import type { JourneyIndexQuery } from "./host.ts";
-import { LiveRead } from "./live.ts";
-import { journeyIndex, type JourneySummary } from "./reads.ts";
+import { keyedRead, valueOf, readView } from "./keyed-read.ts";
+import { liveSource } from "./live.ts";
+import { indexKey, journeyIndex, type JourneySummary } from "./reads.ts";
 import { Session } from "./session.ts";
 
 /** A host with one journey on version 1 of route `r`, whose latest version the test sets. */
@@ -30,23 +33,26 @@ class RouteHost extends FakeHost {
 
 async function reading(query: JourneyIndexQuery) {
   const host = new RouteHost();
-  const session = await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers });
-  const read = new LiveRead(session.subscription, journeyIndex(query)(session));
-  read.mount();
+  const clock = new CountingClock();
+  const session = await Session.start({ host, deriver: new FakeDeriver(), timers: manualTimers().timers, clock });
+  const read = createActor(keyedRead, { clock, input: { source: liveSource<JourneySummary[]>(), env: session.readEnv } }).start();
+  read.send({ type: "want", key: { identity: [indexKey(query)], freshness: [], args: { spec: journeyIndex(query)(session) } } });
+  clock.increment(0);
   await settled();
   host.open();
   await settled();
-  return { host, read };
+  const view = () => readView<JourneySummary[]>(read.getSnapshot(), [indexKey(query)], []);
+  return { host, view };
 }
 
 describe("the journey index kept current", () => {
   it("refetches when a journey's route publishes a newer version", async () => {
-    const { host, read } = await reading({ status: ["active"] });
-    expect(read.view).toMatchObject({ status: "ready", value: [{ upgrade_available: false }] });
+    const { host, view } = await reading({ status: ["active"] });
+    expect(valueOf(view())).toMatchObject([{ upgrade_available: false }]);
     host.latest = 2;
     host.tick({ of: { domain: { route: "r" } }, revision: 9 });
     await settled();
-    expect(read.view).toMatchObject({ status: "ready", value: [{ upgrade_available: true }] });
+    expect(valueOf(view())).toMatchObject([{ upgrade_available: true }]);
   });
 
   it("asks once per revision of a journey outside its filter", async () => {

@@ -4,48 +4,41 @@
 // last answer for the same request until the next arrives, so a live edit swaps the rows once.
 import type { Schema } from "@cairn/client";
 import type { ListQuery } from "@cairn/wasm";
-import { useEffect, useState } from "react";
 
-import { heldFor, type Answered } from "../canvas/hooks.ts";
-import { useSession } from "../data/react.ts";
+import { PROJECTION, errorWords, valueOf, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
+import type { Deriver } from "../data/host.ts";
+import { useKeyedRead, useSession } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import type { NodeRow } from "./why.ts";
 
+interface RowsArgs {
+  deriver: Deriver;
+  journey: string;
+  query: ListQuery;
+}
+
+const ROWS: ReadSource<RowsArgs, NodeRow[]> = {
+  policy: PROJECTION,
+  read: async ({ deriver, journey, query }) => {
+    const rows: NodeRow[] = [];
+    let cursor: number | undefined = undefined;
+    do {
+      const page: Schema<"ListPage"> = await deriver.project(journey, { projection: "list", query: cursor === undefined ? query : { ...query, cursor } });
+      rows.push(...page.rows);
+      cursor = page.next ?? undefined;
+    } while (cursor !== undefined);
+    return rows;
+  },
+};
+
+/** The key of a list's rows: the same read for the same journey and query, read again when the derivation moves. */
+export function rowsKey(deriver: Deriver, view: Ready, query: ListQuery): ReadKey<RowsArgs> {
+  const journey = view.key.journey;
+  return { identity: [journey, JSON.stringify(query)], freshness: [JSON.stringify(view.key)], args: { deriver, journey, query } };
+}
+
 export function useRows(view: Ready, query: ListQuery): { rows: NodeRow[] | undefined; error: string | undefined } {
   const { deriver } = useSession();
-  const journey = view.key.journey;
-  const requested = JSON.stringify([journey, query]);
-  const asked = JSON.stringify([view.key, query]);
-  const [answered, setAnswered] = useState<Answered<NodeRow[]> | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    const read = async () => {
-      const rows: NodeRow[] = [];
-      let cursor: number | undefined = undefined;
-      do {
-        const page: Schema<"ListPage"> = await deriver.project(journey, { projection: "list", query: cursor === undefined ? query : { ...query, cursor } });
-        rows.push(...page.rows);
-        cursor = page.next ?? undefined;
-      } while (cursor !== undefined);
-      return rows;
-    };
-    read().then(
-      (rows) => {
-        if (live) {
-          setAnswered({ request: requested, value: rows });
-        }
-      },
-      (thrown: unknown) => {
-        if (live) {
-          setAnswered({ request: requested, error: thrown instanceof Error ? thrown.message : String(thrown) });
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-    // `asked` names the request and the derivation it is read from, so it alone is the key.
-  }, [deriver, journey, asked]);
-  const { value, error } = heldFor(answered, requested);
-  return { rows: value, error };
+  const { view: answer } = useKeyedRead(ROWS, rowsKey(deriver, view, query));
+  return { rows: valueOf(answer), error: errorWords(answer) };
 }

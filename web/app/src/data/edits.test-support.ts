@@ -5,7 +5,7 @@ import { SimulatedClock, createActor } from "xstate";
 
 import type { About } from "./edit-record.ts";
 import { tabEditStore } from "./edit-record.ts";
-import { FakeHost, memoryStorage, settled, writeEnv } from "./fake.test-support.ts";
+import { FakeDeriver, FakeHost, memoryStorage, settled, writeEnv } from "./fake.test-support.ts";
 import { editsOf } from "./session-root.ts";
 import { sessionRoot } from "./session-root.ts";
 import { patchOf } from "./writes.ts";
@@ -38,6 +38,11 @@ export async function startRoot(options: StartOptions = {}) {
   const root = createActor(sessionRoot, {
     clock,
     input: {
+      host,
+      deriver: new FakeDeriver(),
+      open: host.openTicks,
+      today: () => new Date("2026-10-06T12:00:00Z"),
+      now: () => clock.now(),
       edits: {
         store: tabEditStore(() => storage),
         env: parts,

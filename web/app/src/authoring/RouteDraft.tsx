@@ -4,7 +4,7 @@
 // under the header, and the List projection. A route has no state or dates, so its cards say
 // the date rule in words and no status.
 import type { Schema } from "@cairn/client";
-import { useEffect, useState, type ReactNode } from "react";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 
 import { AssistantDock } from "../assistant/AssistantPanel.tsx";
@@ -18,31 +18,18 @@ import { Refused } from "../screens/Refused.tsx";
 import type { ScreenWrite } from "../screens/write.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { ruleFoot } from "./dates.ts";
-import { ancestorsOf, nodesByPath, type Graph, type Tree } from "./graph.ts";
+import { ancestorsOf, nodesByPath, type Tree } from "./graph.ts";
 import { NoticeList } from "./RouteNotices.tsx";
 import type { Authored } from "./target.ts";
 import { subjectNode, type Violation } from "./violations.ts";
-import { usePublishPreview } from "./write.ts";
+import { usePublishPreviewRead } from "./write.ts";
 
 type Notice = Schema<"Notice">;
 
 /** What publishing the draft would be refused for (A15), read as the engine would answer it on the draft as it stands. */
 export function useDraftViolations(authored: Authored): Violation[] {
-  const preview = usePublishPreview(authored);
-  const [found, setFound] = useState<{ graph: Graph; violations: Violation[] } | undefined>(undefined);
-  useEffect(() => {
-    let live = true;
-    void preview().then((previewed) => {
-      if (live) {
-        setFound({ graph: authored.graph, violations: previewed.outcome === "rejected" && previewed.rejection.rejection === "invalid" ? previewed.rejection.violations : [] });
-      }
-    });
-    return () => {
-      live = false;
-    };
-    // The draft's graph is what is read; the previewer is made afresh each render.
-  }, [authored.graph]);
-  return found?.graph === authored.graph ? found.violations : [];
+  const previewed = usePublishPreviewRead(authored);
+  return previewed?.outcome === "rejected" && previewed.rejection.rejection === "invalid" ? previewed.rejection.violations : [];
 }
 
 /** "Draft (from v3)", or "Draft (first version)" for a route with nothing published. */

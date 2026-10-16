@@ -6,6 +6,7 @@
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { journeyIndex, indexKey, isSegment, routeIndex, type JourneySummary, type RouteSummary } from "../data/reads.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { useLive, useViewer } from "../data/react.ts";
 import { Badge } from "../ui/kit.tsx";
 import { filtersFrom, indexPath, newJourneyPath, overviewPath, queryOf, type IndexFilters } from "./address.ts";
@@ -128,7 +129,8 @@ export function JourneyIndex() {
   const waiting = filters.mine && viewer === undefined && failed === undefined;
   const { view } = useLive(indexKey(waiting ? undefined : query), journeyIndex(waiting ? undefined : query));
   const routes = useLive("routes", routeIndex).view;
-  const known = routes.status === "ready" ? routes.value : [];
+  const known = valueOf(routes) ?? [];
+  const found = valueOf(view);
   return (
     <section className="stack" aria-label="Journeys">
       <div className="row">
@@ -139,8 +141,8 @@ export function JourneyIndex() {
       <IndexFilterBar filters={filters} routes={known.filter((route) => !isSegment(route))} onChange={(next) => void navigate(indexPath(next))} />
       {filters.mine && viewer === undefined && failed !== undefined ? <p className="callout callout-bad">Who you are could not be read, so neither can what is yours: {failed}</p> : null}
       {view.status === "loading" || waiting ? <p className="muted small">Loading the journeys...</p> : null}
-      {view.status === "failed" ? <p className="callout callout-bad">The journeys could not be read: {view.message}</p> : null}
-      {view.status === "ready" && !waiting ? <Rows filters={filters} items={view.value} routes={known} /> : null}
+      {view.status === "failed" ? <p className="callout callout-bad">The journeys could not be read: {view.error.message}</p> : null}
+      {found !== undefined && !waiting ? <Rows filters={filters} items={found} routes={known} /> : null}
     </section>
   );
 }

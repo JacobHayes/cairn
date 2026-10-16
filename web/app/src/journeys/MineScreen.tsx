@@ -16,6 +16,7 @@ import { reasonOf } from "../acting/reasons.ts";
 import { RowActions } from "../acting/RowActions.tsx";
 import "../acting/acting.css";
 import { useProjected } from "../canvas/hooks.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { indexKey, journeyIndex, type JourneySummary } from "../data/reads.ts";
 import { useLive, useViewer } from "../data/react.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
@@ -32,11 +33,11 @@ const MINE_NEXT: NextQuery = { sort: "rank", mine: true, kinds: [], for_viewer: 
 
 /** The journey's progress in one line. */
 function Progress({ view }: { view: Ready }) {
-  const summary = useProjected(view, { projection: "status_summary" });
-  if (summary.value === undefined) {
+  const summary = valueOf(useProjected(view, { projection: "status_summary" }));
+  if (summary === undefined) {
     return null;
   }
-  const model = summaryModel(view, summary.value);
+  const model = summaryModel(view, summary);
   return (
     <span className="muted" data-testid="mine-progress">
       {model.inScope - model.remaining} of {model.inScope} done
@@ -47,7 +48,7 @@ function Progress({ view }: { view: Ready }) {
 /** The viewer's rows in one journey, in that journey's rank, and the line for when none can be done yet. */
 function MineRows({ view, entries, selected }: { view: Ready; entries: MineEntry[]; selected: string | undefined }) {
   const request = useMemo(() => ({ projection: "next" as const, query: MINE_NEXT }), []);
-  const { value: next } = useProjected(view, request);
+  const next = valueOf(useProjected(view, request));
   const id = view.journey.header.id;
   const rows = next?.items ?? [];
   return (
@@ -104,7 +105,8 @@ export function MineScreen() {
   const query = viewer === undefined ? undefined : queryOf({ ...DEFAULT_FILTERS, mine: true }, viewer.entities);
   const { view } = useLive(indexKey(query), journeyIndex(query));
   const entities = viewer?.entities ?? [];
-  const items = view.status === "ready" ? [...view.value].sort((left, right) => left.name.localeCompare(right.name)) : [];
+  const found = valueOf(view);
+  const items = found !== undefined ? [...found].sort((left, right) => left.name.localeCompare(right.name)) : [];
   const { report, none } = useMineCounts(items);
   return (
     <section className="stack" aria-label="Mine" data-testid="mine">
@@ -115,9 +117,9 @@ export function MineScreen() {
       </span>
       {failed === undefined ? null : <p className="callout callout-bad">Who you are could not be read: {failed}</p>}
       {failed === undefined && (viewer === undefined || view.status === "loading") ? <p className="muted small">Reading your journeys...</p> : null}
-      {view.status === "ready" && viewer !== undefined && none ? <p className="muted small" data-testid="mine-empty">Nothing in any active journey is yours.</p> : null}
-      {view.status === "failed" ? <p className="callout callout-bad">The journeys could not be read: {view.message}</p> : null}
-      {view.status === "ready" && viewer !== undefined ? (
+      {found !== undefined && viewer !== undefined && none ? <p className="muted small" data-testid="mine-empty">Nothing in any active journey is yours.</p> : null}
+      {view.status === "failed" ? <p className="callout callout-bad">The journeys could not be read: {view.error.message}</p> : null}
+      {found !== undefined && viewer !== undefined ? (
         <ul className="plain-list stack mine-list">
           {items.map((summary) => (
             <JourneyMine key={summary.id} summary={summary} report={report} openJourney={id} />

@@ -19,6 +19,7 @@ import { useFrameActions } from "../shell/frame.tsx";
 import { typing } from "../ui/typing.ts";
 import { RevealBox, SignalMenu } from "./Chrome.tsx";
 import { GraphCanvas, type Reveal } from "./GraphCanvas.tsx";
+import { errorWords, valueOf, type ReadView } from "../data/keyed-read.ts";
 import { useJoinedTrace, useLaidOut, useProjected } from "./hooks.ts";
 import { journeyLooks } from "./journey.ts";
 import { ancestorsOf, collapsedAt, drawnStep, stepOf, withExpanded } from "./ladder.ts";
@@ -92,26 +93,35 @@ function onlyTraced(model: CanvasModel, traced: ReadonlySet<string>, drawn: Read
   return { cards: model.cards.filter((card) => !out.has(card.key)), lines: [...lines.values()] };
 }
 
+/** Whether a read has neither a value nor a failure to show yet. */
+const isPending = (read: ReadView<unknown>) => read.status === "idle" || read.status === "loading";
+
 /** The view's level (C2), and while Reveal is on, the whole journey's beside it under the same collapse, less what neither draws nor the trace reaches. */
 function useJourneyModel(ready: Ready, view: GraphView, collapsed: string[], drawn: Step, depth: Step, revealed: ReadonlySet<string> | undefined) {
   const request = useMemo(() => levelRequestOf(view.state, drawn, collapsed), [view.state, drawn, collapsed]);
   const everything = useMemo<LevelRequest | undefined>(() => (revealed === undefined ? undefined : { projection: "level", shown: KINDS, ...(collapsed.length === 0 ? {} : { collapsed }) }), [revealed, collapsed]);
-  const level = useProjected(ready, request);
-  const whole = useProjected(ready, everything);
-  const next = useProjected(ready, { projection: "next" });
-  const mine = useProjected(ready, { projection: "mine" });
+  const levelRead = useProjected(ready, request);
+  const wholeRead = useProjected(ready, everything);
+  const level = valueOf(levelRead);
+  const whole = valueOf(wholeRead);
+  const nextRead = useProjected(ready, { projection: "next" });
+  const mineRead = useProjected(ready, { projection: "mine" });
+  const next = valueOf(nextRead);
+  const mine = valueOf(mineRead);
+  // The cards say what is next and what is the viewer's, so the first canvas waits for both: a layout made without them would be laid out again, and fitted before it.
+  const answered = !isPending(nextRead) && !isPending(mineRead);
   const model = useMemo(() => {
-    const shown = revealed === undefined ? level.value : whole.value;
-    if (level.value === undefined || shown === undefined) {
+    const shown = revealed === undefined ? level : whole;
+    if (level === undefined || shown === undefined || !answered) {
       return undefined;
     }
-    const ranked = (next.value?.items ?? []).map((item) => item.key);
-    const entries = mine.value ?? [];
+    const ranked = (next?.items ?? []).map((item) => item.key);
+    const entries = mine ?? [];
     const drawn = journeyModel(ready, shown, { ranked, mine: entries.map((entry) => entry.node), owned: entries.filter((entry) => entry.kinds.includes("k_owner")).map((entry) => entry.node) });
-    return revealed === undefined ? drawn : onlyTraced(drawn, revealed, new Set(level.value.nodes.map((node) => node.key)));
-  }, [ready, level.value, whole.value, next.value, mine.value, revealed]);
+    return revealed === undefined ? drawn : onlyTraced(drawn, revealed, new Set(level.nodes.map((node) => node.key)));
+  }, [ready, level, whole, next, mine, answered, revealed]);
   // Frontier, Fade's dimming and the viewer's expands and collapses keep the layout's positions; the step drawn, the Filter and the search lay it out afresh.
-  return { model, level: level.value, error: level.error ?? whole.error, layoutView: journeyLayoutView(view.state, depth) };
+  return { model, level, error: errorWords(levelRead) ?? errorWords(wholeRead), layoutView: journeyLayoutView(view.state, depth) };
 }
 
 export interface JourneyCanvasProps {
@@ -138,7 +148,7 @@ function useSelectionTrace(ready: Ready, selected: string | undefined) {
   const learn = useCallback((rolledUp: string[]) => {
     setStands((held) => (held.node === selected && held.keys.join() === rolledUp.join() ? held : { node: selected, keys: rolledUp }));
   }, [selected]);
-  return { trace: joined ?? own.value, learn };
+  return { trace: joined ?? valueOf(own), learn };
 }
 
 /** What the canvas draws: the view's level laid out, the selected node's trace over it, what the highlights light, and what Reveal asks for. */
@@ -154,7 +164,9 @@ function useGraph(ready: Ready, view: GraphView, selected: string | undefined) {
   const open = useMemo(() => (traceOnly === undefined ? [] : [...traceOnly].flatMap((key) => ancestorsOf(nodes, key))), [traceOnly, nodes]);
   const unfolded = useMemo(() => collapsed.filter((key) => !open.includes(key)), [collapsed, open]);
   const { model, level, error, layoutView } = useJourneyModel(ready, view, unfolded, drawn, depth, traceOnly);
-  const { laidOut, error: layoutError } = useLaidOut(journey, layoutView, model);
+  const laidRead = useLaidOut(journey, layoutView, model);
+  const laidOut = valueOf(laidRead);
+  const layoutError = errorWords(laidRead);
   const rolledUp = laidOut?.model.cards.find((card) => card.key === selected)?.rolledUp;
   useEffect(() => {
     if (rolledUp !== undefined) {

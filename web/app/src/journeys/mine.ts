@@ -5,8 +5,9 @@
 import type { Schema } from "@cairn/client";
 import { useCallback, useEffect, useState } from "react";
 
+import { useProjected } from "../canvas/hooks.ts";
 import type { JourneyView } from "../data/journeys.ts";
-import { useJourney, useSession } from "../data/react.ts";
+import { useJourney } from "../data/react.ts";
 
 export type MineEntry = Schema<"MineEntry">;
 
@@ -20,44 +21,22 @@ export type MineView =
 
 /** Journey `id`'s "mine", re-projected whenever the journey is derived again. */
 export function useMineOf(id: string): MineView {
-  const { deriver } = useSession();
   const journey = useJourney(id);
-  const [answer, setAnswer] = useState<{ key: Ready["key"]; entries: MineEntry[] } | { error: string } | undefined>();
   const ready = journey.status === "ready" ? journey : undefined;
-  useEffect(() => {
-    if (ready === undefined) {
-      return;
-    }
-    let live = true;
-    deriver.project(id, { projection: "mine" }).then(
-      (entries) => {
-        if (live) {
-          setAnswer({ key: ready.key, entries });
-        }
-      },
-      (thrown: unknown) => {
-        if (live) {
-          setAnswer({ error: thrown instanceof Error ? thrown.message : String(thrown) });
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [deriver, id, ready]);
+  const mine = useProjected(ready, ready === undefined ? undefined : { projection: "mine" });
   if (journey.status === "missing") {
     return { status: "gone" };
   }
   if (journey.status === "failed") {
     return { status: "failed", message: journey.message };
   }
-  if (answer !== undefined && "error" in answer) {
-    return { status: "failed", message: answer.error };
+  if (mine.status === "failed" || mine.status === "behind") {
+    return { status: "failed", message: mine.error.message };
   }
-  if (ready === undefined || answer?.key !== ready.key) {
+  if (ready === undefined || mine.status !== "current") {
     return { status: "loading" };
   }
-  return { status: "ready", view: ready, entries: answer.entries };
+  return { status: "ready", view: ready, entries: mine.value };
 }
 
 /**

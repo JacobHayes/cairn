@@ -9,7 +9,7 @@
 import "./screens.css";
 
 import type { Schema } from "@cairn/client";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
@@ -25,32 +25,24 @@ import { Ladder } from "../canvas/Chrome.tsx";
 import { GraphCanvas } from "../canvas/GraphCanvas.tsx";
 import { refitKey } from "../canvas/refit.ts";
 import { useLaidOut } from "../canvas/hooks.ts";
-import { routeKindsAt, routeStepDrawing, routeStepOf, stepsFor, withStep } from "../canvas/ladder.ts";
+import { routeStepDrawing, routeStepOf, stepsFor, withStep } from "../canvas/ladder.ts";
 import { cardsOf, linesOf, type CanvasModel, type Step } from "../canvas/model.ts";
 import type { CardActions } from "../canvas/NodeCard.tsx";
 import { DEFAULT_VIEW, graphQueryFromOld, layoutViewOf, paramsOf, searchOf, viewFrom, type CanvasView } from "../canvas/settings.ts";
-import type { Level, Route } from "../data/host.ts";
-import { useDeployment, useSession } from "../data/react.ts";
+import type { Route } from "../data/host.ts";
+import { errorWords, valueOf } from "../data/keyed-read.ts";
+import { useDeployment, useKeyedRead, useSession } from "../data/react.ts";
 import { COLUMN, Inspector, useMedia } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { openDraft } from "../routes/model.ts";
-import { routeDetailPath } from "../routes/address.ts";
+import { ROUTES_PATH, routeDetailPath } from "../routes/address.ts";
 import type { ImportedHandler } from "../routes/ImportFile.tsx";
 import { useInserting } from "../segments/entry.ts";
 import { InsertionCanvas } from "../segments/Preview.tsx";
 import { InsertStepper } from "../segments/Stepper.tsx";
 import { Button } from "../ui/kit.tsx";
+import { ROUTE_GRAPH, ROUTE_LEVEL, routeGraphKey, routeLevelKey, type Shown } from "./route-reads.ts";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
-
-/** The graph a route's canvas shows: its draft, or one published version. */
-interface Shown {
-  route: Route;
-  graph: Schema<"Graph">;
-  /** "draft", or the version's number. */
-  of: "draft" | number;
-}
-
-type RouteRead = { status: "loading" } | { status: "failed"; message: string } | { status: "empty"; route: Route } | { status: "ready"; shown: Shown };
 
 /** What an import or a publish left, shown under the header until dismissed. */
 interface Result {
@@ -73,93 +65,16 @@ export function routeNodePath(route: string, view: CanvasView, node: string): st
   return `/routes/${route}/draft/nodes/${node}${searchOf(view)}`;
 }
 
-/** Route `id`'s draft, or `version` (the latest when no draft is open), read again as it moves. */
-function useRouteGraph(id: string, version: number | undefined): RouteRead {
-  const { host, subscription } = useSession();
-  const [read, setRead] = useState<RouteRead>({ status: "loading" });
-  const [moved, setMoved] = useState(0);
-  useEffect(() => {
-    const unwatch = subscription.watch([`route:${id}`]);
-    const unlisten = subscription.listen({
-      opened: () => undefined,
-      tick: (tick) => {
-        if ("domain" in tick.of && typeof tick.of.domain === "object" && "route" in tick.of.domain && tick.of.domain.route === id) {
-          setMoved((count) => count + 1);
-        }
-      },
-    });
-    return () => {
-      unwatch();
-      unlisten();
-    };
-  }, [subscription, id]);
-  useEffect(() => {
-    let live = true;
-    const fetch = async (): Promise<RouteRead> => {
-      const route = await host.route(id);
-      const latest = Math.max(0, ...(route.versions ?? []));
-      if (route.draft != null && version === undefined) {
-        return { status: "ready", shown: { route, graph: route.draft.graph, of: "draft" } };
-      }
-      // A route whose only draft was discarded has nothing to draw.
-      if (version === undefined && latest === 0) {
-        return { status: "empty", route };
-      }
-      const number = version ?? latest;
-      return { status: "ready", shown: { route, graph: (await host.routeVersion(id, number)).graph, of: number } };
-    };
-    fetch().then(
-      (found) => {
-        if (live) {
-          setRead(found);
-        }
-      },
-      (thrown: unknown) => {
-        if (live) {
-          setRead({ status: "failed", message: thrown instanceof Error ? thrown.message : String(thrown) });
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [host, id, version, moved]);
-  return read;
-}
-
 /** C2: the shown graph's level, from the derive worker, with no journey state, and each card's marks (the date rule, and an unanchored notice). */
 function useRouteModel(shown: Shown, view: CanvasView, unanchored: ReadonlySet<string>): { model: CanvasModel | undefined; error: string | undefined } {
   const { deriver } = useSession();
   const deployment = useDeployment();
   const step = routeStepOf(view, shown.graph.nodes ?? []);
-  const [answer, setAnswer] = useState<{ level: Level; shown: Shown; view: string } | { error: string } | undefined>(undefined);
-  useEffect(() => {
-    if (deployment === undefined) {
-      return;
-    }
-    let live = true;
-    const today = new Date().toISOString().slice(0, 10);
-    const request = { graph: shown.graph, deployment, today, shown: routeKindsAt(step), ...(view.container === undefined ? {} : { container: view.container }) };
-    deriver.routeLevel(request).then(
-      (level) => {
-        if (live) {
-          setAnswer({ level, shown, view: layoutViewOf(view, step) });
-        }
-      },
-      (thrown: unknown) => {
-        if (live) {
-          setAnswer({ error: thrown instanceof Error ? thrown.message : String(thrown) });
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [deriver, deployment, shown, view, step]);
+  const today = new Date().toISOString().slice(0, 10);
+  const read = useKeyedRead(ROUTE_LEVEL, routeLevelKey(deriver, shown, view, step, deployment, today)).view;
+  const answer = valueOf(read);
   const model = useMemo(() => {
-    // Only the level of this graph for this view: another view's level laid out under this one
-    // would hint its first layout with another graph's positions.
-    if (answer === undefined || "error" in answer || answer.shown !== shown || answer.view !== layoutViewOf(view, step)) {
+    if (answer === undefined) {
       return undefined;
     }
     const nodes = answer.shown.graph.nodes ?? [];
@@ -169,8 +84,8 @@ function useRouteModel(shown: Shown, view: CanvasView, unanchored: ReadonlySet<s
       return { ...card, route: { foot: node === undefined ? undefined : ruleFoot(node, tree), unanchored: unanchored.has(card.key) } };
     });
     return { cards, lines: linesOf(answer.level, nodes) };
-  }, [answer, shown, view, step, unanchored]);
-  return { model, error: answer !== undefined && "error" in answer ? answer.error : undefined };
+  }, [answer, unanchored]);
+  return { model, error: errorWords(read) };
 }
 
 interface CanvasProps {
@@ -189,7 +104,9 @@ function RouteCanvas({ shown, view, version, selected, unanchored, onPick }: Can
   const draft = shown.of === "draft";
   const { model, error } = useRouteModel(shown, view, unanchored);
   const step = routeStepOf(view, shown.graph.nodes ?? []);
-  const { laidOut, error: layoutError } = useLaidOut(`route:${id}:${String(shown.of)}`, layoutViewOf(view, step), model);
+  const laid = useLaidOut(`route:${id}:${String(shown.of)}`, layoutViewOf(view, step), model);
+  const laidOut = valueOf(laid);
+  const layoutError = errorWords(laid);
   const at = (next: CanvasView) => (selected !== undefined && draft ? routeNodePath(id, next, selected) : routeCanvasPath(id, version, next));
   const actions = useMemo<CardActions>(
     () => ({
@@ -484,7 +401,9 @@ export function RouteCanvasPage() {
   );
   const asked = params.get("version");
   const version = asked === null ? undefined : Number(asked);
-  const read = useRouteGraph(id, version);
+  const { host } = useSession();
+  const read = useKeyedRead(ROUTE_GRAPH, routeGraphKey(host, id, version)).view;
+  const found = valueOf(read);
   const deployment = useDeployment();
   const write = useScreenWrite();
   const navigate = useNavigate();
@@ -496,20 +415,20 @@ export function RouteCanvasPage() {
       void navigate(routeCanvasPath(file.route, undefined, DEFAULT_VIEW));
     }
   };
-  const shown = read.status === "ready" ? read.shown : undefined;
+  const shown = found !== undefined && "shown" in found ? found.shown : undefined;
   const authored = useMemo(() => (shown?.of !== "draft" || deployment === undefined ? undefined : routeAuthored(shown.route, deployment, new Date().toISOString().slice(0, 10))), [shown, deployment]);
-  if (read.status === "loading") {
-    return <p className="muted small">Reading the route...</p>;
+  if (found === undefined) {
+    if (read.status === "gone") {
+      return <p className="callout">This route does not exist. <Link to={ROUTES_PATH}>All routes</Link></p>;
+    }
+    return read.status === "failed" ? <p className="callout callout-bad">The route could not be read: {read.error.message}</p> : <p className="muted small">Reading the route...</p>;
   }
-  if (read.status === "failed") {
-    return <p className="callout callout-bad">The route could not be read: {read.message}</p>;
-  }
-  if (read.status === "empty") {
-    return <EmptyRoute route={read.route} write={write} />;
+  if ("empty" in found) {
+    return <EmptyRoute route={found.empty} write={write} />;
   }
   const frame = { view, version, selected, listed, write, result, setResult, onImported };
-  if (read.shown.of === "draft") {
-    return authored === undefined ? <p className="muted small">Reading the route...</p> : <DraftFrame {...frame} shown={read.shown} authored={authored} />;
+  if (found.shown.of === "draft") {
+    return authored === undefined ? <p className="muted small">Reading the route...</p> : <DraftFrame {...frame} shown={found.shown} authored={authored} />;
   }
-  return <VersionFrame {...frame} shown={read.shown} />;
+  return <VersionFrame {...frame} shown={found.shown} />;
 }

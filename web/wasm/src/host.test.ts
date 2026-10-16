@@ -65,7 +65,7 @@ it("the in-browser root loads each fixture, applies a patch, refuses stale ones,
   const worker = await started.worker();
   const loaded: { journey: string; derivedBytes: number }[] = [];
   for (const summary of host.journeys().items) {
-    const key = await worker.load(host.documentText(summary.id));
+    const { key } = await worker.load(host.documentText(summary.id));
     loaded.push({ journey: key.journey, derivedBytes: (await worker.derivedText(summary.id)).length });
   }
   expect(loaded.map((journey) => journey.journey).sort()).toEqual(serverJourneys());
@@ -74,7 +74,7 @@ it("the in-browser root loads each fixture, applies a patch, refuses stale ones,
   const heard: { first: boolean; ticks: Schema<"Tick">[] }[] = [];
   const unsubscribe = host.subscribe(["journey:j_vendor_eval"], (ticks, first) => heard.push({ ticks, first }));
   await settle(0);
-  const base = (await worker.load(host.documentText("j_vendor_eval"))).revision;
+  const base = (await worker.load(host.documentText("j_vendor_eval"))).key.revision;
   expect(host.patch(note("p_browser_first", base, "a_browser_first"))).toMatchObject({ outcome: "applied", receipt: { revision: base + 1 } });
   const overlapping = note("p_browser_second", base, "a_browser_first");
   const separate = note("p_browser_third", base, "a_browser_third");
@@ -90,7 +90,7 @@ it("the in-browser root loads each fixture, applies a patch, refuses stale ones,
   const vendor = { domain: { journey: "j_vendor_eval" } };
   expect(heard[0]).toMatchObject({ first: true, ticks: [{ of: vendor, revision: base }] });
   expect(heard.at(-1)).toMatchObject({ first: false, ticks: [{ of: vendor, revision: base + 2 }] });
-  expect(await worker.load(host.documentText("j_vendor_eval"))).toMatchObject({ journey: "j_vendor_eval", revision: base + 2 });
+  expect((await worker.load(host.documentText("j_vendor_eval"))).key).toMatchObject({ journey: "j_vendor_eval", revision: base + 2 });
   unsubscribe();
 });
 
@@ -116,11 +116,28 @@ it("the worker keeps a journey's newest document and refuses an older one", asyn
   const host = await started.host.InBrowserHost.start(wasmBytes, () => NOW);
   const worker = await started.worker();
   const earlier = host.documentText("j_vendor_eval");
-  const base = (await worker.load(earlier)).revision;
+  const base = (await worker.load(earlier)).key.revision;
   host.patch(note("p_ordering", base, "a_ordering"));
-  expect((await worker.load(host.documentText("j_vendor_eval"))).revision).toBe(base + 1);
+  expect((await worker.load(host.documentText("j_vendor_eval"))).key.revision).toBe(base + 1);
   expect(await reasonOf(started, () => worker.load(earlier))).toMatchObject({ error: "superseded", held: { revision: base + 1 }, posted: { revision: base } });
-  expect((await worker.load(host.documentText("j_vendor_eval"))).revision).toBe(base + 1);
+  expect((await worker.load(host.documentText("j_vendor_eval"))).key.revision).toBe(base + 1);
+});
+
+it("a derivation is freed only by the load that made it", async () => {
+  const started = await fresh();
+  const host = await started.host.InBrowserHost.start(wasmBytes, () => NOW);
+  const worker = await started.worker();
+  const document = host.documentText("j_vendor_eval");
+  const first = await worker.load(document);
+  // The same document loaded again replaces the first load, as a remount refetching an unchanged journey does.
+  const second = await worker.load(document);
+  expect(second.handle.journey).toBe(first.handle.journey);
+  expect(second.handle.load).not.toBe(first.handle.load);
+  await worker.release(first.handle);
+  expect((await worker.derivedText("j_vendor_eval")).length).toBeGreaterThan(0);
+  await worker.release(second.handle);
+  expect(await reasonOf(started, () => worker.derivedText("j_vendor_eval"))).toMatchObject({ error: "missing" });
+  worker.terminate();
 });
 
 it("a derive worker that fails rejects what was asked of it", async () => {

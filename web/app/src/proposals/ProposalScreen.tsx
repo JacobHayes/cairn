@@ -7,15 +7,16 @@
 // shows what moved and is refreshed and reviewed again before it applies; apply sends the
 // revision the reviewer confirmed reviewing, and is offered only when nothing blocks it.
 import type { Schema } from "@cairn/client";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
 import { treeOf, type Graph, type Kind, type Role } from "../authoring/graph.ts";
 import { PREVIEW_SETTLE_MS } from "../authoring/write.ts";
-import type { Deployment, RouteVersion } from "../data/host.ts";
+import type { Deployment, Deriver, Host, RouteVersion } from "../data/host.ts";
+import { beforeWork, HOST_READ, previewPolicy, valueOf, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
 import { useDraft } from "../data/drafts.ts";
 import type { ProposalReview } from "../data/proposals.ts";
-import { useDeployment, useJourney, useLive, useSession, useViewer } from "../data/react.ts";
+import { useDeployment, useJourney, useKeyedRead, useLive, useSession, useViewer } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
 import { ShortfallView } from "../detail/ShortfallView.tsx";
@@ -81,48 +82,49 @@ function versionsRead(ready: Ready, draft: ProposalDraft): Schema<"Lineage">[] {
 
 type LocalPreview = { preview: ProposalPreview } | { error: string };
 
-/** C14: the edited proposal previewed by the engine over the journey the derive worker holds. */
+/** What the local preview is made from: the journey as derived, the proposal and its edits, and who previews. */
+interface LocalArgs {
+  host: Host;
+  deriver: Deriver;
+  ready: Ready;
+  proposal: Proposal;
+  draft: ProposalDraft;
+  user: string;
+}
+
+/** C14: the edited proposal previewed by the engine over the journey the derive worker holds; the engine's refusal is the read's failure. */
+const LOCAL_PREVIEW: ReadSource<LocalArgs, ProposalPreview> = {
+  policy: previewPolicy(PREVIEW_SETTLE_MS),
+  read: async ({ host, deriver, ready, proposal, draft, user }, at) => {
+    const lineages = versionsRead(ready, draft);
+    const versions: RouteVersion[] = await Promise.all(lineages.map((lineage) => host.routeVersion(lineage.route, lineage.version)));
+    // B13: the engine reads a segment's header for its kind and retirement.
+    const segments = await Promise.all([...new Set((draft.mutations ?? []).flatMap((mutation) => (mutation.op === "insert_segment" ? [mutation.segment.route] : [])))].map((route) => host.route(route)));
+    // The edits may have moved on while the versions were out: obsolete work posts nothing.
+    beforeWork(at);
+    return deriver.preview(ready.journey.header.id, { proposal: { ...proposal, draft }, versions, segments, at: new Date().toISOString(), actor: { user } });
+  },
+};
+
+/**
+ * The key of the edited proposal's preview: the journey and the proposal are the identity; the
+ * journey's derivation, the proposal's revision, the edits and who previews are what it is read from.
+ */
+function localPreviewKey(args: LocalArgs): ReadKey<LocalArgs> {
+  return { identity: [args.ready.journey.header.id, args.proposal.id], freshness: [JSON.stringify(args.ready.key), args.proposal.revision, JSON.stringify(args.draft), args.user], args };
+}
+
+/** C14: the edited proposal previewed by the engine over the journey the derive worker holds, once the edits have held still. */
 function useLocalPreview(ready: Ready | undefined, proposal: Proposal, draft: ProposalDraft): LocalPreview | undefined {
   const { deriver, host } = useSession();
   const { viewer } = useViewer();
   // Only an open proposal is previewed here: one applied or discarded has nothing left to apply.
   const previewed = proposal.status === "open" ? ready : undefined;
-  const asked = previewed === undefined ? "" : JSON.stringify([previewed.key, proposal.revision, draft]);
-  const [answered, setAnswered] = useState<{ for: string; preview: LocalPreview } | undefined>();
-  useEffect(() => {
-    if (previewed === undefined) {
-      return;
-    }
-    let live = true;
-    const timer = setTimeout(() => {
-      const read = async (): Promise<LocalPreview> => {
-        const lineages = versionsRead(previewed, draft);
-        const versions: RouteVersion[] = await Promise.all(lineages.map((lineage) => host.routeVersion(lineage.route, lineage.version)));
-        // B13: the engine reads a segment's header for its kind and retirement.
-        const segments = await Promise.all([...new Set((draft.mutations ?? []).flatMap((mutation) => (mutation.op === "insert_segment" ? [mutation.segment.route] : [])))].map((route) => host.route(route)));
-        const request = { proposal: { ...proposal, draft }, versions, segments, at: new Date().toISOString(), actor: { user: viewer?.user ?? "u_local" } };
-        return { preview: await deriver.preview(previewed.journey.header.id, request) };
-      };
-      read().then(
-        (preview) => {
-          if (live) {
-            setAnswered({ for: asked, preview });
-          }
-        },
-        (thrown: unknown) => {
-          if (live) {
-            setAnswered({ for: asked, preview: { error: thrown instanceof Error ? thrown.message : String(thrown) } });
-          }
-        },
-      );
-    }, PREVIEW_SETTLE_MS);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-    // `asked` names the journey's derivation, the proposal's revision, and the draft.
-  }, [asked]);
-  return answered?.for === asked ? answered.preview : undefined;
+  const { view } = useKeyedRead(LOCAL_PREVIEW, previewed === undefined ? undefined : localPreviewKey({ host, deriver, ready: previewed, proposal, draft, user: viewer?.user ?? "u_local" }));
+  if (view.status === "current") {
+    return { preview: view.value };
+  }
+  return view.status === "failed" || view.status === "behind" ? { error: view.error.message } : undefined;
 }
 
 /**
@@ -599,37 +601,26 @@ function JourneyReview({ journey, ...props }: Omit<BodyProps, "ready" | "before"
   return <p className="muted small">Deriving the journey...</p>;
 }
 
+/** The graph a route proposal is reviewed against: the route's draft as it is, or its latest version; none for a route that does not exist yet. */
+const ROUTE_BEFORE: ReadSource<{ host: Host; route: string }, { graph: Graph | undefined }> = {
+  policy: HOST_READ,
+  read: async ({ host, route }) => {
+    const found = await host.route(route);
+    if (found.draft != null) {
+      return { graph: found.draft.graph };
+    }
+    const latest = Math.max(0, ...(found.versions ?? []));
+    return { graph: latest === 0 ? undefined : (await host.routeVersion(route, latest)).graph };
+  },
+};
+
 /** A route proposal: the route's draft as it is, or its latest version, or nothing for a new route. */
 function RouteReview({ route, ...props }: Omit<BodyProps, "ready" | "before"> & { route: string }) {
   const { host } = useSession();
   const revision = props.review.stale?.conflict.current ?? props.review.proposal.draft.destination_revision;
-  const [before, setBefore] = useState<{ graph: Graph | undefined } | undefined>();
-  useEffect(() => {
-    let live = true;
-    const read = async (): Promise<Graph | undefined> => {
-      const found = await host.route(route);
-      if (found.draft != null) {
-        return found.draft.graph;
-      }
-      const latest = Math.max(0, ...(found.versions ?? []));
-      return latest === 0 ? undefined : (await host.routeVersion(route, latest)).graph;
-    };
-    read().then(
-      (graph) => {
-        if (live) {
-          setBefore({ graph });
-        }
-      },
-      () => {
-        if (live) {
-          setBefore({ graph: undefined });
-        }
-      },
-    );
-    return () => {
-      live = false;
-    };
-  }, [host, route, revision]);
+  const { view } = useKeyedRead(ROUTE_BEFORE, { identity: [route], freshness: [revision], args: { host, route } });
+  // A route that cannot be read, or is not there yet, is reviewed against nothing.
+  const before = valueOf(view) ?? (view.status === "failed" || view.status === "gone" ? { graph: undefined } : undefined);
   if (before === undefined) {
     return <p className="muted small">Reading the route...</p>;
   }
@@ -638,22 +629,18 @@ function RouteReview({ route, ...props }: Omit<BodyProps, "ready" | "before"> & 
 
 export function ProposalScreen() {
   const { id = "" } = useParams();
-  const { view, refetch } = useLive(`proposal:${id}`, proposalReview(id));
+  const { view, refresh: refetch } = useLive(`proposal:${id}`, proposalReview(id));
   const deployment = useDeployment();
-  switch (view.status) {
-    case "loading":
-      return <p className="muted small">Reading the proposal...</p>;
-    case "missing":
+  const review = valueOf(view);
+  if (review === undefined) {
+    if (view.status === "gone") {
       return <p className="callout">This proposal does not exist. <Link to="/">All journeys</Link></p>;
-    case "failed":
-      return <p className="callout callout-bad">The proposal could not be read: {view.message}</p>;
-    case "ready":
-      break;
+    }
+    return view.status === "failed" ? <p className="callout callout-bad">The proposal could not be read: {view.error.message}</p> : <p className="muted small">Reading the proposal...</p>;
   }
   if (deployment === undefined) {
     return <p className="muted small">Reading the deployment...</p>;
   }
-  const review = view.value;
   const destination = review.proposal.destination;
   const props = { review, refetch, deployment };
   if (destination === "deployment") {

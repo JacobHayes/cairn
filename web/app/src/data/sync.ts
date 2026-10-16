@@ -4,10 +4,23 @@
 // (precedence, words, colour); `SyncStatus` collects the inputs and wakes up when a time
 // threshold (no flicker under 300ms, behind after 5s, saved for 2s) passes. What did not
 // land, and the writes in flight, are read from the edit manager, which owns them.
-import type { StreamStatus, Timers } from "@cairn/client";
+import type { StreamStatus } from "@cairn/client";
 
 import { Emitter } from "./emitter.ts";
-import type { Lag } from "./journeys.ts";
+import type { Lag } from "./keyed-read.ts";
+
+/** The timers the chip waits with (a test passes its own). */
+export interface Timers {
+  set(callback: () => void, ms: number): unknown;
+  clear(handle: unknown): void;
+}
+
+export const realTimers: Timers = {
+  set: (callback, ms) => setTimeout(callback, ms),
+  clear: (handle) => {
+    clearTimeout(handle as ReturnType<typeof setTimeout>);
+  },
+};
 
 /** A write has to take this long to show SAVING, and a refetch to show UPDATING (no flicker). */
 export const SYNC_SHOW_AFTER_MS = 300;

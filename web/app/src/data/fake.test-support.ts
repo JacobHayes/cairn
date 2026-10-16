@@ -1,13 +1,15 @@
 // A host and a deriver for the data layer's unit tests: journeys held in memory at the
 // revisions a test sets, documents that count their fetches, and a tick stream the test
 // drives by hand. Shapes are the API's, cut to what the data layer reads.
-import type { Answered, HttpFailure, Patch, PatchAnswer, Tick, TickHandlers, Timers } from "@cairn/client";
-import type { DerivationKey, Derived } from "@cairn/wasm";
+import type { Answered, HttpFailure, Patch, PatchAnswer, Tick, TickHandlers } from "@cairn/client";
+import type { DerivationHandle, Derived, Loaded } from "@cairn/wasm";
+import { SimulatedClock } from "xstate";
 
 import type { AssistantHost } from "./assistant.ts";
 import type { Command } from "./edit-record.ts";
 import type { ProposalHost } from "./proposals.ts";
-import { Missing, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type RouteFile, type Viewer } from "./host.ts";
+import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteVersion, type Viewer } from "./host.ts";
+import type { Timers } from "./sync.ts";
 import type { WriteEnv } from "./write-machine.ts";
 
 export interface FakeJourney {
@@ -27,10 +29,12 @@ export class FakeHost implements Host {
   answers: (Answered<HttpFailure> | Promise<Answered<HttpFailure>>)[] = [];
   readonly sent: Patch[] = [];
   /** The streams opened, the latest last. */
-  readonly streams: { watching: string[]; handlers: TickHandlers }[] = [];
+  readonly streams: { watching: string[]; handlers: TickHandlers; closed: boolean }[] = [];
   failNext = false;
   /** While set, the next document read waits for it (a slow refetch). */
   holdNext: Promise<void> | undefined;
+  /** A read of the named journey's document that waits for the promise, once (others answer meanwhile). */
+  readonly holdDocument = new Map<string, Promise<void>>();
 
   overlaps = (): boolean => false;
 
@@ -59,20 +63,32 @@ export class FakeHost implements Host {
     return Promise.resolve({ items });
   }
 
+  /** How many times the deployment context was read. */
+  deploymentFetches = 0;
+
+  /** While set, the deployment context cannot be read. */
+  deploymentFails = false;
+
   deployment() {
-    return Promise.resolve({ revision: this.deploymentRevision });
+    this.deploymentFetches += 1;
+    return this.deploymentFails ? Promise.reject(new ReadFailed({ status: 500, message: "the deployment could not be read" })) : Promise.resolve({ revision: this.deploymentRevision });
   }
 
   history() {
     return Promise.resolve({ patches: [] });
   }
 
-  route(route: string): Promise<never> {
-    return Promise.reject(new Missing(route));
+  /** The routes the host holds, with their published versions; any other is missing. */
+  readonly routesHeld = new Map<string, { route: Route; versions: RouteVersion[] }>();
+
+  route(route: string): Promise<Route> {
+    const held = this.routesHeld.get(route);
+    return held === undefined ? Promise.reject(new Missing(route)) : Promise.resolve(held.route);
   }
 
-  routeVersion(route: string): Promise<never> {
-    return Promise.reject(new Missing(route));
+  routeVersion(route: string, version: number): Promise<RouteVersion> {
+    const found = this.routesHeld.get(route)?.versions.find((each) => each.version === version);
+    return found === undefined ? Promise.reject(new Missing(`${route}@${String(version)}`)) : Promise.resolve(found);
   }
 
   routes() {
@@ -91,7 +107,11 @@ export class FakeHost implements Host {
     return Promise.resolve({ outcome: "failed", error: { status: 0, message: "no imports in the fake" } });
   }
 
+  /** How many times the caller was read. */
+  viewerFetches = 0;
+
   viewer(): Promise<Viewer> {
+    this.viewerFetches += 1;
     return Promise.resolve(this.viewerHeld);
   }
 
@@ -102,8 +122,12 @@ export class FakeHost implements Host {
 
   async documentText(journey: string): Promise<string> {
     this.fetches.set(journey, (this.fetches.get(journey) ?? 0) + 1);
-    const hold = this.holdNext;
-    this.holdNext = undefined;
+    const named = this.holdDocument.get(journey);
+    this.holdDocument.delete(journey);
+    const hold = named ?? this.holdNext;
+    if (named === undefined) {
+      this.holdNext = undefined;
+    }
     await hold;
     const held = this.journeysHeld.get(journey);
     if (this.failNext) {
@@ -130,8 +154,11 @@ export class FakeHost implements Host {
   }
 
   readonly openTicks = (watching: readonly string[], handlers: TickHandlers) => {
-    this.streams.push({ watching: [...watching], handlers });
-    return () => undefined;
+    const stream = { watching: [...watching], handlers, closed: false };
+    this.streams.push(stream);
+    return () => {
+      stream.closed = true;
+    };
   };
 
   /** The latest stream opens, its current revisions first: every journey watched and the deployment. */
@@ -165,24 +192,44 @@ function noProposals(): ProposalHost {
   return { get: missing, preview: missing, create: failed, edit: failed, discard: failed, refresh: failed, apply: failed, upgrade: failed, saveAsRoute: failed, relink: failed };
 }
 
-/** Derives a fake document into its key, as the worker would. */
+/**
+ * Derives a fake document as the worker does: loads are numbered and a load replaces the one held
+ * for its journey when it is made, `release` frees only the load its handle names, and `derived`
+ * answers only while a load is held. A load waits for `holdLoad` once when a test sets it.
+ */
 export class FakeDeriver implements Deriver {
-  readonly released: string[] = [];
+  /** The load held for each journey. */
+  readonly held = new Map<string, number>();
+  /** The handle of every load made, and of every release. */
+  readonly loaded: DerivationHandle[] = [];
+  readonly released: DerivationHandle[] = [];
+  /** While set, the next load answers when it settles (the worker has replaced the derivation by then). */
+  holdLoad: Promise<void> | undefined;
+  #loads = 0;
 
-  load(document: string): Promise<DerivationKey> {
+  async load(document: string): Promise<Loaded> {
     const parsed = JSON.parse(document) as {
       inputs: { deployment: { revision: number }; today: string };
       journey: { header: { id: string }; revision: number };
     };
-    return Promise.resolve({
-      journey: parsed.journey.header.id,
-      revision: parsed.journey.revision,
-      deployment_revision: parsed.inputs.deployment.revision,
-      today: parsed.inputs.today,
-    });
+    const journey = parsed.journey.header.id;
+    this.#loads += 1;
+    const handle = { journey, load: this.#loads };
+    this.held.set(journey, handle.load);
+    this.loaded.push(handle);
+    const hold = this.holdLoad;
+    this.holdLoad = undefined;
+    await hold;
+    return {
+      key: { journey, revision: parsed.journey.revision, deployment_revision: parsed.inputs.deployment.revision, today: parsed.inputs.today },
+      handle,
+    };
   }
 
-  derived(): Promise<Derived> {
+  derived(journey: string): Promise<Derived> {
+    if (!this.held.has(journey)) {
+      return Promise.reject(new Error(`no document for ${journey} is loaded`));
+    }
     return Promise.resolve({ nodes: {}, frontier: [], acting_frontier: [], today: "2026-10-06" });
   }
 
@@ -214,13 +261,16 @@ export class FakeDeriver implements Deriver {
     return Promise.reject(new Error("no previews in the fake"));
   }
 
-  release(journey: string): Promise<void> {
-    this.released.push(journey);
+  release(handle: DerivationHandle): Promise<void> {
+    this.released.push(handle);
+    if (this.held.get(handle.journey) === handle.load) {
+      this.held.delete(handle.journey);
+    }
     return Promise.resolve();
   }
 }
 
-/** Timers the test fires by hand. */
+/** Timers the test fires by hand (the sync chip's). */
 export function manualTimers() {
   const pending: { callback: () => void; ms: number }[] = [];
   const timers: Timers = {
@@ -228,6 +278,33 @@ export function manualTimers() {
     clear: () => undefined,
   };
   return { timers, pending };
+}
+
+/**
+ * A simulated clock that knows which timeouts are set and not yet fired or cleared, so a test
+ * can say which timers a machine waits on (a retry that should be gone has no timer).
+ */
+export class CountingClock extends SimulatedClock {
+  readonly #pending = new Map<number, number>();
+
+  /** The delays (ms) of the timeouts still set. */
+  get pending(): number[] {
+    return [...this.#pending.values()];
+  }
+
+  override setTimeout(fn: (...args: unknown[]) => void, timeout: number): number {
+    const id = super.setTimeout(() => {
+      this.#pending.delete(id);
+      fn();
+    }, timeout);
+    this.#pending.set(id, timeout);
+    return id;
+  }
+
+  override clearTimeout(id: number): void {
+    this.#pending.delete(id);
+    super.clearTimeout(id);
+  }
 }
 
 /** Lets every pending promise and microtask run. */

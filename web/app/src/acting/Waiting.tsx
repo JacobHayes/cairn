@@ -5,6 +5,7 @@
 import { useLocation } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { namer, viaText } from "../detail/explain.ts";
 import { titleOf, type Ready } from "../detail/model.ts";
 import { nodePath, screenPath } from "../detail/parts.tsx";
@@ -33,7 +34,7 @@ function UnblockerLine({ view, unblocker, row }: { view: Ready; unblocker: Unblo
 
 export function WaitingDecisions({ view, onContinue }: { view: Ready; onContinue: () => void }) {
   const waiting = waitingDecisions(view);
-  const { value: next } = useProjected(view, { projection: "next" });
+  const next = valueOf(useProjected(view, { projection: "next" }));
   const rows = new Map((next?.items ?? []).map((row) => [row.key, row]));
   const proceed = <Button onClick={onContinue}>Continue with everything →</Button>;
   if (waiting.length === 0) {

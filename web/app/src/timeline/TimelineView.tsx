@@ -7,6 +7,7 @@
 // zooms it, vertical scroll moves the rows (the workspace's own). Nodes with no date gather in
 // a folded list. A row's title opens the node's detail (5.1) beside the timeline, which
 // explains its dates (F7).
+import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 
@@ -421,7 +422,8 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
   const step = drawnStep(depth, state.fade);
   const request = useMemo(() => levelRequestOf(state, step, []), [state, step]);
   const { level, drawn, error: levelError } = useLevel(ready, request);
-  const timeline = useProjected(ready, { projection: "timeline" });
+  const timelineRead = useProjected(ready, { projection: "timeline" });
+  const timeline = valueOf(timelineRead);
   const { flipped, flip: onFold } = useFlips(state.depth, picks);
   const current = useMemo(() => currentStagesOf(ready), [ready]);
   const opens = useMemo(() => openAt(step, nodes, current), [nodes, step, current]);
@@ -430,16 +432,16 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
   const lit = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);
   const faded = useMemo(() => outOfFocus(lit, drawn === undefined ? new Set() : depthFaded(state, nodes, depth, collapsedAt(depth, nodes, current, [], []), drawn)), [state, nodes, depth, current, drawn, lit]);
   const badges = useMemo(() => badgesOf("timeline", level?.hidden_by_class ?? {}, base, stepHides(nodes, depth, []), state.fade), [level, base, nodes, depth, state.fade]);
-  const error = levelError ?? timeline.error;
+  const error = levelError ?? errorWords(timelineRead);
   return (
     <>
       <ViewBar ready={ready} screen="timeline" badges={badges} />
       {error !== undefined ? (
         <p className="callout callout-bad">The timeline could not be read: {error}</p>
-      ) : timeline.value === undefined || level === undefined ? (
+      ) : timeline === undefined || level === undefined ? (
         <p className="muted small">Placing the dates...</p>
       ) : (
-        <TimelineChart ready={ready} timeline={timeline.value} drawn={level.nodes} open={open} onFold={onFold} faded={faded} selected={selected} step={step} range={range} empty={<ResetView />} />
+        <TimelineChart ready={ready} timeline={timeline} drawn={level.nodes} open={open} onFold={onFold} faded={faded} selected={selected} step={step} range={range} empty={<ResetView />} />
       )}
     </>
   );

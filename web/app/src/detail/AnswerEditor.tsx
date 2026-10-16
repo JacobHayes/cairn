@@ -10,6 +10,7 @@ import type { Schema } from "@cairn/client";
 import { useId, useMemo, useState, type ReactNode } from "react";
 
 import { useProjected } from "../canvas/hooks.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { useDraft } from "../data/drafts.ts";
 import type { Mutation } from "../data/writes.ts";
 import { newEntityKey } from "../people/model.ts";
@@ -359,8 +360,8 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
   const form = useFormDraft<AnswerValue>(write.journey, node.key, "answer");
   const why = useFormDraft<string>(write.journey, node.key, "answer-why");
   const open = answerable(node.kind, record.state);
-  const projected = useProjected(view, open ? { projection: "answer_effects", key: node.key } : undefined);
-  const effects = projected.value?.applies === true ? projected.value.choices : undefined;
+  const projected = valueOf(useProjected(view, open ? { projection: "answer_effects", key: node.key } : undefined));
+  const effects = projected?.applies === true ? projected.choices : undefined;
   const stored = resolvedAnswer(view, answer);
   const meanwhile = useAnsweredMeanwhile(write, node.key, form, stored);
   const named = namedDraft ?? "";

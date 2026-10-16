@@ -9,6 +9,7 @@ import { Link, useNavigate } from "react-router";
 import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import type { RouteRead } from "../data/reads.ts";
 import { journeyIndex, routeIndex } from "../data/reads.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
 import { overviewPath } from "../journeys/address.ts";
 import { Menu } from "../screens/Menu.tsx";
@@ -29,8 +30,8 @@ type InsertionUse = Schema<"InsertionUse">;
 function useHostNames(): (host: Schema<"Domain">) => { name: string; to: string } {
   const journeys = useLive("journeys-named", journeyIndex({})).view;
   const routes = useLive("routes", routeIndex).view;
-  const journeyName = new Map(journeys.status === "ready" ? journeys.value.map((journey) => [journey.id, journey.name]) : []);
-  const routeName = new Map(routes.status === "ready" ? routes.value.map((route) => [route.header.id, route.header.name]) : []);
+  const journeyName = new Map((valueOf(journeys) ?? []).map((journey) => [journey.id, journey.name] as const));
+  const routeName = new Map((valueOf(routes) ?? []).map((route) => [route.header.id, route.header.name] as const));
   return (host) => {
     if (host === "deployment") {
       return { name: "the deployment", to: "/" };

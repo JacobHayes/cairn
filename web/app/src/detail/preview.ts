@@ -2,44 +2,39 @@
 // derive (apply, committing nothing), debounced so typing does not ask for every keystroke. A
 // draft the engine would reject has no preview: the save itself reports the rejection.
 import type { Schema } from "@cairn/client";
-import { useEffect, useState } from "react";
-
-import { useSession, useViewer } from "../data/react.ts";
+import type { Deriver } from "../data/host.ts";
+import { beforeWork, previewPolicy, type ReadSource } from "../data/keyed-read.ts";
+import { useKeyedRead, useSession, useViewer } from "../data/react.ts";
 import { newPatchId } from "../data/writes.ts";
 import type { Mutation, Ready } from "./model.ts";
 
 /** How long the draft must hold still before it is previewed (ms). */
 export const PREVIEW_DEBOUNCE_MS = 200;
 
+/** What a save preview is made from. */
+interface SaveArgs {
+  deriver: Deriver;
+  ready: Ready;
+  user: string;
+  mutations: Mutation[];
+}
+
+const SAVE_PREVIEW: ReadSource<SaveArgs, Schema<"Consequences">> = {
+  policy: previewPolicy(PREVIEW_DEBOUNCE_MS),
+  read: async ({ deriver, ready, user, mutations }, at) => {
+    beforeWork(at);
+    const journey = ready.journey.header.id;
+    const patch: Schema<"Patch"> = { id: newPatchId(), target: { journey }, base_revision: ready.journey.revision, mutations };
+    return (await deriver.apply(journey, { patch, at: new Date().toISOString(), actor: { user } })).consequences;
+  },
+};
+
 /** D7: what applying `mutations` to the journey would newly cause; none until read, or for no draft. */
 export function useSavePreview(view: Ready, mutations: Mutation[] | undefined): Schema<"Consequences"> | undefined {
   const { deriver } = useSession();
   const { viewer } = useViewer();
-  const journey = view.journey.header.id;
-  const asked = mutations === undefined ? "" : JSON.stringify([view.key, mutations]);
-  const [answered, setAnswered] = useState<{ asked: string; caused: Schema<"Consequences"> } | undefined>(undefined);
   const user = viewer?.user ?? "u_local";
-  useEffect(() => {
-    if (mutations === undefined) {
-      return undefined;
-    }
-    let live = true;
-    const timer = setTimeout(() => {
-      const patch: Schema<"Patch"> = { id: newPatchId(), target: { journey }, base_revision: view.journey.revision, mutations };
-      deriver.apply(journey, { patch, at: new Date().toISOString(), actor: { user } }).then(
-        (applied) => {
-          if (live) {
-            setAnswered({ asked, caused: applied.consequences });
-          }
-        },
-        () => undefined,
-      );
-    }, PREVIEW_DEBOUNCE_MS);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-    // `asked` names the draft and the derivation it is applied to.
-  }, [deriver, journey, user, asked]);
-  return answered?.asked === asked ? answered.caused : undefined;
+  const key = mutations === undefined ? undefined : { identity: [view.journey.header.id], freshness: [JSON.stringify(view.key), view.journey.revision, user, JSON.stringify(mutations)], args: { deriver, ready: view, user, mutations } };
+  const { view: read } = useKeyedRead(SAVE_PREVIEW, key);
+  return read.status === "current" ? read.value : undefined;
 }

@@ -3,14 +3,15 @@
 import { useMemo } from "react";
 
 import { useProjected } from "../canvas/hooks.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { isTerminal, nodeOf, recordOf, type Ready } from "../detail/model.ts";
 import { summaryModel, type SummaryModel } from "../summary/model.ts";
 import type { MineEntry } from "./mine.ts";
 
 /** The journey's status summary, read from its local derivation. */
 export function useStatusSummary(ready: Ready): SummaryModel | undefined {
-  const summary = useProjected(ready, { projection: "status_summary" });
-  return useMemo(() => (summary.value === undefined ? undefined : summaryModel(ready, summary.value)), [ready, summary.value]);
+  const summary = valueOf(useProjected(ready, { projection: "status_summary" }));
+  return useMemo(() => (summary === undefined ? undefined : summaryModel(ready, summary)), [ready, summary]);
 }
 
 /** Done over in scope: what is in scope less what has work left on it. */

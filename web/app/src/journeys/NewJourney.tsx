@@ -8,6 +8,7 @@ import { useLocation, useNavigate } from "react-router";
 import { walkthroughPath } from "../acting/address.ts";
 import { useDraft } from "../data/drafts.ts";
 import { routeIndex } from "../data/reads.ts";
+import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
 import { Refused } from "../screens/Refused.tsx";
 import { useScreenWrite } from "../screens/write.ts";
@@ -101,10 +102,11 @@ export function NewJourney() {
   const { search } = useLocation();
   const params = new URLSearchParams(search);
   const { view } = useLive("routes", routeIndex);
-  if (view.status !== "ready") {
-    return <p className="muted small">{view.status === "failed" ? `The routes could not be read: ${view.message}` : "Loading the routes..."}</p>;
+  const index = valueOf(view);
+  if (index === undefined) {
+    return <p className="muted small">{view.status === "failed" ? `The routes could not be read: ${view.error.message}` : "Loading the routes..."}</p>;
   }
-  const routes = startableRoutes(view.value);
+  const routes = startableRoutes(index);
   const asked = params.get("route") ?? "";
   const offered = routes.some((route) => route.header.id === asked);
   const initial: Form = { name: "", description: "", route: asked, version: offered ? Number(params.get("version") ?? 0) || 0 : 0 };

@@ -5,14 +5,13 @@
 // whether it is accepted and what it would newly cause in the journey (D7) before confirming.
 // Removing a role or a kind shows its cascade the same way. Exported for proposal review
 // (5.7), which shows cascaded items the same way.
-import { useEffect, useState } from "react";
 
 import { Button } from "../ui/kit.tsx";
 import type { Dangling, RemovalPlan } from "./cascade.ts";
 import type { Mutation } from "./graph.ts";
 import { titleIn } from "./graph.ts";
 import type { Authored } from "./target.ts";
-import { usePreviewer, useAuthorWrite, type Preview } from "./write.ts";
+import { useAuthorWrite, useDialogPreview, type Preview } from "./write.ts";
 
 export interface CascadeDialogProps {
   authored: Authored;
@@ -94,22 +93,8 @@ function PreviewLine({ preview }: { preview: Preview | undefined }) {
 }
 
 export function CascadeDialog({ authored, title, plan, dangling, mutations, onDone, onCancel }: CascadeDialogProps) {
-  const previewer = usePreviewer(authored);
   const write = useAuthorWrite(authored);
-  const [preview, setPreview] = useState<Preview | undefined>(undefined);
-  const asked = JSON.stringify([authored.revision, mutations]);
-  useEffect(() => {
-    let live = true;
-    void previewer(mutations).then((answer) => {
-      if (live) {
-        setPreview(answer);
-      }
-    });
-    return () => {
-      live = false;
-    };
-    // `asked` names the patch and the revision it is previewed against.
-  }, [asked]);
+  const preview = useDialogPreview(authored, mutations);
   return (
     <div className="callout stack" role="dialog" aria-label={title} data-testid="cascade-dialog">
       <strong>{title}</strong>

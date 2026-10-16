@@ -74,13 +74,16 @@ export function RouteDetailPage() {
   const { id = "" } = useParams();
   const { view } = useLive(`route:${id}`, routeRead(id));
   switch (view.status) {
+    case "idle":
     case "loading":
       return <p className="muted small">Reading the route...</p>;
-    case "missing":
+    case "gone":
       return <p className="callout">This route does not exist. <Link to={ROUTES_PATH}>All routes</Link></p>;
     case "failed":
-      return <p className="callout callout-bad">The route could not be read: {view.message}</p>;
-    case "ready":
+      return <p className="callout callout-bad">The route could not be read: {view.error.message}</p>;
+    case "current":
+    case "refreshing":
+    case "behind":
       return view.value.route.header.kind === "segment" ? <SegmentDetail read={view.value} /> : <Detail read={view.value} />;
   }
 }

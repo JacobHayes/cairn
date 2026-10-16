@@ -4,9 +4,9 @@
 // rest is paged from the derive worker's `explanations` projection, which reads the complete
 // list, so nothing is fetched from the host.
 import type { Schema } from "@cairn/client";
-import { useEffect, useState } from "react";
-
-import { useSession } from "../data/react.ts";
+import type { Deriver } from "../data/host.ts";
+import { beforeWork, PROJECTION, type ReadSource } from "../data/keyed-read.ts";
+import { useKeyedRead, useSession } from "../data/react.ts";
 import type { Ready } from "./model.ts";
 
 type Contribution = Schema<"Contribution">;
@@ -22,37 +22,37 @@ export function isComplete(explained: Schema<"Explained">): boolean {
   return explained.entries.length >= explained.total;
 }
 
+/** What a capped list is paged from. */
+interface PagedArgs {
+  deriver: Deriver;
+  journey: string;
+  key: string;
+  field: Schema<"ExplainedField">;
+}
+
+const PAGED: ReadSource<PagedArgs, Contribution[]> = {
+  policy: PROJECTION,
+  read: async ({ deriver, journey, key, field }, at) => {
+    const entries: Contribution[] = [];
+    let cursor: number | undefined;
+    do {
+      beforeWork(at);
+      const page = await deriver.project(journey, { projection: "explanations", key, field, ...(cursor === undefined ? {} : { cursor }) });
+      entries.push(...page.entries);
+      cursor = page.next ?? undefined;
+    } while (cursor !== undefined);
+    return entries;
+  },
+};
+
 /** Node `key`'s `field` list in full, paged from the worker when the derive capped it. */
 export function useContributions(view: Ready, key: string, field: Schema<"ExplainedField">, explained: Schema<"Explained">): Contributions {
   const { deriver } = useSession();
   const journey = view.journey.header.id;
-  const derivation = `${String(view.key.revision)}:${String(view.key.deployment_revision)}:${view.key.today}`;
-  const [paged, setPaged] = useState<{ derivation: string; entries: Contribution[] } | undefined>();
   const capped = !isComplete(explained);
-  useEffect(() => {
-    if (!capped) {
-      return;
-    }
-    let live = true;
-    const read = async () => {
-      const entries: Contribution[] = [];
-      let cursor: number | undefined;
-      do {
-        const page = await deriver.project(journey, { projection: "explanations", key, field, ...(cursor === undefined ? {} : { cursor }) });
-        entries.push(...page.entries);
-        cursor = page.next ?? undefined;
-      } while (cursor !== undefined && live);
-      if (live) {
-        setPaged({ derivation, entries });
-      }
-    };
-    read().catch(() => undefined);
-    return () => {
-      live = false;
-    };
-  }, [deriver, journey, key, field, capped, derivation]);
+  const paged = useKeyedRead(PAGED, capped ? { identity: [journey, key, field], freshness: [JSON.stringify(view.key)], args: { deriver, journey, key, field } } : undefined).view;
   if (!capped) {
     return { entries: explained.entries, complete: true };
   }
-  return paged?.derivation === derivation ? { entries: paged.entries, complete: true } : { entries: explained.entries, complete: false };
+  return paged.status === "current" ? { entries: paged.value, complete: true } : { entries: explained.entries, complete: false };
 }

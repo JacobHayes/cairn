@@ -9,7 +9,10 @@ import type { Schema } from "@cairn/client";
 import { HostFailure } from "@cairn/wasm";
 import { useEffect, useId, useState } from "react";
 
-import { unlandedOf, useProblem, useSession, useSkew, useViewer } from "../data/react.ts";
+import type { Deriver, Host } from "../data/host.ts";
+import { Skewed } from "../data/host.ts";
+import { beforeWork, DERIVE, previewPolicy, type ReadAt, type ReadKey, type ReadPolicy, type ReadSource } from "../data/keyed-read.ts";
+import { unlandedOf, useKeyedRead, useProblem, useSession, useSkew, useViewer } from "../data/react.ts";
 import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
 import { newPatchId, type Rejection } from "../data/writes.ts";
 import { writesEntities } from "../detail/write.ts";
@@ -66,49 +69,83 @@ function failedPreview(thrown: unknown): Preview {
   return { outcome: "unavailable", message: thrown instanceof Error ? thrown.message : String(thrown) };
 }
 
+/** What a preview is made from: the derive worker, the author, and what is previewed. */
+interface PreviewArgs {
+  deriver: Deriver;
+  user: string;
+  authored: Authored;
+  mutations: Mutation[];
+}
+
+/** The preview of `mutations` against `authored`, applied locally by the derive worker. */
+async function previewOf({ deriver, user, authored, mutations }: PreviewArgs): Promise<Preview> {
+  const patch = patchOf(authored, mutations);
+  const actor = { user };
+  const at = new Date().toISOString();
+  try {
+    if ("journey" in authored.target) {
+      const applied = await deriver.apply(authored.target.journey, { patch, at, actor });
+      return { outcome: "accepted", consequences: applied.consequences };
+    }
+    const request = { patch, at, actor, today: authored.today, deployment: authored.deployment };
+    await deriver.applyRoute(authored.route === undefined ? request : { ...request, route: authored.route });
+    return { outcome: "accepted", consequences: undefined };
+  } catch (thrown) {
+    return failedPreview(thrown);
+  }
+}
+
 /** The preview of `mutations` against `authored`, applied locally by the derive worker. */
 export function usePreviewer(authored: Authored): (mutations: Mutation[]) => Promise<Preview> {
   const { deriver } = useSession();
   const { viewer } = useViewer();
-  return async (mutations) => {
-    const patch = patchOf(authored, mutations);
-    const actor = { user: viewer?.user ?? LOCAL_USER };
-    const at = new Date().toISOString();
-    try {
-      if ("journey" in authored.target) {
-        const applied = await deriver.apply(authored.target.journey, { patch, at, actor });
-        return { outcome: "accepted", consequences: applied.consequences };
-      }
-      const request = { patch, at, actor, today: authored.today, deployment: authored.deployment };
-      await deriver.applyRoute(authored.route === undefined ? request : { ...request, route: authored.route });
-      return { outcome: "accepted", consequences: undefined };
-    } catch (thrown) {
-      return failedPreview(thrown);
-    }
-  };
+  return (mutations) => previewOf({ deriver, user: viewer?.user ?? LOCAL_USER, authored, mutations });
+}
+
+/** What a publish preview is made from. */
+interface PublishArgs {
+  deriver: Deriver;
+  host: Host;
+  user: string;
+  authored: Authored;
 }
 
 /**
  * The preview of publishing a route's draft: what it would be refused for (A15). Unlike an edit, a
- * publish reads the versions the route already has, so they are read first.
+ * publish reads the versions the route already has, so they are read first; `at` (a keyed read's)
+ * is asked once they are in, so a preview nobody waits for any longer posts nothing.
  */
-export function usePublishPreview(authored: Authored): () => Promise<Preview> {
+async function publishPreviewOf({ deriver, host, user, authored }: PublishArgs, at?: Pick<ReadAt<unknown>, "signal" | "compatible">): Promise<Preview> {
+  const route = authored.route;
+  if (route === undefined || !("route" in authored.target)) {
+    return { outcome: "unavailable", message: "Only a route's draft is published." };
+  }
+  try {
+    const versions = await Promise.all((route.versions ?? []).map((version) => host.routeVersion(route.header.id, version)));
+    if (at !== undefined) {
+      beforeWork(at);
+    }
+    const patch = patchOf(authored, [{ op: "publish_draft" }]);
+    await deriver.applyRoute({ patch, at: new Date().toISOString(), actor: { user }, today: authored.today, deployment: authored.deployment, route, versions });
+    return { outcome: "accepted", consequences: undefined };
+  } catch (thrown) {
+    if (thrown instanceof DOMException || thrown instanceof Skewed) {
+      throw thrown;
+    }
+    return failedPreview(thrown);
+  }
+}
+
+const PUBLISH_PREVIEW: ReadSource<PublishArgs, Preview> = { policy: DERIVE, read: (args, at) => publishPreviewOf(args, at) };
+
+/** What publishing `authored`'s draft would be refused for (A15), read again whenever the draft or the deployment moves. */
+export function usePublishPreviewRead(authored: Authored): Preview | undefined {
   const { deriver, host } = useSession();
   const { viewer } = useViewer();
-  return async () => {
-    const route = authored.route;
-    if (route === undefined || !("route" in authored.target)) {
-      return { outcome: "unavailable", message: "Only a route's draft is published." };
-    }
-    try {
-      const versions = await Promise.all((route.versions ?? []).map((version) => host.routeVersion(route.header.id, version)));
-      const patch = patchOf(authored, [{ op: "publish_draft" }]);
-      await deriver.applyRoute({ patch, at: new Date().toISOString(), actor: { user: viewer?.user ?? LOCAL_USER }, today: authored.today, deployment: authored.deployment, route, versions });
-      return { outcome: "accepted", consequences: undefined };
-    } catch (thrown) {
-      return failedPreview(thrown);
-    }
-  };
+  const user = viewer?.user ?? LOCAL_USER;
+  const key: ReadKey<PublishArgs> = { identity: [JSON.stringify(authored.target)], freshness: [authored.graph, authored.deploymentRevision, authored.today, user], args: { deriver, host, user, authored } };
+  const { view } = useKeyedRead(PUBLISH_PREVIEW, key);
+  return view.status === "current" ? view.value : undefined;
 }
 
 /** Authoring's write path for `authored`'s graph. */
@@ -157,28 +194,38 @@ export function useAuthorWrite(authored: Authored): AuthorWrite {
 /** How long typing settles before a form's preview runs. */
 export const PREVIEW_SETTLE_MS = 250;
 
+/** A preview of what a form would send, read once its settle has passed (or at once). */
+const previewSource = (policy: ReadPolicy): ReadSource<PreviewArgs, Preview> => ({
+  policy,
+  read: (args, at) => {
+    beforeWork(at);
+    return previewOf(args);
+  },
+});
+
+export const LIVE_PREVIEW = previewSource(previewPolicy(PREVIEW_SETTLE_MS));
+const AT_ONCE_PREVIEW = previewSource(DERIVE);
+
+/** The key of a preview: the target is the identity; the revisions it is read against, the day, the viewer and the mutations are what it is read from. */
+export function previewKey(deriver: Deriver, user: string, authored: Authored, mutations: Mutation[]): ReadKey<PreviewArgs> {
+  const { target, revision, deploymentRevision, today, route } = authored;
+  return { identity: [JSON.stringify(target)], freshness: [revision, deploymentRevision, today, route?.revision, user, JSON.stringify(mutations)], args: { deriver, user, authored, mutations } };
+}
+
+function usePreviewRead(source: ReadSource<PreviewArgs, Preview>, authored: Authored, mutations: Mutation[] | undefined): Preview | undefined {
+  const { deriver } = useSession();
+  const { viewer } = useViewer();
+  const asked = mutations === undefined || mutations.length === 0 ? undefined : mutations;
+  const { view } = useKeyedRead(source, asked === undefined ? undefined : previewKey(deriver, viewer?.user ?? LOCAL_USER, authored, asked));
+  return view.status === "current" ? view.value : undefined;
+}
+
 /** The preview of what a form would send now, once typing settles; none while there is nothing to send. */
 export function useLivePreview(authored: Authored, mutations: Mutation[] | undefined): Preview | undefined {
-  const previewer = usePreviewer(authored);
-  const asked = mutations === undefined || mutations.length === 0 ? "" : JSON.stringify([authored.revision, mutations]);
-  const [answered, setAnswered] = useState<{ for: string; preview: Preview } | undefined>(undefined);
-  useEffect(() => {
-    if (asked === "" || mutations === undefined) {
-      return;
-    }
-    let live = true;
-    const timer = setTimeout(() => {
-      void previewer(mutations).then((preview) => {
-        if (live) {
-          setAnswered({ for: asked, preview });
-        }
-      });
-    }, PREVIEW_SETTLE_MS);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-    // `asked` names the mutations and the revision they are drafted against, so it alone is the key.
-  }, [asked]);
-  return answered?.for === asked ? answered.preview : undefined;
+  return usePreviewRead(LIVE_PREVIEW, authored, mutations);
+}
+
+/** The preview of a patch a dialog proposes, at once: it is not being typed. */
+export function useDialogPreview(authored: Authored, mutations: Mutation[]): Preview | undefined {
+  return usePreviewRead(AT_ONCE_PREVIEW, authored, mutations);
 }

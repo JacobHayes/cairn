@@ -107,6 +107,22 @@ export interface DerivationKey {
   today: string;
 }
 
+/**
+ * The ownership of one load (ARCHITECTURE, Web UI: data flow): the journey it derived and the
+ * worker's number for the load. A derivation is freed by the handle of the load that made it,
+ * so a late release from an owner that was replaced never frees what replaced it.
+ */
+export interface DerivationHandle {
+  journey: string;
+  load: number;
+}
+
+/** What a load answers: the key it derived, and the handle that owns the derivation held for it. */
+export interface Loaded {
+  key: DerivationKey;
+  handle: DerivationHandle;
+}
+
 /** `crates/wasm` `RouteLevelRequest`: one canvas level of a route's graph, which has no state (C2). */
 export interface RouteLevelRequest {
   graph: Schema<"Graph">;

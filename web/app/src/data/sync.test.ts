@@ -2,7 +2,7 @@
 // that keep it from flickering.
 import { describe, expect, it } from "vitest";
 
-import type { Lag } from "./journeys.ts";
+import type { Lag } from "./keyed-read.ts";
 import { SYNC_BEHIND_AFTER_MS, SYNC_SAVED_MS, SYNC_SHOW_AFTER_MS, SyncStatus, summarize, type Problem, type SyncInput, type SyncState } from "./sync.ts";
 
 const quiet: SyncInput = {
@@ -20,7 +20,7 @@ const quiet: SyncInput = {
 };
 
 const problem = (kind: Problem["kind"]): Problem => ({ id: "p_a", kind, message: "no", label: "Draft test plan", address: undefined, retry: false });
-const lag = (since: number, failed = false): Lag => ({ journey: "j_one", shown: 42, announced: 43, since, failed });
+const lag = (since: number, failed = false): Lag => ({ subject: "journey:j_one", shown: 42, announced: 43, since, failed });
 
 describe("summarize", () => {
   it("names the revision a view is behind, and the one it shows", () => {

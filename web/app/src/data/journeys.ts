@@ -1,25 +1,36 @@
 // The journeys a tab shows, each derived in the derive worker (ARCHITECTURE, Web UI: data
 // flow): one fetch of the domain document, posted to the worker once per revision, derived
-// there, and its derive read back. A view stays current (H6): a journey tick newer than the
-// revision held refetches it, as does a deployment tick newer than the deployment its
-// document was derived with (owners and entities feed rank) and the date passing in the
-// deployment's zone. A document from another engine (`Skewed`) latches the tab into skew
+// there, and its derive read back. The journey manager, a child of the session root, keeps one
+// keyed read per journey in an explicit map, and keeps the views current (H6): a journey tick
+// newer than the revision held refetches it, as does a deployment tick newer than the
+// deployment its document was derived with (owners and entities feed rank) and the date passing
+// in the deployment's zone. A document from another engine (`Skewed`) latches the tab into skew
 // instead of being derived. Revisions only move forward: an older document is never shown.
-import {
-  backoffDelayMs,
-  Tracker,
-  type RevisionOf,
-  type Schema,
-  type Subscription,
-  type Tick,
-  type Timers,
-} from "@cairn/client";
-import type { DerivationKey, Derived } from "@cairn/wasm";
+//
+// A derivation is owned by the load that made it (the worker numbers loads): the read that
+// derived a document holds its handle, and the handle is released when the read drops the value,
+// so an owner that was evicted and a successor that replaced it never free each other's.
+import type { RevisionOf, Schema } from "@cairn/client";
+import type { DerivationHandle, DerivationKey, Derived } from "@cairn/wasm";
+import { assign, enqueueActions, setup, type ActorRefFrom, type SnapshotFrom } from "xstate";
 
-import { Emitter } from "./emitter.ts";
-import { Missing, Skewed, type Deriver, type DomainDocument, type Host } from "./host.ts";
-import type { Skew } from "./session-root.ts";
-import { todayIn } from "./today.ts";
+import type { Deriver, DomainDocument, Host } from "./host.ts";
+import {
+  DERIVE,
+  beforeWork,
+  heldValue,
+  keyedRead,
+  readLag,
+  readView,
+  worstLag,
+  type Lag,
+  type ReadEnv,
+  type ReadError,
+  type ReadRef,
+  type ReadSnapshot,
+  type ReadSource,
+} from "./keyed-read.ts";
+import { ROLLOVER_CHECK_MS, todayIn } from "./today.ts";
 
 export type Journey = Schema<"Journey">;
 export type DeriveInputs = Schema<"DeriveInputs">;
@@ -39,48 +50,17 @@ export type JourneyView =
  */
 export const PARKED_JOURNEY_COUNT_MAX = 8;
 
-const LOADING: JourneyView = { status: "loading" };
-
-/** What a document must reach to be current: its revision, its deployment's, its today. */
-interface Want {
-  revision: number;
-  deployment: number;
-  today: string | undefined;
-}
-
-/** What the view holds. */
-interface Held {
+/** What a journey read holds: the document, its derive, and the load that owns the derivation. */
+export interface JourneyHeld {
+  journey: Journey;
+  inputs: DeriveInputs;
+  key: DerivationKey;
+  derived: Derived;
+  handle: DerivationHandle;
   revision: number;
   deployment: number;
   today: string;
   timezone: string;
-}
-
-interface Entry {
-  id: string;
-  view: JourneyView;
-  held: Held | undefined;
-  want: Want;
-  dirty: boolean;
-  running: boolean;
-  mounted: number;
-  used: number;
-  /** Failed fetches in a row, which the wait before the next retry grows with. */
-  retries: number;
-  retryTimer: unknown;
-  /** When (monotonic ms) a newer revision than the one held was first announced, while the view still shows the older. */
-  behindSince: number | undefined;
-  /** Whether the last fetch for it failed. */
-  failed: boolean;
-}
-
-/** A shown journey that is behind the revision the stream announced (the sync chip's UPDATING and BEHIND). */
-export interface Lag {
-  journey: string;
-  shown: number;
-  announced: number;
-  since: number;
-  failed: boolean;
 }
 
 /** What the most recently shown journey's view is derived from (the sync popover). */
@@ -90,306 +70,263 @@ export interface Derivation {
   today: string;
 }
 
-export interface JourneyStoreParts {
-  host: Host;
-  deriver: Deriver;
-  subscription: Subscription;
-  skew: Skew;
-  timers: Timers;
-}
-
 /** The schema's `JourneyId`: what an address must name to be a journey at all. */
 export const JOURNEY_ID = /^j_[a-z0-9][a-z0-9_-]{0,61}$/;
 
 export const journeyOf = (id: string): RevisionOf => ({ domain: { journey: id } });
 
+const DEPLOYMENT: RevisionOf = { domain: "deployment" };
+
 /**
- * Whether what the view holds is current for `want`: the journey revision is the tracker's
- * (H6, the one held now), the deployment's and the today are the document's.
+ * The journey `args.id`'s read: its document, posted to the worker and derived. Obsolete work
+ * never publishes over its successor's: the read posts a load only while the machine still waits
+ * for it and the tab is compatible, owns the load until the machine adopts the value, and frees it
+ * itself if the answer is dropped or the derive fails.
  */
-function satisfied(revision: number | undefined, held: Held | undefined, want: Want): boolean {
-  return (
-    revision !== undefined &&
-    held !== undefined &&
-    revision >= want.revision &&
-    held.deployment >= want.deployment &&
-    (want.today === undefined || held.today === want.today)
+export function journeySource(host: Host, deriver: Deriver): ReadSource<{ id: string }, JourneyHeld> {
+  return {
+    policy: DERIVE,
+    async read({ id }, at) {
+      const text = await host.documentText(id);
+      const document = JSON.parse(text) as DomainDocument;
+      const revision = document.journey.revision;
+      const deployment = document.inputs.deployment.revision;
+      const held = at.held;
+      if (held !== undefined && (revision < held.revision || deployment < held.deployment)) {
+        return held;
+      }
+      beforeWork(at);
+      const { key, handle } = await deriver.load(text);
+      let freed = false;
+      const free = () => {
+        if (!freed) {
+          freed = true;
+          void deriver.release(handle).catch(() => undefined);
+        }
+      };
+      // The abort fires exactly when the answer was not and will not be adopted.
+      at.signal.addEventListener("abort", free, { once: true });
+      try {
+        beforeWork(at);
+        const derived = await deriver.derived(id);
+        const { today, timezone } = document.inputs;
+        return { journey: document.journey, inputs: document.inputs, key, derived, handle, revision, deployment, today, timezone };
+      } catch (thrown) {
+        free();
+        throw thrown;
+      }
+    },
+    ticks: ({ id }) => ({
+      watching: [`journey:${id}`, "deployment"],
+      about: (of) => !("proposal" in of) && (of.domain === "deployment" || ("journey" in of.domain && of.domain.journey === id)),
+      holds: (value) => [
+        { of: journeyOf(id), revision: value.revision },
+        { of: DEPLOYMENT, revision: value.deployment },
+      ],
+      subject: journeyOf(id),
+    }),
+    release(value) {
+      void deriver.release(value.handle).catch(() => undefined);
+    },
+  };
+}
+
+/** A journey read and the last snapshot it relayed. */
+export interface JourneyEntry {
+  ref: ReadRef;
+  snapshot: ReadSnapshot;
+  mounted: number;
+  used: number;
+}
+
+export interface JourneysInput {
+  host: Host;
+  deriver: Deriver;
+  env: ReadEnv;
+  /** The page's clock, for date rollover. */
+  today(): Date;
+}
+
+export interface JourneysContext extends JourneysInput {
+  entries: Readonly<Record<string, JourneyEntry>>;
+  uses: number;
+}
+
+export type JourneysEvent =
+  | { type: "mount"; id: string }
+  | { type: "unmount"; id: string }
+  | { type: `xstate.snapshot.${string}`; snapshot: ReadSnapshot };
+
+const SNAPSHOT_PREFIX = "xstate.snapshot.";
+const idOf = (event: JourneysEvent): string => (event as Extract<JourneysEvent, { type: "mount" }>).id;
+
+export const journeyManager = setup({
+  types: { context: {} as JourneysContext, events: {} as JourneysEvent, input: {} as JourneysInput },
+  actors: { read: keyedRead },
+  guards: {
+    valid: ({ event }) => JOURNEY_ID.test(idOf(event)),
+  },
+  actions: {
+    // The journey is shown once more: its read is started on the first mount.
+    mount: assign(({ context, event, spawn }) => {
+      const id = idOf(event);
+      let entry = context.entries[id];
+      if (entry === undefined) {
+        const ref = spawn("read", { id, syncSnapshot: true, input: { source: journeySource(context.host, context.deriver), env: context.env } });
+        entry = { ref, snapshot: ref.getSnapshot(), mounted: 0, used: 0 };
+      }
+      const uses = context.uses + 1;
+      return { entries: { ...context.entries, [id]: { ...entry, mounted: entry.mounted + 1, used: uses } }, uses };
+    }),
+    // A new read is asked for its journey; a parked one listens again, and looks again if it holds nothing to show.
+    greet: enqueueActions(({ context, event, enqueue }) => {
+      const id = idOf(event);
+      const entry = context.entries[id];
+      if (entry === undefined) {
+        return;
+      }
+      if (entry.ref.getSnapshot().matches("idle")) {
+        enqueue.sendTo(entry.ref, { type: "want", key: { identity: [id], freshness: [], args: { id } } });
+        return;
+      }
+      enqueue.sendTo(entry.ref, { type: "show" });
+      if (heldValue(entry.snapshot) === undefined) {
+        enqueue.sendTo(entry.ref, { type: "refresh" });
+      }
+    }),
+    park: enqueueActions(({ context, event, enqueue }) => {
+      const id = idOf(event);
+      const entry = context.entries[id];
+      if (entry === undefined || entry.mounted === 0) {
+        return;
+      }
+      const mounted = entry.mounted - 1;
+      let entries: Record<string, JourneyEntry> = { ...context.entries, [id]: { ...entry, mounted } };
+      if (mounted === 0) {
+        enqueue.sendTo(entry.ref, { type: "park" });
+        // The least recently shown parked journeys beyond the bound are released from the worker.
+        const parked = Object.entries(entries)
+          .filter(([, each]) => each.mounted === 0)
+          .sort(([, left], [, right]) => right.used - left.used);
+        for (const [evicted, each] of parked.slice(PARKED_JOURNEY_COUNT_MAX)) {
+          enqueue.stopChild(each.ref);
+          entries = Object.fromEntries(Object.entries(entries).filter(([name]) => name !== evicted));
+        }
+      }
+      enqueue.assign({ entries });
+    }),
+    relay: assign(({ context, event }) => {
+      const relayed = event as Extract<JourneysEvent, { type: `xstate.snapshot.${string}` }>;
+      const id = relayed.type.slice(SNAPSHOT_PREFIX.length);
+      const entry = context.entries[id];
+      return entry === undefined ? {} : { entries: { ...context.entries, [id]: { ...entry, snapshot: relayed.snapshot } } };
+    }),
+    // Asked at each check until the host's today catches up with the page's clock.
+    rollover: enqueueActions(({ context, enqueue }) => {
+      for (const entry of Object.values(context.entries)) {
+        const held = heldValue<JourneyHeld>(entry.snapshot);
+        if (held === undefined) {
+          continue;
+        }
+        try {
+          if (todayIn(held.timezone, context.today()) !== held.today) {
+            enqueue.sendTo(entry.ref, { type: "refresh" });
+          }
+        } catch {
+          // A zone the page cannot name keeps its day.
+        }
+      }
+    }),
+  },
+}).createMachine({
+  id: "journeys",
+  context: ({ input }) => ({ ...input, entries: {}, uses: 0 }),
+  initial: "running",
+  states: {
+    // Date rollover: a check every so often, on the machine's own clock.
+    running: { after: { [ROLLOVER_CHECK_MS]: { target: "running", reenter: true, actions: "rollover" } } },
+  },
+  on: {
+    mount: { guard: "valid", actions: ["mount", "greet"] },
+    unmount: { actions: "park" },
+    "xstate.snapshot.*": { actions: "relay" },
+  },
+});
+
+export type JourneysRef = ActorRefFrom<typeof journeyManager>;
+export type JourneysSnapshot = SnapshotFrom<typeof journeyManager>;
+
+const LOADING: JourneyView = { status: "loading" };
+const MISSING: JourneyView = { status: "missing" };
+const SKEW: JourneyView = { status: "skew" };
+const ready = new WeakMap<JourneyHeld, JourneyView>();
+const failures = new WeakMap<ReadError, JourneyView>();
+
+/** The view a read shows for journey `id`: the same object while what it shows holds. */
+function viewOf(snapshot: ReadSnapshot, id: string): JourneyView {
+  const view = readView<JourneyHeld>(snapshot, [id], []);
+  switch (view.status) {
+    case "current":
+    case "refreshing":
+    case "behind": {
+      let found = ready.get(view.value);
+      if (found === undefined) {
+        const { journey, inputs, key, derived } = view.value;
+        found = { status: "ready", journey, inputs, key, derived };
+        ready.set(view.value, found);
+      }
+      return found;
+    }
+    case "gone":
+      return MISSING;
+    case "failed": {
+      if (view.error.kind === "skew") {
+        return SKEW;
+      }
+      let found = failures.get(view.error);
+      if (found === undefined) {
+        found = { status: "failed", message: view.error.message };
+        failures.set(view.error, found);
+      }
+      return found;
+    }
+    case "loading":
+    case "idle":
+      return LOADING;
+  }
+}
+
+/** What journey `id`'s view shows. A malformed id names no journey, and nothing watches it. */
+export function journeyView(snapshot: JourneysSnapshot, id: string): JourneyView {
+  if (!JOURNEY_ID.test(id)) {
+    return MISSING;
+  }
+  const entry = snapshot.context.entries[id];
+  return entry === undefined ? LOADING : viewOf(entry.snapshot, id);
+}
+
+/** The mounted journey worst behind what the stream announced (a failed refetch first, then the longest wait), if any. */
+export function lagOf(snapshot: JourneysSnapshot): Lag | undefined {
+  return worstLag(
+    Object.values(snapshot.context.entries)
+      .filter((entry) => entry.mounted > 0)
+      .map((entry) => readLag(entry.snapshot)),
   );
 }
 
-export class JourneyStore extends Emitter {
-  readonly #parts: JourneyStoreParts;
-  readonly #tracker = new Tracker();
-  readonly #entries = new Map<string, Entry>();
-  #uses = 0;
-  #derivation: Derivation | undefined;
-
-  constructor(parts: JourneyStoreParts) {
-    super();
-    this.#parts = parts;
-    parts.subscription.listen({
-      opened: () => {
-        this.#tracker.reopened();
-      },
-      tick: (tick) => {
-        this.#heard(tick);
-      },
-    });
-  }
-
-  /** The mounted journey worst behind what the stream announced (a failed refetch first, then the longest wait), if any. */
-  get lag(): Lag | undefined {
-    let lag: Lag | undefined;
-    for (const entry of this.#entries.values()) {
-      if (entry.mounted > 0 && entry.held !== undefined && entry.behindSince !== undefined) {
-        const next = { journey: entry.id, shown: entry.held.revision, announced: entry.want.revision, since: entry.behindSince, failed: entry.failed };
-        // A failed refetch outranks one still out; among alike, the one that has waited longest.
-        if (lag === undefined || (next.failed && !lag.failed) || (next.failed === lag.failed && next.since < lag.since)) {
-          lag = next;
-        }
-      }
-    }
-    return lag;
-  }
-
-  /** What the most recently shown journey is at, if one is shown; the same object while it holds. */
-  get derivation(): Derivation | undefined {
-    let latest: Entry | undefined;
-    for (const entry of this.#entries.values()) {
-      if (entry.mounted > 0 && entry.held !== undefined && (latest === undefined || entry.used > latest.used)) {
-        latest = entry;
-      }
-    }
-    const held = latest?.held;
-    const previous = this.#derivation;
-    if (held === undefined) {
-      this.#derivation = undefined;
-    } else if (previous?.revision !== held.revision || previous.deployment !== held.deployment || previous.today !== held.today) {
-      this.#derivation = { revision: held.revision, deployment: held.deployment, today: held.today };
-    }
-    return this.#derivation;
-  }
-
-  /** What journey `id`'s view shows now. */
-  view(id: string): JourneyView {
-    return this.#entries.get(id)?.view ?? LOADING;
-  }
-
-  /** Shows journey `id` until the returned function is called: watched, fetched, derived. */
-  mount(id: string): () => void {
-    if (!JOURNEY_ID.test(id)) {
-      // Never watched: the stream refuses a malformed name, and with it every other watch.
-      this.#show(this.#entry(id), { status: "missing" });
-      return () => undefined;
-    }
-    const entry = this.#entry(id);
-    entry.mounted += 1;
-    entry.used = ++this.#uses;
-    this.emit();
-    const unwatch = this.#parts.subscription.watch([`journey:${id}`]);
-    if (entry.held === undefined) {
-      this.#request(entry, {});
-    }
-    return () => {
-      unwatch();
-      entry.mounted -= 1;
-      this.#evict();
-      this.emit();
-    };
-  }
-
-  /**
-   * Date rollover: refetches every held journey whose today has passed in its zone, once
-   * per check while the host still answers the old date (its clock may lag the page's).
-   */
-  rollover(now: Date): void {
-    for (const entry of this.#entries.values()) {
-      const held = entry.held;
-      if (held === undefined) {
-        continue;
-      }
-      let today: string;
-      try {
-        today = todayIn(held.timezone, now);
-      } catch {
-        continue;
-      }
-      // Asked at every check until the host's today catches up with the page's clock.
-      if (today !== held.today) {
-        this.#request(entry, { today });
-      }
+/** What the most recently shown journey is at, if one is shown. */
+export function derivationOf(snapshot: JourneysSnapshot): Derivation | undefined {
+  let latest: JourneyEntry | undefined;
+  for (const entry of Object.values(snapshot.context.entries)) {
+    if (entry.mounted > 0 && heldValue(entry.snapshot) !== undefined && (latest === undefined || entry.used > latest.used)) {
+      latest = entry;
     }
   }
+  const held = latest === undefined ? undefined : heldValue<JourneyHeld>(latest.snapshot);
+  return held === undefined ? undefined : { revision: held.revision, deployment: held.deployment, today: held.today };
+}
 
-  #entry(id: string): Entry {
-    let entry = this.#entries.get(id);
-    if (entry === undefined) {
-      entry = {
-        id,
-        view: LOADING,
-        held: undefined,
-        want: { revision: 0, deployment: 0, today: undefined },
-        dirty: false,
-        running: false,
-        mounted: 0,
-        used: 0,
-        retries: 0,
-        retryTimer: undefined,
-        behindSince: undefined,
-        failed: false,
-      };
-      this.#entries.set(id, entry);
-    }
-    return entry;
-  }
-
-  /** H6: a journey tick newer than held, or a deployment tick newer than a document's. */
-  #heard(tick: Tick): void {
-    if ("proposal" in tick.of) {
-      return;
-    }
-    const domain = tick.of.domain;
-    if (domain === "deployment") {
-      for (const entry of this.#entries.values()) {
-        // A first fetch in flight may have read the document before this deployment moved.
-        const behind = entry.held === undefined ? entry.running : entry.held.deployment < tick.revision;
-        if (behind) {
-          this.#request(entry, { deployment: tick.revision });
-        }
-      }
-      return;
-    }
-    const entry = "journey" in domain ? this.#entries.get(domain.journey) : undefined;
-    if (entry === undefined) {
-      return;
-    }
-    if (tick.revision === 0 && entry.held !== undefined) {
-      this.#gone(entry);
-    } else if (this.#tracker.ticked(tick)) {
-      this.#request(entry, { revision: tick.revision });
-    }
-  }
-
-  #request(entry: Entry, want: Partial<Want>): void {
-    entry.want = {
-      revision: Math.max(entry.want.revision, want.revision ?? 0),
-      deployment: Math.max(entry.want.deployment, want.deployment ?? 0),
-      today: want.today ?? entry.want.today,
-    };
-    entry.dirty = true;
-    // What the sync chip reads: when the view first fell behind (a newer journey or deployment revision
-    // than it holds), and the newest announced since.
-    const held = entry.held;
-    if (held !== undefined && (entry.want.revision > held.revision || entry.want.deployment > held.deployment)) {
-      entry.behindSince ??= performance.now();
-      this.emit();
-    }
-    if (!entry.running) {
-      void this.#run(entry);
-    }
-  }
-
-  /** Fetches until the view holds what was asked for, one fetch at a time per journey. */
-  async #run(entry: Entry): Promise<void> {
-    entry.running = true;
-    while (entry.dirty && !this.#parts.skew.skewed() && this.#holds(entry)) {
-      entry.dirty = false;
-      if (satisfied(this.#tracker.held(journeyOf(entry.id)), entry.held, entry.want)) {
-        continue;
-      }
-      try {
-        await this.#fetch(entry);
-        entry.want.today = undefined;
-        entry.retries = 0;
-      } catch (thrown) {
-        this.#failed(entry, thrown);
-      }
-    }
-    entry.running = false;
-  }
-
-  async #fetch(entry: Entry): Promise<void> {
-    const { host, deriver } = this.#parts;
-    const text = await host.documentText(entry.id);
-    const document = JSON.parse(text) as DomainDocument;
-    const revision = document.journey.revision;
-    const deployment = document.inputs.deployment.revision;
-    const held = entry.held;
-    if (held !== undefined && (revision < held.revision || deployment < held.deployment)) {
-      return;
-    }
-    if (!this.#holds(entry)) {
-      return;
-    }
-    const key = await deriver.load(text);
-    if (!this.#holds(entry)) {
-      void deriver.release(entry.id).catch(() => undefined);
-      return;
-    }
-    const derived = await deriver.derived(entry.id);
-    const { today, timezone } = document.inputs;
-    entry.held = { revision, deployment, today, timezone };
-    entry.failed = false;
-    if (revision >= entry.want.revision && deployment >= entry.want.deployment) {
-      entry.behindSince = undefined;
-    }
-    this.#tracker.fetched(journeyOf(entry.id), revision);
-    this.#show(entry, { status: "ready", journey: document.journey, inputs: document.inputs, key, derived });
-  }
-
-  #failed(entry: Entry, thrown: unknown): void {
-    if (thrown instanceof Missing) {
-      this.#gone(entry);
-      return;
-    }
-    if (thrown instanceof Skewed) {
-      this.#parts.skew.latch();
-      this.#show(entry, entry.view.status === "ready" ? entry.view : { status: "skew" });
-      return;
-    }
-    this.#tracker.refetchFailed(journeyOf(entry.id));
-    entry.failed = true;
-    this.emit();
-    if (entry.view.status !== "ready") {
-      this.#show(entry, { status: "failed", message: thrown instanceof Error ? thrown.message : String(thrown) });
-    }
-    const delay = backoffDelayMs(entry.retries);
-    entry.retries += 1;
-    this.#parts.timers.clear(entry.retryTimer);
-    entry.retryTimer = this.#parts.timers.set(() => {
-      this.#request(entry, {});
-    }, delay);
-  }
-
-  /** The journey no longer exists: deleted, or never there. */
-  #gone(entry: Entry): void {
-    entry.held = undefined;
-    entry.behindSince = undefined;
-    entry.failed = false;
-    this.#tracker.forget(journeyOf(entry.id));
-    void this.#parts.deriver.release(entry.id).catch(() => undefined);
-    this.#show(entry, { status: "missing" });
-  }
-
-  /** Whether `entry` is still the store's (not released while a fetch was in flight). */
-  #holds(entry: Entry): boolean {
-    return this.#entries.get(entry.id) === entry;
-  }
-
-  #show(entry: Entry, view: JourneyView): void {
-    entry.view = view;
-    this.emit();
-  }
-
-  /** Releases the least recently shown parked journeys beyond the bound. */
-  #evict(): void {
-    const parked = [...this.#entries.values()].filter((entry) => entry.mounted === 0);
-    parked.sort((left, right) => right.used - left.used);
-    for (const entry of parked.slice(PARKED_JOURNEY_COUNT_MAX)) {
-      this.#entries.delete(entry.id);
-      this.#parts.timers.clear(entry.retryTimer);
-      this.#tracker.forget(journeyOf(entry.id));
-      void this.#parts.deriver.release(entry.id).catch(() => undefined);
-    }
-  }
+/** Whether two derivations are at the same point: a selector compares with this so React re-renders only on a change. */
+export function sameDerivation(left: Derivation | undefined, right: Derivation | undefined): boolean {
+  return left?.revision === right?.revision && left?.deployment === right?.deployment && left?.today === right?.today;
 }

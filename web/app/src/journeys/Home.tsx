@@ -5,6 +5,7 @@
 import { useEffect } from "react";
 import { Navigate } from "react-router";
 
+import { valueOf } from "../data/keyed-read.ts";
 import { indexKey, journeyIndex, type JourneySummary } from "../data/reads.ts";
 import { useLive, useViewer } from "../data/react.ts";
 import { DEFAULT_FILTERS, indexPath, MINE_PATH, queryOf } from "./address.ts";
@@ -42,11 +43,12 @@ export function Home() {
   const { viewer, failed } = useViewer();
   const query = viewer === undefined ? undefined : queryOf({ ...DEFAULT_FILTERS, mine: true }, viewer.entities);
   const { view } = useLive(indexKey(query), journeyIndex(query));
-  if (failed !== undefined || (viewer !== undefined && query === undefined) || view.status === "failed" || view.status === "missing") {
+  if (failed !== undefined || (viewer !== undefined && query === undefined) || view.status === "failed" || view.status === "gone") {
     return <Navigate replace to={indexPath()} />;
   }
-  if (viewer === undefined || view.status === "loading") {
+  const items = valueOf(view);
+  if (viewer === undefined || items === undefined) {
     return <p className="muted small">Reading your journeys...</p>;
   }
-  return view.value.length === 0 ? <Navigate replace to={indexPath()} /> : <Settling items={view.value} />;
+  return items.length === 0 ? <Navigate replace to={indexPath()} /> : <Settling items={items} />;
 }

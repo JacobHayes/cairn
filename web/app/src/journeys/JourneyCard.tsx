@@ -9,6 +9,7 @@ import { Link, useLocation } from "react-router";
 import type { ListFlag } from "../acting/address.ts";
 import { DetailLink } from "../acting/Parts.tsx";
 import { useProjected } from "../canvas/hooks.ts";
+import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
@@ -43,8 +44,8 @@ function LineageFold({ ready, full }: { ready: Ready; full: boolean }) {
   const query = lineage === undefined ? undefined : { route: lineage.route, version: lineage.version };
   const { view } = useLive(indexKey(query), journeyIndex(query));
   const routes = useLive("routes", routeIndex).view;
-  const summary = view.status === "ready" ? view.value.find((item) => item.id === header.id) : undefined;
-  const route = lineage === undefined || routes.status !== "ready" ? undefined : routes.value.find((each) => each.header.id === lineage.route);
+  const summary = valueOf(view)?.find((item) => item.id === header.id);
+  const route = lineage === undefined ? undefined : valueOf(routes)?.find((each) => each.header.id === lineage.route);
   // A journey that did not come from a route has no lineage to show.
   if (lineage === undefined) {
     return null;
@@ -118,8 +119,8 @@ function Flags({ ready, model }: { ready: Ready; model: SummaryModel }) {
 }
 
 function NextUp({ ready, all }: { ready: Ready; all: boolean }) {
-  const next = useProjected(ready, { projection: "next" });
-  const items = (next.value?.items ?? []).slice(0, all ? undefined : NEXT_UP_SHOWN);
+  const next = valueOf(useProjected(ready, { projection: "next" }));
+  const items = (next?.items ?? []).slice(0, all ? undefined : NEXT_UP_SHOWN);
   if (items.length === 0) {
     return null;
   }
@@ -196,8 +197,10 @@ function Folds({ ready, model, full, selected }: { ready: Ready; model: SummaryM
 export function JourneyCard({ ready, selected, full = false }: { ready: Ready; selected?: string | undefined; full?: boolean }) {
   const journey = ready.journey.header.id;
   const { search } = useLocation();
-  const summary = useProjected(ready, { projection: "status_summary" });
-  const model = useMemo(() => (summary.value === undefined ? undefined : summaryModel(ready, summary.value)), [ready, summary.value]);
+  const summaryRead = useProjected(ready, { projection: "status_summary" });
+  const summary = valueOf(summaryRead);
+  const summaryError = errorWords(summaryRead);
+  const model = useMemo(() => (summary === undefined ? undefined : summaryModel(ready, summary)), [ready, summary]);
   const { header } = ready.journey;
   const done = model === undefined ? undefined : model.inScope - model.remaining;
   return (
@@ -222,9 +225,9 @@ export function JourneyCard({ ready, selected, full = false }: { ready: Ready; s
           </>
         ) : null}
       </div>
-      {summary.error === undefined ? null : <p className="callout callout-bad">The summary could not be read: {summary.error}</p>}
+      {summaryError === undefined ? null : <p className="callout callout-bad">The summary could not be read: {summaryError}</p>}
       {model === undefined || done === undefined ? (
-        summary.error === undefined ? <p className="muted small">Summing up the journey...</p> : null
+        summaryError === undefined ? <p className="muted small">Summing up the journey...</p> : null
       ) : (
         <>
           <span data-testid="card-progress" data-done={done} data-in-scope={model.inScope} data-remaining={model.remaining}>
