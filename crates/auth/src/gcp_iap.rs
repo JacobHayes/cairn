@@ -13,7 +13,18 @@
 //! (Google rotated its keys) fetches it again, at most once per
 //! `IAP_KEY_SET_REFETCH_INTERVAL_MIN`, so a stream of forged key ids cannot make Cairn
 //! fetch on every request.
+//!
+//! Given the Google OAuth client IAP's programmatic access allows, the provider also relays
+//! an MCP client's sign-in to Google (`relay`), so the bearer the client ends up holding is
+//! a Google ID token IAP accepts. Such a bearer counts only beside a valid assertion on the
+//! same request, which names the user; Cairn never reads identity from the bearer itself
+//! (decisions/2026-10-16-mcp-clients-behind-iap-sign-in-through-a-relay-to-google.md).
 
+mod relay;
+
+use std::sync::Arc;
+
+use axum::Router;
 use cairn_schema::{Email, Identity, Slug, Timestamp, Title};
 use openidconnect::core::{
     CoreIdToken, CoreIdTokenClaims, CoreIdTokenVerifier, CoreJsonWebKeySet, CoreJwsSigningAlgorithm,
@@ -27,6 +38,7 @@ use url::Url;
 
 use crate::clock::Clock;
 use crate::error::{ConfigError, Refusal};
+use crate::layer::Authenticate;
 use crate::limits::{IAP_ASSERTION_CLOCK_SKEW_MAX, IAP_KEY_SET_REFETCH_INTERVAL_MIN};
 use crate::oidc::chrono_time;
 use crate::outbound::{Outbound, is_trusted_origin};
@@ -38,6 +50,10 @@ pub const ASSERTION_HEADER: &str = "x-goog-iap-jwt-assertion";
 const ISSUER: &str = "https://cloud.google.com/iap";
 /// Where Google publishes the keys IAP signs with, as a JSON Web Key set.
 pub const GOOGLE_KEY_SET_URL: &str = "https://www.gstatic.com/iap/verify/public_key-jwk";
+/// Google's authorization endpoint, where the relay sends a browser to sign in.
+pub const GOOGLE_AUTHORIZATION_URL: &str = "https://accounts.google.com/o/oauth2/v2/auth";
+/// Google's token endpoint, where the relay exchanges a code or a refresh token.
+pub const GOOGLE_TOKEN_URL: &str = "https://oauth2.googleapis.com/token";
 
 /// The IAP provider's configuration.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -50,6 +66,62 @@ pub struct GcpIapConfig {
     pub audience: String,
     /// H3: link a new identity to the user holding one of its verified emails.
     pub auto_link: bool,
+    /// I2: the Google OAuth client on IAP's programmatic allowlist, through which MCP
+    /// clients sign in; without it the provider serves no OAuth endpoints.
+    pub relay: Option<RelayClient>,
+}
+
+/// The Google OAuth client the relay signs MCP clients in with. Its secret never leaves
+/// the server, and `Debug` does not print it.
+#[derive(Clone, PartialEq, Eq)]
+pub struct RelayClient {
+    /// The client's id at Google: the audience of the ID tokens IAP accepts.
+    pub client_id: String,
+    /// The client's secret at Google.
+    pub client_secret: String,
+}
+
+impl std::fmt::Debug for RelayClient {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RelayClient")
+            .field("client_id", &self.client_id)
+            .field("client_secret", &"<redacted>")
+            .finish()
+    }
+}
+
+/// The Google endpoints the provider calls: fixed in a deployment, stubs in tests
+/// (readiness ruling: every provider tests offline). Nothing a request carries changes
+/// them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct GoogleEndpoints {
+    /// The key set IAP signs with.
+    pub iap_key_set: Url,
+    /// Google's authorization endpoint.
+    pub authorization: Url,
+    /// Google's token endpoint.
+    pub token: Url,
+}
+
+impl GoogleEndpoints {
+    /// Google's own.
+    ///
+    /// # Panics
+    ///
+    /// Never: the constants are URLs.
+    #[must_use]
+    pub fn google() -> Self {
+        let parse = |url: &str| match Url::parse(url) {
+            Ok(url) => url,
+            Err(error) => unreachable!("{url} is a URL: {error}"),
+        };
+        Self {
+            iap_key_set: parse(GOOGLE_KEY_SET_URL),
+            authorization: parse(GOOGLE_AUTHORIZATION_URL),
+            token: parse(GOOGLE_TOKEN_URL),
+        }
+    }
 }
 
 /// The IAP provider.
@@ -59,6 +131,7 @@ pub struct GcpIapProvider {
     http: Outbound,
     key_set_url: JsonWebKeySetUrl,
     keys: Mutex<Option<Kept>>,
+    relay: Option<Arc<relay::Relay>>,
 }
 
 /// The key set as last fetched.
@@ -68,29 +141,27 @@ struct Kept {
 }
 
 impl GcpIapProvider {
-    /// The provider, verifying against Google's IAP keys.
+    /// The provider for a deployment at the public `base` URL, calling Google.
     ///
     /// # Errors
     ///
-    /// The audience is not an IAP resource, or the HTTP client cannot start.
-    pub fn new(config: GcpIapConfig, clock: Clock) -> Result<Self, ConfigError> {
-        let url = GOOGLE_KEY_SET_URL
-            .parse()
-            .map_err(|error: url::ParseError| ConfigError {
-                provider: config.name.to_string(),
-                reason: error.to_string(),
-            })?;
-        Self::with_key_set(config, clock, url)
+    /// As [`GcpIapProvider::with_endpoints`].
+    pub fn new(config: GcpIapConfig, clock: Clock, base: &Url) -> Result<Self, ConfigError> {
+        Self::with_endpoints(config, clock, base, GoogleEndpoints::google())
     }
 
-    /// The provider, verifying against the key set at `url`: Google's in a deployment, a
-    /// stub's in tests (readiness ruling: every provider tests offline).
+    /// The provider, calling `endpoints`: Google's in a deployment, stubs' in tests.
     ///
     /// # Errors
     ///
-    /// The audience is not an IAP resource, the URL is neither https nor this machine, or
-    /// the HTTP client cannot start.
-    pub fn with_key_set(config: GcpIapConfig, clock: Clock, url: Url) -> Result<Self, ConfigError> {
+    /// The audience is not an IAP resource, an endpoint is neither https nor this machine,
+    /// the relay's client id or secret is empty or padded, or the HTTP client cannot start.
+    pub fn with_endpoints(
+        config: GcpIapConfig,
+        clock: Clock,
+        base: &Url,
+        endpoints: GoogleEndpoints,
+    ) -> Result<Self, ConfigError> {
         let refuse = |reason: String| ConfigError {
             provider: config.name.to_string(),
             reason,
@@ -102,18 +173,32 @@ impl GcpIapProvider {
                 config.audience
             )));
         }
-        if !is_trusted_origin(&url) {
-            return Err(refuse(format!(
-                "the key set {url} is neither https nor this machine"
-            )));
+        for url in [
+            &endpoints.iap_key_set,
+            &endpoints.authorization,
+            &endpoints.token,
+        ] {
+            if !is_trusted_origin(url) {
+                return Err(refuse(format!(
+                    "the Google endpoint {url} is neither https nor this machine"
+                )));
+            }
         }
         let http = Outbound::new().map_err(refuse)?;
+        let relay = match &config.relay {
+            Some(client) => {
+                let made = relay::Relay::new(&config.name, client, base, &endpoints, http.clone());
+                Some(Arc::new(made.map_err(refuse)?))
+            }
+            None => None,
+        };
         Ok(Self {
-            config,
             clock,
             http,
-            key_set_url: JsonWebKeySetUrl::from_url(url),
+            key_set_url: JsonWebKeySetUrl::from_url(endpoints.iap_key_set),
             keys: Mutex::new(None),
+            relay,
+            config,
         })
     }
 
@@ -239,13 +324,20 @@ impl AuthProvider for GcpIapProvider {
         &self.config.name
     }
 
+    /// H1, I2: the request's assertion names its user. A Google ID token as the bearer
+    /// (the relay's) counts only beside a valid assertion: alone, it is refused rather than
+    /// left for another provider, and it is never read for who the user is.
     fn authenticate<'a>(&'a self, request: Presented<'a>) -> BoxFuture<'a, Verdict> {
         let assertion = request
             .headers
             .get(ASSERTION_HEADER)
             .map(|value| value.to_str().map(str::trim));
+        let google_bearer = request
+            .bearer()
+            .is_some_and(|token| self.claims_bearer(token));
         Box::pin(async move {
             match assertion {
+                None if google_bearer => Verdict::Refused(Refusal::Credential),
                 None => Verdict::Absent,
                 Some(Ok(assertion)) if !assertion.is_empty() => self.verify(assertion).await,
                 Some(_) => Verdict::Refused(Refusal::Credential),
@@ -253,8 +345,20 @@ impl AuthProvider for GcpIapProvider {
         })
     }
 
+    /// With the relay on, a bearer shaped as an ID token is the relay's Google ID token,
+    /// to be weighed by `authenticate`. This classifies; it checks nothing.
+    fn claims_bearer(&self, token: &str) -> bool {
+        self.relay.is_some() && relay::is_id_token(token)
+    }
+
     fn auto_link(&self) -> bool {
         self.config.auto_link
+    }
+
+    /// The relay's OAuth endpoints, when it has a Google client.
+    fn router(&self, authenticator: Arc<dyn Authenticate>) -> Option<Router> {
+        let _ = authenticator;
+        self.relay.as_ref().map(relay::router)
     }
 }
 
@@ -264,6 +368,7 @@ impl std::fmt::Debug for GcpIapProvider {
             .debug_struct("GcpIapProvider")
             .field("config", &self.config)
             .field("key_set_url", &self.key_set_url.as_str())
+            .field("relay", &self.relay.is_some())
             .finish_non_exhaustive()
     }
 }

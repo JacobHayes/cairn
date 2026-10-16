@@ -245,6 +245,70 @@ fn proxy_mode_trusts_this_machine_or_the_proxies_it_lists() {
     }
 }
 
+/// An IAP provider with the Google client its relay signs MCP clients in through.
+const IAP_RELAY: &str = "[[auth]]
+kind = \"gcp_iap\"
+name = \"iap\"
+audience = \"/projects/1/global/backendServices/2\"
+client_id = \"relay\"
+client_secret = \"relay-secret\"
+";
+
+/// I2: the IAP provider takes its relay's Google client; without one it has no relay.
+#[test]
+fn the_iap_relay_is_configured_by_its_google_client() {
+    let relays = |text: &str| -> Vec<Option<cairn_auth::RelayClient>> {
+        let config = parsed(&format!("{MINIMAL}\n{text}")).unwrap();
+        let iap = config
+            .auth
+            .into_iter()
+            .filter_map(|provider| match provider {
+                Provider::GcpIap(iap) => Some(iap.relay),
+                _ => None,
+            });
+        iap.collect()
+    };
+    let relay = cairn_auth::RelayClient {
+        client_id: "relay".to_owned(),
+        client_secret: "relay-secret".to_owned(),
+    };
+    assert_eq!(relays(IAP_RELAY), [Some(relay)]);
+    let without = IAP_RELAY
+        .replace("client_id = \"relay\"\n", "")
+        .replace("client_secret = \"relay-secret\"\n", "");
+    assert_eq!(relays(&without), [None]);
+}
+
+/// One OAuth server per deployment: the relay beside the built-in server is refused,
+/// whichever comes first; and the relay's client id and secret come together.
+#[test]
+fn iap_relay_mistakes_are_named_by_provider() {
+    let builtin = "[[auth]]\nkind = \"builtin_oauth\"\nname = \"agents\"\n";
+    let cases = [
+        (format!("{IAP_RELAY}{builtin}"), "auth.agents"),
+        (format!("{builtin}{IAP_RELAY}"), "auth.iap"),
+        (
+            IAP_RELAY.replace("client_secret = \"relay-secret\"\n", ""),
+            "auth.iap.client_secret",
+        ),
+        (
+            IAP_RELAY.replace("client_id = \"relay\"\n", ""),
+            "auth.iap.client_id",
+        ),
+        (
+            IAP_RELAY.replace("client_id = \"relay\"", "client_id = \" relay\""),
+            "auth.iap.client_id",
+        ),
+    ];
+    for (added, key) in cases {
+        assert_eq!(
+            problem_keys(&format!("{MINIMAL}\n{added}")),
+            vec![key],
+            "{added}"
+        );
+    }
+}
+
 #[test]
 fn provider_mistakes_are_named_by_provider() {
     let cases = [

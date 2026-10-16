@@ -15,8 +15,8 @@ use std::sync::atomic::{AtomicI64, Ordering};
 use axum::http::Method;
 use cairn_api::client::{Reply, Transport};
 use cairn_auth::{
-    Accounts, Auth, AuthProvider, BoxFuture, Clock, Listener, OAuthConfig, OAuthServer, Presented,
-    Verdict,
+    Accounts, Auth, AuthProvider, BoxFuture, Clock, GcpIapConfig, GcpIapProvider, GoogleEndpoints,
+    Listener, OAuthConfig, OAuthServer, Presented, RelayClient, Verdict,
 };
 use cairn_engine::from_file;
 use cairn_schema::{
@@ -27,6 +27,10 @@ use cairn_service::{AuthKind, AuthMethod, Capabilities, DeploymentSettings, Part
 use cairn_store::{Faults, InProcessNotifier, MemoryStore};
 use jiff::tz::{Offset, TimeZone};
 use serde::de::DeserializeOwned;
+use url::Url;
+
+use crate::auth::support::iap::{self, AUDIENCE, FakeIap, KeySet};
+use crate::auth::support::issuer::Issuer;
 
 /// The team the test sign-in provider knows, with each one's verified email.
 pub const TEAM: [(&str, &str); 2] = [("ann", "lead@example.org"), ("bob", "bob@example.org")];
@@ -90,6 +94,12 @@ impl AuthProvider for TeamProvider {
     }
 }
 
+/// The Google OAuth client on IAP's programmatic allowlist, through which the relay signs
+/// MCP clients in.
+pub const GOOGLE_CLIENT: &str = "relay-client.apps.example";
+/// That client's secret, which only Cairn and Google see.
+pub const GOOGLE_SECRET: &str = "relay-secret-value";
+
 /// The test deployment's time zone: five hours behind UTC all year.
 pub fn settings() -> DeploymentSettings {
     let zone = TimeZone::fixed(Offset::constant(-5));
@@ -113,46 +123,59 @@ impl World {
     /// Starts a server over a fresh memory store on this runtime, its clock at the vendor
     /// evaluation's first step.
     pub async fn start() -> Self {
-        Self::begin(true, None).await
+        Self::begin(true, None, start_clock(), &Front::Team).await
     }
 
     /// As [`World::start`], for a host whose root assembled the assistant over `provider`
     /// (I5): its capabilities offer it and its endpoints are served.
     pub async fn start_with_assistant(provider: Arc<dyn cairn_assistant::Provider>) -> Self {
-        Self::begin(true, Some(provider)).await
+        Self::begin(true, Some(provider), start_clock(), &Front::Team).await
     }
 
     /// As [`World::start`], for a host that does not offer MCP, as the browser host does not
     /// (capability gating: its root serves no MCP endpoint).
     pub async fn start_without_mcp() -> Self {
-        Self::begin(false, None).await
+        Self::begin(false, None, start_clock(), &Front::Team).await
     }
 
-    async fn begin(mcp: bool, assistant: Option<Arc<dyn cairn_assistant::Provider>>) -> Self {
+    /// A deployment behind Google Cloud IAP with the relay on (I2): the IAP provider alone,
+    /// calling a fake Google, and the server reached only through a fake IAP in front of
+    /// it; and the fake Google, for the test to sign in at.
+    pub async fn behind_iap() -> (Self, Issuer) {
+        let clock = start_clock();
+        let google = Issuer::start_google(clock.clock(), GOOGLE_CLIENT, GOOGLE_SECRET).await;
+        let key = iap::key("iap", 5);
+        let keys = KeySet::start(&[&key]).await;
+        let fake = FakeIap {
+            google: google.clone(),
+            allowlisted: GOOGLE_CLIENT.to_owned(),
+            key,
+            clock: clock.clock(),
+        };
+        let endpoints = GoogleEndpoints {
+            iap_key_set: keys.url.clone(),
+            authorization: google.authorization_url(),
+            token: google.token_url(),
+        };
+        let front = Front::Iap(Box::new((fake, endpoints)));
+        (Self::begin(true, None, clock, &front).await, google)
+    }
+
+    async fn begin(
+        mcp: bool,
+        assistant: Option<Arc<dyn cairn_assistant::Provider>>,
+        clock: TestClock,
+        front: &Front,
+    ) -> Self {
         let faults = Faults::default();
         let store = Arc::new(MemoryStore::with_faults(faults.clone()));
         let notifier = Arc::new(InProcessNotifier::new());
-        let clock = TestClock::default();
-        clock.set("2026-10-01T14:00:00Z");
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let base = format!("http://{address}").parse().unwrap();
         let accounts = Accounts::new(Arc::clone(&store), clock.clock());
-        let oauth = OAuthConfig {
-            name: "cairn".parse().unwrap(),
-            sign_in_with: None,
-        };
-        let providers: Vec<Arc<dyn AuthProvider>> = vec![
-            Arc::new(TeamProvider {
-                name: "team".parse().unwrap(),
-            }),
-            Arc::new(OAuthServer::new(oauth, accounts.clone(), &base)),
-        ];
+        let (providers, methods) = front.providers(&accounts, &base, clock.clock());
         let auth = Auth::new(accounts, Listener::Tcp(address), &base, providers);
-        let methods = vec![
-            method("team", AuthKind::Oidc),
-            method("cairn", AuthKind::BuiltinOauth),
-        ];
         let service = Service::new(Parts {
             store: Arc::clone(&store),
             notifier: notifier.clone(),
@@ -166,7 +189,11 @@ impl World {
             let store = Arc::clone(&store);
             cairn_assistant::Assistant::new(service.clone(), store, clock.clock(), provider)
         });
-        let app = cairn_api::router_with_assistant(service.clone(), &auth, assistant);
+        let app = front.in_front_of(cairn_api::router_with_assistant(
+            service.clone(),
+            &auth,
+            assistant,
+        ));
         let router = app.clone();
         tokio::spawn(async move {
             let app = app.into_make_service_with_connect_info::<SocketAddr>();
@@ -238,6 +265,73 @@ impl World {
     /// A transport with no credentials.
     pub fn anonymous(&self) -> Transport {
         Transport::new(self.address, None)
+    }
+}
+
+/// A clock at the vendor evaluation's first step.
+fn start_clock() -> TestClock {
+    let clock = TestClock::default();
+    clock.set("2026-10-01T14:00:00Z");
+    clock
+}
+
+/// Who stands in front of the server and signs requests in.
+enum Front {
+    /// The test sign-in provider for the team, and the built-in OAuth server.
+    Team,
+    /// The IAP provider with its relay, behind a fake IAP.
+    Iap(Box<(FakeIap, GoogleEndpoints)>),
+}
+
+impl Front {
+    fn providers(
+        &self,
+        accounts: &Accounts<MemoryStore>,
+        base: &Url,
+        clock: Clock,
+    ) -> (Vec<Arc<dyn AuthProvider>>, Vec<AuthMethod>) {
+        match self {
+            Front::Team => {
+                let oauth = OAuthConfig {
+                    name: "cairn".parse().unwrap(),
+                    sign_in_with: None,
+                };
+                let providers: Vec<Arc<dyn AuthProvider>> = vec![
+                    Arc::new(TeamProvider {
+                        name: "team".parse().unwrap(),
+                    }),
+                    Arc::new(OAuthServer::new(oauth, accounts.clone(), base)),
+                ];
+                let methods = vec![
+                    method("team", AuthKind::Oidc),
+                    method("cairn", AuthKind::BuiltinOauth),
+                ];
+                (providers, methods)
+            }
+            Front::Iap(iap) => {
+                let endpoints = &iap.1;
+                let config = GcpIapConfig {
+                    name: "iap".parse().unwrap(),
+                    audience: AUDIENCE.to_owned(),
+                    auto_link: false,
+                    relay: Some(RelayClient {
+                        client_id: GOOGLE_CLIENT.to_owned(),
+                        client_secret: GOOGLE_SECRET.to_owned(),
+                    }),
+                };
+                let iap = GcpIapProvider::with_endpoints(config, clock, base, endpoints.clone());
+                let providers: Vec<Arc<dyn AuthProvider>> = vec![Arc::new(iap.unwrap())];
+                (providers, vec![method("iap", AuthKind::GcpIap)])
+            }
+        }
+    }
+
+    /// The server as reached from outside.
+    fn in_front_of(&self, router: axum::Router) -> axum::Router {
+        match self {
+            Front::Team => router,
+            Front::Iap(iap) => iap.0.in_front_of(router),
+        }
     }
 }
 

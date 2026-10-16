@@ -6,8 +6,8 @@ use std::path::{Path, PathBuf};
 
 use cairn_assistant::protocol::{Credential, ProviderConfig};
 use cairn_auth::{
-    DevConfig, GcpIapConfig, OAuthConfig, OidcConfig, ProxySource, TailscaleConfig, TailscaleMode,
-    TrustedProxies,
+    DevConfig, GcpIapConfig, OAuthConfig, OidcConfig, ProxySource, RelayClient, TailscaleConfig,
+    TailscaleMode, TrustedProxies,
 };
 use cairn_schema::{Email, Slug, TimeZoneName, Title};
 use jiff::tz::TimeZone;
@@ -180,16 +180,18 @@ fn providers(written: Vec<ProviderFile>, problems: &mut Vec<Problem>) -> Option<
             ));
         }
     }
-    // The built-in OAuth server answers at the origin's well-known paths (resource and
-    // server metadata), which only one can hold.
+    // An OAuth server answers at the origin's well-known paths (resource and server
+    // metadata) and the OAuth endpoints, which only one can hold: the built-in server, or
+    // the IAP provider's relay to Google.
     for extra in written
         .iter()
-        .filter(|provider| matches!(provider, ProviderFile::BuiltinOauth(_)))
+        .filter(|provider| owns_oauth(provider))
         .skip(1)
     {
         problems.push(Problem::new(
             format!("auth.{}", extra.name()),
-            "is a second built-in OAuth server: a deployment runs one, at its origin's \
+            "is a second OAuth server: a deployment runs one, the built-in server \
+             (builtin_oauth) or the IAP relay (gcp_iap with a client_id), at its origin's \
              well-known paths",
         ));
     }
@@ -209,6 +211,15 @@ fn providers(written: Vec<ProviderFile>, problems: &mut Vec<Problem>) -> Option<
         return None;
     }
     built.into_iter().collect()
+}
+
+/// Whether a provider serves the OAuth endpoints and metadata.
+fn owns_oauth(provider: &ProviderFile) -> bool {
+    match provider {
+        ProviderFile::BuiltinOauth(_) => true,
+        ProviderFile::GcpIap(iap) => iap.client_id.is_some(),
+        ProviderFile::Dev(_) | ProviderFile::Oidc(_) | ProviderFile::Tailscale(_) => false,
+    }
 }
 
 /// Problems about one provider, keyed under `auth.<name>`.
@@ -266,16 +277,42 @@ fn provider(
                 auto_link,
             }))
         }
-        ProviderFile::GcpIap(GcpIapFile {
-            audience,
-            auto_link,
-            ..
-        }) => Some(Provider::GcpIap(GcpIapConfig {
-            name: name?,
-            audience,
-            auto_link,
-        })),
+        ProviderFile::GcpIap(iap) => self::gcp_iap(name, iap, &mut at),
     }
+}
+
+/// H1, I2: Google Cloud IAP, and its relay when given the Google client MCP clients sign
+/// in through, whose id and secret come together.
+fn gcp_iap(name: Option<Slug>, written: GcpIapFile, at: &mut At<'_>) -> Option<Provider> {
+    let relay = match (written.client_id, written.client_secret) {
+        (None, None) => None,
+        (Some(client_id), _) if client_id.is_empty() || client_id.trim() != client_id => {
+            at.push("client_id", "is empty or padded");
+            return None;
+        }
+        (Some(client_id), Some(client_secret)) => Some(RelayClient {
+            client_id,
+            client_secret,
+        }),
+        (Some(_), None) => {
+            at.push(
+                "client_secret",
+                "is missing: the relay's Google client needs its secret \
+                 (CAIRN_AUTH_<NAME>_CLIENT_SECRET)",
+            );
+            return None;
+        }
+        (None, Some(_)) => {
+            at.push("client_id", "is missing beside a client_secret");
+            return None;
+        }
+    };
+    Some(Provider::GcpIap(GcpIapConfig {
+        name: name?,
+        audience: written.audience,
+        auto_link: written.auto_link,
+        relay,
+    }))
 }
 
 /// H1: the dev provider.

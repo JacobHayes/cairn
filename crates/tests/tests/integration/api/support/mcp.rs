@@ -163,8 +163,14 @@ impl Agent {
 
     /// Connects, or the error initializing met.
     pub async fn try_connect(world: &World, token: Option<&str>) -> Result<Self, String> {
+        Self::through(&world.router, token).await
+    }
+
+    /// Connects through `router` (the API as served, or whatever stands in front of it),
+    /// or the error initializing met.
+    pub async fn through(router: &Router, token: Option<&str>) -> Result<Self, String> {
         let client = InProcess {
-            router: world.router.clone(),
+            router: router.clone(),
             peer: SocketAddr::from(([127, 0, 0, 1], 40_000)),
         };
         let mut config = StreamableHttpClientTransportConfig::with_uri(URL);

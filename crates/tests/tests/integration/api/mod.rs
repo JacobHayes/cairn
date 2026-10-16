@@ -7,6 +7,7 @@ mod assistant;
 mod client;
 mod http;
 mod mcp;
+mod mcp_iap;
 mod openapi;
 mod projections;
 mod proposals;

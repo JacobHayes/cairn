@@ -294,6 +294,39 @@ mod oauth {
         format!("cairn_session={}", session.1)
     }
 
+    /// Claude Code registers for refresh tokens too; the built-in server answers with the one
+    /// grant it has, and the client goes on to authorize and exchange a code (I2).
+    #[tokio::test]
+    async fn a_client_asking_for_refresh_too_registers_for_codes() {
+        let setup = setup(false).await;
+        let registration = json!({
+            "client_name": "Claude Code",
+            "redirect_uris": [REDIRECT],
+            "grant_types": ["authorization_code", "refresh_token"],
+            "response_types": ["code"],
+            "token_endpoint_auth_method": "none",
+        });
+        let request = request("/api/oauth/register", LOCAL)
+            .method("POST")
+            .header(CONTENT_TYPE, "application/json")
+            .body(Body::from(registration.to_string()));
+        let response = send(&setup.router, request.unwrap()).await;
+        assert_eq!(response.status(), StatusCode::CREATED);
+        let registered = json_of(response).await;
+        assert_eq!(registered["grant_types"], json!(["authorization_code"]));
+        let client = registered["client_id"].as_str().unwrap();
+
+        let cookies = signed_in(&setup.world, "u_ann").await;
+        let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
+        let authorize = authorize_uri(client, REDIRECT, challenge.as_str());
+        let step = step_of(get(&setup, &authorize, &cookies).await).await;
+        let form = [("step", step.as_str()), ("decision", "allow")];
+        let allowed = post_form(&setup, "/api/oauth/authorize", &cookies, &form).await;
+        let code = query(&location(&allowed))["code"].clone();
+        let exchanged = exchange(&setup, client, verifier.secret(), &code).await;
+        assert_eq!(exchanged.status(), StatusCode::OK);
+    }
+
     /// Redirect URIs match exactly, and only https or loopback ones register; a request
     /// naming another URI is answered with a page, never sent there.
     #[tokio::test]

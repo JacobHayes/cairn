@@ -14,19 +14,19 @@
 use std::sync::Arc;
 
 use axum::extract::{Form, Query, State};
-use axum::http::header::{CACHE_CONTROL, CONTENT_SECURITY_POLICY, LOCATION, X_FRAME_OPTIONS};
-use axum::http::{Extensions, HeaderMap, HeaderValue, StatusCode, Uri};
+use axum::http::{Extensions, HeaderMap, StatusCode, Uri};
 use axum::response::{Html, IntoResponse, Json, Response};
 use cairn_schema::{Actor, Title, UserId};
 use cairn_store::{AuthStore, OAuthStateKind, OAuthStateRecord};
-use openidconnect::{PkceCodeChallenge, PkceCodeVerifier};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
-use subtle::ConstantTimeEq;
 use url::Url;
 
 use super::Server;
-use super::client::{Client, Registration};
+use super::client::{BUILT_IN, Client, Registration};
+use super::metadata::AUTHORIZE;
+use super::pkce::{answers, is_challenge};
+use super::reply::{Back, escape, framed_never, no_store, oauth_error, page, redirect, registered};
 use crate::cookies::{self, SESSION_COOKIE};
 use crate::error::{AuthError, Refusal};
 use crate::layer::{Authenticate, browser};
@@ -60,20 +60,7 @@ struct Approved {
 
 /// RFC 7591: registers a public client.
 pub(super) async fn register(Json(registration): Json<Registration>) -> Response {
-    match Client::register(registration) {
-        Ok(client) => {
-            let body = json!({
-                "client_id": client.id(),
-                "client_name": client.name,
-                "redirect_uris": client.redirect_uris,
-                "token_endpoint_auth_method": "none",
-                "grant_types": ["authorization_code"],
-                "response_types": ["code"],
-            });
-            (StatusCode::CREATED, Json(body)).into_response()
-        }
-        Err(error) => oauth_error(error.code(), error.description()),
-    }
+    registered(Client::register(registration, &BUILT_IN), &BUILT_IN)
 }
 
 #[derive(Deserialize)]
@@ -96,21 +83,21 @@ pub(super) async fn authorize<S: AuthStore>(
     Query(query): Query<AuthorizeQuery>,
 ) -> Response {
     let client_id = query.client_id.clone().unwrap_or_default();
-    let Ok(client) = Client::from_id(&client_id) else {
+    let Ok(client) = Client::from_id(&client_id, &BUILT_IN) else {
         return page(
             StatusCode::BAD_REQUEST,
             "This client is not registered here.",
         );
     };
     let redirect_uri = query.redirect_uri.clone().unwrap_or_default();
-    if !client.redirects_to(&redirect_uri) {
+    if !client.redirects_to(&redirect_uri, &BUILT_IN) {
         return page(
             StatusCode::BAD_REQUEST,
             "The redirect URI is not the client's.",
         );
     }
     let back = Back {
-        issuer: &flow.server.issuer,
+        issuer: flow.server.metadata.issuer(),
         redirect_uri: &redirect_uri,
         state: query.state.as_deref(),
     };
@@ -161,7 +148,7 @@ pub(super) async fn consent<S: AuthStore>(
         Err(response) => return *response,
     }
     let back = Back {
-        issuer: &flow.server.issuer,
+        issuer: flow.server.metadata.issuer(),
         redirect_uri: &request.redirect_uri,
         state: request.state.as_deref(),
     };
@@ -190,13 +177,17 @@ pub(super) async fn token<S: AuthStore>(
     Form(request): Form<TokenRequest>,
 ) -> Response {
     if request.grant_type.as_deref() != Some("authorization_code") {
-        return oauth_error("unsupported_grant_type", "only authorization_code");
+        let only = "only authorization_code";
+        return oauth_error(StatusCode::BAD_REQUEST, "unsupported_grant_type", only);
     }
     let code = request.code.unwrap_or_default();
     let pending = flow.take(&code, OAuthStateKind::AuthorizationCode).await;
     let (user, approved) = match pending {
         Ok(Some(Pending::Code { user, request })) => (user, request),
-        Ok(_) => return oauth_error("invalid_grant", "unknown, used, or expired code"),
+        Ok(_) => {
+            let unknown = "unknown, used, or expired code";
+            return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant", unknown);
+        }
         Err(error) => return failure(&error),
     };
     let verifier = request.code_verifier.unwrap_or_default();
@@ -204,10 +195,8 @@ pub(super) async fn token<S: AuthStore>(
         && request.redirect_uri.as_deref() == Some(approved.redirect_uri.as_str())
         && answers(&verifier, &approved.challenge);
     if !matches {
-        return oauth_error(
-            "invalid_grant",
-            "the client, redirect URI, or verifier differ",
-        );
+        let differ = "the client, redirect URI, or verifier differ";
+        return oauth_error(StatusCode::BAD_REQUEST, "invalid_grant", differ);
     }
     match flow.mint(user, &approved.client_id).await {
         Ok(token) => {
@@ -260,7 +249,7 @@ impl<S: AuthStore> Flow<S> {
     /// Clears a lapsed session cookie in `response`.
     fn clear(&self, lapsed: Lapsed, mut response: Response) -> Response {
         if lapsed.0 {
-            let secure = self.server.issuer.starts_with("https://");
+            let secure = self.server.metadata.issuer().starts_with("https://");
             let cleared = cookies::clear(SESSION_COOKIE, "/", secure);
             cookies::append(response.headers_mut(), cleared);
         }
@@ -340,7 +329,7 @@ impl<S: AuthStore> Flow<S> {
 
     /// The agent token for the client, named after it.
     async fn mint(&self, user: UserId, client_id: &str) -> Result<Secret, AuthError> {
-        let name = Client::from_id(client_id)
+        let name = Client::from_id(client_id, &BUILT_IN)
             .ok()
             .and_then(|client| client.name);
         let name = name.map_or_else(|| "An MCP client".parse::<Title>(), Ok);
@@ -355,73 +344,6 @@ impl<S: AuthStore> Flow<S> {
 #[derive(Clone, Copy)]
 struct Lapsed(bool);
 
-/// RFC 7636: a challenge is the unpadded base64url of a SHA-256 digest.
-fn is_challenge(challenge: &str) -> bool {
-    challenge.len() == 43
-        && challenge
-            .bytes()
-            .all(|b| b.is_ascii_alphanumeric() || b == b'-' || b == b'_')
-}
-
-/// RFC 7636: the verifier is 43 to 128 unreserved characters whose S256 is the challenge,
-/// compared in constant time.
-fn answers(verifier: &str, challenge: &str) -> bool {
-    let unreserved = |b: u8| b.is_ascii_alphanumeric() || b"-._~".contains(&b);
-    if !(43..=128).contains(&verifier.len()) || !verifier.bytes().all(unreserved) {
-        return false;
-    }
-    let verifier = PkceCodeVerifier::new(verifier.to_owned());
-    let answered = PkceCodeChallenge::from_code_verifier_sha256(&verifier);
-    answered
-        .as_str()
-        .as_bytes()
-        .ct_eq(challenge.as_bytes())
-        .into()
-}
-
-/// The client's registered redirect URI, where an answer goes back.
-struct Back<'a> {
-    issuer: &'a str,
-    redirect_uri: &'a str,
-    state: Option<&'a str>,
-}
-
-impl Back<'_> {
-    fn error(&self, error: &str) -> Response {
-        self.send(&[("error", error)])
-    }
-
-    /// RFC 6749 section 4.1.2 with RFC 9207's `iss`: the answer, the client's `state`, and
-    /// who answered.
-    fn send(&self, pairs: &[(&str, &str)]) -> Response {
-        let Ok(mut url) = Url::parse(self.redirect_uri) else {
-            return page(StatusCode::BAD_REQUEST, "The redirect URI is not a URL.");
-        };
-        {
-            let mut query = url.query_pairs_mut();
-            query.extend_pairs(pairs);
-            if let Some(state) = self.state {
-                query.append_pair("state", state);
-            }
-            query.append_pair("iss", self.issuer);
-        }
-        redirect(url.as_str())
-    }
-}
-
-fn redirect(location: &str) -> Response {
-    let mut response = StatusCode::SEE_OTHER.into_response();
-    if let Ok(location) = HeaderValue::from_str(location) {
-        response.headers_mut().insert(LOCATION, location);
-    }
-    no_store(response)
-}
-
-fn oauth_error(error: &str, description: &str) -> Response {
-    let body = json!({"error": error, "error_description": description});
-    no_store((StatusCode::BAD_REQUEST, Json(body)).into_response())
-}
-
 fn refused(refusal: &Refusal) -> Response {
     let status = match refusal {
         Refusal::Credential => StatusCode::UNAUTHORIZED,
@@ -435,47 +357,13 @@ fn failure(error: &AuthError) -> Response {
     page(StatusCode::SERVICE_UNAVAILABLE, &error.to_string())
 }
 
-fn no_store(mut response: Response) -> Response {
-    response
-        .headers_mut()
-        .insert(CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    response
-}
-
-/// A page that no other site can frame, so a click on it is the user's own. Its forms
-/// post only here, and a post's redirect may go only to `answer_to`: browsers hold a
-/// form's redirect to the page's `form-action` too, and the consent's answer is a redirect
-/// to the client's registered URI.
-fn framed_never(mut response: Response, answer_to: Option<&Url>) -> Response {
-    let mut form_action = String::from("'self'");
-    if let Some(origin) = answer_to.map(|url| url.origin().ascii_serialization()) {
-        form_action.push(' ');
-        form_action.push_str(&origin);
-    }
-    let policy = format!("default-src 'none'; form-action {form_action}; frame-ancestors 'none'");
-    let headers = response.headers_mut();
-    headers.insert(X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
-    if let Ok(policy) = HeaderValue::from_str(&policy) {
-        headers.insert(CONTENT_SECURITY_POLICY, policy);
-    }
-    no_store(response)
-}
-
-fn page(status: StatusCode, message: &str) -> Response {
-    let body = format!(
-        "<!doctype html><meta charset=\"utf-8\"><title>Cairn</title><p>{}</p>",
-        escape(message)
-    );
-    framed_never((status, Html(body)).into_response(), None)
-}
-
 fn consent_page(client: &str, redirect_uri: &str, step: &str) -> Response {
     let body = format!(
         "<!doctype html><meta charset=\"utf-8\"><title>Allow access to Cairn</title>\
          <h1>Allow {client} to act for you in Cairn?</h1>\
          <p>It will be able to read and change everything you can, until you revoke it. \
          Its answer goes to <code>{redirect_uri}</code>.</p>\
-         <form method=\"post\" action=\"/api/oauth/authorize\">\
+         <form method=\"post\" action=\"{AUTHORIZE}\">\
          <input type=\"hidden\" name=\"step\" value=\"{step}\">\
          <button name=\"decision\" value=\"allow\">Allow</button> \
          <button name=\"decision\" value=\"deny\">Deny</button></form>",
@@ -488,48 +376,4 @@ fn consent_page(client: &str, redirect_uri: &str, step: &str) -> Response {
         (StatusCode::OK, Html(body)).into_response(),
         answer_to.as_ref(),
     )
-}
-
-/// Text made safe to place in HTML, inside an element or a quoted attribute.
-fn escape(text: &str) -> String {
-    let mut escaped = String::with_capacity(text.len());
-    for character in text.chars() {
-        match character {
-            '&' => escaped.push_str("&amp;"),
-            '<' => escaped.push_str("&lt;"),
-            '>' => escaped.push_str("&gt;"),
-            '"' => escaped.push_str("&quot;"),
-            '\'' => escaped.push_str("&#39;"),
-            other => escaped.push(other),
-        }
-    }
-    escaped
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn a_verifier_answers_only_its_own_challenge() {
-        let (challenge, verifier) = PkceCodeChallenge::new_random_sha256();
-        assert!(is_challenge(challenge.as_str()));
-        assert!(answers(verifier.secret(), challenge.as_str()));
-        let (other, _) = PkceCodeChallenge::new_random_sha256();
-        assert!(!answers(verifier.secret(), other.as_str()));
-        for malformed in [
-            "",
-            "short",
-            &"a".repeat(129),
-            &format!("{}!", "a".repeat(43)),
-        ] {
-            assert!(!answers(malformed, challenge.as_str()), "{malformed:?}");
-        }
-    }
-
-    #[test]
-    fn page_text_is_escaped() {
-        let escaped = escape("<script>\"a\" & 'b'</script>");
-        assert!(!escaped.contains(['<', '>', '"', '\'']), "{escaped}");
-    }
 }

@@ -713,6 +713,7 @@ dependencies = [
  "chrono",
  "cookie",
  "ed25519-dalek",
+ "futures-core",
  "http-body-util",
  "jiff",
  "jsonschema",
@@ -728,6 +729,8 @@ dependencies = [
  "serde_json",
  "tokio",
  "tower",
+ "tracing",
+ "tracing-subscriber",
  "turso",
  "url",
 ]

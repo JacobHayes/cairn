@@ -139,7 +139,7 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | assistant provider call | 120 s | One non-streamed model response, including a long proposal; past this the provider is down and the turn reports it. |
 | assistant turn | 10 min | The iteration limit at typical provider latency, with room. |
 | store connection acquire | 5 s | Commits take milliseconds; five seconds of waiting is contention, which at this scale is a bug. |
-| outbound identity call (OIDC, Tailscale whois, IAP key set) | 10 s | An identity provider that slow is down; the login fails. |
+| outbound identity call (OIDC, Tailscale whois, IAP key set, Google token exchange), and a whole request to the IAP relay's endpoints | 10 s | An identity provider that slow is down; the login fails. |
 | IAP key set refetch on an unknown key id | once per 60 s | Google rotates IAP's keys rarely; a stream of forged key ids must not fetch on every request. |
 | IAP assertion clock skew | 30 s | IAP's assertions last ten minutes and NTP keeps clocks well inside this. |
 | SSE coalescing interval | 250 ms | Feels live; at most four ticks a second per domain. |

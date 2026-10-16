@@ -1,6 +1,6 @@
 # Cairn: feature briefs
 
-Briefs are Cairn's implementation milestones: what each builds, in what order, and how it is shown to work, with its decision log and its proof under `briefs/proof/<id>/`. Phases 1 to 6 have landed and are the record of the milestones that built Cairn; read the ones that built what your work touches. Phases 7 and 8 are planned: each of their briefs is a unit of work for whoever picks it up, built and proved the way the landed ones were, and marked landed in the table below in the same commit. Work that no brief covers starts from the documents alone (`AGENTS.md`), and its proof sits beside the briefs' proofs, under `briefs/proof/YYYY-MM-DD-<short-slug>/`. A brief points into `PRD.md`, `ARCHITECTURE.md`, and `PRACTICES.md` by requirement id and section heading and does not restate them; where a brief and a document disagree, the document wins (`AGENTS.md`).
+Briefs are Cairn's implementation milestones: what each builds, in what order, and how it is shown to work, with its decision log and its proof under `briefs/proof/<id>/`. Phases 1 to 6 have landed and are the record of the milestones that built Cairn; read the ones that built what your work touches. Phases 7 and 8 are planned, and phase 9 holds briefs added after the plan, for needs met in running Cairn: each of their briefs is a unit of work for whoever picks it up, built and proved the way the landed ones were, and marked landed in the table below in the same commit. Work that no brief covers starts from the documents alone (`AGENTS.md`), and its proof sits beside the briefs' proofs, under `briefs/proof/YYYY-MM-DD-<short-slug>/`. A brief points into `PRD.md`, `ARCHITECTURE.md`, and `PRACTICES.md` by requirement id and section heading and does not restate them; where a brief and a document disagree, the document wins (`AGENTS.md`).
 
 Files are named `<phase>.<step>-<slug>.md`. Phases run in order; within a phase, steps run in order unless the table says otherwise. 4.8 and 4.9 finish what 4.1 and 4.2 start once the engine is complete, so they run before 4.3 and 4.5, which depend on them ([`decisions/2026-10-06-the-service-and-api-split-at-the-engines-2-4-boundary.md`](../decisions/2026-10-06-the-service-and-api-split-at-the-engines-2-4-boundary.md)).
 
@@ -71,6 +71,7 @@ The shape every brief follows.
 | 8.9 | Next page | `web/app` | 8.5, 8.6, 8.7 | landed |
 | 8.10 | Plan list and timeline | `crates/schema`, `crates/engine`, `crates/api`, `openapi/`, `web/client`, `web/wasm`, `web/app` | 8.6, 8.1 (Affects: 8.3) | landed |
 | 8.11 | Authoring and proposal review in the frame | `web/app` | 8.6, 8.7, 8.8 | landed |
+| 9.1 | MCP sign-in behind IAP | `crates/auth`, `crates/cairn`, `docs/` | 3.2, 4.3 | landed |
 
 Rule for links between screens: a screen only links to screens that already exist. The brief that builds a screen adds the entry points into it from earlier screens (5.7 adds "break down" to triage and the upgrade, save-as-route, and re-link entries to the overview; 5.8 mounts its panel on earlier screens).
 
@@ -111,6 +112,7 @@ flowchart LR
     s76 & s86 & s811 --> s77[7.7]
     s76 --> s78[7.8]
     s76 --> s79[7.9]
+    s32 & s43 --> s91[9.1]
 ```
 
 Phase 8 redesigns the web app and adds what it needs from the engine. 8.1 to 8.3 (engine) and 8.4 (the frame) start side by side; 8.1, 8.2, and 8.3 all touch the derived schema and the generated paths, so they land in that order and regenerate on rebase. 8.5 to 8.8 follow the frame, and 8.9 to 8.11 follow them. Phases 7 and 8 are the exception to phases running in order: phase 7's briefs are independent of each other apart from 7.7 to 7.9 on 7.6 (and the screens of 7.8 and 7.9 on 7.7), 7.1 waits for 8.2 and 8.9, and the model, API, and MCP parts of 7.2 to 7.5 can run beside phase 8 in separate jj workspaces while their screens land with or after the phase 8 briefs the table names. Dotted: the simulation track (1.3, 6.1, 6.2). It is exploratory and gates nothing (PRACTICES, Simulation): no other brief depends on it, it runs under `mise run sim`, never `mise run check`, and it can be picked up whenever its dependencies exist or skipped if the spike says the shim cannot carry it.
@@ -168,13 +170,13 @@ Every PRD requirement id and named section, mapped to the brief that owns its ac
 | G1, G2 | 2.1 | 5.1, 5.5 |
 | G3 | 2.6 | 5.1 |
 | G4 | 7.3 | - |
-| H1, H4 | 3.2 | 4.1 |
+| H1, H4 | 3.2 | 4.1, 9.1 (H1: the IAP relay) |
 | H3 | 4.1 | 3.2 (verified emails), 2.2, 5.5 |
 | H2 | 4.1 (the actor), 4.8 (the confirming user) | 3.2, 4.4 |
 | H5 | 3.1 | 1.2, 2.1, 4.1, 4.2, 6.1 |
 | H6 | 4.6 | 4.1, 4.2, 4.5, 5.5, 6.1, 8.5 (the sync chip) |
 | I1 | 4.2 | 4.9 |
-| I2, I4, I7 | 4.3 | 3.2, 4.8 (I7), 7.6 (segment kind and instructions), 7.8, 7.9 (segment tools), 8.1 (instructions), 8.2 and 8.3 (node detail fields) |
+| I2, I4, I7 | 4.3 | 3.2, 4.8 (I7), 7.6 (segment kind and instructions), 7.8, 7.9 (segment tools), 8.1 (instructions), 8.2 and 8.3 (node detail fields), 9.1 (I2: sign-in behind IAP) |
 | I3 | 2.6 | 4.8, 4.9, 4.3, 8.1 (`by_display_state`) |
 | I5 | 4.4 | 5.8 |
 | I6 | 4.8 | 2.7, 4.9, 5.7 |

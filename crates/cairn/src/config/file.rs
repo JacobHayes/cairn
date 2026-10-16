@@ -145,6 +145,10 @@ pub(crate) struct GcpIapFile {
     pub audience: String,
     #[serde(default)]
     pub auto_link: bool,
+    /// The Google OAuth client MCP clients sign in through (the relay); absent, there is no
+    /// relay.
+    pub client_id: Option<String>,
+    pub client_secret: Option<String>,
 }
 
 /// Tailscale's two modes.

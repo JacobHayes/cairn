@@ -3,6 +3,7 @@
 
 #![allow(dead_code)]
 
+pub mod iap;
 pub mod issuer;
 
 use std::net::SocketAddr;

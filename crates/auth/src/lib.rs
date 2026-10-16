@@ -27,7 +27,7 @@ pub use accounts::Accounts;
 pub use clock::Clock;
 pub use dev::{DevConfig, DevProvider};
 pub use error::{AuthError, ConfigError, Refusal};
-pub use gcp_iap::{GcpIapConfig, GcpIapProvider};
+pub use gcp_iap::{GcpIapConfig, GcpIapProvider, GoogleEndpoints, RelayClient};
 pub use layer::{Auth, Authenticate};
 pub use oauth::{OAuthConfig, OAuthServer};
 pub use oidc::{OidcConfig, OidcProvider};

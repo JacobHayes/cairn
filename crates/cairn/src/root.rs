@@ -149,8 +149,10 @@ pub fn providers<S: AuthStore + 'static>(
             Provider::Tailscale(tailscale) => {
                 TailscaleProvider::new(tailscale.clone(), listener).map(|made| Arc::new(made) as _)
             }
-            Provider::GcpIap(iap) => GcpIapProvider::new(iap.clone(), accounts.clock().clone())
-                .map(|made| Arc::new(made) as _),
+            Provider::GcpIap(iap) => {
+                GcpIapProvider::new(iap.clone(), accounts.clock().clone(), base)
+                    .map(|made| Arc::new(made) as _)
+            }
         };
         match made {
             Ok(made) => built.push(made),

@@ -3,8 +3,9 @@
 use std::time::Duration;
 
 /// An outbound identity call (an OIDC discovery or code exchange, a Tailscale whois, the
-/// IAP key set): an
-/// identity provider this slow is down, and the sign-in fails.
+/// IAP key set, a Google token exchange), and a whole request to the IAP relay's
+/// endpoints, its body read included: an identity provider this slow is down, and the
+/// sign-in fails.
 pub const IDENTITY_CALL_DURATION_MAX: Duration = Duration::from_secs(10);
 /// How soon an IAP assertion naming a key Cairn has not seen may fetch Google's key set
 /// again: rotation is rare, and a stream of forged key ids must not fetch on every request.

@@ -11,7 +11,7 @@
 //! | `CAIRN_TIMEZONE` | `timezone` |
 //! | `CAIRN_ASSISTANT_API_KEY` | `assistant.api_key` |
 //! | `CAIRN_AUTH_<NAME>_TOKEN` | the dev provider `<name>`'s `token` |
-//! | `CAIRN_AUTH_<NAME>_CLIENT_SECRET` | the OIDC provider `<name>`'s `client_secret` |
+//! | `CAIRN_AUTH_<NAME>_CLIENT_SECRET` | the OIDC or IAP provider `<name>`'s `client_secret` |
 //!
 //! `<NAME>` is the provider's name in capitals with `-` as `_`. A secret variable that
 //! names no provider, or a field the provider does not have, is a problem: a secret set for
@@ -21,7 +21,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 
 use super::Problem;
-use super::file::{DevFile, FileConfig, OidcFile, ProviderFile};
+use super::file::{DevFile, FileConfig, GcpIapFile, OidcFile, ProviderFile};
 
 /// The prefix every Cairn variable carries.
 const PREFIX: &str = "CAIRN_";
@@ -140,7 +140,7 @@ pub(crate) fn apply(file: &mut FileConfig, environment: &Environment) -> (Origin
         if !set_secret(&mut file.auth, rest, value) {
             problems.push(Problem::new(
                 variable,
-                "names no dev provider's token or OIDC provider's client secret",
+                "names no dev provider's token, nor an OIDC or IAP provider's client secret",
             ));
         }
     }
@@ -159,7 +159,11 @@ fn set_secret(providers: &mut [ProviderFile], rest: &str, value: &str) -> bool {
         };
         let slot = match (provider, field) {
             (ProviderFile::Dev(DevFile { token, .. }), "TOKEN") => token,
-            (ProviderFile::Oidc(OidcFile { client_secret, .. }), "CLIENT_SECRET") => client_secret,
+            (
+                ProviderFile::Oidc(OidcFile { client_secret, .. })
+                | ProviderFile::GcpIap(GcpIapFile { client_secret, .. }),
+                "CLIENT_SECRET",
+            ) => client_secret,
             _ => continue,
         };
         *slot = Some(value.to_owned());
@@ -198,6 +202,11 @@ mod tests {
             name = "corp"
             issuer = "https://issuer.example"
             client_id = "cairn"
+            [[auth]]
+            kind = "gcp_iap"
+            name = "iap"
+            audience = "/projects/1/global/backendServices/2"
+            client_id = "relay"
             [assistant]
             protocol = "chat_completions"
             endpoint = "https://models.example/v1"
@@ -218,6 +227,7 @@ mod tests {
                 ("CAIRN_ASSISTANT_API_KEY", "key"),
                 ("CAIRN_AUTH_LOCAL_DEV_TOKEN", "dev-token"),
                 ("CAIRN_AUTH_CORP_CLIENT_SECRET", "secret"),
+                ("CAIRN_AUTH_IAP_CLIENT_SECRET", "relay-secret"),
                 ("HOME", "/home/someone"),
             ]),
         );
@@ -233,12 +243,17 @@ mod tests {
             .map(|provider| match provider {
                 ProviderFile::Dev(dev) => dev.token.clone(),
                 ProviderFile::Oidc(oidc) => oidc.client_secret.clone(),
+                ProviderFile::GcpIap(iap) => iap.client_secret.clone(),
                 _ => None,
             })
             .collect();
         assert_eq!(
             secrets,
-            vec![Some("dev-token".to_owned()), Some("secret".to_owned())]
+            vec![
+                Some("dev-token".to_owned()),
+                Some("secret".to_owned()),
+                Some("relay-secret".to_owned())
+            ]
         );
     }
 
