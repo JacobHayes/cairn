@@ -8,12 +8,12 @@ export type HostKind = "server" | "browser";
 const DEMO = `http://127.0.0.1:${process.env["CAIRN_DEMO_PORT"] ?? ""}`;
 
 /**
- * Opens the screen at `path` (`/`, `/journeys/<id>?view=...`) on `host`, once the shell is up:
+ * Opens the screen at `path` (`/journeys/<id>?view=...`) on `host`, once the shell is up:
  * within the page when it already runs on `host`, as a link would, so the in-browser host's
  * store (which lives only as long as the page) is kept; by loading the page otherwise. The
  * sync chip says which host it is on (`data-host`).
  */
-export async function open(page: Page, host: HostKind, path = "/"): Promise<void> {
+export async function open(page: Page, host: HostKind, path: string): Promise<void> {
   const nav = page.getByRole("navigation", { name: "Screens", exact: true });
   const onDemo = page.url().startsWith(`${DEMO}/`);
   if ((await nav.count()) === 1 && onDemo === (host === "browser")) {
@@ -79,7 +79,7 @@ export async function follow(page: Page, path: string): Promise<void> {
  * Moves the tab to the screen at `path` without loading the page again, as the app's links do,
  * and returns once the router has rendered it (the shell's `data-screen`). Data the screen
  * derives may still be on its way; read it with a web-first assertion. Not for `/`, which
- * redirects on its own once its data is read and would replace a later move.
+ * redirects and so never shows its own address.
  */
 export async function goWithin(page: Page, path: string): Promise<void> {
   await follow(page, path);

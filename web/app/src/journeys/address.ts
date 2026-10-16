@@ -113,13 +113,10 @@ function searchOf(params: URLSearchParams): string {
   return text === "" ? "" : `?${text}`;
 }
 
-/** C16: the journey index. `/` is the landing, which opens Mine or this (2.1). */
+/** C16: the journey index. `/` goes straight here. */
 export function indexPath(filters: IndexFilters = DEFAULT_FILTERS): string {
   return `/journeys${searchOf(filterParams(filters))}`;
 }
-
-/** C16: the cross-journey "mine" list. */
-export const MINE_PATH = "/mine";
 
 /** C16: a journey's landing, where its journey card shows and nothing is selected. */
 export function overviewPath(journey: string): string {

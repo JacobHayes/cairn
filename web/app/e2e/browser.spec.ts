@@ -15,16 +15,14 @@ import { derivedRevision, fresh, goWithin, open, openJourney, recentSaves, renam
 
 // Every error event the window sees, including the browser's own reports (a ResizeObserver
 // loop) that never reach Playwright's pageerror.
-test("the in-browser host boots, redirects, derives in the worker, applies a patch, and survives a screen that cannot load", async ({ page }) => {
+test("the in-browser host boots, derives in the worker, applies a patch, and survives a screen that cannot load", async ({ page }) => {
   await page.addInitScript(() => {
     const seen: string[] = [];
     Object.assign(window, { seenErrors: seen });
     window.addEventListener("error", (event) => seen.push(event.message));
   });
-  // The landing opens Mine.
   await visit(page, "browser", "/");
-  await expect(page).toHaveURL(/\/mine$/);
-  await expect(page.getByTestId("mine-journey").first()).toBeVisible();
+  await expect(page).toHaveURL(/\/journeys$/);
 
   await open(page, "browser", "/journeys");
   await expect(page.getByTestId("journey-row")).toHaveCount(4);
@@ -50,6 +48,30 @@ test("the in-browser host boots, redirects, derives in the worker, applies a pat
   await expect(syncChip(page)).toBeVisible();
   await goWithin(page, "/journeys");
   await expect(page.getByTestId("load-failure")).toHaveCount(0);
+});
+
+test("opening `/` shows the journey index first and the page never moves after", async ({ page }) => {
+  // Every screen the shell paints, and the address it paints it at, from the first mutation on.
+  await page.addInitScript(() => {
+    const painted: string[] = [];
+    Object.assign(window, { painted });
+    const note = () => {
+      const main = document.querySelector("main[data-screen]");
+      const entry = main === null ? null : `${main.getAttribute("data-screen") ?? ""} @ ${location.pathname}${location.search}`;
+      if (entry !== null && painted[painted.length - 1] !== entry) {
+        painted.push(entry);
+      }
+    };
+    new MutationObserver(note).observe(document, { subtree: true, childList: true, attributes: true });
+  });
+  await visit(page, "browser", "/");
+  await expect(page.getByTestId("journey-row").first()).toBeVisible();
+  // Past the point where a data-driven redirect would have moved the page.
+  await page.waitForTimeout(1000);
+  const painted = await page.evaluate(() => (window as unknown as { painted: string[] }).painted);
+  const address = new URL(page.url()).pathname + new URL(page.url()).search;
+  expect(painted).toEqual([`${address} @ ${address}`]);
+  expect(address).toBe("/journeys");
 });
 
 test("the sync dot shows its popover on hover and focus, inside the window, and a click pins it", async ({ page }) => {

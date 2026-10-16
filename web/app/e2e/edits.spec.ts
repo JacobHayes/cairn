@@ -219,7 +219,7 @@ test("a new route refused for an id in use stays under its control and on the ch
   await form.getByTestId("new-create").click();
   await expect(form.getByTestId("refused")).toBeVisible();
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
-  // Away from the control it is still counted (on a screen that stays put: the landing redirects on its own once its data is read), and a reload keeps it under the control.
+  // Away from the control it is still counted, and a reload keeps it under the control.
   await goWithin(page, "/journeys");
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
   await goWithin(page, "/library");

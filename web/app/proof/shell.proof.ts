@@ -14,7 +14,7 @@ const shot = (page: Page, name: string) => page.screenshot({ path: join(out, `${
 const beat = (page: Page) => page.waitForTimeout(700);
 
 test("the journey index and a journey derived in the worker, on the in-browser host", async ({ page }) => {
-  await open(page, "browser");
+  await open(page, "browser", "/journeys");
   await expect(page.getByTestId("journey-row")).toHaveCount(4);
   await shot(page, "1-index-in-browser");
   await page.getByRole("link", { name: "Launch the reporting release" }).click();
@@ -75,7 +75,7 @@ async function mainFlow(browser: Browser, baseURL: string): Promise<void> {
   });
   const page = await context.newPage();
   const other = await context.newPage();
-  await open(page, "server");
+  await open(page, "server", "/journeys");
   await beat(page);
   await page.getByRole("link", { name: "Hire a platform engineer" }).click();
   await derived(page);
