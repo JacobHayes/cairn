@@ -1,19 +1,22 @@
-// The shared write path every screen uses: a patch drafted against the revision its author
-// saw, with a fresh client-generated id (H5), submitted through the client wrapper's safe
-// retry with the page engine's touched-set check, its save recorded with the warnings it caused (D7). Version skew
-// stops it before anything is sent, and stops automatic retries mid-way (ARCHITECTURE, Web
-// UI). Committed state always comes from the host: the tick that follows refetches it.
-import { submit, type HttpFailure, type Schema } from "@cairn/client";
+// What a write is made of (H5, D7), apart from its delivery (write-machine.ts): a patch
+// drafted against the revision its author saw, with a fresh client-generated id; the words
+// for a refusal or an answer that never came; and the save a landed write records, with the
+// warnings it caused. Committed state always comes from the host: the tick that follows
+// refetches it.
+import type { HttpFailure, Schema } from "@cairn/client";
 
-import type { Host, Markdown, Patch } from "./host.ts";
-import { consequenceLines, warningOf, type Activity, type ConsequenceLine, type TitleOf, type Unlocked } from "./activity.ts";
-import type { SkewLatch } from "./skew.ts";
+import type { Markdown, Patch } from "./host.ts";
+import { warningOf, type Activity, type ConsequenceLine, type TitleOf, type Unlocked } from "./activity.ts";
 import type { SyncStatus } from "./sync.ts";
 
 export type Mutation = Schema<"Mutation">;
 export type Rejection = Schema<"Rejection">;
 
-/** A write as a screen asks for it. */
+/**
+ * A write as a screen asks for it. Transitional with `WriteResult` and `Session.write`: the
+ * controls that still await a result move onto the edit manager in the remaining-writes step,
+ * which removes them.
+ */
 export interface WriteIntent {
   target: Patch["target"];
   /** The target's revision the author saw when they started this edit. */
@@ -28,7 +31,8 @@ export type WriteResult =
   | { outcome: "landed"; answer: Schema<"PatchAnswer">; resubmitted: number; warning: string | undefined }
   | { outcome: "rejected"; rejection: Rejection; resubmitted: number }
   | { outcome: "failed"; failure: HttpFailure }
-  | { outcome: "stopped" };
+  | { outcome: "stopped" }
+  | { outcome: "gone" };
 
 /** A fresh patch id (H5): `p_` and 32 hex digits from the browser's random UUID. */
 export function newPatchId(): string {
@@ -67,12 +71,12 @@ export function reasonOf(rejection: Rejection): string {
 }
 
 /** The journey a write targets, if it targets one. */
-function journeyOf(intent: WriteIntent): string | undefined {
+function journeyOf(intent: Pick<WriteIntent, "target">): string | undefined {
   return typeof intent.target === "object" && "journey" in intent.target ? intent.target.journey : undefined;
 }
 
 /** The node a mutation is about: the decision it answers, the node it acts on, or the one its annotation is on. */
-function subjectOf(mutation: Mutation): string | undefined {
+export function subjectOf(mutation: Mutation): string | undefined {
   if ("decision" in mutation) {
     return mutation.decision;
   }
@@ -87,7 +91,7 @@ function subjectOf(mutation: Mutation): string | undefined {
  * a new entity may come before the action) and what it unlocked, for a pass over the acting
  * frontier; undefined when the write is about no node.
  */
-export function unlockedOf(intent: WriteIntent, answer: Schema<"PatchAnswer">, began: number): Unlocked | undefined {
+export function unlockedOf(intent: Pick<WriteIntent, "target" | "mutations">, answer: Schema<"PatchAnswer">, began: number): Unlocked | undefined {
   const journey = journeyOf(intent);
   const by = intent.mutations.map(subjectOf).find((node) => node !== undefined);
   if (journey === undefined || by === undefined) {
@@ -98,7 +102,7 @@ export function unlockedOf(intent: WriteIntent, answer: Schema<"PatchAnswer">, b
 }
 
 /** What a write does, in words for the popover's Recent: "Answered Who runs testing?". */
-export function describe(intent: WriteIntent, titleOf: TitleOf): string {
+export function describe(intent: Pick<WriteIntent, "target" | "mutations">, titleOf: TitleOf): string {
   const journey = journeyOf(intent);
   const [first] = intent.mutations;
   if (first === undefined) {
@@ -129,10 +133,8 @@ export function describe(intent: WriteIntent, titleOf: TitleOf): string {
   }
 }
 
-/** The stores a write reports to. */
-export interface WriteEnv {
-  host: Host;
-  skew: SkewLatch;
+/** The stores a save is recorded in. */
+export interface SaveEnv {
   activity: Activity;
   sync: SyncStatus;
   titleOf: TitleOf;
@@ -142,59 +144,10 @@ export interface WriteEnv {
  * Records a save of this tab: in Recent with the warning sentence its consequences call for
  * (D7), and on the chip as SAVED. The warning is what a receipt shows.
  */
-export function recordSave(env: Pick<WriteEnv, "activity" | "sync" | "titleOf">, text: string, lines: ConsequenceLine[], unlocked?: Unlocked): string | undefined {
+export function recordSave(env: SaveEnv, text: string, lines: ConsequenceLine[], unlocked?: Unlocked): string | undefined {
   const warning = warningOf(lines, env.titleOf);
   const at = new Date();
   env.activity.saved({ at, text, warning, unlocked });
   env.sync.saved(at.toLocaleTimeString([], { hour12: false }));
   return warning;
-}
-
-/**
- * Submits `intent` through the host, counted in flight while it is out. A landed write is
- * recorded as a save with its warning sentence (D7); one that never got an answer is a
- * problem on the chip until the next attempt at the same target lands or it is discarded.
- */
-export async function write(env: WriteEnv, intent: WriteIntent): Promise<WriteResult> {
-  const { host, skew, sync, titleOf } = env;
-  const failedKey = `failed:${JSON.stringify(intent.target)}`;
-  if (skew.latched) {
-    sync.problem(failedKey, {
-      kind: "failed",
-      message: "Cairn was updated, so this change was not sent. Reload; your unsent edits are kept.",
-      label: undefined,
-      address: undefined,
-      discard: () => {
-        sync.resolve(failedKey);
-      },
-    });
-    return { outcome: "stopped" };
-  }
-  const began = env.activity.begin();
-  const submitted = await sync.track(
-    submit(patchOf(intent), (patch) => host.send(patch, intent.note), {
-      overlaps: host.overlaps,
-      mayRetry: () => !skew.latched,
-    }),
-  );
-  switch (submitted.outcome) {
-    case "landed": {
-      const warning = recordSave(env, describe(intent, titleOf), consequenceLines(submitted.answer), unlockedOf(intent, submitted.answer, began));
-      sync.resolve(failedKey);
-      return { ...submitted, warning };
-    }
-    case "rejected":
-      return submitted;
-    case "failed":
-      sync.problem(failedKey, {
-        kind: "failed",
-        message: unconfirmed(submitted.error),
-        label: undefined,
-        address: undefined,
-        discard: () => {
-          sync.resolve(failedKey);
-        },
-      });
-      return { outcome: "failed", failure: submitted.error };
-  }
 }

@@ -60,6 +60,18 @@ Do as much as necessary and as little as possible. The rules above say how to be
 - **Change by removing first.** Before adding code, state, or UI for a new intent, delete what the new intent makes redundant; then add only what is still missing.
 - **Plain and portable over clever.** Take the plain, portable way until a measurement shows it is too slow; then the clever version lands with that measurement. Clever saves seconds when it works and costs an afternoon when it silently does not, often on a machine its author never tried.
 
+### Frontend state
+
+How `web/app` and `web/client` hold state ([`decisions/2026-10-16-frontend-state-is-machines-for-lifecycles-and-functions-for-the-rest.md`](decisions/2026-10-16-frontend-state-is-machines-for-lifecycles-and-functions-for-the-rest.md)).
+
+- **Machines for lifecycles.** An owned, mutually exclusive workflow mode is an XState v5 machine, a small one too. A workflow mode is a state that decides which async work exists, when it expires, or which events may proceed while work is outstanding: a write, a read, the subscription, a form that is open, a toast.
+- **Pure functions for derived values.** Anything derivable is computed by a pure function and never stored beside its source. The sync chip's display state is `summarize`, a projection, not a machine.
+- **Plain data for payloads.** What a machine carries, and what is kept in storage, is data a person could read, never a snapshot.
+- **One owner per fact.** Others read a fact from its owner and are never pushed a copy. A component reads state through a tagged selector (`writeView` and the like), never by piecing it together from optional context fields, and never copies a snapshot into React state.
+- **Effects belong to the machine.** A timer is a delayed transition, a request an invoked actor, and a busy state does not accept a new start. Cancelling stops the UI waiting for the answer; it never undoes a commit.
+- **Preferences are not machines.** `useAxis` and `useFrame` keep their independent preferences and keyed overrides, with presentation derived from them.
+- **Actors are tested with controlled promises and a `SimulatedClock`**, with wall time injected separately; Playwright covers focus, navigation, reload recovery, multiple tabs and worker wiring.
+
 ### Not adopted
 
 Rules from Tiger Style and the Power of Ten that Cairn does not follow, and why. Work that finds a reason to adopt one raises it.
@@ -136,6 +148,7 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | store connections per process | 16 | Each in-flight request borrows one for its load or commit. |
 | assistant turns in flight per process | 32 | Each turn is an open request waiting on the provider; the provider's rate limit binds well before this. |
 | automatic resubmissions of one patch, per client | 32 | A runaway stop, not a budget; the Rust and browser clients give up at the same point ([`decisions/2026-10-06-what-the-clients-safe-retry-resubmits-and-how-often.md`](decisions/2026-10-06-what-the-clients-safe-retry-resubmits-and-how-often.md)). |
+| automatic resends of a write with no answer | 5, waiting 250 ms, doubling, at most 15 s | Five resends cover about eight seconds of a server that answers nothing; time offline uses none, since each waits for the connection. Past five the person retries by hand ([`decisions/2026-10-16-a-write-is-an-operation-the-edit-manager-owns.md`](decisions/2026-10-16-a-write-is-an-operation-the-edit-manager-owns.md)). |
 | journeys a tab keeps derived after their view closes | 8 | Going back to a recent journey shows it at once; each one holds its derivation in the tab's worker, so the least recently shown beyond this are released. |
 | canvas layouts a tab keeps | 32 views, 4 per view | Toggling a setting back and forth lays out nothing; the least recently laid out beyond this are forgotten and laid out again when shown. |
 | assistant turns a tab keeps per conversation | 50 | The newest turns; a long conversation never grows the tab without bound. |

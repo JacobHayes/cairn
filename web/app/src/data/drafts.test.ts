@@ -4,19 +4,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { draftAt, readDraft, readDrafts, writeDraft } from "./drafts.ts";
+import { memoryStorage } from "./fake.test-support.ts";
 
-/** A session storage over a map: Node has none. */
 function storing(): void {
-  const kept = new Map<string, string>();
-  vi.stubGlobal("sessionStorage", {
-    getItem: (key: string) => kept.get(key) ?? null,
-    setItem: (key: string, value: string) => kept.set(key, value),
-    removeItem: (key: string) => kept.delete(key),
-    get length() {
-      return kept.size;
-    },
-    key: (at: number) => [...kept.keys()][at] ?? null,
-  });
+  vi.stubGlobal("sessionStorage", memoryStorage());
 }
 
 afterEach(() => {

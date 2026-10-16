@@ -8,7 +8,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 
 import type { SaveEvent } from "../data/activity.ts";
-import { useDerivation, useSaves, useSession, useSkew, useStreamStatus, useSync } from "../data/react.ts";
+import { useDerivation, useProblems, useSaves, useSession, useSkew, useStreamStatus, useSync } from "../data/react.ts";
 import { dateWords } from "../timeline/model.ts";
 import { SYNC_SAVED_MS, type Problem, type SyncSummary } from "../data/sync.ts";
 import { Button } from "../ui/kit.tsx";
@@ -43,12 +43,14 @@ const anchorBelow = (dot: HTMLElement): Anchor => {
 
 function NeedsYou({ problems, onGo }: { problems: readonly Problem[]; onGo: () => void }) {
   const navigate = useNavigate();
+  const { edits } = useSession();
+  const skew = useSkew();
   return (
     <section className="sync-section" aria-label="Needs you">
       <h3>Needs you</h3>
       <ul>
-        {problems.map((problem, at) => (
-          <li key={at} className="stack" data-testid="sync-problem" data-kind={problem.kind}>
+        {problems.map((problem) => (
+          <li key={problem.id} className="stack" data-testid="sync-problem" data-kind={problem.kind}>
             <span>
               {problem.label === undefined ? null : <strong>{problem.label}: </strong>}
               {problem.message}
@@ -64,7 +66,22 @@ function NeedsYou({ problems, onGo }: { problems: readonly Problem[]; onGo: () =
                   Go to it
                 </Button>
               )}
-              <Button onClick={problem.discard}>Discard</Button>
+              {problem.retry && !skew ? (
+                <Button
+                  onClick={() => {
+                    edits.send({ type: "retry", id: problem.id });
+                  }}
+                >
+                  Retry
+                </Button>
+              ) : null}
+              <Button
+                onClick={() => {
+                  edits.send({ type: "discard", id: problem.id });
+                }}
+              >
+                Discard
+              </Button>
             </span>
           </li>
         ))}
@@ -93,8 +110,9 @@ function Recent({ saves }: { saves: readonly SaveEvent[] }) {
   );
 }
 
-function Popover({ summary, problems, anchor, onClose }: { summary: SyncSummary; problems: readonly Problem[]; anchor: Anchor; onClose: () => void }) {
+function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: Anchor; onClose: () => void }) {
   const stream = useStreamStatus();
+  const problems = useProblems();
   const saves = useSaves();
   const derivation = useDerivation();
   const skew = useSkew();
@@ -183,7 +201,7 @@ function usePopover() {
 
 export function SyncChip() {
   const session = useSession();
-  const { summary, problems } = useSync();
+  const summary = useSync();
   const derivation = useDerivation();
   const { open, setOpen, setPeek, shown, close, wrap, chip } = usePopover();
   const saved = useSavedAnnouncement();
@@ -231,7 +249,7 @@ export function SyncChip() {
           }
         }}
       />
-      {shown ? <Popover summary={summary} problems={problems} anchor={anchor} onClose={close} /> : null}
+      {shown ? <Popover summary={summary} anchor={anchor} onClose={close} /> : null}
       <span className="visually-hidden" role="status" aria-live="polite">
         {saved === undefined ? null : <span key={saved.id}>{saved.text}</span>}
         {summary.announce === "polite" ? summary.sentence : ""}

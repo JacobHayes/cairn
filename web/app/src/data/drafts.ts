@@ -1,7 +1,8 @@
 // ARCHITECTURE, Web UI: drafts survive a reload. Text being typed and forms not yet sent are
 // kept per tab in session storage, so a reload, a crash, or a version-skew reload loses
-// nothing; anything sent is already committed on the host. Storage that refuses (a private
-// window, a full quota) leaves the draft in memory only.
+// nothing. An edit already sent is no longer a draft: the edit manager keeps its record
+// (edit-manager.ts). Storage that refuses (a private window, a full quota) leaves the draft in
+// memory only.
 import { useCallback, useState } from "react";
 
 const PREFIX = "cairn:draft:";

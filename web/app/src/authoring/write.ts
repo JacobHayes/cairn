@@ -41,8 +41,11 @@ export interface AuthorWrite {
   disabled: boolean;
   /** The last attempt's rejection (the preview's or the host's), until dismissed or a later attempt. */
   failed: { sent: Sent; rejection: Rejection } | undefined;
-  /** The last attempt got no answer (`failed`: it may or may not have been saved) or was not sent (`stopped`: the app was updated), until a later attempt. */
-  unanswered: "failed" | "stopped" | undefined;
+  /**
+   * The last attempt got no answer (`failed`: it may or may not have been saved), was not sent
+   * (`stopped`: the app was updated), or found what it names removed (`gone`), until a later attempt.
+   */
+  unanswered: "failed" | "stopped" | "gone" | undefined;
   dismiss: () => void;
   /** What the last landed write leaves under the form, for a few seconds. */
   receipt: ReceiptState | undefined;
@@ -122,7 +125,7 @@ export function useAuthorWrite(authored: Authored): AuthorWrite {
     setFailed(undefined);
   };
   useProblem(key, failed === undefined ? undefined : unlandedOf(failed.rejection), { discard: dismiss });
-  useEffect(() => () => { session.sync.resolve(key); }, [session, key]);
+  useEffect(() => () => { session.edits.send({ type: "resolve", key }); }, [session, key]);
   const run = async (mutations: Mutation[], places: Place[] = [], base = authored.revision): Promise<boolean> => {
     const sent = { mutations, places };
     setPending(true);
@@ -142,7 +145,7 @@ export function useAuthorWrite(authored: Authored): AuthorWrite {
     });
     setPending(false);
     setFailed(result.outcome === "rejected" ? { sent, rejection: result.rejection } : undefined);
-    setUnanswered(result.outcome === "failed" || result.outcome === "stopped" ? result.outcome : undefined);
+    setUnanswered(result.outcome === "failed" || result.outcome === "stopped" || result.outcome === "gone" ? result.outcome : undefined);
     if (result.outcome === "landed") {
       receipt.show(result.warning);
     }

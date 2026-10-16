@@ -1,20 +1,27 @@
 // The tab's one data layer over either host (ARCHITECTURE, Web UI): the capabilities, the
 // deployment context, the caller, the derived journeys, the tick stream that keeps
-// them current (H6), the version-skew latch, what the tab did (activity), what the sync
-// chip says (sync), and the write path (H5, D7).
-import { Subscription, type Timers } from "@cairn/client";
+// them current (H6), the session root (version skew, and the edit manager that owns every
+// write), what the tab did (activity), what the sync chip says (sync), and the write path
+// (H5, D7).
+import { Subscription, networkFailure, type Timers } from "@cairn/client";
+import { createActor, waitFor, type ActorOptions } from "xstate";
 
-import { Activity, type TitleOf } from "./activity.ts";
+import { Activity, consequenceLines, warningOf, type ConsequenceLine, type TitleOf } from "./activity.ts";
 import { DeploymentStore } from "./deployment-store.ts";
 import { readDrafts, writeDraft } from "./drafts.ts";
+import { inFlightOf, problemsOf } from "./edit-manager.ts";
+import { tabEditStore, type EditStore } from "./edit-record.ts";
 import type { Capabilities, Deriver, Host } from "./host.ts";
 import { JourneyStore } from "./journeys.ts";
-import { SkewLatch } from "./skew.ts";
-import { SyncStatus } from "./sync.ts";
+import { editsOf, sessionRoot, type EditsRef, type SessionRootRef } from "./session-root.ts";
+import { SyncStatus, type EditsReading, type Problem } from "./sync.ts";
 import { ViewerStore } from "./viewer-store.ts";
 import { ROLLOVER_CHECK_MS } from "./today.ts";
-import type { ConsequenceLine } from "./activity.ts";
-import { reasonOf, recordSave, write, type Rejection, type WriteIntent, type WriteResult } from "./writes.ts";
+import { unlockedOf, describe, newPatchId, patchOf, reasonOf, recordSave, type Rejection, type WriteIntent, type WriteResult } from "./writes.ts";
+import { writeView } from "./write-machine.ts";
+
+/** The clock the session root's delays run on. */
+type Clock = NonNullable<ActorOptions<typeof sessionRoot>["clock"]>;
 
 export interface SessionParts {
   host: Host;
@@ -22,6 +29,10 @@ export interface SessionParts {
   timers?: Timers;
   /** The page's clock, for date rollover. */
   now?: () => Date;
+  /** The clock the session root's delays run on (a test passes a simulated one). */
+  clock?: Clock;
+  /** Where the tab keeps its edit records. */
+  store?: EditStore;
 }
 
 /** The page, when there is one: the unit tests run without a window, so no online or offline events. */
@@ -34,13 +45,21 @@ const realTimers: Timers = {
   },
 };
 
+/** The address of the screen now shown, for Go to it. */
+export function currentAddress(): string | undefined {
+  return typeof window === "undefined" ? undefined : `${window.location.pathname}${window.location.search}`;
+}
+
 export class Session {
   readonly host: Host;
   /** The derive worker: projections and drafts over the journeys it holds. */
   readonly deriver: Deriver;
   readonly capabilities: Capabilities;
   readonly subscription: Subscription;
-  readonly skew = new SkewLatch();
+  /** The session root: whether the tab is compatible with the server's build or in version skew, and its edit manager. */
+  readonly root: SessionRootRef;
+  /** The edit manager, the root's child that owns every write. */
+  readonly edits: EditsRef;
   readonly activity = new Activity();
   readonly sync: SyncStatus;
   readonly deployment: DeploymentStore;
@@ -50,9 +69,10 @@ export class Session {
   readonly #now: () => Date;
   #rolloverTimer: unknown;
   readonly #online = {
-    online: () => { this.sync.setOnline(true); },
-    offline: () => { this.sync.setOnline(false); },
+    online: () => { this.sync.setOnline(true); this.root.send({ type: "wake" }); },
+    offline: () => { this.sync.setOnline(false); this.root.send({ type: "wake" }); },
   };
+  readonly #unsubscribe: (() => void)[] = [];
 
   private constructor(parts: SessionParts, capabilities: Capabilities) {
     this.host = parts.host;
@@ -60,20 +80,24 @@ export class Session {
     this.capabilities = capabilities;
     this.#timers = parts.timers ?? realTimers;
     this.#now = parts.now ?? (() => new Date());
-    this.sync = new SyncStatus(this.#timers, () => performance.now(), parts.host.kind === "browser");
     this.subscription = new Subscription(parts.host.openTicks, this.#timers);
+    this.root = this.#startRoot(parts);
+    this.edits = editsOf(this.root);
+    this.sync = new SyncStatus(this.#timers, () => performance.now(), parts.host.kind === "browser", this.#readEdits());
     this.deployment = new DeploymentStore(parts.host, this.subscription);
     this.viewer = new ViewerStore(parts.host, this.deployment);
     this.journeys = new JourneyStore({
       host: parts.host,
       deriver: parts.deriver,
       subscription: this.subscription,
-      skew: this.skew,
+      skew: { skewed: () => this.skewed, latch: () => { this.root.send({ type: "skew" }); } },
       timers: this.#timers,
     });
     this.#scheduleRollover();
     this.#feedSync();
     this.#restoreRejections();
+    // Last: the kept edits start on the running root, and the chip and the stream are already listening.
+    this.root.send({ type: "restore" });
   }
 
   /** Starts a session over `parts.host`: its capabilities and deployment context first. */
@@ -95,13 +119,64 @@ export class Session {
     return recordSave({ activity: this.activity, sync: this.sync, titleOf: this.titleOf }, text, lines);
   }
 
-  /** The shared write path (writes.ts). */
-  write(intent: WriteIntent): Promise<WriteResult> {
-    return write({ host: this.host, skew: this.skew, activity: this.activity, sync: this.sync, titleOf: this.titleOf }, intent);
+  /** Whether the tab is in version skew, which never lifts until a reload. */
+  get skewed(): boolean {
+    return this.root.getSnapshot().matches("skewed");
   }
 
-  /** Stops the stream, the rollover check and the network listeners. */
+  /**
+   * The shared write path for the controls not yet on the edit manager (a later step moves
+   * them): submits `intent` as a write with a fresh patch id and waits until it landed or
+   * needs the person. A write that lost its answer is resent by the manager meanwhile, so a
+   * control stays busy rather than failing at the first silence.
+   */
+  async write(intent: WriteIntent): Promise<WriteResult> {
+    const id = newPatchId();
+    const patch = patchOf(intent, id);
+    const address = currentAddress();
+    this.edits.send({
+      type: "submit",
+      id,
+      command: intent.note === undefined ? { kind: "patch", patch } : { kind: "patch", patch, note: intent.note },
+      about: address === undefined ? { edit: id } : { edit: id, address },
+    });
+    const ref = this.edits.getSnapshot().context.writes[id]?.ref;
+    if (ref === undefined) {
+      return { outcome: "failed", failure: { status: 0, message: "the write was not started" } };
+    }
+    let snapshot;
+    try {
+      snapshot = await waitFor(ref, (each) => each.status === "done" || each.hasTag("needsYou"), { timeout: Infinity });
+    } catch (thrown) {
+      return { outcome: "failed", failure: networkFailure(thrown) };
+    }
+    const view = writeView(snapshot);
+    switch (view.state) {
+      case "landed":
+        return { outcome: "landed", answer: view.answer, resubmitted: view.resubmitted, warning: warningOf(consequenceLines(view.answer), this.titleOf) };
+      case "rejected":
+        // The control shows a rejection and reports it itself.
+        this.edits.send({ type: "discard", id });
+        return { outcome: "rejected", rejection: view.rejection, resubmitted: view.resubmitted };
+      case "gone":
+        return { outcome: "gone" };
+      case "unconfirmed":
+        return { outcome: "failed", failure: view.failure ?? { status: 0, message: "no answer came" } };
+      case "stopped":
+      case "idle":
+      case "sending":
+      case "discarded":
+        return { outcome: "stopped" };
+    }
+  }
+
+  /** Stops the session root and what it owns, the stream, the rollover check and the network listeners. */
   close(): void {
+    for (const stop of this.#unsubscribe.splice(0)) {
+      stop();
+    }
+    this.root.stop();
+    this.sync.close();
     this.subscription.close();
     this.#timers.clear(this.#rolloverTimer);
     for (const [event, listener] of Object.entries(this.#online)) {
@@ -109,20 +184,73 @@ export class Session {
     }
   }
 
+  /** The session root over the host: the edit manager's environment is the session's own stores and the connection. */
+  #startRoot(parts: SessionParts): SessionRootRef {
+    const root = createActor(sessionRoot, {
+      ...(parts.clock === undefined ? {} : { clock: parts.clock }),
+      input: {
+        edits: {
+          store: parts.store ?? tabEditStore(),
+          env: {
+            send: (patch, note) => parts.host.send(patch, note),
+            overlaps: parts.host.overlaps,
+            began: () => this.activity.begin(),
+            saved: (command, answer, began) => {
+              recordSave(this, describe(command.patch, this.titleOf), consequenceLines(answer), unlockedOf(command.patch, answer, began));
+            },
+            connected: () => (page?.navigator.onLine ?? true) && this.subscription.status === "live",
+          },
+          notes: {
+            dropped: (count) => {
+              this.activity.confirm(`${String(count)} unsent ${count === 1 ? "edit" : "edits"} from an earlier version of Cairn could not be kept.`, "problem");
+            },
+            unstored: () => {
+              this.activity.confirm("Your unsent edits are kept only until reload: this tab cannot store them.", "problem");
+            },
+          },
+        },
+      },
+    });
+    root.start();
+    return root;
+  }
+
+  /** What the edit manager says of the writes, for the chip: read from its snapshot, never copied. */
+  #readEdits(): EditsReading {
+    let seen: { snapshot: unknown; skewed: boolean; problems: readonly Problem[] } | undefined;
+    return {
+      problems: () => {
+        const snapshot = this.edits.getSnapshot();
+        const skewed = this.skewed;
+        if (seen?.snapshot !== snapshot || seen.skewed !== skewed) {
+          seen = { snapshot, skewed, problems: problemsOf(snapshot.context.writes, snapshot.context.reported, skewed) };
+        }
+        return seen.problems;
+      },
+      inFlight: () => inFlightOf(this.edits.getSnapshot().context.writes),
+      subscribe: (listener) => {
+        const subscription = this.edits.subscribe(listener);
+        return () => {
+          subscription.unsubscribe();
+        };
+      },
+    };
+  }
+
   /**
    * A rejection kept as a draft survives a reload (ARCHITECTURE, Web UI: drafts), so the chip
    * counts it again before its control is on screen; the control takes it over once it is.
+   * Transitional: the controls that keep their rejection as a draft move onto the edit
+   * manager in the remaining-writes step, which removes this.
    */
   #restoreRejections(): void {
     for (const [key, kept] of readDrafts<{ rejection: Rejection; address?: string }>("rejected:")) {
-      this.sync.problem(key, {
-        kind: kept.rejection.rejection === "stale" ? "conflict" : "rejected",
-        message: reasonOf(kept.rejection),
-        label: undefined,
-        address: kept.address,
+      this.edits.send({
+        type: "report",
+        key,
+        problem: { kind: kept.rejection.rejection === "stale" ? "conflict" : "rejected", message: reasonOf(kept.rejection), label: undefined, address: kept.address },
         discard: () => {
           writeDraft(key, undefined);
-          this.sync.resolve(key);
         },
       });
     }
@@ -133,13 +261,23 @@ export class Session {
     const lag = () => {
       this.sync.setLag(this.journeys.lag, this.journeys.derivation?.revision);
     };
-    this.subscription.onStatus(() => {
-      this.sync.setStream(this.subscription.status);
+    this.#unsubscribe.push(
+      this.subscription.onStatus(() => {
+        this.sync.setStream(this.subscription.status);
+        this.root.send({ type: "wake" });
+      }),
+      this.journeys.subscribe(lag),
+    );
+    let skewed = false;
+    const watching = this.root.subscribe((snapshot) => {
+      if (snapshot.matches("skewed") !== skewed) {
+        skewed = !skewed;
+        this.sync.setSkew(skewed);
+      }
     });
-    this.skew.subscribe(() => {
-      this.sync.setSkew(this.skew.latched);
+    this.#unsubscribe.push(() => {
+      watching.unsubscribe();
     });
-    this.journeys.subscribe(lag);
     for (const [event, listener] of Object.entries(this.#online)) {
       page?.addEventListener(event, listener);
     }

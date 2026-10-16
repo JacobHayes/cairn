@@ -37,6 +37,9 @@ export function pickProblem(dropped: boolean, write: Pick<AuthorWrite, "failed" 
   if (unanswered === "stopped") {
     return "Couldn't add the requirement: Cairn was updated, so the change was not sent. Reload; then try again.";
   }
+  if (unanswered === "gone") {
+    return "Couldn't add the requirement: something it names was removed, so the change cannot be saved.";
+  }
   if (unanswered === "failed") {
     return "Couldn't confirm the requirement was added: no answer came back, so it may have been saved. Check the list before trying again.";
   }

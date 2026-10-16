@@ -3,6 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  backoffDelayMs,
   REOPEN_DELAY_FIRST_MS,
   REOPEN_DELAY_MAX_MS,
   Subscription,
@@ -102,6 +103,12 @@ describe("Subscription", () => {
 });
 
 describe("Subscription after a drop", () => {
+  it("backs off from the first wait, doubling, to the longest, whatever the attempt count", () => {
+    expect([0, 1, 2, 3].map(backoffDelayMs)).toEqual([REOPEN_DELAY_FIRST_MS, 2 * REOPEN_DELAY_FIRST_MS, 4 * REOPEN_DELAY_FIRST_MS, 8 * REOPEN_DELAY_FIRST_MS]);
+    expect(backoffDelayMs(6)).toBe(REOPEN_DELAY_MAX_MS);
+    expect(backoffDelayMs(10_000)).toBe(REOPEN_DELAY_MAX_MS);
+  });
+
   it("reopens a closed stream after a wait that doubles up to the bound", async () => {
     const { opened, open, latest } = transport();
     const { timers, fire } = manualTimers();

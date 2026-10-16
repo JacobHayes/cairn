@@ -3,122 +3,50 @@
 // one meta line (the owner, the one date that matters, the rank when it is on the acting
 // frontier), the flags that are set, and, for an orphaned node, the choice it needs. Where the
 // node came from is not here: it is the Origin section.
-import { useEffect, useState } from "react";
 import { Link } from "react-router";
 
 import { assignOwner } from "../acting/acts.ts";
 import { isStage } from "../canvas/ladder.ts";
-import { useDraft } from "../data/drafts.ts";
-import { unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
-import type { Rejection, WriteResult } from "../data/writes.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { RejectionView } from "../screens/RejectionView.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { flagsOf, isTerminal, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
 import { entityName } from "./sections.tsx";
 import { ownerName } from "./sentence.ts";
+import type { Rename } from "./rename.ts";
 import { dueLine } from "./words.ts";
 import { rebasedOnto, useNodeWrite } from "./write.ts";
 
-interface TitleDraft {
-  text: string;
-  /** The journey revision the author saw when they started editing. */
-  base: number;
-}
-
-/** What renaming the open node needs: its draft, kept across a reload, and the way to start it. */
-export interface Rename {
-  draft: TitleDraft | undefined;
-  start: () => void;
-  change: (text: string) => void;
-  /** Keeps the text and drafts it against `base` instead, after a conflict. */
-  rebase: (base: number) => void;
-  cancel: () => void;
-}
-
-/** The node's rename: a draft (its text and the revision its author saw) in session storage, so a reload keeps it. */
-export function useRename(view: Ready, node: string, title: string): Rename {
-  const journey = view.journey.header.id;
-  const [draft, setDraft] = useDraft<TitleDraft>(`title:${journey}:${node}`);
-  return {
-    draft,
-    start: () => {
-      setDraft({ text: title, base: view.journey.revision });
-    },
-    change: (text) => {
-      if (draft !== undefined) {
-        setDraft({ ...draft, text });
-      }
-    },
-    rebase: (base) => {
-      if (draft !== undefined) {
-        setDraft({ ...draft, base });
-      }
-    },
-    cancel: () => {
-      setDraft(undefined);
-    },
-  };
-}
-
-/** The title as an input: saving sends one `set_node_field` against the revision it was drafted on (H5). */
-function RenameForm({ view, node, title, rename }: { view: Ready; node: string; title: string; rename: Rename }) {
-  const session = useSession();
-  const skew = useSkew();
-  const [rejection, setRejection] = useState<Rejection | undefined>();
-  const [saving, setSaving] = useState(false);
-  const { draft } = rename;
-  const journey = view.journey.header.id;
-  // A rejected rename stays on the sync chip while it is shown here: a conflict, or NOT SAVED.
-  const key = `title:${journey}:${node}`;
-  useProblem(key, rejection === undefined ? undefined : unlandedOf(rejection), { label: title, discard: () => { setRejection(undefined); } });
-  useEffect(() => () => { session.sync.resolve(key); }, [session, key]);
-  if (draft === undefined) {
-    return null;
-  }
-  const save = async () => {
-    setSaving(true);
-    const result: WriteResult = await session.write({
-      target: { journey },
-      baseRevision: draft.base,
-      mutations: [{ op: "set_node_field", node, value: { title: draft.text } }],
-    });
-    setSaving(false);
-    setRejection(result.outcome === "rejected" ? result.rejection : undefined);
-    if (result.outcome === "landed") {
-      rename.cancel();
-    }
-  };
+/** The title as an input: saving sends one `set_node_field` against the revision it was drafted on (H5), and from then on the edit manager owns the write. */
+function RenameForm({ view, title, rename }: { view: Ready; title: string; rename: Rename }) {
+  const { write, text, base, busy } = rename;
   return (
     <div className="stack" data-testid="rename">
       <span className="row">
         <Field
           aria-label={`New title for ${title}`}
-          value={draft.text}
-          disabled={saving}
+          value={text}
+          disabled={busy || write?.state === "gone"}
           onChange={(event) => { rename.change(event.target.value); }}
           onKeyDown={(event) => {
-            if (event.key === "Enter" && draft.text.trim() !== "") {
-              void save();
+            if (event.key === "Enter") {
+              rename.save();
             }
           }}
         />
-        <Button primary disabled={saving || skew || draft.text.trim() === ""} onClick={() => void save()}>
+        <Button primary disabled={!rename.canSave} onClick={rename.save}>
           Save
         </Button>
-        <Button onClick={() => { rename.cancel(); setRejection(undefined); }}>Cancel</Button>
+        {busy ? null : <Button onClick={rename.cancel}>Cancel</Button>}
       </span>
-      {draft.base < view.journey.revision ? <span className="muted small">Editing as of revision {draft.base}; now {view.journey.revision}.</span> : null}
-      {rejection === undefined ? null : (
-        <RejectionView
-          rejection={rejection}
-          onRebase={() => {
-            rename.rebase(rebasedOnto(rejection, journey, view.journey.revision));
-            setRejection(undefined);
-          }}
-        />
+      {base !== undefined && base < view.journey.revision ? <span className="muted small">Editing as of revision {base}; now {view.journey.revision}.</span> : null}
+      {write?.state === "rejected" ? (
+        <RejectionView rejection={write.rejection} onRebase={() => { rename.keep(rebasedOnto(write.rejection, view.journey.header.id, view.journey.revision)); }} />
+      ) : write === undefined ? null : (
+        <WriteStatus view={write} />
       )}
     </div>
   );
@@ -201,7 +129,7 @@ export function Header({ view, detail, position, rename, removeTo }: { view: Rea
           {statusWord(shown, node.kind)}
         </Badge>
       </div>
-      {rename.draft === undefined ? <h2 data-testid="detail-title">{node.title}</h2> : <RenameForm view={view} node={node.key} title={node.title} rename={rename} />}
+      {rename.open ? <RenameForm view={view} title={node.title} rename={rename} /> : <h2 data-testid="detail-title">{node.title}</h2>}
       <Meta view={view} detail={detail} position={position} />
       {flags.length === 0 ? null : (
         <div className="row" data-testid="flags">

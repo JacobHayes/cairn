@@ -124,7 +124,7 @@ describe("a journey's faults", () => {
     host.open();
     edit(host, "j_one", 4);
     await settled();
-    expect(session.skew.latched).toBe(true);
+    expect(session.skewed).toBe(true);
     expect(revisionShown(session, "j_one")).toEqual([3, 1, TODAY]);
     edit(host, "j_one", 5);
     await settled();

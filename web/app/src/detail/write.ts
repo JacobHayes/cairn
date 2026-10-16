@@ -5,7 +5,8 @@
 import { useState } from "react";
 
 import { useDraft } from "../data/drafts.ts";
-import { currentAddress, unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
+import { unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
+import { currentAddress } from "../data/session.ts";
 import type { Rejection } from "../data/writes.ts";
 import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
 import { titleOf, type Mutation, type Ready } from "./model.ts";

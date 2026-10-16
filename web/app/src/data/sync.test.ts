@@ -19,7 +19,7 @@ const quiet: SyncInput = {
   revision: 42,
 };
 
-const problem = (kind: Problem["kind"]): Problem => ({ kind, message: "no", label: "Draft test plan", address: undefined, discard: () => undefined });
+const problem = (kind: Problem["kind"]): Problem => ({ id: "p_a", kind, message: "no", label: "Draft test plan", address: undefined, retry: false });
 const lag = (since: number, failed = false): Lag => ({ journey: "j_one", shown: 42, announced: 43, since, failed });
 
 describe("summarize", () => {
@@ -77,7 +77,28 @@ describe("summarize", () => {
   });
 });
 
+/** An edit manager that says what a test sets, and tells the chip when it changes. */
+function fakeEdits() {
+  const listeners = new Set<() => void>();
+  const state = { problems: [] as readonly Problem[], inFlight: 0 };
+  return {
+    state,
+    reading: {
+      problems: () => state.problems,
+      inFlight: () => state.inFlight,
+      subscribe: (listener: () => void) => {
+        listeners.add(listener);
+        return () => listeners.delete(listener);
+      },
+    },
+    changed: () => {
+      listeners.forEach((listener) => { listener(); });
+    },
+  };
+}
+
 function setup() {
+  const edits = fakeEdits();
   let now = 0;
   const timers = new Map<number, { at: number; callback: () => void }>();
   let next = 0;
@@ -93,6 +114,7 @@ function setup() {
     },
     () => now,
     false,
+    edits.reading,
   );
   const advance = (ms: number) => {
     now += ms;
@@ -103,7 +125,7 @@ function setup() {
       }
     }
   };
-  return { status, advance };
+  return { status, advance, edits };
 }
 
 describe("SyncStatus", () => {
@@ -119,6 +141,28 @@ describe("SyncStatus", () => {
     status.saved("14:02:11");
     expect(status.summary.state).toBe("saved");
     advance(SYNC_SAVED_MS);
+    expect(status.summary.state).toBe("in-sync");
+  });
+
+  it("counts the edit manager's writes in flight as saving, once one has been out for 300ms", () => {
+    const { status, advance, edits } = setup();
+    edits.state.inFlight = 1;
+    edits.changed();
+    expect(status.summary.state).toBe("in-sync");
+    advance(SYNC_SHOW_AFTER_MS);
+    expect(status.summary.state).toBe("saving");
+    edits.state.inFlight = 0;
+    edits.changed();
+    expect(status.summary.state).toBe("in-sync");
+  });
+
+  it("shows what the edit manager says did not land, and stops when it says it did", () => {
+    const { status, edits } = setup();
+    edits.state.problems = [problem("conflict")];
+    edits.changed();
+    expect(status.summary).toMatchObject({ state: "conflict", tone: "act" });
+    edits.state.problems = [];
+    edits.changed();
     expect(status.summary.state).toBe("in-sync");
   });
 });

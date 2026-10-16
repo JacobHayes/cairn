@@ -28,14 +28,13 @@ export function useScreenWrite(): ScreenWrite {
   const skew = useSkew();
   const [pending, setPending] = useState(false);
   const [rejected, setRejected] = useState<Rejection | undefined>();
-  const { sync } = session;
   const key = `screen:${useId()}`;
   const dismiss = () => {
     setRejected(undefined);
   };
   useProblem(key, rejected === undefined ? undefined : unlandedOf(rejected), { discard: dismiss });
   // What this screen's state held goes with it, so the chip does not keep a rejection nobody can see.
-  useEffect(() => () => { sync.resolve(key); }, [sync, key]);
+  useEffect(() => () => { session.edits.send({ type: "resolve", key }); }, [session, key]);
   const receipt = useReceipt();
   const run = async (intent: WriteIntent, onLanded?: (notices: Schema<"Notice">[]) => void): Promise<boolean> => {
     setPending(true);

@@ -34,6 +34,15 @@ export type StreamStatus = "idle" | "connecting" | "live" | "reconnecting";
 export const REOPEN_DELAY_FIRST_MS = 250;
 export const REOPEN_DELAY_MAX_MS = 15_000;
 
+/**
+ * The wait before retry number `attempt` (counted from 0) of anything that backs off: the
+ * first wait, doubling, at most the longest. The stream's reopening, the journeys' refetches
+ * and a write's resends share it, so there is one backoff.
+ */
+export function backoffDelayMs(attempt: number): number {
+  return Math.min(REOPEN_DELAY_FIRST_MS * 2 ** Math.min(attempt, 16), REOPEN_DELAY_MAX_MS);
+}
+
 /** The timer the helper waits with (a test passes its own). */
 export interface Timers {
   set(callback: () => void, ms: number): unknown;
@@ -58,7 +67,7 @@ export class Subscription {
   #watching = "";
   #reopenTimer: unknown;
   #reopenScheduled = false;
-  #delay = REOPEN_DELAY_FIRST_MS;
+  #reopenAttempt = 0;
   status: StreamStatus = "idle";
 
   constructor(open: OpenTicks, timers: Timers = realTimers) {
@@ -178,7 +187,7 @@ export class Subscription {
   }
 
   #opened(): void {
-    this.#delay = REOPEN_DELAY_FIRST_MS;
+    this.#reopenAttempt = 0;
     this.#setStatus("live");
     this.#listeners.forEach((listener) => {
       listener.opened();
@@ -190,8 +199,8 @@ export class Subscription {
     if (!closed) {
       return;
     }
-    const delay = this.#delay;
-    this.#delay = Math.min(this.#delay * 2, REOPEN_DELAY_MAX_MS);
+    const delay = backoffDelayMs(this.#reopenAttempt);
+    this.#reopenAttempt += 1;
     this.#reopenTimer = this.#timers.set(() => {
       this.#reopenTimer = undefined;
       this.#restart(true);

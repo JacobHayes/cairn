@@ -1,13 +1,9 @@
-// The shared write path: H5's safe retry through the host with a fresh patch id, D7's
-// consequences recorded as a save with its warning, what the sync chip says about a write
-// that did not land, and nothing sent under version skew.
+// What a write is made of: H5's patch with a fresh id, and D7's consequences recorded as a save
+// with its warning. The delivery is write-machine.test.ts's.
 import { describe, expect, it } from "vitest";
 
-import { Activity, consequenceLines, warningOf } from "./activity.ts";
-import { FakeHost } from "./fake.test-support.ts";
-import { SkewLatch } from "./skew.ts";
-import { SyncStatus } from "./sync.ts";
-import { newPatchId, patchOf, unlockedOf, write, type WriteEnv, type WriteIntent } from "./writes.ts";
+import { consequenceLines, warningOf } from "./activity.ts";
+import { newPatchId, patchOf, unlockedOf, type WriteIntent } from "./writes.ts";
 
 const intent: WriteIntent = {
   target: { journey: "j_one" },
@@ -19,13 +15,8 @@ const receipt = { patch_id: "p_x", domain: { journey: "j_one" }, content_hash: "
 
 const titles: Record<string, string> = { n_a: "Draft the plan", n_b: "Kickoff" };
 
-function envOf(host: FakeHost, skew = new SkewLatch()): WriteEnv {
-  const timers = { set: () => 0, clear: () => undefined };
-  return { host, skew, activity: new Activity(), sync: new SyncStatus(timers, () => 0, false), titleOf: (_journey, node) => titles[node] ?? node };
-}
-
-describe("write", () => {
-  it("sends a patch drafted against the revision its author saw, with a fresh id", () => {
+describe("patchOf", () => {
+  it("drafts a patch against the revision its author saw, with a fresh id", () => {
     const patch = patchOf(intent);
     expect(patch).toMatchObject({ target: { journey: "j_one" }, base_revision: 3, mutations: intent.mutations });
     expect(patch).not.toHaveProperty("deployment_revision");
@@ -34,46 +25,6 @@ describe("write", () => {
     expect(newPatchId()).not.toBe(newPatchId());
     expect(patchOf({ ...intent, deploymentRevision: 2 })).toMatchObject({ deployment_revision: 2 });
   });
-
-  it("retries a safe stale answer on the reported revision, lands, and records the save with its warning", async () => {
-    const host = new FakeHost();
-    const env = envOf(host);
-    const conflicts = [{ of: { domain: { journey: "j_one" } }, expected: 3, current: 5 }];
-    host.answers = [
-      { outcome: "rejected", rejection: { rejection: "stale", conflicts, intervening: [] } },
-      { outcome: "answered", answer: { outcome: "applied", receipt, consequences: { j_one: { overdue: ["n_b"] } } } },
-    ];
-    const result = await write(env, intent);
-    expect(result).toMatchObject({ outcome: "landed", resubmitted: 1, warning: "Kickoff is now overdue." });
-    expect(host.sent.map((patch) => patch.base_revision)).toEqual([3, 5]);
-    expect(new Set(host.sent.map((patch) => patch.id)).size).toBe(1);
-    expect(env.activity.saves.map(({ text, warning }) => ({ text, warning }))).toEqual([{ text: "Edited Draft the plan", warning: "Kickoff is now overdue." }]);
-    expect(env.sync.summary.state).toBe("saved");
-  });
-
-  it("sends nothing once the tab is in version skew, and the chip says the edit was not sent", async () => {
-    const host = new FakeHost();
-    const skew = new SkewLatch();
-    skew.latch();
-    const env = envOf(host, skew);
-    expect(await write(env, intent)).toEqual({ outcome: "stopped" });
-    expect(host.sent).toEqual([]);
-    expect(env.sync.summary.state).toBe("not-saved");
-    expect(env.sync.problems.map((each) => each.message)).toEqual([expect.stringContaining("Reload")]);
-  });
-
-  it("keeps a write that got no answer on the chip until the next one to that target lands", async () => {
-    const host = new FakeHost();
-    const env = envOf(host);
-    host.answers = [{ outcome: "failed", error: { status: 503, message: "busy" } }];
-    expect(await write(env, intent)).toEqual({ outcome: "failed", failure: { status: 503, message: "busy" } });
-    expect(env.sync.summary).toMatchObject({ state: "not-saved", tone: "act" });
-    expect(env.sync.problems.map((problem) => problem.message)).toEqual(["Could not confirm the save: busy"]);
-    host.answers = [{ outcome: "answered", answer: { outcome: "applied", receipt, consequences: {} } }];
-    await write(env, intent);
-    expect(env.sync.problems).toEqual([]);
-  });
-
 });
 
 describe("unlockedOf (D7)", () => {

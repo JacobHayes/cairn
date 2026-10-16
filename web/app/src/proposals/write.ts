@@ -41,9 +41,9 @@ export function useProposalWrite(): ProposalWrite {
     setProblem(undefined);
   };
   const report = useProblem(key, problem === undefined ? undefined : "rejection" in problem ? unlandedOf(problem.rejection) : { kind: "failed", message: unconfirmed(problem.failure) }, { discard: dismiss });
-  useEffect(() => () => { session.sync.resolve(key); }, [session, key]);
+  useEffect(() => () => { session.edits.send({ type: "resolve", key }); }, [session, key]);
   const run = async <A>(call: (proposals: ProposalHost, patchId: string) => Promise<ProposalWritten<A>>, patchId: string = newPatchId()): Promise<A | undefined> => {
-    if (skew || session.skew.latched) {
+    if (skew || session.skewed) {
       return undefined;
     }
     setPending(true);

@@ -1,13 +1,16 @@
 // The data layer as React hooks: every screen reads through these, never the host directly.
 import type { StreamStatus } from "@cairn/client";
+import { useSelector } from "@xstate/react";
 import { createContext, useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 
 import type { Capabilities, Deployment, Viewer } from "./host.ts";
 import type { Derivation, JourneyView } from "./journeys.ts";
 import { LiveRead, type LiveSpec, type LiveView } from "./live.ts";
 import type { SaveEvent, Toast } from "./activity.ts";
-import type { Session } from "./session.ts";
+import { problemsOf, writeOf } from "./edit-manager.ts";
+import { currentAddress, type Session } from "./session.ts";
 import type { Problem, SyncSummary } from "./sync.ts";
+import { writeView, type WriteView } from "./write-machine.ts";
 import { reasonOf, type Rejection } from "./writes.ts";
 
 export const SessionContext = createContext<Session | undefined>(undefined);
@@ -56,8 +59,7 @@ export function useDeployment(): Deployment | undefined {
 
 /** Whether the tab is in version skew. */
 export function useSkew(): boolean {
-  const { skew } = useSession();
-  return useSyncExternalStore(skew.subscribe, () => skew.latched);
+  return useSelector(useSession().root, (snapshot) => snapshot.matches("skewed"));
 }
 
 /** This tab's last saves, newest first. */
@@ -73,11 +75,29 @@ export function useToast(): Toast | undefined {
 }
 
 /** What the sync chip says (design 9). */
-export function useSync(): { summary: SyncSummary; problems: readonly Problem[] } {
+export function useSync(): SyncSummary {
   const { sync } = useSession();
-  const summary = useSyncExternalStore(sync.subscribe, () => sync.summary);
-  const problems = useSyncExternalStore(sync.subscribe, () => sync.problems);
-  return { summary, problems };
+  return useSyncExternalStore(sync.subscribe, () => sync.summary);
+}
+
+/** The writes that did not land, as the edit manager holds them (the chip's Needs you). */
+export function useProblems(): readonly Problem[] {
+  const { edits } = useSession();
+  const skewed = useSkew();
+  const writes = useSelector(edits, (snapshot) => snapshot.context.writes);
+  const reported = useSelector(edits, (snapshot) => snapshot.context.reported);
+  return useMemo(() => problemsOf(writes, reported, skewed), [writes, reported, skewed]);
+}
+
+/** The write of `edit`, if the edit manager holds one: kept across the control that sent it going away. */
+export function useWriteOf(edit: string): WriteView | undefined {
+  const { edits } = useSession();
+  const snapshot = useSelector(edits, (held) => writeOf(held.context.writes, edit)?.snapshot);
+  return useMemo(() => {
+    const view = snapshot === undefined ? undefined : writeView(snapshot);
+    // A landed or discarded write is on its way out of the manager; a control has nothing to show of it.
+    return view?.state === "landed" || view?.state === "discarded" ? undefined : view;
+  }, [snapshot]);
 }
 
 /** A write that did not land, as the chip counts it. */
@@ -93,11 +113,6 @@ export function unlandedOf(rejection: Rejection, address?: string): Unlanded {
   return { kind: rejection.rejection === "stale" ? "conflict" : "rejected", message: reasonOf(rejection), address };
 }
 
-/** The address of the screen now shown, for Go to it. */
-export function currentAddress(): string | undefined {
-  return typeof window === "undefined" ? undefined : `${window.location.pathname}${window.location.search}`;
-}
-
 /**
  * Keeps a control's unlanded write on the sync chip while it stands, under `key`: it counts
  * as NOT SAVED (CONFLICT when stale) and is listed in the popover with Go to it, which returns
@@ -110,24 +125,20 @@ export function useProblem(
   unlanded: Unlanded | undefined,
   about: { label?: string | undefined; discard: () => void },
 ): (settled: Unlanded | undefined) => void {
-  const { sync } = useSession();
+  const { edits } = useSession();
   const { label, discard } = about;
   const report = (settled: Unlanded | undefined) => {
     if (settled === undefined) {
-      sync.resolve(key);
+      edits.send({ type: "resolve", key });
       return;
     }
-    // Discard drops the control's state and the chip's entry, whether or not the control is still mounted.
-    const drop = () => {
-      discard();
-      sync.resolve(key);
-    };
-    sync.problem(key, { kind: settled.kind, message: settled.message, label, address: settled.address ?? currentAddress(), discard: drop });
+    // The manager runs the control's own discard, then drops the entry, whether or not the control is still mounted.
+    edits.send({ type: "report", key, problem: { kind: settled.kind, message: settled.message, label, address: settled.address ?? currentAddress() }, discard });
   };
   useEffect(() => {
     report(unlanded);
     // What the chip says changes with the problem, not with the callbacks.
-  }, [sync, key, unlanded?.kind, unlanded?.message, unlanded?.address]);
+  }, [edits, key, unlanded?.kind, unlanded?.message, unlanded?.address]);
   return report;
 }
 

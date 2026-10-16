@@ -34,10 +34,10 @@ function useImport(onImported: ImportedHandler | undefined) {
     outcome.status === "idle" ? undefined : outcome.status === "rejected" ? unlandedOf(outcome.rejection) : { kind: "failed", message: `The file could not be imported: ${outcome.message}` },
     { discard: dismiss },
   );
-  useEffect(() => () => { session.sync.resolve(key); }, [session, key]);
+  useEffect(() => () => { session.edits.send({ type: "resolve", key }); }, [session, key]);
   const send = async (file: RouteFile) => {
     // ARCHITECTURE, Web UI: version skew. A file read while the tab latched skew is not sent.
-    if (session.skew.latched) {
+    if (session.skewed) {
       return;
     }
     setPending(true);

@@ -6,8 +6,7 @@
 // deployment's zone. A document from another engine (`Skewed`) latches the tab into skew
 // instead of being derived. Revisions only move forward: an older document is never shown.
 import {
-  REOPEN_DELAY_FIRST_MS,
-  REOPEN_DELAY_MAX_MS,
+  backoffDelayMs,
   Tracker,
   type RevisionOf,
   type Schema,
@@ -19,7 +18,7 @@ import type { DerivationKey, Derived } from "@cairn/wasm";
 
 import { Emitter } from "./emitter.ts";
 import { Missing, Skewed, type Deriver, type DomainDocument, type Host } from "./host.ts";
-import type { SkewLatch } from "./skew.ts";
+import type { Skew } from "./session-root.ts";
 import { todayIn } from "./today.ts";
 
 export type Journey = Schema<"Journey">;
@@ -66,7 +65,8 @@ interface Entry {
   running: boolean;
   mounted: number;
   used: number;
-  retryDelay: number;
+  /** Failed fetches in a row, which the wait before the next retry grows with. */
+  retries: number;
   retryTimer: unknown;
   /** When (monotonic ms) a newer revision than the one held was first announced, while the view still shows the older. */
   behindSince: number | undefined;
@@ -94,7 +94,7 @@ export interface JourneyStoreParts {
   host: Host;
   deriver: Deriver;
   subscription: Subscription;
-  skew: SkewLatch;
+  skew: Skew;
   timers: Timers;
 }
 
@@ -233,7 +233,7 @@ export class JourneyStore extends Emitter {
         running: false,
         mounted: 0,
         used: 0,
-        retryDelay: REOPEN_DELAY_FIRST_MS,
+        retries: 0,
         retryTimer: undefined,
         behindSince: undefined,
         failed: false,
@@ -292,7 +292,7 @@ export class JourneyStore extends Emitter {
   /** Fetches until the view holds what was asked for, one fetch at a time per journey. */
   async #run(entry: Entry): Promise<void> {
     entry.running = true;
-    while (entry.dirty && !this.#parts.skew.latched && this.#holds(entry)) {
+    while (entry.dirty && !this.#parts.skew.skewed() && this.#holds(entry)) {
       entry.dirty = false;
       if (satisfied(this.#tracker.held(journeyOf(entry.id)), entry.held, entry.want)) {
         continue;
@@ -300,7 +300,7 @@ export class JourneyStore extends Emitter {
       try {
         await this.#fetch(entry);
         entry.want.today = undefined;
-        entry.retryDelay = REOPEN_DELAY_FIRST_MS;
+        entry.retries = 0;
       } catch (thrown) {
         this.#failed(entry, thrown);
       }
@@ -353,8 +353,8 @@ export class JourneyStore extends Emitter {
     if (entry.view.status !== "ready") {
       this.#show(entry, { status: "failed", message: thrown instanceof Error ? thrown.message : String(thrown) });
     }
-    const delay = entry.retryDelay;
-    entry.retryDelay = Math.min(delay * 2, REOPEN_DELAY_MAX_MS);
+    const delay = backoffDelayMs(entry.retries);
+    entry.retries += 1;
     this.#parts.timers.clear(entry.retryTimer);
     entry.retryTimer = this.#parts.timers.set(() => {
       this.#request(entry, {});

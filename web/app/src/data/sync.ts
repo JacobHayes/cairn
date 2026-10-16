@@ -2,7 +2,8 @@
 // view shows against the one the stream announced, version skew, writes in flight, the
 // writes that did not land, and whether the network is up. `summarize` is the pure rule
 // (precedence, words, colour); `SyncStatus` collects the inputs and wakes up when a time
-// threshold (no flicker under 300ms, behind after 5s, saved for 2s) passes.
+// threshold (no flicker under 300ms, behind after 5s, saved for 2s) passes. What did not
+// land, and the writes in flight, are read from the edit manager, which owns them.
 import type { StreamStatus, Timers } from "@cairn/client";
 
 import { Emitter } from "./emitter.ts";
@@ -34,8 +35,10 @@ export type SyncState =
  */
 export type SyncTone = "good" | "working" | "wait" | "act" | "hollow";
 
-/** A write that did not land, until it is resolved or discarded. */
+/** A write that did not land, until it is resolved or discarded (an event sent to its owner, the edit manager). */
 export interface Problem {
+  /** What Discard and Retry name: the write's operation id. */
+  id: string;
   kind: "conflict" | "rejected" | "failed";
   /** What the reason is, in a sentence. */
   message: string;
@@ -43,8 +46,8 @@ export interface Problem {
   label: string | undefined;
   /** The screen it happened on, for Go to it (its rejected control is still there). */
   address: string | undefined;
-  /** Drops it: the control's own dismiss. */
-  discard: () => void;
+  /** Whether Retry is offered: the write may be sent again by hand. */
+  retry: boolean;
 }
 
 /** Everything the rule reads. */
@@ -64,8 +67,18 @@ export interface SyncInput {
   revision: number | undefined;
 }
 
-/** What `SyncStatus` is told, as opposed to what it keeps (the problems) or reads off the clock (now). */
-type Reported = Omit<SyncInput, "now" | "problems">;
+/** What the edit manager says of the writes: the chip reads it, and is never told a copy. */
+export interface EditsReading {
+  /** The writes that did not land, in the order they were sent. */
+  problems(): readonly Problem[];
+  /** The writes out or being resent, which the chip counts as saving. */
+  inFlight(): number;
+  /** Hears every change of the manager until the returned function is called. */
+  subscribe(listener: () => void): () => void;
+}
+
+/** What `SyncStatus` is told, as opposed to what it reads (the edits, the tracked work) or reads off the clock (now). */
+type Reported = Omit<SyncInput, "now" | "problems" | "inFlight" | "inFlightSince">;
 
 export interface SyncSummary {
   state: SyncState;
@@ -133,29 +146,42 @@ export function summarize(input: SyncInput): SyncSummary {
 export class SyncStatus extends Emitter {
   readonly #timers: Timers;
   readonly #clock: () => number;
-  readonly #problems = new Map<string, Problem>();
+  readonly #edits: EditsReading;
   #input: Reported;
+  /** Work counted by `track`: the writes that are not edits yet (proposals, an import). */
+  #tracked = 0;
+  /** When (monotonic ms) the work in flight, tracked or an edit, first became more than none. */
+  #since: number | undefined;
   #wake: unknown;
   #snapshot: SyncSummary;
-  #problemList: readonly Problem[] = [];
+  readonly #unsubscribe: () => void;
 
   /** `clock` is monotonic milliseconds (the page's `Date` may be held still by a test). */
-  constructor(timers: Timers, clock: () => number, demo: boolean) {
+  constructor(timers: Timers, clock: () => number, demo: boolean, edits: EditsReading) {
     super();
     this.#timers = timers;
     this.#clock = clock;
+    this.#edits = edits;
     this.#input = {
       stream: "idle",
       online: true,
       demo,
       skew: false,
-      inFlight: 0,
-      inFlightSince: undefined,
       lag: undefined,
       saved: undefined,
       revision: undefined,
     };
     this.#snapshot = this.#compute();
+    this.#unsubscribe = edits.subscribe(() => {
+      this.#refresh();
+    });
+  }
+
+  /** Stops listening to the edits. */
+  close(): void {
+    this.#unsubscribe();
+    this.#timers.clear(this.#wake);
+    this.#wake = undefined;
   }
 
   /** The chip's state now. A new object only when it changed, so React re-renders only then. */
@@ -163,37 +189,21 @@ export class SyncStatus extends Emitter {
     return this.#snapshot;
   }
 
-  /** The writes that did not land, in the order they happened. */
-  get problems(): readonly Problem[] {
-    return this.#problemList;
-  }
-
-  /** Counts the write `work` as in flight until it settles. */
+  /** Counts the work `work` as in flight until it settles. Transitional: proposals and the import move onto the edit manager in the remaining-writes step, which removes this. */
   async track<T>(work: Promise<T>): Promise<T> {
-    this.#update({ inFlight: this.#input.inFlight + 1, inFlightSince: this.#input.inFlight === 0 ? this.#clock() : this.#input.inFlightSince });
+    this.#tracked += 1;
+    this.#refresh();
     try {
       return await work;
     } finally {
-      const inFlight = this.#input.inFlight - 1;
-      this.#update({ inFlight, inFlightSince: inFlight === 0 ? undefined : this.#input.inFlightSince });
+      this.#tracked -= 1;
+      this.#refresh();
     }
   }
 
   /** A save landed. */
   saved(time: string): void {
     this.#update({ saved: { at: this.#clock(), time } });
-  }
-
-  /** Keeps `problem` under `key` until it is resolved: a later attempt for the same control replaces it. */
-  problem(key: string, problem: Problem): void {
-    this.#problems.set(key, problem);
-    this.#changed();
-  }
-
-  resolve(key: string): void {
-    if (this.#problems.delete(key)) {
-      this.#changed();
-    }
   }
 
   setStream(stream: StreamStatus): void {
@@ -212,21 +222,15 @@ export class SyncStatus extends Emitter {
     this.#update({ online });
   }
 
-  /** The list of problems changed, which the chip's own words may not show (a second rejection under a conflict). */
-  #changed(): void {
-    this.#problemList = [...this.#problems.values()];
-    this.#snapshot = this.#compute();
-    this.emit();
-    this.#refresh();
-  }
-
   #update(next: Partial<Reported>): void {
     this.#input = { ...this.#input, ...next };
     this.#refresh();
   }
 
   #compute(): SyncSummary {
-    return summarize({ ...this.#input, now: this.#clock(), problems: this.#problemList });
+    const inFlight = this.#tracked + this.#edits.inFlight();
+    this.#since = inFlight === 0 ? undefined : (this.#since ?? this.#clock());
+    return summarize({ ...this.#input, now: this.#clock(), problems: this.#edits.problems(), inFlight, inFlightSince: this.#since });
   }
 
   /** Recomputes, tells listeners if the chip changed, and sleeps until the next threshold. */
@@ -240,7 +244,8 @@ export class SyncStatus extends Emitter {
     this.#timers.clear(this.#wake);
     this.#wake = undefined;
     const now = this.#clock();
-    const { inFlightSince, lag, saved } = this.#input;
+    const { lag, saved } = this.#input;
+    const inFlightSince = this.#since;
     const due = [
       inFlightSince === undefined ? undefined : inFlightSince + SYNC_SHOW_AFTER_MS,
       lag === undefined ? undefined : lag.since + SYNC_SHOW_AFTER_MS,

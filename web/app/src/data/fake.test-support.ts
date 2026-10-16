@@ -1,12 +1,14 @@
 // A host and a deriver for the data layer's unit tests: journeys held in memory at the
 // revisions a test sets, documents that count their fetches, and a tick stream the test
 // drives by hand. Shapes are the API's, cut to what the data layer reads.
-import type { Answered, HttpFailure, Patch, Tick, TickHandlers, Timers } from "@cairn/client";
+import type { Answered, HttpFailure, Patch, PatchAnswer, Tick, TickHandlers, Timers } from "@cairn/client";
 import type { DerivationKey, Derived } from "@cairn/wasm";
 
 import type { AssistantHost } from "./assistant.ts";
+import type { Command } from "./edit-record.ts";
 import type { ProposalHost } from "./proposals.ts";
 import { Missing, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type RouteFile, type Viewer } from "./host.ts";
+import type { WriteEnv } from "./write-machine.ts";
 
 export interface FakeJourney {
   revision: number;
@@ -21,8 +23,8 @@ export class FakeHost implements Host {
   readonly journeysHeld = new Map<string, FakeJourney>();
   readonly fetches = new Map<string, number>();
   deploymentRevision = 1;
-  /** The answers `send` gives, in turn. */
-  answers: Answered<HttpFailure>[] = [];
+  /** The answers `send` gives, in turn; a promise holds the answer until the test settles it. */
+  answers: (Answered<HttpFailure> | Promise<Answered<HttpFailure>>)[] = [];
   readonly sent: Patch[] = [];
   /** The streams opened, the latest last. */
   readonly streams: { watching: string[]; handlers: TickHandlers }[] = [];
@@ -235,4 +237,55 @@ export async function settled(): Promise<void> {
       setTimeout(resolve, 0);
     });
   }
+}
+
+/** A promise the test settles by hand. */
+export function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void; reject: (reason: unknown) => void } {
+  let resolve: (value: T) => void = () => undefined;
+  let reject: (reason: unknown) => void = () => undefined;
+  const promise = new Promise<T>((done, fail) => {
+    resolve = done;
+    reject = fail;
+  });
+  return { promise, resolve, reject };
+}
+
+/** A session storage over a map: Node has none. */
+export function memoryStorage(): Storage {
+  const kept = new Map<string, string>();
+  return {
+    getItem: (key) => kept.get(key) ?? null,
+    setItem: (key, value) => {
+      kept.set(key, value);
+    },
+    removeItem: (key) => {
+      kept.delete(key);
+    },
+    clear: () => {
+      kept.clear();
+    },
+    get length() {
+      return kept.size;
+    },
+    key: (at) => [...kept.keys()][at] ?? null,
+  };
+}
+
+/** What a write reads, over `host`: the connection and the build can be switched, and the saves are logged. */
+export function writeEnv(host: FakeHost) {
+  const switches = { connected: true, compatible: true };
+  const saves: { command: Command; answer: PatchAnswer; began: number }[] = [];
+  let began = 0;
+  // What the session root supplies is the build check; a write alone is given it here.
+  const parts: Omit<WriteEnv, "compatible"> = {
+    send: (patch) => host.send(patch),
+    overlaps: host.overlaps,
+    began: () => ++began,
+    saved: (command, answer, at) => {
+      saves.push({ command, answer, began: at });
+    },
+    connected: () => switches.connected,
+  };
+  const env: WriteEnv = { ...parts, compatible: () => switches.compatible };
+  return { env, parts, switches, saves };
 }

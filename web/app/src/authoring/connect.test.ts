@@ -13,16 +13,17 @@ describe("pickProblem", () => {
     expect(pickProblem(true, { failed: { sent, rejection: { rejection: "invalid", violations: [] } as unknown as Rejection }, unanswered: undefined })).toBeUndefined();
   });
 
-  it("tells a rejection, an unconfirmed write and a stopped write apart", () => {
-    const [rejected, unconfirmed, stopped, other] = [
+  it("tells a rejection, an unconfirmed write, a stopped write and a removed subject apart", () => {
+    const [rejected, unconfirmed, stopped, gone, other] = [
       pickProblem(true, stale),
       pickProblem(true, { failed: undefined, unanswered: "failed" }),
       pickProblem(true, { failed: undefined, unanswered: "stopped" }),
+      pickProblem(true, { failed: undefined, unanswered: "gone" }),
       pickProblem(true, { failed: undefined, unanswered: undefined }),
     ];
     expect(rejected).toContain("changed this");
     expect(unconfirmed).toContain("may have been saved");
     expect(stopped).toContain("Reload");
-    expect(new Set([rejected, unconfirmed, stopped, other]).size).toBe(4);
+    expect(new Set([rejected, unconfirmed, stopped, gone, other]).size).toBe(5);
   });
 });
