@@ -4,11 +4,47 @@
 import type { Schema } from "@cairn/client";
 
 import { dateWords, dayOf } from "../timeline/model.ts";
+import type { FormCase } from "./actions-form.ts";
 import type { NodeKind } from "./model.ts";
 
 type ChoiceEffect = Schema<"ChoiceEffect">;
 type Consequences = Schema<"Consequences">;
 type Condition = Schema<"ConditionResolved">;
+
+/** What a guard waits on, in words: the thing a bypass passes the node without. */
+export function guardWords(guard: Schema<"Guard">): string {
+  switch (guard) {
+    case "deps_done":
+      return "what it waits on";
+    case "has_artifact":
+      return "a link";
+    case "has_note":
+      return "a note";
+    case "broken_down":
+      return "a breakdown";
+  }
+}
+
+/** What a form's write did, as the first words of a block that keeps what was typed after it: "Skipped.", "Marked done.". */
+export function keptWords(kind: FormCase, node: NodeKind): string {
+  switch (kind) {
+    case "skip":
+      return "Skipped.";
+    case "keep":
+      return "Kept.";
+    case "include":
+      return "Included.";
+    case "bypass":
+    case "evidence":
+      return node === "milestone" ? "Marked reached." : "Marked done.";
+    case "anyway":
+      return "Answered.";
+    case "snooze":
+      return "Snoozed.";
+    case "edit-date":
+      return "Date saved.";
+  }
+}
 
 /** "1 node", "3 nodes". */
 export function plural(count: number, one: string, many = `${one}s`): string {

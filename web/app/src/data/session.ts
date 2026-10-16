@@ -7,7 +7,6 @@ import { networkFailure, streamStatus } from "@cairn/client";
 import { createActor, waitFor, type ActorOptions, type Subscription } from "xstate";
 
 import { Activity, consequenceLines, warningOf, type ConsequenceLine, type TitleOf } from "./activity.ts";
-import { readDrafts, writeDraft } from "./drafts.ts";
 import { inFlightOf, problemsOf } from "./edit-manager.ts";
 import { tabEditStore, type EditStore } from "./edit-record.ts";
 import type { Capabilities, Deriver, Host } from "./host.ts";
@@ -15,7 +14,7 @@ import { derivationOf, journeyView, lagOf, type JourneysRef } from "./journeys.t
 import { readLag, settledRead, worstLag, type ReadEnv, type ReadRef } from "./keyed-read.ts";
 import { deploymentOf, editsOf, journeysOf, readEnvOf, sessionRoot, subscriptionOf, viewerOf, type EditsRef, type SessionRootRef, type SubscriptionRef } from "./session-root.ts";
 import { SyncStatus, realTimers, type EditsReading, type Problem, type Timers } from "./sync.ts";
-import { unlockedOf, describe, newPatchId, patchOf, reasonOf, recordSave, type Rejection, type WriteIntent, type WriteResult } from "./writes.ts";
+import { unlockedOf, describe, newPatchId, patchOf, recordSave, type WriteIntent, type WriteResult } from "./writes.ts";
 import { writeView } from "./write-machine.ts";
 
 /** The clock the session root's delays run on. */
@@ -88,7 +87,6 @@ export class Session {
     this.readEnv = readEnvOf(this.root, this.#monotonic);
     this.sync = new SyncStatus(this.#timers, this.#monotonic, parts.host.kind === "browser", this.#readEdits());
     this.#feedSync();
-    this.#restoreRejections();
     // Last: the kept edits start on the running root, and the chip and the stream are already listening.
     this.root.send({ type: "restore" });
   }
@@ -231,25 +229,6 @@ export class Session {
         };
       },
     };
-  }
-
-  /**
-   * A rejection kept as a draft survives a reload (ARCHITECTURE, Web UI: drafts), so the chip
-   * counts it again before its control is on screen; the control takes it over once it is.
-   * Transitional: the controls that keep their rejection as a draft move onto the edit
-   * manager in the remaining-writes step, which removes this.
-   */
-  #restoreRejections(): void {
-    for (const [key, kept] of readDrafts<{ rejection: Rejection; address?: string }>("rejected:")) {
-      this.edits.send({
-        type: "report",
-        key,
-        problem: { kind: kept.rejection.rejection === "stale" ? "conflict" : "rejected", message: reasonOf(kept.rejection), label: undefined, address: kept.address },
-        discard: () => {
-          writeDraft(key, undefined);
-        },
-      });
-    }
   }
 
   /**

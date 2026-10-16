@@ -5,12 +5,16 @@
 import type { Schema } from "@cairn/client";
 
 import { useDraft } from "../data/drafts.ts";
+import type { OperationId } from "../data/edit-record.ts";
+import { newPatchId } from "../data/writes.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { titleOf, type Mutation, type Ready } from "./model.ts";
 import { ShortfallView } from "./ShortfallView.tsx";
-import { rebasedOnto, type Attempt, type NodeWrite, type Seen } from "./write.ts";
+import { guardWords } from "./words.ts";
+import { rebasedOnto, type Attempt, type Failed, type NodeWrite, type Seen } from "./write.ts";
 
 type Violation = Schema<"Violation">;
 type Guard = Schema<"Guard">;
@@ -20,19 +24,26 @@ interface Resolving {
   write: NodeWrite;
   /** Called once a retry of the rejected edit lands: the form that drafted it closes. */
   onResolved?: (() => void) | undefined;
+  /** Called when a retry is sent in the place of the rejected write `from`: the form that drafted it follows the new write `id`. */
+  onResent?: ((from: OperationId, id: OperationId) => void) | undefined;
 }
 
 /**
  * Sends the rejected edit again, changed, and reports when it lands. It keeps the revision
  * the author drafted against, so a change someone made meanwhile to what it touches is shown
- * as a conflict (H5), never overwritten.
+ * as a conflict (H5), never overwritten. Only a landing resolves it: another rejection leaves
+ * the form that drafted it open.
  */
-function retry(write: NodeWrite, mutations: Mutation[], seen: Seen, onResolved: (() => void) | undefined): void {
-  void write.run(mutations, seen).then((landed) => {
+function retry(write: NodeWrite, failed: Failed, mutations: Mutation[], seen: Seen, { onResolved, onResent }: Pick<Resolving, "onResolved" | "onResent">): void {
+  const id = newPatchId();
+  void write.run(mutations, seen, id).then((landed) => {
     if (landed) {
       onResolved?.();
     }
   });
+  if (write.holds(id)) {
+    onResent?.(failed.id, id);
+  }
 }
 
 /** F5: the rejected patch with one resolution move after it: the edit kept, the chain given its days. */
@@ -69,7 +80,7 @@ export function bypassable(violations: Violation[]): { node: string; guards: Gua
 }
 
 /** F5: the contradictory chains a rejection lists, each with its moves, any one sent with the edit. */
-export function DateConflictResolver({ view, write, violations, onResolved }: Resolving & { violations: Violation[] }) {
+export function DateConflictResolver({ view, write, violations, onResolved, onResent }: Resolving & { violations: Violation[] }) {
   const { failed } = write;
   const chains = violations.flatMap((violation) => violation.chains?.chains ?? []);
   if (failed === undefined || chains.length === 0) {
@@ -85,7 +96,7 @@ export function DateConflictResolver({ view, write, violations, onResolved }: Re
           view={view}
           short={short}
           disabled={write.disabled}
-          onMove={(move) => { retry(write, withMove(failed.attempt, move), failed.attempt, onResolved); }}
+          onMove={(move) => { retry(write, failed, withMove(failed.attempt, move), failed.attempt, { onResolved, onResent }); }}
         />
       ))}
       {more ? <span className="muted small">There are more chains than shown; resolve these first.</span> : null}
@@ -93,8 +104,8 @@ export function DateConflictResolver({ view, write, violations, onResolved }: Re
   );
 }
 
-function Bypass({ write, node, guards, onResolved }: Omit<Resolving, "view"> & { node: string; guards: Guard[] }) {
-  const [draft, setReason] = useDraft<string>(`bypass:${write.journey}:${node}`);
+function Bypass({ write, node, guards, onResolved, onResent }: Omit<Resolving, "view"> & { node: string; guards: Guard[] }) {
+  const [draft, setReason] = useDraft<string>(`rejected-bypass:${write.journey}:${node}`);
   const reason = draft ?? "";
   const { failed } = write;
   if (failed === undefined) {
@@ -103,14 +114,17 @@ function Bypass({ write, node, guards, onResolved }: Omit<Resolving, "view"> & {
   const override: Mutation = { op: "apply_override", node, override: { guard_bypass: { guards, reason } } };
   return (
     <div className="row" data-testid="bypass">
-      <span>Do it anyway, bypassing {guards.join(", ")}:</span>
+      <span>Do it anyway, without {guards.map(guardWords).join(" and ")}:</span>
       <Field aria-label="Why bypass the guard" placeholder="Why" value={reason} onChange={(event) => { setReason(event.target.value); }} />
       <Button
         disabled={write.disabled || !bypassReady(reason)}
         onClick={() => {
-          retry(write, [override, ...failed.attempt.mutations], failed.attempt, () => {
-            setReason(undefined);
-            onResolved?.();
+          retry(write, failed, [override, ...failed.attempt.mutations], failed.attempt, {
+            onResolved: () => {
+              setReason(undefined);
+              onResolved?.();
+            },
+            onResent,
           });
         }}
       >
@@ -120,7 +134,7 @@ function Bypass({ write, node, guards, onResolved }: Omit<Resolving, "view"> & {
   );
 }
 
-function Invalid({ view, write, violations, onResolved }: Resolving & { violations: Violation[] }) {
+function Invalid({ view, write, violations, onResolved, onResent }: Resolving & { violations: Violation[] }) {
   const chains = violations.filter((violation) => violation.code === "contradictory_chain");
   const others = violations.filter((violation) => violation.code !== "contradictory_chain");
   return (
@@ -138,9 +152,9 @@ function Invalid({ view, write, violations, onResolved }: Resolving & { violatio
           })}
         </ul>
       )}
-      <DateConflictResolver view={view} write={write} violations={chains} onResolved={onResolved} />
+      <DateConflictResolver view={view} write={write} violations={chains} onResolved={onResolved} onResent={onResent} />
       {bypassable(violations).map(({ node, guards }) => (
-        <Bypass key={node} write={write} node={node} guards={guards} onResolved={onResolved} />
+        <Bypass key={node} write={write} node={node} guards={guards} onResolved={onResolved} onResent={onResent} />
       ))}
       <span className="row">
         <Button onClick={write.dismiss}>Drop this change</Button>
@@ -149,15 +163,24 @@ function Invalid({ view, write, violations, onResolved }: Resolving & { violatio
   );
 }
 
-/** What the section's last write left under it: its rejection, with what can be done about it, or its receipt. */
-export function Rejected({ view, write, onResolved }: Resolving) {
+/**
+ * What the section's last write left under it: its rejection, with what can be done about it;
+ * else what a write that did not land needs of the person (no answer, not sent, gone), and the
+ * receipt of one that did.
+ */
+export function Rejected({ view, write, onResolved, onResent }: Resolving) {
   const { failed } = write;
   if (failed === undefined) {
-    return <Receipt receipt={write.receipt} />;
+    return (
+      <>
+        {write.status === undefined ? null : <WriteStatus view={write.status} />}
+        <Receipt receipt={write.receipt} />
+      </>
+    );
   }
   const { rejection, attempt } = failed;
   if (rejection.rejection === "invalid") {
-    return <Invalid view={view} write={write} violations={rejection.violations} onResolved={onResolved} />;
+    return <Invalid view={view} write={write} violations={rejection.violations} onResolved={onResolved} onResent={onResent} />;
   }
   return (
     <RejectionView
@@ -166,7 +189,7 @@ export function Rejected({ view, write, onResolved }: Resolving) {
         // Kept on the current version: the journey revision the rejection reports, and the
         // deployment the view holds now, which the author sees with the conflict.
         const seen = { base: rebasedOnto(rejection, write.journey, write.revision), deployment: write.seen.deployment };
-        retry(write, attempt.mutations, seen, onResolved);
+        retry(write, failed, attempt.mutations, seen, { onResolved, onResent });
       }}
     />
   );

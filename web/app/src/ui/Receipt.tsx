@@ -51,3 +51,19 @@ export function Receipt({ receipt }: { receipt: ReceiptState | undefined }) {
     </span>
   );
 }
+
+/**
+ * Whether a form's own write is out: `saving` while it is on its way, `waiting` once it needs more
+ * than that (a retry or the person), which the write's own status then says. Closing the form
+ * leaves either one going.
+ */
+export type Sending = false | "saving" | "waiting";
+
+/** Under a form whose write is on its way. */
+export function Saving({ sending }: { sending: Sending }) {
+  return sending === "saving" ? (
+    <span className="muted small" data-testid="saving">
+      Saving...
+    </span>
+  ) : null;
+}

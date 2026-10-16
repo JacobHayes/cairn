@@ -1,13 +1,19 @@
-// Node detail's writes: each action one patch through the shell's write path (4.6: the safe
-// retry, D7's consequences notice, nothing sent under version skew), drafted against the
-// revision its author saw, with the rejection kept for the section to show inline (A15).
-// Each section holds its own, so a rejection shows beside the action that caused it.
-import { useState } from "react";
+// Node detail's writes: each action one patch through the edit manager (4.6: the safe retry,
+// D7's consequences notice, nothing sent under version skew), drafted against the revision its
+// author saw. The write is the manager's, keyed by the section's edit: a rejection waits there
+// across a screen left and a reload, and the section shows it inline when it is on screen (A15)
+// and the sync chip counts it wherever the person is.
+import { waitFor } from "xstate";
 
-import { useDraft } from "../data/drafts.ts";
-import { unlandedOf, useProblem, useSession, useSkew } from "../data/react.ts";
+import { consequenceLines, warningOf } from "../data/activity.ts";
+import { held, submitPatch } from "../data/edit-manager.ts";
+import { useSession, useSkew, useWriteOf } from "../data/react.ts";
 import { currentAddress } from "../data/session.ts";
-import type { Rejection } from "../data/writes.ts";
+import { useDraft } from "../data/drafts.ts";
+import type { Patch } from "../data/host.ts";
+import type { OperationId } from "../data/edit-record.ts";
+import { writeView, type WriteView } from "../data/write-machine.ts";
+import { newPatchId, patchOf, type Rejection } from "../data/writes.ts";
 import { useReceipt, type ReceiptState } from "../ui/Receipt.tsx";
 import { titleOf, type Mutation, type Ready } from "./model.ts";
 
@@ -26,19 +32,37 @@ export interface Attempt extends Seen {
   mutations: Mutation[];
 }
 
+/** A rejected write, with the patch it refused. */
+export interface Failed {
+  /** The rejected write's operation id. */
+  id: OperationId;
+  attempt: Attempt;
+  rejection: Rejection;
+}
+
 export interface NodeWrite {
   journey: string;
   /** The revision the view holds. */
   revision: number;
   /** What the view holds: what a fresh edit is drafted against. */
   seen: Seen;
-  /** Sends `mutations` drafted against `seen` (the view's by default); true when it landed. */
-  run: (mutations: Mutation[], seen?: Seen) => Promise<boolean>;
+  /**
+   * Sends `mutations` drafted against `seen` (the view's by default) as the write `id` (a fresh
+   * one by default; a caller that must find its write again mints it); true when it landed.
+   * The write is submitted before the first await, so `holds(id)` answers at once.
+   */
+  run: (mutations: Mutation[], seen?: Seen, id?: OperationId) => Promise<boolean>;
+  /** Whether the edit manager accepted the write `id` and still holds it. */
+  holds: (id: OperationId) => boolean;
+  /** The write the manager holds for this section, if it is not rejected: out, or in need of the person (no answer, not sent, gone). */
+  status: WriteView | undefined;
+  /** A write is out or may have committed. */
   pending: boolean;
   /** Version skew or a write in flight: no new write starts. */
   disabled: boolean;
   /** The last attempt's rejection, until dismissed or a later attempt. */
-  failed: { attempt: Attempt; rejection: Rejection; address?: string | undefined } | undefined;
+  failed: Failed | undefined;
+  /** Drops the section's rejected (or stopped, or gone) write; one that is out or may have committed is never dropped. */
   dismiss: () => void;
   /** What the last landed write leaves under the control, for a few seconds. */
   receipt: ReceiptState | undefined;
@@ -54,59 +78,79 @@ export function writesEntities(mutations: Mutation[]): boolean {
   );
 }
 
+/** What `patch` was drafted against; a patch that names no deployment revision was drafted against `deployment`. */
+export function attemptOf(patch: Patch, deployment: number): Attempt {
+  return { mutations: patch.mutations, base: patch.base_revision, deployment: patch.deployment_revision ?? deployment };
+}
+
+/** The edit a section's writes share: one write of it is out at a time. */
+export function nodeEdit(journey: string, scope: string): string {
+  return `node:${journey}:${scope}`;
+}
+
 /**
- * A section's write path for the journey `view` shows. Its last rejection is kept as a draft
- * under `scope` (the section and its node), so it, and the resolution being chosen, survive
- * a reload as typed text does. While it stands the sync chip counts it, named by `node`'s
- * title (the one the section is about).
+ * A section's write path for the journey `view` shows. Its writes are the edit manager's, under
+ * the edit `scope` names (the section and its node), so a rejection and the resolution being
+ * chosen survive a reload, and the sync chip counts it, named by `node`'s title (the one the
+ * section is about), wherever the person is.
  */
 export function useNodeWrite(view: Ready, scope: string, node?: string): NodeWrite {
   const session = useSession();
+  const { edits } = session;
   const skew = useSkew();
-  const [pending, setPending] = useState(false);
   const journey = view.journey.header.id;
-  const [failed, setFailed] = useDraft<NonNullable<NodeWrite["failed"]>>(`rejected:${journey}:${scope}`);
+  const edit = nodeEdit(journey, scope);
+  const written = useWriteOf(edit);
   const revision = view.journey.revision;
   const deployment = view.key.deployment_revision;
   const current: Seen = { base: revision, deployment };
+  const label = node === undefined ? view.journey.header.name : titleOf(view, node);
   const receipt = useReceipt();
-  const dismiss = () => {
-    setFailed(undefined);
-  };
-  const report = useProblem(`rejected:${journey}:${scope}`, failed === undefined ? undefined : unlandedOf(failed.rejection, failed.address), {
-    label: node === undefined ? view.journey.header.name : titleOf(view, node),
-    discard: dismiss,
-  });
-  const run = async (mutations: Mutation[], seen: Seen = current): Promise<boolean> => {
-    setPending(true);
-    receipt.clear();
+  const pending = written?.state === "sending" || written?.state === "unconfirmed";
+  const run = async (mutations: Mutation[], seen: Seen = current, id: OperationId = newPatchId()): Promise<boolean> => {
+    if (skew) {
+      return false;
+    }
+    const patch = patchOf(
+      { target: { journey }, baseRevision: seen.base, mutations, ...(writesEntities(mutations) ? { deploymentRevision: seen.deployment } : {}) },
+      id,
+    );
     // Where the edit was made, taken before the wait: the user may be elsewhere when the answer comes.
     const address = currentAddress();
-    const result = await session.write({
-      target: { journey },
-      baseRevision: seen.base,
-      mutations,
-      ...(writesEntities(mutations) ? { deploymentRevision: seen.deployment } : {}),
-    });
-    setPending(false);
-    const attempt: Attempt = { mutations, base: seen.base, deployment: seen.deployment };
-    setFailed(result.outcome === "rejected" ? { attempt, rejection: result.rejection, address } : undefined);
-    // The control may be gone by now (its draft is kept): the chip hears of the result either way.
-    report(result.outcome === "rejected" ? unlandedOf(result.rejection, address) : undefined);
-    if (result.outcome === "landed") {
-      receipt.show(result.warning);
+    const ref = submitPatch(edits, patch, { edit, label, ...(address === undefined ? {} : { address }) });
+    if (ref === undefined) {
+      return false;
     }
-    return result.outcome === "landed";
+    receipt.clear();
+    let snapshot;
+    try {
+      snapshot = await waitFor(ref, (each) => each.status === "done" || each.hasTag("needsYou"), { timeout: Infinity });
+    } catch {
+      // The session closed.
+      return false;
+    }
+    const result = writeView(snapshot);
+    if (result.state !== "landed") {
+      return false;
+    }
+    receipt.show(warningOf(consequenceLines(result.answer), session.titleOf));
+    return true;
   };
   return {
     journey,
     revision,
     seen: current,
     run,
+    holds: (id) => held(edits, id),
+    status: written?.state === "rejected" ? undefined : written,
     pending,
     disabled: pending || skew,
-    failed,
-    dismiss,
+    failed: written?.state === "rejected" ? { id: written.id, attempt: attemptOf(written.command.patch, deployment), rejection: written.rejection } : undefined,
+    dismiss: () => {
+      if (written?.state === "rejected" || written?.state === "stopped" || written?.state === "gone") {
+        edits.send({ type: "discard", id: written.id });
+      }
+    },
     receipt: receipt.receipt,
   };
 }

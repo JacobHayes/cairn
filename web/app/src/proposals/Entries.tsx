@@ -163,18 +163,11 @@ interface Piece {
   title: string;
 }
 
-/** B10: break `node` down: the pieces typed here open a proposal adding them beneath it. */
-export function BreakDown({ ready, node, startOpen = false, onCancel }: { ready: Ready; node: { key: string; title: string }; startOpen?: boolean; onCancel?: () => void }) {
+/** B10: break `node` down: the pieces typed here open a proposal adding them beneath it. Shown while its owner has it open. */
+export function BreakDown({ ready, node, onCancel }: { ready: Ready; node: { key: string; title: string }; onCancel: () => void }) {
   const { write, start } = useDraftAndOpen();
-  const [pieces, setPieces] = useState<Piece[] | undefined>(startOpen ? [{ kind: "action", title: "" }] : undefined);
+  const [pieces, setPieces] = useState<Piece[]>([{ kind: "action", title: "" }]);
   const drafted = useRef<{ asked: string; draft: Schema<"ProposalDraft"> } | undefined>(undefined);
-  if (pieces === undefined) {
-    return (
-      <Button onClick={() => { setPieces([{ kind: "action", title: "" }]); }} data-testid="break-down">
-        Break down
-      </Button>
-    );
-  }
   const filled = pieces.filter((piece) => piece.title.trim() !== "");
   const set = (at: number, piece: Partial<Piece>) => {
     setPieces(pieces.map((each, index) => (index === at ? { ...each, ...piece } : each)));
@@ -199,7 +192,7 @@ export function BreakDown({ ready, node, startOpen = false, onCancel }: { ready:
         <Button primary disabled={write.disabled || filled.length === 0} onClick={propose} data-testid="propose-breakdown">
           Propose the breakdown
         </Button>
-        <Button onClick={() => { setPieces(undefined); onCancel?.(); }}>Cancel</Button>
+        <Button onClick={onCancel}>Cancel</Button>
       </span>
       <Problem problem={write.problem} onDismiss={write.dismiss} />
     </div>

@@ -8,13 +8,13 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 
 import { useViewer } from "../data/react.ts";
-import { DoneButton, EvidenceForm } from "../detail/DoneEvidence.tsx";
+import { DoneButton, EvidenceForm, type Needs } from "../detail/DoneEvidence.tsx";
 import { transition, type Ready } from "../detail/model.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { entityName, resolveEntity } from "../detail/sections.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { Button } from "../ui/kit.tsx";
-import { actsFor, assignOwner, doneMutations, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
+import { actsFor, assignOwner, doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
 import type { NodeRow } from "./why.ts";
 
 /** C11: "Decide" opens the inspector, opens the node's answer form, and puts the focus in it once it is drawn. */
@@ -66,6 +66,34 @@ function AssignInline({ view, write, node }: { view: Ready; write: NodeWrite; no
   );
 }
 
+/** The fields Done... asks for in the row, kept as the row's own draft until the write lands. */
+function RowEvidence({ write, node, needs, form }: { write: NodeWrite; node: string; needs: Needs; form: ReturnType<typeof useFormDraft<EvidenceDraft | string>> }) {
+  const drafted = form.draft;
+  if (drafted === undefined) {
+    return null;
+  }
+  return (
+    <EvidenceForm
+      needs={needs}
+      value={evidenceDraft(drafted.value)}
+      sending={write.pending ? "saving" : false}
+      disabled={write.disabled}
+      onChange={form.change}
+      onSend={(added) => {
+        void write.run(doneMutations(node, added), drafted).then((landed) => {
+          if (landed) {
+            form.close();
+          }
+        });
+      }}
+      onClose={() => {
+        form.close();
+        write.dismiss();
+      }}
+    />
+  );
+}
+
 /**
  * The row's owner slot and primary action, and under the row the form and rejection they open.
  * With `owner` off (Mine, where every row is the viewer's) the slot says nothing unless the row
@@ -100,7 +128,14 @@ export function RowActions({ view, row, to, owner = true }: { view: Ready; row: 
           {acts.includes("start") ? <Button disabled={write.disabled} onClick={run([transition(row.key, "start")])}>Start</Button> : null}
           {acts.includes("done") ? (
             needs.artifact || needs.note ? (
-              <DoneButton write={write} form={evidence} />
+              <DoneButton
+                disabled={write.disabled}
+                onOpen={() => {
+                  if (evidence.draft === undefined) {
+                    evidence.open({ artifact: "", note: "" }, write.seen);
+                  }
+                }}
+              />
             ) : (
               <Button primary disabled={write.disabled} onClick={run(doneMutations(row.key))}>Done</Button>
             )
@@ -120,7 +155,7 @@ export function RowActions({ view, row, to, owner = true }: { view: Ready; row: 
           {acts.includes("atomic") ? <Button disabled={write.disabled} onClick={run([{ op: "set_atomic", node: row.key, atomic: true }])}>Mark atomic</Button> : null}
         </span>
       </div>
-      <EvidenceForm write={write} node={row.key} needs={needs} form={evidence} />
+      <RowEvidence write={write} node={row.key} needs={needs} form={evidence} />
       <Rejected view={view} write={write} />
     </>
   );

@@ -120,13 +120,11 @@ export function useWrite(id: OperationId | undefined): WriteView | undefined {
 export interface Unlanded {
   kind: Problem["kind"];
   message: string;
-  /** The screen it happened on; the current one when not given. */
-  address?: string | undefined;
 }
 
 /** A rejection as the chip counts it: a stale one is a conflict, any other is not saved. */
-export function unlandedOf(rejection: Rejection, address?: string): Unlanded {
-  return { kind: rejection.rejection === "stale" ? "conflict" : "rejected", message: reasonOf(rejection), address };
+export function unlandedOf(rejection: Rejection): Unlanded {
+  return { kind: rejection.rejection === "stale" ? "conflict" : "rejected", message: reasonOf(rejection) };
 }
 
 /**
@@ -149,12 +147,12 @@ export function useProblem(
       return;
     }
     // The manager runs the control's own discard, then drops the entry, whether or not the control is still mounted.
-    edits.send({ type: "report", key, problem: { kind: settled.kind, message: settled.message, label, address: settled.address ?? currentAddress() }, discard });
+    edits.send({ type: "report", key, problem: { kind: settled.kind, message: settled.message, label, address: currentAddress() }, discard });
   };
   useEffect(() => {
     report(unlanded);
     // What the chip says changes with the problem, not with the callbacks.
-  }, [edits, key, unlanded?.kind, unlanded?.message, unlanded?.address]);
+  }, [edits, key, unlanded?.kind, unlanded?.message]);
   return report;
 }
 

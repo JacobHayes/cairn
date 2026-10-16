@@ -12,7 +12,8 @@ import { useId, useMemo, useState, type ReactNode } from "react";
 import { useProjected } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useDraft } from "../data/drafts.ts";
-import type { Mutation } from "../data/writes.ts";
+import type { OperationId } from "../data/edit-record.ts";
+import { newPatchId, type Mutation } from "../data/writes.ts";
 import { newEntityKey } from "../people/model.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
@@ -319,8 +320,20 @@ function Why({ typed, recorded, editing, onChange, onEdit }: {
   );
 }
 
-/** D4: the reason a blocked decision is answered past its guard with, as a draft. */
-export type Anyway = ReturnType<typeof useFormDraft<string>>;
+/**
+ * D4: the reason a blocked decision is answered past its guard with. It is the actions' open
+ * "anyway" form (actions-form.ts), shown inside this form: typed here, and sent with the answer,
+ * whose write the actions' form then follows (`sent`, and `resent` when a retry replaces it).
+ */
+export interface Anyway {
+  reason: string;
+  change: (text: string) => void;
+  /** Closes the reason form without answering. */
+  cancel: () => void;
+  /** The answer was sent past the guard as the write `id`. */
+  sent: (id: OperationId) => void;
+  resent: (from: OperationId, id: OperationId) => void;
+}
 
 /** B2: whether someone else answered while this draft was made (what was recorded when it began is no longer), and the way to keep the draft anyway. */
 function useAnsweredMeanwhile(write: NodeWrite, node: string, form: ReturnType<typeof useFormDraft<AnswerValue>>, stored: AnswerValue | undefined) {
@@ -351,6 +364,17 @@ function AnsweredMeanwhile({ text, onKeep, onDiscard }: { text: string; onKeep: 
   );
 }
 
+/** What each of the decision's choices would cause, once it is open to be answered. */
+function useChoiceEffects(view: Ready, node: string, open: boolean) {
+  const projected = valueOf(useProjected(view, open ? { projection: "answer_effects", key: node } : undefined));
+  return projected?.applies === true ? projected.choices : undefined;
+}
+
+/** D4: answering past the guard that blocks the decision records why. */
+function bypassOverride(node: string, reason: string | undefined): Mutation[] {
+  return reason === undefined ? [] : [{ op: "apply_override", node, override: { guard_bypass: { guards: ["deps_done"], reason: reason.trim() } } }];
+}
+
 /** What the form holds, and what it would do: the drafts, what Save would send, and Save itself. */
 function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefined) {
   const write = useNodeWrite(view, `answer:${detail.node.key}`, detail.node.key);
@@ -360,8 +384,7 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
   const form = useFormDraft<AnswerValue>(write.journey, node.key, "answer");
   const why = useFormDraft<string>(write.journey, node.key, "answer-why");
   const open = answerable(node.kind, record.state);
-  const projected = valueOf(useProjected(view, open ? { projection: "answer_effects", key: node.key } : undefined));
-  const effects = projected?.applies === true ? projected.choices : undefined;
+  const effects = useChoiceEffects(view, node.key, open);
   const stored = resolvedAnswer(view, answer);
   const meanwhile = useAnsweredMeanwhile(write, node.key, form, stored);
   const named = namedDraft ?? "";
@@ -370,17 +393,15 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
   const sending = outgoing({ stored, storedReason: rationale, draft: form.draft?.value, reason: why.draft?.value, named });
   const mutations = sending === undefined ? undefined : answerMutations(node.key, sending.value, named, sending.reason, () => entityKey);
   const caused = useSavePreview(view, mutations);
-  const bypass = anyway?.draft?.value;
-  const bypassing = bypass !== undefined;
+  const bypass = anyway?.reason;
   const newAnswer = form.draft !== undefined && !sameAnswer(form.draft.value, stored);
   const blocked = isBlocked(detail.derived, view);
-  const canSave = sending !== undefined && !write.disabled && (!blocked || (bypassing && bypassReady(bypass)));
+  const canSave = sending !== undefined && !write.disabled && (!blocked || (bypass !== undefined && bypassReady(bypass)));
   const close = () => {
     setNamed(undefined);
     form.close();
     why.close();
     meanwhile.close();
-    anyway?.close();
   };
   return {
     write,
@@ -414,8 +435,12 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
       if (!canSave || mutations === undefined) {
         return;
       }
-      const override: Mutation[] = bypass === undefined ? [] : [{ op: "apply_override", node: node.key, override: { guard_bypass: { guards: ["deps_done"], reason: bypass.trim() } } }];
-      if (await write.run([...override, ...mutations], form.draft ?? why.draft ?? write.seen)) {
+      const id = newPatchId();
+      const landed = write.run([...bypassOverride(node.key, bypass), ...mutations], form.draft ?? why.draft ?? write.seen, id);
+      if (write.holds(id)) {
+        anyway?.sent(id);
+      }
+      if (await landed) {
         close();
       }
     },
@@ -426,12 +451,12 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
  * The decision's answer form. `menu` ends its action row (the inspector's `⋯`); `anyway` is the
  * bypass's reason draft, opened from that menu on a blocked decision.
  */
-export function AnswerEditor({ view, detail, menu, anyway }: { view: Ready; detail: NodeDetail; menu?: ReactNode; anyway?: Anyway }) {
+export function AnswerEditor({ view, detail, menu, anyway }: { view: Ready; detail: NodeDetail; menu?: ReactNode; anyway?: Anyway | undefined }) {
   const state = useAnswerForm(view, detail, anyway);
   const { node, rationale } = detail;
   const { write, form, why, stored, bypass } = state;
   if (!state.open) {
-    return <Rejected view={view} write={write} />;
+    return <Rejected view={view} write={write} onResent={anyway?.resent} />;
   }
   const bypassing = bypass !== undefined;
   const asked = node.prompt !== undefined;
@@ -469,11 +494,11 @@ export function AnswerEditor({ view, detail, menu, anyway }: { view: Ready; deta
       {bypassing && anyway !== undefined ? (
         <span className="row" data-testid="answer-anyway">
           <Field aria-label="Why answer anyway" placeholder="Why (required)" value={bypass} onChange={(event) => { anyway.change(event.target.value); }} />
-          <Button onClick={() => { anyway.close(); }}>Cancel</Button>
+          <Button onClick={anyway.cancel}>Cancel</Button>
         </span>
       ) : null}
       {state.meanwhile.answered ? (
-        <AnsweredMeanwhile text={stored === undefined ? "this" : answerText(view, stored, node)} onKeep={state.meanwhile.keep} onDiscard={state.close} />
+        <AnsweredMeanwhile text={stored === undefined ? "this" : answerText(view, stored, node)} onKeep={state.meanwhile.keep} onDiscard={() => { state.close(); anyway?.cancel(); }} />
       ) : (
         <span className="row actions-row">
           <Button primary disabled={!state.canSave} onClick={() => void state.save()}>
@@ -484,7 +509,7 @@ export function AnswerEditor({ view, detail, menu, anyway }: { view: Ready; deta
           {menu}
         </span>
       )}
-      <Rejected view={view} write={write} onResolved={state.close} />
+      <Rejected view={view} write={write} onResolved={state.close} onResent={anyway?.resent} />
     </div>
   );
 }

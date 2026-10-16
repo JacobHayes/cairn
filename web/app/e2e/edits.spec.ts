@@ -2,9 +2,12 @@
 // playwright.config.ts): a write belongs to the tab, not to the control that sent it. A rename
 // whose answer comes after its screen was left stays on the chip across a reload until it is
 // dealt with (H5, H6), and one whose answer was lost is resent with its patch id and lands once.
+// A node's actions form that sent its write stays until that write ends: text typed since is
+// never lost to the landing, closing it never drops the write, and a rejection that came after
+// the screen was left waits under the form (D1, H5).
 import { expect, test, type Page } from "@playwright/test";
 
-import { fresh, nodeCard, openJourney, recentSaves, rename, renameOf, save, startRename, syncChip } from "./shell.ts";
+import { fresh, menuItem, nodeCard, nodePanel, openFromCanvas, openJourney, recentSaves, rename, renameOf, save, startRename, syncChip } from "./shell.ts";
 
 const PATCHES = "**/api/journeys/*/patches";
 
@@ -88,4 +91,114 @@ test("a rename whose answer is lost is resent with its id and lands once", { tag
   expect(ids[0]).toBe(ids[1]);
   await expect.poll(async () => (await recentSaves(page)).length).toBe(1);
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
+});
+
+/** Holds the page's patch requests until the returned release; each request's mutations are recorded as it goes out. */
+async function holding(page: Page) {
+  let release: () => void = () => undefined;
+  const held = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const sent: unknown[][] = [];
+  await page.route(PATCHES, async (route) => {
+    sent.push((route.request().postDataJSON() as { patch: { mutations: unknown[] } }).patch.mutations);
+    await held;
+    await route.continue();
+  });
+  return { release, sent };
+}
+
+test("text typed after a form was sent is kept when the send lands, and was never sent, across a reload", { tag: "@server" }, async ({ page }) => {
+  await openJourney(page, "server", "j_launch");
+  const { release, sent } = await holding(page);
+  const panel = await openFromCanvas(page, "n_announcement");
+  await menuItem(panel, "skip");
+  const form = panel.getByTestId("skip-form");
+  const first = fresh("Waiting on the vendor");
+  await form.getByLabel("Why skip it").fill(first);
+  await form.getByRole("button", { name: "Skip" }).click();
+  await expect(form.getByText("Saving...")).toBeVisible();
+  await expect(form.getByRole("button", { name: "Skip" })).toBeDisabled();
+  const longer = `${first} until Friday`;
+  await form.getByLabel("Why skip it").fill(longer);
+  release();
+  const kept = panel.getByTestId("kept");
+  await expect(kept).toContainText("Skipped.");
+  await expect(kept.getByTestId("kept-text")).toContainText(longer);
+  await expect(panel.getByRole("button", { name: "Skip", exact: true })).toHaveCount(0);
+  expect(JSON.stringify(sent)).toContain(first);
+  expect(JSON.stringify(sent)).not.toContain("until Friday");
+  await page.reload();
+  await expect(kept).toContainText("Skipped.");
+  await expect(kept.getByTestId("kept-text")).toContainText(longer);
+  await kept.getByRole("button", { name: "Close" }).click();
+  await expect(kept).toHaveCount(0);
+  await expect(panel.getByTestId("detail-state")).toHaveText("skipped");
+});
+
+test("Done... sends the note it was given and keeps what was added meanwhile, and the node is done", { tag: "@server" }, async ({ page }) => {
+  await openJourney(page, "server", "j_launch");
+  const { release, sent } = await holding(page);
+  const panel = await openFromCanvas(page, "n_docs");
+  await panel.getByRole("button", { name: "Done..." }).click();
+  const evidence = panel.getByTestId("done-evidence");
+  const link = `https://example.test/${fresh("docs").replace(" ", "-")}`;
+  await evidence.getByLabel("Artifact address").fill(link);
+  await evidence.getByRole("button", { name: "Link and mark done" }).click();
+  await expect(evidence.getByText("Saving...")).toBeVisible();
+  await evidence.getByLabel("Artifact address").fill(`${link}/later`);
+  release();
+  const kept = panel.getByTestId("kept");
+  await expect(kept).toContainText("Marked done.");
+  await expect(kept).toContainText(`${link}/later`);
+  expect(JSON.stringify(sent)).toContain(link);
+  expect(JSON.stringify(sent)).not.toContain("/later");
+  await expect(panel.getByTestId("detail-state")).toHaveText("done");
+  await page.reload();
+  await expect(kept).toContainText(`${link}/later`);
+});
+
+test("closing a form that sent its write leaves the write going, and the node is skipped", { tag: "@server" }, async ({ page }) => {
+  await openJourney(page, "server", "j_launch");
+  const { release } = await holding(page);
+  const panel = await openFromCanvas(page, "n_retro");
+  await menuItem(panel, "skip");
+  const form = panel.getByTestId("skip-form");
+  await form.getByLabel("Why skip it").fill(fresh("Not this time"));
+  await form.getByRole("button", { name: "Skip" }).click();
+  await form.getByRole("button", { name: "Close" }).click();
+  await expect(form).toHaveCount(0);
+  release();
+  await expect(panel.getByTestId("detail-state")).toHaveText("skipped");
+  await expect(nodeCard(page, "n_retro")).toBeVisible();
+});
+
+test("a node action rejected after its screen was left waits under its form, across a reload", { tag: "@server" }, async ({ context }) => {
+  const [one, two] = [await context.newPage(), await context.newPage()];
+  await openJourney(one, "server", "j_launch");
+  await openJourney(two, "server", "j_launch");
+  // Page two has the form open; page one skips the same node meanwhile, so page two's skip is stale.
+  const panelTwo = await openFromCanvas(two, "n_launch");
+  await menuItem(panelTwo, "skip");
+  const mine = fresh("Mine");
+  await panelTwo.getByTestId("skip-form").getByLabel("Why skip it").fill(mine);
+  const panelOne = await openFromCanvas(one, "n_launch");
+  await menuItem(panelOne, "skip");
+  await panelOne.getByTestId("skip-form").getByLabel("Why skip it").fill(fresh("Theirs"));
+  await panelOne.getByTestId("skip-form").getByRole("button", { name: "Skip" }).click();
+  await expect(panelOne.getByTestId("detail-state")).toHaveText("skipped");
+  const { release } = await holding(two);
+  await panelTwo.getByTestId("skip-form").getByRole("button", { name: "Skip" }).click();
+  await two.getByRole("link", { name: "Journeys" }).click();
+  await expect(two.getByTestId("node-detail")).toHaveCount(0);
+  release();
+  await expect(syncChip(two)).toHaveAttribute("aria-label", /^(CONFLICT|NOT SAVED) · 1\./);
+  await two.reload();
+  await expect(syncChip(two)).toHaveAttribute("aria-label", /^(CONFLICT|NOT SAVED) · 1\./);
+  await syncChip(two).click();
+  await two.getByTestId("sync-popover").getByTestId("sync-problem").getByRole("button", { name: "Go to it" }).click();
+  // The form is back with what was typed, and the refusal under it.
+  const restored = nodePanel(two, "n_launch");
+  await expect(restored.getByTestId("skip-form").getByLabel("Why skip it")).toHaveValue(mine);
+  await expect(restored.locator('[data-testid="conflict"], [data-testid="invalid"]')).toBeVisible();
 });

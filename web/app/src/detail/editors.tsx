@@ -1,17 +1,18 @@
 // The node's journey state a section edits in place (B5, B6, E3, F5): its pin, routed
-// through the decision that feeds it when one does; its snooze (what to set aside, until when);
-// a force include lifted; its weight; and its participations. Each is one patch whose rejection shows here,
-// a pin's with the moves that resolve a contradictory chain.
+// through the decision that feeds it when one does; the snooze form (what to set aside, until
+// when) the actions open; a force include lifted; its weight; and its participations. Each is
+// one patch whose rejection shows here, a pin's with the moves that resolve a contradictory chain.
 import type { Schema } from "@cairn/client";
 import { useId, type ReactNode } from "react";
 
 import { dateWords } from "../timeline/model.ts";
 import { Button, Field } from "../ui/kit.tsx";
-import { isTerminal, nodeOf, transition, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { Saving, type Sending } from "../ui/Receipt.tsx";
+import { nodeOf, transition, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { NodeLink } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
 import { entityName } from "./sections.tsx";
-import { nextMonday, setAsideOptions, tomorrow, withinScope } from "./snooze.ts";
+import { setAsideOptions, UNTIL_OPTIONS, untilOf, withinScope, type SnoozeDraft } from "./snooze.ts";
 import { useFormDraft, useNodeWrite, type NodeWrite, type Seen } from "./write.ts";
 
 type Draft = ReturnType<typeof useFormDraft<string>>;
@@ -121,34 +122,6 @@ export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail })
   );
 }
 
-/** What a snooze waits for: its date, or the node. */
-function SnoozeUntil({ view, target }: { view: Ready; target: Schema<"SnoozeTarget"> }) {
-  return "date" in target ? target.date : <NodeLink view={view} node={target.node} />;
-}
-
-/** B6: a descendant held by its container's snooze, which is the one to lift (the node has no snooze of its own to). */
-function SnoozedThrough({ view, write, container, target }: { view: Ready; write: NodeWrite; container: string; target: Schema<"SnoozeTarget"> }) {
-  return (
-    <span className="row" data-testid="snoozed-via" data-via={container}>
-      <span>
-        Snoozed through <NodeLink view={view} node={container} />, until <SnoozeUntil view={view} target={target} />
-      </span>
-      <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: container }])}>
-        Unsnooze {nodeOf(view, container)?.title ?? container}
-      </Button>
-    </span>
-  );
-}
-
-type Until = "tomorrow" | "monday" | "date" | "node";
-
-const UNTIL_OPTIONS = [
-  { value: "tomorrow", label: "Tomorrow" },
-  { value: "monday", label: "Next Monday" },
-  { value: "date", label: "A date" },
-  { value: "node", label: "When something is done" },
-] as const;
-
 /** B6: the node, or a container above it with its open count: what a snooze sets aside. */
 function SetAside({ options, group, aside, onChange }: { options: ReturnType<typeof setAsideOptions>; group: string; aside: string; onChange: (node: string) => void }) {
   return (
@@ -167,60 +140,26 @@ function SetAside({ options, group, aside, onChange }: { options: ReturnType<typ
   );
 }
 
-/** B6: what the snooze form holds: what to set aside and until when, kept across a reload. */
-export interface SnoozeDraft {
-  aside: string;
-  until: Until;
-  date: string;
-  target: string;
-}
-
-export type SnoozeForm = ReturnType<typeof useFormDraft<SnoozeDraft>>;
-
-/** Opens the snooze form on the node itself, until tomorrow. */
-export function openSnooze(form: SnoozeForm, view: Ready, node: string, seen: Seen): void {
-  form.open({ aside: node, until: "tomorrow", date: tomorrow(view.derived.today), target: "" }, seen);
-}
-
-/**
- * B6: the snooze form (shown in place of the buttons while its draft is open): what to set aside
- * (the node, or a container above it with its open count, nearest first) and until when.
- * Setting a container aside holds everything beneath it; the engine refuses a wait on the
- * set-aside work itself. Sent against the revisions its author saw.
- */
-export function SnoozePanel({ view, detail, form }: { view: Ready; detail: NodeDetail; form: SnoozeForm }) {
-  const write = useNodeWrite(view, `snooze:${detail.node.key}`);
-  const group = useId();
-  const options = setAsideOptions(view, detail);
-  const draft = form.draft;
-  if (draft === undefined) {
-    return null;
-  }
-  const { aside, until, date, target } = draft.value;
-  const change = (patch: Partial<SnoozeDraft>) => {
-    form.change({ ...draft.value, ...patch });
-  };
-  const today = view.derived.today;
+/** B6: until when: a quick date, a date, or another node being done. */
+function UntilFields({ view, group, value, onChange }: { view: Ready; group: string; value: SnoozeDraft; onChange: (patch: Partial<SnoozeDraft>) => void }) {
+  const { aside, until, date, target } = value;
   const scope = withinScope(view, aside);
-  const chosen: Schema<"SnoozeTarget"> | undefined =
-    until === "tomorrow" ? { date: tomorrow(today) } : until === "monday" ? { date: nextMonday(today) } : until === "date" ? (date === "" ? undefined : { date }) : target === "" ? undefined : { node: target };
   return (
-    <div className="stack popover-panel" role="dialog" aria-label="Snooze" data-testid="snooze" data-popover="">
-      {options.length === 1 ? null : <SetAside options={options} group={group} aside={aside} onChange={(node) => { change({ aside: node }); }} />}
+    <>
       <fieldset className="stack">
         <legend className="small muted">Until</legend>
         <div className="opts">
           {UNTIL_OPTIONS.map((option) => (
             <label key={option.value} className="opt">
-              <input type="radio" name={`${group}-until`} checked={until === option.value} onChange={() => { change({ until: option.value }); }} />
+              <input type="radio" name={`${group}-until`} checked={until === option.value} onChange={() => { onChange({ until: option.value }); }} />
               <span>{option.label}</span>
             </label>
           ))}
         </div>
       </fieldset>
-      {until === "date" ? <Field type="date" aria-label="Snooze until" value={date} onChange={(event) => { change({ date: event.target.value }); }} /> : null}
+      {until === "date" ? <Field type="date" aria-label="Snooze until" value={date} onChange={(event) => { onChange({ date: event.target.value }); }} /> : null}
       {until === "node" ? (
-        <select aria-label="Snooze until node" value={target} onChange={(event) => { change({ target: event.target.value }); }}>
+        <select aria-label="Snooze until node" value={target} onChange={(event) => { onChange({ target: event.target.value }); }}>
           <option value="">Choose</option>
           {(view.journey.graph.nodes ?? [])
             .filter((node) => !scope.has(node.key))
@@ -231,55 +170,73 @@ export function SnoozePanel({ view, detail, form }: { view: Ready; detail: NodeD
             ))}
         </select>
       ) : null}
+    </>
+  );
+}
+
+/** B6: what a snooze says it does, as a sentence's end: "Kickoff until Oct 20". */
+export function snoozeWords(view: Ready, draft: SnoozeDraft): string {
+  const until = untilOf(draft, view.derived.today);
+  const when = until === undefined ? "a time not chosen" : "date" in until ? dateWords(until.date, view.derived.today) : `${nodeOf(view, until.node)?.title ?? until.node} is done`;
+  return `${nodeOf(view, draft.aside)?.title ?? draft.aside} until ${when}`;
+}
+
+/**
+ * B6: the snooze form (shown in place of the buttons while it is open): what to set aside
+ * (the node, or a container above it with its open count, nearest first) and until when.
+ * Setting a container aside holds everything beneath it; the engine refuses a wait on the
+ * set-aside work itself. It holds no state and sends nothing: its owner keeps the draft and
+ * submits the write (against the revisions the form was opened at), and `footer` is where the
+ * owner shows that write's rejection, inside the dialog.
+ */
+export function SnoozePanel({
+  view,
+  detail,
+  value,
+  sending,
+  disabled,
+  onChange,
+  onSnooze,
+  onClose,
+  footer,
+}: {
+  view: Ready;
+  detail: NodeDetail;
+  value: SnoozeDraft;
+  sending: Sending;
+  disabled: boolean;
+  onChange: (next: SnoozeDraft) => void;
+  onSnooze: (mutation: Mutation) => void;
+  onClose: () => void;
+  footer: ReactNode;
+}) {
+  const group = useId();
+  const options = setAsideOptions(view, detail);
+  const { aside } = value;
+  const change = (patch: Partial<SnoozeDraft>) => {
+    onChange({ ...value, ...patch });
+  };
+  const chosen = untilOf(value, view.derived.today);
+  return (
+    <div className="stack popover-panel" role="dialog" aria-label="Snooze" data-testid="snooze" data-popover="">
+      {options.length === 1 ? null : <SetAside options={options} group={group} aside={aside} onChange={(node) => { change({ aside: node }); }} />}
+      <UntilFields view={view} group={group} value={value} onChange={change} />
       <span className="row">
         <Button
           primary
-          disabled={write.disabled || chosen === undefined}
+          disabled={disabled || chosen === undefined}
           onClick={() => {
             if (chosen !== undefined) {
-              void write.run([{ op: "snooze", node: aside, until: chosen }], draft).then((landed) => {
-                if (landed) {
-                  form.close();
-                }
-              });
+              onSnooze({ op: "snooze", node: aside, until: chosen });
             }
           }}
         >
           Snooze
         </Button>
-        <Button onClick={form.close}>Cancel</Button>
+        <Button onClick={onClose}>{sending ? "Close" : "Cancel"}</Button>
       </span>
-      <Rejected view={view} write={write} />
-    </div>
-  );
-}
-
-/** B6: a snooze's state and the way to set one: for a card or row, where the inspector's menu is not. */
-export function SnoozeEditor({ view, detail }: { view: Ready; detail: NodeDetail }) {
-  const write = useNodeWrite(view, `snooze:${detail.node.key}`, detail.node.key);
-  const key = detail.node.key;
-  const form = useFormDraft<SnoozeDraft>(write.journey, key, "snooze");
-  const stored = view.journey.graph.state?.snoozes?.[key];
-  const via = detail.derived.snoozed_via ?? undefined;
-  const viaStored = via === undefined ? undefined : view.journey.graph.state?.snoozes?.[via];
-  // With a container's snooze over it, `snoozed` is the node's own target while that holds, else the container's.
-  const holds = via === undefined ? detail.derived.snoozed != null : JSON.stringify(detail.derived.snoozed) === JSON.stringify(stored);
-  return (
-    <div className="stack" data-testid="snooze-state">
-      {stored === undefined ? null : (
-        <span className="row">
-          <span>
-            Snoozed until <SnoozeUntil view={view} target={stored} />
-            {holds ? "" : " (no longer holding)"}
-          </span>
-          <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: key }])}>
-            Unsnooze
-          </Button>
-        </span>
-      )}
-      {via === undefined || viaStored === undefined ? null : <SnoozedThrough view={view} write={write} container={via} target={viaStored} />}
-      {isTerminal(detail.record.state) ? null : form.draft !== undefined ? <SnoozePanel view={view} detail={detail} form={form} /> : <Button onClick={() => { openSnooze(form, view, key, write.seen); }}>Snooze…</Button>}
-      <Rejected view={view} write={write} />
+      <Saving sending={sending} />
+      {footer}
     </div>
   );
 }

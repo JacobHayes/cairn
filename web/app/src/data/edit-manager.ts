@@ -12,6 +12,8 @@
 import { assign, enqueueActions, sendTo, setup } from "xstate";
 
 import { EDIT_RECORD_VERSION, type About, type Command, type EditStore, type OperationId } from "./edit-record.ts";
+import type { Markdown, Patch } from "./host.ts";
+import type { EditsRef } from "./session-root.ts";
 import type { Problem } from "./sync.ts";
 import { writeMachine, writeView, recordOf, type WriteEnv, type WriteRef, type WriteSnapshot, type WriteView } from "./write-machine.ts";
 import { reasonOf, unconfirmed } from "./writes.ts";
@@ -211,6 +213,21 @@ export const editManager = setup({
     "xstate.done.actor.*": { actions: "finish" },
   },
 });
+
+/**
+ * Sends `patch` to the manager as the write of `about.edit` and answers the write it started,
+ * or none when the manager refused it (the edit has another write out, or this id is taken).
+ * The manager takes it synchronously, so the answer is known before the caller's first await.
+ */
+export function submitPatch(edits: EditsRef, patch: Patch, about: About, note?: Markdown): WriteRef | undefined {
+  edits.send({ type: "submit", id: patch.id, command: note === undefined ? { kind: "patch", patch } : { kind: "patch", patch, note }, about });
+  return edits.getSnapshot().context.writes[patch.id]?.ref;
+}
+
+/** Whether the manager holds the write `id`: it accepted it, and it has not ended and gone. */
+export function held(edits: EditsRef, id: OperationId): boolean {
+  return edits.getSnapshot().context.writes[id] !== undefined;
+}
 
 /** The write of `edit`, if the manager holds one (a settled one is replaced by the next submit, so at most one). */
 export function writeOf(writes: EditsContext["writes"], edit: string): Entry | undefined {

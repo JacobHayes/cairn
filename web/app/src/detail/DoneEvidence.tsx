@@ -3,17 +3,15 @@
 // inspector's Actions and the next list's rows both offer it, so a Complete that the engine
 // would reject is never the primary action.
 import { newAttachmentKey } from "./Attachments.tsx";
-import { doneMutations, evidenceComplete, evidenceDraft, type Evidence, type EvidenceDraft } from "../acting/acts.ts";
+import { evidenceComplete, type Evidence, type EvidenceDraft } from "../acting/acts.ts";
 import { Button, Field } from "../ui/kit.tsx";
-import type { NodeWrite, useFormDraft } from "./write.ts";
+import { Saving, type Sending } from "../ui/Receipt.tsx";
 
 /** What done needs added first. */
 export interface Needs {
   artifact: boolean;
   note: boolean;
 }
-
-export type DoneForm = ReturnType<typeof useFormDraft<EvidenceDraft | string>>;
 
 /** The words on the button that adds what done needs and completes. */
 function sendLabel({ artifact, note }: Needs): string {
@@ -23,48 +21,57 @@ function sendLabel({ artifact, note }: Needs): string {
   return artifact ? "Link and mark done" : "Add note and mark done";
 }
 
-/** The Done... button: opens the form once, keeping what was typed. */
-export function DoneButton({ write, form }: { write: NodeWrite; form: DoneForm }) {
+/** The Done... button: opens the form; the owner of the form keeps it once open, with what was typed. */
+export function DoneButton({ disabled, onOpen }: { disabled: boolean; onOpen: () => void }) {
   return (
-    <Button
-      primary
-      disabled={write.disabled}
-      onClick={() => {
-        if (form.draft === undefined) {
-          form.open({ artifact: "", note: "" }, write.seen);
-        }
-      }}
-    >
+    <Button primary disabled={disabled} onClick={onOpen}>
       Done...
     </Button>
   );
 }
 
-export function EvidenceForm({ write, node, needs, form }: { write: NodeWrite; node: string; needs: Needs; form: DoneForm }) {
-  const drafted = form.draft;
-  if (drafted === undefined) {
-    return null;
-  }
-  const { artifact, note } = evidenceDraft(drafted.value);
-  const send = async () => {
-    const evidence: Evidence = {
-      ...(needs.artifact ? { artifact: { key: newAttachmentKey(), url: artifact.trim() } } : {}),
-      ...(needs.note ? { note: { key: newAttachmentKey(), text: note.trim() } } : {}),
-    };
-    if (await write.run(doneMutations(node, evidence), drafted)) {
-      form.close();
-    }
+/** What sending `draft` adds before completing: each field the node needs, trimmed, with its new key. */
+export function evidenceOf(needs: Needs, draft: EvidenceDraft): Evidence {
+  return {
+    ...(needs.artifact ? { artifact: { key: newAttachmentKey(), url: draft.artifact.trim() } } : {}),
+    ...(needs.note ? { note: { key: newAttachmentKey(), text: draft.note.trim() } } : {}),
   };
+}
+
+/**
+ * The fields done needs and the button that sends them. The form holds no state and sends
+ * nothing itself: its owner keeps the draft, submits the write, and says when one is out
+ * (`sending`: Cancel reads Close, because closing leaves the save going).
+ */
+export function EvidenceForm({
+  needs,
+  value,
+  sending,
+  disabled,
+  onChange,
+  onSend,
+  onClose,
+}: {
+  needs: Needs;
+  value: EvidenceDraft;
+  sending: Sending;
+  disabled: boolean;
+  onChange: (next: EvidenceDraft) => void;
+  onSend: (evidence: Evidence) => void;
+  onClose: () => void;
+}) {
+  const { artifact, note } = value;
   return (
     <div className="stack row-more" data-testid="done-evidence">
-      {needs.artifact ? <Field autoFocus aria-label="Artifact address" placeholder="Its artifact's address" value={artifact} onChange={(event) => { form.change({ artifact: event.target.value, note }); }} /> : null}
-      {needs.note ? <textarea autoFocus={!needs.artifact} aria-label="Note" placeholder="What was done, in a note" value={note} onChange={(event) => { form.change({ artifact, note: event.target.value }); }} /> : null}
+      {needs.artifact ? <Field autoFocus aria-label="Artifact address" placeholder="Its artifact's address" value={artifact} onChange={(event) => { onChange({ artifact: event.target.value, note }); }} /> : null}
+      {needs.note ? <textarea autoFocus={!needs.artifact} aria-label="Note" placeholder="What was done, in a note" value={note} onChange={(event) => { onChange({ artifact, note: event.target.value }); }} /> : null}
       <span className="row">
-        <Button primary disabled={write.disabled || !evidenceComplete(needs, { artifact, note })} onClick={() => void send()}>
+        <Button primary disabled={disabled || !evidenceComplete(needs, { artifact, note })} onClick={() => { onSend(evidenceOf(needs, value)); }}>
           {sendLabel(needs)}
         </Button>
-        <Button onClick={() => { form.close(); write.dismiss(); }}>Cancel</Button>
+        <Button onClick={onClose}>{sending ? "Close" : "Cancel"}</Button>
       </span>
+      <Saving sending={sending} />
     </div>
   );
 }

@@ -3,7 +3,7 @@
 // screen reused for another journey or node.
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { draftAt, readDraft, readDrafts, writeDraft } from "./drafts.ts";
+import { draftAt, readDraft, writeDraft } from "./drafts.ts";
 import { memoryStorage } from "./fake.test-support.ts";
 
 function storing(): void {
@@ -21,17 +21,6 @@ describe("drafts kept per tab", () => {
     expect(readDraft("title:j_a:n_x")).toEqual({ text: "Typed" });
     writeDraft("title:j_a:n_x", undefined);
     expect(readDraft("title:j_a:n_x")).toBeUndefined();
-  });
-
-  it("lists every draft under a prefix", () => {
-    storing();
-    writeDraft("rejected:j_a:dates", 1);
-    writeDraft("rejected:j_b:dates", 2);
-    writeDraft("title:j_a:n_x", 3);
-    expect(readDrafts("rejected:")).toEqual([
-      ["rejected:j_a:dates", 1],
-      ["rejected:j_b:dates", 2],
-    ]);
   });
 
   it("are kept in memory only when the storage refuses", () => {
