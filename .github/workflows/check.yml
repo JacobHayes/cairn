@@ -1,7 +1,9 @@
-# PRACTICES, The validation ladder: the full ladder on every push, plus a nightly run, and the
-# simulation campaigns nightly outside the gate, and the release binaries on a pushed v* tag.
-# Linux runners only. mise installs the pinned tools; a tool that fails to install fails the
-# job, and the lint step fails on any tool still missing, so nothing is skipped.
+# PRACTICES, The validation ladder: the full ladder on every push, plus a nightly run with more
+# property cases, split into parts that run side by side on separate runners (scripts/ladder
+# --parts); the simulation campaigns nightly outside the gate; and the release binaries on a
+# pushed v* tag. Linux runners only. mise installs the pinned tools; a tool that fails to
+# install fails the job, and the lint step fails on any tool still missing, so nothing is
+# skipped.
 name: check
 
 on:
@@ -17,22 +19,51 @@ permissions:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}-${{ github.event_name }}
-  cancel-in-progress: true
+  # A run in flight on main is never cancelled: it finishes and saves its caches, and a newer
+  # push waits for it (replacing any run already waiting), so the newest run covers everything
+  # pushed before it. Any other ref cancels the run a newer push supersedes
+  # (decisions/2026-10-16-ci-caches-survive-failed-runs-and-main-runs-finish.md).
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 env:
   CARGO_TERM_COLOR: always
   MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
 
 jobs:
-  check:
-    if: github.event_name != 'schedule'
+  # The ladder's parts, which the next job runs one runner each
+  # (decisions/2026-10-16-ci-runs-the-ladder-in-parts-on-separate-runners.md): a step added to the
+  # ladder runs in CI with no edit here, and the ladder refuses a step that belongs to no part.
+  parts:
     runs-on: ubuntu-latest
+    outputs:
+      parts: ${{ steps.list.outputs.parts }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: list
+        # Two commands: `echo "parts=$(...)"` would hide the ladder's exit status.
+        run: |
+          parts=$(scripts/ladder --parts)
+          printf 'parts=%s\n' "$parts" >>"$GITHUB_OUTPUT"
+
+  part:
+    needs: parts
+    name: check (${{ matrix.part }})
+    runs-on: ubuntu-latest
+    # A hung job on main holds the next run, which waits instead of cancelling it (PRACTICES,
+    # Explicit limits).
+    timeout-minutes: 45
+    strategy:
+      # A failing part must not cancel the others mid-build: they finish their tests and save
+      # their caches.
+      fail-fast: false
+      matrix:
+        part: ${{ fromJSON(needs.parts.outputs.parts) }}
     env:
       # Only `mise run sim` uses cargo-patina, and it builds from source; the ladder skips it.
       MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
-      # The property tests at more cases than a local run's 64
-      # (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
-      PROPTEST_CASES: 256
+      # The property tests at more cases than a local run's 64, and at a larger count in the
+      # nightly run (decisions/2026-10-08-property-tests-run-64-cases-locally-and-256-in-ci.md).
+      PROPTEST_CASES: ${{ github.event_name == 'schedule' && 4096 || 256 }}
       # The browser host's module as it ships, optimized: its bindings are the ones the generated
       # step checks, and the browser step tests it (a local check builds the faster wasm-dev profile;
       # decisions/2026-10-08-the-check-builds-the-wasm-module-without-lto.md).
@@ -40,53 +71,44 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
-      # The compiled dependencies and the cargo registry, from the last push to main: without
-      # them every run compiled the whole dependency tree from nothing, most of the job. It
-      # restores Cargo's own target directory, so Cargo still decides what is fresh, and saves
-      # it without the workspace's crates or stale dependencies: a 0.6 GB entry, where the whole
-      # directory after a check is 5.8 GB, half of it the workspace's own test binaries.
+      # rust-cache hashes Cargo.lock and the members' manifests, not the root one that holds the
+      # build profiles: a profile change must not exact-hit artifacts built with the old one.
+      - id: profiles
+        run: echo "hash=$(awk '/^\[/ { p = /^\[profile/ } p' Cargo.toml | sha256sum | cut -c1-8)" >>"$GITHUB_OUTPUT"
+      # The compiled dependencies and the cargo registry, one entry per part (a key is saved once,
+      # so parts sharing one would leave all but the first to finish out). Saved from main even
+      # when a later step fails, and once per lock file, profile and toolchain: it restores
+      # Cargo's own target directory, so Cargo still decides what is fresh, and saves it without
+      # the workspace's crates or stale dependencies.
       - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
         with:
-          shared-key: check
-          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      # The npm workspace's tools (TypeScript, eslint, openapi-typescript) for the lint and generated steps.
+          shared-key: check-${{ matrix.part }}-${{ steps.profiles.outputs.hash }}
+          cache-on-failure: true
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+      # The npm workspace's tools (TypeScript, eslint, openapi-typescript, Vitest, Vite).
       - run: npm ci
-      # The browser step's browser, at the version @playwright/test pins.
-      - run: npx playwright install --with-deps chromium
-      - run: mise run check
+      # The browser step's browser, without --with-deps: the runner image has the libraries it
+      # needs, and the apt round trip cost more than the download. The download is not cached: a
+      # restore took as long as fetching it (about 7 s).
+      - if: matrix.part == 'browser'
+        run: npx playwright install chromium
+      - run: mise run check --part "$PART"
+        env:
+          PART: ${{ matrix.part }}
       # The check prints only what failed; the complete log is a file.
       - if: failure()
         run: tail -n +1 dist/ladder/*.log
 
-  # Every step, as on push, with the property tests at a larger case count
-  # (PRACTICES, The validation ladder).
-  nightly:
-    if: github.event_name == 'schedule'
+  # The gate: green only when every part ran and passed. A part that was skipped because the
+  # list of parts failed counts as a failure here, not as a success.
+  check:
+    needs: part
+    if: always()
     runs-on: ubuntu-latest
-    env:
-      MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
-      PROPTEST_CASES: 4096
-      CAIRN_WASM_PROFILE: wasm
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
-      # The compiled dependencies and the cargo registry, from the last push to main: without
-      # them every run compiled the whole dependency tree from nothing, most of the job. It
-      # restores Cargo's own target directory, so Cargo still decides what is fresh, and saves
-      # it without the workspace's crates or stale dependencies: a 0.6 GB entry, where the whole
-      # directory after a check is 5.8 GB, half of it the workspace's own test binaries.
-      - uses: Swatinem/rust-cache@6323deb102c322ba6fcbdcafc7e3dddab59af2b6 # v2.9.2
-        with:
-          shared-key: check
-          save-if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-      # The npm workspace's tools (TypeScript, eslint, openapi-typescript) for the lint and generated steps.
-      - run: npm ci
-      # The browser step's browser, at the version @playwright/test pins.
-      - run: npx playwright install --with-deps chromium
-      - run: mise run check
-      # The check prints only what failed; the complete log is a file.
-      - if: failure()
-        run: tail -n +1 dist/ladder/*.log
+      - env:
+          RESULT: ${{ needs.part.result }}
+        run: '[ "$RESULT" = success ] || { echo "a part of the check did not pass ($RESULT)"; exit 1; }'
 
   # PRACTICES, Simulation with patina: the campaigns, nightly and on demand, never on push and
   # never part of check. mise builds cargo-patina from source at the pinned revision.

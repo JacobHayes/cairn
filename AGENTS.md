@@ -30,7 +30,7 @@ You are changing Cairn: a feature, a fix, a refactor, tests or CI, documents, or
 - One logical commit per unit of work: the change with its tests, documents, proof, and review fixes folded in.
 - Before it lands, an independent reviewer reviews the whole change. Verify each finding against the code, fix the valid ones, and record any that would change a document or a design call in `decisions/`.
 - A second round reviews only the fixes, and runs only when the first found something severe, several medium findings, or the fixes were large. A third, again only the fixes, runs only when the second found something severe.
-- Land onto current main: rebase, check for conflicts with what landed meanwhile, and pass `mise run check` on the result. CI runs the full check on every push; a newer push supersedes an older run, so the newest run covers everything pushed before it.
+- Land onto current main: rebase, check for conflicts with what landed meanwhile, and pass `mise run check` on the result. CI runs the full check on every push; on main a newer push waits for the run in flight instead of cancelling it (and replaces a run still waiting), so the newest run covers everything pushed before it.
 - Integrate as you go: once a unit passes, land it, push main, move the default workspace to the new main when its working copy is empty, and remove the unit's workspace. Do not park finished work for someone to collect or ask before landing it.
 
 ## Repository conventions

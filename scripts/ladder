@@ -2,7 +2,7 @@
 # Runs the validation ladder (PRACTICES, The validation ladder): `mise run check` (the whole
 # thing) or `mise run check:fast` (the part a change can affect, fewer steps).
 #
-# usage: scripts/ladder [--fast]
+# usage: scripts/ladder [--fast | --part NAME | --parts]
 #
 # The steps are the files of scripts/steps/. The fail-early ones run first, one at a time, in
 # order: lint (format, lint, typecheck), then the unit tests (unit: Rust; web-unit: Vitest),
@@ -22,17 +22,82 @@
 # server side of the web app. The full check and CI skip nothing. The slowest Rust steps
 # (integration, cost) are left out of --fast.
 #
+# CI runs the full check in parts, one runner each and side by side: --part NAME runs the steps
+# of that part, in the order above, building only what they need. A part is the steps that
+# share one build (lint; rust: the Rust test steps; web: the web build and what reads it;
+# browser: the binary and Playwright). --parts prints them as a JSON array, which is the
+# workflow's matrix, so a part added here runs in CI with no workflow edit; every invocation
+# fails when a step of the full check belongs to no part, or to two.
+#
 # The mise tasks hold the machine-wide lock (mise-tasks/check/): one run at a time.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-fast=
-if [ "${1:-}" = --fast ]; then
-  fast=1
-  shift
-fi
-[ $# -eq 0 ] || { echo "usage: scripts/ladder [--fast]" >&2; exit 2; }
+# The steps of the full check in the order they run (one at a time, then side by side), and the
+# part each runs in on CI. Plain arrays and "step:part" entries: macOS ships Bash 3.2.
+all_first=(lint unit web-unit generated embed)
+all_side=(property integration cost browser)
+step_parts=(lint:lint unit:rust property:rust integration:rust cost:rust web-unit:web generated:web embed:web browser:browser)
+parts=(lint rust web browser)
 
+usage() { echo "usage: scripts/ladder [--fast | --part NAME | --parts]" >&2; exit 2; }
+partition_fail() { echo "ladder: the parts are wrong: $1" >&2; exit 2; }
+
+# Every step of the full check is in exactly one part, every part has a step, and nothing else
+# is listed, so no step can drop out of CI.
+partition_check() {
+  local step part entry count other
+  for step in "${all_first[@]}" "${all_side[@]}"; do
+    count=0
+    for other in "${all_first[@]}" "${all_side[@]}"; do [ "$other" != "$step" ] || count=$((count + 1)); done
+    [ "$count" -eq 1 ] || partition_fail "step $step is listed $count times in the full check"
+    count=0
+    for entry in "${step_parts[@]}"; do [ "${entry%%:*}" != "$step" ] || count=$((count + 1)); done
+    [ "$count" -eq 1 ] || partition_fail "step $step is in $count parts, not one"
+  done
+  for entry in "${step_parts[@]}"; do
+    step=${entry%%:*}
+    part=${entry#*:}
+    [[ " ${all_first[*]} ${all_side[*]} " == *" $step "* ]] || partition_fail "$entry names a step that is not in the full check"
+    [[ " ${parts[*]} " == *" $part "* ]] || partition_fail "$entry names a part that is not listed"
+  done
+  for part in "${parts[@]}"; do
+    count=0
+    for other in "${parts[@]}"; do [ "$other" != "$part" ] || count=$((count + 1)); done
+    [ "$count" -eq 1 ] || partition_fail "part $part is listed $count times"
+    [[ " ${step_parts[*]} " == *":$part "* ]] || partition_fail "part $part has no step"
+  done
+}
+partition_check
+
+# The part of a step of the full check.
+part_of() {
+  local entry
+  for entry in "${step_parts[@]}"; do
+    if [ "${entry%%:*}" = "$1" ]; then echo "${entry#*:}"; return 0; fi
+  done
+}
+
+fast=
+part=
+case ${1:-} in
+  --fast) fast=1; shift ;;
+  --part)
+    [ $# -ge 2 ] || usage
+    part=$2
+    [[ " ${parts[*]} " == *" $part "* ]] || { echo "ladder: no part $part; the parts are: ${parts[*]}" >&2; exit 2; }
+    shift 2
+    ;;
+  --parts)
+    [ $# -eq 1 ] || usage
+    printf '['
+    sep=
+    for name in "${parts[@]}"; do printf '%s"%s"' "$sep" "$name"; sep=,; done
+    printf ']\n'
+    exit 0
+    ;;
+esac
+[ $# -eq 0 ] || usage
 
 rust=1
 web=1
@@ -50,14 +115,18 @@ fi
 export LADDER_RUST=$rust LADDER_SERVER=$server
 
 # The steps that run one at a time, then the ones that run side by side.
-first=(lint)
+first=()
 side=()
-if [ "$rust" = 1 ]; then first+=(unit); fi
-if [ "$rust" = 1 ] || [ "$web" = 1 ]; then first+=(web-unit); fi
-if [ -z "$fast" ]; then
-  first+=(generated embed)
-  side=(property integration cost browser)
+if [ -n "$part" ]; then
+  for step in "${all_first[@]}"; do [ "$(part_of "$step")" != "$part" ] || first+=("$step"); done
+  for step in "${all_side[@]}"; do [ "$(part_of "$step")" != "$part" ] || side+=("$step"); done
+elif [ -z "$fast" ]; then
+  first=("${all_first[@]}")
+  side=("${all_side[@]}")
 else
+  first=(lint)
+  if [ "$rust" = 1 ]; then first+=(unit); fi
+  if [ "$rust" = 1 ] || [ "$web" = 1 ]; then first+=(web-unit); fi
   if [ "$rust" = 1 ]; then side+=(property); fi
   if [ "$web" = 1 ]; then side+=(browser); fi
 fi
@@ -66,38 +135,53 @@ mkdir -p dist/ladder
 started=$SECONDS
 failed=
 
-# After lint, which may fix files, and before the tests: the browser step runs the web app's
-# build the binary serves, so that build comes first, and then the test binaries every
-# Rust test step picks from (scripts/ladder-tests), built once. They read the web build at
-# run time (CAIRN_WEB_DIR), so it is no input of them. The browser step needs both only when
-# it runs the binary (server is 1: always in the full check).
+# Before the first step after lint, which may fix files, and before the tests: the web build
+# that the binary serves and the embed step reads (the browser step runs it, and so does
+# embed, which in a part of its own gets no build from a step beside it), then the test
+# binaries every Rust test step picks from (scripts/ladder-tests), built once. They read the web
+# build at run time (CAIRN_WEB_DIR), so it is no input of them. The browser step needs the web
+# build and the tests only when it runs the binary (server is 1: always in the full check).
+# A part without those steps (lint) builds nothing.
 prepare() {
-  local log=dist/ladder/build.log needs_tests=
+  local step log=dist/ladder/build.log needs_tests= needs_web= built= build_started=$SECONDS
   : >"$log"
-  for step in "${first[@]}" ${side[@]+"${side[@]}"}; do
-    case $step in unit | property | integration | cost) needs_tests=1 ;; browser) [ "$server" != 1 ] || needs_tests=1 ;; esac
+  for step in ${first[@]+"${first[@]}"} ${side[@]+"${side[@]}"}; do
+    case $step in
+      unit | property | integration | cost) needs_tests=1 ;;
+      embed) needs_web=1 ;;
+      browser) [ "$server" != 1 ] || { needs_tests=1; needs_web=1; } ;;
+    esac
   done
-  if [[ " ${side[*]-} " == *" browser "* ]] && [ "$server" = 1 ]; then
+  if [ -n "$needs_web" ]; then
     mise run build:web >>"$log" 2>&1 || { tail -n 30 "$log"; echo "build: FAILED in $((SECONDS - started))s: the web build; log: $log"; exit 1; }
+    built="the web build"
   fi
-  [ -n "$needs_tests" ] || return 0
-  # stdout is the log; a build error shows on stderr.
-  scripts/ladder-tests --build dist/ladder/test-binaries.json >>"$log" || {
-    echo "build: FAILED in $((SECONDS - started))s: the test binaries did not build; log: $log"
-    exit 1
-  }
-  export LADDER_TEST_LIST=dist/ladder/test-binaries.json
+  if [ -n "$needs_tests" ]; then
+    # stdout is the log; a build error shows on stderr.
+    scripts/ladder-tests --build dist/ladder/test-binaries.json >>"$log" || {
+      echo "build: FAILED in $((SECONDS - started))s: the test binaries did not build; log: $log"
+      exit 1
+    }
+    export LADDER_TEST_LIST=dist/ladder/test-binaries.json
+    built="${built:+$built and }the test binaries"
+  fi
+  [ -z "$built" ] || echo "build: passed, $built, $((SECONDS - build_started))s"
 }
 
-for step in "${first[@]}"; do
+prepared=
+for step in ${first[@]+"${first[@]}"}; do
+  if [ "$step" != lint ] && [ -z "$prepared" ]; then
+    prepare
+    prepared=1
+  fi
   scripts/steps/"$step" || {
     echo "ladder: FAILED at $step after $((SECONDS - started))s; later steps did not run; log: dist/ladder/$step.log"
     exit 1
   }
-  [ "$step" != lint ] || prepare
 done
 
 if [ ${#side[@]} -gt 0 ]; then
+  [ -n "$prepared" ] || prepare
   pids=()
   for step in "${side[@]}"; do
     scripts/steps/"$step" >dist/ladder/"$step".out &
@@ -114,4 +198,5 @@ if [ -n "$failed" ]; then
   echo "ladder: FAILED at${failed} after $((SECONDS - started))s; logs: dist/ladder/<step>.log"
   exit 1
 fi
-echo "ladder: passed, ${first[*]} ${side[*]-}, $((SECONDS - started))s; logs: dist/ladder/"
+ran=(${first[@]+"${first[@]}"} ${side[@]+"${side[@]}"})
+echo "ladder: passed${part:+ (part $part)}, ${ran[*]}, $((SECONDS - started))s; logs: dist/ladder/"
