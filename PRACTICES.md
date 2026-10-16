@@ -135,6 +135,10 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 | requests in flight per process | 128 | Tens of users with a few tabs and agents; past this a client is looping. Overflow is a 503 with `Retry-After`. |
 | store connections per process | 16 | Each in-flight request borrows one for its load or commit. |
 | assistant turns in flight per process | 32 | Each turn is an open request waiting on the provider; the provider's rate limit binds well before this. |
+| automatic resubmissions of one patch, per client | 32 | A runaway stop, not a budget; the Rust and browser clients give up at the same point ([`decisions/2026-10-06-what-the-clients-safe-retry-resubmits-and-how-often.md`](decisions/2026-10-06-what-the-clients-safe-retry-resubmits-and-how-often.md)). |
+| journeys a tab keeps derived after their view closes | 8 | Going back to a recent journey shows it at once; each one holds its derivation in the tab's worker, so the least recently shown beyond this are released. |
+| canvas layouts a tab keeps | 32 views, 4 per view | Toggling a setting back and forth lays out nothing; the least recently laid out beyond this are forgotten and laid out again when shown. |
+| assistant turns a tab keeps per conversation | 50 | The newest turns; a long conversation never grows the tab without bound. |
 
 ## Code conventions
 
