@@ -63,6 +63,13 @@ use std::task::{Context, Poll, Waker};
 
 use wasm_bindgen::prelude::wasm_bindgen;
 
+// The crate version stays 0.0.0 (ARCHITECTURE, Build, run, deploy): wasm-bindgen hashes it into
+// every import name of the generated glue, so a bump would churn web/wasm/generated/.
+const _: () = assert!(
+    matches!(env!("CARGO_PKG_VERSION").as_bytes(), b"0.0.0"),
+    "the crate version stays 0.0.0: a release takes its version from its git tag at build time (CAIRN_VERSION), so do not bump Cargo.toml"
+);
+
 /// Runs a future the memory store drives to completion on its first poll: every service
 /// operation over it, which awaits nothing else.
 ///

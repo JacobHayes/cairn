@@ -72,6 +72,7 @@ pub fn assembly(notifier: Arc<InProcessNotifier>) -> Assembly<MemoryStore> {
         assets: assets(),
         metrics: PrometheusBuilder::new().build_recorder().handle(),
         clock: Clock::system(),
+        version: "dev",
     }
 }
 

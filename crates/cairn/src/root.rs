@@ -46,6 +46,9 @@ pub struct Assembly<S> {
     pub metrics: PrometheusHandle,
     /// The deployment clock.
     pub clock: Clock,
+    /// The version the server reports (MCP `serverInfo`): the binary's [`crate::VERSION`];
+    /// tests pass `dev`.
+    pub version: &'static str,
 }
 
 /// Why the server did not start, or stopped.
@@ -199,14 +202,13 @@ pub fn app<S: Store + 'static>(
     let metrics = auth.protect(telemetry::metrics_router(parts.metrics));
     // Metrics and the UI sit beside the API under its request limits: the in-flight limit
     // is per process, whatever the path. The UI answers every path the API does not keep.
-    let app = cairn_api::router_beside(service, &auth, assistant, metrics, Some(ui)).layer(
-        map_response(move |mut response: Response| {
+    let app = cairn_api::router_beside(service, &auth, assistant, metrics, Some(ui), parts.version)
+        .layer(map_response(move |mut response: Response| {
             response
                 .headers_mut()
                 .insert(assets::BUILD_HEADER, build.clone());
             std::future::ready(response)
-        }),
-    );
+        }));
     Ok(AllowedHosts::new(&config.public_url, config.listen).guard(app))
 }
 
@@ -232,6 +234,7 @@ pub async fn serve<S: Store + 'static>(
             assets: assets::load().map_err(StartupError::WebBuild)?,
             metrics,
             clock: Clock::system(),
+            version: crate::VERSION,
         },
     )?
     .merge(beside);

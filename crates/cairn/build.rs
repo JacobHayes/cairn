@@ -7,16 +7,41 @@
 //! restores the compile made from the old folder. So the script also hands the compile a
 //! digest of the folder in `CAIRN_WEB_BUILD_DIGEST`, which `src/assets.rs` reads with
 //! `env!`: a different web build is then a different compile for Cargo and the cache alike.
+//!
+//! The script also hands the compile the version the binary reports, in
+//! `CAIRN_BUILD_VERSION`: the release tag in `CAIRN_VERSION` (`v1.2.3`), or `dev` when it is
+//! unset, and a build error when it is not a semantic version. The crate version stays
+//! `0.0.0`; a release takes its version from its tag (ARCHITECTURE, Build, run, deploy).
 
+use std::env::VarError;
 use std::fs;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::io;
 use std::path::Path;
 
+#[path = "src/version.rs"]
+mod version;
+
 /// The web build the binary embeds, relative to this crate.
 const WEB_BUILD: &str = "../../web/app/dist/build";
 
 fn main() -> io::Result<()> {
+    println!("cargo::rerun-if-env-changed=CAIRN_VERSION");
+    let tag = match std::env::var("CAIRN_VERSION") {
+        Ok(tag) => Some(tag),
+        Err(VarError::NotPresent) => None,
+        Err(VarError::NotUnicode(_)) => {
+            println!("cargo::error=CAIRN_VERSION is not UTF-8");
+            return Ok(());
+        }
+    };
+    match version::from_tag(tag.as_deref()) {
+        Ok(release) => println!("cargo::rustc-env=CAIRN_BUILD_VERSION={release}"),
+        Err(problem) => {
+            println!("cargo::error={problem}");
+            return Ok(());
+        }
+    }
     if std::env::var_os("CARGO_FEATURE_WEB_DIR").is_some() {
         println!("cargo::rerun-if-changed=build.rs");
         return Ok(());

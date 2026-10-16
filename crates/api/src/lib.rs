@@ -125,8 +125,11 @@ pub fn router_with_assistant<S: Store + 'static>(
     auth: &Auth<S>,
     assistant: Option<Assistant<S>>,
 ) -> Router {
-    router_beside(service, auth, assistant, Router::new(), None)
+    router_beside(service, auth, assistant, Router::new(), None, UNRELEASED)
 }
+
+/// The version a host built without a release tag reports, as the binary's dev build does.
+const UNRELEASED: &str = "dev";
 
 /// [`router_with_assistant`], with a host's own routes `beside` it (the binary's metrics)
 /// and its web `app`, held to the same request limits and observed alike: the in-flight
@@ -134,7 +137,8 @@ pub fn router_with_assistant<S: Store + 'static>(
 /// own auth, if any, and must claim no path the API does. The server keeps
 /// [`endpoints::RESERVED`] and the health check: a path there that no endpoint serves is
 /// answered as no endpoint. Every other request is the `app`'s, which answers what it does
-/// not serve itself, or, with no app, no endpoint as well.
+/// not serve itself, or, with no app, no endpoint as well. `version` is the build the MCP
+/// server reports.
 ///
 /// # Panics
 ///
@@ -145,6 +149,7 @@ pub fn router_beside<S: Store + 'static>(
     assistant: Option<Assistant<S>>,
     beside: Router,
     app: Option<Router>,
+    version: &'static str,
 ) -> Router {
     use crate::handlers as handle;
     assert_eq!(
@@ -171,7 +176,7 @@ pub fn router_beside<S: Store + 'static>(
     });
     let mcp = api.service.capabilities().mcp.then(|| {
         let tools = cairn_mcp::ToolSet::new(api.service.clone(), auth.accounts().clock().clone());
-        cairn_mcp::router(tools)
+        cairn_mcp::router(tools, version)
     });
     // The health check sits outside the auth layer, so a proxy's anonymous probe reaches
     // it, but inside the request limits and observation like everything else.

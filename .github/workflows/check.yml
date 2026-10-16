@@ -1,7 +1,7 @@
 # PRACTICES, The validation ladder: the full ladder on every push, plus a nightly run, and the
-# simulation campaigns nightly outside the gate. Linux runners only. mise installs the pinned
-# tools; a tool that fails to install fails the job, and the lint step fails on any tool still
-# missing, so nothing is skipped.
+# simulation campaigns nightly outside the gate, and the release archives on a pushed v* tag.
+# Linux runners only. mise installs the pinned tools; a tool that fails to install fails the
+# job, and the lint step fails on any tool still missing, so nothing is skipped.
 name: check
 
 on:
@@ -101,3 +101,74 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
       - run: mise run sim
+
+  # Releases (ARCHITECTURE, Build, run, deploy): a pushed tag vX.Y.Z, once the check passes on
+  # it, is built on each Linux target with that version, and one job with write access attaches
+  # the archives to the GitHub release
+  # (decisions/2026-10-16-release-archives-are-built-by-ci-for-linux.md).
+  package:
+    needs: check
+    if: startsWith(github.ref, 'refs/tags/v')
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    env:
+      MISE_DISABLE_TOOLS: "cargo:https://github.com/JacobHayes/patina"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          # main's history, to check the tag is on it.
+          fetch-depth: 0
+      - name: Refuse a tag that is not on main
+        run: git merge-base --is-ancestor HEAD origin/main || { echo "::error::$GITHUB_REF_NAME is not on main"; exit 1; }
+      - uses: jdx/mise-action@2d8d4cafcbd33be2ea37d2b6f5ad595363d1f1ca # v5.1.1
+      - run: npm ci
+      # build.rs refuses a tag that is not a semantic version.
+      - run: mise run build:release
+        env:
+          CAIRN_VERSION: ${{ github.ref_name }}
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-${{ matrix.runner }}
+          path: dist/release/
+          if-no-files-found: error
+
+  # The only job that can write: no checkout, no build, only the archives the legs made.
+  release:
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: release-*
+          merge-multiple: true
+          path: dist/release
+      - name: Create the release, or add to it
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          shopt -s nullglob
+          archives=(dist/release/*.tar.gz)
+          [ "${#archives[@]}" -gt 0 ] || { echo "::error::no release archives"; exit 1; }
+          for archive in "${archives[@]}"; do
+            [ -f "$archive.sha256" ] || { echo "::error::$archive has no .sha256"; exit 1; }
+          done
+          assets=(dist/release/*)
+          # A pre-release part (a "-" before any "+build") makes a GitHub pre-release.
+          core=${TAG%%+*}
+          prerelease=false
+          if [[ $core == *-* ]]; then prerelease=true; fi
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "${assets[@]}" --clobber
+            gh release edit "$TAG" --draft=false --prerelease="$prerelease"
+          else
+            gh release create "$TAG" --verify-tag --generate-notes \
+              --prerelease="$prerelease" "${assets[@]}"
+          fi

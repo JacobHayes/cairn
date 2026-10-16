@@ -48,6 +48,37 @@ mod in_process {
             .status
     }
 
+    /// The MCP server reports the version the host was assembled with (I2), not the crate's:
+    /// a release's version reaches `serverInfo` through the root and the API's router.
+    #[tokio::test]
+    async fn mcp_reports_the_version_the_server_was_built_with() {
+        let config = support::config(&support::dev_provider(Some("dev-token")));
+        let assembly = root::Assembly {
+            version: "1.2.3-test",
+            ..support::assembly(Arc::new(InProcessNotifier::new()))
+        };
+        let address = support::serve(root::app(&config, assembly).unwrap()).await;
+        let headers = [
+            ("content-type", "application/json"),
+            ("accept", "application/json, text/event-stream"),
+            ("authorization", "Bearer dev-token"),
+        ];
+        let reply = send(
+            address,
+            "POST",
+            PUBLIC_HOST,
+            "/api/mcp",
+            &headers,
+            Some(INITIALIZE),
+        )
+        .await;
+        assert_eq!(reply.status, 200, "{}", reply.text());
+        assert_eq!(
+            reply.json()["result"]["serverInfo"]["version"],
+            json!("1.2.3-test")
+        );
+    }
+
     /// DNS-rebinding protection
     /// (decisions/2026-10-06-dns-rebinding-protection-is-a-host-allowlist-in-front.md):
     /// a request naming another host is refused on every surface before the auth layer,
@@ -388,6 +419,7 @@ mod in_process {
             assets: support::assets(),
             metrics: handle,
             clock: cairn_auth::Clock::system(),
+            version: "dev",
         };
         let address = support::serve(root::app(&config, assembly).unwrap()).await;
         let bearer = [("authorization", "Bearer dev-token")];

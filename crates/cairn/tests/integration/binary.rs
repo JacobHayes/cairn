@@ -154,7 +154,7 @@ mod commands {
         }
         assert!(directory.join("cairn.db").exists());
         let version = String::from_utf8(run(&["version"], &[]).stdout).unwrap();
-        assert!(version.contains(env!("CARGO_PKG_VERSION")), "{version}");
+        assert_eq!(version, format!("cairn {}\n", cairn::VERSION));
     }
 }
 

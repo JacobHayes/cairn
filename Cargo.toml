@@ -3,7 +3,9 @@ members = ["crates/*"]
 resolver = "3"
 
 [workspace.package]
-version = "0.3.0"
+# Frozen: a release takes its version from its git tag at build time (CAIRN_VERSION, read by
+# crates/cairn/build.rs), and the guard in crates/wasm/src/lib.rs fails a build that changes this.
+version = "0.0.0"
 edition = "2024"
 rust-version = "1.99"
 license = "Apache-2.0"

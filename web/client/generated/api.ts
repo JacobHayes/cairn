@@ -199,7 +199,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** The domain document: the journey, the caller's derive inputs, and the engine version; nothing derived. */
+        /** The domain document: the journey and the caller's derive inputs; nothing derived. */
         get: operations["getJourneyDocument"];
         put?: never;
         post?: never;

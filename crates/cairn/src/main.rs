@@ -74,7 +74,7 @@ fn main() -> ExitCode {
     let cli = Cli::parse();
     let outcome = match cli.command {
         Command::Version => {
-            println!("cairn {}", env!("CARGO_PKG_VERSION"));
+            println!("cairn {}", cairn::VERSION);
             Ok(())
         }
         Command::Config {

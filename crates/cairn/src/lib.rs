@@ -14,3 +14,8 @@ pub mod limits;
 pub mod listener;
 pub mod root;
 pub mod telemetry;
+pub mod version;
+
+/// The version this build reports (`cairn version`, MCP `serverInfo`): the release tag it was
+/// built from with `CAIRN_VERSION` set, else `dev` (build.rs).
+pub const VERSION: &str = env!("CAIRN_BUILD_VERSION");

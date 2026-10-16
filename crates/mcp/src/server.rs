@@ -35,8 +35,9 @@ use crate::{ToolError, ToolSet, instructions, tools};
 pub const MCP_PATH: &str = "/api/mcp";
 
 /// The MCP endpoint over `tools` at [`MCP_PATH`], for a router whose auth layer puts an
-/// [`Actor`] in every request's extensions.
-pub fn router<S: Store + 'static>(tools: ToolSet<S>) -> Router {
+/// [`Actor`] in every request's extensions. `version` is what `serverInfo` reports: the host's
+/// build.
+pub fn router<S: Store + 'static>(tools: ToolSet<S>, version: &'static str) -> Router {
     // Host and Origin checks guard a server nothing else authenticates; this one sits
     // behind the auth layer, and its public host is the deployment's, which the listener
     // owns
@@ -47,7 +48,7 @@ pub fn router<S: Store + 'static>(tools: ToolSet<S>) -> Router {
         .with_sse_keep_alive(None)
         .with_max_request_body_bytes(usize::try_from(REQUEST_BYTES_MAX).unwrap_or(usize::MAX))
         .disable_allowed_hosts();
-    let server = Server { tools };
+    let server = Server { tools, version };
     let service = StreamableHttpService::new(
         move || Ok(server.clone()),
         Arc::new(LocalSessionManager::default()),
@@ -59,12 +60,14 @@ pub fn router<S: Store + 'static>(tools: ToolSet<S>) -> Router {
 /// The rmcp handler: one per request, sharing the tool set.
 struct Server<S> {
     tools: ToolSet<S>,
+    version: &'static str,
 }
 
 impl<S> Clone for Server<S> {
     fn clone(&self) -> Self {
         Self {
             tools: self.tools.clone(),
+            version: self.version,
         }
     }
 }
@@ -76,7 +79,7 @@ impl<S: Store + 'static> ServerHandler for Server<S> {
             .enable_prompts()
             .build();
         ServerConfig::new(capabilities)
-            .with_server_info(Implementation::new("cairn", env!("CARGO_PKG_VERSION")))
+            .with_server_info(Implementation::new("cairn", self.version))
             .with_instructions(instructions::guide())
     }
 

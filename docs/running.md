@@ -10,7 +10,10 @@ the revision stream, the assistant when one is configured, and the web UI on one
 one database file. The API, MCP, metrics, and sign-in live under `/api/`; OAuth metadata
 under `/.well-known/` and the health check at `/healthz` sit beside it; every other path is
 the web UI, so a screen's address (`/journeys/<id>`) loads directly. Build it with
-`mise run build` (the web build is embedded; a binary built without it refuses to serve).
+`mise run build` (the web build is embedded; a binary built without it refuses to serve);
+set `CAIRN_VERSION=vX.Y.Z` (or `$(git describe --tags)`) to stamp the version `cairn version`
+reports, which is `dev` otherwise. Or download a release's `cairn-<version>-<target>.tar.gz`
+and its `.sha256` from the GitHub releases (Linux, x86_64 and aarch64, glibc).
 The other commands: `cairn migrate` creates the database or brings its schema up to date,
 `cairn config check` validates a configuration (providers included) without opening
 anything, and `cairn version`. `cairn demo` serves sample journeys from memory with no

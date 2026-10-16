@@ -121,12 +121,17 @@ mise run check:fast dates   # only the Rust tests, Vitest files and Playwright s
 mise run gen          # regenerate the generated files
 mise run sim          # simulation campaigns under patina; not part of check
 mise run build        # the release binary, with the web build embedded
+CAIRN_VERSION=v0.4.0 mise run build:release   # that binary versioned by a tag, packed into dist/release/
 mise run serve        # a local deployment from cairn.dev.toml
 mise run demo         # the sample journeys in memory, nothing to configure
 mise run workspace name   # a jj workspace in ../cairn-ws/name with this checkout's build outputs copied in
 ```
 
-CI runs `mise run check` on every push and nightly, and `mise run sim` nightly.
+CI runs `mise run check` on every push and nightly, and `mise run sim` nightly. To release,
+tag a commit on main and push the tag (jj does not push tags; the checkout is colocated, so git
+sees its commits): `git tag -a vX.Y.Z -m vX.Y.Z <commit>` and `git push origin vX.Y.Z`. CI then
+builds the Linux archives and publishes the GitHub release; a tag like `v0.4.0-rc.1` makes a
+pre-release. No file changes per release.
 
 More reading:
 

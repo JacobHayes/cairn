@@ -1,0 +1,9 @@
+# Releases take their version from the git tag
+
+Question (from the release work): every `workspace.package.version` bump changed `Cargo.lock`, the OpenAPI document and the wasm glue (wasm-bindgen hashes the crate name and version into every import name), so a release meant a regeneration commit and a failing generated step until it landed. Where should the version of a release live?
+
+Call: in the tag. `Cargo.toml` stays at `0.0.0`, forever, and a `const` assertion in `crates/wasm/src/lib.rs` fails the build of any other value, naming the reason, so a hand bump fails at once instead of in CI. The build takes the version from `CAIRN_VERSION` (`v1.2.3`, `1.2.3`, a pre-release such as `v0.4.0-rc.1`, or `git describe` output): `crates/cairn/build.rs` strips one leading `v`, refuses anything that is not a semantic version with a build error, and hands the compile `CAIRN_BUILD_VERSION` through `rustc-env`, the route the web build's digest already uses, which the build cache keys on. Unset or empty is `dev`, so check and test builds never vary. `cairn version` prints it. The version never reaches the web build or the wasm module, so skew detection (a digest of the web build) is unchanged and a release and a dev build of one commit share a digest.
+
+Alternatives: bump the crate version per release (the status quo: churns generated files, and the bump commit must pass the generated step); `option_env!` read in `main.rs` (the build cache is not known to key on it, so a cached compile could keep an old version; the release task's smoke check would catch that, but `rustc-env` avoids it); an empty `CAIRN_VERSION` as an error (the shell idiom treats it as unset, and the release task itself refuses an empty value).
+
+What would change it: publishing crates to a registry, which needs real versions in the manifests.

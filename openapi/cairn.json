@@ -14243,7 +14243,7 @@
   "info": {
     "description": "The Cairn HTTP API. Every request but the health check is authenticated (a session cookie or a bearer token). A rejected patch answers its rejection unchanged, every violation by path (A15); other errors answer a Problem with the request id.",
     "title": "Cairn",
-    "version": "0.3.0"
+    "version": "unversioned"
   },
   "openapi": "3.1.0",
   "paths": {
@@ -15673,7 +15673,7 @@
             "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
           }
         },
-        "summary": "The domain document: the journey, the caller's derive inputs, and the engine version; nothing derived."
+        "summary": "The domain document: the journey and the caller's derive inputs; nothing derived."
       }
     },
     "/api/journeys/{id}/history": {

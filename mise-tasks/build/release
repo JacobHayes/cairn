@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+#MISE description="Build a release archive: the binary as build makes it, versioned by CAIRN_VERSION (a vX.Y.Z tag), packed with its licence into dist/release/ beside its SHA-256"
+# ARCHITECTURE, Build, run, deploy: releases. CI's release jobs run this on each target.
+set -euo pipefail
+cd "$(dirname "$0")/../.."
+[ -n "${CAIRN_VERSION:-}" ] || {
+  echo "build:release: set CAIRN_VERSION to the release tag (vX.Y.Z)" >&2
+  exit 1
+}
+version=${CAIRN_VERSION#v}
+# build.rs refuses a CAIRN_VERSION that is not a semantic version.
+mise run build
+target_dir=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
+  let text = "";
+  process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => console.log(JSON.parse(text).target_directory));')
+binary=$target_dir/release/cairn
+# The binary must report the release's version: a build that kept an old one is not released.
+reported=$("$binary" version)
+[ "$reported" = "cairn $version" ] || {
+  echo "build:release: the binary reports '$reported', not 'cairn $version'" >&2
+  exit 1
+}
+triple=$(rustc -vV | sed -n 's/^host: //p')
+name=cairn-$version-$triple
+rm -rf dist/release dist/release-stage
+mkdir -p dist/release "dist/release-stage/$name"
+install -m 755 "$binary" "dist/release-stage/$name/cairn"
+cp LICENSE README.md "dist/release-stage/$name/"
+tar -C dist/release-stage --owner=0 --group=0 --numeric-owner -czf "dist/release/$name.tar.gz" "$name"
+(cd dist/release && sha256sum "$name.tar.gz" >"$name.tar.gz.sha256")
+rm -rf dist/release-stage
+ls dist/release
