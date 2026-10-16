@@ -12,8 +12,9 @@ under `/.well-known/` and the health check at `/healthz` sit beside it; every ot
 the web UI, so a screen's address (`/journeys/<id>`) loads directly. Build it with
 `mise run build` (the web build is embedded; a binary built without it refuses to serve);
 set `CAIRN_VERSION=vX.Y.Z` (or `$(git describe --tags)`) to stamp the version `cairn version`
-reports, which is `dev` otherwise. Or download a release's `cairn-<version>-<target>.tar.gz`
-and its `.sha256` from the GitHub releases (Linux, x86_64 and aarch64, glibc).
+reports, which is `dev` otherwise. Or download a release's `cairn-<target>` binary and its `.sha256` from the GitHub releases
+(Linux, x86_64 and aarch64, glibc; `chmod +x` it and check it with `sha256sum -c`).
+`releases/latest/download/cairn-x86_64-unknown-linux-gnu` is the newest stable release.
 The other commands: `cairn migrate` creates the database or brings its schema up to date,
 `cairn config check` validates a configuration (providers included) without opening
 anything, and `cairn version`. `cairn demo` serves sample journeys from memory with no

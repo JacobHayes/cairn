@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-#MISE description="Build a release archive: the binary as build makes it, versioned by CAIRN_VERSION (a vX.Y.Z tag), packed with its licence into dist/release/ beside its SHA-256"
+#MISE description="Build a release binary: the binary as build makes it, versioned by CAIRN_VERSION (a vX.Y.Z tag), copied to dist/release/cairn-<target> beside its SHA-256"
 # ARCHITECTURE, Build, run, deploy: releases. CI's release jobs run this on each target.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -21,12 +21,12 @@ reported=$("$binary" version)
   exit 1
 }
 triple=$(rustc -vV | sed -n 's/^host: //p')
-name=cairn-$version-$triple
-rm -rf dist/release dist/release-stage
-mkdir -p dist/release "dist/release-stage/$name"
-install -m 755 "$binary" "dist/release-stage/$name/cairn"
-cp LICENSE README.md "dist/release-stage/$name/"
-tar -C dist/release-stage --owner=0 --group=0 --numeric-owner -czf "dist/release/$name.tar.gz" "$name"
-(cd dist/release && sha256sum "$name.tar.gz" >"$name.tar.gz.sha256")
-rm -rf dist/release-stage
+# No version in the name, so releases/latest/download/cairn-<target> is a stable link; the
+# version is in the binary and the tag. The checksum names the asset, so `sha256sum -c` works
+# in the download directory.
+name=cairn-$triple
+rm -rf dist/release
+mkdir -p dist/release
+install -m 755 "$binary" "dist/release/$name"
+(cd dist/release && sha256sum "$name" >"$name.sha256")
 ls dist/release

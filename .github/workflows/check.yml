@@ -1,5 +1,5 @@
 # PRACTICES, The validation ladder: the full ladder on every push, plus a nightly run, and the
-# simulation campaigns nightly outside the gate, and the release archives on a pushed v* tag.
+# simulation campaigns nightly outside the gate, and the release binaries on a pushed v* tag.
 # Linux runners only. mise installs the pinned tools; a tool that fails to install fails the
 # job, and the lint step fails on any tool still missing, so nothing is skipped.
 name: check
@@ -104,8 +104,8 @@ jobs:
 
   # Releases (ARCHITECTURE, Build, run, deploy): a pushed tag vX.Y.Z, once the check passes on
   # it, is built on each Linux target with that version, and one job with write access attaches
-  # the archives to the GitHub release
-  # (decisions/2026-10-16-release-archives-are-built-by-ci-for-linux.md).
+  # the binaries to the GitHub release
+  # (decisions/2026-10-16-release-binaries-are-built-by-ci-for-linux.md).
   package:
     needs: check
     if: startsWith(github.ref, 'refs/tags/v')
@@ -135,7 +135,7 @@ jobs:
           path: dist/release/
           if-no-files-found: error
 
-  # The only job that can write: no checkout, no build, only the archives the legs made.
+  # The only job that can write: no checkout, no build, only the binaries the legs made.
   release:
     needs: package
     if: startsWith(github.ref, 'refs/tags/v')
@@ -155,12 +155,17 @@ jobs:
           TAG: ${{ github.ref_name }}
         run: |
           shopt -s nullglob
-          archives=(dist/release/*.tar.gz)
-          [ "${#archives[@]}" -gt 0 ] || { echo "::error::no release archives"; exit 1; }
-          for archive in "${archives[@]}"; do
-            [ -f "$archive.sha256" ] || { echo "::error::$archive has no .sha256"; exit 1; }
+          binaries=(dist/release/cairn-*)
+          checksums=(dist/release/cairn-*.sha256)
+          [ "${#checksums[@]}" -gt 0 ] || { echo "::error::no release binaries"; exit 1; }
+          for checksum in "${checksums[@]}"; do
+            binary=${checksum%.sha256}
+            [ -f "$binary" ] || { echo "::error::$checksum has no binary"; exit 1; }
           done
-          assets=(dist/release/*)
+          for binary in "${binaries[@]}"; do
+            [[ $binary == *.sha256 || -f "$binary.sha256" ]] || { echo "::error::$binary has no .sha256"; exit 1; }
+          done
+          assets=("${binaries[@]}")
           # A pre-release part (a "-" before any "+build") makes a GitHub pre-release.
           core=${TAG%%+*}
           prerelease=false

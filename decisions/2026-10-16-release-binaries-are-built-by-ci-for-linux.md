@@ -1,0 +1,16 @@
+# Release binaries are built by CI, for Linux
+
+Question (from the release work): a pushed tag should produce a GitHub release with binaries. Revised: the assets were first tarballs (binary, `LICENSE`, `README.md`); the owner asked for plain binaries, which need no unpacking and give a stable download link. Which targets, how is it named, who may write, and what is a pre-release?
+
+Call:
+- The `package` and `release` jobs in `check.yml` run when a `v*` tag is pushed, after `check` passes on it. `package` builds on `ubuntu-latest` (x86_64) and `ubuntu-24.04-arm` (aarch64), `fail-fast: false`, with a read-only token: it refuses a tag whose commit is not on main, runs `mise run build:release` with `CAIRN_VERSION` set to the tag, and uploads `dist/release/` as a workflow artifact. `build:release` builds as `mise run build` does, checks the binary reports the release's version (a build that kept an old one is not released), and copies the binary to `cairn-<rustc host triple>` (no version in the name, so `releases/latest/download/cairn-x86_64-unknown-linux-gnu` is a stable link; the version is in the binary and the tag) beside `cairn-<rustc host triple>.sha256` in `sha256sum` format, naming the asset so `sha256sum -c` works after download.
+- `release` is the one job with `contents: write`, and has no checkout and no build: it downloads every leg's files, refuses a binary without its checksum, or a checksum without its binary, and creates the release with `--verify-tag --generate-notes`, or uploads to it (`--clobber`) and publishes it if it exists, for a re-run or a hand-made draft. One publisher, because `gh release create` with assets makes a draft, uploads, then publishes, and a second leg uploading into that draft could lose its files or leave a stale draft. It needs every leg, so a failed leg publishes nothing, and re-running failed jobs rebuilds only that leg.
+- A tag with a pre-release part (a `-` before any `+build`: `v0.3.1-alpha.1`, `v1.0.0-rc.2`) makes a GitHub pre-release, not the latest release. Notes stay auto-generated.
+- build.rs is the only semantic-version validator: a non-semver `v*` tag fails at the build, before anything is published; no second regex in the workflow to drift.
+- Linux only, GitHub-hosted runners; no hosted macOS (macOS would go to the owner's self-hosted runner). The jobs run on any `v*` ref, so a manual run on a tag rebuilds and re-uploads that tag's assets. The binaries need the runner image's glibc or newer. `LICENSE` and dependency licence notices are not bundled with the binary; they are in the repository.
+- Cutting a release is `git tag -a vX.Y.Z -m vX.Y.Z <commit on main>` and `git push origin vX.Y.Z` (jj does not push tags).
+- The aarch64 leg is cheap (one matrix entry: mise's lockfile pins linux-arm64 tools, the npm lockfile has the arm64 bindings) but unproven until the first tag, since a cross check from this machine could not be set up. If it stays broken, dropping its matrix line is the fix.
+
+Alternatives: x86_64 only; each leg publishing itself (the draft race above); a regex in the workflow as well as in build.rs; hand-written notes.
+
+What would change it: a target that needs a different runner (macOS, musl), signing or provenance for the binaries, or a cheaper way to build for aarch64 than a native runner.
