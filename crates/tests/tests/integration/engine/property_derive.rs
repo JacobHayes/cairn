@@ -7,13 +7,15 @@ mod property {
     use std::collections::BTreeSet;
 
     use cairn_engine::testing::derive_inputs;
-    use cairn_engine::testing::generated::arb_journey;
+    use cairn_engine::testing::generated::{arb_journey, plan_held};
     use cairn_engine::{Derived, Graph, derive};
     use cairn_schema::{
         Deployment, EntityKey, KindKey, NodeKey, ParticipationOrigin, ParticipationSource,
-        Relevance, RoleKey, State,
+        Relevance, RoleKey, State, ViolationCode,
     };
     use patina_dst_proptest::prelude::*;
+
+    use crate::engine::support;
 
     fn derived(graph: &Graph) -> Derived {
         derive(graph, None, &derive_inputs(Deployment::default()))
@@ -38,7 +40,8 @@ mod property {
             })
     }
 
-    /// The graph with every open decision skipped: every decision terminal.
+    /// The graph with every open decision skipped: every decision terminal. Skipping takes
+    /// nodes out of scope and brings others in, so the plan is held again over the new scope.
     fn every_decision_terminal(graph: &Graph) -> Graph {
         let mut document = graph.document().clone();
         for stored in document.state.nodes.values_mut() {
@@ -47,7 +50,7 @@ mod property {
                 stored.skip_reason = Some("Generated.".parse().unwrap());
             }
         }
-        Graph::new(document, &Deployment::default()).unwrap()
+        plan_held(document)
     }
 
     /// D1a by its definition: a non-terminal, in-scope node with a skipped proper ancestor
@@ -161,14 +164,58 @@ mod property {
                 .all(|entity| members(graph, &role).contains(entity))
     }
 
+    /// D1a: with every decision terminal, no node's relevance is undecided.
+    fn assert_decided_once_terminal(graph: &Graph) -> Result<(), TestCaseError> {
+        let derived = derived(&every_decision_terminal(graph));
+        for (key, found) in derived.relevance().iter() {
+            prop_assert_ne!(found.value, Relevance::Undecided, "{}", key);
+        }
+        Ok(())
+    }
+
+    /// Skipping a decision can bring a contradictory chain into the plan: a group due before
+    /// a milestone one day ahead of it, with the milestone inside the group beneath a node
+    /// that waits for the answer to a second decision. That answer counts only once the
+    /// second decision is itself relevant, which it is when the first is skipped and not
+    /// while the first is open. The plan holds with the first open; skipped, the chain
+    /// contradicts, and the terminal graph is built with that chain's dates dropped.
+    #[test]
+    fn a_skipped_decision_can_bring_a_contradictory_chain_into_scope() {
+        let mut mutations = support::add_nodes(&[
+            "{key: n_first, id: first, kind: decision, title: First, prompt: First?, answer_type: boolean}",
+            "{key: n_second, id: second, kind: decision, title: Second, prompt: Second?, answer_type: boolean}",
+            "{key: n_group, id: group, kind: group, title: Group, due_by: {before: n_ms, offset: 1}}",
+            "{key: n_inner, id: inner, kind: group, title: Inner, parent: n_group, relevant_when: {answered: n_second}}",
+            "{key: n_ms, id: ms, kind: milestone, title: Ms, parent: n_inner}",
+        ]);
+        mutations.push_str("- op: answer\n  decision: n_second\n  value: {boolean: true}\n");
+        mutations.push_str("- op: set_node_field\n  node: n_second\n  value: {relevant_when: {not: {equals: {decision: n_first, value: true}}}}\n");
+        let records = support::journey(&mutations);
+        let graph = support::journey_graph(&records, support::JOURNEY);
+        let mut document = graph.document().clone();
+        for stored in document.state.nodes.values_mut() {
+            if stored.state == State::Open {
+                stored.state = State::Skipped;
+                stored.skip_reason = Some("Generated.".parse().unwrap());
+            }
+        }
+        let Err(violations) = Graph::new(document, &Deployment::default()) else {
+            panic!("skipping the decision should bring the chain into the plan");
+        };
+        assert!(
+            violations
+                .as_slice()
+                .iter()
+                .any(|found| found.code == ViolationCode::ContradictoryChain),
+            "{violations:#?}"
+        );
+        assert_decided_once_terminal(&graph).unwrap();
+    }
+
     proptest! {
         #[test]
         fn relevance_is_decided_once_every_decision_is_terminal(graph in arb_journey(1..=120)) {
-            let terminal = every_decision_terminal(&graph);
-            let derived = derived(&terminal);
-            for (key, found) in derived.relevance().iter() {
-                prop_assert_ne!(found.value, Relevance::Undecided, "{}", key);
-            }
+            assert_decided_once_terminal(&graph)?;
         }
 
         #[test]

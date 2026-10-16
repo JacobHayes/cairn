@@ -315,9 +315,16 @@ fn is_within(document: &Document, key: &NodeKey, ancestor: &NodeKey) -> bool {
     false
 }
 
-/// The graph, with the dates of every node on a contradictory chain dropped until its plan
-/// holds (F5); a graph with no dates at all holds, so this ends.
-fn plan_held(mut document: Document) -> Graph {
+/// The graph of `document`, with the dates of every node on a contradictory chain dropped
+/// until its plan holds (F5); a graph with no dates at all holds, so this ends. A test that
+/// changes a generated document's state calls this on the result: the state decides which
+/// nodes are in scope, and the plan holds over those.
+///
+/// # Panics
+///
+/// When the document breaks an invariant other than a contradictory chain.
+#[must_use]
+pub fn plan_held(mut document: Document) -> Graph {
     let deployment = cairn_schema::Deployment::default();
     loop {
         let violations = match Graph::new(document.clone(), &deployment) {

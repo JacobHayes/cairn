@@ -197,6 +197,19 @@ if [ "$rust" = 1 ]; then
   fi
   ladder_suite clippy "$checked" crates
 
+  # Each testbed is a workspace of its own with its own lock file, which nothing above reads;
+  # `mise run sim` builds them with --locked nightly. A lock that no longer matches the crates
+  # it depends on (a version or dependency change in the main workspace) fails here, on push.
+  testbed_locks=0
+  for manifest in testbeds/*/Cargo.toml; do
+    cargo metadata --locked --format-version 1 --manifest-path "$manifest" >/dev/null 2>"$typescript/testbed-lock.err" || {
+      ladder_show <"$typescript/testbed-lock.err"
+      ladder_fail "$(dirname "$manifest")/Cargo.lock is out of date (run: cargo metadata --format-version 1 --manifest-path $manifest >/dev/null)"
+    }
+    testbed_locks=$((testbed_locks + 1))
+  done
+  ladder_suite "testbed lock files" "$testbed_locks" testbeds
+
   # PRACTICES, Simulation with patina: every `sometimes!`, `reachable!`, `always!`, and
   # `buggify!` site carries a literal kebab-case label. A campaign reads the labels declared
   # anywhere in a binary, and one holding a space breaks every campaign over it (patina gap 5,
