@@ -65,11 +65,16 @@ mise run sim     # every leg of sim.sh, from the repository root
    events, an interrupted commit lost whole, one that had landed, a restart recovering
    acknowledged commits.
 6. The same sweep with fs errors at 5 per mille: no invariant breaks. A run whose store
-   fails closed ends `unavailable`, as one whose store does not open does. The store
-   finding below is pinned as a regression run (seed 5, no crash point): its first failing
-   fsync is a commit's, and the run must end with the store failed closed. A store that
-   answered on would complete it, acknowledging the commit from its receipt.
-7. Known gaps still reproduce.
+   fails closed ends `unavailable`, as one whose store does not open does. A write that
+   fails at a sync while the store still answers is a violation (the store finding below),
+   and a `sometimes!` oracle on the other outcome, a failed sync that closed the store,
+   makes leg 4's campaign require that it happened.
+7. Known gaps still reproduce: the page-cache panic of a retried open (the first of 64
+   seeds that shows it; no check names a seed) and the absence of a partial Turso log
+   frame after a crash. The other Turso gaps are cases of the store's own tests.
+
+No check here depends on one seed's outcome: a seed reproduces a run on one binary only
+(`decisions/2026-10-16-simulation-checks-pin-no-seed.md`).
 
 ## Findings
 
@@ -84,8 +89,8 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
   (Linux drops it) and accepts `posix_fadvise` without changing anything, so a run cannot
   show the restart reading from disk: the world ends the run when the store fails closed,
   instead of reopening it in-process. Its deterministic tests are
-  `crates/tests/tests/integration/store_turso/conformance/conformance/log_sync.rs`; leg 6 pins
-  seed 5. Recorded in
+  `crates/tests/tests/integration/store_turso/conformance/conformance/log_sync.rs`; the
+  testbed judges every sync failure of every run. Recorded in
   [`decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md`](../../decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md),
   which replaced the barrier of
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
@@ -99,8 +104,10 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
   sweep early, which leg 5 catches. Recorded in
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 - **Turso: opens under injected faults.** A log size error at open panics; a short read of
-  the log header fails the open; an open retried in-process after a failed one panics in the
-  page cache; `EINTR` is reported, not retried. Recorded in
+  the log header fails the open (both are cases in
+  `crates/tests/tests/integration/store_turso/open_faults.rs`); an open retried in-process
+  after a failed one panics in the page cache (leg 7); `EINTR` is reported, not retried.
+  Recorded in
   [`decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md`](../../decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md).
 - **Patina: no crash in campaigns, no partial Turso frame.** A campaign never draws a crash,
   so the crash oracles carry constant labels (out of the link-time table) and the sweep

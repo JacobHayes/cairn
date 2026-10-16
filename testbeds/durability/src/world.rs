@@ -192,6 +192,7 @@ impl World {
                     eprintln!("DURABILITY_RETRY step={index} error={error}");
                     failed += 1;
                     self.failures += 1;
+                    self.judge_sync_failure(index, &error)?;
                     if let Err(closed) = self.store().health() {
                         return Err(Stop::Unavailable(closed.to_string()));
                     }
@@ -207,6 +208,24 @@ impl World {
                 }
             }
         }
+    }
+
+    /// A write that failed at a sync may be visible without being on disk, so the store must
+    /// have failed closed (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-
+    /// closed.md). Judged on every such failure of every run; the `sometimes!` makes the
+    /// campaign require that one happened.
+    fn judge_sync_failure(&self, index: usize, error: &impl std::fmt::Display) -> Result<(), Stop> {
+        if !error.to_string().contains("(sync)") {
+            return Ok(());
+        }
+        let closed = self.store().health().is_err();
+        patina_dst::sometimes!(closed, "durability-sync-failure-closed-store");
+        if closed {
+            return Ok(());
+        }
+        let detail = format!("step {index} failed at a sync and the store answers on: {error}");
+        report_violation("durability-failed-sync-fails-store-closed", &detail);
+        Err(Stop::Violated)
     }
 }
 

@@ -14,12 +14,15 @@
 #      byte-granular tearing, over two seeds; every run restarts and completes with the
 #      invariants holding, and every crash oracle fires somewhere in the sweep;
 #   6. crash under errors: the sweep's crash points with fs errors too; no run breaks an
-#      invariant, and the pinned run of the fixed store finding ends with the store failed
-#      closed (a store that does not open on a failing disk is an honest outcome);
-#   7. known Turso and patina gaps (README, Findings): each must still reproduce exactly as
-#      recorded. One that stops reproducing fails this leg, so a Turso or patina bump that
-#      fixes it gets its README section and its file in decisions/ updated instead of
-#      going stale.
+#      invariant (a store that does not open on a failing disk is an honest outcome). A run
+#      that fails a write at a sync and leaves the store answering is a violation of the
+#      testbed itself, and leg 4's campaign requires that a failed sync closing the store
+#      happened;
+#   7. known patina gaps and the Turso gap that needs a sweep (README, Findings): each must
+#      still reproduce. One that stops reproducing fails this leg, so a bump that fixes it
+#      gets its README section and its file in decisions/ updated instead of going stale.
+#      No check here depends on one seed's outcome
+#      (decisions/2026-10-16-simulation-checks-pin-no-seed.md).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -196,33 +199,22 @@ while read -r status err; do
     fi
   fi
 done <"$out/crash-errors.runs"
-mapfile -t error_logs < <(awk '{print $2}' "$out/crash-errors.runs")
-# The finding the testbed found
-# (decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md), pinned as a
-# regression: seed 5's first failing fsync is a commit's, and the run must end with the store
-# failed closed. A store that answered on after it (and acknowledged the commit from its
-# receipt) would complete the run instead, and lose that acknowledged commit to a crash.
-run --seed 5 --fs-error-permille 5 >/dev/null 2>"$out/finding.err" ||
-  fail "the pinned failed log sync run broke an invariant: $out/finding.err"
-grep -q '^DURABILITY_RESULT outcome=unavailable .*the store failed closed: .*(sync)' "$out/finding.err" ||
-  fail "the pinned run no longer ends with the store failed closed after a failed sync ($out/finding.err): find a new seed"
-complete=$(grep -l '^DURABILITY_RESULT outcome=complete ' "${error_logs[@]}" | wc -l)
-say "leg 6 passed: crash under errors, $complete of $(wc -l <"$out/crash-errors.runs") runs completed, no invariant broke; the pinned run ended with the store failed closed"
+complete=$(grep -l '^DURABILITY_RESULT outcome=complete ' $(awk '{print $2}' "$out/crash-errors.runs") | wc -l)
+say "leg 6 passed: crash under errors, $complete of $(wc -l <"$out/crash-errors.runs") runs completed, no invariant broke"
 
-# gap NAME PATTERN ARGS...: a run with ARGS must still print PATINA.
-gap() {
-  local name=$1 pattern=$2
-  shift 2
-  run "$@" >"$out/gap-$name.log" 2>&1 || true
-  grep -Eq "$pattern" "$out/gap-$name.log" ||
-    fail "Turso gap '$name' no longer reproduces: update testbeds/durability/README.md and its file in decisions/"
-  say "gap $name still reproduces: $(grep -Eo "$pattern" "$out/gap-$name.log" | head -1)"
-}
-gap open-size-panic 'turso panicked: failed to get file size' --seed 27 --fs-error-permille 50
-gap open-short-read 'Logical log short read: expected [0-9]+, got [0-9]+' --seed 3 --fs-short-permille 200
-gap reopen-page-cache-panic 'Attempted to insert different page with same key' \
-  --seed 6 --fs-error-permille 20 -- --open-attempts 64
+# The Turso gaps whose injected fault is deterministic are cases of the store's own tests
+# (crates/tests, store_turso/open_faults.rs). The last one needs a failed open at a point only
+# a run's fault draws reach, so it is a sweep: the gap still reproduces if any of the first
+# 64 seeds reproduces it, whichever seed that is on this binary.
+pattern='Attempted to insert different page with same key'
+for seed in $(seq 1 64); do
+  run --seed "$seed" --fs-error-permille 20 -- --open-attempts 64 >"$out/gap-reopen.log" 2>&1 || true
+  grep -Eq "$pattern" "$out/gap-reopen.log" && break
+done
+grep -Eq "$pattern" "$out/gap-reopen.log" ||
+  fail "Turso gap 'reopen-page-cache-panic' no longer reproduces in 64 seeds: update testbeds/durability/README.md and its file in decisions/"
+say "gap reopen-page-cache-panic still reproduces: $pattern"
 torn=$(grep -l '^DURABILITY_RESTART .*torn_tail=true' "${crash_logs[@]}" || true)
 [ -z "$torn" ] || fail "patina gap 'no-partial-log-frame' no longer reproduces ($torn): require durability-torn-log-tail-discarded in leg 5 and update README.md and its file in decisions/"
 say "gap no-partial-log-frame still reproduces: no crash left part of a Turso log frame"
-say "leg 7 passed: known Turso and patina gaps reproduce as recorded"
+say "leg 7 passed: known gaps reproduce as recorded"
