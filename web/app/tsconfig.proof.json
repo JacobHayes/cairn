@@ -1,0 +1,8 @@
+{
+  // The proof config's (playwright.proof.config.ts): a proof spec lives outside the checkout,
+  // where Node finds no node_modules, so `@playwright/test` is mapped to the repository's copy:
+  // its ESM entry, the one the browser tests' helpers load, so spec and helpers share one.
+  "compilerOptions": {
+    "paths": { "@playwright/test": ["../../node_modules/@playwright/test/index.mjs"] }
+  }
+}

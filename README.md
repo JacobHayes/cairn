@@ -125,6 +125,7 @@ mise run build        # the release binary, with the web build embedded
 CAIRN_VERSION=v0.4.0 mise run build:release   # that binary versioned by a tag, copied to dist/release/ with its checksum
 mise run serve        # a local deployment from cairn.dev.toml
 mise run demo         # the sample journeys in memory, nothing to configure
+mise run proof DIR    # a proof's media, from the Playwright specs in DIR (kept outside the repository)
 mise run workspace name   # a jj workspace in ../cairn-ws/name with this checkout's build outputs copied in
 ```
 
