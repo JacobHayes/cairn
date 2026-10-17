@@ -220,8 +220,8 @@ pub fn limit_seeds() -> Vec<NodeSeed> {
 
 /// A journey of `nodes` nodes (at most `node_count_max`) shaped like a real route rather than
 /// the limits' worst case: the limits' containment, kinds, stored states, and stage openings,
-/// but three requirements per node, conditions on one node in six, and no date rules. It is
-/// the size benchmarks' input (design: a 500-node and a 2,000-node journey).
+/// but three requirements per node, conditions on one node in six, and no date rules. The
+/// wasm build's agreement cases run it at 2,000 nodes.
 ///
 /// # Panics
 ///

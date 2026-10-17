@@ -3,12 +3,11 @@
 //! date rules on every node at the edge limit) as a journey. No fixture reaches the limits
 //! and no store holds this journey, so its expected values are the native engine's through
 //! this crate: what the browser's wasm build must match at the depth limit, on its small
-//! stack. It is also the derive benchmark's input (ARCHITECTURE, Date network: reported, not
-//! gated).
+//! stack.
 //!
-//! The size figures' input is a journey of 2,000 generated nodes shaped like a real route
-//! ([`budget_group`]): the level with containers collapsed and a relevance class left out,
-//! and a trace, which the browser test times in the worker and reports.
+//! Beside it, a journey of 2,000 generated nodes shaped like a real route ([`budget_group`]):
+//! the level with containers collapsed and a relevance class left out, and a trace, which the
+//! wasm build must match at that size.
 
 use std::collections::BTreeSet;
 

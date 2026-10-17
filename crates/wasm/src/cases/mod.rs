@@ -10,8 +10,8 @@
 //! merge (so a derive cached across a deployment change is caught). [`limits_group`] adds a
 //! document at the limits (containment at the depth limit, `node_count_max` nodes), whose
 //! expected values are the native engine's: there the point is the wasm build at the depth
-//! limit, and the benchmark. [`budget_group`] adds a generated journey of 2,000 nodes,
-//! whose level and trace the browser test times and reports.
+//! limit. [`budget_group`] adds a generated journey of 2,000 nodes shaped like a real route,
+//! whose levels and trace the wasm build must match at that size.
 
 mod limits;
 mod walk;

@@ -14,8 +14,8 @@ crate-type = ["cdylib", "rlib"]
 
 [features]
 # The server's side of the agreement (`cairn_wasm::cases`): the fixtures walked through the
-# service natively, and a document at the limits, for the native agreement tests, the browser
-# tests, and the benchmark. Native only; never part of the browser build.
+# service natively, and a document at the limits, for the native agreement tests and the browser
+# tests. Native only; never part of the browser build.
 server = ["cairn-engine/testing"]
 
 [[bin]]

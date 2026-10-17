@@ -3,7 +3,7 @@
 // interface, so the code under test is the browser's, not a copy. Each `fresh` call starts
 // from the module graph up when a test resets the registry first (the engine's instance,
 // the worker's held documents, and the stop latch of ./types.ts), as a page and a worker of
-// its own would. No Vitest in here: the proof's benchmark (proof/bench.ts) runs it too.
+// its own would.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";

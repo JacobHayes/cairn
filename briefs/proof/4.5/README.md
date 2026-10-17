@@ -35,4 +35,3 @@ derive worker's own script runs in Node's V8 over the same wasm32 binary, timed 
 At 2,000 generated nodes the slowest level takes 23.8 ms and the trace 1.6 ms (median of 9).
 The figures were taken on a loaded machine, so the milliseconds are larger than an idle run's.
 
-`prove.sh` prints this table afresh; timings vary with the host's load.
