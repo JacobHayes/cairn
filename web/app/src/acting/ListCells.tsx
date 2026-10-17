@@ -6,11 +6,10 @@
 import type { CSSProperties } from "react";
 import { Link, useLocation } from "react-router";
 
-import { ancestorsOf, placedAt } from "../canvas/ladder.ts";
-import { DEFAULT_GRAPH_VIEW, canvasPath, revealing } from "../canvas/settings.ts";
 import type { DecisionRow } from "../decisions/model.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
-import { nodePath, screenPath } from "../detail/parts.tsx";
+import { nodeOpened, screenSwitched } from "../journeys/address.ts";
+import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { entityName } from "../detail/sections.tsx";
 import { rollups } from "../plan/tree.ts";
 import { statusTone, statusWord } from "../status/words.ts";
@@ -91,7 +90,7 @@ function Acting({ line, context }: { line: Line; context: CellContext }) {
   return line.row === undefined ? null : (
     <span className="list-acting stack" data-testid="list-acting">
       <Fact line={line} context={context} />
-      <RowActions view={context.view} row={line.row} to={`${nodePath(screenPath(pathname), line.key)}${search}`} owner={false} />
+      <RowActions view={context.view} row={line.row} to={nodeOpened(pathname, search, line.key)} owner={false} />
     </span>
   );
 }
@@ -125,6 +124,8 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
 
 /** What a node's affects say of its answer: what it brought in and ruled out, or what waits on it. */
 function Affects({ context, node }: { context: CellContext; node: string }) {
+  const { search } = useLocation();
+  const target = useJourneyTarget();
   const decision = context.decisions.get(node);
   if (decision === undefined || decision.affects.length === 0) {
     return null;
@@ -136,7 +137,8 @@ function Affects({ context, node }: { context: CellContext; node: string }) {
       ? `Decides ${String(decision.affects.length)} ${decision.affects.length === 1 ? "item" : "items"}`
       : [brought > 0 ? `brings in ${String(brought)}` : "", out > 0 ? `drops ${String(out)}` : ""].filter(Boolean).join(", ");
   const kind = nodeOf(context.view, node);
-  const to = kind === undefined ? undefined : canvasPath(context.view.journey.header.id, revealing(DEFAULT_GRAPH_VIEW, placedAt(context.view.journey.graph.nodes ?? [], kind.kind, ancestorsOf(context.view.journey.graph.nodes ?? [], node)), context.view.derived.nodes[node]?.display_state), node);
+  // The graph draws the node whatever the view hides (C7), so the link only has to name it.
+  const to = kind === undefined ? undefined : screenSwitched(target, search, "graph", node);
   return to === undefined ? <>{words}</> : <Link to={to} data-testid="affects-link">{words}</Link>;
 }
 

@@ -9,7 +9,7 @@ import { visit } from "../e2e/shell.ts";
 const out = process.env["CAIRN_PROOF_OUT"] ?? "dist/proof";
 
 test("opening Cairn shows the journey index", async ({ page }) => {
-  await visit(page, "browser", "/");
+  await visit(page, "browser", "/journeys");
   await expect(page.getByTestId("journey-row").first()).toBeVisible();
   await page.screenshot({ path: join(out, "1-opening-cairn.png") });
 });

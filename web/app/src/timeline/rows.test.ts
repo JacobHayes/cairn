@@ -51,12 +51,21 @@ describe("the rows are the drawn nodes with dates", () => {
     expect(loose.rows.map((row) => [row.key, row.depth])).toEqual([["n_report", 0], ["n_meeting", 0]]);
   });
 
-  it("holds open the containers above a selected node, and selects its stand-in when it is not drawn", () => {
-    const view = testView();
-    const held = chartOf(view, timeline, { ...options, open: () => false, selected: "n_report" });
-    expect(keys(held.rows)).toEqual(["n_stage", "n_findings", "n_report", "n_meeting"]);
-    const standIn = chartOf(view, timeline, { ...options, drawn: [{ key: "n_stage" }, { key: "n_meeting" }], selected: "n_report" });
+  it("selects the stand-in of a selected node the chart draws no row for", () => {
+    const standIn = chartOf(testView(), timeline, { ...options, drawn: [{ key: "n_stage" }, { key: "n_meeting" }], selected: "n_report" });
     expect(standIn.rows.filter((row) => !row.faded).map((row) => row.key)).toContain("n_stage");
+  });
+
+  it("lists a selected node that has no row, whatever its state, and no other finished or undrawn one", () => {
+    const view = testView();
+    const finished = view.derived.nodes["n_when"];
+    if (finished === undefined) {
+      throw new Error("no n_when");
+    }
+    view.derived.nodes["n_when"] = { ...finished, display_state: "done" };
+    expect(chartOf(view, timeline, options).undated).toEqual([]);
+    expect(chartOf(view, timeline, { ...options, selected: "n_when" }).undated).toEqual(["n_when"]);
+    expect(chartOf(view, timeline, { ...options, drawn: [{ key: "n_stage" }, { key: "n_meeting" }], selected: "n_when" }).undated).toEqual(["n_when"]);
   });
 });
 

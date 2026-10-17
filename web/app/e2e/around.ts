@@ -6,7 +6,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, type Locator, type Page } from "@playwright/test";
 
-import { fresh, open, type HostKind } from "./shell.ts";
+import { expectAddress, fresh, open, type HostKind } from "./shell.ts";
 
 /** A fixture's route file as it is kept on disk. */
 export function fixtureRoute(fixture: string): string {
@@ -15,7 +15,7 @@ export function fixtureRoute(fixture: string): string {
 
 /** Starts a journey from the new-journey form at `path`; its id, once it opens on its walkthrough. */
 export async function startJourney(page: Page, host: HostKind, name: string, from?: { route: string; version?: number }): Promise<string> {
-  const path = from === undefined ? "/new" : `/new?route=${from.route}${from.version === undefined ? "" : `&version=${String(from.version)}`}`;
+  const path = from === undefined ? "/journeys/new" : `/journeys/new?route=${from.route}${from.version === undefined ? "" : `&version=${String(from.version)}`}`;
   await open(page, host, path);
   const form = page.getByTestId("new-journey-form");
   await form.getByLabel("Name").fill(name);
@@ -23,16 +23,18 @@ export async function startJourney(page: Page, host: HostKind, name: string, fro
     await form.getByLabel("Start from").selectOption("");
   }
   await form.getByRole("button", { name: "Start the journey" }).click();
-  await expect(page).toHaveURL(/\/journeys\/j_[a-z0-9_-]+\/walk\?depth=decisions$/);
-  return /\/journeys\/(j_[a-z0-9_-]+)\//.exec(page.url())?.[1] ?? "";
+  await expect(page).toHaveURL(/\/journeys\/j_[a-z0-9_-]+\?/);
+  const id = /\/journeys\/(j_[a-z0-9_-]+)/.exec(page.url())?.[1] ?? "";
+  await expectAddress(page, `/journeys/${id}?view=walk&depth=decisions`);
+  return id;
 }
 
 /** A fresh name for a journey this run starts. */
 export const journeyName = (stem: string) => fresh(stem);
 
-/** Journey `id`'s landing, its graph, with its journey card, once derived. */
+/** Journey `id`'s graph, with its journey card, once derived. */
 export async function openJourneyCard(page: Page, host: HostKind, id: string): Promise<Locator> {
-  await open(page, host, `/journeys/${id}/graph`);
+  await open(page, host, `/journeys/${id}?view=graph`);
   const card = page.getByTestId("journey-card");
   await expect(card).toBeVisible();
   return card;

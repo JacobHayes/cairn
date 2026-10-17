@@ -11,7 +11,7 @@ import type { RouteRead } from "../data/reads.ts";
 import { journeyIndex, routeIndex } from "../data/reads.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
-import { overviewPath } from "../journeys/address.ts";
+import { journeyPath } from "../journeys/address.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Refused } from "../screens/Refused.tsx";
 import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
@@ -38,7 +38,7 @@ function useHostNames(): (host: Schema<"Domain">) => { name: string; to: string 
       return { name: "the deployment", to: "/" };
     }
     return "journey" in host
-      ? { name: journeyName.get(host.journey) ?? host.journey, to: overviewPath(host.journey) }
+      ? { name: journeyName.get(host.journey) ?? host.journey, to: journeyPath({ journey: host.journey }) }
       : { name: routeName.get(host.route) ?? host.route, to: routeDetailPath(host.route) };
   };
 }

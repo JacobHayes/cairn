@@ -5,6 +5,7 @@ import { createContext, use, type ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import "./detail.css";
+import { nodeOpened } from "../journeys/address.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { setFold, useFold } from "./folds.ts";
 import { titleOf, type Ready } from "./model.ts";
@@ -19,26 +20,11 @@ export function Rationale({ text }: { text: string | undefined }) {
   );
 }
 
-/**
- * The address of the journey screen a node's detail is open on (the canvas, the timeline,
- * ...): `pathname` without its `/nodes/<key>` or `/edges/<from>~<to>`. Every screen opens the
- * panel at its own address with that added, so the panel's links and its close stay on that screen.
- */
-export function screenPath(pathname: string): string {
-  // Mine's node address is `/mine/<journey>/nodes/<key>`; Mine itself is `/mine`.
-  return pathname.replace(/\/(?:nodes|edges)\/[^/]*$/, "").replace(/^\/mine\/[^/]+$/, "/mine");
-}
-
-/** Node `key`'s detail on the journey screen at `screen` (`screenPath`). */
-export function nodePath(screen: string, key: string): string {
-  return `${screen}/nodes/${key}`;
-}
-
-/** A link to another node's detail, by its title, keeping the screen and what it shows (5.2). */
+/** A link to another node's detail, by its title, keeping the view and what it shows (5.2). */
 export function NodeLink({ view, node }: { view: Ready; node: string }) {
   const { pathname, search } = useLocation();
   return (
-    <Link to={{ pathname: nodePath(screenPath(pathname), node), search }} data-node={node}>
+    <Link to={nodeOpened(pathname, search, node)} data-node={node}>
       {titleOf(view, node)}
     </Link>
   );

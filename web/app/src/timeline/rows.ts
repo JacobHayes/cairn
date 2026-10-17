@@ -57,7 +57,7 @@ export interface Dependency {
 
 export interface Chart {
   rows: ChartRow[];
-  /** In-scope nodes with no date, not finished: the folded list. */
+  /** In-scope nodes with no date, not finished, and the selected node when no row stands for it: the folded list. */
   undated: string[];
   dependencies: Dependency[];
   /** Every date the rows and the selected row's float lie on, for the axis. */
@@ -124,7 +124,7 @@ function wordsOf(view: Ready, node: GraphNode, own: Own | undefined, progress: C
 export interface ChartOptions {
   /** The level's nodes, each with the drawn node it is drawn under. */
   drawn: readonly { key: string; parent?: string | null }[];
-  /** Whether a container is open: the step's rule with the viewer's flips (canvas/ladder.ts, `openAt`). */
+  /** Whether a container is open: the step's rule with the viewer's flips, and open above the selected node (canvas/hooks.ts, `useFolds`). */
   open: (key: string) => boolean;
   selected: string | undefined;
   /** Whether a row is out of focus for Frontier or for Depth's Fade (journeys/requests.ts, `outOfFocus`). */
@@ -202,8 +202,6 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
   const rolls = rollups(view);
   const today = view.derived.today;
   const children = treeOfRows(view, dated, options.drawn);
-  // The selected row, or the row standing for it, is always in sight: the containers above it are held open.
-  const revealing = new Set(options.selected === undefined ? [] : ancestorsOf(view, options.selected));
   const rows: ChartRow[] = [];
   const visit = (key: string, depth: number) => {
     const node = nodeOf(view, key);
@@ -214,7 +212,7 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
     }
     const kids = children.get(key) ?? [];
     const container = scopedChildren(key).length > 0;
-    const open = kids.length > 0 && (revealing.has(key) || options.open(key));
+    const open = kids.length > 0 && options.open(key);
     const own = container ? undefined : owns.get(key);
     const progress = container ? rolls.get(key) : undefined;
     const late = entries.get(key)?.overdue === true && own !== undefined ? Math.max(0, -daysUntil(own.to, today)) : 0;
@@ -317,7 +315,12 @@ export function chartOf(view: Ready, timeline: Timeline, options: ChartOptions):
   const drawn = new Set(options.drawn.map((node) => node.key));
   const undated = planOrder(view).filter((key) => {
     const state = view.derived.nodes[key]?.display_state;
-    return drawn.has(key) && dated.inScope(key) && dated.spans.get(key) === undefined && dated.scopedChildren(key).length === 0 && state !== "done" && state !== "skipped";
+    const dateless = dated.spans.get(key) === undefined && dated.scopedChildren(key).length === 0;
+    // A selected node the chart has no row for is listed whatever its state or scope: it has no date (C13), and it is there to be seen (C7).
+    if (key === options.selected && !rows.some((row) => row.key === key)) {
+      return true;
+    }
+    return drawn.has(key) && dated.inScope(key) && dateless && state !== "done" && state !== "skipped";
   });
   return {
     rows,

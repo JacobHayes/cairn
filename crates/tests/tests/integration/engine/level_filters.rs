@@ -3,7 +3,8 @@
 //! a kind left out: they roll up, their edges re-target, and a blocked node waiting on one with
 //! no stand-in carries the hidden-prerequisites marker. The top-level rule (Stages) leaves out
 //! the subtrees under a top-level node of another kind. The level counts what each class left
-//! out hides. Derived at 2026-10-06.
+//! out hides. The selected node and the containers above it are drawn whatever hides them.
+//! Derived at 2026-10-06.
 #![cfg(test)]
 
 use crate::engine::support;
@@ -286,5 +287,157 @@ fn the_class_count_skips_collapsed_and_filtered_nodes() {
         level_of(&records, &every_kind(), &[])
             .hidden_by_class
             .is_empty()
+    );
+}
+
+/// The level with `n_other` selected under `query`, checked to draw it with the containers above
+/// it, none of them collapsed.
+fn drawn_selected(records: &Records, query: LevelQuery) -> Level {
+    let level = level_of(
+        records,
+        &LevelQuery {
+            selected: Some(key("n_other")),
+            ..query
+        },
+        &[],
+    );
+    let drawn = placement(&level);
+    for node in ["n_other", "n_work", "n_group"] {
+        assert!(drawn.contains_key(node), "{node} is drawn");
+    }
+    assert_eq!(drawn["n_other"], Some("n_work"));
+    assert!(
+        !level.collapsed.contains(&key("n_group")) && !level.collapsed.contains(&key("n_work")),
+        "the containers above it are open"
+    );
+    level
+}
+
+/// C2, C7: the selected node, an action nothing else would draw, is drawn with the containers
+/// above it, none of them collapsed, whatever hides it: its kind, its collapsed container, its
+/// relevance class, a search it does not match, or the top-level rule. What else the rule
+/// leaves out or hides stays so.
+#[test]
+fn the_selected_node_is_drawn_whatever_hides_it() {
+    let records = journey();
+    let kinds_without_actions: BTreeSet<NodeKind> = NodeKind::ALL
+        .into_iter()
+        .filter(|kind| *kind != NodeKind::Action)
+        .collect();
+    let by_kind = drawn_selected(&records, LevelQuery::of_kinds(kinds_without_actions, None));
+    assert!(
+        !placement(&by_kind).contains_key("n_step"),
+        "the other action stays hidden"
+    );
+    assert_eq!(rolled_up(&by_kind, "n_work"), ["n_step"]);
+
+    let by_collapse = drawn_selected(
+        &records,
+        LevelQuery {
+            collapsed: BTreeSet::from([key("n_group")]),
+            ..every_kind()
+        },
+    );
+    assert!(
+        placement(&by_collapse).contains_key("n_side"),
+        "opening the containers above it draws what the rules draw beneath them"
+    );
+
+    let by_class = drawn_selected(
+        &records,
+        LevelQuery {
+            display: BTreeSet::from([LevelDisplay::Relevant]),
+            ..every_kind()
+        },
+    );
+    assert!(
+        !placement(&by_class).contains_key("n_spare"),
+        "another conditional node stays hidden"
+    );
+    let by_text = drawn_selected(&records, searching("lighthouse"));
+    assert!(
+        !placement(&by_text).contains_key("n_side"),
+        "no match, no draw"
+    );
+
+    let by_top = drawn_selected(
+        &records,
+        LevelQuery {
+            top: BTreeSet::from([NodeKind::Milestone]),
+            ..every_kind()
+        },
+    );
+    let drawn = placement(&by_top);
+    assert!(
+        !drawn.contains_key("n_side") && !drawn.contains_key("n_spare"),
+        "the rest of the left-out stage stays left out"
+    );
+    assert!(
+        by_top
+            .edges
+            .iter()
+            .all(|edge| edge.from.as_str() != "n_side" && edge.to.as_str() != "n_side"),
+        "nothing re-targets onto the forced container"
+    );
+}
+
+/// C2, C7: the hidden-by-class count leaves out the selected node alone.
+#[test]
+fn the_selected_node_is_left_out_of_the_hidden_count_alone() {
+    let records = journey();
+    let relevant_only = LevelQuery {
+        display: BTreeSet::from([LevelDisplay::Relevant]),
+        ..every_kind()
+    };
+    let hidden = drawn_selected(&records, relevant_only.clone())
+        .hidden_by_class
+        .get(&LevelDisplay::Conditional)
+        .copied()
+        .unwrap_or(0);
+    let plain = level_of(&records, &relevant_only, &[]);
+    assert_eq!(
+        plain.hidden_by_class[&LevelDisplay::Conditional],
+        hidden + 1,
+        "the count leaves out the selected node alone"
+    );
+}
+
+/// C2, C7: a selected container that is collapsed stays collapsed, and a selection outside the
+/// drilled-in container, or an unknown one, changes nothing or fails like any unknown key.
+#[test]
+fn a_selected_container_stays_collapsed_and_a_selection_outside_changes_nothing() {
+    let records = journey();
+    let collapsed = LevelQuery {
+        collapsed: BTreeSet::from([key("n_work")]),
+        selected: Some(key("n_work")),
+        ..every_kind()
+    };
+    let level = level_of(&records, &collapsed, &[]);
+    assert!(level.collapsed.contains(&key("n_work")));
+    assert!(!placement(&level).contains_key("n_step"));
+
+    let drilled = LevelQuery {
+        container: Some(key("n_work")),
+        ..every_kind()
+    };
+    let outside = LevelQuery {
+        selected: Some(key("n_loose")),
+        ..drilled.clone()
+    };
+    assert_eq!(
+        level_of(&records, &outside, &[]),
+        level_of(&records, &drilled, &[])
+    );
+
+    let graph = support::journey_graph(&records, support::JOURNEY);
+    let derived = support::derived(&records, support::JOURNEY);
+    let unknown = LevelQuery {
+        selected: Some(key("n_nothing")),
+        ..every_kind()
+    };
+    assert!(
+        DerivedJourney::new(&graph, &derived)
+            .level(&unknown, &records.deployment, &BTreeSet::new())
+            .is_err()
     );
 }

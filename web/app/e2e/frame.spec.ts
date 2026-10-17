@@ -4,7 +4,7 @@
 // pan. On the in-browser host.
 import { expect, test, type Page } from "@playwright/test";
 
-import { nodeCard, nodePanel, openAt, openJourney } from "./shell.ts";
+import { expectAddress, nodeCard, nodePanel, openAt, openJourney } from "./shell.ts";
 
 /** Opens History in `node`'s inspector and scrolls it to its end the way a person does: the wheel over it. */
 async function reachHistory(page: Page, node: string, height: number): Promise<void> {
@@ -63,7 +63,7 @@ test("the inspector scrolls to the end of History at 1440 and 1024px, a node ope
   expect((last?.y ?? 0) + (last?.height ?? 0)).toBeLessThanOrEqual((sheet?.y ?? 0) + 1);
   await page.keyboard.press("Escape");
   await expect(nodePanel(page, "n_plan")).toHaveCount(0);
-  await expect(page).toHaveURL(/\/journeys\/j_vendor_eval\/summary$/);
+  await expectAddress(page, "/journeys/j_vendor_eval");
 });
 
 test("the inspector hides to a rail that shows it again, and selecting a node brings it back", async ({ page }) => {
@@ -170,7 +170,7 @@ test.describe("a phone's map", () => {
     await page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").click();
     const panel = nodePanel(page, "n_make_offer");
     await expect(panel).toBeVisible();
-    await expect(page).toHaveURL(/\/graph\/nodes\/n_make_offer\?depth=decisions&map=1$/);
+    await expectAddress(page, "/journeys/j_hiring/nodes/n_make_offer?depth=decisions&map=1");
     await expect(page.getByTestId("map-full")).toBeVisible();
     const sheet = (await page.locator(".inspector").boundingBox())?.y ?? 0;
     expect(sheet).toBeGreaterThan(300);

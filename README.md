@@ -92,7 +92,7 @@ signed in as a development user.
 mise run serve   # then open http://127.0.0.1:8080/
 ```
 
-It starts empty. To get going, open Library, choose New, then "Import a file…", and pick
+It starts empty. To get going, open Routes, choose New route, then "Import a file…", and pick
 one of the sample routes, such as `fixtures/vendor-evaluation/route.yaml`. Publish the
 draft, then start a journey from it.
 

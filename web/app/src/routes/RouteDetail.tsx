@@ -9,7 +9,7 @@ import { Link, useParams } from "react-router";
 import { routeRead, type RouteRead } from "../data/reads.ts";
 import { useLive } from "../data/react.ts";
 import { dateWords } from "../timeline/model.ts";
-import { newJourneyPath, overviewPath } from "../journeys/address.ts";
+import { journeyPath, newJourneyPath } from "../journeys/address.ts";
 import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
 import { Badge, Button, Panel } from "../ui/kit.tsx";
@@ -39,7 +39,7 @@ function Version({ read, row, latest }: { read: RouteRead; row: VersionRow; late
       <ul className="stack">
         {row.journeys.map((journey) => (
           <li key={journey.id} className="row" data-testid="version-journey" data-journey={journey.id} data-upgrade={journey.upgrade ? "available" : "none"}>
-            <Link to={overviewPath(journey.id)}>{journey.name}</Link>
+            <Link to={journeyPath({ journey: journey.id })}>{journey.name}</Link>
             {journey.upgrade ? <Badge tone="warn" data-testid="upgrade" data-status="available">Upgrade available</Badge> : null}
           </li>
         ))}

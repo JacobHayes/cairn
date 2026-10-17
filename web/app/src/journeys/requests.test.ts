@@ -6,9 +6,9 @@ import { describe, expect, it } from "vitest";
 
 import { actingView } from "../acting/acting.test-support.ts";
 import { collapsedAt, drawnStep, kindsAt } from "../canvas/ladder.ts";
-import { STEPS, type Step } from "../canvas/model.ts";
+import { STEPS, type Level, type Step } from "../canvas/model.ts";
 import type { GraphNode } from "../detail/model.ts";
-import { badgesOf, depthFaded, journeyLayoutView, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides, tableQueryOf, walkQueryOf } from "./requests.ts";
+import { badgesOf, depthFaded, journeyLayoutView, levelRequestOf, lightsUp, litOf, outOfFocus, selectedRequest, stepHides, tableQueryOf, walkQueryOf } from "./requests.ts";
 import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, type ViewState } from "./view.ts";
 
 const view = actingView();
@@ -46,6 +46,35 @@ describe("the level every view draws from", () => {
 
   it("is the same with Frontier on: it only lights", () => {
     expect(levelRequestOf({ ...narrowed, frontier: true }, "deliverables", [])).toEqual(levelRequestOf(narrowed, "deliverables", []));
+  });
+});
+
+describe("the level that draws the selected node (C7)", () => {
+  const request = levelRequestOf(DEFAULT_VIEW_STATE, "actions", []);
+  /** The part of a level the decision reads: what it draws and what it shows collapsed. */
+  const answer = (drawn: string[], collapsed: string[] = []) => ({ nodes: drawn.map((key) => ({ key })), collapsed }) as unknown as Pick<Level, "nodes" | "collapsed">;
+
+  it("is none while the level draws the node and every container above it open", () => {
+    expect(selectedRequest(request, answer(["n_stage", "n_inner"]), "n_inner", nodes)).toBeUndefined();
+  });
+
+  it("names the node when the level does not draw it, or draws it under a container it shows collapsed or does not draw", () => {
+    const named = { ...request, selected: "n_inner" };
+    expect(selectedRequest(request, answer(["n_stage"]), "n_inner", nodes)).toEqual(named);
+    expect(selectedRequest(request, answer(["n_stage", "n_inner"], ["n_stage"]), "n_inner", nodes)).toEqual(named);
+    expect(selectedRequest(request, answer(["n_inner"]), "n_inner", nodes)).toEqual(named);
+  });
+
+  it("is none for no selection, a node the journey lacks, or a level not read yet; a collapsed selection is the container itself", () => {
+    expect(selectedRequest(request, answer([]), undefined, nodes)).toBeUndefined();
+    expect(selectedRequest(request, answer([]), "n_nowhere", nodes)).toBeUndefined();
+    expect(selectedRequest(request, undefined, "n_inner", nodes)).toBeUndefined();
+    expect(selectedRequest(request, answer(["n_stage"], ["n_stage"]), "n_stage", nodes)).toBeUndefined();
+  });
+
+  it("stops at the container drilled into", () => {
+    const drilled = { ...request, container: "n_stage" };
+    expect(selectedRequest(drilled, answer(["n_inner"]), "n_inner", nodes)).toBeUndefined();
   });
 });
 

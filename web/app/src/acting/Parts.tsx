@@ -3,7 +3,7 @@
 import { Link, useLocation } from "react-router";
 
 import { startedEarly, titleOf, type Ready } from "../detail/model.ts";
-import { nodePath, screenPath } from "../detail/parts.tsx";
+import { nodeOpened } from "../journeys/address.ts";
 import { Badge, type Tone } from "../ui/kit.tsx";
 import type { NodeRow } from "./why.ts";
 
@@ -11,7 +11,7 @@ import type { NodeRow } from "./why.ts";
 export function DetailLink({ view, node, className }: { view: Ready; node: string; className?: string }) {
   const { pathname, search } = useLocation();
   return (
-    <Link to={{ pathname: nodePath(screenPath(pathname), node), search }} data-node={node} {...(className === undefined ? {} : { className })}>
+    <Link to={nodeOpened(pathname, search, node)} data-node={node} {...(className === undefined ? {} : { className })}>
       {titleOf(view, node)}
     </Link>
   );

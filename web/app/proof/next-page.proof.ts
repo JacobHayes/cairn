@@ -89,8 +89,8 @@ test("Mine", async ({ page }) => {
   await openActing(page, "browser", journey, "list?frontier=1");
   await frontierItem(page, "n_partner_runs").getByLabel("Assign owner").selectOption("e_lead");
   await frontierItem(page, "n_partner_runs").getByTestId("receipt").waitFor();
-  await goWithin(page, "/mine");
-  await page.getByTestId("mine-journey").first().waitFor();
+  await goWithin(page, "/");
+  await page.getByTestId("home-journey").first().waitFor();
   await shot(page, "9-mine");
 });
 

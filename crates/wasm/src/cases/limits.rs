@@ -113,7 +113,9 @@ pub fn limits_group() -> Group {
 fn projection_call(request: Projection) -> (String, CaseCall) {
     (
         format!("project {}", json(&request)),
-        CaseCall::Project { request },
+        CaseCall::Project {
+            request: Box::new(request),
+        },
     )
 }
 

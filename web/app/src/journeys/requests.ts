@@ -10,7 +10,7 @@ import type { ListQuery, ProjectionRequest } from "@cairn/wasm";
 
 import type { SortBy } from "../acting/address.ts";
 import { currentStages, drawnStep, kindsAt, leftOutAt, STAGES_TOP } from "../canvas/ladder.ts";
-import type { LevelDisplay, Step } from "../canvas/model.ts";
+import type { Level, LevelDisplay, Step } from "../canvas/model.ts";
 import { recordOf, type GraphNode, type Ready } from "../detail/model.ts";
 import type { Badge } from "../screens/badge.ts";
 import type { Screen } from "./address.ts";
@@ -43,6 +43,31 @@ export function levelRequestOf(state: ViewState, step: Step, collapsed: readonly
     ...(filter.owner === undefined ? {} : { owner: filter.owner }),
     ...(text === "" ? {} : { text }),
   };
+}
+
+/**
+ * C2, C7: the level request that draws the selected node: none while `level` (the answer to
+ * `request`) draws it and every container above it open, or no node is selected, or the journey
+ * has no such node; else `request` naming it `selected`, and the engine draws it with the
+ * containers above it whatever hides them. A node can be drawn while a container above it is
+ * hoisted past or collapsed, so the whole chain is checked, not the node alone.
+ */
+export function selectedRequest(request: LevelRequest, level: Pick<Level, "nodes" | "collapsed"> | undefined, selected: string | undefined, nodes: readonly GraphNode[]): LevelRequest | undefined {
+  if (selected === undefined || level === undefined) {
+    return undefined;
+  }
+  const byKey = new Map(nodes.map((node) => [node.key, node]));
+  if (!byKey.has(selected)) {
+    return undefined;
+  }
+  const drawn = new Set(level.nodes.map((node) => node.key));
+  const collapsed = new Set(level.collapsed);
+  for (let at: string | undefined = selected, seen = 0; at !== undefined && at !== request.container && seen <= nodes.length; at = byKey.get(at)?.parent ?? undefined, seen += 1) {
+    if (!drawn.has(at) || (at !== selected && collapsed.has(at))) {
+      return { ...request, selected };
+    }
+  }
+  return undefined;
 }
 
 /**

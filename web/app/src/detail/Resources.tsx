@@ -12,6 +12,7 @@ import { useKeyedRead, useSession } from "../data/react.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { Markdown, safeHref } from "../ui/markdown.tsx";
 import { foldKey } from "./folds.ts";
+import { journeyPath } from "../journeys/address.ts";
 import type { NodeDetail, Ready } from "./model.ts";
 import { Section } from "./parts.tsx";
 
@@ -22,9 +23,9 @@ export function draftText(draft: RenderedDraft): string {
   return draft.segments.map((segment) => ("text" in segment ? segment.text : `[missing: ${segment.missing}]`)).join("");
 }
 
-/** The page's link to the journey (`{{journey.url}}`): its address on this origin. */
+/** The page's link to the journey (`{{journey.url}}`): its address on this origin (the journey, which opens on its Summary). */
 export function journeyUrl(journey: string, origin: string): string {
-  return `${origin}/journeys/${journey}`;
+  return `${origin}${journeyPath({ journey }, "summary")}`;
 }
 
 /** A message draft rendered in the derive worker. */

@@ -1,19 +1,21 @@
-// The addresses of the screens around a journey, and what the journey index shows (C16): its
-// filters live in the address, as the canvas's and the acting surfaces' do, so a filtered
-// index is shareable and follows the back button. Every filter at its default leaves the
-// address bare.
+// The addresses of the journey pages, the index and Home (C16): what an address names is in its
+// path, how it is looked at in its query, so a page is shareable, survives a reload and follows
+// the back button. The path mirrors the API:
 //
-// A journey has one page, graph first, with views of its nodes and the Walkthrough of its frontier,
-// all picked in the header (screens/ViewPicker.tsx):
+//   /                                       Home: what waits on the viewer, then their journeys
+//   /journeys?status=&route=&version=&mine=&upgrade=   the journey index; its filters in the query
+//   /journeys/new?route=&version=           the new-journey form
+//   /journeys/<id>                          a journey
+//   /journeys/<id>/nodes/<key>              a node selected in it
+//   /journeys/<id>/edges/<from>~<to>        an edge's card (the graph)
 //
-//   /journeys/<id>/{graph|list|timeline}[/nodes/<key>]   (graph: also /edges/<from>~<to>)
-//   /journeys/<id>/summary[/nodes/<key>]
-//   /journeys/<id>/walk[/nodes/<key>]
-//   /journeys/<id>/nodes/<key>      deep link: the graph with the node selected (JourneyDeepLink)
-//   /journeys/<id>                  landing: the view last shown, the graph at first (JourneyLanding)
-//
-// The view state every view shares is in the query on every view (view.ts: `depth`, `fade`, `frontier`,
-// `mine`, `owner`, `flag`, `show`, `q`), beside the view's own settings.
+// `view=graph|list|timeline|summary|walk` says how a journey is looked at, and is written only
+// when it differs from the address's default (`defaultScreen`): the Summary for a bare journey,
+// the Graph for a node or an edge, so one state has one address. Beside it the view state every view
+// shares (view.ts: `depth`, `fade`, `frontier`, `mine`, `owner`, `flag`, `show`, `q`) and each view's
+// own settings (the graph's `open`, `shut`, `lens`, `edit`, `map`; the list's `sort`, `cols`; the
+// timeline's `range`), which stay in the query when the view changes, so switching back restores
+// them. Nothing redirects, and no earlier address is kept.
 import type { Schema } from "@cairn/client";
 
 import type { JourneyIndexQuery } from "../data/host.ts";
@@ -113,17 +115,15 @@ function searchOf(params: URLSearchParams): string {
   return text === "" ? "" : `?${text}`;
 }
 
-/** C16: the journey index, which is `/` with its filters in the query. */
+/** Home (`/`): what waits on the viewer, then their active journeys. */
+export const HOME_PATH = "/";
+
+/** C16: the journey index, `/journeys`, its filters in the query. */
 export function indexPath(filters: IndexFilters = DEFAULT_FILTERS): string {
-  return `/${searchOf(filterParams(filters))}`;
+  return `/journeys${searchOf(filterParams(filters))}`;
 }
 
-/** C16: a journey's landing, where its journey card shows and nothing is selected. */
-export function overviewPath(journey: string): string {
-  return `/journeys/${journey}`;
-}
-
-/** B1: the new-journey form, from a route's version when one is given. */
+/** B1: the new-journey form, `/journeys/new`, from a route's version when one is given. */
 export function newJourneyPath(route?: string, version?: number): string {
   const params = new URLSearchParams();
   if (route !== undefined) {
@@ -132,7 +132,7 @@ export function newJourneyPath(route?: string, version?: number): string {
       params.set("version", String(version));
     }
   }
-  return `/new${searchOf(params)}`;
+  return `/journeys/new${searchOf(params)}`;
 }
 
 /** How a journey is drawn: the three projections of its nodes. */
@@ -150,11 +150,9 @@ export const SCREENS: readonly Screen[] = ["graph", "list", "timeline", "summary
 /** Each screen's name as the View picker says it. */
 export const SCREEN_WORDS: Record<Screen, string> = { graph: "Graph", list: "List", timeline: "Timeline", summary: "Summary", walk: "Walkthrough" };
 
-export const DEFAULT_PROJECTION: Projection = "graph";
-
 /** Key `v`: the projection after `current`, wrapping round. */
 export function nextProjection(current: Projection): Projection {
-  return PROJECTIONS[(PROJECTIONS.indexOf(current) + 1) % PROJECTIONS.length] ?? DEFAULT_PROJECTION;
+  return PROJECTIONS[(PROJECTIONS.indexOf(current) + 1) % PROJECTIONS.length] ?? "graph";
 }
 
 /** `search` with the parameter `name` set to `value`, or removed when `value` is undefined. */
@@ -165,21 +163,112 @@ export function withParam(search: string, name: string, value: string | undefine
   } else {
     params.set(name, value);
   }
-  const text = params.toString();
-  return text === "" ? "" : `?${text}`;
+  return searchOf(params);
+}
+
+/** What a journey address names: the journey, and a node or an edge (`<from>~<to>`) in it. */
+export interface JourneyTarget {
+  journey: string;
+  node?: string | undefined;
+  edge?: string | undefined;
+}
+
+/**
+ * The view an address opens when its query names none: the Summary for a bare journey, the Graph
+ * for a node or an edge (a node's place and neighbourhood is what a node link is for). The one
+ * place that says so.
+ */
+export function defaultScreen(target: JourneyTarget): Screen {
+  return target.node === undefined && target.edge === undefined ? "summary" : "graph";
+}
+
+/** The view `params` names for `target` (`view=`), or its default; an unknown value is the default. */
+export function screenOf(target: JourneyTarget, params: URLSearchParams): Screen {
+  const view = params.get("view");
+  return SCREENS.find((each) => each === view) ?? defaultScreen(target);
+}
+
+/** The path of `target` alone: `/journeys/<id>[/nodes/<key> | /edges/<from>~<to>]`. */
+function targetPath(target: JourneyTarget): string {
+  const place = target.node !== undefined ? `/nodes/${target.node}` : target.edge !== undefined ? `/edges/${target.edge}` : "";
+  return `/journeys/${target.journey}${place}`;
+}
+
+/**
+ * `target` showing `screen`: `search` kept as given (with or without its `?`), but for `view`,
+ * written first and only when `screen` is not `defaultScreen(target)`.
+ */
+export function journeyPath(target: JourneyTarget, screen: Screen = defaultScreen(target), search = ""): string {
+  const params = new URLSearchParams(search);
+  params.delete("view");
+  const query = new URLSearchParams();
+  if (screen !== defaultScreen(target)) {
+    query.set("view", screen);
+  }
+  for (const [name, value] of params) {
+    query.append(name, value);
+  }
+  return `${targetPath(target)}${searchOf(query)}`;
+}
+
+/**
+ * The journey address `pathname` is, or none for any other page (`/journeys/new` is not one). Only
+ * `nodeOpened` reads a path, since it serves pages that are not a journey's; a component on a
+ * journey page takes its target from the router (`useJourneyTarget`).
+ */
+function journeyTargetOf(pathname: string): JourneyTarget | undefined {
+  const found = /^\/journeys\/([^/]+)(?:\/nodes\/([^/]+)|\/edges\/([^/]+))?$/.exec(pathname);
+  if (found === null || found[1] === undefined || (found[1] === "new" && found[2] === undefined && found[3] === undefined)) {
+    return undefined;
+  }
+  return { journey: found[1], node: found[2], edge: found[3] };
+}
+
+/**
+ * From the page at `pathname` + `search`, the same page with node `key` open, or none when `key`
+ * is undefined; an open edge closes either way. On a journey page the view stays the one shown
+ * (the address's default can change with the node, the view does not). On another page with a
+ * detail column (a route's draft, a proposal) `/nodes/<key>` or `/edges/...` is taken off its path
+ * and `/nodes/<key>` added.
+ */
+export function nodeOpened(location: string, search: string, key: string | undefined): string {
+  const pathname = location.length > 1 ? location.replace(/\/+$/, "") : location;
+  const target = journeyTargetOf(pathname);
+  if (target !== undefined) {
+    const screen = screenOf(target, new URLSearchParams(search));
+    return journeyPath({ journey: target.journey, node: key }, screen, search);
+  }
+  const page = pathname.replace(/\/(?:nodes|edges)\/[^/]*$/, "");
+  return `${key === undefined ? page : `${page}/nodes/${key}`}${withQuestion(search)}`;
+}
+
+/**
+ * View `to` from the journey page at `target` + `search`: the whole query but `map` (the phone's
+ * full-screen map is a moment of the graph), so the other views' own settings stay for the way
+ * back. The node stays (or becomes `node` when given: Show in list, Show in graph, the Affects
+ * link), except into the Walkthrough from another view: there a node's address means "opened from
+ * a card", and a node opened elsewhere is no card of this pass. An edge stays only in the graph.
+ */
+export function screenSwitched(target: JourneyTarget, search: string, to: Screen, node?: string): string {
+  const from = screenOf(target, new URLSearchParams(search));
+  const params = new URLSearchParams(search);
+  if (from !== to) {
+    params.delete("map");
+  }
+  const keeps = node ?? (to === "walk" && from !== "walk" ? undefined : target.node);
+  const edge = to === "graph" && node === undefined && keeps === undefined ? target.edge : undefined;
+  return journeyPath({ journey: target.journey, node: keeps, edge }, to, params.toString());
+}
+
+/**
+ * C11: the decision walkthrough a new journey opens on: the walk through at Decisions depth
+ * (the creation flow, 5.5, navigates here once the journey exists; it can be launched any time).
+ */
+export function walkthroughPath(journey: string): string {
+  return journeyPath({ journey }, "walk", "?depth=decisions");
 }
 
 /** `search` with `?` in front when it holds anything, whichever way it was given. */
 function withQuestion(search: string): string {
   return search === "" || search === "?" ? "" : search.startsWith("?") ? search : `?${search}`;
-}
-
-/** A journey's screen, or a node's detail on it. `search` is the query, kept as given. */
-export function pagePath(journey: string, screen: Screen, node?: string, search = ""): string {
-  return `/journeys/${journey}/${screen}${node === undefined ? "" : `/nodes/${node}`}${withQuestion(search)}`;
-}
-
-/** The address agents post for a node; it resolves to the graph with the node selected (JourneyDeepLink). */
-export function deepLinkPath(journey: string, node: string): string {
-  return `/journeys/${journey}/nodes/${node}`;
 }

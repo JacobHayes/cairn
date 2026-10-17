@@ -37,7 +37,7 @@ pub enum CaseCall {
     /// One projection.
     Project {
         /// The projection.
-        request: Projection,
+        request: Box<Projection>,
     },
     /// A proposal previewed against the document's journey.
     Preview {

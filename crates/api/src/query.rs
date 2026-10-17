@@ -196,6 +196,11 @@ pub const LEVEL_PARAMS: &[ParamSpec] = &[
         "Text found in the title, description, notes, or resources, ignoring ASCII case; nodes \
          holding a match are kept too.",
     ),
+    ParamSpec::one::<NodeKey>(
+        "selected",
+        "The node selected: drawn whatever would hide it, with every container above it within \
+         the level, none of them collapsed. A key outside the level has no effect.",
+    ),
 ];
 
 /// `GET /api/journeys/{id}/next` (C10).
@@ -449,6 +454,7 @@ pub fn level(params: &Params) -> Result<LevelQuery, ApiError> {
         flags: params.all("flag")?.into_iter().collect(),
         owner: params.one("owner")?,
         text: params.one("text")?,
+        selected: params.one("selected")?,
         ..LevelQuery::requested(
             params.all("kind")?.into_iter().collect(),
             params.one("container")?,

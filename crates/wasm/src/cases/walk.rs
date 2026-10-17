@@ -221,6 +221,7 @@ fn projections(document: &DomainDocument) -> Vec<Projection> {
         }));
     }
     requests.extend(filtered_levels(document, &shown));
+    requests.extend(selected_under_collapsed(&nodes, &shown));
     requests.extend([
         Projection::DecisionView,
         Projection::Timeline,
@@ -260,6 +261,23 @@ fn projections(document: &DomainDocument) -> Vec<Projection> {
         }
     }
     requests
+}
+
+/// The last non-group node selected with every group collapsed: drawn, with the groups opened.
+fn selected_under_collapsed(
+    nodes: &[&Node<KeyRefs>],
+    shown: &BTreeSet<NodeKind>,
+) -> Option<Projection> {
+    let deepest = nodes.iter().rfind(|node| node.kind() != NodeKind::Group)?;
+    Some(Projection::Level(LevelQuery {
+        collapsed: nodes
+            .iter()
+            .filter(|node| node.kind() == NodeKind::Group)
+            .map(|node| node.key.clone())
+            .collect(),
+        selected: Some(deepest.key.clone()),
+        ..LevelQuery::of_kinds(shown.clone(), None)
+    }))
 }
 
 /// A projection request's name in a case: its tag and its arguments.
@@ -442,7 +460,9 @@ fn journey_group(service: &Service<MemoryStore>, label: &str, id: &JourneyId) ->
     cases.extend(projections(&document).into_iter().map(|request| Case {
         name: named(&request),
         expected: server_projection(service, id, &request),
-        call: CaseCall::Project { request },
+        call: CaseCall::Project {
+            request: Box::new(request),
+        },
     }));
     cases.extend(previews(service, id, &document));
     Group {
@@ -534,7 +554,9 @@ fn after_group(
     cases.extend(requests.into_iter().map(|request| Case {
         name: named(&request),
         expected: server_projection(service, id, &request),
-        call: CaseCall::Project { request },
+        call: CaseCall::Project {
+            request: Box::new(request),
+        },
     }));
     Group {
         label: label.to_owned(),

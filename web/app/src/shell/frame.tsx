@@ -11,7 +11,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useSyncExternalS
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router";
 
-import { screenPath } from "../detail/parts.tsx";
+import { nodeOpened } from "../journeys/address.ts";
 
 export type InspectorTab = "inspector" | "assistant";
 
@@ -86,7 +86,7 @@ export function Inspector({ focus, reveal = true, children }: { focus: string; r
   const actions = useFrameActions();
   const state = useFrameState();
   const { pathname, search } = useLocation();
-  const close = `${screenPath(pathname)}${search}`;
+  const close = nodeOpened(pathname, search, undefined);
   // Layout effects, so the column appears in the same commit as the screen that fills it: a second
   // render after paint could land in a ResizeObserver delivery and make the canvas resize twice.
   useLayoutEffect(() => actions?.mount("inspector"), [actions]);

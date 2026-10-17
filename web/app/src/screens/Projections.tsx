@@ -34,6 +34,8 @@ export interface ProjectionProps {
   /** In edit mode, the journey's structure as authored, and the edge being drawn (5.6). */
   authored: Authored | undefined;
   drawing: EdgeDrawing;
+  /** The walk reports the card it is on (none when it has none), so the frame can leave the node it names to the card. */
+  onCard: (key: string | undefined) => void;
 }
 
 /** The canvas's own bars, which stay with the head: the structure's tools (edit mode) and the stalled surface. */
@@ -46,12 +48,12 @@ export function CanvasBars({ ready, view, authored, drawing, banner }: Pick<Proj
   );
 }
 
-export function ProjectionBody({ ready, view, screen, selected, edge, authored, drawing, selection }: ProjectionProps) {
+export function ProjectionBody({ ready, view, screen, selected, edge, authored, drawing, selection, onCard }: ProjectionProps) {
   const { search } = useLocation();
   const { state, picks } = useViewState();
   const params = useMemo(() => new URLSearchParams(search), [search]);
   if (screen === "walk") {
-    return <TriageBody view={ready} state={state} selected={selected} />;
+    return <TriageBody view={ready} state={state} selected={selected} onCard={onCard} />;
   }
   if (screen === "list") {
     return <ListBody view={ready} state={state} picks={picks} list={listSettingsFrom(params)} selected={selected} selection={selection} />;

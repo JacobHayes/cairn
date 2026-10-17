@@ -1,9 +1,10 @@
-// The Library: the index of routes and segments, each linking to its detail (C17, C19) and
-// saying one thing of itself: a segment how much it is used ("Used in 6 places", or "2 of 6
-// behind"), a route how to start a journey, or that it has a draft open or is retired (A19:
+// The routes index (`/routes`): routes and segments in one table, each linking to its detail (C17,
+// C19) and saying one thing of itself: a segment how much it is used ("Used in 6 places", or "2 of
+// 6 behind"), a route how to start a journey, or that it has a draft open or is retired (A19:
 // hidden from new-journey creation, its journeys still upgrading). The `Routes` and `Segments`
-// chips keep it to one (both off shows all); `New` starts a route or segment empty, to author
-// by hand (A12), or imports a route file as a new route or draft (A13). Kept current (H6).
+// chips keep it to one (both off shows all); `New route` opens the form that starts a route or
+// segment empty, to author by hand (A12), or imports a route file as a new route or draft (A13).
+// Kept current (H6).
 import { Link, useSearchParams } from "react-router";
 
 import { segmentUses, routeIndex, type RouteSummary, type SegmentUse } from "../data/reads.ts";
@@ -11,8 +12,7 @@ import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
 import { newJourneyPath } from "../journeys/address.ts";
 import { Badge } from "../ui/kit.tsx";
-import { routeDetailPath } from "./address.ts";
-import { NewRoute } from "./NewRoute.tsx";
+import { newRoutePath, routeDetailPath } from "./address.ts";
 
 /** The one secondary fact of a segment: how many places use it, or how many of them are behind. */
 export function usageWords(use: SegmentUse | undefined): string {
@@ -71,7 +71,7 @@ const TYPES = [
 /** The chips: each keeps the list to its type, pressed again it lets everything back (both off shows all). */
 function TypeChips({ type, onPick }: { type: string | null; onPick: (next: string | undefined) => void }) {
   return (
-    <div className="journey-chips" role="group" aria-label="Show" data-testid="library-types">
+    <div className="journey-chips" role="group" aria-label="Show" data-testid="routes-types">
       {TYPES.map((each) => (
         <button key={each.id} type="button" className="chip" aria-pressed={type === each.id} data-testid={`type-${each.id}`} onClick={() => { onPick(type === each.id ? undefined : each.id); }}>
           {each.label}
@@ -81,7 +81,7 @@ function TypeChips({ type, onPick }: { type: string | null; onPick: (next: strin
   );
 }
 
-export function Library() {
+export function RouteIndex() {
   const { view } = useLive("routes", routeIndex);
   const uses = useLive("segment-uses", segmentUses).view;
   const [params, setParams] = useSearchParams();
@@ -89,13 +89,16 @@ export function Library() {
   const routes = valueOf(view);
   const shown = routes !== undefined ? routes.filter((route) => type === null || (type === "segments") === (route.header.kind === "segment")) : [];
   return (
-    <section className="stack" aria-label="Library" data-testid="library">
-      <h1>Library</h1>
-      <NewRoute />
+    <section className="stack" aria-label="Routes" data-testid="routes">
+      <div className="row">
+        <h1>Routes</h1>
+        <span className="spacer" />
+        <Link className="button" to={newRoutePath(type === "segments" ? "segment" : undefined)} data-testid="new-route-link">New route</Link>
+      </div>
       <TypeChips type={type} onPick={(next) => { setParams(next === undefined ? {} : { type: next }, { replace: true }); }} />
       {view.status === "idle" || view.status === "loading" ? <p className="muted small">Loading the routes...</p> : null}
       {view.status === "failed" ? <p className="callout callout-bad">The routes could not be read: {view.error.message}</p> : null}
-      {routes !== undefined && shown.length === 0 ? <p className="muted small" data-testid="library-empty">No routes match.</p> : null}
+      {routes !== undefined && shown.length === 0 ? <p className="muted small" data-testid="routes-empty">No routes match.</p> : null}
       {routes !== undefined && shown.length > 0 ? (
         <div className="table-wrap">
           <table className="data">

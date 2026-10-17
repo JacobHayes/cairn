@@ -6,7 +6,7 @@ import { readFileSync } from "node:fs";
 import { expect, type Locator, type Page } from "@playwright/test";
 
 import { fixtureRoute } from "./around.ts";
-import { derivedRevision, fresh, importIntoLibrary, open, openAt, type HostKind } from "./shell.ts";
+import { derivedRevision, fresh, importRoute, openAt, type HostKind } from "./shell.ts";
 
 /** Opens journey `journey`'s projection at `path` (`list?frontier=1`, `walk`, with a query) on `host`, once derived. */
 export async function openActing(page: Page, host: HostKind, journey: string, path: string): Promise<void> {
@@ -126,8 +126,7 @@ export async function publishFollowUpRoute(page: Page): Promise<string> {
       "- key: n_kickoff\n",
       "- key: n_partner_scope\n  id: partner-scope\n  kind: decision\n  title: Partner scope\n  prompt: Does the partner run all of the testing?\n  answer_type: boolean\n  weight: 0\n  relevant_when:\n    equals:\n      decision: partner-runs\n      value: true\n- key: n_kickoff\n",
     );
-  await open(page, "browser", "/library");
-  await importIntoLibrary(page, { name: `${route}.yaml`, mimeType: "text/yaml", buffer: Buffer.from(file) });
+  await importRoute(page, "browser", { name: `${route}.yaml`, mimeType: "text/yaml", buffer: Buffer.from(file) });
   await expect(page.getByTestId("draft")).toHaveAttribute("data-status", "open");
   await page.getByTestId("route-actions").getByRole("button", { name: "Publish the draft" }).click();
   await expect(page.locator('[data-testid="version"][data-version="1"]')).toBeVisible();

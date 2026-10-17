@@ -7,9 +7,9 @@
 // keeps the same own settings beside its step (`depth=`) and names the container it drilled
 // into by `in=`; the parameters it does not own ride along untouched. Every setting at its
 // default leaves the address bare.
-import { drawnAt, type Placed } from "./ladder.ts";
 import { DEFAULT_SETTINGS, LENSES, STEPS, type CanvasSettings, type Lens, type Step } from "./model.ts";
-import { DEFAULT_VIEW_STATE, viewStateFrom, viewStateParams, type ViewState } from "../journeys/view.ts";
+import { journeyPath } from "../journeys/address.ts";
+import { DEFAULT_VIEW_STATE, VIEW_PARAMS, viewStateFrom, viewStateParams, type ViewState } from "../journeys/view.ts";
 
 /**
  * A route canvas's settings, whether the structure is edited, and whether the full-screen map is open (below 720px, where the canvas is otherwise a preview).
@@ -188,40 +188,20 @@ function graphParamsOf(view: GraphView): URLSearchParams {
   return params;
 }
 
-function graphSearchOf(view: GraphView): string {
-  const text = graphParamsOf(view).toString();
-  return text === "" ? "" : `?${text}`;
-}
-
 /**
- * C2, 5.7: `view` opened on a node with `ancestors` (its containers, nearest first) and `kind`,
- * with whatever the view hides of it shown: its containers expanded, the least depth from the one
- * chosen that draws it (its kind, and at Stages its top-level node being a stage or a milestone), its class when it is not relevant or conditional, and no Filter or
- * search narrowing (which may not keep it).
- * Frontier and Fade are kept: they hide nothing.
+ * A journey's graph showing `view` at `target` (a node, an edge, or neither): the view state and
+ * the graph's own settings rewritten in `search`, every other parameter kept, and `view=graph`
+ * written only off its default (`journeyPath`). `search` is the query of the page the link is on;
+ * links from anywhere else pass none.
  */
-export function revealing(view: GraphView, node: Placed, state: string | undefined): GraphView {
-  const depth = view.state.depth ?? "actions";
-  const { filter } = view.state;
-  return {
-    ...view,
-    state: {
-      ...view.state,
-      depth: drawnAt(depth, node) ? view.state.depth : STEPS.slice(STEPS.indexOf(depth)).find((each) => drawnAt(each, node)),
-      filter: { mine: false, owner: undefined, flags: [], notRelevant: filter.notRelevant || state === "not_relevant", conditional: filter.conditional || state === "conditional" },
-      text: "",
-    },
-    open: [...new Set([...view.open, ...node.ancestors])],
-    shut: view.shut.filter((key) => !node.ancestors.includes(key)),
-  };
-}
-
-/** The path of a journey's canvas (PLAN, GRAPH), or of a node's detail on it, keeping what the canvas shows. */
-export function canvasPath(journey: string, view: GraphView, node?: string): string {
-  return `/journeys/${journey}/graph${node === undefined ? "" : `/nodes/${node}`}${graphSearchOf(view)}`;
-}
-
-/** An edge's card on the canvas: the ends it joins, `<from>~<to>`, in the address. */
-export function edgePath(journey: string, view: GraphView, edge: { from: string; to: string }): string {
-  return `/journeys/${journey}/graph/edges/${edge.from}~${edge.to}${graphSearchOf(view)}`;
+export function graphPath(journey: string, view: GraphView, target: { node?: string | undefined; edge?: string | undefined }, search: string): string {
+  const rest = new URLSearchParams(search);
+  for (const name of [...VIEW_PARAMS, OPEN, SHUT, LENS, EDIT, MAP]) {
+    rest.delete(name);
+  }
+  const params = graphParamsOf(view);
+  for (const [name, value] of rest) {
+    params.append(name, value);
+  }
+  return journeyPath({ journey, ...target }, "graph", params.toString());
 }

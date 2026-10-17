@@ -178,6 +178,24 @@ mod in_process {
             answered, expected,
             "the top-level rule and the filters parse"
         );
+        let selected = LevelQuery {
+            selected: Some("n_partner_runs".parse().unwrap()),
+            ..filtered.clone()
+        };
+        let held_back = same(world.service.level(call, id, &filtered).await.unwrap());
+        let expected = same(world.service.level(call, id, &selected).await.unwrap());
+        let drawn = |level: &serde_json::Value, key: &str| {
+            level["value"]["nodes"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|node| node["key"] == key)
+        };
+        assert!(!drawn(&held_back, "n_partner_runs") && drawn(&expected, "n_partner_runs"));
+        let target =
+            format!("{JOURNEY}/level?top=group&flag=unassigned&text=plan&selected=n_partner_runs");
+        let answered: serde_json::Value = get(&ann, &target).await;
+        assert_eq!(answered, expected, "the selected node parses");
 
         let partner: &NodeKey = &"n_partner_runs".parse().unwrap();
         let detail = world.service.node_detail(call, id, partner).await.unwrap();

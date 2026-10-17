@@ -20,8 +20,9 @@ import { StatusSummaryView } from "../summary/StatusSummary.tsx";
 import { dateAway, dateWords } from "../timeline/model.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
-import { pagePath } from "./address.ts";
-import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, switchedSearch, viewStateParams } from "./view.ts";
+import { journeyPath, screenSwitched } from "./address.ts";
+import { useJourneyTarget } from "./useJourneyTarget.ts";
+import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, viewStateParams } from "./view.ts";
 import { yoursOf } from "./figures-model.ts";
 import { JourneyFlow } from "../proposals/Entries.tsx";
 import { UpgradeMark } from "./JourneyIndex.tsx";
@@ -109,7 +110,7 @@ function Flags({ ready, model }: { ready: Ready; model: SummaryModel }) {
       {flags.map((each, at) => (
         <span key={each.flag}>
           {at === 0 ? "" : ", "}
-          <Link to={pagePath(journey, "list", undefined, viewStateParams({ ...DEFAULT_VIEW_STATE, filter: { ...DEFAULT_FILTER, flags: [each.flag] } }).toString())} data-testid={`card-flag-${each.flag}`}>
+          <Link to={journeyPath({ journey }, "list", viewStateParams({ ...DEFAULT_VIEW_STATE, filter: { ...DEFAULT_FILTER, flags: [each.flag] } }).toString())} data-testid={`card-flag-${each.flag}`}>
             {each.count} {each.words}
           </Link>
         </span>
@@ -195,8 +196,8 @@ function Folds({ ready, model, full, selected }: { ready: Ready; model: SummaryM
  * card at full width with every fold open and each list whole (`full`).
  */
 export function JourneyCard({ ready, selected, full = false }: { ready: Ready; selected?: string | undefined; full?: boolean }) {
-  const journey = ready.journey.header.id;
   const { search } = useLocation();
+  const target = useJourneyTarget();
   const summaryRead = useProjected(ready, { projection: "status_summary" });
   const summary = valueOf(summaryRead);
   const summaryError = errorWords(summaryRead);
@@ -219,7 +220,7 @@ export function JourneyCard({ ready, selected, full = false }: { ready: Ready; s
             <Button className="no-print" onClick={() => { globalThis.print(); }}>
               Print
             </Button>
-            <Link to={pagePath(journey, "graph", undefined, switchedSearch(search, "summary", "graph"))} className="no-print" data-testid="summary-close" aria-label="Close the summary">
+            <Link to={screenSwitched(target, search, "graph")} className="no-print" data-testid="summary-close" aria-label="Close the summary">
               Close
             </Link>
           </>

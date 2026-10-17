@@ -27,6 +27,8 @@ pub enum IdError {
     },
     /// A path with an empty segment.
     EmptySegment(String),
+    /// A word the app's addresses keep (`/routes/new` is the new-route form).
+    Reserved(String),
 }
 
 impl fmt::Display for IdError {
@@ -43,6 +45,9 @@ impl fmt::Display for IdError {
                 "{text:?} is not a key of this type: expected {prefix:?} followed by a slug"
             ),
             IdError::EmptySegment(text) => write!(formatter, "path {text:?} has an empty segment"),
+            IdError::Reserved(text) => {
+                write!(formatter, "{text:?} is reserved and cannot be a route id")
+            }
         }
     }
 }
@@ -362,9 +367,16 @@ impl FromStr for RouteId {
     type Err = IdError;
 
     fn from_str(text: &str) -> Result<Self, IdError> {
+        if text == RESERVED_ROUTE_ID {
+            return Err(IdError::Reserved(text.to_owned()));
+        }
         Ok(Self(text.parse()?))
     }
 }
+
+/// The one route id the app's addresses keep: `/routes/new` is the new-route form, so a route
+/// with this id would have no address.
+const RESERVED_ROUTE_ID: &str = "new";
 
 string_serde!(
     RouteId,
@@ -437,6 +449,16 @@ mod tests {
         for bad in ["", "Setup", "-x", "_x", "a b", "a/b", "a.b"] {
             assert!(bad.parse::<Slug>().is_err(), "{bad:?}");
         }
+    }
+
+    #[test]
+    fn a_route_id_cannot_be_the_word_the_new_route_address_keeps() {
+        assert!(matches!(
+            "new".parse::<RouteId>(),
+            Err(IdError::Reserved(_))
+        ));
+        assert!("new-hire".parse::<RouteId>().is_ok());
+        assert!(serde_json::from_str::<RouteId>("\"new\"").is_err());
     }
 
     #[test]

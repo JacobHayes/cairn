@@ -8,12 +8,10 @@ import { fresh, open, openJourney, type HostKind } from "./shell.ts";
 /** A fresh name for a route this run starts. */
 export const routeName = (stem: string) => fresh(stem);
 
-/** Starts a route with an empty draft from the route index; its id, once its draft's canvas opens. */
+/** Starts a route with an empty draft from the new-route form; its id, once its draft's canvas opens. */
 export async function newRoute(page: Page, host: HostKind, name: string): Promise<string> {
-  await open(page, host, "/library");
+  await open(page, host, "/routes/new");
   const form = page.getByTestId("new-route");
-  await form.getByTestId("new-menu").click();
-  await form.getByTestId("new-process").click();
   await form.getByLabel("New route name").fill(name);
   const id = await form.getByLabel("New route id").inputValue();
   await form.getByTestId("new-create").click();

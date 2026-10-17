@@ -7,7 +7,8 @@
 import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
-import { canvasPath, DEFAULT_GRAPH_VIEW } from "../canvas/settings.ts";
+import { graphPath, graphViewFrom } from "../canvas/settings.ts";
+import { nodeOpened } from "../journeys/address.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { Actions } from "./Actions.tsx";
 import { Affects } from "./Affects.tsx";
@@ -21,7 +22,7 @@ import { foldKey } from "./folds.ts";
 import { Header } from "./Header.tsx";
 import { NodeHistory } from "./History.tsx";
 import { nodeDetail, type NodeDetail, type Ready } from "./model.ts";
-import { FoldedSections, screenPath } from "./parts.tsx";
+import { FoldedSections } from "./parts.tsx";
 import { Pieces } from "./Pieces.tsx";
 import { useRankRow } from "./reads.ts";
 import { useRename } from "./rename.ts";
@@ -75,7 +76,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
   const row = useRankRow(view, nodeKey);
   // Closing keeps the screen it is open on and what that screen shows (5.2).
   const { pathname, search } = useLocation();
-  const close = { pathname: screenPath(pathname), search };
+  const close = nodeOpened(pathname, search, undefined);
   if (detail === undefined) {
     return (
       <aside className="detail-panel panel" data-testid="node-detail-missing">
@@ -90,7 +91,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
   return (
     <FoldedSections value={folded}>
       <aside className="detail-panel panel stack" aria-label={node.title} data-testid="node-detail" data-node={nodeKey}>
-        <Header view={view} detail={detail} position={position} rename={rename} removeTo={canvasPath(journey, { ...DEFAULT_GRAPH_VIEW, edit: true }, nodeKey)} />
+        <Header view={view} detail={detail} position={position} rename={rename} removeTo={graphPath(journey, { ...graphViewFrom(new URLSearchParams(search)), edit: true }, { node: nodeKey }, search)} />
         <Sentence view={view} detail={detail} rank={{ position, row }} />
         {node.kind === "decision" || description === "" ? null : <Markdown text={description} data-testid="description" />}
         <Actions view={view} detail={detail} onRename={rename.start} />

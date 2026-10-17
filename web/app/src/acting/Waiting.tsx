@@ -8,7 +8,7 @@ import { useProjected } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { namer, viaText } from "../detail/explain.ts";
 import { titleOf, type Ready } from "../detail/model.ts";
-import { nodePath, screenPath } from "../detail/parts.tsx";
+import { nodeOpened } from "../journeys/address.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { DetailLink } from "./Parts.tsx";
 import { RowActions } from "./RowActions.tsx";
@@ -27,7 +27,7 @@ function UnblockerLine({ view, unblocker, row }: { view: Ready; unblocker: Unblo
           {unblocker.through === undefined ? "" : ` of ${titleOf(view, unblocker.through)}, which holds it`})
         </span>
       </span>
-      {row === undefined ? null : <RowActions view={view} row={row} to={`${nodePath(screenPath(pathname), unblocker.node)}${search}`} />}
+      {row === undefined ? null : <RowActions view={view} row={row} to={nodeOpened(pathname, search, unblocker.node)} />}
     </li>
   );
 }

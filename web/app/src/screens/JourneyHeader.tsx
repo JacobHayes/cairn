@@ -4,10 +4,10 @@
 // deletion once archived, A19). What the journey is (progress, next milestone, route) is on the
 // journey card in the inspector. When completion is suggested, a band under the header offers it.
 import { useState } from "react";
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 
 import { AssistantDock, journeyTitles } from "../assistant/AssistantPanel.tsx";
-import { canvasPath, type GraphView } from "../canvas/settings.ts";
+import { graphPath, type GraphView } from "../canvas/settings.ts";
 import type { Ready } from "../detail/model.ts";
 import { DeleteJourney } from "../journeys/DeleteJourney.tsx";
 import { statusActions } from "../journeys/lifecycle.ts";
@@ -108,6 +108,7 @@ function copyLink(): void {
 /** The journey's `⋯`, in groups: Edit and the structure flows, its link, and its status. */
 function JourneyMenu({ ready, view, selected, write, onPanel }: { ready: Ready; view: GraphView; selected: string | undefined; write: ScreenWrite; onPanel: (panel: Panel) => void }) {
   const { header } = ready.journey;
+  const { search } = useLocation();
   const insert = useInsertEntry();
   const archived = header.status === "archived";
   return (
@@ -121,7 +122,7 @@ function JourneyMenu({ ready, view, selected, write, onPanel }: { ready: Ready; 
         return (
           <>
             {archived ? null : (
-              <Link role="menuitem" className="menu-item" data-testid="menu-edit" to={canvasPath(header.id, { ...view, edit: !view.edit }, selected)} onClick={close}>
+              <Link role="menuitem" className="menu-item" data-testid="menu-edit" to={graphPath(header.id, { ...view, edit: !view.edit }, { node: selected }, search)} onClick={close}>
                 {view.edit ? "Done editing" : "Edit"}
               </Link>
             )}
@@ -160,7 +161,7 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
         </div>
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
         <div className="journey-header-actions">
-          <ViewPicker journey={header.id} screen={screen} node={selected} />
+          <ViewPicker screen={screen} />
           <JourneyMenu ready={ready} view={view} selected={selected} write={write} onPanel={setPanel} />
         </div>
       </div>

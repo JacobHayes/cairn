@@ -12,9 +12,14 @@ import { expect, test, type Locator, type Page } from "@playwright/test";
 import { journeyName, setStatus, startJourney } from "./around.ts";
 import { viewportOf, viewportSettled } from "./canvas.ts";
 import { daysAfter, frontierKeys, listKeys, passOrder, select, setFrontier } from "./acting.ts";
-import { fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDepth, setFade } from "./shell.ts";
+import { expectAddress, fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDepth, setFade } from "./shell.ts";
 import { closePopover, filterOf, ownAndPin, search, setCheck, setViewState, VIEWER } from "./view-state.ts";
 import { FIXED_TODAY } from "./views.ts";
+
+/** The journey's own path, without the query: the tab's page is a journey page. */
+function journeyBase(page: Page): string {
+  return new URL(page.url()).pathname;
+}
 
 const UP_FRONT = ["n_meeting_date", "n_partner_runs", "n_purpose", "n_who_informed", "n_who_owns"];
 
@@ -85,7 +90,12 @@ async function walkHolds(page: Page, x: string, word: string): Promise<void> {
   expect(await passOrder(page)).toEqual([x]);
   await holds(page, "walk", word);
   await expect(page.getByTestId("chip-frontier")).toBeDisabled();
-  const before = page.url();
+  const canon = (address: string) => {
+    const url = new URL(address);
+    url.searchParams.sort();
+    return url.href;
+  };
+  const before = canon(page.url());
   await page.locator("main").click({ position: { x: 5, y: 5 } });
   // Shift F does nothing here; m, which does, shows the keys are heard.
   await page.keyboard.press("Shift+F");
@@ -94,7 +104,7 @@ async function walkHolds(page: Page, x: string, word: string): Promise<void> {
   expect(new URL(page.url()).searchParams.get("frontier")).toBe("1");
   await expect(async () => {
     await page.keyboard.press("m");
-    await expect(page).toHaveURL(before, { timeout: 1000 });
+    await expect.poll(() => canon(page.url()), { timeout: 1000 }).toBe(before);
   }).toPass();
   await openFilter(page);
   await expect(filterOf(page).getByTestId("show-conditional").locator("input")).toBeDisabled();
@@ -162,11 +172,11 @@ test("C10, C11: after a click in the page, j opens the next row, Enter its form,
 
   await page.locator("main").click({ position: { x: 5, y: 5 } });
   await page.keyboard.press("v");
-  await expect(page).toHaveURL(/\/timeline\?depth=decisions&frontier=1$/);
+  await expectAddress(page, `${journeyBase(page)}?view=timeline&depth=decisions&frontier=1`);
   // The next v acts on the view drawn, so wait for it.
   await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "timeline");
   await page.keyboard.press("v");
-  await expect(page).toHaveURL(/\/graph\?depth=decisions&frontier=1$/);
+  await expectAddress(page, `${journeyBase(page)}?view=graph&depth=decisions&frontier=1`);
 });
 
 test("C10: Frontier highlights the list: every row stays, the frontier's rows carry their action under the title, and the rest fade", async ({ page }) => {
@@ -174,7 +184,7 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
   await openAt(page, "browser", "j_vendor_eval", "list", { fixedToday: FIXED_TODAY });
   const everything = await listKeys(page);
   await setFrontier(page, true);
-  await expect(page).toHaveURL(/\/list\?frontier=1$/);
+  await expectAddress(page, `${journeyBase(page)}?view=list&frontier=1`);
   expect(await listKeys(page)).toEqual(everything);
   const counted = /(\d+) can move now/.exec((await page.getByTestId("chip-frontier").getAttribute("title")) ?? "")?.[1];
   const frontier = await frontierKeys(page);
@@ -227,17 +237,17 @@ test("C2, C9: a search narrows the graph to its matches and fits them; nothing m
   await viewportSettled(page);
   expect(await viewportOf(page)).not.toEqual(fitted);
   await search(page, "");
-  await expect(page).toHaveURL(/\/graph$/);
+  await expectAddress(page, `${journeyBase(page)}?view=graph`);
   await expect(page.getByTestId("node-card")).toHaveCount(whole);
   // A search longer than the engine reads never leaves the box.
   await search(page, "a".repeat(257));
   expect(await page.getByTestId("toolbar-search").evaluate((box: HTMLInputElement) => box.validity.valid)).toBe(false);
-  await expect(page).toHaveURL(/\/graph$/);
+  await expectAddress(page, `${journeyBase(page)}?view=graph`);
 
   await openAt(page, "browser", "j_vendor_eval", "graph?q=nothing-is-called-this&shut=n_setup");
   await expect(page.getByTestId("nothing-matches")).toBeVisible();
   await page.getByTestId("nothing-matches").getByTestId("reset-view").click();
-  await expect(page).toHaveURL(/\/graph$/);
+  await expectAddress(page, `${journeyBase(page)}?view=graph`);
   await expect(nodeCard(page, "n_access")).toBeVisible();
 });
 
@@ -274,7 +284,7 @@ test("C2, C9: the list at Decisions with a search that matches nothing is empty,
   await expect(empty).toBeVisible();
   await expect(page.getByTestId("list-row")).toHaveCount(0);
   await empty.getByTestId("reset-view").click();
-  await expect(page).toHaveURL(/\/list$/);
+  await expectAddress(page, `${journeyBase(page)}?view=list`);
   await expect(page.getByTestId("list-row").first()).toBeVisible();
 });
 
@@ -295,19 +305,21 @@ test("a journey opens as the stock view, switching views keeps the chips, and co
   await page.mouse.wheel(0, 150);
   await viewportSettled(page);
   await goTo(page, "list");
-  await expect(page).toHaveURL(/\/list\?frontier=1$/);
+  await expectAddress(page, `${journeyBase(page)}?view=list&frontier=1`);
   await goTo(page, "graph");
-  await expect(page).toHaveURL(/\/graph\?frontier=1$/);
+  await expectAddress(page, `${journeyBase(page)}?view=graph&frontier=1`);
   await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "true");
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   await viewportSettled(page);
   expect(await viewportOf(page)).toEqual(opened);
   // Back at the journey's landing, nothing is held: no chip, no pan.
   await page.evaluate(() => {
-    history.pushState(null, "", location.pathname.replace(/\/graph.*/, ""));
+    history.pushState(null, "", location.pathname);
     dispatchEvent(new PopStateEvent("popstate"));
   });
-  await expect(page).toHaveURL(/\/graph$/);
+  await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "summary");
+  expect(new URL(page.url()).search).toBe("");
+  await goTo(page, "graph");
   await expect(page.getByTestId("chip-frontier")).toHaveAttribute("aria-pressed", "false");
   await expect(depth).toHaveAccessibleName("Depth: Actions");
 });
@@ -382,7 +394,7 @@ test("C2, C11, C12: the depth and Fade follow every view; the walk through has n
   // Fade draws the deliverable and dims it; it is a card on the canvas.
   await expect(nodeCard(page, "n_plan")).toHaveClass(/node-faded/);
   await expect(nodeCard(page, "n_plan")).toBeVisible();
-  const depthed = (view: string) => { expect(new URL(page.url()).search, view).toBe("?depth=decisions&fade=1"); };
+  const depthed = (view: string) => { expect(new URL(page.url()).searchParams.get("depth"), view).toBe("decisions"); expect(new URL(page.url()).searchParams.get("fade"), view).toBe("1"); };
   depthed("graph");
 
   await goTo(page, "list");
@@ -469,7 +481,7 @@ test("C11: the walk through at Decisions walks the up-front decisions and not th
   await openAt(page, "browser", "j_vendor_eval", "walk?depth=decisions", { fixedToday: FIXED_TODAY });
   await expect(page.getByTestId("no-decisions")).toBeVisible();
   await page.getByRole("button", { name: "Continue with everything" }).click();
-  await expect(page).toHaveURL(/\/walk$/);
+  await expectAddress(page, `${journeyBase(page)}?view=walk`);
   await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
 });
 
@@ -481,7 +493,7 @@ test("C9-C13: the View picker lands on each view, keeps the shared settings, and
   for (const view of ["list", "timeline", "summary", "walk", "graph"]) {
     await page.getByTestId("view-picker").click();
     await page.getByTestId(`view-${view}`).click();
-    await expect(page).toHaveURL(new RegExp(`/journeys/j_vendor_eval/${view}\\?frontier=1$`));
+    await expectAddress(page, `/journeys/j_vendor_eval?${view === "summary" ? "" : `view=${view}&`}frontier=1`);
     await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", view);
     await expect(page.getByTestId(ROOTS[view] ?? "")).toBeVisible();
     // Opened again, exactly one item is marked as where you are, and it is this view's.
@@ -507,7 +519,7 @@ test("C9, C11: the View picker works from the keyboard: it opens on the current 
   await page.keyboard.press("ArrowDown");
   await expect(page.getByTestId("view-list")).toBeFocused();
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/list$/);
+  await expectAddress(page, `${journeyBase(page)}?view=list`);
   // The router's transition may still be pending at the address: the picker names the view once it has landed.
   await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "list");
   await expect(button).toBeFocused();
@@ -520,7 +532,7 @@ test("C9, C11: the View picker works from the keyboard: it opens on the current 
   // Choosing the view already open changes nothing and keeps the focus on the button.
   await page.keyboard.press("Enter");
   await page.keyboard.press("Enter");
-  await expect(page).toHaveURL(/\/list$/);
+  await expectAddress(page, `${journeyBase(page)}?view=list`);
   await expect(page.getByTestId("view-picker-menu")).toHaveCount(0);
   await expect(button).toBeFocused();
   // Tab closes it and moves on to the next control, the journey's menu.

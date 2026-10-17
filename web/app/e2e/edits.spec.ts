@@ -210,10 +210,8 @@ test("a node action rejected after its screen was left waits under its form, acr
 });
 
 test("a new route refused for an id in use stays under its control and on the chip, across a reload, until discarded", async ({ page }) => {
-  await open(page, "browser", "/library");
+  await open(page, "browser", "/routes/new");
   const form = page.getByTestId("new-route");
-  await form.getByTestId("new-menu").click();
-  await form.getByTestId("new-process").click();
   // The name's slug is the id of a route the fixtures already hold.
   await form.getByLabel("New route name").fill("Hiring loop");
   await form.getByTestId("new-create").click();
@@ -222,7 +220,7 @@ test("a new route refused for an id in use stays under its control and on the ch
   // Away from the control it is still counted, and a reload keeps it under the control.
   await goWithin(page, "/");
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
-  await goWithin(page, "/library");
+  await goWithin(page, "/routes/new");
   await expect(form.getByTestId("refused")).toBeVisible();
   await page.reload();
   await expect(form.getByTestId("refused")).toBeVisible();

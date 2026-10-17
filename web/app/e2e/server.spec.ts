@@ -14,6 +14,7 @@ import {
   countDocumentFetches,
   derivedRevision,
   fresh,
+  goTo,
   live,
   nodeCard,
   open,
@@ -70,6 +71,7 @@ test("a later page shows the edit, and a page on the index shows a journey start
   const started = await startVendorJourney(one);
   await expect(two.locator(`[data-testid="journey-row"][data-journey="${started}"]`)).toBeVisible();
   await two.getByRole("link", { name: "Launch the reporting release" }).click();
+  await goTo(two, "graph");
   await expect(title(two, "n_docs")).toHaveText(renamed);
   await live(two);
   const later = await context.newPage();

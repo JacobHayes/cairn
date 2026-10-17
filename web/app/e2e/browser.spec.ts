@@ -1,7 +1,6 @@
 // The shell on the in-browser host (ARCHITECTURE, Web UI: in-browser host), one smoke test of
 // what only a real browser shows: no server, the fixtures seeded on load, the module loaded by
-// its address and each journey derived in the derive worker, the router redirecting an old
-// address, a patch applied by the page's own service with no error event, and a screen whose
+// its address and each journey derived in the derive worker, the router (no redirects), a patch applied by the page's own service with no error event, and a screen whose
 // file cannot be fetched asking for a reload while the frame stays. The module's agreement with
 // the server is web/wasm's Node tests; every other test here starts from this host working.
 // The timed parts of the shell that only a mounted page shows are here too: the sync dot's
@@ -11,7 +10,7 @@ import { expect, test } from "@playwright/test";
 
 import { newRoute, routeName } from "./authoring.ts";
 import { savedText } from "./around.ts";
-import { derivedRevision, fresh, goWithin, open, openJourney, recentSaves, rename, syncChip, visit } from "./shell.ts";
+import { derivedRevision, expectAddress, fresh, goTo, goWithin, open, openJourney, recentSaves, rename, syncChip, visit } from "./shell.ts";
 
 // Every error event the window sees, including the browser's own reports (a ResizeObserver
 // loop) that never reach Playwright's pageerror.
@@ -22,14 +21,17 @@ test("the in-browser host boots, derives in the worker, applies a patch, and sur
     window.addEventListener("error", (event) => seen.push(event.message));
   });
   await visit(page, "browser", "/");
-  await expect(page.getByTestId("journey-row")).toHaveCount(4);
+  await expect(page.getByTestId("home")).toBeVisible();
   expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe("/");
+  await visit(page, "browser", "/journeys");
 
   await expect(page.getByTestId("journey-row")).toHaveCount(4);
   await page.getByRole("link", { name: "Hire a platform engineer" }).click();
   await expect(page.getByTestId("journey-name")).toHaveText("Hire a platform engineer");
-  await expect(page).toHaveURL(/\/journeys\/j_hiring\/graph$/);
+  await expectAddress(page, "/journeys/j_hiring");
+  await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "summary");
   expect(await derivedRevision(page)).toBe(6);
+  await goTo(page, "graph");
   await expect(page.locator("[data-testid=node-card][data-here]").first()).toBeVisible();
   expect(page.workers().length).toBeGreaterThan(0);
 
@@ -50,14 +52,14 @@ test("the in-browser host boots, derives in the worker, applies a patch, and sur
   await expect(page.getByTestId("load-failure")).toHaveCount(0);
 });
 
-test("opening `/` shows the journey index first and the page never moves after", async ({ page }) => {
+test("opening `/` shows Home first and the page never moves after", async ({ page }) => {
   // Every screen the shell paints, and the address it paints it at, from the first mutation on.
   await page.addInitScript(() => {
     const painted: string[] = [];
     Object.assign(window, { painted });
     const note = () => {
       const main = document.querySelector("main[data-screen]");
-      const entry = main === null ? null : `${main.getAttribute("data-screen") ?? ""} @ ${location.pathname}${location.search}`;
+      const entry = main === null ? null : `${main.getAttribute("data-screen") ?? ""} @ ${location.pathname}${location.search} # ${main.querySelector("h1")?.textContent ?? ""}`;
       if (entry !== null && painted[painted.length - 1] !== entry) {
         painted.push(entry);
       }
@@ -65,27 +67,30 @@ test("opening `/` shows the journey index first and the page never moves after",
     new MutationObserver(note).observe(document, { subtree: true, childList: true, attributes: true });
   });
   await visit(page, "browser", "/");
-  await expect(page.getByTestId("journey-row").first()).toBeVisible();
+  await expect(page.getByTestId("home")).toBeVisible();
+  await expect(page.getByTestId("home-journey").first()).toBeVisible();
   // Past the point where a data-driven redirect would have moved the page.
   await page.waitForTimeout(1000);
   const painted = await page.evaluate(() => (window as unknown as { painted: string[] }).painted);
   const address = new URL(page.url()).pathname + new URL(page.url()).search;
-  expect(painted).toEqual([`${address} @ ${address}`]);
+  // Home's heading is in the first paint of the page, at the address it was opened at, and nothing after changes either.
+  expect(painted).toEqual([`${address} @ ${address} # Waiting on you`]);
   expect(address).toBe("/");
 });
 
-test("the rail marks the journey index current at `/` and only there", async ({ page }) => {
+test("the rail marks Home at `/` only, Journeys on the index and Routes on theirs", async ({ page }) => {
   await visit(page, "browser", "/");
   const rail = page.getByRole("navigation", { name: "Screens", exact: true });
   const current = rail.locator("[aria-current=page]");
-  await expect(current).toHaveText(["Journeys"]);
-  await rail.getByRole("link", { name: "Library" }).click();
-  await expect(current).toHaveText(["Library"]);
+  await expect(current).toHaveText(["Home"]);
+  await rail.getByRole("link", { name: "Routes" }).click();
+  await expect(current).toHaveText(["Routes"]);
+  expect(new URL(page.url()).pathname).toBe("/routes");
   await rail.getByRole("link", { name: "Journeys" }).click();
   await expect(page.getByTestId("journey-row").first()).toBeVisible();
   await expect(current).toHaveText(["Journeys"]);
-  expect(new URL(page.url()).pathname).toBe("/");
-  await page.goto(`${new URL(page.url()).origin}/?status=any`);
+  expect(new URL(page.url()).pathname).toBe("/journeys");
+  await page.goto(`${new URL(page.url()).origin}/journeys?status=any`);
   await expect(page.getByTestId("journey-row").first()).toBeVisible();
   await expect(current).toHaveText(["Journeys"]);
 });

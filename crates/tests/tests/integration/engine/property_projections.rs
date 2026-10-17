@@ -2,7 +2,8 @@
 //! generated journeys: a level's visible set is exactly the nodes within the container whose
 //! kind and relevance class are shown, whose top-level ancestor's kind the top-level rule
 //! keeps, that the list's filters match or that hold a match, and that no collapsed container
-//! above them hides; showing a class left out draws exactly the count the level gives for it
+//! above them hides, except that the selected node and the containers above it within the
+//! level are always visible; showing a class left out draws exactly the count the level gives for it
 //! and hides nothing; each
 //! node sits under its nearest visible ancestor, every drawn edge stands for at least one
 //! underlying edge between its ends' stand-ins and every edge with two distinct stand-ins is
@@ -116,6 +117,7 @@ mod property {
         class_shown: BTreeMap<NodeKey, bool>,
         top: BTreeSet<NodeKind>,
         filters: Filters,
+        selected: Option<NodeKey>,
     }
 
     impl Rules {
@@ -129,7 +131,35 @@ mod property {
                 flags: self.filters.flags.clone(),
                 owner: None,
                 text: self.filters.text.clone(),
+                selected: self.selected.clone(),
             }
+        }
+
+        /// Within the container drilled into, by its definition.
+        fn within(&self, graph: &Graph, key: &NodeKey) -> bool {
+            self.container
+                .as_ref()
+                .is_none_or(|top| graph.tree().is_ancestor(top, key))
+        }
+
+        /// The selected node, by its definition, when it is within the level.
+        fn selection(&self, graph: &Graph) -> Option<&NodeKey> {
+            self.selected
+                .as_ref()
+                .filter(|selected| self.within(graph, selected))
+        }
+
+        /// Drawn because selected: the selected node, or a container above it within the level.
+        fn on_chain(&self, graph: &Graph, key: &NodeKey) -> bool {
+            self.selection(graph).is_some_and(|selected| {
+                self.within(graph, key)
+                    && (key == selected || graph.tree().is_ancestor(key, selected))
+            })
+        }
+
+        /// A container above the selected node: opened, whatever collapsed it.
+        fn opened(&self, graph: &Graph, key: &NodeKey) -> bool {
+            self.on_chain(graph, key) && self.selection(graph) != Some(key)
         }
 
         /// Left out by the top-level rule, by its definition: its root's kind is not kept.
@@ -142,19 +172,18 @@ mod property {
             !self.top.is_empty() && !self.top.contains(&graph.node(root).unwrap().kind())
         }
 
-        /// A node is visible by its definition: within the container, its kind and class
-        /// shown, not left out at the top, kept by the filters, and no collapsed container
-        /// between it and the container above it.
+        /// A node is visible by its definition: selected or above the selected node within the
+        /// level, or else within the container, its kind and class shown, not left out at the
+        /// top, kept by the filters, and no collapsed container (one above the selected node
+        /// is open) between it and the container above it.
         fn visible(&self, graph: &Graph, key: &NodeKey) -> bool {
+            if self.on_chain(graph, key) {
+                return true;
+            }
             let tree = graph.tree();
-            let within = |key: &NodeKey| {
-                self.container
-                    .as_ref()
-                    .is_none_or(|top| tree.is_ancestor(top, key))
-            };
             let mut above = tree.parent(key);
-            while let Some(node) = above.filter(|node| within(node)) {
-                if self.collapsed.contains(node) {
+            while let Some(node) = above.filter(|node| self.within(graph, node)) {
+                if self.collapsed.contains(node) && !self.opened(graph, node) {
                     return false;
                 }
                 above = tree.parent(node);
@@ -165,16 +194,16 @@ mod property {
                 && self.filters.keeps(graph, key)
         }
 
-        /// A node's stand-in by its definition: walking up from it within the container, the
-        /// first visible node.
+        /// A node's stand-in by its definition: none when the top-level rule leaves it out
+        /// (unless it is drawn because selected), else walking up from it within the container,
+        /// the first visible node.
         fn stand_in(&self, graph: &Graph, key: &NodeKey) -> Option<NodeKey> {
+            if !self.on_chain(graph, key) && self.left_out(graph, key) {
+                return None;
+            }
             let tree = graph.tree();
             let mut current = Some(key);
-            while let Some(node) = current.filter(|node| {
-                self.container
-                    .as_ref()
-                    .is_none_or(|top| tree.is_ancestor(top, node))
-            }) {
+            while let Some(node) = current.filter(|node| self.within(graph, node)) {
                 if self.visible(graph, node) {
                     return Some(node.clone());
                 }
@@ -415,6 +444,7 @@ mod property {
             top_mask in prop::option::of(1_u8..32),
             flag_mask in 0_u8..32,
             search in prop::option::of((0_usize..80, 0_usize..3)),
+            select in prop::option::of(0_usize..80),
         ) {
             let derived = derived(&graph);
             let journey = DerivedJourney::new(&graph, &derived);
@@ -434,6 +464,7 @@ mod property {
                 class_shown,
                 top: top_mask.map(kinds).unwrap_or_default(),
                 filters: Filters::of(&journey, flags(flag_mask), text),
+                selected: select.map(|at| keys[at % keys.len()].clone()),
             };
             let level = journey.level(&rules.query(&display), &Deployment::default(), &BTreeSet::new()).unwrap();
             level_holds(&graph, &derived, &level, &rules);

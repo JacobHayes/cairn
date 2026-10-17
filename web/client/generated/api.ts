@@ -6105,6 +6105,8 @@ export interface operations {
                 owner?: components["schemas"]["EntityKey"];
                 /** @description Text found in the title, description, notes, or resources, ignoring ASCII case; nodes holding a match are kept too. */
                 text?: components["schemas"]["Title"];
+                /** @description The node selected: drawn whatever would hide it, with every container above it within the level, none of them collapsed. A key outside the level has no effect. */
+                selected?: components["schemas"]["NodeKey"];
             };
             header?: never;
             path: {

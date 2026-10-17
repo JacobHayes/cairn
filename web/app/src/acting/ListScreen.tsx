@@ -12,21 +12,20 @@
 import { useEffect, useMemo, useRef, type CSSProperties, type MouseEvent } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { useFlips, useLevel, useProjected } from "../canvas/hooks.ts";
+import { useFolds, useLevel, useProjected } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
-import { collapsedAt, drawnStep, openAt, stepOf } from "../canvas/ladder.ts";
-import type { Step } from "../canvas/model.ts";
+import { collapsedAt, drawnStep, stepOf } from "../canvas/ladder.ts";
 import type { Selection } from "../canvas/selection.ts";
 import { decisionRows } from "../decisions/model.ts";
 import type { Ready } from "../detail/model.ts";
-import { nodePath, screenPath } from "../detail/parts.tsx";
 import { useMineOf } from "../journeys/mine.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides, tableQueryOf } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
-import { ancestorsOf, planOrder } from "../plan/tree.ts";
+import { planOrder } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
+import { nodeOpened } from "../journeys/address.ts";
 import { withListSettings, type ListSettings } from "./address.ts";
 import { Checks } from "./Controls.tsx";
 import { Cell, type CellContext } from "./ListCells.tsx";
@@ -106,7 +105,7 @@ function Row({ line, columns, context, selection, current, faded }: { line: Line
         if (!own) {
           // The selected row clicked again changes no address, so the inspector must be asked to come back.
           frame?.show("inspector");
-          void navigate(`${nodePath(screenPath(pathname), line.key)}${search}`);
+          void navigate(nodeOpened(pathname, search, line.key));
         }
       }}
     >
@@ -203,20 +202,9 @@ function FrontierPanels({ view, drawn }: { view: Ready; drawn: ReadonlySet<strin
     <>
       {!stalled ? <NextForYou view={view} entries={entries} /> : null}
       {stalled ? <StalledPanel view={view} /> : null}
-      <Folds view={view} drawn={drawn} toOf={(key) => `${nodePath(screenPath(pathname), key)}${search}`} />
+      <Folds view={view} drawn={drawn} toOf={(key) => nodeOpened(pathname, search, key)} />
     </>
   );
-}
-
-/** The containers the drawn step opens and the viewer's flips since the depth was chosen (5.1): a flip holds until another depth is picked. */
-function useFolds(view: Ready, depth: ViewState["depth"], drawn: Step, picks: number, selected: string | undefined) {
-  const { flipped, flip } = useFlips(depth, picks);
-  const nodes = view.journey.graph.nodes ?? [];
-  const opens = useMemo(() => openAt(drawn, nodes, currentStagesOf(view)), [view, nodes, drawn]);
-  // The open node's containers stay open, so it is not hidden in a fold.
-  const holding = useMemo(() => new Set(selected === undefined ? [] : ancestorsOf(view, selected)), [view, selected]);
-  const open = useMemo(() => (key: string) => holding.has(key) || opens(key) !== flipped.has(key), [holding, opens, flipped]);
-  return { open, flip };
 }
 
 /**
@@ -228,7 +216,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const depth = stepOf({ step: state.depth }, nodes);
   const shown = drawnStep(depth, state.fade);
   const request = useMemo(() => levelRequestOf(state, shown, []), [state, shown]);
-  const { level, drawn, error: levelError } = useLevel(view, request);
+  const { level, drawn, error: levelError } = useLevel(view, request, selected);
   const query = useMemo(() => tableQueryOf(list.sort), [list.sort]);
   const { rows, error: rowsError } = useRows(view, query);
   const decisionColumns = depth === "decisions";
@@ -238,7 +226,9 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const ranks = useMemo(() => rankPositions(view, state.frontier), [view, state.frontier]);
   const order = useMemo(() => new Map(planOrder(view).map((key, at) => [key, at])), [view]);
   const tree = list.sort === undefined;
-  const folds = useFolds(view, state.depth, shown, picks, selected);
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  const folds = useFolds(view, state.depth, shown, picks, selected, (key) => void navigate(nodeOpened(pathname, search, key)));
   const kept = useMemo(() => (rows === undefined || drawn === undefined ? undefined : rows.filter((row) => drawn.has(row.key))), [rows, drawn]);
   const lines = useMemo(
     () => (kept === undefined || level === undefined ? [] : tree ? treeLines(level.nodes, new Map(kept.map((row) => [row.key, row])), folds.open, order) : flatLines(view, kept, list.sort)),
@@ -254,7 +244,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const badges = useMemo(() => badgesOf("list", level?.hidden_by_class ?? {}, base, stepHides(nodes, depth, []), state.fade), [level, base, nodes, depth, state.fade]);
   const everyLine = lines.flatMap((line) => (line.row === undefined ? [] : [line.row.key]));
   const columns = columnsOf(list, decisionColumns);
-  const context: CellContext = { view, tree, decisions, ranks, frontier, sort: list.sort, onFold: folds.flip };
+  const context: CellContext = { view, tree, decisions, ranks, frontier, sort: list.sort, onFold: folds.fold };
   const error = levelError ?? rowsError;
   return (
     <section className="stack list" aria-label="List" data-testid="list">

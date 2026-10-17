@@ -16,14 +16,13 @@ import { domainOf, journeyAuthored } from "../authoring/target.ts";
 import { stepsFor } from "../canvas/ladder.ts";
 import { MapBand, useMapOpen } from "../canvas/MapFrame.tsx";
 import { useSelection, type Selection } from "../canvas/selection.ts";
-import { canvasPath, DEFAULT_GRAPH_VIEW, graphViewFrom, type GraphView } from "../canvas/settings.ts";
+import { graphViewFrom, type GraphView } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { EdgeCard } from "../detail/EdgeCard.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
-import { nodePath, screenPath } from "../detail/parts.tsx";
-import { indexPath, type Screen } from "../journeys/address.ts";
+import { indexPath, nodeOpened, type Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { isStock, useViewState, ViewStateContext, withViewState, type ViewState, type ViewStateValue } from "../journeys/view.ts";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
@@ -72,7 +71,7 @@ export function JourneyGate({ id, children }: { id: string; children: (ready: Re
 function BackToPass() {
   const { pathname, search } = useLocation();
   return (
-    <Link className="back-to-pass" to={`${screenPath(pathname)}${search}`} data-testid="back-to-pass">
+    <Link className="back-to-pass" to={nodeOpened(pathname, search, undefined)} data-testid="back-to-pass">
       ‹ Back to pass
     </Link>
   );
@@ -89,11 +88,14 @@ function InspectorSlot({
   inserting,
   selection,
   authored,
+  walkCard,
 }: {
   ready: Ready;
   screen: Screen;
   selected: string | undefined;
   edge: string | undefined;
+  /** The walk's current card: its own panel is the node's editor, so the address naming it opens nothing beside it. */
+  walkCard: string | undefined;
   structure: ReactNode;
   card: boolean;
   inserting: ReturnType<typeof useInserting>;
@@ -123,6 +125,9 @@ function InspectorSlot({
       </Inspector>
     );
   }
+  if (screen === "walk" && selected !== undefined && selected === walkCard) {
+    return null;
+  }
   if (selected !== undefined) {
     return (
       <Inspector focus={`${journey}:${selected}`}>
@@ -140,7 +145,7 @@ function InspectorSlot({
 }
 
 /** The page's body: the segment being placed, drawn as review will draw it, while the stepper has a preview; else the page's own. */
-function Workspace({ ready, view, screen, selected, edge, authored, drawing, selection, preview }: Pick<FrameProps, "screen" | "selected" | "edge"> & { ready: Ready; view: GraphView; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; selection: Selection; preview: InsertPreview | undefined }) {
+function Workspace({ ready, view, screen, selected, edge, authored, drawing, selection, preview, onCard }: Pick<FrameProps, "screen" | "selected" | "edge"> & { onCard: ProjectionProps["onCard"]; ready: Ready; view: GraphView; authored: ProjectionProps["authored"]; drawing: ProjectionProps["drawing"]; selection: Selection; preview: InsertPreview | undefined }) {
   if (preview !== undefined) {
     return (
       <Suspense fallback={<p className="muted small">Drawing the preview...</p>}>
@@ -156,7 +161,7 @@ function Workspace({ ready, view, screen, selected, edge, authored, drawing, sel
       </>
     );
   }
-  return <ProjectionBody ready={ready} view={view} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} />;
+  return <ProjectionBody ready={ready} view={view} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} onCard={onCard} />;
 }
 
 /** C1, C2: off the stock view, the Summary says the view state is not its to apply. */
@@ -176,6 +181,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const view = useMemo(() => graphViewFrom(params), [params]);
   const [picks, setPicks] = useState(0);
+  const [walkCard, setWalkCard] = useState<string | undefined>(undefined);
   const onState = useCallback(
     (next: ViewState, picked = false) => {
       if (picked) {
@@ -191,12 +197,12 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const authored = useMemo(() => (planned && view.edit ? journeyAuthored(ready) : undefined), [ready, planned, view.edit]);
   const drawing = useEdgeDrawing(authored);
   // The set is the frame's, so it survives a switch between the graph and the list; each opens a node on its own screen.
-  const selection = useSelection(selected, (node) => void navigate(screen === "graph" ? canvasPath(journey, view, node) : `${node === undefined ? screenPath(pathname) : nodePath(screenPath(pathname), node)}${search}`));
+  const selection = useSelection(selected, (node) => void navigate(nodeOpened(pathname, search, node)));
   const inserting = useInserting(`journey:${journey}`);
   const [sheetOpen, setSheetOpen] = useState(false);
-  useJourneyKeys({ journey, screen, selected, sheetOpen, setSheetOpen, state: view.state, steps, onState });
+  useJourneyKeys({ screen, selected, sheetOpen, setSheetOpen, state: view.state, steps, onState });
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
-  const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(canvasPath(journey, view))} />;
+  const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(nodeOpened(pathname, search, undefined))} />;
   // The graph is a gesture surface that fills the workspace under the head; the rest scroll.
   const fills = planned || inserting.preview !== undefined;
   // A phone's open map covers the head, so the drawing's banner is the map's, not the head's.
@@ -213,17 +219,17 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       <InsertEntryContext value={inserting.start}>
       <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen}>
         <div className="ws-head stack journey-head">
-          <JourneyHeader ready={ready} view={planned ? view : DEFAULT_GRAPH_VIEW} screen={screen} selected={selected} />
+          <JourneyHeader ready={ready} view={planned ? view : { ...view, edit: false }} screen={screen} selected={selected} />
           {planned ? <CanvasBars ready={ready} view={view} authored={authored} drawing={drawing} banner={!onMap} /> : null}
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>
-          <Workspace ready={ready} view={view} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} />
+          <Workspace ready={ready} view={view} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} onCard={setWalkCard} />
           {card === "inline" ? <JourneyCard ready={ready} selected={selected} /> : null}
         </div>
         {sheetOpen ? <KeySheet onClose={() => { setSheetOpen(false); }} /> : null}
       </div>
       {/* After the head: a node opened from the assistant brings its detail forward last. */}
-      <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} />
+      <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} walkCard={walkCard} />
       </InsertEntryContext>
     </MapBand>
     </ConnectContext>

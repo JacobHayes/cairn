@@ -214,6 +214,32 @@ mod in_process {
         assert_eq!(drafted.destination, journey);
     }
 
+    /// `/routes/new` is the app's new-route form, so no route can be called `new`: a route
+    /// file naming it, a save as route to it, and the path to it are refused before anything is
+    /// stored (A13, B8).
+    #[tokio::test]
+    async fn no_route_can_be_called_new() {
+        let world = World::start().await;
+        let ann = world.vendor_after(3).await;
+        let mut file = serde_json::to_value(route_v2()).unwrap();
+        file["route"] = json!("new");
+        let import = json!({"patch_id": "p_import_new", "file": file});
+        let save = json!({
+            "patch_id": "p_save_new",
+            "proposal": "pr_save_new",
+            "route": "new",
+            "name": "New",
+        });
+        for (target, body) in [
+            ("/api/routes/new/import".to_owned(), import.clone()),
+            (format!("{ROUTE}/import"), import),
+            (format!("{JOURNEY}/save-as-route"), save),
+        ] {
+            let reply = post(&ann, &target, &body).await;
+            assert!(reply.status.is_client_error(), "{target}: {}", reply.status);
+        }
+    }
+
     /// A journey or version that does not exist is not found; an upgrade of a journey that
     /// follows no route, or a file of another route, is refused.
     #[tokio::test]

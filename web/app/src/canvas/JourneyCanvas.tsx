@@ -12,7 +12,8 @@ import { useLocation, useNavigate } from "react-router";
 
 import { nodeDetail, titleOf, type Ready } from "../detail/model.ts";
 import { contextMenuOf } from "../detail/offers.ts";
-import { pagePath } from "../journeys/address.ts";
+import { screenSwitched } from "../journeys/address.ts";
+import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { badgesOf, currentStagesOf, depthFaded, journeyLayoutView, levelRequestOf, litOf, stepHides, type LevelRequest } from "../journeys/requests.ts";
 import { ResetView, ViewControls } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
@@ -20,7 +21,7 @@ import { typing } from "../ui/typing.ts";
 import { RevealBox, SignalMenu } from "./Chrome.tsx";
 import { GraphCanvas, type Reveal } from "./GraphCanvas.tsx";
 import { errorWords, valueOf, type ReadView } from "../data/keyed-read.ts";
-import { useJoinedTrace, useLaidOut, useProjected } from "./hooks.ts";
+import { useJoinedTrace, useLaidOut, useLevel, useProjected } from "./hooks.ts";
 import { journeyLooks } from "./journey.ts";
 import { ancestorsOf, collapsedAt, drawnStep, stepOf, withExpanded } from "./ladder.ts";
 import { KINDS, STRENGTH, cardsOf, linesOf, type CanvasModel, type JourneyExtras, type Level, type Line, type Step } from "./model.ts";
@@ -28,7 +29,7 @@ import type { CardActions } from "./NodeCard.tsx";
 import { standsFor, traceOverlay } from "./overlay.ts";
 import { refitKey } from "./refit.ts";
 import type { Selection } from "./selection.ts";
-import { canvasPath, edgePath, type GraphView } from "./settings.ts";
+import { graphPath, type GraphView } from "./settings.ts";
 
 /** C1, C2, C5, C6: the journey's canvas model for one level. */
 export function journeyModel(ready: Ready, level: Level, extras: JourneyExtras): CanvasModel {
@@ -97,12 +98,12 @@ function onlyTraced(model: CanvasModel, traced: ReadonlySet<string>, drawn: Read
 const isPending = (read: ReadView<unknown>) => read.status === "idle" || read.status === "loading";
 
 /** The view's level (C2), and while Reveal is on, the whole journey's beside it under the same collapse, less what neither draws nor the trace reaches. */
-function useJourneyModel(ready: Ready, view: GraphView, collapsed: string[], drawn: Step, depth: Step, revealed: ReadonlySet<string> | undefined) {
+function useJourneyModel(ready: Ready, view: GraphView, collapsed: string[], drawn: Step, depth: Step, revealed: ReadonlySet<string> | undefined, selected: string | undefined) {
   const request = useMemo(() => levelRequestOf(view.state, drawn, collapsed), [view.state, drawn, collapsed]);
   const everything = useMemo<LevelRequest | undefined>(() => (revealed === undefined ? undefined : { projection: "level", shown: KINDS, ...(collapsed.length === 0 ? {} : { collapsed }) }), [revealed, collapsed]);
-  const levelRead = useProjected(ready, request);
+  // The node the address names is always drawn (C7): the level reads it in when the view's own does not.
+  const { level, error: levelError } = useLevel(ready, request, selected);
   const wholeRead = useProjected(ready, everything);
-  const level = valueOf(levelRead);
   const whole = valueOf(wholeRead);
   const nextRead = useProjected(ready, { projection: "next" });
   const mineRead = useProjected(ready, { projection: "mine" });
@@ -121,7 +122,7 @@ function useJourneyModel(ready: Ready, view: GraphView, collapsed: string[], dra
     return revealed === undefined ? drawn : onlyTraced(drawn, revealed, new Set(level.nodes.map((node) => node.key)));
   }, [ready, level, whole, next, mine, answered, revealed]);
   // Frontier, Fade's dimming and the viewer's expands and collapses keep the layout's positions; the step drawn, the Filter and the search lay it out afresh.
-  return { model, level, error: errorWords(levelRead) ?? errorWords(wholeRead), layoutView: journeyLayoutView(view.state, depth) };
+  return { model, level, error: levelError ?? errorWords(wholeRead), layoutView: journeyLayoutView(view.state, depth) };
 }
 
 export interface JourneyCanvasProps {
@@ -152,7 +153,7 @@ function useSelectionTrace(ready: Ready, selected: string | undefined) {
 }
 
 /** What the canvas draws: the view's level laid out, the selected node's trace over it, what the highlights light, and what Reveal asks for. */
-function useGraph(ready: Ready, view: GraphView, selected: string | undefined) {
+function useGraph(ready: Ready, view: GraphView, selected: string | undefined, address: string | undefined) {
   const journey = ready.journey.header.id;
   const { nodes, depth, drawn, collapsed, hidden } = useLadder(ready, view);
   const { trace, learn } = useSelectionTrace(ready, selected);
@@ -163,7 +164,7 @@ function useGraph(ready: Ready, view: GraphView, selected: string | undefined) {
   const traceOnly = revealed === undefined ? undefined : traced;
   const open = useMemo(() => (traceOnly === undefined ? [] : [...traceOnly].flatMap((key) => ancestorsOf(nodes, key))), [traceOnly, nodes]);
   const unfolded = useMemo(() => collapsed.filter((key) => !open.includes(key)), [collapsed, open]);
-  const { model, level, error, layoutView } = useJourneyModel(ready, view, unfolded, drawn, depth, traceOnly);
+  const { model, level, error, layoutView } = useJourneyModel(ready, view, unfolded, drawn, depth, traceOnly, address);
   const laidRead = useLaidOut(journey, layoutView, model);
   const laidOut = valueOf(laidRead);
   const layoutError = errorWords(laidRead);
@@ -191,6 +192,8 @@ function useGraph(ready: Ready, view: GraphView, selected: string | undefined) {
 function useActions(ready: Ready, view: GraphView, selected: string | undefined, onPick: JourneyCanvasProps["onPick"], selection: Selection): CardActions {
   const navigate = useNavigate();
   const frame = useFrameActions();
+  const { search } = useLocation();
+  const target = useJourneyTarget();
   const journey = ready.journey.header.id;
   return useMemo<CardActions>(
     () => ({
@@ -203,7 +206,11 @@ function useActions(ready: Ready, view: GraphView, selected: string | undefined,
       },
       drill: undefined,
       // The refit rides on the navigation, not the address.
-      expand: (key, expanded) => void navigate(canvasPath(journey, withExpanded(view, key, expanded), selected), { state: { reveal: { key, how: expanded ? "expanded" : "collapsed" } } }),
+      // Closing a container that holds the selected node moves the selection to it (C7).
+      expand: (key, expanded) => {
+        const holding = !expanded && selected !== undefined && ancestorsOf(ready.journey.graph.nodes ?? [], selected).includes(key);
+        void navigate(graphPath(journey, withExpanded(view, key, expanded), { node: holding ? key : selected }, search), { state: { reveal: { key, how: expanded ? "expanded" : "collapsed" } } });
+      },
       trace: (key) => { selection.pick(key); },
       title: (key) => titleOf(ready, key),
       menu: {
@@ -218,11 +225,11 @@ function useActions(ready: Ready, view: GraphView, selected: string | undefined,
             return;
           }
           selection.release();
-          void (id === "show-in-list" ? navigate(pagePath(journey, "list", key)) : navigate(canvasPath(journey, view, key), { replace: key === selected, state: { choice: { node: key, id } } }));
+          void (id === "show-in-list" ? navigate(screenSwitched(target, search, "list", key)) : navigate(graphPath(journey, view, { node: key }, search), { replace: key === selected, state: { choice: { node: key, id } } }));
         },
       },
     }),
-    [navigate, frame, journey, view, selected, ready, onPick, selection],
+    [navigate, frame, target, search, journey, view, selected, ready, onPick, selection],
   );
 }
 
@@ -252,6 +259,24 @@ function outsideOf(trace: { upstream: string[]; downstream: string[] } | undefin
   return trace === undefined ? 0 : [...trace.upstream, ...trace.downstream].filter((key) => !drawnAs.has(key)).length;
 }
 
+/**
+ * Where the canvas is asked to go: what a navigation asked for (its `reveal` state), else, while
+ * the location is still the one the canvas mounted at, the node its address names, centred once. Any
+ * navigation changes the location, so an opening request is gone for good and never comes back to
+ * centre the first node after a later reveal.
+ */
+function useRevealed(selected: string | undefined): Reveal | undefined {
+  const location = useLocation();
+  const [opened] = useState(() => ({ key: location.key, node: selected }));
+  const asked = (location.state as { reveal?: { key: string; how: Reveal["how"] } } | null)?.reveal;
+  return useMemo<Reveal | undefined>(() => {
+    if (asked !== undefined) {
+      return { key: asked.key, how: asked.how, id: location.key };
+    }
+    return opened.key === location.key && opened.node !== undefined ? { key: opened.node, how: "centre", id: location.key } : undefined;
+  }, [asked, opened, location.key]);
+}
+
 /** The journey's canvas, laid out, with the selected node's trace. */
 export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }: JourneyCanvasProps) {
   const navigate = useNavigate();
@@ -260,12 +285,11 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
   // One member is inspected and traced; several are only tinted.
   const [single, ...others] = selection.members;
   const alone = others.length === 0 ? single : undefined;
-  const graph = useGraph(ready, view, alone);
+  const graph = useGraph(ready, view, alone, selected);
   const actions = useActions(ready, view, selected, onPick, selection);
-  const go = (next: GraphView, node: string | undefined) => void navigate(canvasPath(journey, next, node));
-  useEscapeEdit(view.edit && others.length === 0, useCallback(() => { void navigate(canvasPath(journey, { ...view, edit: false }, selected)); }, [navigate, journey, view, selected]));
-  const asked = (location.state as { reveal?: { key: string; how: Reveal["how"] } } | null)?.reveal;
-  const reveal = useMemo<Reveal | undefined>(() => (asked === undefined ? undefined : { key: asked.key, how: asked.how, id: location.key }), [asked, location.key]);
+  const go = (next: GraphView, node: string | undefined) => void navigate(graphPath(journey, next, { node }, location.search));
+  useEscapeEdit(view.edit && others.length === 0, useCallback(() => { void navigate(graphPath(journey, { ...view, edit: false }, { node: selected }, location.search)); }, [navigate, journey, view, selected, location.search]));
+  const reveal = useRevealed(selected);
   const { laidOut, overlay, trace } = graph;
   if (graph.error !== undefined) {
     // The controls stay, so a setting the engine refused can be changed or reset from here.
@@ -295,7 +319,7 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
         viewKey={refitKey(laidOut, view.edit)}
         label={`${ready.journey.header.name}: canvas`}
         title={ready.journey.header.name}
-        onEdge={(line) => void navigate(edgePath(journey, view, line))}
+        onEdge={(line) => void navigate(graphPath(journey, view, { edge: `${line.from}~${line.to}` }, location.search))}
         onBackground={() => {
           if (selection.members.length > 0) {
             selection.clear();

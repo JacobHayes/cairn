@@ -11,6 +11,9 @@
 //!   leaves out every node whose top-level ancestor, or itself at the top level, is of a kind
 //!   the query's `top` lacks; drilled into a container, the container's top-level ancestor
 //!   decides for everything within it.
+//! - The selected node (C7) is visible whatever the rules above would do, and so is every
+//!   container above it within the level, none of them collapsed; the rest of what is beneath
+//!   those containers follows the rules as usual. A selection outside the level has no effect.
 //! - Each node within the container has a stand-in: itself when visible, else its nearest
 //!   visible ancestor within the container, else none; a node left out by the top-level rule
 //!   has none. A visible node is drawn under the
@@ -43,11 +46,13 @@
 //! roll-up its children, O(nodes) in all. With filters, the list's matcher reads each node's
 //! text fields once (bounded by the text limits), and the matches are closed over their
 //! ancestors with an early stop, at most 2,000 x 16 (`containment_depth_max`) parent steps;
-//! the kept set and the class counts are B-tree sets and maps of at most 2,000 keys. The
+//! the selected node's chain is at most 16 (`containment_depth_max`) parent steps; the kept
+//! set and the class counts are B-tree sets and maps of at most 2,000 keys. The
 //! top-level rule walks the drilled container's ancestors once, then reads each node's parent.
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use cairn_schema::limits::CONTAINMENT_DEPTH_MAX;
 use cairn_schema::{
     DependencyVia, Deployment, EdgeOrigin, EntityKey, Level, LevelDisplay, LevelEdge, LevelNode,
     LevelQuery, NodeKey, NodeKind, Relevance, RollUp, State, UnderlyingEdge,
@@ -91,7 +96,8 @@ impl<'a> DerivedJourney<'a> {
     ///
     /// # Errors
     ///
-    /// When the container, or a collapsed container, is not a node of the journey.
+    /// When the container, a collapsed container, or the selected node is not a node of the
+    /// journey.
     pub fn level(
         &self,
         query: &LevelQuery,
@@ -113,7 +119,7 @@ impl<'a> DerivedJourney<'a> {
         if let Some(key) = &query.container {
             self.known(key)?;
         }
-        for key in &query.collapsed {
+        for key in query.collapsed.iter().chain(&query.selected) {
             self.known(key)?;
         }
         assert!(
@@ -226,10 +232,12 @@ impl<'a> DerivedJourney<'a> {
         kept: Option<&BTreeSet<&'a NodeKey>>,
     ) -> StandIns<'a> {
         let within = self.tree_order(query.container.as_ref());
+        let chain = self.selected_chain(query, &within);
         let collapsed: BTreeSet<&NodeKey> = within
             .iter()
             .copied()
             .filter(|key| query.collapsed.contains(*key))
+            .filter(|key| !chain.contains(*key) || query.selected.as_ref() == Some(*key))
             .collect();
         let mut of: BTreeMap<&NodeKey, Option<&NodeKey>> = BTreeMap::new();
         let mut inside: BTreeSet<&NodeKey> = BTreeSet::new();
@@ -248,16 +256,20 @@ impl<'a> DerivedJourney<'a> {
                 Some(parent) => left_out.contains(parent),
                 None => self.left_out_at_top(query, key),
             };
+            let on_chain = chain.contains(key);
             if left {
                 left_out.insert(key);
-                of.insert(key, None);
-                continue;
+                if !on_chain {
+                    of.insert(key, None);
+                    continue;
+                }
             }
             let class = classes.map(|classes| display_of(classes.class(key)));
-            let drawable = !under_collapse
-                && query.shown.contains(&self.node(key).kind())
-                && kept.is_none_or(|kept| kept.contains(key));
-            let shown_class = class.is_none_or(|class| query.display.contains(&class));
+            let drawable = on_chain
+                || (!under_collapse
+                    && query.shown.contains(&self.node(key).kind())
+                    && kept.is_none_or(|kept| kept.contains(key)));
+            let shown_class = on_chain || class.is_none_or(|class| query.display.contains(&class));
             if let (true, false, Some(class)) = (drawable, shown_class, class) {
                 *hidden_by_class.entry(class).or_default() += 1;
             }
@@ -274,6 +286,30 @@ impl<'a> DerivedJourney<'a> {
             collapsed,
             hidden_by_class,
         }
+    }
+
+    /// C2, C7: the selected node and the containers above it within the level: what is drawn
+    /// whatever would hide it. Empty when nothing is selected or the node is outside the level.
+    fn selected_chain(&self, query: &LevelQuery, within: &[&'a NodeKey]) -> BTreeSet<&'a NodeKey> {
+        let Some(&selected) = query
+            .selected
+            .as_ref()
+            .and_then(|selected| within.iter().find(|key| **key == selected))
+        else {
+            return BTreeSet::new();
+        };
+        let tree = self.graph.tree();
+        let mut chain = BTreeSet::from([selected]);
+        let mut at = tree.parent(selected);
+        while let Some(parent) = at.filter(|parent| query.container.as_ref() != Some(*parent)) {
+            chain.insert(parent);
+            at = tree.parent(parent);
+        }
+        assert!(
+            chain.len() <= CONTAINMENT_DEPTH_MAX as usize,
+            "a chain is as deep as containment allows"
+        );
+        chain
     }
 
     /// The canvas edges (explicit, condition, opening) of the full set between stand-ins.

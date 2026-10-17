@@ -4,10 +4,11 @@
 // (`/edges/<from>~<to>`): it is a dependency of `to` on `from`.
 import { Link, useLocation } from "react-router";
 
+import { nodeOpened } from "../journeys/address.ts";
 import { statusWord } from "../status/words.ts";
 import { namer, viaText } from "./explain.ts";
 import { nodeDetail, nodeOf, type Ready } from "./model.ts";
-import { nodePath, NodeLink, screenPath } from "./parts.tsx";
+import { NodeLink } from "./parts.tsx";
 
 /** `from~to` split into its two node keys, when it names two. */
 export function edgeEnds(edge: string): { from: string; to: string } | undefined {
@@ -72,7 +73,6 @@ export function EdgeCard({ view, edge }: { view: Ready; edge: string }) {
   if (sources.length === 0) {
     return missing;
   }
-  const screen = screenPath(pathname);
   return (
     <aside className="detail-panel panel stack" aria-label={`${from.title} to ${to.title}`} data-testid="edge-card" data-from={ends.from} data-to={ends.to}>
       <div className="stack detail-head">
@@ -94,10 +94,10 @@ export function EdgeCard({ view, edge }: { view: Ready; edge: string }) {
         </ul>
       </div>
       <span className="row">
-        <Link className="button" to={{ pathname: nodePath(screen, ends.from), search }}>
+        <Link className="button" to={nodeOpened(pathname, search, ends.from)}>
           Go to {from.title}
         </Link>
-        <Link className="button" to={{ pathname: nodePath(screen, ends.to), search }}>
+        <Link className="button" to={nodeOpened(pathname, search, ends.to)}>
           Go to {to.title}
         </Link>
       </span>

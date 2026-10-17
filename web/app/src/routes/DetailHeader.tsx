@@ -1,4 +1,4 @@
-// The title row both Library details share (C17, C19): the kind word, the name, a retired chip,
+// The title row both route details share (C17, C19): the kind word, the name, a retired chip,
 // the screen's own actions, and the way back to the list.
 import type { ReactNode } from "react";
 import { Link } from "react-router";

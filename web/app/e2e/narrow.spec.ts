@@ -60,7 +60,7 @@ test("the graph's controls fold into one Controls menu that holds them all", asy
 });
 
 test("A3: on a phone the drawing's banner is the open map's, one banner, and Escape stops the drawing and leaves the map open", async ({ page }) => {
-  await open(page, "browser", "/journeys/j_vendor_eval/graph?edit=on&depth=actions");
+  await open(page, "browser", "/journeys/j_vendor_eval?view=graph&edit=on&depth=actions");
   await derived(page);
   await page.getByTestId("map-open").click();
   await nodeCard(page, "n_access").getByTestId("card-open").click();

@@ -25,9 +25,9 @@ export async function open(page: Page, host: HostKind, path: string): Promise<vo
   await expect(syncChip(page)).toHaveAttribute("data-host", host);
 }
 
-/** On the Library, imports a route file through its `New` menu: a new route, or a new draft of the one it names. */
-export async function importIntoLibrary(page: Page, file: string | { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
-  await page.getByTestId("new-menu").click();
+/** From the new-route form (`/routes/new`), imports a route file: a new route, or a new draft of the one it names. */
+export async function importRoute(page: Page, host: HostKind, file: string | { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
+  await open(page, host, "/routes/new");
   await page.getByLabel("Import a file…").setInputFiles(file);
 }
 
@@ -86,6 +86,11 @@ export async function goWithin(page: Page, path: string): Promise<void> {
   await expect.poll(async () => screenOf((await main.getAttribute("data-screen")) ?? "")).toBe(screenOf(path));
 }
 
+/** Waits until the tab is at `address`, whatever the order of its query parameters. */
+export async function expectAddress(page: Page, address: string): Promise<void> {
+  await expect.poll(() => screenOf(page.url())).toBe(screenOf(address));
+}
+
 /** The screen an address names: its path and its query, in a stable order. */
 function screenOf(address: string): string {
   const url = new URL(address, "http://screen.invalid");
@@ -99,7 +104,7 @@ function screenOf(address: string): string {
  * most stages folded, for a person).
  */
 export async function openJourney(page: Page, host: HostKind, journey: string, query = "?depth=actions"): Promise<void> {
-  await open(page, host, `/journeys/${journey}/graph${query}`);
+  await open(page, host, `/journeys/${journey}?view=graph${query === "" ? "" : `&${query.replace(/^\?/, "")}`}`);
   await derived(page);
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   // The default opens the whole graph at every depth, fitted, so a spec reaches any node.
@@ -111,6 +116,18 @@ export async function openJourney(page: Page, host: HostKind, journey: string, q
 }
 
 /**
+ * The address of journey `journey`'s page at `address`: the view, then `/edges/<e>` for an edge's
+ * card, then a query (`list?frontier=1`, `graph/edges/a~b`, `summary`); with node `node` open when
+ * given. It always names the view, so the app is given what the test means whatever the default is.
+ */
+export function journeyAddress(journey: string, address: string, node?: string): string {
+  const [path = "", query] = address.split("?");
+  const [view = "", ...place] = path.split("/");
+  const at = node === undefined ? (place.length === 0 ? "" : `/${place.join("/")}`) : `/nodes/${node}`;
+  return `/journeys/${journey}${at}?view=${view}${query === undefined ? "" : `&${query}`}`;
+}
+
+/**
  * Opens journey `journey`'s page at `address` (`list?frontier=1`, `timeline`, `summary`, with a
  * query), with node `node`'s detail beside it when given, once derived. On the browser host the
  * page's clock is held at noon UTC on `fixedToday` first, so the host derives with that today.
@@ -119,8 +136,7 @@ export async function openAt(page: Page, host: HostKind, journey: string, addres
   if (host === "browser" && options.fixedToday !== undefined) {
     await page.clock.setFixedTime(new Date(`${options.fixedToday}T12:00:00Z`));
   }
-  const [path = "", query] = address.split("?");
-  await open(page, host, `/journeys/${journey}/${path}${options.node === undefined ? "" : `/nodes/${options.node}`}${query === undefined ? "" : `?${query}`}`);
+  await open(page, host, journeyAddress(journey, address, options.node));
   await expect(page.getByTestId("journey-frame")).toBeVisible();
   await derived(page);
   if (host === "browser" && options.fixedToday !== undefined) {

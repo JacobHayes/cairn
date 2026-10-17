@@ -163,7 +163,7 @@ test("A3: on a journey's graph in edit mode, Escape stops drawing and keeps edit
   await expect(page.getByTestId("authoring-bar")).toBeVisible();
   await expect(banner).toHaveCount(0);
   await draw();
-  await open(page, "browser", "/journeys/j_launch/graph?edit=on");
+  await open(page, "browser", "/journeys/j_launch?view=graph&edit=on");
   await expect(page.getByTestId("authoring-bar")).toBeVisible();
   await expect(banner).toHaveCount(0);
 });

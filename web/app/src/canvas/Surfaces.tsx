@@ -1,17 +1,18 @@
 // What sits around the journey canvas: the stalled surface when nothing can be acted on,
 // naming what the journey waits on and why (C5, D5). The trace bar and the ladder are the
 // canvas's own (Chrome.tsx).
-import { Link } from "react-router";
+import { Link, useLocation } from "react-router";
 
 import { titleOf, type Ready } from "../detail/model.ts";
 import type { Stalled } from "./model.ts";
-import { canvasPath, type GraphView } from "./settings.ts";
+import { graphPath, type GraphView } from "./settings.ts";
 
 /** One thing a stalled journey waits on (D5), in words, with a link to the node. */
 function Cause({ ready, view, cause }: { ready: Ready; view: GraphView; cause: Stalled["waiting_on"][number] }) {
   const journey = ready.journey.header.id;
+  const { search } = useLocation();
   const link = (key: string) => (
-    <Link to={canvasPath(journey, view, key)} data-node={key}>
+    <Link to={graphPath(journey, view, { node: key }, search)} data-node={key}>
       {titleOf(ready, key)}
     </Link>
   );

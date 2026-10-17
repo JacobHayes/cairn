@@ -11,7 +11,10 @@ import type { Deriver } from "../data/host.ts";
 import { PROJECTION, errorWords, valueOf, type ReadKey, type ReadSource, type ReadView } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
+import { currentStagesOf, selectedRequest, type LevelRequest } from "../journeys/requests.ts";
+import { ancestorsOf } from "../plan/tree.ts";
 import { layoutRequestOf } from "./cards.ts";
+import { openAt } from "./ladder.ts";
 import type { Layout } from "./layout.ts";
 import type { Layouts } from "./layouts.ts";
 import type { CanvasModel, Step } from "./model.ts";
@@ -64,14 +67,22 @@ export function useProjected<R extends ProjectionRequest>(view: Ready | undefine
 }
 
 /**
- * C2: the level `request` asks for (journeys/requests.ts), and the keys it draws, for a view that
- * keeps its own rows where the level draws them (the list, the timeline, the walk through).
+ * C2, C7: the level `request` asks for (journeys/requests.ts), and the keys it draws, for a view
+ * that keeps its own rows where the level draws them (the list, the timeline, the walk through).
+ * With a node `selected` the answer always draws it with the containers above it: when the plain
+ * level does not (`selectedRequest`), a second read names the node and answers instead, and
+ * `level` is pending until it arrives, so a node link never paints without its node. The decision
+ * is made from the plain read's value as held, and each read shows a value only for its own
+ * request and derivation; selecting a node the plain level draws changes neither.
  */
-export function useLevel(view: Ready, request: Extract<ProjectionRequest, { projection: "level" }> | undefined): { level: Schema<"Level"> | undefined; drawn: ReadonlySet<string> | undefined; error: string | undefined } {
-  const answer = useProjected(view, request);
-  const level = valueOf(answer);
+export function useLevel(view: Ready, request: LevelRequest | undefined, selected?: string): { level: Schema<"Level"> | undefined; drawn: ReadonlySet<string> | undefined; error: string | undefined } {
+  const plain = useProjected(view, request);
+  const plainLevel = valueOf(plain);
+  const widening = request === undefined ? undefined : selectedRequest(request, plainLevel, selected, view.journey.graph.nodes ?? []);
+  const widened = useProjected(view, widening);
+  const level = widening === undefined ? plainLevel : valueOf(widened);
   const drawn = useMemo(() => (level === undefined ? undefined : new Set(level.nodes.map((node) => node.key))), [level]);
-  return { level, drawn, error: errorWords(answer) };
+  return { level, drawn, error: errorWords(plain) ?? (widening === undefined ? undefined : errorWords(widened)) };
 }
 
 /** What a joined trace asks of the worker: each node's own trace, less the nodes the card stands for. */
@@ -157,8 +168,9 @@ const NO_FLIPS: ReadonlySet<string> = new Set();
  * C2, 5.1: the containers the viewer has flipped (opened against the ladder, or folded) since
  * `step` was chosen, for a view that folds for display. A pick (`picks` counts them, a repeated
  * pick of the same step and Reset included) drops them, so a flip made before never comes back.
+ * `set` makes one container's flip what it is told, rather than toggling it.
  */
-export function useFlips(step: Step | undefined, picks: number): { flipped: ReadonlySet<string>; flip: (key: string) => void } {
+export function useFlips(step: Step | undefined, picks: number): { flipped: ReadonlySet<string>; flip: (key: string) => void; set: (key: string, flipped: boolean) => void } {
   const [folds, setFolds] = useState<{ step: Step | undefined; picks: number; flipped: ReadonlySet<string> }>({ step, picks, flipped: NO_FLIPS });
   const held = folds.step === step && folds.picks === picks;
   if (!held) {
@@ -166,12 +178,39 @@ export function useFlips(step: Step | undefined, picks: number): { flipped: Read
     setFolds({ step, picks, flipped: NO_FLIPS });
   }
   const flipped = held ? folds.flipped : NO_FLIPS;
-  const flip = (key: string) => {
+  const set = (key: string, flip: boolean) => {
     const next = new Set(flipped);
-    if (!next.delete(key)) {
+    if (flip) {
       next.add(key);
+    } else {
+      next.delete(key);
     }
     setFolds({ step, picks, flipped: next });
   };
-  return { flipped, flip };
+  return { flipped, flip: (key) => { set(key, !flipped.has(key)); }, set };
+}
+
+/**
+ * C2, C7, 5.1: the folds of a view that folds for display (the list, the timeline): the containers
+ * the drawn step opens and the viewer's flips since the depth was chosen, and a container above
+ * the selected node is open whatever either says. Folding such a container moves the selection to
+ * it (`take`) and closes it: the node is no longer hidden inside a fold, and the address says
+ * what is selected.
+ */
+export function useFolds(view: Ready, depth: Step | undefined, drawn: Step, picks: number, selected: string | undefined, take: (key: string) => void): { open: (key: string) => boolean; fold: (key: string) => void } {
+  const { flipped, flip, set } = useFlips(depth, picks);
+  const nodes = view.journey.graph.nodes ?? [];
+  const opens = useMemo(() => openAt(drawn, nodes, currentStagesOf(view)), [view, nodes, drawn]);
+  const holding = useMemo(() => new Set(selected === undefined ? [] : ancestorsOf(view, selected)), [view, selected]);
+  const open = useMemo(() => (key: string) => holding.has(key) || opens(key) !== flipped.has(key), [holding, opens, flipped]);
+  const fold = (key: string) => {
+    if (holding.has(key)) {
+      take(key);
+      // Closed once it is the selection itself: its flip is what makes the step's rule false.
+      set(key, opens(key));
+    } else {
+      flip(key);
+    }
+  };
+  return { open, fold };
 }

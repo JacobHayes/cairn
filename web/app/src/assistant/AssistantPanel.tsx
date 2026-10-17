@@ -17,6 +17,7 @@ import { linesOf, mayNotApply } from "../data/activity.ts";
 import { useSession } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
 import { AssistantSlot, useAssistantDock } from "../shell/frame.tsx";
+import { journeyPath } from "../journeys/address.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import { aboutWords, assistantOffered, becauseWords, endedWords, shown, toolWords, type Entry } from "./model.ts";
@@ -34,7 +35,7 @@ export function journeyTitles(ready: Ready): TitleOf {
 
 function NodeLink({ journey, node, titleOf }: { journey: string; node: string; titleOf: TitleOf | undefined }) {
   return (
-    <Link to={`/journeys/${journey}/nodes/${node}`} data-testid="assistant-node" data-node={node}>
+    <Link to={journeyPath({ journey, node }, "graph")} data-testid="assistant-node" data-node={node}>
       {titleOf?.(node) ?? node}
     </Link>
   );

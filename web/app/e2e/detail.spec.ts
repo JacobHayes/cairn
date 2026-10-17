@@ -27,7 +27,7 @@ test("a later pin is rejected with its chain, kept across a reload and counted a
   await expect(conflict).toBeVisible();
   await expect(panel.getByTestId("bypass").getByLabel("Why bypass the guard")).toHaveValue(reason);
   // Away from the control it is still counted, and Go to it comes back to it.
-  await goWithin(page, "/library?type=routes");
+  await goWithin(page, "/routes?type=routes");
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
   await syncChip(page).click();
   const needsYou = page.getByTestId("sync-popover").getByTestId("sync-problem");

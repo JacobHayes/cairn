@@ -6,7 +6,8 @@
 import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
-import { indexPath } from "../journeys/address.ts";
+import { HOME_PATH, indexPath } from "../journeys/address.ts";
+import { ROUTES_INDEX_PATH } from "../routes/address.ts";
 import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
 import { InspectorColumn } from "./InspectorColumn.tsx";
 import { KeysHint } from "./KeysHint.tsx";
@@ -18,15 +19,15 @@ import { useFrame } from "./useFrame.ts";
 /** The screens, as links; the one the viewer is on is marked. */
 function Rail({ pathname }: { pathname: string }) {
   const screens = [
-    { to: "/mine", label: "Mine", on: pathname.startsWith("/mine") },
-    { to: indexPath(), label: "Journeys", on: pathname === "/" || /^\/(journeys|new|proposals)(\/|$)/.test(pathname) },
-    { to: "/library", label: "Library", on: /^\/(library|routes)(\/|$)/.test(pathname) },
+    { to: HOME_PATH, label: "Home", on: pathname === HOME_PATH },
+    { to: indexPath(), label: "Journeys", on: /^\/(journeys|proposals)(\/|$)/.test(pathname) },
+    { to: ROUTES_INDEX_PATH, label: "Routes", on: /^\/routes(\/|$)/.test(pathname) },
     { to: "/entities", label: "Entities", on: pathname.startsWith("/entities") },
   ];
   return (
     <aside className="rail">
       <div className="rail-head">
-        <Link to={indexPath()} className="brand">
+        <Link to={HOME_PATH} className="brand">
           Cairn
         </Link>
         <SyncChip />

@@ -17,9 +17,13 @@ import { Button } from "../ui/kit.tsx";
 import { actsFor, assignOwner, doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
 import type { NodeRow } from "./why.ts";
 
-/** C11: "Decide" opens the inspector, opens the node's answer form, and puts the focus in it once it is drawn. */
+/**
+ * C11: "Decide" opens the inspector, opens the node's answer form, and puts the focus in it once it is
+ * drawn. It waits up to a second for the node's detail: from a screen that is not the journey's (Home)
+ * the navigation loads the graph's chunk first.
+ */
 function focusAnswerForm(node: string): void {
-  let frames = 0;
+  const until = performance.now() + 1000;
   let opened = false;
   const look = () => {
     const detail = document.querySelector(`[data-testid="node-detail"][data-node="${node}"]`);
@@ -33,7 +37,7 @@ function focusAnswerForm(node: string): void {
       opened = true;
       answer.click();
     }
-    if (frames++ < 30) {
+    if (performance.now() < until) {
       requestAnimationFrame(look);
     }
   };

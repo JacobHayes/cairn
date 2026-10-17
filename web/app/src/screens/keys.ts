@@ -11,9 +11,9 @@ import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { STEPS, type Step } from "../canvas/model.ts";
-import { screenPath, nodePath } from "../detail/parts.tsx";
-import { nextProjection, type Projection, type Screen } from "../journeys/address.ts";
-import { viewPath, type ViewState } from "../journeys/view.ts";
+import { nextProjection, nodeOpened, screenSwitched, type JourneyTarget, type Projection, type Screen } from "../journeys/address.ts";
+import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
+import type { ViewState } from "../journeys/view.ts";
 import { typing } from "../ui/typing.ts";
 
 /** The bindings the sheet lists, each with its words; `group` heads the run of rows it starts. The canvas handles its own keys (canvas/GraphCanvas.tsx) and the table lists them. */
@@ -71,7 +71,6 @@ function focusSearch(): boolean {
 }
 
 export interface KeysProps {
-  journey: string;
   screen: Screen;
   selected: string | undefined;
   sheetOpen: boolean;
@@ -85,6 +84,7 @@ export interface KeysProps {
 /** What one key press acts on: the props, and where the page is now. */
 interface Heard extends KeysProps {
   pathname: string;
+  target: JourneyTarget;
   search: string;
   go: (to: string) => void;
 }
@@ -97,7 +97,7 @@ function escape({ selected, sheetOpen, setSheetOpen, pathname, search, go }: Hea
   if (sheetOpen) {
     setSheetOpen(false);
   } else if (selected !== undefined) {
-    go(`${screenPath(pathname)}${search}`);
+    go(nodeOpened(pathname, search, undefined));
   }
 }
 
@@ -122,7 +122,7 @@ function onViewState(key: string, { screen, state, steps, onState }: Heard): boo
 
 /** The views and the rows: keys that exist where a journey screen has them. */
 function onChips(key: string, heard: Heard): boolean {
-  const { journey, screen, selected, pathname, search, go } = heard;
+  const { screen, selected, pathname, target, search, go } = heard;
   if (onViewState(key, heard)) {
     return true;
   }
@@ -132,11 +132,11 @@ function onChips(key: string, heard: Heard): boolean {
         return false;
       }
       const to: Projection = nextProjection(screen);
-      go(viewPath(journey, screen, to, selected, search));
+      go(screenSwitched(target, search, to));
       return true;
     }
     case "w":
-      go(viewPath(journey, screen, "walk", selected, search));
+      go(screenSwitched(target, search, "walk"));
       return true;
     case "/":
       return focusSearch();
@@ -144,7 +144,7 @@ function onChips(key: string, heard: Heard): boolean {
     case "k": {
       const to = rowAfter(visibleRows(), selected, key === "j" ? 1 : -1);
       if (to !== undefined) {
-        go(`${nodePath(screenPath(pathname), to)}${search}`);
+        go(nodeOpened(pathname, search, to));
       }
       return true;
     }
@@ -178,15 +178,16 @@ function heardKey(event: KeyboardEvent, heard: Heard): void {
 
 export function useJourneyKeys(props: KeysProps): void {
   const { pathname, search } = useLocation();
+  const target = useJourneyTarget();
   const navigate = useNavigate();
-  const { journey, screen, selected, sheetOpen, setSheetOpen, state, steps, onState } = props;
+  const { screen, selected, sheetOpen, setSheetOpen, state, steps, onState } = props;
   useEffect(() => {
     const heard = (event: KeyboardEvent) => {
-      heardKey(event, { journey, screen, selected, sheetOpen, setSheetOpen, state, steps, onState, pathname, search, go: (to) => void navigate(to) });
+      heardKey(event, { screen, selected, sheetOpen, setSheetOpen, state, steps, onState, pathname, target, search, go: (to) => void navigate(to) });
     };
     document.addEventListener("keydown", heard);
     return () => {
       document.removeEventListener("keydown", heard);
     };
-  }, [journey, screen, selected, sheetOpen, setSheetOpen, state, steps, onState, pathname, search, navigate]);
+  }, [screen, selected, sheetOpen, setSheetOpen, state, steps, onState, pathname, target, search, navigate]);
 }

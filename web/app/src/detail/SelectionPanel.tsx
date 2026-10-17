@@ -11,10 +11,10 @@ import type { Selection } from "../canvas/selection.ts";
 import { selectionOf } from "../acting/acts.ts";
 import { NodePanel } from "../acting/NodeItem.tsx";
 import { SelectionActions } from "../acting/SelectionActions.tsx";
+import { nodeOpened } from "../journeys/address.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { titleOf, type Ready } from "./model.ts";
-import { nodePath, screenPath } from "./parts.tsx";
 
 export function SelectionPanel({ ready, selection, authored }: { ready: Ready; selection: Selection; authored: Authored | undefined }) {
   const { pathname, search } = useLocation();
@@ -42,7 +42,7 @@ export function SelectionPanel({ ready, selection, authored }: { ready: Ready; s
             <div className="node-row-main">
               <Badge tone={statusTone(derived.display_state)}>{statusWord(derived.display_state, node.kind)}</Badge>
               <span className="node-row-text">
-                <Link to={{ pathname: nodePath(screenPath(pathname), node.key), search }} className="node-title" data-node={node.key} onClick={selection.release}>
+                <Link to={nodeOpened(pathname, search, node.key)} className="node-title" data-node={node.key} onClick={selection.release}>
                   {titleOf(ready, node.key)}
                 </Link>
                 <span className="node-fact muted">{node.kind}</span>

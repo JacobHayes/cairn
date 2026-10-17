@@ -5,7 +5,6 @@
 // keeps it (ARCHITECTURE, Web UI).
 import { useLocation, useNavigate } from "react-router";
 
-import { walkthroughPath } from "../acting/address.ts";
 import { useDraft } from "../data/drafts.ts";
 import { routeIndex } from "../data/reads.ts";
 import { valueOf } from "../data/keyed-read.ts";
@@ -14,6 +13,7 @@ import { Refused } from "../screens/Refused.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field, Panel } from "../ui/kit.tsx";
+import { walkthroughPath } from "./address.ts";
 import { createMutation, newJourneyId, startableRoutes, type RouteSummary } from "./lifecycle.ts";
 
 interface Form {

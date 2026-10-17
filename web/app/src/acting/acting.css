@@ -653,12 +653,12 @@ button.list-sort {
   white-space: nowrap;
 }
 
-/* Mine: each journey's group, its rows in that journey's rank. */
-.mine-list {
+/* Home: each journey's group of waiting rows, in that journey's rank. */
+.home-list {
   gap: var(--space-6);
 }
 
-.mine-head {
+.home-head {
   padding: 0 var(--space-4);
   gap: var(--space-4);
 }

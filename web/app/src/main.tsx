@@ -15,16 +15,17 @@ import { LayoutsContext } from "./canvas/hooks.ts";
 import { Layouts, LayoutWorker } from "./canvas/layouts.ts";
 import { SessionContext } from "./data/react.ts";
 import type { Session } from "./data/session.ts";
+import { Home } from "./journeys/Home.tsx";
 import { JourneyIndex } from "./journeys/JourneyIndex.tsx";
-import { JourneyDeepLink, JourneyLanding, JourneyPageRoute, NoSuchPage } from "./screens/JourneyRoutes.tsx";
+import { JourneyPage, NoSuchPage } from "./screens/JourneyRoutes.tsx";
 import { Shell } from "./shell/Shell.tsx";
 
-const MineScreen = lazy(() => import("./journeys/MineScreen.tsx").then((module) => ({ default: module.MineScreen })));
 const NewJourney = lazy(() => import("./journeys/NewJourney.tsx").then((module) => ({ default: module.NewJourney })));
 const Entities = lazy(() => import("./people/Entities.tsx").then((module) => ({ default: module.Entities })));
 const Identity = lazy(() => import("./people/Identity.tsx").then((module) => ({ default: module.Identity })));
 const ProposalScreen = lazy(() => import("./proposals/ProposalScreen.tsx").then((module) => ({ default: module.ProposalScreen })));
-const Library = lazy(() => import("./routes/Library.tsx").then((module) => ({ default: module.Library })));
+const NewRoutePage = lazy(() => import("./routes/NewRoute.tsx").then((module) => ({ default: module.NewRoutePage })));
+const RouteIndex = lazy(() => import("./routes/RouteIndex.tsx").then((module) => ({ default: module.RouteIndex })));
 const RouteDetailPage = lazy(() => import("./routes/RouteDetail.tsx").then((module) => ({ default: module.RouteDetailPage })));
 const RouteCanvasPage = lazy(() => import("./screens/RouteCanvasPage.tsx").then((module) => ({ default: module.RouteCanvasPage })));
 
@@ -35,18 +36,14 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
         <BrowserRouter>
           <Routes>
             <Route element={<Shell />}>
-              <Route index element={<JourneyIndex />} />
-              <Route path="mine" element={<MineScreen />} />
-              <Route path="mine/:id/nodes/:key" element={<MineScreen />} />
-              <Route path="new" element={<NewJourney />} />
-              <Route path="journeys/:id" element={<JourneyLanding />} />
-              <Route path="journeys/:id/nodes/:key" element={<JourneyDeepLink />} />
-              {(["graph", "list", "timeline", "summary", "walk"] as const).map((screen) => [
-                <Route key={screen} path={`journeys/:id/${screen}`} element={<JourneyPageRoute screen={screen} />} />,
-                <Route key={`${screen}/nodes`} path={`journeys/:id/${screen}/nodes/:key`} element={<JourneyPageRoute screen={screen} />} />,
-              ])}
-              <Route path="journeys/:id/graph/edges/:edge" element={<JourneyPageRoute screen="graph" />} />
-              <Route path="library" element={<Library />} />
+              <Route index element={<Home />} />
+              <Route path="journeys" element={<JourneyIndex />} />
+              <Route path="journeys/new" element={<NewJourney />} />
+              <Route path="journeys/:id" element={<JourneyPage />} />
+              <Route path="journeys/:id/nodes/:key" element={<JourneyPage />} />
+              <Route path="journeys/:id/edges/:edge" element={<JourneyPage />} />
+              <Route path="routes" element={<RouteIndex />} />
+              <Route path="routes/new" element={<NewRoutePage />} />
               <Route path="routes/:id" element={<RouteCanvasPage />} />
               <Route path="routes/:id/draft" element={<RouteCanvasPage />} />
               <Route path="routes/:id/draft/nodes/:key" element={<RouteCanvasPage />} />

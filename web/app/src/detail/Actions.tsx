@@ -13,14 +13,13 @@ import { useLocation, useNavigate } from "react-router";
 
 import { useFrameActions } from "../shell/frame.tsx";
 import { assignOwner, doneMutations, evidenceDraft, missingEvidence } from "../acting/acts.ts";
-import { ancestorsOf, placedAt } from "../canvas/ladder.ts";
-import { canvasPath, DEFAULT_GRAPH_VIEW, revealing } from "../canvas/settings.ts";
+import { graphPath, graphViewFrom } from "../canvas/settings.ts";
 import { mayNotApply } from "../data/activity.ts";
 import { writeDraft } from "../data/drafts.ts";
 import type { OperationId } from "../data/edit-record.ts";
 import { useSession } from "../data/react.ts";
 import { newPatchId } from "../data/writes.ts";
-import { deepLinkPath } from "../journeys/address.ts";
+import { journeyPath } from "../journeys/address.ts";
 import { BreakDown } from "../proposals/Entries.tsx";
 import { Menu } from "../screens/Menu.tsx";
 import { useInsertEntry } from "../segments/entry.ts";
@@ -31,7 +30,7 @@ import { AnswerEditor, type Anyway } from "./AnswerEditor.tsx";
 import { DoneButton, EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { foldKey, setFold } from "./folds.ts";
-import { answerable, isBlocked, movesFrom, nodeOf, titleOf, transition, unansweredOf, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, isBlocked, movesFrom, titleOf, transition, unansweredOf, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
 import { Rejected } from "./Rejected.tsx";
 import { entityName } from "./sections.tsx";
@@ -232,13 +231,15 @@ interface Menus {
 }
 
 /** What each menu entry does: its one move, or the form it opens. */
-function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }: Menus, navigate: (to: string, state?: unknown) => void): Record<MenuId, () => void> {
+function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }: Menus, navigate: (to: string, state?: unknown) => void, search: string): Record<MenuId, () => void> {
   const key = detail.node.key;
   const origin = memberOrigin(view.journey.graph, key);
   const journey = view.journey.header.id;
   const move = (...mutations: Mutation[]) => () => void write.run(mutations);
   const reason = (kind: "skip" | "keep" | "include" | "bypass" | "anyway") => () => { form.openForm(kind, ""); };
-  const link = `${globalThis.location.origin}${deepLinkPath(journey, key)}`;
+  // The view the person is on goes with them (the graph draws the node whatever it hides); the copied link is the node's own address.
+  const graph = graphViewFrom(new URLSearchParams(search));
+  const link = `${globalThis.location.origin}${journeyPath({ journey, node: key }, "graph")}`;
   return {
     snooze: () => { form.openForm("snooze", snoozeStart(view, key)); },
     skip: reason("skip"),
@@ -255,16 +256,14 @@ function runnersOf({ view, detail, write, form, onRename, onCopied, insertHere }
     weight: () => { form.openPanel("weight"); },
     pin: () => { setFold(foldKey(detail.node.kind, "dates"), true); },
     "break-down": () => { form.openPanel("break-down"); },
-    "show-in-graph": () => { navigate(canvasPath(journey, DEFAULT_GRAPH_VIEW, key)); },
+    "show-in-graph": () => { navigate(graphPath(journey, graph, { node: key }, search)); },
     "insert-segment": () => { insertHere?.(key); },
     "show-insertion": () => {
       const root = (origin === undefined ? undefined : insertionRoot(view.journey.graph, origin.insertion)) ?? key;
-      const at = nodeOf(view, root);
-      // The stock view, at the All step, which draws every branch whatever its kind, with the ancestors expanded.
-      const shown = at === undefined ? DEFAULT_GRAPH_VIEW : revealing(DEFAULT_GRAPH_VIEW, placedAt(view.journey.graph.nodes ?? [], at.kind, ancestorsOf(view.journey.graph.nodes ?? [], root)), view.derived.nodes[root]?.display_state);
-      navigate(canvasPath(journey, shown, root), { reveal: { key: root, how: "centre" } });
+      // The graph draws the insertion's root and its containers whatever the view hides.
+      navigate(graphPath(journey, graph, { node: root }, search), { reveal: { key: root, how: "centre" } });
     },
-    "edit-node": () => { navigate(canvasPath(journey, { ...DEFAULT_GRAPH_VIEW, edit: true }, key)); },
+    "edit-node": () => { navigate(graphPath(journey, { ...graph, edit: true }, { node: key }, search)); },
     "copy-link": () => { globalThis.navigator.clipboard.writeText(link).then(onCopied, () => undefined); },
   };
 }
@@ -533,12 +532,13 @@ function useContextChoice(node: string, run: (id: ContextId) => void): void {
 function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runners: Record<MenuId, () => void> } {
   const { view, detail, write, form } = menus;
   const navigate = useNavigate();
+  const { search } = useLocation();
   const insertHere = useInsertEntry();
   // Only a frame with a stepper can insert: elsewhere the entry is not offered.
   const groups = menuOf(view, detail)
     .map((group) => group.filter((item) => item.id !== "insert-segment" || insertHere !== undefined))
     .filter((group) => group.length > 0);
-  const runners = runnersOf({ ...menus, insertHere }, (to, state) => void navigate(to, state === undefined ? {} : { state }));
+  const runners = runnersOf({ ...menus, insertHere }, (to, state) => void navigate(to, state === undefined ? {} : { state }), search);
   useContextChoice(detail.node.key, (id) => {
     if (id in runners) {
       runners[id as MenuId]();

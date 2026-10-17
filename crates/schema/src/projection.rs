@@ -283,6 +283,12 @@ pub struct LevelQuery {
     /// list's search reads it; nodes holding a match are kept too.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub text: Option<Title>,
+    /// C2, C7: the node selected, drawn whatever would hide it (its kind, its relevance class,
+    /// the top-level rule, the filters and text, a collapsed container above it), with every
+    /// container above it within the level, none of them collapsed; what else is beneath those
+    /// containers follows the rules as usual. A key outside the level has no effect.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub selected: Option<NodeKey>,
 }
 
 impl LevelQuery {
@@ -299,6 +305,7 @@ impl LevelQuery {
             flags: BTreeSet::new(),
             owner: None,
             text: None,
+            selected: None,
         }
     }
 

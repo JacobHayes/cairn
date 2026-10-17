@@ -11,12 +11,12 @@ import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 
-import { useFlips, useLevel, useProjected } from "../canvas/hooks.ts";
-import { collapsedAt, drawnStep, openAt, stepOf } from "../canvas/ladder.ts";
+import { useFolds, useLevel, useProjected } from "../canvas/hooks.ts";
+import { collapsedAt, drawnStep, stepOf } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
 import { nodeOf, titleOf, type Ready } from "../detail/model.ts";
-import { NodeLink, nodePath, screenPath } from "../detail/parts.tsx";
-import { withParam } from "../journeys/address.ts";
+import { NodeLink } from "../detail/parts.tsx";
+import { nodeOpened, withParam } from "../journeys/address.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
 import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
@@ -299,7 +299,7 @@ function Tracks({ chart, axis, selected }: { chart: Chart; axis: Axis; selected:
         const floatTo = row.float === undefined ? undefined : positionOf(axis, row.float.to);
         return (
           <g key={row.key} className="timeline-row" data-state={row.state} data-faded={row.faded} data-selected={row.key === selected} data-testid="timeline-track" data-node={row.key}>
-            <rect className="timeline-hit" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} onClick={() => { void navigate({ pathname: nodePath(screenPath(pathname), row.key), search }); }} />
+            <rect className="timeline-hit" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} onClick={() => { void navigate(nodeOpened(pathname, search, row.key)); }} />
             {row.late > 0 ? <rect className="timeline-overdue" x={percent(positionOf(axis, row.to))} y={y - BAR_PX} width={percent(Math.max(0, axis.today - positionOf(axis, row.to)))} height={BAR_PX * 2} /> : null}
             {floatFrom === undefined || floatTo === undefined ? null : (
               <g className="timeline-float" data-testid="timeline-float" data-from={row.float?.from} data-to={row.float?.to}>
@@ -398,7 +398,7 @@ export function TimelineChart({ ready, timeline, drawn, open, onFold, faded, sel
         </div>
       )}
       {chart.undated.length === 0 ? null : (
-        <details className="timeline-undated" data-testid="timeline-undated">
+        <details className="timeline-undated" data-testid="timeline-undated" open={selected !== undefined && chart.undated.includes(selected) ? true : undefined}>
           <summary>No date yet ({chart.undated.length})</summary>
           <ul className="timeline-undated-list">
             {chart.undated.map((node) => (
@@ -415,19 +415,18 @@ export function TimelineChart({ ready, timeline, drawn, open, onFold, faded, sel
 
 /** C13, C2: the timeline view: the toolbar, then the dated nodes of the journey's level, folded by the ladder and the viewer's flips (which hold until another depth), lit by Frontier and dimmed below the depth by Fade. */
 export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Ready; state: ViewState; picks: number; selected: string | undefined }) {
-  const { search } = useLocation();
+  const { pathname, search } = useLocation();
   const { range } = useMemo(() => timelineSettingsFrom(new URLSearchParams(search)), [search]);
   const nodes = ready.journey.graph.nodes ?? [];
   const depth = stepOf({ step: state.depth }, nodes);
   const step = drawnStep(depth, state.fade);
   const request = useMemo(() => levelRequestOf(state, step, []), [state, step]);
-  const { level, drawn, error: levelError } = useLevel(ready, request);
+  const { level, drawn, error: levelError } = useLevel(ready, request, selected);
   const timelineRead = useProjected(ready, { projection: "timeline" });
   const timeline = valueOf(timelineRead);
-  const { flipped, flip: onFold } = useFlips(state.depth, picks);
+  const navigate = useNavigate();
+  const { open, fold: onFold } = useFolds(ready, state.depth, step, picks, selected, (key) => void navigate(nodeOpened(pathname, search, key)));
   const current = useMemo(() => currentStagesOf(ready), [ready]);
-  const opens = useMemo(() => openAt(step, nodes, current), [nodes, step, current]);
-  const open = useMemo(() => (key: string) => opens(key) !== flipped.has(key), [opens, flipped]);
   const base = useMemo(() => litOf("timeline", state, ready), [state, ready]);
   const lit = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);
   const faded = useMemo(() => outOfFocus(lit, drawn === undefined ? new Set() : depthFaded(state, nodes, depth, collapsedAt(depth, nodes, current, [], []), drawn)), [state, nodes, depth, current, drawn, lit]);

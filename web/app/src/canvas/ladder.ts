@@ -25,24 +25,6 @@ export function kindsAt(step: Step): NodeKind[] {
   return KINDS_AT[step];
 }
 
-/** A node as the ladder places it: its kind, its containers (nearest first) and the kind of the top-level node it sits under (its own when it is top-level). */
-export interface Placed {
-  kind: NodeKind;
-  ancestors: readonly string[];
-  top: NodeKind;
-}
-
-/** `kind` placed under `ancestors` (nearest first) among `nodes`. */
-export function placedAt(nodes: readonly GraphNode[], kind: NodeKind, ancestors: readonly string[]): Placed {
-  const root = ancestors.at(-1);
-  return { kind, ancestors, top: nodes.find((node) => node.key === root)?.kind ?? kind };
-}
-
-/** C2: whether `step` draws a node: its kind is drawn, and at Stages its top-level node is a stage or a milestone. */
-export function drawnAt(step: Step, node: Placed): boolean {
-  return kindsAt(step).includes(node.kind) && (step !== "stages" || STAGES_TOP.includes(node.top));
-}
-
 /**
  * The nodes `step` leaves out (5.1): at Stages, each top-level node that is neither a stage nor a
  * milestone, with everything beneath it. Stages draws the Deliverables set only inside the stages.

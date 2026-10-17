@@ -19,6 +19,7 @@ export type ProjectionRequest =
       flags?: Schema<"ListFlag">[];
       owner?: Schema<"EntityKey">;
       text?: string;
+      selected?: NodeKey;
     }
   | { projection: "trace"; key: NodeKey }
   | { projection: "decision_view" }

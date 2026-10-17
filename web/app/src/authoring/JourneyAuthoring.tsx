@@ -7,10 +7,9 @@
 // (RouteAuthoring.tsx).
 import "./authoring.css";
 
-import { Link, useNavigate } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
 
-import { ancestorsOf, placedAt } from "../canvas/ladder.ts";
-import { canvasPath, revealing, type GraphView } from "../canvas/settings.ts";
+import { graphPath, type GraphView } from "../canvas/settings.ts";
 import { DrawingBanner, type EdgeDrawing } from "./connect.tsx";
 import { StructureTools } from "./StructureTools.tsx";
 import { Tombstones } from "./LocalEdits.tsx";
@@ -34,6 +33,7 @@ export function JourneyAuthoringBar({
   banner: boolean;
 }) {
   const navigate = useNavigate();
+  const { search } = useLocation();
   const journey = "journey" in authored.target ? authored.target.journey : "";
   return (
     <section className="stack author-bar" aria-label="Edit the journey's structure" data-testid="authoring-bar">
@@ -46,11 +46,11 @@ export function JourneyAuthoringBar({
           authored={authored}
           container={undefined}
           onAdded={(node) => {
-            // The node just added is drawn whatever the view hides: its step, and no narrowing that may leave it out.
-            void navigate(canvasPath(journey, revealing(view, placedAt(authored.graph.nodes ?? [], node.kind, node.parent == null ? [] : [node.parent, ...ancestorsOf(authored.graph.nodes ?? [], node.parent)]), undefined), node.key));
+            // The node just added is selected, so the view draws it whatever its step, filter and search would hide.
+            void navigate(graphPath(journey, view, { node: node.key }, search));
           }}
         />
-        <Link to={canvasPath(journey, { ...view, edit: false })} className="button" data-testid="edit-done">
+        <Link to={graphPath(journey, { ...view, edit: false }, {}, search)} className="button" data-testid="edit-done">
           Done
         </Link>
       </div>

@@ -1,6 +1,6 @@
 // C11: the walk through, a queue of cards over the acting frontier, one at a time in rank order,
 // for "act, or move on"; and its decisions-only mode, the decision walkthrough, which starting a
-// journey opens (address.ts, `walkthroughPath`). It is `/walk`, at Decisions depth for the
+// journey opens (address.ts, `walkthroughPath`). It is the `walk` view, at Decisions depth for the
 // walkthrough, under the toolbar every view shares: its cards are the frontier work the level
 // draws at the depth that itself matches the Filter and search (journeys/requests.ts). It ignores
 // Depth's Fade: one card at a time has nothing to dim. A card is the
@@ -11,7 +11,6 @@
 // storage, never sent. What a write made from the pass unlocked (the patch's consequences, never
 // a diff of the frontier) comes next, each card labeled with the card that unlocked it.
 import { useCallback, useEffect, useMemo, useRef } from "react";
-import { useLocation, useNavigate } from "react-router";
 
 import { useLevel } from "../canvas/hooks.ts";
 import { stepOf } from "../canvas/ladder.ts";
@@ -20,7 +19,6 @@ import { useDraft } from "../data/drafts.ts";
 import { useSaves, useSession } from "../data/react.ts";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import type { Ready } from "../detail/model.ts";
-import { screenPath } from "../detail/parts.tsx";
 import { badgesOf, levelRequestOf, stepHides, walkQueryOf } from "../journeys/requests.ts";
 import { useViewState, type ViewState } from "../journeys/view.ts";
 import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
@@ -176,9 +174,7 @@ function useCards(view: Ready, state: ViewState) {
 }
 
 /** The walk through: one card at a time, in the order of this pass. */
-export function TriageBody({ view, state, selected }: { view: Ready; state: ViewState; selected: string | undefined }) {
-  const navigate = useNavigate();
-  const { pathname, search } = useLocation();
+export function TriageBody({ view, state, selected, onCard }: { view: Ready; state: ViewState; selected: string | undefined; onCard: (key: string | undefined) => void }) {
   const wide = useMedia(COLUMN);
   const journey = view.journey.header.id;
   const [pass, setPass] = usePass(view);
@@ -196,12 +192,12 @@ export function TriageBody({ view, state, selected }: { view: Ready; state: View
     }
   }, [card, pass, setPass]);
   usePassKey(card === undefined ? undefined : onPass);
-  // The card is the focus node's inspector, so opening that node leaves one editor: the address drops it.
+  // The card is the focus node's editor, so the frame opens nothing beside it for the node the address names: it reports the card.
+  const cardKey = card?.key;
   useEffect(() => {
-    if (selected !== undefined && selected === card?.key) {
-      void navigate(`${screenPath(pathname)}${search}`, { replace: true });
-    }
-  }, [selected, card?.key, navigate, pathname, search]);
+    onCard(cardKey);
+    return () => { onCard(undefined); };
+  }, [cardKey, onCard]);
   const newPass = () => { setPass(begin(view.derived.acting_frontier)); };
   const passedCount = order.filter((key) => pass.passed.includes(key)).length;
   const rail = <PassRail view={view} order={order} pass={pass} onNewPass={newPass} />;

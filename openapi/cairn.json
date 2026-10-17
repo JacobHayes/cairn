@@ -15918,6 +15918,17 @@
               "$ref": "#/components/schemas/Title"
             },
             "style": "form"
+          },
+          {
+            "description": "The node selected: drawn whatever would hide it, with every container above it within the level, none of them collapsed. A key outside the level has no effect.",
+            "explode": true,
+            "in": "query",
+            "name": "selected",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/NodeKey"
+            },
+            "style": "form"
           }
         ],
         "responses": {

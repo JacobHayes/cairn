@@ -4,12 +4,13 @@
 // every view shares goes with the pick (journeys/view.ts).
 import { Link, useLocation } from "react-router";
 
-import { SCREENS, SCREEN_WORDS, type Screen } from "../journeys/address.ts";
-import { viewPath } from "../journeys/view.ts";
+import { SCREENS, SCREEN_WORDS, screenSwitched, type Screen } from "../journeys/address.ts";
+import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { Menu } from "./Menu.tsx";
 
-export function ViewPicker({ journey, screen, node }: { journey: string; screen: Screen; node: string | undefined }) {
+export function ViewPicker({ screen }: { screen: Screen }) {
   const { search } = useLocation();
+  const target = useJourneyTarget();
   return (
     <Menu
       label={`View: ${SCREEN_WORDS[screen]}`}
@@ -27,7 +28,7 @@ export function ViewPicker({ journey, screen, node }: { journey: string; screen:
             className="menu-item"
             aria-current={each === screen ? "page" : undefined}
             data-testid={`view-${each}`}
-            to={viewPath(journey, screen, each, node, search)}
+            to={screenSwitched(target, search, each)}
             onClick={close}
           >
             {SCREEN_WORDS[each]}

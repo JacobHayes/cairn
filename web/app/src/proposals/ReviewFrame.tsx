@@ -10,8 +10,7 @@ import { useUserWords } from "../data/react.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import type { Graph } from "../authoring/graph.ts";
-import { canvasPath, DEFAULT_GRAPH_VIEW } from "../canvas/settings.ts";
-import { overviewPath } from "../journeys/address.ts";
+import { journeyPath } from "../journeys/address.ts";
 import { routeDetailPath } from "../routes/address.ts";
 import {
   DIFF_LABELS,
@@ -47,7 +46,7 @@ function DestinationLink({ proposal, journeyTitle }: { proposal: Proposal; journ
     return <span>the deployment</span>;
   }
   if ("journey" in destination) {
-    return proposal.draft.destination_revision === 0 ? <span>a new journey</span> : <Link to={overviewPath(destination.journey)}>{journeyTitle ?? "the journey"}</Link>;
+    return proposal.draft.destination_revision === 0 ? <span>a new journey</span> : <Link to={journeyPath({ journey: destination.journey })}>{journeyTitle ?? "the journey"}</Link>;
   }
   return <Link to={routeDetailPath(destination.route)}>the route {destination.route}</Link>;
 }
@@ -93,7 +92,7 @@ export function ReviewHeader({ proposal, itemCount, conflictCount, blockers, dis
           </Badge>
         )}
         {proposal.status === "applied" && journey !== undefined ? (
-          <Link to={canvasPath(journey, DEFAULT_GRAPH_VIEW)} data-testid="applied-journey">
+          <Link to={journeyPath({ journey }, "graph")} data-testid="applied-journey">
             Open the journey
           </Link>
         ) : null}

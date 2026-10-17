@@ -78,6 +78,32 @@ mod cost {
                 .unwrap()
         });
         assert!(filtered.nodes.len() <= nodes);
+        // The selected node of a filtered level: a second chain walk, at the deepest node.
+        let tree = journey.graph().tree();
+        let depth =
+            |key: &NodeKey| std::iter::successors(Some(key), |key| tree.parent(key)).count();
+        let deepest = journey
+            .graph()
+            .document()
+            .nodes
+            .as_map()
+            .keys()
+            .max_by_key(|key| depth(key))
+            .unwrap()
+            .clone();
+        let selected = timed("level filtered, with a deep selected node", || {
+            let query = LevelQuery {
+                flags: [ListFlag::Unassigned, ListFlag::Blocked].into(),
+                text: "e".parse().ok(),
+                top: [NodeKind::Group, NodeKind::Milestone].into(),
+                selected: Some(deepest.clone()),
+                ..LevelQuery::of_kinds(NodeKind::ALL.into_iter().collect(), None)
+            };
+            journey
+                .level(&query, &Deployment::default(), &BTreeSet::new())
+                .unwrap()
+        });
+        assert!(selected.nodes.iter().any(|node| node.key == deepest));
     }
 
     #[test]

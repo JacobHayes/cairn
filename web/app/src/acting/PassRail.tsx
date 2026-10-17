@@ -5,7 +5,7 @@
 import { useLocation } from "react-router";
 
 import { titleOf, type Ready } from "../detail/model.ts";
-import { nodePath, screenPath } from "../detail/parts.tsx";
+import { nodeOpened } from "../journeys/address.ts";
 import { Button } from "../ui/kit.tsx";
 import { NodeItem, NodePanel } from "./NodeItem.tsx";
 import { doneThisPass, unlockedBy, type Pass } from "./pass.ts";
@@ -28,7 +28,7 @@ function Group({ view, title, keys, testId, pass }: { view: Ready; title: string
   return (
     <NodePanel title={title} count={keys.length} testId={testId}>
       {keys.slice(0, SHOWN).map((key) => (
-        <NodeItem key={key} view={view} node={key} to={`${nodePath(screenPath(pathname), key)}${search}`} fact={by(key) === undefined ? undefined : `Unlocked by ${titleOf(view, by(key) ?? key)}`} />
+        <NodeItem key={key} view={view} node={key} to={nodeOpened(pathname, search, key)} fact={by(key) === undefined ? undefined : `Unlocked by ${titleOf(view, by(key) ?? key)}`} />
       ))}
       {keys.length > SHOWN ? <li className="node-row muted small">and {keys.length - SHOWN} more</li> : null}
     </NodePanel>

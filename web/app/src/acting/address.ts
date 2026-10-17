@@ -1,7 +1,7 @@
 // The list's own settings live in its address, as the view state does (journeys/view.ts), so a
 // re-sorted list with its columns is shareable, survives a reload, and follows the back button:
-// `sort=` and `cols=`. Every setting at its default leaves the address bare. The list and the walk
-// through live at `/journeys/<id>/list` and `/walk`.
+// `sort=` and `cols=`. Every setting at its default leaves the address bare. The list is
+// `?view=list` of a journey's address (journeys/address.ts).
 import type { Schema } from "@cairn/client";
 
 export type ListFlag = Schema<"ListFlag">;
@@ -62,13 +62,4 @@ export function withListSettings(search: string, list: ListSettings): string {
   }
   const text = params.toString();
   return text === "" ? "" : `?${text}`;
-}
-
-/**
- * C11: the decision walkthrough of `journey`, the walk through at Decisions depth. Starting a journey
- * opens it here (the creation flow, 5.5, navigates to this address once the journey exists),
- * and it can be launched any time from the journey's pages.
- */
-export function walkthroughPath(journey: string): string {
-  return `/journeys/${journey}/walk?depth=decisions`;
 }

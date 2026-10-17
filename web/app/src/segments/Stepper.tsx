@@ -63,7 +63,7 @@ function ChooseStep({ authored, onChoose }: { authored: Authored; onChoose: (seg
     <div className="stack" data-testid="step-choose">
       <Field aria-label="Search segments" placeholder="Search segments" value={text} onChange={(event) => { setText(event.target.value); }} />
       {loading ? <p className="muted small">Reading the segments...</p> : null}
-      {!loading && offers.length === 0 ? <p className="muted small">{leftOut ? "No other segments are published yet." : "There are no published segments yet. Publish one from the Library first."}</p> : null}
+      {!loading && offers.length === 0 ? <p className="muted small">{leftOut ? "No other segments are published yet." : "There are no published segments yet. Publish one from Routes first."}</p> : null}
       {!loading && offers.length > 0 && shown.length === 0 ? <p className="muted small">No segment is named like that.</p> : null}
       <ul className="stack segment-offers">
         {shown.map((offer) => (

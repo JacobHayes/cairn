@@ -5,15 +5,14 @@ import { fileURLToPath } from "node:url";
 
 import { expect, type Locator, type Page } from "@playwright/test";
 
-import { importIntoLibrary, menuItem, open, openFromCanvas, openJourney, type HostKind } from "./shell.ts";
+import { importRoute, menuItem, openFromCanvas, openJourney, type HostKind } from "./shell.ts";
 
 /** The security-review segment's file (fixtures/README.md). */
 export const SEGMENT_FILE = fileURLToPath(new URL("../../../fixtures/security-review/segment.yaml", import.meta.url));
 
 /** Imports the segment from its file as a new segment and publishes its draft as version 1. */
 export async function publishSegment(page: Page, host: HostKind): Promise<void> {
-  await open(page, host, "/library");
-  await importIntoLibrary(page, SEGMENT_FILE);
+  await importRoute(page, host, SEGMENT_FILE);
   await expect(page.getByTestId("route-detail")).toHaveAttribute("data-kind", "segment");
   await publishDraft(page);
 }

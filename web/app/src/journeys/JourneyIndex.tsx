@@ -9,7 +9,7 @@ import { journeyIndex, indexKey, isSegment, routeIndex, type JourneySummary, typ
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive, useViewer } from "../data/react.ts";
 import { Badge } from "../ui/kit.tsx";
-import { filtersFrom, indexPath, newJourneyPath, overviewPath, queryOf, type IndexFilters } from "./address.ts";
+import { filtersFrom, indexPath, journeyPath, newJourneyPath, queryOf } from "./address.ts";
 import { IndexFilterBar } from "./IndexFilterBar.tsx";
 import { Figures } from "./Figures.tsx";
 import { useMineCounts, useMineOf, useReportMine } from "./mine.ts";
@@ -43,7 +43,7 @@ export function JourneyCells({ summary, routes }: { summary: JourneySummary; rou
   return (
     <>
       <td data-column="title">
-        <Link to={overviewPath(summary.id)} title={summary.id}>{summary.name}</Link>
+        <Link to={journeyPath({ journey: summary.id })} title={summary.id}>{summary.name}</Link>
       </td>
       <td data-column="route">
         <span className="stack">
@@ -86,13 +86,17 @@ function MineRow({ summary, routes, report }: { summary: JourneySummary; routes:
   return <JourneyRow summary={summary} routes={routes} />;
 }
 
-function Rows({ filters, items, routes }: { filters: IndexFilters; items: JourneySummary[]; routes: RouteSummary[] }) {
-  const { report, none } = useMineCounts(filters.mine ? items : []);
+/**
+ * The journeys as a table of figures: every one of `items`, or with `mine` only those where the
+ * caller holds something (E4), which says so when none does. Home shows the same table.
+ */
+export function JourneyTable({ items, routes, mine }: { items: JourneySummary[]; routes: RouteSummary[]; mine: boolean }) {
+  const { report, none } = useMineCounts(mine ? items : []);
   if (items.length === 0) {
     return <p className="muted small" data-testid="index-empty">No journeys match.</p>;
   }
   // With "mine", every candidate stays mounted (kept current) though its row may be empty.
-  const empty = filters.mine && none;
+  const empty = mine && none;
   return (
     <div className="table-wrap">
       {empty ? <p className="muted small" data-testid="index-empty">No journeys match: nothing in them is yours.</p> : null}
@@ -112,7 +116,7 @@ function Rows({ filters, items, routes }: { filters: IndexFilters; items: Journe
         )}
         <tbody>
           {items.map((summary) =>
-            filters.mine ? <MineRow key={summary.id} summary={summary} routes={routes} report={report} /> : <JourneyRow key={summary.id} summary={summary} routes={routes} />,
+            mine ? <MineRow key={summary.id} summary={summary} routes={routes} report={report} /> : <JourneyRow key={summary.id} summary={summary} routes={routes} />,
           )}
         </tbody>
       </table>
@@ -142,7 +146,7 @@ export function JourneyIndex() {
       {filters.mine && viewer === undefined && failed !== undefined ? <p className="callout callout-bad">Who you are could not be read, so neither can what is yours: {failed}</p> : null}
       {view.status === "loading" || waiting ? <p className="muted small">Loading the journeys...</p> : null}
       {view.status === "failed" ? <p className="callout callout-bad">The journeys could not be read: {view.error.message}</p> : null}
-      {found !== undefined && !waiting ? <Rows filters={filters} items={found} routes={known} /> : null}
+      {found !== undefined && !waiting ? <JourneyTable items={found} routes={known} mine={filters.mine} /> : null}
     </section>
   );
 }
