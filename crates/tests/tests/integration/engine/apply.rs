@@ -4,7 +4,6 @@
 
 use crate::engine::support;
 
-use cairn_engine::apply;
 use cairn_schema::{
     ChangeClass, EventType, Guard, GuardFailure, LocalEdit, NodeField, Rejection, RevisionOf,
     ViolationCode,
@@ -20,12 +19,14 @@ fn a_stale_base_revision_is_a_rejection_naming_the_revision() {
         "- op: transition\n  node: n_kickoff\n  transition: reach\n",
     );
     patch.base_revision = cairn_schema::Revision::NONE.next();
-    let Err(Rejection::Stale { conflicts, .. }) = apply(&records, &patch, &support::fixed_inputs())
+    let Err(Rejection::Stale { conflicts, .. }) =
+        support::apply(&records, &patch, &support::fixed_inputs())
     else {
         panic!("a base revision behind the journey's is stale (A17, H5)")
     };
     assert_eq!(conflicts.len(), 1);
     assert!(matches!(conflicts[0].of, RevisionOf::Domain(_)));
+    assert_eq!(conflicts[0].expected, patch.base_revision);
     assert_eq!(
         conflicts[0].current,
         records.revision(&patch.target.domain())
@@ -42,7 +43,7 @@ fn a_stale_deployment_revision_is_a_rejection() {
     );
     patch.deployment_revision = Some(cairn_schema::Revision::NONE);
     assert!(matches!(
-        apply(&records, &patch, &support::fixed_inputs()),
+        support::apply(&records, &patch, &support::fixed_inputs()),
         Err(Rejection::Stale { .. })
     ));
 }
@@ -117,6 +118,36 @@ fn removing_a_route_copied_subtree_retires_its_keys_and_tombstones_it() {
         assert!(!graph.state.nodes.contains_key(&key(removed)), "{removed}");
     }
     assert_eq!(applied.events().len(), 1);
+}
+
+/// A18: a removal of a stage with its whole subtree, and the edges into and inside it.
+#[test]
+fn a_removal_takes_the_subtree_and_the_edges_into_it() {
+    let removal = "- op: remove_node\n  removal:\n    node: n_testing\n    descendants: [n_comparison_set, n_baseline, n_partner_led, n_criteria, n_partner_results]\n    edges:\n    - {node: n_reporting, requires: n_testing}\n    - {node: n_comparison_set, requires: n_plan}\n    - {node: n_partner_results, requires: n_criteria}\n";
+    let applied = vendor_patch(&vendor_after(5), removal).unwrap();
+    let graph = vendor_graph(applied.records());
+    for removed in [
+        "n_testing",
+        "n_comparison_set",
+        "n_baseline",
+        "n_partner_led",
+        "n_criteria",
+        "n_partner_results",
+    ] {
+        assert!(graph.nodes.get(&key(removed)).is_none(), "{removed}");
+        assert!(
+            graph.retired_keys.nodes.contains(&key(removed)),
+            "{removed}"
+        );
+    }
+    assert!(
+        graph
+            .nodes
+            .get(&key("n_reporting"))
+            .unwrap()
+            .requires
+            .is_empty()
+    );
 }
 
 #[test]
@@ -359,6 +390,20 @@ fn a_role_with_a_filling_decision_and_a_fed_milestone_change_only_through_the_de
         codes(vendor_patch(&records, pin)),
         [ViolationCode::PinnedThroughDecision]
     );
+    let shift = "- op: shift_pin\n  node: n_decision_meeting\n  offset_days: 3\n";
+    assert_eq!(
+        codes(vendor_patch(&records, shift)),
+        [ViolationCode::PinnedThroughDecision]
+    );
+    let moved = support::accepted_on(
+        &records,
+        "j_vendor_eval",
+        "- op: answer\n  decision: n_meeting_date\n  value: {date: \"2026-11-27\"}\n",
+    );
+    assert!(
+        vendor_graph(&moved).state.pins.is_empty(),
+        "E3: the pin is the answer's, never stored"
+    );
     let reopen = "- op: transition\n  node: n_who_owns\n  transition: reopen\n";
     let reopened = vendor_patch(&records, reopen).unwrap();
     assert!(
@@ -480,7 +525,8 @@ fn a_deployment_past_its_size_cap_is_rejected() {
         entity: entity(index),
     });
     patch.mutations = cairn_schema::Mutations::new(creates.collect()).unwrap();
-    let Err(Rejection::Invalid { violations }) = apply(&records, &patch, &support::fixed_inputs())
+    let Err(Rejection::Invalid { violations }) =
+        support::apply(&records, &patch, &support::fixed_inputs())
     else {
         panic!("a deployment past graph_bytes_max is rejected")
     };
@@ -504,13 +550,17 @@ fn a_proposal_is_edited_only_through_its_own_destination() {
     let create = "- op: create_proposal\n  proposal: {title: A note, destination_revision: 1}\n";
     let target = "{proposal: {id: pr_note, destination: {journey: j_vendor_eval}}}";
     let patch = support::patch_to(&records, target, create);
-    let created = apply(&records, &patch, &support::fixed_inputs()).unwrap();
+    let created = support::apply(&records, &patch, &support::fixed_inputs()).unwrap();
     let elsewhere = "{proposal: {id: pr_note, destination: deployment}}";
     let edit = "- op: edit_proposal\n  proposal: {title: Another note, destination_revision: 1}\n";
     let patch = support::patch_to(created.records(), elsewhere, edit);
     let mut patch = patch;
     patch.base_revision = cairn_schema::Revision::NONE.next();
-    let found = codes(apply(created.records(), &patch, &support::fixed_inputs()));
+    let found = codes(support::apply(
+        created.records(),
+        &patch,
+        &support::fixed_inputs(),
+    ));
     assert_eq!(found, [ViolationCode::MutationNotForTarget]);
 }
 
@@ -576,10 +626,14 @@ fn applying_a_proposal_that_does_not_create_its_new_destination_is_rejected() {
     let create =
         "- op: create_proposal\n  proposal: {title: Nothing yet, destination_revision: 0}\n";
     let patch = support::patch_to(&records, target, create);
-    let created = apply(&records, &patch, &support::fixed_inputs()).unwrap();
+    let created = support::apply(&records, &patch, &support::fixed_inputs()).unwrap();
     let apply_it = "- op: apply_proposal\n  proposal: pr_empty\n  reviewed_revision: 1\n";
     let patch = support::patch_to(created.records(), "{journey: j_new}", apply_it);
-    let found = codes(apply(created.records(), &patch, &support::fixed_inputs()));
+    let found = codes(support::apply(
+        created.records(),
+        &patch,
+        &support::fixed_inputs(),
+    ));
     assert_eq!(found, [ViolationCode::TargetMissing]);
 }
 
@@ -600,10 +654,10 @@ fn a_proposal_may_delete_its_existing_destination() {
     let target = "{proposal: {id: pr_delete, destination: {journey: j_vendor_eval}}}";
     let create = "- op: create_proposal\n  proposal:\n    title: Delete the journey\n    destination_revision: 2\n    mutations:\n    - op: delete_journey\n";
     let patch = support::patch_to(&records, target, create);
-    let created = apply(&records, &patch, &support::fixed_inputs()).unwrap();
+    let created = support::apply(&records, &patch, &support::fixed_inputs()).unwrap();
     let apply_it = "- op: apply_proposal\n  proposal: pr_delete\n  reviewed_revision: 1\n";
     let patch = support::patch_to(created.records(), "{journey: j_vendor_eval}", apply_it);
-    let applied = apply(created.records(), &patch, &support::fixed_inputs()).unwrap();
+    let applied = support::apply(created.records(), &patch, &support::fixed_inputs()).unwrap();
     assert!(applied.records().journeys.is_empty());
     let event = &applied.events()[0];
     assert_eq!(
@@ -661,14 +715,14 @@ fn a_merge_counts_a_journey_whose_conditions_compare_the_entities() {
     );
     let patch = support::patch_to(records, "deployment", &merge);
     assert!(
-        apply(records, &patch, &support::fixed_inputs()).is_ok(),
+        support::apply(records, &patch, &support::fixed_inputs()).is_ok(),
         "E6: the condition makes the journey a referencing one"
     );
     let unnamed = "- op: merge_entities\n  survivor: e_two\n  merged: e_one\n  journeys: {}\n";
     let patch = support::patch_to(records, "deployment", unnamed);
     assert!(
         matches!(
-            apply(records, &patch, &support::fixed_inputs()),
+            support::apply(records, &patch, &support::fixed_inputs()),
             Err(Rejection::Stale { .. })
         ),
         "a merge that leaves it out is stale"
@@ -694,11 +748,11 @@ fn a_proposal_may_unarchive_or_delete_an_archived_journey() {
             "- op: create_proposal\n  proposal:\n    title: Tidy up\n    destination_revision: {revision}\n    mutations:\n    {mutation}"
         );
         let patch = support::patch_to(records, &target, &create);
-        let created = apply(records, &patch, &support::fixed_inputs()).unwrap();
+        let created = support::apply(records, &patch, &support::fixed_inputs()).unwrap();
         let apply_it = format!("- op: apply_proposal\n  proposal: {id}\n  reviewed_revision: 1\n");
         let patch = support::patch_to(created.records(), "{journey: j_vendor_eval}", &apply_it);
         assert!(
-            apply(created.records(), &patch, &support::fixed_inputs()).is_ok(),
+            support::apply(created.records(), &patch, &support::fixed_inputs()).is_ok(),
             "{id}"
         );
     }

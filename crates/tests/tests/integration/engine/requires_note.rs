@@ -8,7 +8,7 @@ use crate::engine::support;
 
 use std::collections::BTreeSet;
 
-use cairn_engine::{Applied, Records, apply};
+use cairn_engine::{Applied, Records};
 use cairn_schema::{
     Guard, GuardFailure, Lineage, Rejection, RouteFile, SequentialKeys, ViolationCode, from_yaml,
 };
@@ -56,7 +56,7 @@ fn launch_after(steps: usize) -> Records {
 
 fn patch(records: &Records, mutations: &str) -> Result<Applied, Rejection> {
     let patch = support::patch_to(records, &format!("{{journey: {LAUNCH}}}"), mutations);
-    apply(records, &patch, &support::fixed_inputs())
+    support::apply(records, &patch, &support::fixed_inputs())
 }
 
 fn accepted(records: &Records, mutations: &str) -> Records {

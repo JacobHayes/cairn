@@ -43,7 +43,7 @@ pub fn route_graph(name: &str) -> Graph {
         .unwrap_or_else(|violations| panic!("{name}: {violations:#?}"))
 }
 
-use cairn_engine::{Applied, ApplyInputs, Records, apply};
+use cairn_engine::{Applied, ApplyInputs, Records, replay};
 use cairn_schema::{
     Lineage, Rejection, Route, RouteHeader, RouteVersion, ScenarioStep, VersionNumber,
 };
@@ -98,6 +98,26 @@ fn published(mut records: Records, file: &RouteFile, graph: cairn_schema::Graph)
         },
     );
     records
+}
+
+/// `cairn_engine::apply`, and for an accepted patch the replay check (J3): the records its
+/// events rebuild from `records` equal the records apply produced. Every engine test that
+/// applies a patch goes through here, so every accepted step of every scenario replays.
+pub fn apply(
+    records: &Records,
+    patch: &cairn_schema::Patch,
+    inputs: &ApplyInputs,
+) -> Result<Applied, Rejection> {
+    let result = cairn_engine::apply(records, patch, inputs);
+    if let Ok(applied) = &result {
+        assert_eq!(
+            replay(records, applied.events()),
+            *applied.records(),
+            "J3: replaying the events of {} differs from what apply produced",
+            patch.id
+        );
+    }
+    result
 }
 
 /// The inputs a scenario step applies with.

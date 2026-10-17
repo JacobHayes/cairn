@@ -6,17 +6,17 @@ use crate::engine::support;
 
 use std::collections::BTreeSet;
 
-use cairn_engine::{Records, apply};
+use cairn_engine::Records;
 use cairn_schema::{
-    EventType, Lineage, Mutation, Patch, ProposalStatus, Rejection, RevisionOf, VersionNumber,
-    ViolationCode,
+    Domain, EventType, Lineage, Mutation, Patch, ProposalStatus, Rejection, RevisionOf,
+    VersionNumber, ViolationCode,
 };
 use serde_json::Value;
 
 /// Applies mutations to a target, written as YAML; panics on a rejection.
 fn accept(records: &Records, target: &str, mutations: &str, ops: &mut BTreeSet<String>) -> Records {
     let patch = support::patch_to(records, target, mutations);
-    let applied = apply(records, &patch, &support::fixed_inputs())
+    let applied = support::apply(records, &patch, &support::fixed_inputs())
         .unwrap_or_else(|rejection| panic!("{rejection:#?}\n{mutations}"));
     assert_eq!(applied.events().len(), patch.mutations.len(), "J2");
     collect(&patch, ops);
@@ -122,7 +122,7 @@ fn walk_route(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     let records = accept(&records, ROUTE, "- op: open_draft\n  source: import\n", ops);
     let again = support::patch_to(&records, ROUTE, "- op: open_draft\n  source: edit\n");
     assert_eq!(
-        support::codes(apply(&records, &again, &support::fixed_inputs())),
+        support::codes(support::apply(&records, &again, &support::fixed_inputs())),
         [ViolationCode::DraftExists]
     );
     let records = accept(&records, ROUTE, "- op: discard_draft\n", ops);
@@ -152,7 +152,7 @@ fn segment_rules(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     const SEGMENT: &str = "{route: reuse}";
     let reject = |records: &Records, target: &str, mutations: &str| {
         let patch = support::patch_to(records, target, mutations);
-        support::codes(apply(records, &patch, &support::fixed_inputs()))
+        support::codes(support::apply(records, &patch, &support::fixed_inputs()))
     };
     // A root id at the length limit has no suffix that fits, so a second insertion under the
     // same parent is refused rather than searching for one.
@@ -204,7 +204,7 @@ fn segment_rules(records: &Records, ops: &mut BTreeSet<String>) -> Records {
 fn walk_segment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     let reject = |records: &Records, target: &str, mutations: &str| {
         let patch = support::patch_to(records, target, mutations);
-        support::codes(apply(records, &patch, &support::fixed_inputs()))
+        support::codes(support::apply(records, &patch, &support::fixed_inputs()))
     };
     let records = segment_rules(records, ops);
     let insert = "- op: open_draft\n  source: edit\n- op: insert_segment\n  insertion: i_reuse\n  segment: {route: reuse, version: 1}\n  parent: n_reporting\n";
@@ -294,7 +294,8 @@ fn walk_deployment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
         journey.get() - 1
     );
     let patch = support::patch_to(&records, "deployment", &stale);
-    let Err(Rejection::Stale { conflicts, .. }) = apply(&records, &patch, &support::fixed_inputs())
+    let Err(Rejection::Stale { conflicts, .. }) =
+        support::apply(&records, &patch, &support::fixed_inputs())
     else {
         panic!("a merge naming a journey's old revision is stale (E6)")
     };
@@ -349,7 +350,7 @@ fn walk_proposals(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     );
     let stale = "- op: apply_proposal\n  proposal: pr_note\n  reviewed_revision: 1\n";
     let patch = support::patch_to(&records, JOURNEY, stale);
-    let result = apply(&records, &patch, &support::fixed_inputs());
+    let result = support::apply(&records, &patch, &support::fixed_inputs());
     assert!(
         matches!(result, Err(Rejection::Stale { .. })),
         "the reviewer saw revision 1; it is at 2"
@@ -370,7 +371,7 @@ fn walk_proposals(records: &Records, ops: &mut BTreeSet<String>) -> Records {
 fn apply_note_proposal(records: &Records, ops: &mut BTreeSet<String>) -> Records {
     let apply_it = "- op: apply_proposal\n  proposal: pr_note\n  reviewed_revision: 2\n";
     let patch = support::patch_to(records, JOURNEY, apply_it);
-    let applied = apply(records, &patch, &support::fixed_inputs()).unwrap();
+    let applied = support::apply(records, &patch, &support::fixed_inputs()).unwrap();
     let event = &applied.events()[0];
     assert_eq!(event.event_type, EventType::ProposalApplied);
     assert_eq!(
@@ -394,9 +395,40 @@ fn apply_note_proposal(records: &Records, ops: &mut BTreeSet<String>) -> Records
     assert!(annotations.get(&"a_proposed".parse().unwrap()).is_some());
     let again = "- op: apply_proposal\n  proposal: pr_note\n  reviewed_revision: 3\n";
     let twice = support::patch_to(&records, JOURNEY, again);
-    let found = support::codes(apply(&records, &twice, &support::fixed_inputs()));
+    let found = support::codes(support::apply(&records, &twice, &support::fixed_inputs()));
     assert_eq!(found, [ViolationCode::ProposalNotOpen]);
     records
+}
+
+/// I6, H5: a proposal applied after its destination moved past the revision it was drafted
+/// on is stale, naming the destination; a discard resubmitted at the revision before the
+/// proposal existed is stale too.
+#[test]
+fn a_proposal_is_stale_once_its_destination_moves() {
+    let drafted = support::after("bake-off", 2);
+    let moved = support::accepted_on(
+        &drafted,
+        "j_bakeoff",
+        "- op: edit_journey\n  name: Two-week bake-off between options\n",
+    );
+    let apply_it = "- op: apply_proposal\n  proposal: pr_bakeoff\n  reviewed_revision: 1\n";
+    let patch = support::patch_to(&moved, "{journey: j_bakeoff}", apply_it);
+    let Err(Rejection::Stale { conflicts, .. }) =
+        support::apply(&moved, &patch, &support::fixed_inputs())
+    else {
+        panic!("the destination moved past the proposal's base")
+    };
+    assert!(matches!(
+        &conflicts[0].of,
+        RevisionOf::Domain(Domain::Journey(_))
+    ));
+    let target = "{proposal: {id: pr_bakeoff, destination: {journey: j_bakeoff}}}";
+    let mut resubmitted = support::patch_to(&moved, target, "- op: discard_proposal\n");
+    resubmitted.base_revision = cairn_schema::Revision::NONE;
+    assert!(matches!(
+        support::apply(&moved, &resubmitted, &support::fixed_inputs()),
+        Err(Rejection::Stale { .. })
+    ));
 }
 
 #[test]
@@ -435,7 +467,7 @@ fn a_patch_to_the_wrong_kind_of_target_is_rejected() {
     for (target, mutations) in cases {
         let patch = support::patch_to(&records, target, mutations);
         assert_eq!(
-            support::codes(apply(&records, &patch, &support::fixed_inputs())),
+            support::codes(support::apply(&records, &patch, &support::fixed_inputs())),
             [ViolationCode::MutationNotForTarget],
             "{target}"
         );
@@ -446,7 +478,11 @@ fn a_patch_to_the_wrong_kind_of_target_is_rejected() {
         "- op: add_node\n  node: {key: n_x, id: x, kind: action, title: X}\n",
     );
     assert_eq!(
-        support::codes(apply(&records, &no_draft, &support::fixed_inputs())),
+        support::codes(support::apply(
+            &records,
+            &no_draft,
+            &support::fixed_inputs()
+        )),
         [ViolationCode::NoDraft]
     );
 }

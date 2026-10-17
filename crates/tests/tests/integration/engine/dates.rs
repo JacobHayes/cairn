@@ -7,7 +7,10 @@
 use crate::engine::support;
 
 use cairn_engine::Records;
-use cairn_schema::{ConstraintSource, Date, DateOrigin, FixedBy, Instant, InstantPoint, NodeDates};
+use cairn_schema::{
+    ConstraintSource, Date, DateOrigin, FixedBy, Instant, InstantPoint, NodeDates, Rejection,
+    ViolationCode,
+};
 use support::key;
 
 /// `add_node` mutations, one per node written as a YAML flow mapping.
@@ -540,4 +543,57 @@ fn a_fact_too_early_for_created_at_or_an_answer_is_short() {
         assert_eq!(shortfall.shortfall_days, days, "{node}");
         assert_eq!(shortfall.chain.fixed[0].instant, source, "{node}");
     }
+}
+
+/// F6: the launch's code freeze is reached two days after the launch pin's chain allows; the
+/// shortfall names that chain, and an unrelated patch after it is accepted.
+#[test]
+fn a_late_actual_is_a_shortfall_never_a_rejection() {
+    let records = support::finished("product-launch");
+    let derived = support::derived(&records, "j_launch");
+    assert_eq!(
+        derived.dates().shortfall_days(&key("n_code_freeze")),
+        Some(2)
+    );
+    assert_eq!(derived.dates().shortfall_days(&key("n_launch")), Some(2));
+    support::accepted_on(
+        &records,
+        "j_launch",
+        "- op: add_annotation\n  annotation: {key: a_late, node: n_code_freeze, note: Slipped two days.}\n",
+    );
+}
+
+/// F4, F5: a stage that closes five days after it opens holds two three-day pieces of work
+/// side by side, but not one after the other.
+#[test]
+fn a_stage_window_holds_parallel_estimates_but_not_sequential_ones() {
+    let records = support::journey(&add(&[
+        "{key: n_opens, id: opens, kind: milestone, title: Opens}",
+        "{key: n_closes, id: closes, kind: milestone, title: Closes, due_by: {after: n_opens, offset: 5}}",
+        "{key: n_window, id: window, kind: group, title: Window, opens_at: n_opens, closes_at: n_closes}",
+        "{key: n_first, id: first, parent: n_window, kind: action, title: First, estimate: 3}",
+        "{key: n_second, id: second, parent: n_window, kind: action, title: Second, estimate: 3}",
+    ]));
+    let sequential = support::journey_patch(
+        &records,
+        "- op: add_edge\n  edge: {node: n_second, requires: n_first}\n",
+    );
+    let Err(Rejection::Invalid { violations }) = sequential else {
+        panic!("sequential work past the window is invalid");
+    };
+    let found = &violations.as_slice()[0];
+    assert_eq!(found.code, ViolationCode::ContradictoryChain);
+    assert_eq!(
+        found.chains.as_ref().unwrap().chains.as_slice()[0].shortfall_days,
+        1
+    );
+    let pinned = support::accepted(
+        &records,
+        "- op: set_pin\n  node: n_opens\n  date: \"2026-11-02\"\n",
+    );
+    assert_eq!(
+        bound(dates_of(&pinned, "n_second").due.as_ref()),
+        Some(date("2026-11-07")),
+        "parallel work fits the window"
+    );
 }

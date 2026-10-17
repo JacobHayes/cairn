@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 
 use cairn_engine::{Derived, Graph, Records};
 use cairn_schema::{
-    Date, DependencyVia, GuardFailure, NodeKey, Relevance, SnoozeTarget, StallCause,
+    Date, DependencyVia, GuardFailure, NodeKey, Relevance, SnoozeTarget, StallCause, ViolationCode,
 };
 use support::{add_nodes as add, key};
 
@@ -541,4 +541,119 @@ fn a_closed_ancestor_lists_what_it_holds_back() {
         blockers(&derived, "n_box"),
         BTreeSet::from([blocker("n_work", DependencyVia::Explicit)])
     );
+}
+
+/// Applies mutations to the vendor evaluation.
+fn vendor_step(records: &Records, mutations: &str) -> Records {
+    support::accepted_on(records, VENDOR, mutations)
+}
+
+/// The container whose snooze holds over `node`, and the one the snoozed list names on its
+/// row.
+fn held_through(records: &Records, node: &str) -> (Option<NodeKey>, Option<NodeKey>) {
+    let graph = support::journey_graph(records, VENDOR);
+    let derived = support::derived(records, VENDOR);
+    let query = cairn_schema::ListQuery {
+        flags: [cairn_schema::ListFlag::Snoozed].into(),
+        ..cairn_schema::ListQuery::default()
+    };
+    let listed = cairn_engine::DerivedJourney::new(&graph, &derived)
+        .list(&query, &BTreeSet::new())
+        .unwrap();
+    let listed = listed.rows.iter().find(|row| row.key == key(node));
+    (
+        derived.blocking().snoozed_via(&key(node)).cloned(),
+        listed.and_then(|row| row.snoozed_via.clone()),
+    )
+}
+
+/// The vendor evaluation with Testing snoozed until the decision meeting is reached and the
+/// partner decision open again.
+fn testing_snoozed() -> Records {
+    let records = vendor_step(
+        &support::vendor_after(7),
+        &transition("n_partner_runs", "reopen"),
+    );
+    vendor_step(
+        &records,
+        "- op: snooze\n  node: n_testing\n  until: {node: n_decision_meeting}\n",
+    )
+}
+
+/// B6, D3, D5: a container's snooze holds over its subtree: the snoozed list names it on
+/// its descendants, a target inside it or depending on it is rejected, and answering the
+/// partner decision brings the partner-led work onto the frontier already snoozed.
+#[test]
+fn a_container_snooze_holds_over_its_subtree() {
+    let records = testing_snoozed();
+    let testing = Some(key("n_testing"));
+    assert_eq!(
+        held_through(&records, "n_baseline"),
+        (testing.clone(), testing.clone())
+    );
+    assert_eq!(
+        acting(&support::derived(&records, VENDOR)),
+        [
+            "n_decision_meeting",
+            "n_partner_runs",
+            "n_workload_ingest",
+            "n_workload_query"
+        ]
+    );
+    for target in ["n_baseline", "n_final_report"] {
+        let again = format!("- op: snooze\n  node: n_testing\n  until: {{node: {target}}}\n");
+        let found = support::codes(support::vendor_patch(&records, &again));
+        assert_eq!(found, [ViolationCode::SnoozeCycle], "{target}");
+    }
+    let records = vendor_step(&records, &answer("n_partner_runs", "{boolean: true}"));
+    let derived = support::derived(&records, VENDOR);
+    assert!(frontier(&derived).contains(&"n_criteria"));
+    assert!(!acting(&derived).contains(&"n_criteria"));
+    assert_eq!(held_through(&records, "n_criteria").0, testing);
+}
+
+/// B6: a descendant completing does not clear the container's snooze; a descendant with its
+/// own later snooze stays hidden after the container's lifts, and the container's holds again
+/// when the meeting reopens; a transition on the container clears it.
+#[test]
+fn a_container_snooze_outlasts_its_descendants_and_clears_on_a_transition() {
+    let records = vendor_step(
+        &testing_snoozed(),
+        &answer("n_partner_runs", "{boolean: true}"),
+    );
+    let records = vendor_step(
+        &records,
+        "- op: snooze\n  node: n_criteria\n  until: {date: \"2026-10-20\"}\n",
+    );
+    let alone = "- op: unsnooze\n  node: n_partner_results\n";
+    assert_eq!(
+        support::codes(support::vendor_patch(&records, alone)),
+        [ViolationCode::SnoozedThroughContainer]
+    );
+    let held = |records: &Records| {
+        support::vendor_graph(records)
+            .state
+            .snoozes
+            .contains_key(&key("n_testing"))
+    };
+    let records = vendor_step(&records, &transition("n_baseline", "complete"));
+    assert!(held(&records), "a descendant completing does not clear it");
+    let records = vendor_step(&records, &transition("n_decision_meeting", "reach"));
+    assert_eq!(
+        held_through(&records, "n_criteria").0,
+        None,
+        "the container's lifts"
+    );
+    let derived = support::derived(&records, VENDOR);
+    assert!(
+        !acting(&derived).contains(&"n_criteria"),
+        "its own snooze holds"
+    );
+    let records = vendor_step(&records, &transition("n_decision_meeting", "reopen"));
+    assert_eq!(
+        held_through(&records, "n_criteria").0,
+        Some(key("n_testing"))
+    );
+    let skip = transition("n_testing", "{skip: {reason: Not needed.}}");
+    assert!(!held(&vendor_step(&records, &skip)));
 }

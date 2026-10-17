@@ -104,7 +104,7 @@ fn merge_then(
     }
     merges.push_str(after);
     let patch = support::patch_to(records, "deployment", &merges);
-    cairn_engine::apply(records, &patch, &support::fixed_inputs())
+    support::apply(records, &patch, &support::fixed_inputs())
 }
 
 #[test]
@@ -186,7 +186,7 @@ fn a_merge_naming_too_many_journeys_is_refused() {
         journeys,
     }])
     .unwrap();
-    let past = cairn_engine::apply(&created, &patch, &support::fixed_inputs());
+    let past = support::apply(&created, &patch, &support::fixed_inputs());
     assert_eq!(limits_named(past), [Some(limit)]);
 }
 

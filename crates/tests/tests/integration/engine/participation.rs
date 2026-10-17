@@ -207,3 +207,34 @@ fn role_changes_rederive_inheritance_and_flag_lost_members() {
             .is_empty()
     );
 }
+
+/// E5, B5: a participation set on a node stays through a later change to the role it could
+/// have followed, and is marked as a local edit.
+#[test]
+fn an_explicit_participation_survives_a_role_change() {
+    let records = support::vendor_after(2);
+    let records = support::accepted_on(
+        &records,
+        VENDOR,
+        "- op: set_participation\n  node: n_access\n  kind: k_owner\n  source: [e_stakeholder_a]\n",
+    );
+    let records = support::accepted_on(
+        &records,
+        VENDOR,
+        "- op: answer\n  decision: n_who_owns\n  value: {entity: e_stakeholder_b}\n",
+    );
+    let graph = support::vendor_graph(&records);
+    let owner = &graph
+        .nodes
+        .get(&key("n_access"))
+        .unwrap()
+        .participations
+        .as_map()[&kind("k_owner")];
+    assert!(
+        matches!(owner, cairn_schema::ParticipationSource::Entities(found) if found.iter().any(|e| e.as_str() == "e_stakeholder_a"))
+    );
+    assert!(
+        graph.state.local_edits[&key("n_access")]
+            .contains(&cairn_schema::LocalEdit::Participation(kind("k_owner")))
+    );
+}

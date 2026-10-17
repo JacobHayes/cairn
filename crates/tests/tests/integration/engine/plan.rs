@@ -228,7 +228,7 @@ fn a_late_actual_never_rejects_a_patch() {
     let finished = support::finished("product-launch");
     let note = "- op: add_annotation\n  annotation: {key: a_note, node: n_docs, note: Drafting.}\n";
     let patch = support::patch_to(&finished, "{journey: j_launch}", note);
-    let applied = cairn_engine::apply(&finished, &patch, &support::fixed_inputs());
+    let applied = support::apply(&finished, &patch, &support::fixed_inputs());
     assert!(applied.is_ok(), "{applied:#?}");
 }
 
@@ -286,7 +286,7 @@ fn a_merge_that_breaks_the_plan_carries_its_chains() {
     ] {
         let patch = support::patch_to(records, "deployment", &mutations);
         let Err(Rejection::Invalid { violations }) =
-            cairn_engine::apply(records, &patch, &support::fixed_inputs())
+            support::apply(records, &patch, &support::fixed_inputs())
         else {
             panic!("the merge makes the long action apply:\n{mutations}");
         };

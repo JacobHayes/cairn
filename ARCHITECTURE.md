@@ -228,7 +228,7 @@ YAML on disk, JSON on the wire, one document schema (A13, A14). Files carry path
 
 ### Testing the engine
 
-The J3 replay harness and the scenario matrix run against the engine alone with a fixed clock and the memory store. Fixtures under `fixtures/` are shared with the in-browser host and server integration tests, so the same scenarios exercise all three.
+The J3 replay harness and the scenario tests run against the engine alone with a fixed clock and the memory store. Fixtures under `fixtures/` are shared with the in-browser host and server integration tests, so the same scenarios exercise all three.
 
 ## Storage
 

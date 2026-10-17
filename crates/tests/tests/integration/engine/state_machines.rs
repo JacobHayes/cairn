@@ -236,3 +236,24 @@ fn a_transition_on_a_snoozed_node_clears_the_snooze_in_its_own_event() {
 fn key_a() -> cairn_schema::NodeKey {
     key("n_a")
 }
+
+/// B2, D4: revising an answer after the work it gated is done never deletes recorded state,
+/// and keeps the date the decision was decided.
+#[test]
+fn revising_an_answer_after_progress_keeps_the_recorded_state() {
+    let records = support::finished("vendor-evaluation");
+    let state = |records: &cairn_engine::Records, node: &str| {
+        support::vendor_graph(records).state.nodes[&key(node)].clone()
+    };
+    let decided = state(&records, "n_comparison_set");
+    let revised = support::accepted_on(
+        &records,
+        "j_vendor_eval",
+        "- op: answer\n  decision: n_comparison_set\n  value: {single_choice: none}\n",
+    );
+    assert_eq!(state(&revised, "n_baseline").state, Done);
+    assert_eq!(
+        state(&revised, "n_comparison_set").finished_on,
+        decided.finished_on
+    );
+}

@@ -169,8 +169,8 @@ Hard-coded named constants; validation rejects a patch that would exceed one, an
 
 ### Engine: examples, properties, replay
 
-- **Scenario matrix** (J3): every scenario the PRD lists, as example-based tests at a fixed clock over the shared fixtures, asserting derived bounds, blocking, shortfalls, and ranking, not only replay equality.
-- **Replay harness** (J3): after every scenario, rebuild the graph from its events and compare field by field to the stored state. Drift fails the build. A separate test asserts that every mutation type emits an event (J2).
+- **Scenario tests** (J3): every scenario the PRD lists, as example-based tests at a fixed clock over the shared fixtures, each in the file of the area it exercises and citing the PRD ids it covers, asserting derived bounds, blocking, shortfalls, and ranking, not only replay equality. A scenario another test already covers is not repeated.
+- **Replay harness** (J3): the engine tests apply every patch through one shared helper (`support::apply`), which rebuilds the records from the patch's events and compares them to what apply produced, so every accepted step of every scenario replays. Drift fails the build. A separate test asserts that every mutation type emits an event (J2).
 - **Property tests** with `proptest` through `patina-dst-proptest`: generated graphs within the limits and generated operation sequences, with properties such as: apply then replay equals apply; a rejected patch leaves the graph unchanged; derive is a pure function of (graph, inputs); gravity never decreases upstream along a dependency between in-scope nodes; no accepted graph contains a contradictory chain; every implicit edge names its source.
 - **Round trips**: file import and export, JSON and YAML, proposal edit and apply.
 
@@ -240,7 +240,7 @@ Two commands cover it: `mise run check:fast [filter...]` for the inner loop and 
 
 ```mermaid
 flowchart TB
-    lint["lint: format, lint, typecheck<br/>seconds"] --> unit["unit: Rust unit tests, scenario matrix, replay<br/>seconds"] --> webunit["web-unit: Vitest, browser host agreement<br/>seconds"]
+    lint["lint: format, lint, typecheck<br/>seconds"] --> unit["unit: Rust unit tests, scenario tests, replay<br/>seconds"] --> webunit["web-unit: Vitest, browser host agreement<br/>seconds"]
     webunit --> gate{"check or check:fast?"}
     gate -- "check" --> generated["generated: regenerate and diff<br/>seconds"]
     generated --> embed["embed: the binary builds with the web build embedded<br/>seconds"] --> all
@@ -261,7 +261,7 @@ flowchart TB
 | Step | Check | Typical time |
 |---|---|---|
 | lint | `rustfmt`, `clippy` (deny), kebab-case patina site labels, TypeScript typecheck, `eslint`, the CSS lint (`mise run lint:css`: one scroller per region, tokens for colour and radius), the `wasm32-unknown-unknown` build of the runtime-free crates (the service and what it stands on) | seconds |
-| unit | unit tests for every Rust crate, engine scenario matrix, replay harness (memory store) | seconds |
+| unit | unit tests for every Rust crate, engine scenario tests, replay harness (memory store) | seconds |
 | web-unit | web unit tests (Vitest), including the browser host's agreement with the server's answers | seconds |
 | generated | regenerate the generated paths and fail if any file in them changed, appeared, or disappeared | seconds |
 | embed | `cargo check` of the `cairn` crate with its default features, which embeds the web build rather than reading it from disk as every other build of the ladder does (`web-dir`); it writes metadata only, so the binary the tests run and every other step's artifacts are untouched | seconds |

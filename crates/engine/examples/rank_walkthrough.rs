@@ -3,7 +3,7 @@
 //! decisions are answered, and after kickoff is reached, with each node's gravity, unlocks,
 //! slack, rank, rank terms, and top contributions; the product launch ranked globally and for
 //! two viewers once its feature work goes to a writer; and effort-adjusted ordering. Every
-//! patch goes through `apply`; every derive is at 2026-10-06, the scenario matrix's clock.
+//! patch goes through `apply`; every derive is at 2026-10-06, the scenario tests' clock.
 //! The values in `briefs/proof/2.5/README.md` come from it.
 //!
 //! usage: `cargo run -p cairn-engine --example rank_walkthrough -- FIXTURES_DIR`

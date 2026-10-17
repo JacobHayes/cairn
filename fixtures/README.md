@@ -42,8 +42,7 @@ finishes the workload and the baseline (which completes testing and opens report
 answers the reviewer with a person created in the same patch.
 
 Derived at each decision point (brief 2.2): the relevance and participations `derive` gives
-after steps 1, 2, 6, and 8. The scenario matrix (`crates/tests/tests/integration/engine/matrix.rs`) checks these
-values.
+after steps 1, 2, 6, and 8. `fixture_readme.rs` reads this table and checks it against what the engine derives.
 
 | Node | created (step 1) | up-front decisions (step 2) | comparison set (step 6) | findings reviewer (step 8) |
 |---|---|---|---|---|
@@ -87,7 +86,7 @@ Due dates once the decision meeting is pinned (brief 2.3): answering the meeting
 pins `decision-meeting` to 2026-11-20 (E3), and every unfinished node a bound reaches gets
 these latest starts and due dates. The final review closes at the meeting and opens 14 days
 before it; everything upstream is due by what it feeds. Latest bounds read backward from pins
-and actuals, so they do not depend on the day they are read. The scenario matrix checks these
+and actuals, so they do not depend on the day they are read. `fixture_readme.rs` checks these
 values.
 
 | Node | latest start | due |
@@ -109,7 +108,7 @@ values.
 What can be acted on after each step (brief 2.4): the frontier (every actionable node: relevant,
 open, not blocked, not a group) and, where it differs, the acting frontier (without snoozed
 nodes and `auto_reach` milestones whose date is ahead). Nothing in this route auto-reaches, so
-the values do not depend on the day they are read. The scenario matrix checks them.
+the values do not depend on the day they are read. `fixture_readme.rs` checks them.
 
 | After step | Frontier | Off the acting frontier |
 |---|---|---|
@@ -127,14 +126,13 @@ the plan reaches the frontier only after its two actions, and the comparison set
 plan.
 
 The frontier in rank order after the first three steps (brief 2.5), read on 2026-10-06 (the
-scenario matrix's clock), with each node's gravity, unlocks, and slack (null is "no deadline")
+scenario tests' clock), with each node's gravity, unlocks, and slack (null is "no deadline")
 and its rank under the default constants, to four places. Rank is global: every owner is the evaluation's owner (or, at creation, no one), so the
 owner factor is 1 throughout. Kickoff leads while it gates Setup (its gravity holds Setup, the
 plan, and everything after them, the undecided baseline at half); the partner decision's gravity
 holds the partner-led subset at half while it is undecided; the four up-front decisions tie and
 fall back to key order; once kickoff is reached, environment access leads. Every slack is past
-the 14-day horizon, so urgency is 0. The scenario matrix checks the ranks
-(`crates/tests/tests/integration/engine/matrix.rs`).
+the 14-day horizon, so urgency is 0. `fixture_readme.rs` checks the ranks.
 
 | After step | Node | Gravity | Unlocks | Slack | Rank |
 |---|---|---|---|---|---|
@@ -243,9 +241,8 @@ next list.
 A segment: a group root holding *Data sensitivity* (a single choice: low, moderate, high),
 *Threat model* (a deliverable relevant unless the sensitivity is low, owned by the `reviewer`
 role), and *Who reviews?* (an entity decision that fills `reviewer`). It has no final milestone
-and no default owner (a segment declares neither). The matrix scenario "segment insertion twice
-into one graph" (`crates/tests/tests/integration/engine/matrix.rs`) publishes it as version 1 and
-inserts it into the finished hiring-loop journey twice: first with the defaults, wired after the
+and no default owner (a segment declares neither). The tests in `crates/tests/tests/integration/engine/insertion.rs` publish it as version 1 and
+insert it into the finished hiring-loop journey twice: first with the defaults, wired after the
 panel decision, then with *Who reviews?* left out (the first insertion's decision already fills
 `reviewer`, which the default mapping reuses by id), wired before the offer decision.
 

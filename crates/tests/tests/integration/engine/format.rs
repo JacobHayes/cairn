@@ -5,7 +5,7 @@
 use crate::engine::support;
 
 use cairn_engine::format::{RouteHeading, content, export, import};
-use cairn_engine::{Graph, Records, apply, from_file};
+use cairn_engine::{Graph, Records, from_file};
 use cairn_schema::{
     Mutation, Mutations, Patch, PatchTarget, RouteFile, SequentialKeys, from_yaml, to_yaml,
 };
@@ -200,7 +200,7 @@ fn content_builds_the_graph_in_an_imported_draft() {
         deployment_revision: None,
         mutations: Mutations::new(mutations).unwrap(),
     };
-    let applied = apply(&Records::default(), &patch, &support::fixed_inputs()).unwrap();
+    let applied = support::apply(&Records::default(), &patch, &support::fixed_inputs()).unwrap();
     let route = applied.records().routes.values().next().unwrap();
     assert_eq!(&route.draft.as_ref().unwrap().graph, graph.document());
 }
@@ -218,7 +218,8 @@ fn route_patch(
         deployment_revision: None,
         mutations: Mutations::new(mutations).unwrap(),
     };
-    apply(records, &patch, &support::fixed_inputs()).map(|applied| applied.records().clone())
+    support::apply(records, &patch, &support::fixed_inputs())
+        .map(|applied| applied.records().clone())
 }
 
 /// Invariants (no key is ever reused), A13: a file supplying a key its base retired is

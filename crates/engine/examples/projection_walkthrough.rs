@@ -4,7 +4,7 @@
 //! decision view, the timeline, the status summary, the next list with filters, the agent
 //! snapshot with its top N and counts, a message draft before and after its decisions, and a
 //! node's history. Every patch goes through `apply`; every derive is at 2026-10-06, the
-//! scenario matrix's clock. The values in `briefs/proof/2.6/README.md` come from it.
+//! scenario tests' clock. The values in `briefs/proof/2.6/README.md` come from it.
 //!
 //! usage: `cargo run -p cairn-engine --example projection_walkthrough -- FIXTURES_DIR`
 

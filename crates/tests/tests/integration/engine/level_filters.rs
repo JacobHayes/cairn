@@ -151,7 +151,7 @@ fn the_owner_filter_follows_aliases_and_mine_reads_the_viewer() {
         support::JOURNEY
     );
     let patch = support::patch_to(&records, "deployment", &merge);
-    let merged = cairn_engine::apply(&records, &patch, &support::fixed_inputs()).unwrap();
+    let merged = support::apply(&records, &patch, &support::fixed_inputs()).unwrap();
     assert_eq!(
         owned_by(merged.records(), "e_b"),
         [

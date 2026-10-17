@@ -331,7 +331,7 @@ fn the_rank_table_is_what_derive_gives() {
 
 /// The projection lines: for each fixture and step the README names, the canvas level with
 /// actions hidden (each node in its nearest visible ancestor), what rolls up into a visible
-/// node, and the first three items of the next list, read at the scenario matrix's clock.
+/// node, and the first three items of the next list, read at the scenario tests' clock.
 #[test]
 fn the_projection_lines_are_what_the_engine_projects() {
     let text = readme();

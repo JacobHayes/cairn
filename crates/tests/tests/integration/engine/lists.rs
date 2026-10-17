@@ -369,7 +369,7 @@ fn next_re_sorts_by_one_signal() {
     assert_eq!(by(SortBy::Slack), ["n_soon", "n_heavy"]);
 }
 
-/// C10: the product launch at the scenario matrix's day, where every slack is past the urgency
+/// C10: the product launch at the scenario tests' day, where every slack is past the urgency
 /// window: gravity and unlocks rank, so the launch leads, then the work feeding it, and the
 /// retrospective, with no deadline, sorts last by slack too.
 #[test]

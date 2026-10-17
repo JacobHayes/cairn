@@ -9,7 +9,7 @@ use crate::engine::support;
 use std::collections::BTreeSet;
 
 use cairn_engine::Records;
-use cairn_schema::{Guard, GuardFailure, Rejection, Relevance, Violation, ViolationCode};
+use cairn_schema::{Guard, GuardFailure, Rejection, Relevance, State, Violation, ViolationCode};
 use support::{add_nodes as add, key};
 
 fn complete(node: &str) -> String {
@@ -117,10 +117,15 @@ fn relevance_guards_completion() {
     assert_eq!(found.code, ViolationCode::NotRelevant);
     assert_eq!(found.bypassable, None, "relevance has no bypass");
     assert_eq!(found.caused_by, BTreeSet::from([1]), "the answer");
+    assert_eq!(found.at.mutation, Some(0), "the completion");
     let forced = format!(
         "- op: apply_override\n  node: n_branch\n  override: {{force_include: {{reason: Needed anyway.}}}}\n{answered_away}"
     );
-    assert!(support::journey_patch(&records, &forced).is_ok());
+    let forced = support::accepted(&records, &forced);
+    assert_eq!(
+        support::graph(&forced).state.nodes[&key("n_branch")].state,
+        State::Done
+    );
 }
 
 /// Gating, D4: completing, answering, or reaching a node whose relevance waits on an
@@ -201,6 +206,12 @@ fn a_gated_decision_answered_out_of_order() {
         panic!("one violation")
     };
     assert_eq!(found.code, ViolationCode::GuardFailed);
+    assert_eq!(found.bypassable, Some(Guard::DepsDone));
+    assert!(
+        found
+            .failures
+            .contains(&GuardFailure::OpenDependency(key("n_first")))
+    );
     assert!(support::journey_patch(&records, &format!("{answer}{}", complete("n_first"))).is_ok());
     let bypassed = support::accepted(
         &records,

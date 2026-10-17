@@ -5,7 +5,7 @@
 
 use crate::engine::support;
 
-use cairn_engine::{Records, replay, upgrade};
+use cairn_engine::{Records, upgrade};
 use cairn_schema::{
     Conflict, ConflictResolution, Kept, LocalEdit, NodeField, ProposalDraft, Provenance,
     ReviewItem, VersionNumber, ViolationCode,
@@ -57,18 +57,12 @@ fn chosen(
     }
 }
 
-/// Proposes and applies the draft, panicking on a rejection; checks replay on the way (J3).
+/// Proposes and applies the draft, panicking on a rejection.
 fn applied(records: &Records, draft: &ProposalDraft) -> Records {
     let proposed = support::propose(records, "pr_upgrade", JOURNEY, draft);
     let result = support::apply_proposal(&proposed, "pr_upgrade")
         .unwrap_or_else(|rejection| panic!("{rejection:#?}"));
-    let after = result.records().clone();
-    assert_eq!(
-        replay(&proposed, result.events()),
-        after,
-        "J3: replay equals apply"
-    );
-    after
+    result.records().clone()
 }
 
 fn conflicts(draft: &ProposalDraft) -> Vec<&Conflict> {
