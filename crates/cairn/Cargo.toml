@@ -8,6 +8,13 @@ license.workspace = true
 repository.workspace = true
 publish.workspace = true
 
+# main.rs holds no tests (they live in the library and tests/), so skip building the binary a
+# second time as its own test harness.
+[[bin]]
+name = "cairn"
+path = "src/main.rs"
+test = false
+
 [features]
 # Reads the web build at startup from the folder CAIRN_WEB_DIR names, instead of embedding it
 # (src/assets.rs). The check ladder's builds turn it on; release, demo and image builds embed.

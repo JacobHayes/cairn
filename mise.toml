@@ -12,3 +12,9 @@ rust = { version = "1.99.0", profile = "minimal", components = "clippy,rustfmt",
 # source once at the same revision as the SDK git dependencies in Cargo.toml. Only
 # `mise run sim` uses it; the check ladder never does.
 "cargo:https://github.com/JacobHayes/patina" = { version = "rev:6a2977e7bce794d15eabaa18258a5542115bd872", crate = "cargo-patina", locked = true }
+
+[env]
+# A fixed build time for every build, local and CI. turso_core's build script embeds the wall
+# clock in its output unless this is set, so the crate and everything built on it missed the
+# build cache in every fresh target directory. The value is arbitrary (2026-01-01T00:00:00Z).
+SOURCE_DATE_EPOCH = "1767225600"
