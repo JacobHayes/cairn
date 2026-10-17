@@ -105,12 +105,12 @@ impl Domains {
         &self,
         entities: &BTreeSet<cairn_schema::EntityKey>,
     ) -> BTreeMap<JourneyId, Revision> {
-        let keys = crate::backend::with_aliases(entities, &self.deployment.aliases);
+        let keys = crate::backend::query::with_aliases(entities, &self.deployment.aliases);
         self.journeys
             .iter()
             .filter(|(id, _)| {
                 let graph = self.graph(&GraphId::Journey((*id).clone()));
-                !crate::backend::entity_references(&graph).is_disjoint(&keys)
+                !crate::backend::query::entity_references(&graph).is_disjoint(&keys)
             })
             .map(|(id, (_, revision))| (id.clone(), *revision))
             .collect()
@@ -119,8 +119,8 @@ impl Domains {
     /// J5: the nodes an event is about or wrote on, with the nodes whose edges a whole-node
     /// removal in it takes, read before the commit.
     pub fn event_nodes(&self, event: &cairn_schema::Event) -> BTreeSet<cairn_schema::NodeKey> {
-        let mut nodes = crate::backend::event_nodes(event);
-        for (graph, removed) in crate::backend::removed_nodes(event) {
+        let mut nodes = crate::backend::query::event_nodes(event);
+        for (graph, removed) in crate::backend::query::removed_nodes(event) {
             if let Some(content) = self.graphs.get(&graph) {
                 let requiring = content
                     .nodes

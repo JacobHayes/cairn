@@ -740,7 +740,7 @@ pub async fn writes_follow_the_reference_semantics<B: Backend>(backend: &B) {
 }
 
 fn backend_text(resource: &cairn_schema::Resource<cairn_schema::refs::KeyRefs>) -> String {
-    crate::backend::resource_text(resource)
+    crate::backend::query::resource_text(resource)
 }
 
 trait EstimateForTest {

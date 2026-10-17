@@ -41,7 +41,7 @@ impl State {
                     .as_ref()
                     .and_then(|lineage| self.latest_version(&lineage.route)),
             };
-            if backend::journey_listed(query, &summary, referencing.as_ref()) {
+            if backend::query::journey_listed(query, &summary, referencing.as_ref()) {
                 items.push(summary);
                 if items.len() > query.size.len() {
                     break;
@@ -53,7 +53,7 @@ impl State {
 
     pub(super) fn route_detail(&self, route: &RouteId) -> Option<RouteDetail> {
         let (header, revision) = self.domains.routes.get(route)?;
-        let mut uses = backend::insertion_uses(
+        let mut uses = backend::query::insertion_uses(
             route,
             |held| self.latest_version(held),
             |version| {
@@ -183,7 +183,7 @@ fn graph_hits(graph: &cairn_schema::Graph, needle: &str) -> BTreeSet<SearchHit> 
             hits.insert(SearchHit::NodeDescription(node.key.clone()));
         }
         for resource in &node.resources {
-            if text_matches(&backend::resource_text(resource), needle) {
+            if text_matches(&backend::query::resource_text(resource), needle) {
                 hits.insert(SearchHit::Resource {
                     node: node.key.clone(),
                     resource: resource.key.clone(),
@@ -192,7 +192,7 @@ fn graph_hits(graph: &cairn_schema::Graph, needle: &str) -> BTreeSet<SearchHit> 
         }
     }
     for annotation in graph.state.annotations.values() {
-        if text_matches(&backend::annotation_text(annotation), needle) {
+        if text_matches(&backend::query::annotation_text(annotation), needle) {
             hits.insert(SearchHit::Annotation(annotation.body.key.clone()));
         }
     }

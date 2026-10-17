@@ -248,8 +248,8 @@ async fn event_nodes(
 ) -> Result<Vec<std::collections::BTreeSet<cairn_schema::NodeKey>>, Abort> {
     let mut all = Vec::new();
     for event in &commit.change_set.events {
-        let mut nodes = backend::event_nodes(event);
-        for (graph, removed) in backend::removed_nodes(event) {
+        let mut nodes = backend::query::event_nodes(event);
+        for (graph, removed) in backend::query::removed_nodes(event) {
             let select = "SELECT node FROM edges WHERE graph_id = ?1 AND requires = ?2";
             let params = vec![text(&crate::sql::graph_id(&graph)), text(&removed)];
             for row in crate::sql::rows(connection, select, params).await? {

@@ -44,7 +44,7 @@ pub(crate) async fn journeys(
             created_at: row.timestamp(6)?,
             latest_version: row.opt_int(7)?.map(crate::sql::number).transpose()?,
         };
-        if backend::journey_listed(query, &summary, referencing.as_ref()) {
+        if backend::query::journey_listed(query, &summary, referencing.as_ref()) {
             items.push(summary);
             if items.len() > query.size.len() {
                 break;
@@ -69,7 +69,7 @@ pub(crate) async fn route_detail(
         graphs.push((id.clone(), crate::graph::load(connection, &id).await?));
     }
     let roots = version_roots(connection, route).await?;
-    let mut uses = backend::insertion_uses(
+    let mut uses = backend::query::insertion_uses(
         route,
         |held| latest.get(held).copied(),
         |version| roots.get(&version).cloned(),
@@ -169,7 +169,7 @@ pub(crate) async fn referencing(
         ),
     ];
     let mut found = BTreeMap::new();
-    for key in backend::with_aliases(entities, &aliases) {
+    for key in backend::query::with_aliases(entities, &aliases) {
         for (select, quoted) in selects {
             let param = if quoted {
                 format!("\"{key}\"")

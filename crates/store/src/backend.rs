@@ -1,20 +1,23 @@
 //! The commit rules every backend applies the same way, over schema values, so the memory
 //! and Turso backends cannot drift: the change set's shape, which receipts a stale
 //! revision's intervening events come from, and the checks only a commit can make on the
-//! records it produced.
+//! records it produced. The read side (what a graph refers to, which nodes an event is
+//! about, search text, index listing, insertion uses) is in [`query`].
 
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    ChangeSet, Deployment, Domain, EntityKey, EventType, Graph, GraphId, GraphRecord, InsertionKey,
-    JourneyId, JourneyState, Limit, Location, NodeKey, PatchReceipt, PatchTarget, ProposalId,
-    Record, RecordKey, Rejection, RetiredKey, RetiredKeys, Revision, RevisionConflict, RevisionOf,
-    RouteId, Slug, Subject, TouchedSet, VersionNumber, Violation, ViolationCode, Violations, Write,
-    limits::GRAPH_BYTES_MAX,
+    ChangeSet, Deployment, Domain, EntityKey, EventType, Graph, GraphId, GraphRecord, JourneyId,
+    JourneyState, Limit, Location, NodeKey, PatchReceipt, PatchTarget, ProposalId, Record,
+    RecordKey, Rejection, RetiredKey, RetiredKeys, Revision, RevisionConflict, RevisionOf, Slug,
+    Subject, TouchedSet, Violation, ViolationCode, Violations, Write, limits::GRAPH_BYTES_MAX,
 };
 
 use crate::commit::{Commit, CommitError, Committed, StoreError};
-use crate::query::InsertionUse;
+
+pub mod query;
+
+use query::entity_keys_in;
 
 /// What a commit's change set says about itself, checked before anything is read.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -296,14 +299,6 @@ pub fn stale(conflicts: Vec<RevisionConflict>, intervening: TouchedSet) -> Commi
     })
 }
 
-/// The rejection for a patch id committed before with other content (H5).
-#[must_use]
-pub fn patch_id_reused(receipt: &PatchReceipt) -> CommitError {
-    CommitError::Rejected(Rejection::PatchIdReused {
-        patch_id: receipt.patch_id.clone(),
-    })
-}
-
 /// H5: a committed patch id resubmitted: the same content is answered from its receipt,
 /// other content is rejected.
 ///
@@ -317,7 +312,9 @@ pub fn resubmission(
     if stored.content_hash == submitted.content_hash {
         Ok(Committed::AlreadyApplied(stored.clone()))
     } else {
-        Err(patch_id_reused(submitted))
+        Err(CommitError::Rejected(Rejection::PatchIdReused {
+            patch_id: submitted.patch_id.clone(),
+        }))
     }
 }
 
@@ -348,8 +345,7 @@ pub fn reject_violations(mut violations: Vec<Violation>) -> Result<(), CommitErr
 /// # Panics
 ///
 /// When `violations` is empty: a rejection lists what it rejects.
-#[must_use]
-pub fn rejection(violations: Vec<Violation>) -> CommitError {
+fn rejection(violations: Vec<Violation>) -> CommitError {
     assert!(!violations.is_empty(), "a rejection lists what it rejects");
     match Violations::new(violations) {
         Ok(violations) => CommitError::Rejected(Rejection::Invalid { violations }),
@@ -360,8 +356,7 @@ pub fn rejection(violations: Vec<Violation>) -> CommitError {
 }
 
 /// A violation about `subject`.
-#[must_use]
-pub fn violation(code: ViolationCode, subject: Subject, message: String) -> Violation {
+fn violation(code: ViolationCode, subject: Subject, message: String) -> Violation {
     Violation {
         code,
         at: Location {
@@ -390,8 +385,7 @@ pub fn deleted_journey(journey: &JourneyId) -> Violation {
 
 /// E6: entity creates whose key is already an entity or an alias, against the deployment
 /// as it was before the commit.
-#[must_use]
-pub fn taken_entity_keys(created: &BTreeSet<EntityKey>, before: &Deployment) -> Vec<Violation> {
+fn taken_entity_keys(created: &BTreeSet<EntityKey>, before: &Deployment) -> Vec<Violation> {
     created
         .iter()
         .filter(|key| before.entities.get(key).is_some() || before.aliases.contains_key(key))
@@ -436,11 +430,7 @@ pub fn entity_create_violations(
 /// riding in a journey patch takes no deployment revision (E6), so two patches validated
 /// against the same deployment can each fit and together not; the commit is where that shows.
 /// Checked before the commit's writes are applied, which could not hold the overflow.
-#[must_use]
-pub fn entity_count_violation(
-    created: &BTreeSet<EntityKey>,
-    before: &Deployment,
-) -> Option<Violation> {
+fn entity_count_violation(created: &BTreeSet<EntityKey>, before: &Deployment) -> Option<Violation> {
     let added = created
         .iter()
         .filter(|key| before.entities.get(key).is_none())
@@ -553,156 +543,13 @@ fn serialized_len<T: serde::Serialize>(value: &T) -> Result<usize, String> {
 }
 
 /// The subject a graph's violations name: its journey or route.
-#[must_use]
-pub fn graph_subject(graph: &GraphId) -> Subject {
+fn graph_subject(graph: &GraphId) -> Subject {
     match graph {
         GraphId::Journey(journey) => Subject::Journey(journey.clone()),
         GraphId::RouteDraft(route) | GraphId::RouteVersion { route, .. } => {
             Subject::Route(route.clone())
         }
     }
-}
-
-/// E6: the entities a journey's graph refers to, by the key it holds (an entity or an
-/// alias): answers, direct role fills, explicit participations, and condition values that
-/// name an entity key. A condition value is text the decision's answer type gives meaning,
-/// so any value shaped like an entity key counts: a superset only costs a merge an extra
-/// journey to check.
-#[must_use]
-pub fn entity_references(graph: &Graph) -> BTreeSet<EntityKey> {
-    use cairn_schema::{AnswerValue, ParticipationSource};
-    let mut keys = BTreeSet::new();
-    for answer in graph.state.answers.values() {
-        match answer {
-            AnswerValue::Entity(key) => {
-                keys.insert(key.clone());
-            }
-            AnswerValue::EntityList(set) => keys.extend(set.iter().cloned()),
-            _ => {}
-        }
-    }
-    for fill in graph.state.role_fills.values() {
-        keys.extend(fill.iter().cloned());
-    }
-    for node in graph.nodes.values() {
-        for source in node.participations.as_map().values() {
-            if let ParticipationSource::Entities(set) = source {
-                keys.extend(set.iter().cloned());
-            }
-        }
-        if let Some(condition) = &node.relevant_when
-            && let Ok(value) = serde_json::to_value(condition)
-        {
-            keys.extend(entity_keys_in(&value));
-        }
-    }
-    keys
-}
-
-/// Every string in a JSON value that parses as an entity key, walked with an explicit stack
-/// (PRACTICES, No recursion).
-#[must_use]
-pub fn entity_keys_in(value: &serde_json::Value) -> BTreeSet<EntityKey> {
-    let mut keys = BTreeSet::new();
-    let mut stack = vec![value];
-    while let Some(value) = stack.pop() {
-        match value {
-            serde_json::Value::String(text) => keys.extend(text.parse::<EntityKey>().ok()),
-            serde_json::Value::Array(items) => stack.extend(items),
-            serde_json::Value::Object(fields) => stack.extend(fields.values()),
-            _ => {}
-        }
-    }
-    keys
-}
-
-/// E6: the keys that name the same entities as `entities`: each one's entity (an alias
-/// resolves to the entity it was merged into), and every key naming one of those entities,
-/// itself or an alias of it.
-#[must_use]
-pub fn with_aliases(
-    entities: &BTreeSet<EntityKey>,
-    aliases: &BTreeMap<EntityKey, EntityKey>,
-) -> BTreeSet<EntityKey> {
-    let resolved: BTreeSet<EntityKey> = entities
-        .iter()
-        .map(|key| aliases.get(key).unwrap_or(key).clone())
-        .collect();
-    let mut keys = entities.clone();
-    keys.extend(resolved.iter().cloned());
-    for (alias, entity) in aliases {
-        if resolved.contains(entity) {
-            keys.insert(alias.clone());
-        }
-    }
-    keys
-}
-
-/// J5: the nodes an event is about or wrote on: its subject, the node every record it wrote
-/// hangs off, and both ends of an edge. The event filter by node reads it.
-#[must_use]
-pub fn event_nodes(event: &cairn_schema::Event) -> BTreeSet<NodeKey> {
-    let mut nodes = BTreeSet::new();
-    if let Subject::Node(node) = &event.subject {
-        nodes.insert(node.clone());
-    }
-    if let Subject::Edge(edge) = &event.subject {
-        nodes.insert(edge.node.clone());
-        nodes.insert(edge.requires.clone());
-    }
-    for key in event.touched().as_set() {
-        if let RecordKey::InGraph { key, .. } = key {
-            nodes.extend(key.node_scope().cloned());
-            if let cairn_schema::GraphKey::Edge(edge) = key {
-                nodes.insert(edge.requires.clone());
-            }
-        }
-    }
-    nodes
-}
-
-/// The whole nodes an event removes, by graph: a removed node takes the edges into it, so
-/// the nodes that required it are on the event too (J5, a node's history). The backend looks
-/// them up in the graph as it was before the commit.
-#[must_use]
-pub fn removed_nodes(event: &cairn_schema::Event) -> Vec<(GraphId, NodeKey)> {
-    event
-        .delta
-        .iter()
-        .filter_map(|write| match write {
-            Write::Remove(RecordKey::InGraph {
-                graph,
-                key: cairn_schema::GraphKey::Node(node),
-            }) => Some((graph.clone(), node.clone())),
-            _ => None,
-        })
-        .collect()
-}
-
-/// The text a resource is searched by: its title and its content as written.
-#[must_use]
-pub fn resource_text(resource: &cairn_schema::Resource<cairn_schema::refs::KeyRefs>) -> String {
-    written_text(resource)
-}
-
-/// The text a note or link is searched by: its title and its content as written.
-#[must_use]
-pub fn annotation_text(annotation: &cairn_schema::Annotation) -> String {
-    written_text(&annotation.body)
-}
-
-/// Every string field of a value's written form but its key and node, joined by line
-/// breaks so a match never spans two fields.
-fn written_text<T: serde::Serialize>(value: &T) -> String {
-    let Ok(serde_json::Value::Object(fields)) = serde_json::to_value(value) else {
-        return String::new();
-    };
-    fields
-        .iter()
-        .filter(|(name, _)| !matches!(name.as_str(), "key" | "node"))
-        .filter_map(|(_, value)| value.as_str())
-        .collect::<Vec<_>>()
-        .join("\n")
 }
 
 /// Every record of a graph, in an order a put can replay: content before state.
@@ -789,29 +636,6 @@ fn state_records(state: &JourneyState) -> Vec<GraphRecord> {
     records
 }
 
-/// C16: whether a journey belongs in the index `query` asks for. `referencing` is the
-/// journeys referring to the query's entities, when it names any.
-#[must_use]
-pub fn journey_listed(
-    query: &crate::query::JourneyQuery,
-    summary: &crate::query::JourneySummary,
-    referencing: Option<&BTreeMap<JourneyId, Revision>>,
-) -> bool {
-    let route = summary.lineage.as_ref().map(|lineage| &lineage.route);
-    let version = summary.lineage.as_ref().map(|lineage| lineage.version);
-    query.after.as_ref().is_none_or(|after| summary.id > *after)
-        && (query.statuses.is_empty() || query.statuses.contains(&summary.status))
-        && query
-            .route
-            .as_ref()
-            .is_none_or(|wanted| route == Some(wanted))
-        && query.version.is_none_or(|wanted| version == Some(wanted))
-        && referencing.is_none_or(|found| found.contains_key(&summary.id))
-        && query
-            .upgrade_available
-            .is_none_or(|wanted| summary.upgrade_available() == wanted)
-}
-
 /// A conversation is stored whole, so it is held to the serialized size cap a graph is.
 ///
 /// # Errors
@@ -838,74 +662,6 @@ pub fn no_such_user(user: &cairn_schema::UserId) -> StoreError {
     StoreError::Malformed(format!("user {user} does not exist"))
 }
 
-/// C19: the insertions of `segment`'s versions across `graphs`, each under the version it is on:
-/// journeys, route drafts, and each route's latest version, where an insertion a draft also
-/// holds is listed once, as the draft's. `latest` is a route's latest published version, and
-/// `root` the key of a version of `segment`'s one root. Cost: one pass over the insertions of
-/// the graphs given.
-#[must_use]
-pub fn insertion_uses<'g>(
-    segment: &RouteId,
-    latest: impl Fn(&RouteId) -> Option<VersionNumber>,
-    root: impl Fn(VersionNumber) -> Option<NodeKey>,
-    graphs: impl IntoIterator<Item = (&'g GraphId, &'g Graph)>,
-) -> BTreeMap<VersionNumber, Vec<InsertionUse>> {
-    let graphs: Vec<_> = graphs.into_iter().collect();
-    let drafted: BTreeSet<(&RouteId, &InsertionKey)> = graphs
-        .iter()
-        .filter_map(|(id, graph)| match id {
-            GraphId::RouteDraft(route) => Some((route, graph)),
-            _ => None,
-        })
-        .flat_map(|(route, graph)| graph.insertions.values().map(move |i| (route, &i.key)))
-        .collect();
-    let newest = latest(segment);
-    let mut found: BTreeMap<VersionNumber, Vec<InsertionUse>> = BTreeMap::new();
-    for (id, graph) in graphs {
-        let (host, current) = match id {
-            GraphId::Journey(journey) => (Domain::Journey(journey.clone()), true),
-            GraphId::RouteDraft(route) => (Domain::Route(route.clone()), true),
-            GraphId::RouteVersion { route, version } => (
-                Domain::Route(route.clone()),
-                latest(route) == Some(*version),
-            ),
-        };
-        for insertion in graph.insertions.values() {
-            let held_by_draft = matches!(id, GraphId::RouteVersion { route, .. }
-                if drafted.contains(&(route, &insertion.key)));
-            if insertion.segment.route != *segment || !current || held_by_draft {
-                continue;
-            }
-            // Members may move, so the root is the member copied from the version's root; once
-            // it is removed, the insertion is listed under what is left of it.
-            let version_root = root(insertion.segment.version);
-            let members = insertion.nodes.iter();
-            let copied = members
-                .clone()
-                .find(|(_, from)| Some(*from) == version_root.as_ref());
-            let root = copied
-                .or_else(|| members.clone().next())
-                .and_then(|(member, _)| graph.nodes.get(member));
-            let Some(root) = root else { continue };
-            found
-                .entry(insertion.segment.version)
-                .or_default()
-                .push(InsertionUse {
-                    host: host.clone(),
-                    graph: id.clone(),
-                    insertion: insertion.key.clone(),
-                    title: root.title.clone(),
-                    upgrade_available: newest
-                        .is_some_and(|newest| newest > insertion.segment.version),
-                });
-        }
-    }
-    for uses in found.values_mut() {
-        uses.sort_by(|a, b| (&a.graph, &a.insertion).cmp(&(&b.graph, &b.insertion)));
-    }
-    found
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -913,7 +669,7 @@ mod tests {
     use cairn_schema::{EventType, Record, Subject};
 
     #[test]
-    fn a_write_outside_the_domain_is_malformed_unless_it_creates_an_entity() {
+    fn a_write_outside_the_domain_is_malformed_and_so_is_an_entity_edit_riding_in() {
         let foreign = build::journey_patch("p_one", "j_one", 1)
             .event(
                 EventType::NodeAdded,
@@ -925,32 +681,6 @@ mod tests {
             )
             .commit();
         assert!(matches!(Shape::of(&foreign), Err(StoreError::Malformed(_))));
-
-        let riding = build::create_entity(
-            build::journey_patch("p_two", "j_one", 1),
-            build::entity("e_new", "New", &[]),
-        )
-        .commit();
-        let shape = Shape::of(&riding).unwrap();
-        assert!(shape.bumps_deployment);
-        assert_eq!(shape.created_entities, BTreeSet::from([id("e_new")]));
-
-        // A proposal applied to a journey may create entities its mutations carry (the
-        // fixtures' bake-off does), and they ride the same way.
-        let applied = build::journey_patch("p_four", "j_one", 1)
-            .event(
-                EventType::ProposalApplied,
-                Subject::Journey(id("j_one")),
-                vec![Write::Put(Record::Entity(build::entity(
-                    "e_proposed",
-                    "Proposed",
-                    &[],
-                )))],
-            )
-            .commit();
-        let shape = Shape::of(&applied).unwrap();
-        assert!(shape.bumps_deployment);
-        assert_eq!(shape.created_entities, BTreeSet::from([id("e_proposed")]));
 
         let edit_riding = build::journey_patch("p_three", "j_one", 1)
             .event(
@@ -1016,71 +746,5 @@ mod tests {
         let violations = graph_violations(&build::journey_graph("j_one"), &graph);
         let codes: Vec<_> = violations.iter().map(|violation| violation.code).collect();
         assert_eq!(codes, vec![ViolationCode::DuplicateSiblingId]);
-    }
-
-    #[test]
-    fn entity_references_reach_conditions_and_aliases_resolve_both_ways() {
-        let mut graph = Graph::default();
-        graph
-            .nodes
-            .put(build::node(serde_json::json!({
-                "key": "n_a", "id": "a", "kind": "action", "title": "A",
-                "relevant_when": {"equals": {"decision": "n_d", "value": "e_alice"}},
-                "participations": {"k_owner": ["e_bob"]},
-            })))
-            .unwrap();
-        assert_eq!(
-            entity_references(&graph),
-            BTreeSet::from([id("e_alice"), id("e_bob")])
-        );
-        let aliases = BTreeMap::from([(id("e_old"), id("e_alice"))]);
-        assert_eq!(
-            with_aliases(&BTreeSet::from([id("e_alice")]), &aliases),
-            BTreeSet::from([id("e_alice"), id("e_old")])
-        );
-        assert_eq!(
-            with_aliases(&BTreeSet::from([id("e_old")]), &aliases),
-            BTreeSet::from([id("e_alice"), id("e_old")])
-        );
-        let two = BTreeMap::from([(id("e_old1"), id("e_alice")), (id("e_old2"), id("e_alice"))]);
-        assert_eq!(
-            with_aliases(&BTreeSet::from([id("e_old1")]), &two),
-            BTreeSet::from([id("e_alice"), id("e_old1"), id("e_old2")])
-        );
-    }
-
-    #[test]
-    fn an_event_is_about_its_subject_and_the_nodes_it_wrote_on() {
-        let graph = build::journey_graph("j_one");
-        let commit = build::journey_patch("p_one", "j_one", 1)
-            .event(
-                EventType::EdgeChanged,
-                Subject::Edge(cairn_schema::Edge {
-                    node: id("n_b"),
-                    requires: id("n_a"),
-                }),
-                vec![build::put_in(
-                    &graph,
-                    cairn_schema::GraphRecord::Edge(cairn_schema::Edge {
-                        node: id("n_b"),
-                        requires: id("n_a"),
-                    }),
-                )],
-            )
-            .event(
-                EventType::AnnotationAdded,
-                Subject::Attachment(id("a_note")),
-                vec![build::put_in(
-                    &graph,
-                    cairn_schema::GraphRecord::Annotation(build::note("a_note", Some("n_c"), "x")),
-                )],
-            )
-            .commit();
-        let events = &commit.change_set.events;
-        assert_eq!(
-            event_nodes(&events[0]),
-            BTreeSet::from([id("n_a"), id("n_b")])
-        );
-        assert_eq!(event_nodes(&events[1]), BTreeSet::from([id("n_c")]));
     }
 }
