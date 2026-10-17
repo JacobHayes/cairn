@@ -1,0 +1,9 @@
+#!/usr/bin/env bash
+#MISE description="Install the npm workspace's packages (npm ci) into node_modules/, skipped while they are newer than the lockfile and the package.json files"
+#MISE sources=["package.json", "package-lock.json", "web/*/package.json"]
+#MISE outputs=["node_modules/.package-lock.json"]
+# The build tasks depend on this, so a fresh clone or a changed lockfile installs before
+# anything calls a tool from node_modules/.bin.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+npm ci

@@ -72,8 +72,9 @@ You need [mise](https://mise.jdx.dev), which installs the rest. From a clone:
 
 ```sh
 mise install   # the pinned Rust, Node, and build tools
-npm ci         # the web app's packages
 ```
+
+The build tasks install the web app's packages (`npm ci`) themselves when the lockfile changes.
 
 **The demo.** No setup and no account: Cairn starts with a few sample journeys (a vendor
 evaluation, a hiring loop, a product launch), signed in as a development user. Nothing is
