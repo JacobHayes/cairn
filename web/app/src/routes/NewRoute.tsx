@@ -11,11 +11,10 @@ import { useDraft, writeDraft } from "../data/drafts.ts";
 import { TITLE_BYTES_MAX, overBytes } from "../authoring/limits.ts";
 import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { Refused } from "../screens/Refused.tsx";
-import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
-import { ROUTES_INDEX_PATH } from "./address.ts";
+import { ROUTES_INDEX_PATH, routeCanvasPath } from "./address.ts";
 import { ImportFile } from "./ImportFile.tsx";
 import { openDraft } from "./model.ts";
 

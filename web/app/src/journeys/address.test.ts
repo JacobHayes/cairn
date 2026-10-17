@@ -135,10 +135,17 @@ describe("opening and closing a node keeps the view", () => {
     expect(nodeOpened(pathname, search, key)).toBe(expected);
   });
 
-  it("takes a node off a route's draft or a proposal and adds one", () => {
+  it("takes a node off a route's draft or a proposal under any destination and adds one", () => {
     expect(nodeOpened("/routes/r/draft", "?edit=on", "n_x")).toBe("/routes/r/draft/nodes/n_x?edit=on");
     expect(nodeOpened("/routes/r/draft/nodes/n_x", "", undefined)).toBe("/routes/r/draft");
-    expect(nodeOpened("/proposals/p_1/nodes/n_x", "", "n_y")).toBe("/proposals/p_1/nodes/n_y");
+    expect(nodeOpened("/journeys/j_a/proposals/p_1/nodes/n_x", "", "n_y")).toBe("/journeys/j_a/proposals/p_1/nodes/n_y");
+    expect(nodeOpened("/routes/r/proposals/p_1", "?view=list", "n_y")).toBe("/routes/r/proposals/p_1/nodes/n_y?view=list");
+    expect(nodeOpened("/entities/proposals/p_1/nodes/n_x", "", undefined)).toBe("/entities/proposals/p_1");
+  });
+
+  it("opens a node from a journey's open proposals on the journey, and has none to close there", () => {
+    expect(nodeOpened("/journeys/j_a/proposals", "", "n_x")).toBe("/journeys/j_a/nodes/n_x");
+    expect(nodeOpened("/journeys/j_a/proposals", "", undefined)).toBe("/journeys/j_a/proposals");
   });
 });
 

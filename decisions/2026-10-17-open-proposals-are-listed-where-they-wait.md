@@ -1,0 +1,16 @@
+# Open proposals are listed where they wait
+
+Question (from the same unit): which open proposals does each place list, in what order, and how does a person who did not draft one find it?
+
+Call:
+
+- Order and count: open proposals only, newest first by creation time then id, a cursor carrying both so it survives the proposal it names closing, and a count from the same read. Applied and discarded proposals are history and are not listed; their addresses still read.
+- A journey's and a route's open proposals are a third tab, Proposals, in the inspector column beside Inspector and Assistant. They are not a page: the column is already where the thing's secondary state lives, it works on the phone sheet like the other tabs, and the destination's own page stays in view. The tab is there while any proposal is open, its count in mono beside its name and on the folded rail as well; with none open there is no tab and no column held open for one, and the `/proposals` address (reached from the `⋯` entry, which is always there) still shows the tab with its empty sentence. `/journeys/<id>/proposals` and `/routes/<id>/proposals` open the destination's default view with the tab in view, which is where the `⋯` "Open proposals" entry (always there, count beside it) and the review head's "<Destination> > Open proposals" go.
+- Entities has no inspector column, so the deployment's open proposals are a panel on the Entities page.
+- A proposal whose destination does not exist yet has no page to list it on: the Journeys and Routes indexes carry a "Proposed" panel, present only while one is open, so someone other than its author finds it there.
+- Home lists the proposals waiting on the viewer: those they created, and those an agent drafted for an active journey that refers to one of their entities, directly or through an alias (the reference set Home already reads its journeys from); not another user's hand-made proposal, and not an agent draft on a completed journey. A user matched to no entity gets their own only. The panel has its own read state: Home does not say nothing needs the viewer before it is read, or while it holds any, and a failed refresh keeps the rows.
+- A row says what the proposal is, who proposed it, and, when the destination moved since it was drafted, "Needs a refresh" (a create whose destination now exists counts as moved).
+
+Alternatives: a Proposals page per destination (the first plan; a second place to navigate to for what is a handful of rows, and a header link that has to hide on the phone); listing every proposal on Home (it would bury what is the viewer's); counting closed proposals (not what waits).
+
+What would change it: a destination where the open list grows past a page of rows people can scan (the lists read every page, since open proposals per destination are few), which would need paging in the tab.

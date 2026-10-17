@@ -21,8 +21,8 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_mcp::{ToolError, ToolSet};
 use cairn_schema::{
-    Actor, ChangeClass, Consequences, Graph, JourneyId, NodeKey, Patch, PatchReceipt, PatchTarget,
-    ProposalId, Revision, Title,
+    Actor, ChangeClass, Consequences, Domain, Graph, JourneyId, NodeKey, Patch, PatchReceipt,
+    PatchTarget, ProposalId, Revision, Title,
 };
 use cairn_service::DomainPatch;
 use cairn_store::{Document, LoadTarget, Store};
@@ -121,6 +121,8 @@ pub enum Action {
         tool: String,
         /// The proposal.
         proposal: ProposalId,
+        /// Its destination, under which it is addressed (I6).
+        destination: Domain,
         /// Why it is a proposal.
         because: Because,
     },
@@ -318,7 +320,7 @@ pub async fn run<S: Store + 'static>(
             let proposal = arguments.get("proposal").cloned();
             let discards = arguments.get("change").and_then(Value::as_str) == Some("discard");
             let answer = tools.call(actor, name, arguments).await;
-            let action = answer.as_ref().ok().and_then(|_| {
+            let action = answer.as_ref().ok().and_then(|output| {
                 let proposal = serde_json::from_value(proposal?).ok()?;
                 let tool = name.to_owned();
                 Some(if discards {
@@ -327,6 +329,7 @@ pub async fn run<S: Store + 'static>(
                     Action::Proposed {
                         tool,
                         proposal,
+                        destination: destination_of(output)?,
                         because: Because::Asked,
                     }
                 })
@@ -380,6 +383,7 @@ async fn propose<S: Store + 'static>(
                 action: Some(Action::Proposed {
                     tool: name.to_owned(),
                     proposal,
+                    destination: patch.target.domain(),
                     because,
                 }),
             }
@@ -389,6 +393,17 @@ async fn propose<S: Store + 'static>(
             action: None,
         },
     }
+}
+
+/// The destination a proposal tool's answer is about: the proposal's, or, when the answer
+/// is only a receipt (a write answered from an earlier one), the receipt's domain, which is
+/// the proposal's destination.
+fn destination_of(output: &Value) -> Option<Domain> {
+    let proposal = output
+        .get("proposal")
+        .and_then(|held| held.get("destination"));
+    let receipt = output.get("receipt").and_then(|held| held.get("domain"));
+    serde_json::from_value(proposal.or(receipt)?.clone()).ok()
 }
 
 /// The proposal id a write drafted as a proposal is filed under: `pr_` and a digest of its

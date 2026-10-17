@@ -9,7 +9,7 @@ use cairn_schema::{
     RouteId, Subject, VersionNumber, Write,
 };
 
-use crate::query::InsertionUse;
+use crate::query::{InsertionUse, ProposalPage, ProposalQuery, ProposalScope, ProposalSummary};
 
 /// E6: the entities a journey's graph refers to, by the key it holds (an entity or an
 /// alias): answers, direct role fills, explicit participations, and condition values that
@@ -242,6 +242,74 @@ pub fn insertion_uses<'g>(
         uses.sort_by(|a, b| (&a.graph, &a.insertion).cmp(&(&b.graph, &b.insertion)));
     }
     found
+}
+
+/// C14, C16: whether an open proposal belongs in a listing's scope. `waiting` is the journeys
+/// referring to the scope's entities, when the scope is the viewer's waiting list.
+#[must_use]
+pub fn proposal_listed(
+    scope: &ProposalScope,
+    summary: &ProposalSummary,
+    waiting: Option<&BTreeSet<JourneyId>>,
+) -> bool {
+    match scope {
+        ProposalScope::Destination(destination) => summary.destination == *destination,
+        ProposalScope::CreatingJourneys => {
+            matches!(summary.destination, Domain::Journey(_)) && !summary.now.exists
+        }
+        ProposalScope::CreatingRoutes => {
+            matches!(summary.destination, Domain::Route(_)) && !summary.now.exists
+        }
+        ProposalScope::Waiting { user, .. } => {
+            summary.created_by == *user
+                || match (&summary.destination, waiting) {
+                    (Domain::Journey(journey), Some(found)) => {
+                        summary.proposing_agent.is_some()
+                            && summary.now.exists
+                            && summary.now.status == Some(cairn_schema::JourneyStatus::Active)
+                            && found.contains(journey)
+                    }
+                    _ => false,
+                }
+        }
+    }
+}
+
+/// C14: the page of a listing, from every open proposal `candidates` the backend read: the
+/// scope's members, newest first by creation time then id, after the cursor, with the
+/// scope's whole count. Every backend builds its page here, so they order and cut alike.
+#[must_use]
+pub fn proposal_page(
+    query: &ProposalQuery,
+    candidates: Vec<ProposalSummary>,
+    waiting: Option<&BTreeSet<JourneyId>>,
+    destination: Option<crate::query::DestinationNow>,
+) -> ProposalPage {
+    let mut listed: Vec<_> = candidates
+        .into_iter()
+        .filter(|summary| proposal_listed(&query.scope, summary, waiting))
+        .collect();
+    listed.sort_by(|left, right| (right.created_at, &right.id).cmp(&(left.created_at, &left.id)));
+    let count = u32::try_from(listed.len()).unwrap_or(u32::MAX);
+    if let Some(after) = &query.after {
+        listed.retain(|summary| (summary.created_at, &summary.id) < (after.created_at, &after.id));
+    }
+    let more = listed.len() > query.size.len();
+    listed.truncate(query.size.len());
+    let next = if more {
+        listed.last().map(|last| crate::query::ProposalCursor {
+            created_at: last.created_at,
+            id: last.id.clone(),
+        })
+    } else {
+        None
+    };
+    ProposalPage {
+        count,
+        destination,
+        items: listed,
+        next,
+    }
 }
 
 #[cfg(test)]

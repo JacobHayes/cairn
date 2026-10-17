@@ -4,13 +4,15 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AttachmentKey, Consequences, Cursor, JourneyId, JourneyStatus, KeyRefs, Lineage, Node, NodeKey,
-    Notice, ParticipationKind, PatchEvents, Proposal, ProposalId, ProposalPreview, Revision,
-    RevisionConflict, Role, RoleKey, RouteHeader, RouteId, RouteKind, Title, TouchedSet,
-    UnresolvedItem, VersionNumber, Violation, to_yaml,
+    AgentId, AttachmentKey, Consequences, Cursor, Domain, JourneyId, JourneyStatus, KeyRefs,
+    Lineage, Node, NodeKey, Notice, ParticipationKind, PatchEvents, Proposal, ProposalId,
+    ProposalPreview, Revision, RevisionConflict, Role, RoleKey, RouteHeader, RouteId, RouteKind,
+    Timestamp, Title, TouchedSet, UnresolvedItem, UserId, VersionNumber, Violation, to_yaml,
 };
 use cairn_service::{Call, ProposalReview, StaleBase};
-use cairn_store::{JourneyQuery, PageSize, SearchHit, SearchQuery, Store};
+use cairn_store::{
+    JourneyQuery, PageSize, ProposalCursor, ProposalScope, SearchHit, SearchQuery, Store,
+};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -61,6 +63,19 @@ pub(crate) const SPECS: &[Spec] = &[
         output: schema::<ExportOutput>,
     },
     Spec {
+        name: "list_proposals",
+        description: "The open proposals of a scope, newest first, a page at a time, with how \
+            many there are in all: the ones under one destination (a journey, a route, or the \
+            deployment), the ones waiting on the caller (created by them, or drafted for an \
+            active journey that refers to them), or the ones that would create a journey or a \
+            route. Use it to find a proposal again whose id you lost; then fetch it with \
+            `get_proposal`.",
+        writes: false,
+        destructive: false,
+        schema: schema::<ListProposals>,
+        output: schema::<ProposalsOutput>,
+    },
+    Spec {
         name: "get_proposal",
         description: "A proposal by id: its destination, editing revision, status, and \
             content. With `review`, also what applying it now would do: unresolved items, \
@@ -106,6 +121,7 @@ impl<S: Store + 'static> ToolSet<S> {
             "list_routes" => output(self.list_routes(parse(arguments)?).await),
             "get_route" => output(self.get_route(parse(arguments)?).await),
             "export_route" => output(self.export_route(parse(arguments)?).await),
+            "list_proposals" => output(self.list_proposals(call, parse(arguments)?).await),
             "get_proposal" => output(self.get_proposal(call, parse(arguments)?).await),
             "search" => output(self.search(parse(arguments)?).await),
             "get_history" => output(self.get_history(parse(arguments)?).await),
@@ -272,6 +288,71 @@ struct ExportOutput {
     route: RouteId,
     /// The route file, in YAML.
     file: String,
+}
+
+/// Which open proposals `list_proposals` lists.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub(crate) enum ProposalsScope {
+    /// The ones under `destination`.
+    Destination,
+    /// The ones waiting on the caller.
+    Waiting,
+    /// The ones that would create a journey.
+    NewJourneys,
+    /// The ones that would create a route.
+    NewRoutes,
+}
+
+/// `list_proposals`.
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ListProposals {
+    /// Which proposals.
+    scope: ProposalsScope,
+    /// The destination, for the `destination` scope: `{"journey": id}`, `{"route": id}`, or
+    /// `"deployment"`.
+    #[serde(default)]
+    destination: Option<Domain>,
+    /// The page starts after this proposal: the `next` of the page before.
+    #[serde(default)]
+    after: Option<ProposalAfter>,
+}
+
+/// Where a proposal page resumes.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub(crate) struct ProposalAfter {
+    created_at: Timestamp,
+    id: ProposalId,
+}
+
+/// A page of open proposals.
+#[derive(Debug, Serialize, JsonSchema)]
+struct ProposalsOutput {
+    /// How many open proposals the scope holds in all.
+    count: u32,
+    proposals: Vec<ProposalListed>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    next: Option<ProposalAfter>,
+}
+
+/// An open proposal in a listing.
+#[derive(Debug, Serialize, JsonSchema)]
+struct ProposalListed {
+    id: ProposalId,
+    destination: Domain,
+    title: Title,
+    /// Its editing revision.
+    revision: Revision,
+    created_by: UserId,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    proposing_agent: Option<AgentId>,
+    created_at: Timestamp,
+    /// Whether its destination exists yet; a proposal can create it.
+    destination_exists: bool,
+    /// Whether its destination moved since it was drafted: refresh it before applying.
+    stale: bool,
 }
 
 /// `get_proposal`.
@@ -555,6 +636,63 @@ impl<S: Store + 'static> ToolSet<S> {
         Ok(ExportOutput { route, file })
     }
 
+    async fn list_proposals(
+        &self,
+        call: &Call,
+        arguments: ListProposals,
+    ) -> Result<ProposalsOutput, ToolError> {
+        let after = arguments.after.map(|after| ProposalCursor {
+            created_at: after.created_at,
+            id: after.id,
+        });
+        let size = PageSize::MAX;
+        let page = match (arguments.scope, arguments.destination) {
+            (ProposalsScope::Destination, Some(destination)) => {
+                let scope = ProposalScope::Destination(destination);
+                self.service.proposals(scope, after, size).await?
+            }
+            (ProposalsScope::Destination, None) => {
+                return Err(ToolError::Arguments {
+                    path: "destination".to_owned(),
+                    message: "the destination scope needs a destination".to_owned(),
+                });
+            }
+            (ProposalsScope::Waiting, _) => {
+                self.service.proposals_waiting(call, after, size).await?
+            }
+            (ProposalsScope::NewJourneys, _) => {
+                let scope = ProposalScope::CreatingJourneys;
+                self.service.proposals(scope, after, size).await?
+            }
+            (ProposalsScope::NewRoutes, _) => {
+                let scope = ProposalScope::CreatingRoutes;
+                self.service.proposals(scope, after, size).await?
+            }
+        };
+        Ok(ProposalsOutput {
+            count: page.count,
+            proposals: page
+                .items
+                .into_iter()
+                .map(|summary| ProposalListed {
+                    stale: summary.now.exists && summary.now.revision != summary.drafted_against,
+                    destination_exists: summary.now.exists,
+                    id: summary.id,
+                    destination: summary.destination,
+                    title: summary.title,
+                    revision: summary.revision,
+                    created_by: summary.created_by,
+                    proposing_agent: summary.proposing_agent,
+                    created_at: summary.created_at,
+                })
+                .collect(),
+            next: page.next.map(|next| ProposalAfter {
+                created_at: next.created_at,
+                id: next.id,
+            }),
+        })
+    }
+
     async fn get_proposal(
         &self,
         call: &Call,
@@ -562,7 +700,16 @@ impl<S: Store + 'static> ToolSet<S> {
     ) -> Result<ProposalOutput, ToolError> {
         let id = &arguments.proposal;
         if arguments.review {
-            let review = self.service.preview_proposal(call, id).await?;
+            let destination = self
+                .service
+                .proposal(id)
+                .await?
+                .ok_or_else(|| ToolError::not_found(format_args!("proposal {id}")))?
+                .destination;
+            let review = self
+                .service
+                .preview_proposal(call, &destination, id)
+                .await?;
             return Ok(ProposalOutput {
                 proposal: review.proposal.clone(),
                 review: Some(review.into()),

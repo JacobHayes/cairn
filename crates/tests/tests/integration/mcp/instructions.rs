@@ -82,9 +82,10 @@ fn every_i2_capability_has_a_tool() {
         ("assign participations", &["assign"]),
         ("apply a patch", &["apply_patch"]),
         (
-            "draft/get/edit proposals",
+            "draft, list, get and edit proposals",
             &[
                 "create_proposal",
+                "list_proposals",
                 "get_proposal",
                 "edit_proposal",
                 "apply_proposal",

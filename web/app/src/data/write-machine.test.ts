@@ -300,7 +300,7 @@ describe("shutdown", () => {
 
 const applyCommand: Command = {
   kind: "proposal",
-  call: { op: "apply", proposal: "pr_one", request: { patch_id: "p_one", reviewed_revision: 4 } },
+  call: { op: "apply", destination: { journey: "j_one" }, proposal: "pr_one", request: { patch_id: "p_one", reviewed_revision: 4 } },
 };
 const createCommand: Command = {
   kind: "proposal",

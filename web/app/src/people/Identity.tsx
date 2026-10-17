@@ -5,6 +5,7 @@
 // identity to you (ARCHITECTURE, Auth: users and identities); it comes back here.
 import { Link } from "react-router";
 
+import { pathTo } from "../address.ts";
 import type { Capabilities, Viewer } from "../data/host.ts";
 import { useCapabilities, useDeployment, useSession, useViewer } from "../data/react.ts";
 import { Segmented } from "../ui/kit.tsx";
@@ -13,7 +14,7 @@ import { byName, offeredMerge } from "./model.ts";
 
 /** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
 export function signInHref(name: string): string {
-  return `/api/auth/${name}/sign-in?return_to=${encodeURIComponent("/me")}`;
+  return `/api/auth/${name}/sign-in?return_to=${encodeURIComponent(pathTo("me"))}`;
 }
 
 /** The providers a browser signs in with by being sent to them: OIDC on the server. */
@@ -66,7 +67,7 @@ function YourEntities({ viewer }: { viewer: Viewer }) {
       {merge === undefined ? null : (
         <div className="callout stack" data-testid="merge-offer">
           <span>Your verified emails name {entities.length} entities: they are one person. "Mine" already covers them all; merging makes them one.</span>
-          <Link to={`/entities?merge=${merge.survivor},${merge.merged}`}>Merge them</Link>
+          <Link to={`${pathTo("entities")}?merge=${merge.survivor},${merge.merged}`}>Merge them</Link>
         </div>
       )}
     </section>

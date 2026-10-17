@@ -41,8 +41,9 @@ pub use local::{
     apply_route, apply_route_locally, preview, preview_locally, touched, touched_overlaps,
 };
 pub use proposals::{
-    ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalReview, ProposalStep,
-    RelinkRequest, SaveAsRouteRequest, StaleBase, UpgradeRequest,
+    ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalListRequest,
+    ProposalListScope, ProposalReview, ProposalStep, RelinkRequest, SaveAsRouteRequest, StaleBase,
+    UpgradeRequest,
 };
 pub use reads::{
     JourneyIndexQuery, LinkedIdentity, RouteDetail, RouteImport, RoutePage, RouteSummary,

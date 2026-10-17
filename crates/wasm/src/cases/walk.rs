@@ -426,7 +426,7 @@ fn previews(
             let proposal = served(now_or_never(service.proposal(&proposal_id)), "proposal")
                 .unwrap_or_else(|| panic!("{proposal_id}"));
             let review = served(
-                now_or_never(service.preview_proposal(&reader(), &proposal_id)),
+                now_or_never(service.preview_proposal(&reader(), &destination, &proposal_id)),
                 "preview",
             );
             let request = PreviewRequest {

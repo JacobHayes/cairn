@@ -2,17 +2,18 @@
 // (`/nodes/<key>`) or an edge (`/edges/<from>~<to>`), all one page; the view is its `view=`
 // query, defaulting by what the path names. Anything else lands on the shell's "no such page".
 import { useMemo } from "react";
-import { Link, useLocation, useParams } from "react-router";
+import { Link, useLocation } from "react-router";
 
 import { indexPath, screenOf } from "../journeys/address.ts";
+import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { JourneyFrame } from "./JourneyFrame.tsx";
 
-/** `/journeys/<id>[/nodes/<key>|/edges/<from>~<to>]?view=...`. */
+/** A journey's page: its address, a node in it or an edge (address.ts), `?view=...`. */
 export function JourneyPage() {
-  const { id = "", key, edge } = useParams();
+  const target = useJourneyTarget();
   const { search } = useLocation();
-  const screen = useMemo(() => screenOf({ journey: id, node: key, edge }, new URLSearchParams(search)), [id, key, edge, search]);
-  return <JourneyFrame key={id} id={id} screen={screen} selected={key} edge={edge} />;
+  const screen = useMemo(() => screenOf(target, new URLSearchParams(search)), [target, search]);
+  return <JourneyFrame key={target.journey} id={target.journey} screen={screen} selected={target.node} edge={target.edge} />;
 }
 
 /** An address that is none of the app's: the shell's "no such page". */

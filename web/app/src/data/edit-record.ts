@@ -8,10 +8,11 @@ import type { HttpFailure, Schema } from "@cairn/client";
 
 import type { Markdown, Patch, RouteImport } from "./host.ts";
 import type { Domain, ProposalAnswer } from "./proposals.ts";
+import type { ProposalAsk } from "../proposals/write.ts";
 import type { Rejection } from "./writes.ts";
 
 /** The record schema version; the only one `readRecord` accepts. */
-export const EDIT_RECORD_VERSION = 2;
+export const EDIT_RECORD_VERSION = 3;
 
 /** What names one edit's delivery: its patch id (H5), the same on every resend. */
 export type OperationId = string;
@@ -30,10 +31,10 @@ export interface PatchCommand {
  */
 export type ProposalCall =
   | { op: "create"; destination: Domain; request: Schema<"ProposalCreate"> }
-  | { op: "edit"; proposal: string; request: Schema<"ProposalEdit"> }
-  | { op: "discard"; proposal: string; request: Schema<"ProposalStep"> }
-  | { op: "refresh"; proposal: string; request: Schema<"ProposalStep"> }
-  | { op: "apply"; proposal: string; request: Schema<"ProposalApply"> }
+  | { op: "edit"; destination: Domain; proposal: string; request: Schema<"ProposalEdit"> }
+  | { op: "discard"; destination: Domain; proposal: string; request: Schema<"ProposalStep"> }
+  | { op: "refresh"; destination: Domain; proposal: string; request: Schema<"ProposalStep"> }
+  | { op: "apply"; destination: Domain; proposal: string; request: Schema<"ProposalApply"> }
   | { op: "upgrade"; journey: string; request: Schema<"UpgradeRequest"> }
   | { op: "save_as_route"; journey: string; request: Schema<"SaveAsRouteRequest"> }
   | { op: "relink"; journey: string; request: Schema<"RelinkRequest"> };
@@ -82,6 +83,19 @@ export function proposalIdOf(call: ProposalCall): string {
     case "refresh":
     case "apply":
       return call.proposal;
+  }
+}
+
+/** The destination a proposal call is about: the one named, the journey it upgrades or re-links, or the route it saves a journey as. */
+export function destinationOf(call: ProposalCall | ProposalAsk): Domain {
+  switch (call.op) {
+    case "upgrade":
+    case "relink":
+      return { journey: call.journey };
+    case "save_as_route":
+      return { route: call.request.route };
+    default:
+      return call.destination;
   }
 }
 
@@ -182,7 +196,11 @@ function readCall(value: unknown, id: string): boolean {
     return false;
   }
   const subject = CALL_SUBJECT[value.op as ProposalCall["op"]];
-  return subject === "destination" ? isPlain(value.destination) || value.destination === "deployment" : isText(value[subject]);
+  const named = isPlain(value.destination) || value.destination === "deployment";
+  if (subject === "destination") {
+    return named;
+  }
+  return subject === "proposal" ? named && isText(value.proposal) : isText(value.journey);
 }
 
 function readPatchCommand(value: Plain, id: string): boolean {

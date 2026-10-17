@@ -7,7 +7,11 @@ import { useLocation } from "react-router";
 
 import type { Deployment } from "../data/host.ts";
 import { useDraft } from "../data/drafts.ts";
-import { useDeployment, useViewer } from "../data/react.ts";
+import { valueOf } from "../data/keyed-read.ts";
+import { useDeployment, useLive, useViewer } from "../data/react.ts";
+import { RowsPanel } from "../acting/RowsPanel.tsx";
+import { proposalRows } from "../proposals/ProposalRows.tsx";
+import { listKey, proposalsUnder } from "../proposals/read.ts";
 import type { Rejection } from "../data/writes.ts";
 import { Refused } from "../screens/Refused.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
@@ -107,6 +111,23 @@ function CreateEntity({ deployment }: { deployment: Deployment }) {
   );
 }
 
+/** C14: the open proposals for the deployment (an entity edited or merged by an agent), above the entities; nothing when none is waiting. */
+function DeploymentProposals() {
+  const { view, refresh } = useLive(listKey("deployment"), proposalsUnder("deployment"));
+  const found = valueOf(view);
+  if (view.status === "failed") {
+    return (
+      <p className="callout callout-bad" role="alert" data-testid="proposals-failed">
+        The open proposals could not be read: {view.error.message} <Button onClick={refresh}>Try again</Button>
+      </p>
+    );
+  }
+  if (found === undefined) {
+    return <p className="muted small" data-testid="proposals-reading">Reading the open proposals...</p>;
+  }
+  return found.items.length === 0 ? null : <RowsPanel title="Open proposals" testId="deployment-proposals" rows={proposalRows(found.items)} />;
+}
+
 export function Entities() {
   const deployment = useDeployment();
   const { viewer } = useViewer();
@@ -118,9 +139,10 @@ export function Entities() {
   const yours = new Set(viewer?.entities ?? []);
   const entities = byName(deployment.entities ?? []);
   return (
-    <section className="stack" aria-label="Entities" data-testid="entities" data-revision={deployment.revision}>
+    <section className="stack" aria-label="Entities" data-testid="entities" data-revision={deployment.revision} data-rows-page tabIndex={-1}>
       <h1>Entities</h1>
       <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an entity holding your verified email is you.</span>
+      <DeploymentProposals />
       <CreateEntity deployment={deployment} />
       <MergeEntities key={asked.join(",")} deployment={deployment} entities={entities} asked={asked} />
       {entities.length === 0 ? <p className="muted small" data-testid="entities-empty">No entities yet.</p> : null}

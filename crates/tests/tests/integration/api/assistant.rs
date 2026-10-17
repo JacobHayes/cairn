@@ -24,7 +24,7 @@ mod in_process {
     use serde_json::{Value, json};
     use tower::ServiceExt;
 
-    use cairn_schema::{Mutation, NodeKey};
+    use cairn_schema::{Domain, Mutation, NodeKey};
 
     use cairn_api::client::Transport;
 
@@ -313,16 +313,29 @@ mod in_process {
             decisions, four deliverables, and a decision milestone. Set it up." });
         let reply = post(ann, "/api/journeys/j_bakeoff/assistant", &said).await;
         let turn: TurnReply = ok(&reply);
-        let [Action::Proposed { proposal, .. }] = turn.actions.as_slice() else {
+        let [
+            Action::Proposed {
+                proposal,
+                destination,
+                ..
+            },
+        ] = turn.actions.as_slice()
+        else {
             panic!("{:?}", turn.actions);
         };
+        assert_eq!(*destination, Domain::Journey("j_bakeoff".parse().unwrap()));
         assert_eq!(
             world.revision("j_bakeoff").await,
             1,
             "drafting moves nothing"
         );
         let apply = json!({ "patch_id": "p_apply_bakeoff", "reviewed_revision": 1 });
-        let applied = post(ann, &format!("/api/proposals/{proposal}/apply"), &apply).await;
+        let applied = post(
+            ann,
+            &format!("/api/journeys/j_bakeoff/proposals/{proposal}/apply"),
+            &apply,
+        )
+        .await;
         ok::<Value>(&applied);
         assert_eq!(world.revision("j_bakeoff").await, 2);
         let events: Value = get(ann, "/api/events?patch=p_apply_bakeoff&size=1").await;

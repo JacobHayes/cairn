@@ -14,8 +14,9 @@ pub use assistant::{
 };
 pub use projections::{ChildEntry, History, Mine, NodeDetail, Projected};
 pub use proposals::{
-    ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalReview, ProposalStep,
-    RelinkRequest, RouteImport, SaveAsRouteRequest, StaleBase, UpgradeRequest,
+    DestinationKind, DestinationNow, ProposalAnswer, ProposalApply, ProposalCreate, ProposalCursor,
+    ProposalEdit, ProposalList, ProposalReview, ProposalStep, ProposalSummary, RelinkRequest,
+    RouteImport, SaveAsRouteRequest, StaleBase, UpgradeRequest,
 };
 pub use reads::{
     EventPage, InsertionUse, JourneyMatches, JourneyPage, JourneySummary, LoggedEvent, RouteDetail,

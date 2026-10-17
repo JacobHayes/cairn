@@ -32,7 +32,7 @@ test("C16: a row action on Home writes in place and the address stays `/`", asyn
   expect(new URL(page.url()).pathname + new URL(page.url()).search).toBe("/");
 });
 
-test("the rail lights Home at `/` only, Journeys on the journey pages and proposals, and Routes on the route pages", async ({ page }) => {
+test("the rail lights Home at `/` only, Journeys on the journey pages and their proposals, Routes on the route pages and theirs, and Entities on its page and its proposals", async ({ page }) => {
   const rail = page.getByRole("navigation", { name: "Screens", exact: true });
   const current = rail.locator("[aria-current=page]");
   const cases: [string, string][] = [
@@ -42,7 +42,11 @@ test("the rail lights Home at `/` only, Journeys on the journey pages and propos
     ["/journeys/new", "Journeys"],
     ["/journeys/j_vendor_eval", "Journeys"],
     ["/journeys/j_vendor_eval/nodes/n_plan", "Journeys"],
+    ["/journeys/j_vendor_eval/proposals", "Journeys"],
     ["/routes", "Routes"],
+    ["/routes/vendor-evaluation/proposals", "Routes"],
+    ["/entities", "Entities"],
+    ["/entities/proposals", "Entities"],
     ["/routes/new", "Routes"],
     ["/routes/vendor-evaluation", "Routes"],
   ];
@@ -59,7 +63,7 @@ test("a bare journey opens the Summary, a node or an edge opens the Graph, and t
   await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "graph");
   await visit(page, "browser", "/journeys/j_vendor_eval/edges/n_access~n_plan");
   await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "graph");
-  for (const gone of ["/mine", "/new", "/library", "/journeys/j_vendor_eval/graph", "/journeys/j_vendor_eval/summary", "/journeys/j_vendor_eval/walk/nodes/n_plan"]) {
+  for (const gone of ["/proposals/pr_gone", "/proposals/pr_gone/nodes/n_plan", "/mine", "/new", "/library", "/journeys/j_vendor_eval/graph", "/journeys/j_vendor_eval/summary", "/journeys/j_vendor_eval/walk/nodes/n_plan"]) {
     await visit(page, "browser", gone);
     await expect(page.getByTestId("no-such-page"), gone).toBeVisible();
     expect(new URL(page.url()).pathname, gone).toBe(gone);

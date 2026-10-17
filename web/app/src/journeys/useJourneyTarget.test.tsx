@@ -2,6 +2,7 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter, Route, Routes } from "react-router";
 import { describe, expect, it } from "vitest";
 
+import { ADDRESSES } from "../address.ts";
 import { screenSwitched, type JourneyTarget } from "./address.ts";
 import { useJourneyTarget } from "./useJourneyTarget.ts";
 
@@ -15,9 +16,9 @@ function targetAt(address: string): JourneyTarget {
   renderToStaticMarkup(
     <MemoryRouter initialEntries={[address]}>
       <Routes>
-        <Route path="journeys/:id" element={<Probe />} />
-        <Route path="journeys/:id/nodes/:key" element={<Probe />} />
-        <Route path="journeys/:id/edges/:edge" element={<Probe />} />
+        {ADDRESSES.filter(({ name }) => name === "journey" || name === "journeyNode" || name === "journeyEdge").map(({ name, path }) => (
+          <Route key={name} path={path.slice(1)} element={<Probe />} />
+        ))}
       </Routes>
     </MemoryRouter>,
   );

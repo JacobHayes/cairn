@@ -123,6 +123,7 @@ impl Ledger {
                 action: Some(Action::Proposed {
                     tool: tool.to_owned(),
                     proposal,
+                    destination: domain.clone(),
                     because,
                 }),
             },

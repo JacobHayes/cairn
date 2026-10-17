@@ -49,6 +49,7 @@ export function NodeItem({ view, node, to, selected = false, fact, factTone, tes
       ref={item}
       className={className === undefined ? "node-row" : `node-row ${className}`}
       data-testid={testId}
+      data-row
       data-node={node}
       data-state={state}
       data-selected={selected}
@@ -61,7 +62,7 @@ export function NodeItem({ view, node, to, selected = false, fact, factTone, tes
       <div className="node-row-main">
         {state === undefined || kind === undefined ? null : <Badge tone={statusTone(state)}>{statusWord(state, kind)}</Badge>}
         <span className="node-row-text">
-          <Link to={to} className="node-title" data-node={node} aria-current={selected ? "true" : undefined}>
+          <Link to={to} className="node-title" data-row-title data-node={node} aria-current={selected ? "true" : undefined}>
             {titleOf(view, node)}
           </Link>
           {fact === undefined ? null : (

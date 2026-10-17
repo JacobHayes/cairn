@@ -17,7 +17,8 @@ use crate::build::{
 };
 use crate::commit::CommitError;
 use crate::query::{
-    EventQuery, InsertionUse, JourneyQuery, PageSize, SearchHit, SearchQuery, VersionJourneys,
+    DestinationKind, EventQuery, InsertionUse, JourneyQuery, PageSize, ProposalCursor,
+    ProposalPage, ProposalQuery, ProposalScope, SearchHit, SearchQuery, VersionJourneys,
 };
 use crate::store::Store;
 
@@ -674,4 +675,266 @@ pub async fn text_search_hits_names_nodes_notes_and_resources<B: Backend>(backen
         assert_eq!(page.items[0].journey, id("j_one"));
         assert_eq!(page.items[0].hits, expected, "{text}");
     }
+}
+
+/// Commits proposal `key` for `destination`, made at `minute` by `user` (and `agent`), in
+/// `status`.
+async fn drafted<S: Store>(
+    store: &S,
+    key: &str,
+    destination: &Domain,
+    (user, agent): (&str, Option<&str>),
+    (minute, status): (i64, cairn_schema::ProposalStatus),
+) {
+    let mut proposal = build::proposal(key, destination, 1);
+    proposal.created_by = id(user);
+    proposal.proposing_agent = agent.map(id);
+    proposal.created_at = build::at(minute);
+    proposal.status = status;
+    let patch = build::proposal_patch(&format!("p_{key}"), key, destination.clone(), 0).event(
+        EventType::ProposalCreated,
+        Subject::Proposal(id(key)),
+        vec![Write::Put(Record::Proposal(proposal))],
+    );
+    applied(store, patch.commit()).await;
+}
+
+/// Every page of a listing, concatenated, with each page's count.
+async fn listed<S: Store>(
+    store: &S,
+    scope: ProposalScope,
+    size: u32,
+) -> (Vec<String>, ProposalPage) {
+    let mut ids = Vec::new();
+    let mut after = None;
+    let first = loop {
+        let query = ProposalQuery {
+            scope: scope.clone(),
+            after: after.clone(),
+            size: PageSize::new(size),
+        };
+        let page = store.proposals(&query).await.unwrap();
+        ids.extend(page.items.iter().map(|item| item.id.to_string()));
+        match page.next.clone() {
+            Some(next) => after = Some(next),
+            None => break page,
+        }
+    };
+    (ids, first)
+}
+
+/// C14, C16: a proposal listing holds exactly the open proposals of its scope, newest first
+/// with ties by id, whole across pages, counted, and says what each destination is now.
+pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backend>(backend: &B) {
+    use cairn_schema::ProposalStatus::{Applied, Open};
+    let store = open(backend).await;
+    let merge = deployment_patch("p_people", 0).event(
+        EventType::EntitiesMerged,
+        Subject::Entity(id("e_old")),
+        vec![
+            Write::Put(Record::Entity(entity("e_a", "A", &["a@example.org"]))),
+            Write::Put(Record::EntityAlias {
+                alias: id("e_old"),
+                entity: id("e_a"),
+            }),
+        ],
+    );
+    applied(&store, merge.commit()).await;
+    for (journey, status) in [
+        ("j_active", JourneyStatus::Active),
+        ("j_done", JourneyStatus::Completed),
+        ("j_other", JourneyStatus::Active),
+    ] {
+        let mut header = journey_header(journey, journey, None);
+        header.status = status;
+        let mut builder = journey_patch(&format!("p_{journey}"), journey, 0).event(
+            EventType::JourneyCreated,
+            Subject::Journey(id(journey)),
+            vec![Write::Put(Record::JourneyHeader(header))],
+        );
+        if journey != "j_other" {
+            builder = builder.event(
+                EventType::RoleFillChanged,
+                Subject::Role(id("r_owner")),
+                vec![put_in(
+                    &journey_graph(journey),
+                    GraphRecord::RoleFill {
+                        role: id("r_owner"),
+                        entities: cairn_schema::BoundedSet::new([id::<cairn_schema::EntityKey>(
+                            "e_old",
+                        )])
+                        .unwrap(),
+                    },
+                )],
+            );
+        }
+        applied(&store, builder.commit()).await;
+    }
+    applied(&store, create_route("p_route", "r_one").commit()).await;
+    let journey = |key: &str| Domain::Journey(id(key));
+    let route = |key: &str| Domain::Route(id(key));
+    drafted(
+        &store,
+        "pr_1",
+        &journey("j_active"),
+        ("u_other", Some("ag_x")),
+        (1, Open),
+    )
+    .await;
+    drafted(
+        &store,
+        "pr_2",
+        &journey("j_active"),
+        ("u_other", None),
+        (2, Open),
+    )
+    .await;
+    drafted(
+        &store,
+        "pr_3",
+        &journey("j_done"),
+        ("u_other", Some("ag_x")),
+        (3, Open),
+    )
+    .await;
+    drafted(
+        &store,
+        "pr_4",
+        &journey("j_other"),
+        ("u_me", None),
+        (4, Open),
+    )
+    .await;
+    drafted(
+        &store,
+        "pr_5",
+        &journey("j_new"),
+        ("u_other", None),
+        (5, Open),
+    )
+    .await;
+    drafted(
+        &store,
+        "pr_6",
+        &route("r_one"),
+        ("u_other", None),
+        (6, Open),
+    )
+    .await;
+    drafted(
+        &store,
+        "pr_7",
+        &route("r_new"),
+        ("u_other", None),
+        (6, Open),
+    )
+    .await;
+    drafted(
+        &store,
+        "pr_8",
+        &Domain::Deployment,
+        ("u_other", None),
+        (7, Open),
+    )
+    .await;
+    drafted(
+        &store,
+        "pr_9",
+        &journey("j_active"),
+        ("u_other", None),
+        (2, Applied),
+    )
+    .await;
+
+    let waiting = ProposalScope::Waiting {
+        user: id("u_me"),
+        entities: BTreeSet::from([id("e_a")]),
+    };
+    let cases = [
+        (
+            ProposalScope::Destination(journey("j_active")),
+            vec!["pr_2", "pr_1"],
+        ),
+        (ProposalScope::Destination(journey("j_done")), vec!["pr_3"]),
+        (ProposalScope::Destination(route("r_new")), vec!["pr_7"]),
+        (ProposalScope::Destination(Domain::Deployment), vec!["pr_8"]),
+        (ProposalScope::Destination(journey("j_nothing")), vec![]),
+        (ProposalScope::CreatingJourneys, vec!["pr_5"]),
+        (ProposalScope::CreatingRoutes, vec!["pr_7"]),
+        (waiting, vec!["pr_4", "pr_1"]),
+    ];
+    for (scope, expected) in cases {
+        for size in [1, 2, 200] {
+            let (found, last) = listed(&store, scope.clone(), size).await;
+            assert_eq!(found, expected, "{scope:?} in pages of {size}");
+            assert_eq!(last.count as usize, expected.len(), "{scope:?}");
+        }
+    }
+
+    let page = |scope| ProposalQuery {
+        scope,
+        after: None,
+        size: PageSize::new(1),
+    };
+    let active = store
+        .proposals(&page(ProposalScope::Destination(journey("j_active"))))
+        .await
+        .unwrap();
+    assert_eq!((active.count, active.items.len()), (2, 1));
+    let now = active.destination.unwrap();
+    assert_eq!(
+        (now.exists, now.kind, now.status, now.revision),
+        (
+            true,
+            DestinationKind::Journey,
+            Some(JourneyStatus::Active),
+            revision(1)
+        )
+    );
+    assert_eq!(active.items[0].now, now);
+    assert_eq!(active.items[0].drafted_against, revision(1));
+    let gone = store
+        .proposals(&page(ProposalScope::Destination(route("r_new"))))
+        .await
+        .unwrap();
+    let now = gone.destination.unwrap();
+    assert_eq!(
+        (now.exists, now.name, now.revision),
+        (false, None, revision(0))
+    );
+
+    // The cursor is a position, so it holds when the proposal it names closes.
+    let after = ProposalCursor {
+        created_at: build::at(2),
+        id: id("pr_2"),
+    };
+    let discard = build::proposal_patch("p_close", "pr_2", journey("j_active"), 1).event(
+        EventType::ProposalDiscarded,
+        Subject::Proposal(id("pr_2")),
+        vec![Write::Put(Record::Proposal({
+            let mut closed = build::proposal("pr_2", &journey("j_active"), 2);
+            closed.created_at = build::at(2);
+            closed.status = cairn_schema::ProposalStatus::Discarded;
+            closed
+        }))],
+    );
+    applied(&store, discard.commit()).await;
+    let rest = store
+        .proposals(&ProposalQuery {
+            scope: ProposalScope::Destination(journey("j_active")),
+            after: Some(after),
+            size: PageSize::new(1),
+        })
+        .await
+        .unwrap();
+    assert_eq!(
+        (
+            rest.count,
+            rest.items
+                .iter()
+                .map(|item| item.id.to_string())
+                .collect::<Vec<_>>()
+        ),
+        (1, vec!["pr_1".to_owned()])
+    );
 }

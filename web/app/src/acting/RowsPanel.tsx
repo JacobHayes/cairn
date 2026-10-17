@@ -1,6 +1,6 @@
-// The bounded list of rows a page shows (the Summary's sections, Home's journeys): a panel of
-// node rows, the first five of them and "Show all" for the rest, optionally a fold of the same,
-// and the keeping of the focus as rows move away (C18). The rows are rendered by the caller, so a
+// The bounded list of rows a page shows (the Summary's sections, Home's journeys, the open
+// proposals): a panel of rows (each an `li[data-row]` whose link carries `data-row-title`), the
+// first five of them and "Show all" for the rest, optionally a fold of the same, and the keeping of the focus as rows move away (C18). The rows are rendered by the caller, so a
 // panel can hold rows of several journeys; this owns only how many are drawn and where the focus
 // goes. On paper every row is there and no control is.
 import { Fragment, useEffect, useLayoutEffect, useRef, useState, type FocusEvent, type ReactNode } from "react";
@@ -66,7 +66,7 @@ function useKeptFocus(rows: PanelRow[]) {
     if (active !== null && active !== document.body) {
       return;
     }
-    const titles = panel.current?.querySelectorAll<HTMLElement>(".node-title");
+    const titles = panel.current?.querySelectorAll<HTMLElement>("[data-row-title]");
     const next = titles === undefined || titles.length === 0 ? undefined : titles[Math.min(held.at, titles.length - 1)];
     (next ?? panel.current)?.focus();
   }, [keys]);
@@ -79,14 +79,14 @@ function useKeptFocus(rows: PanelRow[]) {
         return;
       }
       const page = element.closest<HTMLElement>("[data-rows-page]");
-      const others = Array.from(page?.querySelectorAll<HTMLElement>("[data-rows-panel] .node-title") ?? []).filter((title) => !element.contains(title));
+      const others = Array.from(page?.querySelectorAll<HTMLElement>("[data-rows-panel] [data-row-title]") ?? []).filter((title) => !element.contains(title));
       (others[0] ?? page)?.focus();
     };
   }, []);
   // `rows` are the ones drawn, in order, so a row's place in the panel is its place in the list.
   const onFocusCapture = (event: FocusEvent<HTMLElement>) => {
-    const item = event.target instanceof Element ? event.target.closest<HTMLElement>("li[data-node]") : null;
-    const items = Array.from(panel.current?.querySelectorAll<HTMLElement>("li[data-node]") ?? []);
+    const item = event.target instanceof Element ? event.target.closest<HTMLElement>("li[data-row]") : null;
+    const items = Array.from(panel.current?.querySelectorAll<HTMLElement>("li[data-row]") ?? []);
     const at = item === null ? -1 : items.indexOf(item);
     const row = rows[at];
     if (row !== undefined) {
@@ -97,8 +97,8 @@ function useKeptFocus(rows: PanelRow[]) {
 }
 
 interface PanelProps {
-  /** The panel's name, in its head: a string, or a link to the thing the rows belong to. */
-  title: ReactNode;
+  /** The panel's name, in its head: a string, or a link to the thing the rows belong to. None: the rows alone, for a panel something else (a tab) already names. */
+  title?: ReactNode;
   /** The head's name for assistive technology when `title` is not a string. */
   label?: string;
   /** Set at the head's right end, beside the count: a short figure in mono. */

@@ -51,6 +51,10 @@
                 "$ref": "#/components/schemas/Because",
                 "description": "Why it is a proposal."
               },
+              "destination": {
+                "$ref": "#/components/schemas/Domain",
+                "description": "Its destination, under which it is addressed (I6)."
+              },
               "outcome": {
                 "const": "proposed",
                 "type": "string"
@@ -68,6 +72,7 @@
               "outcome",
               "tool",
               "proposal",
+              "destination",
               "because"
             ],
             "type": "object"
@@ -2766,6 +2771,77 @@
           "nodes",
           "frontier",
           "acting_frontier"
+        ],
+        "type": "object"
+      },
+      "DestinationKind": {
+        "description": "What a proposal's destination is.",
+        "oneOf": [
+          {
+            "const": "journey",
+            "description": "A journey.",
+            "type": "string"
+          },
+          {
+            "const": "route",
+            "description": "A process route.",
+            "type": "string"
+          },
+          {
+            "const": "segment",
+            "description": "A segment route.",
+            "type": "string"
+          },
+          {
+            "const": "deployment",
+            "description": "The deployment.",
+            "type": "string"
+          }
+        ]
+      },
+      "DestinationNow": {
+        "additionalProperties": false,
+        "description": "A proposal's destination as it is now (C14).",
+        "properties": {
+          "exists": {
+            "description": "Whether it exists.",
+            "type": "boolean"
+          },
+          "kind": {
+            "$ref": "#/components/schemas/DestinationKind",
+            "description": "What it is."
+          },
+          "name": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Title"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Its name, when it exists and has one."
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "Its revision; 0 when it does not exist."
+          },
+          "status": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JourneyStatus"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A journey's status."
+          }
+        },
+        "required": [
+          "exists",
+          "revision",
+          "kind"
         ],
         "type": "object"
       },
@@ -10422,6 +10498,26 @@
         ],
         "type": "object"
       },
+      "ProposalCursor": {
+        "additionalProperties": false,
+        "description": "Where a proposal listing resumes: pass its two fields as `after_at` and `after`.",
+        "properties": {
+          "created_at": {
+            "description": "When the last proposal of the page before was created.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "id": {
+            "$ref": "#/components/schemas/ProposalId",
+            "description": "Its id."
+          }
+        },
+        "required": [
+          "created_at",
+          "id"
+        ],
+        "type": "object"
+      },
       "ProposalDraft": {
         "additionalProperties": false,
         "description": "A proposal's content: what creating or editing it carries.",
@@ -10493,6 +10589,72 @@
         "minLength": 1,
         "pattern": "^pr_[a-z0-9][a-z0-9_-]*$",
         "type": "string"
+      },
+      "ProposalList": {
+        "additionalProperties": false,
+        "description": "A page of open proposals, newest first (C14, C16).",
+        "properties": {
+          "count": {
+            "description": "How many open proposals the listing holds in all.",
+            "format": "uint32",
+            "minimum": 0,
+            "type": "integer"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/DestinationNow"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "A destination's listing: the destination as it is now, so a header does not depend on\nhaving rows."
+          },
+          "items": {
+            "description": "The proposals.",
+            "items": {
+              "$ref": "#/components/schemas/ProposalSummary"
+            },
+            "type": "array"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ProposalCursor"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Pass as `after_at` and `after` for the next page."
+          }
+        },
+        "required": [
+          "count",
+          "items"
+        ],
+        "type": "object"
+      },
+      "ProposalListing": {
+        "description": "Which open proposals `GET /api/proposals` lists: those no one destination holds.",
+        "oneOf": [
+          {
+            "const": "waiting",
+            "description": "Waiting on the caller: created by them, or drafted by an agent for an active journey\nreferring to one of their entities (C16).",
+            "type": "string"
+          },
+          {
+            "const": "new_journeys",
+            "description": "Those whose destination is a journey that does not exist yet.",
+            "type": "string"
+          },
+          {
+            "const": "new_routes",
+            "description": "Those whose destination is a route that does not exist yet.",
+            "type": "string"
+          }
+        ]
       },
       "ProposalPreview": {
         "additionalProperties": false,
@@ -10627,6 +10789,67 @@
         "required": [
           "patch_id",
           "base_revision"
+        ],
+        "type": "object"
+      },
+      "ProposalSummary": {
+        "additionalProperties": false,
+        "description": "An open proposal in a listing (C14).",
+        "properties": {
+          "created_at": {
+            "description": "When it was created.",
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The user it was created by or for."
+          },
+          "destination": {
+            "$ref": "#/components/schemas/Domain",
+            "description": "Its destination."
+          },
+          "drafted_against": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "The destination's revision it was drafted against."
+          },
+          "id": {
+            "$ref": "#/components/schemas/ProposalId",
+            "description": "The proposal."
+          },
+          "now": {
+            "$ref": "#/components/schemas/DestinationNow",
+            "description": "Its destination as it is now."
+          },
+          "proposing_agent": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/AgentId"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The agent that drafted it, if any."
+          },
+          "revision": {
+            "$ref": "#/components/schemas/Revision",
+            "description": "Its editing revision."
+          },
+          "title": {
+            "$ref": "#/components/schemas/Title",
+            "description": "What it proposes, in a line."
+          }
+        },
+        "required": [
+          "id",
+          "destination",
+          "title",
+          "revision",
+          "drafted_against",
+          "created_by",
+          "created_at",
+          "now"
         ],
         "type": "object"
       },
@@ -14526,6 +14749,115 @@
       }
     },
     "/api/deployment/proposals": {
+      "get": {
+        "operationId": "listDeploymentProposals",
+        "parameters": [
+          {
+            "description": "The page starts after the proposal created at this time (with `after`).",
+            "explode": true,
+            "in": "query",
+            "name": "after_at",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "description": "The page starts after this proposal (with `after_at`).",
+            "explode": true,
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            },
+            "style": "form"
+          },
+          {
+            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "explode": true,
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalList"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "The destination's open proposals, newest first, with their count and the destination as it is now (C14)."
+      },
       "post": {
         "operationId": "proposeToDeployment",
         "requestBody": {
@@ -14646,6 +14978,775 @@
           }
         },
         "summary": "Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6)."
+      }
+    },
+    "/api/deployment/proposals/{proposal}": {
+      "get": {
+        "operationId": "getDeploymentProposal",
+        "parameters": [
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "A proposal under this destination: its editing revision, status, and content (I6)."
+      },
+      "patch": {
+        "operationId": "editDeploymentProposal",
+        "parameters": [
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Replaces its content against its editing revision; its destination does not move (H5)."
+      }
+    },
+    "/api/deployment/proposals/{proposal}/apply": {
+      "post": {
+        "operationId": "applyDeploymentProposal",
+        "parameters": [
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalApply"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6)."
+      }
+    },
+    "/api/deployment/proposals/{proposal}/discard": {
+      "post": {
+        "operationId": "discardDeploymentProposal",
+        "parameters": [
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalStep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Discards it (I6)."
+      }
+    },
+    "/api/deployment/proposals/{proposal}/preview": {
+      "post": {
+        "operationId": "previewDeploymentProposal",
+        "parameters": [
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalReview"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6)."
+      }
+    },
+    "/api/deployment/proposals/{proposal}/refresh": {
+      "post": {
+        "operationId": "refreshDeploymentProposal",
+        "parameters": [
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalStep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Rejection"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Problem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6)."
       }
     },
     "/api/events": {
@@ -16889,6 +17990,134 @@
       }
     },
     "/api/journeys/{id}/proposals": {
+      "get": {
+        "operationId": "listJourneyProposals",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          },
+          {
+            "description": "The page starts after the proposal created at this time (with `after`).",
+            "explode": true,
+            "in": "query",
+            "name": "after_at",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "description": "The page starts after this proposal (with `after_at`).",
+            "explode": true,
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            },
+            "style": "form"
+          },
+          {
+            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "explode": true,
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalList"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "The destination's open proposals, newest first, with their count and the destination as it is now (C14)."
+      },
       "post": {
         "operationId": "proposeToJourney",
         "parameters": [
@@ -17030,6 +18259,829 @@
           }
         },
         "summary": "Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6)."
+      }
+    },
+    "/api/journeys/{id}/proposals/{proposal}": {
+      "get": {
+        "operationId": "getJourneyProposal",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "A proposal under this destination: its editing revision, status, and content (I6)."
+      },
+      "patch": {
+        "operationId": "editJourneyProposal",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Replaces its content against its editing revision; its destination does not move (H5)."
+      }
+    },
+    "/api/journeys/{id}/proposals/{proposal}/apply": {
+      "post": {
+        "operationId": "applyJourneyProposal",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalApply"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6)."
+      }
+    },
+    "/api/journeys/{id}/proposals/{proposal}/discard": {
+      "post": {
+        "operationId": "discardJourneyProposal",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalStep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Discards it (I6)."
+      }
+    },
+    "/api/journeys/{id}/proposals/{proposal}/preview": {
+      "post": {
+        "operationId": "previewJourneyProposal",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalReview"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6)."
+      }
+    },
+    "/api/journeys/{id}/proposals/{proposal}/refresh": {
+      "post": {
+        "operationId": "refreshJourneyProposal",
+        "parameters": [
+          {
+            "description": "The journey.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/JourneyId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalStep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Rejection"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Problem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6)."
       }
     },
     "/api/journeys/{id}/relink": {
@@ -17926,18 +19978,56 @@
         "summary": "Proposes upgrading the journey to a newer version of its route: the merge's conflicts, kept edits, and orphans are its review items (B7)."
       }
     },
-    "/api/proposals/{id}": {
+    "/api/proposals": {
       "get": {
-        "operationId": "getProposal",
+        "operationId": "listProposals",
         "parameters": [
           {
-            "description": "The proposal, by its client-generated id.",
-            "in": "path",
-            "name": "id",
+            "description": "Which open proposals to list.",
+            "explode": true,
+            "in": "query",
+            "name": "scope",
             "required": true,
             "schema": {
+              "$ref": "#/components/schemas/ProposalListing"
+            },
+            "style": "form"
+          },
+          {
+            "description": "The page starts after the proposal created at this time (with `after`).",
+            "explode": true,
+            "in": "query",
+            "name": "after_at",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "description": "The page starts after this proposal (with `after_at`).",
+            "explode": true,
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
               "$ref": "#/components/schemas/ProposalId"
-            }
+            },
+            "style": "form"
+          },
+          {
+            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "explode": true,
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "style": "form"
           }
         ],
         "responses": {
@@ -17945,7 +20035,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Proposal"
+                  "$ref": "#/components/schemas/ProposalList"
                 }
               }
             },
@@ -17981,16 +20071,6 @@
             },
             "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
           },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "No such resource."
-          },
           "500": {
             "content": {
               "application/json": {
@@ -18017,682 +20097,7 @@
             "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
           }
         },
-        "summary": "A proposal: its destination, editing revision, status, and content (I6)."
-      },
-      "patch": {
-        "operationId": "editProposal",
-        "parameters": [
-          {
-            "description": "The proposal, by its client-generated id.",
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/ProposalId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProposalEdit"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProposalAnswer"
-                }
-              }
-            },
-            "description": "Answered."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The request is malformed."
-          },
-          "401": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "No credential, or one that is refused (the auth layer, in text)."
-          },
-          "403": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "No such resource."
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rejection"
-                }
-              }
-            },
-            "description": "Stale (with what intervened) or a reused patch id (H5)."
-          },
-          "413": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is over the request size limit."
-          },
-          "415": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is not application/json."
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rejection"
-                }
-              }
-            },
-            "description": "Invalid: every violation, by path (A15)."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The server failed; the request id names it in the logs."
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
-          }
-        },
-        "summary": "Replaces its content against its editing revision; its destination does not move (H5)."
-      }
-    },
-    "/api/proposals/{id}/apply": {
-      "post": {
-        "operationId": "applyProposal",
-        "parameters": [
-          {
-            "description": "The proposal, by its client-generated id.",
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/ProposalId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProposalApply"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PatchAnswer"
-                }
-              }
-            },
-            "description": "Answered."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The request is malformed."
-          },
-          "401": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "No credential, or one that is refused (the auth layer, in text)."
-          },
-          "403": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "No such resource."
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rejection"
-                }
-              }
-            },
-            "description": "Stale (with what intervened) or a reused patch id (H5)."
-          },
-          "413": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is over the request size limit."
-          },
-          "415": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is not application/json."
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rejection"
-                }
-              }
-            },
-            "description": "Invalid: every violation, by path (A15)."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The server failed; the request id names it in the logs."
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
-          }
-        },
-        "summary": "Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6)."
-      }
-    },
-    "/api/proposals/{id}/discard": {
-      "post": {
-        "operationId": "discardProposal",
-        "parameters": [
-          {
-            "description": "The proposal, by its client-generated id.",
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/ProposalId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProposalStep"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProposalAnswer"
-                }
-              }
-            },
-            "description": "Answered."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The request is malformed."
-          },
-          "401": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "No credential, or one that is refused (the auth layer, in text)."
-          },
-          "403": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "No such resource."
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rejection"
-                }
-              }
-            },
-            "description": "Stale (with what intervened) or a reused patch id (H5)."
-          },
-          "413": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is over the request size limit."
-          },
-          "415": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is not application/json."
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rejection"
-                }
-              }
-            },
-            "description": "Invalid: every violation, by path (A15)."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The server failed; the request id names it in the logs."
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
-          }
-        },
-        "summary": "Discards it (I6)."
-      }
-    },
-    "/api/proposals/{id}/preview": {
-      "post": {
-        "operationId": "previewProposal",
-        "parameters": [
-          {
-            "description": "The proposal, by its client-generated id.",
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/ProposalId"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProposalReview"
-                }
-              }
-            },
-            "description": "Answered."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The request is malformed."
-          },
-          "401": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "No credential, or one that is refused (the auth layer, in text)."
-          },
-          "403": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "No such resource."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The server failed; the request id names it in the logs."
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
-          }
-        },
-        "summary": "What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6)."
-      }
-    },
-    "/api/proposals/{id}/refresh": {
-      "post": {
-        "operationId": "refreshProposal",
-        "parameters": [
-          {
-            "description": "The proposal, by its client-generated id.",
-            "in": "path",
-            "name": "id",
-            "required": true,
-            "schema": {
-              "$ref": "#/components/schemas/ProposalId"
-            }
-          }
-        ],
-        "requestBody": {
-          "content": {
-            "application/json": {
-              "schema": {
-                "$ref": "#/components/schemas/ProposalStep"
-              }
-            }
-          },
-          "required": true
-        },
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ProposalAnswer"
-                }
-              }
-            },
-            "description": "Answered."
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The request is malformed."
-          },
-          "401": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "No credential, or one that is refused (the auth layer, in text)."
-          },
-          "403": {
-            "content": {
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
-          },
-          "404": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "No such resource."
-          },
-          "409": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Rejection"
-                }
-              }
-            },
-            "description": "Stale (with what intervened) or a reused patch id (H5)."
-          },
-          "413": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is over the request size limit."
-          },
-          "415": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The body is not application/json."
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "oneOf": [
-                    {
-                      "$ref": "#/components/schemas/Rejection"
-                    },
-                    {
-                      "$ref": "#/components/schemas/Problem"
-                    }
-                  ]
-                }
-              }
-            },
-            "description": "Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9)."
-          },
-          "500": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              }
-            },
-            "description": "The server failed; the request id names it in the logs."
-          },
-          "503": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Problem"
-                }
-              },
-              "text/plain": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
-          }
-        },
-        "summary": "Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6)."
+        "summary": "The open proposals no one destination holds: those waiting on the caller, and those that would create a journey or a route, newest first with their count (C14, C16)."
       }
     },
     "/api/routes": {
@@ -19519,6 +20924,134 @@
       }
     },
     "/api/routes/{id}/proposals": {
+      "get": {
+        "operationId": "listRouteProposals",
+        "parameters": [
+          {
+            "description": "The route.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RouteId"
+            }
+          },
+          {
+            "description": "The page starts after the proposal created at this time (with `after`).",
+            "explode": true,
+            "in": "query",
+            "name": "after_at",
+            "required": false,
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            },
+            "style": "form"
+          },
+          {
+            "description": "The page starts after this proposal (with `after_at`).",
+            "explode": true,
+            "in": "query",
+            "name": "after",
+            "required": false,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            },
+            "style": "form"
+          },
+          {
+            "description": "Items per page, 1 to the page limit (200); larger sizes are cut to it.",
+            "explode": true,
+            "in": "query",
+            "name": "size",
+            "required": false,
+            "schema": {
+              "format": "uint32",
+              "minimum": 0,
+              "type": "integer"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalList"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "The destination's open proposals, newest first, with their count and the destination as it is now (C14)."
+      },
       "post": {
         "operationId": "proposeToRoute",
         "parameters": [
@@ -19660,6 +21193,829 @@
           }
         },
         "summary": "Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6)."
+      }
+    },
+    "/api/routes/{id}/proposals/{proposal}": {
+      "get": {
+        "operationId": "getRouteProposal",
+        "parameters": [
+          {
+            "description": "The route.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RouteId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Proposal"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "A proposal under this destination: its editing revision, status, and content (I6)."
+      },
+      "patch": {
+        "operationId": "editRouteProposal",
+        "parameters": [
+          {
+            "description": "The route.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RouteId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Replaces its content against its editing revision; its destination does not move (H5)."
+      }
+    },
+    "/api/routes/{id}/proposals/{proposal}/apply": {
+      "post": {
+        "operationId": "applyRouteProposal",
+        "parameters": [
+          {
+            "description": "The route.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RouteId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalApply"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PatchAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6)."
+      }
+    },
+    "/api/routes/{id}/proposals/{proposal}/discard": {
+      "post": {
+        "operationId": "discardRouteProposal",
+        "parameters": [
+          {
+            "description": "The route.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RouteId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalStep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Discards it (I6)."
+      }
+    },
+    "/api/routes/{id}/proposals/{proposal}/preview": {
+      "post": {
+        "operationId": "previewRouteProposal",
+        "parameters": [
+          {
+            "description": "The route.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RouteId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalReview"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6)."
+      }
+    },
+    "/api/routes/{id}/proposals/{proposal}/refresh": {
+      "post": {
+        "operationId": "refreshRouteProposal",
+        "parameters": [
+          {
+            "description": "The route.",
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/RouteId"
+            }
+          },
+          {
+            "description": "The proposal, by its client-generated id.",
+            "in": "path",
+            "name": "proposal",
+            "required": true,
+            "schema": {
+              "$ref": "#/components/schemas/ProposalId"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProposalStep"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProposalAnswer"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "No such resource."
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Rejection"
+                }
+              }
+            },
+            "description": "Stale (with what intervened) or a reused patch id (H5)."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is over the request size limit."
+          },
+          "415": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The body is not application/json."
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "oneOf": [
+                    {
+                      "$ref": "#/components/schemas/Rejection"
+                    },
+                    {
+                      "$ref": "#/components/schemas/Problem"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6)."
       }
     },
     "/api/routes/{id}/versions": {

@@ -6,7 +6,7 @@ import { expect, test } from "@playwright/test";
 
 import { openJourneyCard } from "./around.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";
-import { nodeCard, setDepth, syncChip } from "./shell.ts";
+import { expectAddress, nodeCard, open, setDepth, syncChip } from "./shell.ts";
 
 test("B7, C14: the scenario journey upgraded to version 2, each conflict resolved, then applied", async ({ page }) => {
   await editWhereVersionTwoChanges(page, "browser");
@@ -56,4 +56,33 @@ test("B7, C14: the scenario journey upgraded to version 2, each conflict resolve
   await expect(nodeCard(page, "n_signoff")).toBeVisible();
   await expect(nodeCard(page, "n_access").getByTestId("title")).toHaveText("Access to the environment");
   await expect(nodeCard(page, "n_workload")).toHaveCount(0);
+});
+
+test("C14, C16: a drafted upgrade is listed in its journey's Proposals tab and on Home, and opens under the journey", async ({ page }) => {
+  await publishVersionTwo(page, "browser");
+  await openJourneyCard(page, "browser", "j_vendor_eval");
+  await page.getByTestId("journey-upgrade").click();
+  await page.getByTestId("upgrade-flow").getByRole("button", { name: "Propose the upgrade" }).click();
+  await reviewOpen(page);
+  const reviewed = new URL(page.url()).pathname;
+  expect(reviewed).toMatch(/^\/journeys\/j_vendor_eval\/proposals\/pr_[0-9a-f]+$/);
+  // Away from it: the journey's tab names it, and its row opens the same address.
+  await open(page, "browser", "/journeys/j_vendor_eval");
+  await expect(page.getByTestId("tab-proposals")).toContainText("1");
+  await page.getByTestId("tab-proposals").click();
+  await page.getByTestId("proposals-pane").getByTestId("proposal-row").getByRole("link").click();
+  await reviewOpen(page);
+  await expectAddress(page, reviewed);
+  // The address of the list opens the journey with the tab in view.
+  await open(page, "browser", "/journeys/j_vendor_eval/proposals");
+  await expect(page.getByTestId("tab-proposals")).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("proposals-panel").getByTestId("proposal-row")).toHaveCount(1);
+  // Home waits on it too.
+  await open(page, "browser", "/");
+  await page.getByTestId("home-proposals").getByTestId("proposal-row").getByRole("link").click();
+  await reviewOpen(page);
+  await expectAddress(page, reviewed);
+  // The way back names the destination and its open proposals.
+  await page.getByTestId("review-trail").getByRole("link", { name: "Open proposals" }).click();
+  await expect(page.getByTestId("tab-proposals")).toHaveAttribute("aria-selected", "true");
 });

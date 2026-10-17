@@ -15,7 +15,7 @@ const applied: AssistantAction = {
   receipt: { patch_id: "p_one", domain: { journey: "j_one" }, content_hash: "h", revision: 3 },
   nodes: ["n_kickoff"],
 };
-const proposed: AssistantAction = { outcome: "proposed", tool: "apply_patch", proposal: "pr_one", because: { reason: "structural" } };
+const proposed: AssistantAction = { outcome: "proposed", tool: "apply_patch", proposal: "pr_one", destination: { journey: "j_one" }, because: { reason: "structural" } };
 const replied: Ended = { status: "replied" };
 
 const messages = [

@@ -60,7 +60,7 @@ pub struct AppliedLocally {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct PreviewRequest {
-    /// The proposal, as `GET /api/proposals/{id}` answers it; its destination is the journey.
+    /// The proposal, as `GET /api/{destination}/proposals/{proposal}` answers it; its destination is the journey.
     pub proposal: Proposal,
     /// The route versions its mutations read (an upgrade's target and the journey's own),
     /// as `GET /api/routes/{id}/versions/{version}` answers them.

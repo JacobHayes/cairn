@@ -138,7 +138,10 @@ impl<S: Store + 'static> ToolSet<S> {
         let (patch_id, base) = (arguments.patch_id, arguments.base_revision);
         let written = match arguments.change {
             ProposalChange::Refresh => {
-                let refresh = self.service.refresh_proposal(call, patch_id, id, base);
+                let destination = self.held(id).await?.destination;
+                let refresh = self
+                    .service
+                    .refresh_proposal(call, patch_id, &destination, id, base);
                 refresh.await?
             }
             ProposalChange::Replace { draft } => {

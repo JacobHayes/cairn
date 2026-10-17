@@ -6,14 +6,15 @@
 // Kept current (H6): its own ticks and every journey's.
 import { Link, useParams } from "react-router";
 
+import { required } from "../address.ts";
+
 import { routeRead, type RouteRead } from "../data/reads.ts";
 import { useLive } from "../data/react.ts";
 import { dateWords } from "../timeline/model.ts";
 import { journeyPath, newJourneyPath } from "../journeys/address.ts";
 import { DEFAULT_VIEW } from "../canvas/settings.ts";
-import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
 import { Badge, Button, Panel } from "../ui/kit.tsx";
-import { ROUTES_PATH } from "./address.ts";
+import { ROUTES_PATH, routeCanvasPath } from "./address.ts";
 import { DetailHeader } from "./DetailHeader.tsx";
 import { useExport } from "./exporting.ts";
 import { upgradable, versionRows, type VersionRow } from "./model.ts";
@@ -71,7 +72,7 @@ function Detail({ read }: { read: RouteRead }) {
 }
 
 export function RouteDetailPage() {
-  const { id = "" } = useParams();
+  const id = required(useParams(), "route");
   const { view } = useLive(`route:${id}`, routeRead(id));
   switch (view.status) {
     case "idle":

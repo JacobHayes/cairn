@@ -8,13 +8,13 @@ import { Link } from "react-router";
 import type { Mutation } from "../data/writes.ts";
 import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { Refused, violates } from "../screens/Refused.tsx";
-import { routeCanvasPath } from "../screens/RouteCanvasPage.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { ImportFile } from "./ImportFile.tsx";
 import { openDraft, retireMutation, routeMoves } from "./model.ts";
 import { useExport } from "./exporting.ts";
+import { routeCanvasPath } from "./address.ts";
 
 export function RouteActions({ route }: { route: Schema<"Route"> }) {
   const id = route.header.id;

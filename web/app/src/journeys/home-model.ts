@@ -34,7 +34,13 @@ export interface HomeJourney {
  * the viewer has nothing; one still being read keeps it from saying anything until something is
  * ready to show.
  */
-export function homeState(input: { viewer: "loading" | "failed" | { entities: number }; index: "loading" | "failed" | "ready"; journeys: readonly HomeJourney[] }): HomeState {
+export function homeState(input: {
+  viewer: "loading" | "failed" | { entities: number };
+  index: "loading" | "failed" | "ready";
+  journeys: readonly HomeJourney[];
+  /** The proposals waiting on the viewer: Home does not say nothing needs them before they are read, or while there are some (C14, C16). */
+  proposals: "loading" | "failed" | { waiting: number };
+}): HomeState {
   if (input.viewer === "failed" || input.index === "failed") {
     return "failed";
   }
@@ -49,6 +55,12 @@ export function homeState(input: { viewer: "loading" | "failed" | { entities: nu
   }
   if (input.journeys.some((each) => each.reading === "loading")) {
     return "loading";
+  }
+  if (input.proposals === "loading" || input.proposals === "failed") {
+    return input.proposals;
+  }
+  if (input.proposals.waiting > 0) {
+    return "ready";
   }
   return input.journeys.some((each) => each.participates) ? "quiet" : "unassigned";
 }

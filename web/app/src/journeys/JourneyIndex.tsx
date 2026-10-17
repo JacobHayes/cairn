@@ -9,6 +9,7 @@ import { Link, useLocation, useNavigate } from "react-router";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive, useViewer } from "../data/react.ts";
 import { indexKey, isSegment, journeyIndex, routeIndex } from "../data/reads.ts";
+import { NewDestinations } from "../proposals/NewDestinations.tsx";
 import { IndexState } from "../ui/kit.tsx";
 import { DEFAULT_FILTERS, filtersFrom, indexPath, newJourneyPath, queryOf, type IndexFilters } from "./address.ts";
 import { IndexFilterBar } from "./IndexFilterBar.tsx";
@@ -65,7 +66,7 @@ export function JourneyIndex() {
   const found = valueOf(view);
   const unknownViewer = filters.mine && viewer === undefined && failed !== undefined;
   return (
-    <section className="stack index-page" aria-label="Journeys">
+    <section className="stack index-page" aria-label="Journeys" data-rows-page tabIndex={-1}>
       <div className="row index-head">
         <h1>Journeys</h1>
         <span className="spacer" />
@@ -73,6 +74,7 @@ export function JourneyIndex() {
           New journey
         </Link>
       </div>
+      <NewDestinations scope="new_journeys" />
       <IndexFilterBar filters={filters} routes={known.filter((route) => !isSegment(route))} onChange={(next) => void navigate(indexPath(next))} />
       {unknownViewer ? <IndexState kind="failed">Who you are could not be read, so neither can what is yours: {failed}</IndexState> : null}
       {!unknownViewer && (waiting || view.status === "loading" || view.status === "idle") ? <IndexState kind="loading">Reading the journeys...</IndexState> : null}

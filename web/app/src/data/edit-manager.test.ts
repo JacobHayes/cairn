@@ -352,8 +352,8 @@ describe("a check before the write is sent", () => {
 describe("the kept writes of the other kinds", () => {
   const apply = (id: string): Sent => ({
     id,
-    command: { kind: "proposal", call: { op: "apply", proposal: "pr_one", request: { patch_id: id, reviewed_revision: 4 } } },
-    about: { edit: "proposal:pr_one", label: "Plan", address: "/proposals/pr_one" },
+    command: { kind: "proposal", call: { op: "apply", destination: { journey: "j_one" }, proposal: "pr_one", request: { patch_id: id, reviewed_revision: 4 } } },
+    about: { edit: "proposal:pr_one", label: "Plan", address: "/journeys/j_one/proposals/pr_one" },
   });
   const upload: Sent = {
     id: "p_i",

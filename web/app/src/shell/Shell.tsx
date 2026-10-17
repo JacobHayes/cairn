@@ -6,6 +6,7 @@
 import { Suspense } from "react";
 import { Link, Outlet, useLocation } from "react-router";
 
+import { pathTo, sectionOf } from "../address.ts";
 import { HOME_PATH, indexPath } from "../journeys/address.ts";
 import { ROUTES_INDEX_PATH } from "../routes/address.ts";
 import { FrameActionsContext, FrameStateContext } from "./frame.tsx";
@@ -18,11 +19,12 @@ import { useFrame } from "./useFrame.ts";
 
 /** The screens, as links; the one the viewer is on is marked. */
 function Rail({ pathname }: { pathname: string }) {
+  const section = sectionOf(pathname);
   const screens = [
-    { to: HOME_PATH, label: "Home", on: pathname === HOME_PATH },
-    { to: indexPath(), label: "Journeys", on: /^\/(journeys|proposals)(\/|$)/.test(pathname) },
-    { to: ROUTES_INDEX_PATH, label: "Routes", on: /^\/routes(\/|$)/.test(pathname) },
-    { to: "/entities", label: "Entities", on: pathname.startsWith("/entities") },
+    { to: HOME_PATH, label: "Home", on: section === "home" },
+    { to: indexPath(), label: "Journeys", on: section === "journeys" },
+    { to: ROUTES_INDEX_PATH, label: "Routes", on: section === "routes" },
+    { to: pathTo("entities"), label: "Entities", on: section === "entities" },
   ];
   return (
     <aside className="rail">
@@ -40,7 +42,7 @@ function Rail({ pathname }: { pathname: string }) {
         ))}
         <span className="spacer" />
         <span className="rail-foot">
-          <Link to="/me" {...(pathname.startsWith("/me") ? { "aria-current": "page" as const } : {})}>
+          <Link to={pathTo("me")} {...(section === "me" ? { "aria-current": "page" as const } : {})}>
             You
           </Link>
           <KeysHint />
@@ -75,12 +77,14 @@ export function Shell() {
             folded={frame.folded}
             tab={frame.state.tab}
             snap={frame.snap}
-            assistantOffered={frame.dock !== undefined}
+            tabs={frame.tabs}
+            proposalsCount={frame.state.proposalsCount}
             onTab={frame.choose}
             onSnap={frame.setSnap}
             onToggle={frame.toggleFolded}
             inspectorRef={frame.setInspector}
             assistantRef={frame.setAssistant}
+            proposalsRef={frame.setProposals}
           />
         </div>
       </FrameStateContext>

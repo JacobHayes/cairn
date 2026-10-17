@@ -6,9 +6,11 @@ import "@design/tokens.css";
 import "@design/base.css";
 import "./ui/app.css";
 
-import { lazy, StrictMode } from "react";
+import { lazy, StrictMode, type ReactElement } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
+
+import { ADDRESSES, type AddressName } from "./address.ts";
 
 import { boot } from "./boot.ts";
 import { LayoutsContext } from "./canvas/hooks.ts";
@@ -29,6 +31,33 @@ const RouteIndex = lazy(() => import("./routes/RouteIndex.tsx").then((module) =>
 const RouteDetailPage = lazy(() => import("./routes/RouteDetail.tsx").then((module) => ({ default: module.RouteDetailPage })));
 const RouteCanvasPage = lazy(() => import("./screens/RouteCanvasPage.tsx").then((module) => ({ default: module.RouteCanvasPage })));
 
+/** The screen each address pattern shows (address.ts); a journey's or route's `/proposals` opens its page with the inspector on the Proposals tab. */
+const SCREENS: Record<AddressName, ReactElement> = {
+  home: <Home />,
+  journeys: <JourneyIndex />,
+  journeyNew: <NewJourney />,
+  journey: <JourneyPage />,
+  journeyNode: <JourneyPage />,
+  journeyEdge: <JourneyPage />,
+  journeyProposals: <JourneyPage />,
+  journeyProposal: <ProposalScreen />,
+  journeyProposalNode: <ProposalScreen />,
+  routes: <RouteIndex />,
+  routeNew: <NewRoutePage />,
+  route: <RouteCanvasPage />,
+  routeDraft: <RouteCanvasPage />,
+  routeDraftNode: <RouteCanvasPage />,
+  routeVersions: <RouteDetailPage />,
+  routeProposals: <RouteCanvasPage />,
+  routeProposal: <ProposalScreen />,
+  routeProposalNode: <ProposalScreen />,
+  entities: <Entities />,
+  deploymentProposals: <Entities />,
+  deploymentProposal: <ProposalScreen />,
+  deploymentProposalNode: <ProposalScreen />,
+  me: <Identity />,
+};
+
 function App({ session, layouts }: { session: Session; layouts: Layouts }) {
   return (
     <SessionContext value={session}>
@@ -36,22 +65,7 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
         <BrowserRouter>
           <Routes>
             <Route element={<Shell />}>
-              <Route index element={<Home />} />
-              <Route path="journeys" element={<JourneyIndex />} />
-              <Route path="journeys/new" element={<NewJourney />} />
-              <Route path="journeys/:id" element={<JourneyPage />} />
-              <Route path="journeys/:id/nodes/:key" element={<JourneyPage />} />
-              <Route path="journeys/:id/edges/:edge" element={<JourneyPage />} />
-              <Route path="routes" element={<RouteIndex />} />
-              <Route path="routes/new" element={<NewRoutePage />} />
-              <Route path="routes/:id" element={<RouteCanvasPage />} />
-              <Route path="routes/:id/draft" element={<RouteCanvasPage />} />
-              <Route path="routes/:id/draft/nodes/:key" element={<RouteCanvasPage />} />
-              <Route path="routes/:id/versions" element={<RouteDetailPage />} />
-              <Route path="entities" element={<Entities />} />
-              <Route path="me" element={<Identity />} />
-              <Route path="proposals/:id" element={<ProposalScreen />} />
-              <Route path="proposals/:id/nodes/:key" element={<ProposalScreen />} />
+              {ADDRESSES.map(({ name, path }) => (name === "home" ? <Route key={name} index element={SCREENS.home} /> : <Route key={name} path={path.slice(1)} element={SCREENS[name]} />))}
               <Route path="*" element={<NoSuchPage />} />
             </Route>
           </Routes>

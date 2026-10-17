@@ -1,0 +1,14 @@
+# A proposal lives under its destination, and `/proposals/<id>` is no page
+
+Question (from the unit that made open proposals findable): neither the API nor the app could list proposals, and a drafted one was reachable only by its own link at `/proposals/<id>`, a path with no destination in it, so nothing on a journey, a route, Entities or Home could say one was waiting. Where does a proposal live? This supersedes `2026-10-06-a-proposal-is-created-under-its-domain-and-addressed.md` (a proposal addressed by its id alone after creation) and the clause "`/proposals/...` is unchanged" in `2026-10-17-one-address-per-journey-and-node.md`.
+
+Call: a proposal has one destination (a journey, a route or its draft, or the deployment; it may be one that does not exist yet, including the route a save-as-route creates), and every address of it is under that destination.
+
+- App: `/journeys/<id>/proposals/<proposal>`, `/routes/<id>/proposals/<proposal>` and `/entities/proposals/<proposal>` (the deployment's home is Entities, whose page already lists what the deployment holds), each with `/nodes/<key>` below it. The list of a destination's open proposals is the same address without the proposal. `/proposals/<id>` is no page: no alias, no redirect. The rail lights the destination's section, so a route's proposal lights Routes.
+- API: `GET` and `POST /api/journeys/{id}/proposals` (likewise `/api/routes/{id}/proposals` and `/api/deployment/proposals`) list and create; `GET`, `PATCH` and `POST` preview, apply, discard and refresh are on `.../proposals/{proposal}`. `/api/proposals/{id}...` is removed. A proposal asked for under a destination other than its own is a 404, before any write. `GET /api/proposals?scope=waiting|new_journeys|new_routes` lists what no one destination holds, and answers nothing else.
+- Lost responses (I6): an agent that lost an answer fetches or resubmits by id under the destination it used; it always knows it, since it chose it. The MCP tools take the destination beside the id (`get_proposal`, `edit_proposal`, `apply_proposal`, and the new `list_proposals`), and the in-browser root's per-proposal methods take it too.
+- Storage and the model are unchanged: the destination was already stored and never changes; two indexes (migration 0010) serve the lists.
+
+Alternatives: keep the id-only addresses and add lists beside them (a proposal would still have two homes, and the page for it would not know which rail entry to light); a top-level "Proposals" screen (a place to go looking, away from the thing the proposal is about; the ticket's test is finding it from its destination); the destination in a query on `/proposals/<id>` (the same sentence in the path, optional and able to disagree).
+
+What would change it: proposals whose destination can change, or a proposal that spans several destinations (a linked insertion across two graphs), which would need a home of its own.

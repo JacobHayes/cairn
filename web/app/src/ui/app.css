@@ -337,6 +337,12 @@ body {
     color: var(--chrome-ink);
   }
 }
+/* The open proposals' count beside the Proposals tab's name, in the tab bar and on the folded rail. */
+.tab-count {
+  margin-inline-start: var(--space-1);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
 .frame > .inspector[data-folded="true"] {
   width: var(--fold-w);
 }

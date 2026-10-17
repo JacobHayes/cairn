@@ -9,9 +9,9 @@ import type { JourneyTarget } from "./address.ts";
  * journey page's route.
  */
 export function useJourneyTarget(): JourneyTarget {
-  const { id, key, edge } = useParams();
-  if (id === undefined) {
+  const { journey, key, edge } = useParams();
+  if (journey === undefined) {
     throw new Error("not inside a journey page");
   }
-  return useMemo(() => ({ journey: id, node: key, edge }), [id, key, edge]);
+  return useMemo(() => ({ journey, node: key, edge }), [journey, key, edge]);
 }

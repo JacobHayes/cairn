@@ -15,9 +15,9 @@ use crate::query::{self, ParamSpec, schema_of};
 use crate::wire::{
     AgentToken, AssistantRequest, Capabilities, Conversation, EventPage, Health, History,
     JourneyPage, Mine, MintedToken, NodeDetail, PatchAnswer, PatchRequest, Problem, Projected,
-    ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalReview, ProposalStep,
-    RelinkRequest, RouteDetail, RouteImport, RoutePage, SaveAsRouteRequest, SearchPage, Tick,
-    TokenRequest, TurnReply, UpgradeRequest, Viewer,
+    ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalList, ProposalReview,
+    ProposalStep, RelinkRequest, RouteDetail, RouteImport, RoutePage, SaveAsRouteRequest,
+    SearchPage, Tick, TokenRequest, TurnReply, UpgradeRequest, Viewer,
 };
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, ExplainedField, ExplanationPage,
@@ -68,7 +68,7 @@ const fn operation(endpoint: &'static Endpoint, summary: &'static str) -> Operat
 const JOURNEY_ID: (&str, &str, SchemaFn) = ("id", "The journey.", schema_of::<JourneyId>);
 const ROUTE_ID: (&str, &str, SchemaFn) = ("id", "The route.", schema_of::<RouteId>);
 const PROPOSAL_ID: (&str, &str, SchemaFn) = (
-    "id",
+    "proposal",
     "The proposal, by its client-generated id.",
     schema_of::<ProposalId>,
 );
@@ -263,13 +263,13 @@ fn proposal_write<T: JsonSchema>(endpoint: &'static Endpoint, summary: &'static 
     }
 }
 
-/// Proposals: created against a domain, then addressed by id (I6, C14).
+/// Proposals: created against a domain, then listed and addressed under it (I6, C14).
 fn proposals() -> Vec<Operation> {
     use crate::endpoints as at;
     let create = "Creates a proposal for this domain, which may not exist yet, under a \
                   client-generated id; a create resubmitted under that id answers the proposal \
                   (I6).";
-    vec![
+    let mut all = vec![
         Operation {
             path: &[JOURNEY_ID],
             ..proposal_write::<ProposalCreate>(&at::PROPOSE_JOURNEY, create)
@@ -279,49 +279,94 @@ fn proposals() -> Vec<Operation> {
             ..proposal_write::<ProposalCreate>(&at::PROPOSE_ROUTE, create)
         },
         proposal_write::<ProposalCreate>(&at::PROPOSE_DEPLOYMENT, create),
+    ];
+    all.extend(proposals_under(
+        &at::JOURNEY_PROPOSALS,
+        &[JOURNEY_ID],
+        &[JOURNEY_ID, PROPOSAL_ID],
+    ));
+    all.extend(proposals_under(
+        &at::ROUTE_PROPOSALS,
+        &[ROUTE_ID],
+        &[ROUTE_ID, PROPOSAL_ID],
+    ));
+    all.extend(proposals_under(
+        &at::DEPLOYMENT_PROPOSALS,
+        &[],
+        &[PROPOSAL_ID],
+    ));
+    all.push(Operation {
+        query: query::PROPOSAL_SCOPE_PARAMS,
+        ..read::<ProposalList>(
+            &at::PROPOSALS,
+            "The open proposals no one destination holds: those waiting on the caller, and those \
+             that would create a journey or a route, newest first with their count (C14, C16).",
+        )
+    });
+    all
+}
+
+/// The operations on the proposals under one destination (I6, C14): `at` is the path
+/// parameters of the destination's list, `under` of one proposal.
+fn proposals_under(
+    set: &'static endpoints::ProposalEndpoints,
+    at: &'static [(&'static str, &'static str, SchemaFn)],
+    under: &'static [(&'static str, &'static str, SchemaFn)],
+) -> Vec<Operation> {
+    vec![
         Operation {
-            path: &[PROPOSAL_ID],
-            ..read::<Proposal>(
-                &at::PROPOSAL,
-                "A proposal: its destination, editing revision, status, and content (I6).",
+            path: at,
+            query: query::PROPOSAL_PARAMS,
+            ..read::<ProposalList>(
+                &set.list,
+                "The destination's open proposals, newest first, with their count and the \
+                 destination as it is now (C14).",
             )
         },
         Operation {
-            path: &[PROPOSAL_ID],
+            path: under,
+            ..read::<Proposal>(
+                &set.get,
+                "A proposal under this destination: its editing revision, status, and content \
+                 (I6).",
+            )
+        },
+        Operation {
+            path: under,
             ..proposal_write::<ProposalEdit>(
-                &at::EDIT_PROPOSAL,
+                &set.edit,
                 "Replaces its content against its editing revision; its destination does not \
                  move (H5).",
             )
         },
         Operation {
-            path: &[PROPOSAL_ID],
+            path: under,
             ..read::<ProposalReview>(
-                &at::PREVIEW_PROPOSAL,
+                &set.preview,
                 "What applying it now would do: unresolved items, violations, the graph and \
                  frontier after, consequences, and what moved since drafting (C14, D7, I6).",
             )
         },
         Operation {
-            path: &[PROPOSAL_ID],
+            path: under,
             body: Some(schema_of::<ProposalApply>),
             success: json::<PatchAnswer>(),
             patch: true,
             ..operation(
-                &at::APPLY_PROPOSAL,
+                &set.apply,
                 "Applies it at the reviewed editing revision, the caller confirming (H2); \
                  stale with what intervened when either revision moved (I6).",
             )
         },
         Operation {
-            path: &[PROPOSAL_ID],
-            ..proposal_write::<ProposalStep>(&at::DISCARD_PROPOSAL, "Discards it (I6).")
+            path: under,
+            ..proposal_write::<ProposalStep>(&set.discard, "Discards it (I6).")
         },
         Operation {
-            path: &[PROPOSAL_ID],
+            path: under,
             drafts: true,
             ..proposal_write::<ProposalStep>(
-                &at::REFRESH_PROPOSAL,
+                &set.refresh,
                 "Drafts it again on its destination as it stands, the reviewer's choices \
                  carried over; review it again before applying (I6).",
             )

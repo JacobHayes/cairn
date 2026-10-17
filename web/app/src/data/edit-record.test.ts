@@ -68,7 +68,7 @@ describe("the tab's edit records", () => {
 
 const proposalRecord = (id: string, delivery: EditRecord["delivery"] = { state: "unconfirmed" }): EditRecord => ({
   ...record(id, delivery),
-  command: { kind: "proposal", call: { op: "apply", proposal: "pr_one", request: { patch_id: id, reviewed_revision: 4 } } },
+  command: { kind: "proposal", call: { op: "apply", destination: { journey: "j_one" }, proposal: "pr_one", request: { patch_id: id, reviewed_revision: 4 } } },
 });
 const importRecord = (id: string): EditRecord => ({
   ...record(id),
@@ -90,10 +90,12 @@ describe("the records of proposal writes and imports", () => {
   it("are dropped when their request is not the one the record is named by, or lacks what it needs", () => {
     const apply = proposalRecord("p_a");
     const cases: unknown[] = [
-      { ...apply, command: { kind: "proposal", call: { op: "apply", proposal: "pr_one", request: { patch_id: "p_other", reviewed_revision: 4 } } } },
+      { ...apply, command: { kind: "proposal", call: { op: "apply", destination: { journey: "j_one" }, proposal: "pr_one", request: { patch_id: "p_other", reviewed_revision: 4 } } } },
       { ...apply, command: { kind: "proposal", call: { op: "apply", request: { patch_id: "p_a", reviewed_revision: 4 } } } },
       { ...apply, command: { kind: "proposal", call: { op: "explode", proposal: "pr_one", request: { patch_id: "p_a" } } } },
       { ...apply, command: { kind: "proposal", call: { op: "apply", proposal: "pr_one" } } },
+      // A write to a proposal names the destination it is under: without one it has no address to be sent to.
+      { ...apply, command: { kind: "proposal", call: { op: "apply", proposal: "pr_one", request: { patch_id: "p_a", reviewed_revision: 4 } } } },
       { ...importRecord("p_a"), command: { kind: "import", request: { patch_id: "p_a" } } },
       { ...importRecord("p_a"), command: { kind: "import", request: { patch_id: "p_other", file: {} } } },
     ];

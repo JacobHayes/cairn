@@ -18,6 +18,7 @@
 // them. Nothing redirects, and no earlier address is kept.
 import type { Schema } from "@cairn/client";
 
+import { addressOf, pathTo, proposalAddress, proposalIn, required } from "../address.ts";
 import type { JourneyIndexQuery } from "../data/host.ts";
 
 export type JourneyStatus = Schema<"JourneyStatus">;
@@ -116,11 +117,11 @@ function searchOf(params: URLSearchParams): string {
 }
 
 /** Home (`/`): what waits on the viewer, then their active journeys. */
-export const HOME_PATH = "/";
+export const HOME_PATH = pathTo("home");
 
 /** C16: the journey index, `/journeys`, its filters in the query. */
 export function indexPath(filters: IndexFilters = DEFAULT_FILTERS): string {
-  return `/journeys${searchOf(filterParams(filters))}`;
+  return `${pathTo("journeys")}${searchOf(filterParams(filters))}`;
 }
 
 /** B1: the new-journey form, `/journeys/new`, from a route's version when one is given. */
@@ -132,7 +133,7 @@ export function newJourneyPath(route?: string, version?: number): string {
       params.set("version", String(version));
     }
   }
-  return `/journeys/new${searchOf(params)}`;
+  return `${pathTo("journeyNew")}${searchOf(params)}`;
 }
 
 /** How a journey is drawn: the three projections of its nodes. */
@@ -188,10 +189,12 @@ export function screenOf(target: JourneyTarget, params: URLSearchParams): Screen
   return SCREENS.find((each) => each === view) ?? defaultScreen(target);
 }
 
-/** The path of `target` alone: `/journeys/<id>[/nodes/<key> | /edges/<from>~<to>]`. */
+/** The path of `target` alone: a journey, a node in it, or an edge (`<from>~<to>`). */
 function targetPath(target: JourneyTarget): string {
-  const place = target.node !== undefined ? `/nodes/${target.node}` : target.edge !== undefined ? `/edges/${target.edge}` : "";
-  return `/journeys/${target.journey}${place}`;
+  if (target.node !== undefined) {
+    return pathTo("journeyNode", { journey: target.journey, key: target.node });
+  }
+  return target.edge !== undefined ? pathTo("journeyEdge", { journey: target.journey, edge: target.edge }) : pathTo("journey", { journey: target.journey });
 }
 
 /**
@@ -212,34 +215,36 @@ export function journeyPath(target: JourneyTarget, screen: Screen = defaultScree
 }
 
 /**
- * The journey address `pathname` is, or none for any other page (`/journeys/new` is not one). Only
- * `nodeOpened` reads a path, since it serves pages that are not a journey's; a component on a
- * journey page takes its target from the router (`useJourneyTarget`).
- */
-function journeyTargetOf(pathname: string): JourneyTarget | undefined {
-  const found = /^\/journeys\/([^/]+)(?:\/nodes\/([^/]+)|\/edges\/([^/]+))?$/.exec(pathname);
-  if (found === null || found[1] === undefined || (found[1] === "new" && found[2] === undefined && found[3] === undefined)) {
-    return undefined;
-  }
-  return { journey: found[1], node: found[2], edge: found[3] };
-}
-
-/**
  * From the page at `pathname` + `search`, the same page with node `key` open, or none when `key`
  * is undefined; an open edge closes either way. On a journey page the view stays the one shown
- * (the address's default can change with the node, the view does not). On another page with a
- * detail column (a route's draft, a proposal) `/nodes/<key>` or `/edges/...` is taken off its path
- * and `/nodes/<key>` added.
+ * (the address's default can change with the node, the view does not). A route's draft and a
+ * proposal's review (under any destination) take the node in their own path; any other page is
+ * unchanged.
  */
 export function nodeOpened(location: string, search: string, key: string | undefined): string {
-  const pathname = location.length > 1 ? location.replace(/\/+$/, "") : location;
-  const target = journeyTargetOf(pathname);
-  if (target !== undefined) {
-    const screen = screenOf(target, new URLSearchParams(search));
-    return journeyPath({ journey: target.journey, node: key }, screen, search);
+  const at = addressOf(location);
+  const query = withQuestion(search);
+  // The open proposals have no node to close; a node opened from them is opened on the journey.
+  if (at?.name === "journeyProposals") {
+    return key === undefined ? `${location}${query}` : journeyPath({ journey: required(at.params, "journey"), node: key }, "graph", search);
   }
-  const page = pathname.replace(/\/(?:nodes|edges)\/[^/]*$/, "");
-  return `${key === undefined ? page : `${page}/nodes/${key}`}${withQuestion(search)}`;
+  switch (at?.name) {
+    case "journey":
+    case "journeyNode":
+    case "journeyEdge": {
+      const target = { journey: required(at.params, "journey"), node: at.params.key, edge: at.params.edge };
+      return journeyPath({ journey: target.journey, node: key }, screenOf(target, new URLSearchParams(search)), search);
+    }
+    case "routeDraft":
+    case "routeDraftNode": {
+      const route = required(at.params, "route");
+      return `${key === undefined ? pathTo("routeDraft", { route }) : pathTo("routeDraftNode", { route, key })}${query}`;
+    }
+    default: {
+      const proposal = at === undefined ? undefined : proposalIn(at);
+      return proposal === undefined ? `${location}${query}` : `${proposalAddress(proposal.destination, proposal.proposal, key)}${query}`;
+    }
+  }
 }
 
 /**

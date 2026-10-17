@@ -1,7 +1,7 @@
 // The frame's state: which of the inspector column's panes have something in them, which tab
 // is in view, whether the viewer hid the column (`]`), and where Esc takes the sheet.
 // The screens report through `FrameActions` (frame.tsx); the shell reads the result.
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import type { SheetSnap } from "./InspectorColumn.tsx";
@@ -25,6 +25,9 @@ export interface Frame {
   choose: (tab: InspectorTab) => void;
   setInspector: (element: HTMLElement | null) => void;
   setAssistant: (element: HTMLElement | null) => void;
+  setProposals: (element: HTMLElement | null) => void;
+  /** The tabs on offer, in order. */
+  tabs: InspectorTab[];
 }
 
 /** The assistant's opener for screens: opens it, and brings it into view when already open but hidden or behind the other tab. */
@@ -71,16 +74,19 @@ function useFrameKeys({ tab, dock, closeTo }: { tab: InspectorTab; dock: Assista
   }, [tab, dock, closeTo, navigate, fold]);
 }
 
-export function useFrame(): Frame {
-  const [inspector, setInspector] = useState<HTMLElement | null>(null);
-  const [assistant, setAssistant] = useState<HTMLElement | null>(null);
-  const [counts, setCounts] = useState({ inspector: 0, assistant: 0 });
-  const [tab, setTab] = useState<InspectorTab>("inspector");
-  const [dock, setDock] = useState<AssistantDock | undefined>(undefined);
-  const [hidden, setHidden] = useState(false);
-  const [snap, setSnap] = useState<SheetSnap>("half");
-  const [closeTo, setCloseTo] = useState<string | undefined>(undefined);
-  const actions = useMemo<FrameActions>(
+/** The setters the frame's actions write through. */
+interface Setters {
+  setCounts: Dispatch<SetStateAction<{ inspector: number; assistant: number; proposals: number }>>;
+  setTab: (tab: InspectorTab) => void;
+  setHidden: (hidden: boolean) => void;
+  setDock: Dispatch<SetStateAction<AssistantDock | undefined>>;
+  setProposalsCount: (count: number | undefined) => void;
+  setCloseTo: (address: string | undefined) => void;
+}
+
+/** What screens tell the shell: stable for the shell's life, so effects keyed on it run once. */
+function useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo }: Setters): FrameActions {
+  return useMemo<FrameActions>(
     () => ({
       mount: (slot) => {
         setCounts((now) => ({ ...now, [slot]: now[slot] + 1 }));
@@ -98,14 +104,35 @@ export function useFrame(): Frame {
           setDock((now) => (now === next ? undefined : now));
         };
       },
+      countProposals: (count) => {
+        setProposalsCount(count);
+        return () => {
+          setProposalsCount(undefined);
+        };
+      },
       closeTo: setCloseTo,
     }),
-    [],
+    [setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo],
   );
+}
+
+export function useFrame(): Frame {
+  const [inspector, setInspector] = useState<HTMLElement | null>(null);
+  const [assistant, setAssistant] = useState<HTMLElement | null>(null);
+  const [proposals, setProposals] = useState<HTMLElement | null>(null);
+  const [proposalsCount, setProposalsCount] = useState<number | undefined>(undefined);
+  const [counts, setCounts] = useState({ inspector: 0, assistant: 0, proposals: 0 });
+  const [tab, setTab] = useState<InspectorTab>("inspector");
+  const [dock, setDock] = useState<AssistantDock | undefined>(undefined);
+  const [hidden, setHidden] = useState(false);
+  const [snap, setSnap] = useState<SheetSnap>("half");
+  const [closeTo, setCloseTo] = useState<string | undefined>(undefined);
+  const actions = useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo });
   // A pane with nothing in it cannot be the tab in view.
-  const shown: InspectorTab = counts.assistant > 0 && (counts.inspector === 0 || tab === "assistant") ? "assistant" : "inspector";
+  const order: InspectorTab[] = [tab, "inspector", "assistant", "proposals"];
+  const shown: InspectorTab = order.find((each) => counts[each] > 0) ?? "inspector";
   // An offered assistant keeps the column, and so its tabs, on screen: they are its only way in.
-  const present = counts.inspector > 0 || counts.assistant > 0 || dock !== undefined;
+  const present = counts.inspector > 0 || counts.assistant > 0 || counts.proposals > 0 || dock !== undefined;
   // A phone stacks the inspector under the page, except over the full-screen map, where it is a sheet that can be hidden.
   const stacked = useMedia(PHONE_WIDTH) && new URLSearchParams(useLocation().search).get("map") !== "1";
   const toggleFolded = useCallback(() => {
@@ -113,7 +140,12 @@ export function useFrame(): Frame {
   }, []);
   useFrameKeys({ tab: shown, dock, closeTo }, toggleFolded);
   const openAssistant = useOpenAssistant(dock, actions);
-  const state = useMemo<FrameState>(() => ({ inspector, assistant, tab: shown, openAssistant }), [inspector, assistant, shown, openAssistant]);
+  const state = useMemo<FrameState>(() => ({ inspector, assistant, proposals, proposalsCount, tab: shown, openAssistant }), [inspector, assistant, proposals, proposalsCount, shown, openAssistant]);
+  // The inspector's tab is there where it has something, or the assistant's does (its tabs are its only way in), or nothing else is.
+  const tabs = useMemo<InspectorTab[]>(
+    () => [...(counts.inspector > 0 || dock !== undefined || counts.proposals === 0 ? (["inspector"] as const) : []), ...(dock === undefined ? [] : (["assistant"] as const)), ...(counts.proposals > 0 ? (["proposals"] as const) : [])],
+    [dock, counts.inspector, counts.proposals],
+  );
   return {
     state,
     actions,
@@ -134,5 +166,7 @@ export function useFrame(): Frame {
     },
     setInspector,
     setAssistant,
+    setProposals,
+    tabs,
   };
 }

@@ -62,10 +62,97 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The destination's open proposals, newest first, with their count and the destination as it is now (C14). */
+        get: operations["listDeploymentProposals"];
         put?: never;
         /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6). */
         post: operations["proposeToDeployment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/deployment/proposals/{proposal}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A proposal under this destination: its editing revision, status, and content (I6). */
+        get: operations["getDeploymentProposal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Replaces its content against its editing revision; its destination does not move (H5). */
+        patch: operations["editDeploymentProposal"];
+        trace?: never;
+    };
+    "/api/deployment/proposals/{proposal}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6). */
+        post: operations["applyDeploymentProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/deployment/proposals/{proposal}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discards it (I6). */
+        post: operations["discardDeploymentProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/deployment/proposals/{proposal}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6). */
+        post: operations["previewDeploymentProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/deployment/proposals/{proposal}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6). */
+        post: operations["refreshDeploymentProposal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -352,10 +439,97 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The destination's open proposals, newest first, with their count and the destination as it is now (C14). */
+        get: operations["listJourneyProposals"];
         put?: never;
         /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6). */
         post: operations["proposeToJourney"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journeys/{id}/proposals/{proposal}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A proposal under this destination: its editing revision, status, and content (I6). */
+        get: operations["getJourneyProposal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Replaces its content against its editing revision; its destination does not move (H5). */
+        patch: operations["editJourneyProposal"];
+        trace?: never;
+    };
+    "/api/journeys/{id}/proposals/{proposal}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6). */
+        post: operations["applyJourneyProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journeys/{id}/proposals/{proposal}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discards it (I6). */
+        post: operations["discardJourneyProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journeys/{id}/proposals/{proposal}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6). */
+        post: operations["previewJourneyProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/journeys/{id}/proposals/{proposal}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6). */
+        post: operations["refreshJourneyProposal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -481,86 +655,17 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/proposals/{id}": {
+    "/api/proposals": {
         parameters: {
             query?: never;
             header?: never;
             path?: never;
             cookie?: never;
         };
-        /** A proposal: its destination, editing revision, status, and content (I6). */
-        get: operations["getProposal"];
+        /** The open proposals no one destination holds: those waiting on the caller, and those that would create a journey or a route, newest first with their count (C14, C16). */
+        get: operations["listProposals"];
         put?: never;
         post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        /** Replaces its content against its editing revision; its destination does not move (H5). */
-        patch: operations["editProposal"];
-        trace?: never;
-    };
-    "/api/proposals/{id}/apply": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6). */
-        post: operations["applyProposal"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/proposals/{id}/discard": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Discards it (I6). */
-        post: operations["discardProposal"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/proposals/{id}/preview": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6). */
-        post: operations["previewProposal"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/proposals/{id}/refresh": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6). */
-        post: operations["refreshProposal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -677,10 +782,97 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** The destination's open proposals, newest first, with their count and the destination as it is now (C14). */
+        get: operations["listRouteProposals"];
         put?: never;
         /** Creates a proposal for this domain, which may not exist yet, under a client-generated id; a create resubmitted under that id answers the proposal (I6). */
         post: operations["proposeToRoute"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routes/{id}/proposals/{proposal}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** A proposal under this destination: its editing revision, status, and content (I6). */
+        get: operations["getRouteProposal"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /** Replaces its content against its editing revision; its destination does not move (H5). */
+        patch: operations["editRouteProposal"];
+        trace?: never;
+    };
+    "/api/routes/{id}/proposals/{proposal}/apply": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Applies it at the reviewed editing revision, the caller confirming (H2); stale with what intervened when either revision moved (I6). */
+        post: operations["applyRouteProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routes/{id}/proposals/{proposal}/discard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Discards it (I6). */
+        post: operations["discardRouteProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routes/{id}/proposals/{proposal}/preview": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** What applying it now would do: unresolved items, violations, the graph and frontier after, consequences, and what moved since drafting (C14, D7, I6). */
+        post: operations["previewRouteProposal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/routes/{id}/proposals/{proposal}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Drafts it again on its destination as it stands, the reviewer's choices carried over; review it again before applying (I6). */
+        post: operations["refreshRouteProposal"];
         delete?: never;
         options?: never;
         head?: never;
@@ -834,6 +1026,8 @@ export interface components {
         } | {
             /** @description Why it is a proposal. */
             because: components["schemas"]["Because"];
+            /** @description Its destination, under which it is addressed (I6). */
+            destination: components["schemas"]["Domain"];
             /** @constant */
             outcome: "proposed";
             /** @description The proposal. */
@@ -1637,6 +1831,21 @@ export interface components {
              * @description The today it was derived for.
              */
             today: string;
+        };
+        /** @description What a proposal's destination is. */
+        DestinationKind: "journey" | "route" | "segment" | "deployment";
+        /** @description A proposal's destination as it is now (C14). */
+        DestinationNow: {
+            /** @description Whether it exists. */
+            exists: boolean;
+            /** @description What it is. */
+            kind: components["schemas"]["DestinationKind"];
+            /** @description Its name, when it exists and has one. */
+            name?: components["schemas"]["Title"] | null;
+            /** @description Its revision; 0 when it does not exist. */
+            revision: components["schemas"]["Revision"];
+            /** @description A journey's status. */
+            status?: components["schemas"]["JourneyStatus"] | null;
         };
         /**
          * @description D8: the one state every surface shows for a node, composed from relevance, stored state,
@@ -3742,6 +3951,16 @@ export interface components {
             /** @description The write's patch id (H5). */
             patch_id: components["schemas"]["PatchId"];
         };
+        /** @description Where a proposal listing resumes: pass its two fields as `after_at` and `after`. */
+        ProposalCursor: {
+            /**
+             * Format: date-time
+             * @description When the last proposal of the page before was created.
+             */
+            created_at: string;
+            /** @description Its id. */
+            id: components["schemas"]["ProposalId"];
+        };
         /** @description A proposal's content: what creating or editing it carries. */
         ProposalDraft: {
             description?: components["schemas"]["Markdown"] | null;
@@ -3764,6 +3983,25 @@ export interface components {
         };
         /** @description Starts with "pr_"; at most id_bytes_max (64) bytes. */
         ProposalId: string;
+        /** @description A page of open proposals, newest first (C14, C16). */
+        ProposalList: {
+            /**
+             * Format: uint32
+             * @description How many open proposals the listing holds in all.
+             */
+            count: number;
+            /**
+             * @description A destination's listing: the destination as it is now, so a header does not depend on
+             *     having rows.
+             */
+            destination?: components["schemas"]["DestinationNow"] | null;
+            /** @description The proposals. */
+            items: components["schemas"]["ProposalSummary"][];
+            /** @description Pass as `after_at` and `after` for the next page. */
+            next?: components["schemas"]["ProposalCursor"] | null;
+        };
+        /** @description Which open proposals `GET /api/proposals` lists: those no one destination holds. */
+        ProposalListing: "waiting" | "new_journeys" | "new_routes";
         /**
          * @description What a proposal would do to its destination now (C14, I6), for review: the items still
          *     unresolved, and the candidate the resolved mutations produce, with every violation strict
@@ -3825,6 +4063,30 @@ export interface components {
             base_revision: components["schemas"]["Revision"];
             /** @description The write's patch id (H5). */
             patch_id: components["schemas"]["PatchId"];
+        };
+        /** @description An open proposal in a listing (C14). */
+        ProposalSummary: {
+            /**
+             * Format: date-time
+             * @description When it was created.
+             */
+            created_at: string;
+            /** @description The user it was created by or for. */
+            created_by: components["schemas"]["UserId"];
+            /** @description Its destination. */
+            destination: components["schemas"]["Domain"];
+            /** @description The destination's revision it was drafted against. */
+            drafted_against: components["schemas"]["Revision"];
+            /** @description The proposal. */
+            id: components["schemas"]["ProposalId"];
+            /** @description Its destination as it is now. */
+            now: components["schemas"]["DestinationNow"];
+            /** @description The agent that drafted it, if any. */
+            proposing_agent?: components["schemas"]["AgentId"] | null;
+            /** @description Its editing revision. */
+            revision: components["schemas"]["Revision"];
+            /** @description What it proposes, in a line. */
+            title: components["schemas"]["Title"];
         };
         /** @description A node's origin in a journey (PRD glossary, Provenance). */
         Provenance: "from_route" | "local" | "orphaned" | "from_segment";
@@ -5170,6 +5432,79 @@ export interface operations {
             };
         };
     };
+    listDeploymentProposals: {
+        parameters: {
+            query?: {
+                /** @description The page starts after the proposal created at this time (with `after`). */
+                after_at?: string;
+                /** @description The page starts after this proposal (with `after_at`). */
+                after?: components["schemas"]["ProposalId"];
+                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalList"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
     proposeToDeployment: {
         parameters: {
             query?: never;
@@ -5253,6 +5588,634 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getDeploymentProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    editDeploymentProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalEdit"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    applyDeploymentProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalApply"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    discardDeploymentProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalStep"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    previewDeploymentProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalReview"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    refreshDeploymentProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalStep"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */
@@ -6755,6 +7718,91 @@ export interface operations {
             };
         };
     };
+    listJourneyProposals: {
+        parameters: {
+            query?: {
+                /** @description The page starts after the proposal created at this time (with `after`). */
+                after_at?: string;
+                /** @description The page starts after this proposal (with `after_at`). */
+                after?: components["schemas"]["ProposalId"];
+                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                size?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalList"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
     proposeToJourney: {
         parameters: {
             query?: never;
@@ -6850,6 +7898,646 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getJourneyProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    editJourneyProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalEdit"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    applyJourneyProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalApply"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    discardJourneyProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalStep"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    previewJourneyProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalReview"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    refreshJourneyProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The journey. */
+                id: components["schemas"]["JourneyId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalStep"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */
@@ -7559,14 +9247,20 @@ export interface operations {
             };
         };
     };
-    getProposal: {
+    listProposals: {
         parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The proposal, by its client-generated id. */
-                id: components["schemas"]["ProposalId"];
+            query: {
+                /** @description Which open proposals to list. */
+                scope: components["schemas"]["ProposalListing"];
+                /** @description The page starts after the proposal created at this time (with `after`). */
+                after_at?: string;
+                /** @description The page starts after this proposal (with `after_at`). */
+                after?: components["schemas"]["ProposalId"];
+                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                size?: number;
             };
+            header?: never;
+            path?: never;
             cookie?: never;
         };
         requestBody?: never;
@@ -7577,7 +9271,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["Proposal"];
+                    "application/json": components["schemas"]["ProposalList"];
                 };
             };
             /** @description The request is malformed. */
@@ -7605,565 +9299,6 @@ export interface operations {
                 };
                 content: {
                     "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
-    editProposal: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The proposal, by its client-generated id. */
-                id: components["schemas"]["ProposalId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProposalEdit"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposalAnswer"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The body is over the request size limit. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The body is not application/json. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Invalid: every violation, by path (A15). */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
-    applyProposal: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The proposal, by its client-generated id. */
-                id: components["schemas"]["ProposalId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProposalApply"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PatchAnswer"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The body is over the request size limit. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The body is not application/json. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Invalid: every violation, by path (A15). */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
-    discardProposal: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The proposal, by its client-generated id. */
-                id: components["schemas"]["ProposalId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProposalStep"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposalAnswer"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The body is over the request size limit. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The body is not application/json. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Invalid: every violation, by path (A15). */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
-    previewProposal: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The proposal, by its client-generated id. */
-                id: components["schemas"]["ProposalId"];
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposalReview"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The server failed; the request id names it in the logs. */
-            500: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
-            503: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                    "text/plain": string;
-                };
-            };
-        };
-    };
-    refreshProposal: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                /** @description The proposal, by its client-generated id. */
-                id: components["schemas"]["ProposalId"];
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["ProposalStep"];
-            };
-        };
-        responses: {
-            /** @description Answered. */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["ProposalAnswer"];
-                };
-            };
-            /** @description The request is malformed. */
-            400: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description No credential, or one that is refused (the auth layer, in text). */
-            401: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
-            403: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "text/plain": string;
-                };
-            };
-            /** @description No such resource. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Stale (with what intervened) or a reused patch id (H5). */
-            409: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"];
-                };
-            };
-            /** @description The body is over the request size limit. */
-            413: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description The body is not application/json. */
-            415: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Problem"];
-                };
-            };
-            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
-            422: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */
@@ -8835,6 +9970,91 @@ export interface operations {
             };
         };
     };
+    listRouteProposals: {
+        parameters: {
+            query?: {
+                /** @description The page starts after the proposal created at this time (with `after`). */
+                after_at?: string;
+                /** @description The page starts after this proposal (with `after_at`). */
+                after?: components["schemas"]["ProposalId"];
+                /** @description Items per page, 1 to the page limit (200); larger sizes are cut to it. */
+                size?: number;
+            };
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalList"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
     proposeToRoute: {
         parameters: {
             query?: never;
@@ -8930,6 +10150,646 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    getRouteProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Proposal"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    editRouteProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalEdit"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    applyRouteProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalApply"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PatchAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    discardRouteProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalStep"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    previewRouteProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalReview"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    refreshRouteProposal: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description The route. */
+                id: components["schemas"]["RouteId"];
+                /** @description The proposal, by its client-generated id. */
+                proposal: components["schemas"]["ProposalId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ProposalStep"];
+            };
+        };
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProposalAnswer"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description No such resource. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Stale (with what intervened) or a reused patch id (H5). */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"];
+                };
+            };
+            /** @description The body is over the request size limit. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description The body is not application/json. */
+            415: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description Invalid: every violation, by path (A15); or a problem when it cannot be drafted (B7, B8, B9). */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Rejection"] | components["schemas"]["Problem"];
                 };
             };
             /** @description The server failed; the request id names it in the logs. */

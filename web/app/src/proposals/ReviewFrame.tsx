@@ -6,12 +6,14 @@
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 
+import { pathTo, proposalsAddress } from "../address.ts";
 import { useUserWords } from "../data/react.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import type { Graph } from "../authoring/graph.ts";
-import { journeyPath } from "../journeys/address.ts";
-import { routeDetailPath } from "../routes/address.ts";
+import { indexPath, journeyPath } from "../journeys/address.ts";
+import { ROUTES_INDEX_PATH, routeCanvasPath } from "../routes/address.ts";
+import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import {
   DIFF_LABELS,
   filterOf,
@@ -39,31 +41,74 @@ export const BLOCKER_WORDS: Record<Blocker, string> = {
 
 const FILTER_WORDS: Record<ReviewFilter, string> = { all: "All", conflicts: "Conflicts", add: "Add", change: "Change", remove: "Remove" };
 
-/** Where the proposal goes, as a link, named the way the screens name it. */
-function DestinationLink({ proposal, journeyTitle }: { proposal: Proposal; journeyTitle: string | undefined }) {
+/** Whether applying the proposal creates its destination: it was drafted against revision 0, and has not been applied. */
+function creates(proposal: Proposal): boolean {
+  return proposal.draft.destination_revision === 0 && proposal.status !== "applied" && proposal.destination !== "deployment";
+}
+
+/** The page of the proposal's destination: the journey, the route's draft or latest version, or Entities for the deployment; none for one it has yet to create. */
+function destinationPage(proposal: Proposal): string | undefined {
   const destination = proposal.destination;
   if (destination === "deployment") {
-    return <span>the deployment</span>;
+    return pathTo("entities");
   }
-  if ("journey" in destination) {
-    return proposal.draft.destination_revision === 0 ? <span>a new journey</span> : <Link to={journeyPath({ journey: destination.journey })}>{journeyTitle ?? "the journey"}</Link>;
+  if (creates(proposal)) {
+    return undefined;
   }
-  return <Link to={routeDetailPath(destination.route)}>the route {destination.route}</Link>;
+  return "journey" in destination ? journeyPath({ journey: destination.journey }) : routeCanvasPath(destination.route, undefined, DEFAULT_VIEW);
+}
+
+/** How the destination is named: its name when it has one, else what the proposal would create. */
+function destinationName(proposal: Proposal, name: string | undefined): string {
+  const destination = proposal.destination;
+  if (destination === "deployment") {
+    return "Entities";
+  }
+  if (creates(proposal)) {
+    return "route" in destination ? `a new route ${destination.route}` : "a new journey";
+  }
+  return name ?? ("route" in destination ? `the route ${destination.route}` : "the journey");
+}
+
+/** Where the proposal goes, as a link when its destination is there to open. */
+function DestinationLink({ proposal, name }: { proposal: Proposal; name: string | undefined }) {
+  const page = destinationPage(proposal);
+  const words = destinationName(proposal, name);
+  return page === undefined ? <span>{words}</span> : <Link to={page}>{words}</Link>;
 }
 
 /** Who the proposal is for and by whom, at the top of the proposal card. */
-export function ProposalOrigin({ proposal, journeyTitle }: { proposal: Proposal; journeyTitle: string | undefined }) {
+export function ProposalOrigin({ proposal, name }: { proposal: Proposal; name: string | undefined }) {
   const userWords = useUserWords();
   return (
     <p className="muted small">
-      For <DestinationLink proposal={proposal} journeyTitle={journeyTitle} />, proposed by {userWords(proposal.created_by)}
+      For <DestinationLink proposal={proposal} name={name} />, proposed by {userWords(proposal.created_by)}
       {proposal.proposing_agent == null ? "" : ` with the agent ${proposal.proposing_agent}`}.
     </p>
   );
 }
 
+/** The way back, above the title: the destination's page, then its open proposals (a destination yet to be created has the index that lists it instead). */
+function Trail({ proposal, name }: { proposal: Proposal; name: string | undefined }) {
+  const destination = proposal.destination;
+  const forRoute = destination !== "deployment" && "route" in destination;
+  const index = creates(proposal) ? (forRoute ? ROUTES_INDEX_PATH : indexPath()) : undefined;
+  return (
+    <nav className="muted small review-trail" aria-label="Where this proposal is" data-testid="review-trail">
+      {index === undefined ? (
+        <>
+          <DestinationLink proposal={proposal} name={name} /> &rsaquo; <Link to={proposalsAddress(destination)}>Open proposals</Link>
+        </>
+      ) : (
+        <Link to={index}>{forRoute ? "Routes" : "Journeys"} &rsaquo; Proposed</Link>
+      )}
+    </nav>
+  );
+}
+
 export interface ReviewHeaderProps {
   proposal: Proposal;
+  name: string | undefined;
   itemCount: number;
   conflictCount: number;
   blockers: Blocker[];
@@ -73,11 +118,12 @@ export interface ReviewHeaderProps {
 }
 
 /** One line: the proposal's name, its size and conflicts, Apply (off, and saying why on hover, while anything blocks it), and the `⋯` with Discard. */
-export function ReviewHeader({ proposal, itemCount, conflictCount, blockers, disabled, onApply, onDiscard }: ReviewHeaderProps) {
+export function ReviewHeader({ proposal, name, itemCount, conflictCount, blockers, disabled, onApply, onDiscard }: ReviewHeaderProps) {
   const journey = proposal.destination !== "deployment" && "journey" in proposal.destination ? proposal.destination.journey : undefined;
   const open = proposal.status === "open";
   return (
     <section className="stack route-header" aria-label={proposal.draft.title} data-testid="review-header">
+      <Trail proposal={proposal} name={name} />
       <div className="row">
         <h1 data-testid="proposal-title">{proposal.draft.title}</h1>
         <Badge tone={open ? "plain" : proposal.status === "applied" ? "good" : "warn"} data-testid="proposal-status" data-status={proposal.status}>

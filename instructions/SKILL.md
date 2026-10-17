@@ -96,7 +96,9 @@ person should see it whole first. A proposal has an id you choose (`pr_` and a s
 own editing revision, and the destination revision it was drafted against. Review it with
 `get_proposal` and `review`; a person applies it with `apply_proposal`. Upgrades, saving a
 journey as a route, and re-linking are always proposals (`upgrade`, `save_as_route`,
-`relink`).
+`relink`). A proposal you lost the id of is found again with `list_proposals` (the ones
+under a destination, the ones waiting on the caller, or the ones that would create a journey
+or route); a proposal stays listed until it is applied or discarded.
 
 `apply_patch` takes any patch to a journey, a route's draft, or the deployment, when no
 other tool fits.
@@ -149,9 +151,9 @@ Each workflow is also served as an MCP prompt by its name.
 | Need | Tools |
 |---|---|
 | Where things stand | `get_snapshot`, `list_frontier`, `get_node`, `get_level`, `get_history` |
-| Find things | `list_journeys`, `list_routes`, `get_route`, `search` |
+| Find things | `list_journeys`, `list_routes`, `list_proposals`, `get_route`, `search` |
 | Change state | `answer_decision`, `transition_node`, `assign`, `set_date`, `snooze`, `unsnooze`, `override`, `resolve_date_conflict` |
-| Change structure | `create_proposal`, `get_proposal`, `edit_proposal`, `apply_proposal`, `apply_patch` |
+| Change structure | `create_proposal`, `list_proposals`, `get_proposal`, `edit_proposal`, `apply_proposal`, `apply_patch` |
 | Journeys and routes | `create_journey`, `open_draft`, `publish_draft`, `import_route`, `export_route` |
 | Lineage | `upgrade`, `save_as_route`, `relink` |
 | People and teams | `manage_entity` |

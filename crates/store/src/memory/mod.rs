@@ -384,6 +384,13 @@ impl Store for MemoryStore {
         ready(Ok(self.state().journeys(query)))
     }
 
+    fn proposals(
+        &self,
+        query: &crate::query::ProposalQuery,
+    ) -> impl Future<Output = Result<crate::query::ProposalPage, StoreError>> + Send {
+        ready(Ok(self.state().proposals(query)))
+    }
+
     fn route_detail(
         &self,
         route: &cairn_schema::RouteId,

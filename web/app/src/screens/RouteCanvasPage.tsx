@@ -12,6 +12,8 @@ import type { Schema } from "@cairn/client";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
+import { required } from "../address.ts";
+import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
 import { ConnectContext, DrawingBanner, useEdgeDrawing } from "../authoring/connect.tsx";
 import { ruleFoot } from "../authoring/dates.ts";
 import { treeOf, type GraphNode } from "../authoring/graph.ts";
@@ -28,14 +30,14 @@ import { useLaidOut } from "../canvas/hooks.ts";
 import { routeStepDrawing, routeStepOf, stepsFor, withStep } from "../canvas/ladder.ts";
 import { cardsOf, linesOf, type CanvasModel, type Step } from "../canvas/model.ts";
 import type { CardActions } from "../canvas/NodeCard.tsx";
-import { DEFAULT_VIEW, graphQueryFromOld, layoutViewOf, paramsOf, searchOf, viewFrom, type CanvasView } from "../canvas/settings.ts";
+import { DEFAULT_VIEW, graphQueryFromOld, layoutViewOf, viewFrom, type CanvasView } from "../canvas/settings.ts";
 import type { Route } from "../data/host.ts";
 import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { useDeployment, useKeyedRead, useSession } from "../data/react.ts";
 import { COLUMN, Inspector, useMedia } from "../shell/frame.tsx";
 import { useEscapeTo } from "../shell/useEscapeTo.ts";
 import { openDraft } from "../routes/model.ts";
-import { ROUTES_PATH, routeDetailPath } from "../routes/address.ts";
+import { ROUTES_PATH, routeCanvasPath, routeDetailPath, routeNodePath } from "../routes/address.ts";
 import type { ImportedHandler } from "../routes/ImportFile.tsx";
 import { useInserting } from "../segments/entry.ts";
 import { InsertionCanvas } from "../segments/Preview.tsx";
@@ -48,21 +50,6 @@ import { useScreenWrite, type ScreenWrite } from "./write.ts";
 interface Result {
   words: string;
   notices: Schema<"Notice">[];
-}
-
-/** The path of a route's canvas: its draft, or `version`, keeping what the canvas shows. */
-export function routeCanvasPath(route: string, version: number | undefined, view: CanvasView): string {
-  const params = paramsOf(view);
-  if (version !== undefined) {
-    params.set("version", String(version));
-  }
-  const query = params.toString();
-  return `/routes/${route}${version === undefined ? "/draft" : ""}${query === "" ? "" : `?${query}`}`;
-}
-
-/** A draft node's form in the inspector beside the route's canvas, keeping what the canvas shows. */
-export function routeNodePath(route: string, view: CanvasView, node: string): string {
-  return `/routes/${route}/draft/nodes/${node}${searchOf(view)}`;
 }
 
 /** C2: the shown graph's level, from the derive worker, with no journey state, and each card's marks (the date rule, and an unanchored notice). */
@@ -391,8 +378,21 @@ function EmptyRoute({ route, write }: { route: Route; write: ScreenWrite }) {
   );
 }
 
+/** A route's page: its draft or a version, and its open proposals in the inspector's Proposals tab (C14). */
 export function RouteCanvasPage() {
-  const { id = "", key: selected } = useParams();
+  const route = required(useParams(), "route");
+  return (
+    <>
+      <RoutePage />
+      <DestinationProposals destination={{ route }} />
+    </>
+  );
+}
+
+function RoutePage() {
+  const at = useParams();
+  const id = required(at, "route");
+  const selected = at.key;
   const { search } = useLocation();
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const listed = params.get("view") === "list";

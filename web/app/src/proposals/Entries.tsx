@@ -8,6 +8,8 @@ import type { Schema } from "@cairn/client";
 import { useState } from "react";
 import { useNavigate } from "react-router";
 
+import { proposalAddress } from "../address.ts";
+import { destinationOf } from "../data/edit-record.ts";
 import { breakdownMutations } from "../authoring/StructureEditors.tsx";
 import { slugOf } from "../authoring/keys.ts";
 import { Picker } from "../authoring/parts.tsx";
@@ -15,7 +17,7 @@ import { journeyAuthored } from "../authoring/target.ts";
 import type { NodeKind } from "../authoring/graph.ts";
 import { isSegment, routeIndex } from "../data/reads.ts";
 import { isPatchAnswer } from "../data/writes.ts";
-import { newProposalId, proposalOf, proposalPath } from "../data/proposals.ts";
+import { newProposalId, proposalOf } from "../data/proposals.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
 import type { Ready } from "../detail/model.ts";
@@ -45,7 +47,7 @@ export function useDraftAndOpen(edit: string, label?: string) {
       }
       after?.(answer);
       if (write.mounted()) {
-        void navigate(proposalPath(proposalOf(answer)?.id ?? id));
+        void navigate(proposalAddress(destinationOf(asked), proposalOf(answer)?.id ?? id));
       }
     });
   };

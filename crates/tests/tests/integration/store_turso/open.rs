@@ -169,6 +169,8 @@ mod open {
                 "ALTER TABLE answers DROP COLUMN rationale",
                 "ALTER TABLE routes DROP COLUMN kind",
                 "DROP TABLE insertions",
+                "DROP INDEX proposals_by_destination",
+                "DROP INDEX proposals_by_creator",
                 "DELETE FROM schema_migrations WHERE version >= 5",
             ] {
                 connection.execute(statement, ()).await.unwrap();
@@ -250,6 +252,12 @@ mod open {
                      SELECT id, '{node}', '{until}' FROM graphs"
                 );
                 connection.execute(&insert, ()).await.unwrap();
+            }
+            for statement in [
+                "DROP INDEX proposals_by_destination",
+                "DROP INDEX proposals_by_creator",
+            ] {
+                connection.execute(statement, ()).await.unwrap();
             }
             connection
                 .execute("DELETE FROM schema_migrations WHERE version >= 9", ())

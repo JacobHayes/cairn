@@ -559,6 +559,7 @@ fn report(action: &Action) -> String {
             tool,
             proposal,
             because,
+            ..
         } => {
             let why = match because {
                 wrapper::Because::Structural => "it changes structure".to_owned(),

@@ -12,8 +12,8 @@ mod in_process {
     use cairn_api::client::{Reply, Transport};
     use cairn_api::wire::{PatchAnswer, Problem, ProblemCode, ProposalAnswer, ProposalReview};
     use cairn_schema::{
-        Conflict, ConflictResolution, Domain, Journey, Kept, Proposal, Rejection, ReviewItem,
-        Route, RouteFile, Subject, ViolationCode, from_yaml,
+        Conflict, ConflictResolution, Domain, Journey, Kept, Proposal, ProposalDraft, Rejection,
+        ReviewItem, Route, RouteFile, Subject, ViolationCode, from_yaml,
     };
     use serde_json::json;
 
@@ -21,7 +21,7 @@ mod in_process {
 
     const ROUTE: &str = "/api/routes/vendor-evaluation";
     const JOURNEY: &str = "/api/journeys/j_vendor_eval";
-    const UPGRADE_APPLY: &str = "/api/proposals/pr_upgrade/apply";
+    const UPGRADE_APPLY: &str = "/api/journeys/j_vendor_eval/proposals/pr_upgrade/apply";
 
     fn route_v2() -> RouteFile {
         let path = support::fixtures_root().join("vendor-evaluation/route-v2.yaml");
@@ -104,20 +104,9 @@ mod in_process {
         assert_eq!(draft, exported, "the draft is version 1, every key kept");
     }
 
-    /// B7, C14, I6: an upgrade is drafted as a proposal of review items, the journey keeps its
-    /// version until it is applied, and its conflict blocks the apply until resolved.
-    #[tokio::test]
-    async fn an_upgrade_is_a_proposal_whose_conflict_blocks_until_resolved() {
-        let world = World::start().await;
-        let ann = version_two_published(&world).await;
-        let upgrade = json!({"patch_id": "p_upgrade", "proposal": "pr_upgrade", "to": 2});
-        let drafted = saved(ok(
-            &post(&ann, &format!("{JOURNEY}/upgrade"), &upgrade).await
-        ));
-        // The title both sides changed conflicts, the estimate only the journey changed is
-        // kept, and the workload version 2 removes is an orphan.
-        let about: BTreeSet<(&str, &str)> = drafted
-            .draft
+    /// What each review item of `draft` is about: its kind and node.
+    fn items_about(draft: &ProposalDraft) -> BTreeSet<(&str, &str)> {
+        draft
             .items
             .as_slice()
             .iter()
@@ -132,7 +121,22 @@ mod in_process {
                 ReviewItem::Orphan { node, .. } => ("orphan", node.as_str()),
                 other => panic!("{other:?}"),
             })
-            .collect();
+            .collect()
+    }
+
+    /// B7, C14, I6: an upgrade is drafted as a proposal of review items, the journey keeps its
+    /// version until it is applied, and its conflict blocks the apply until resolved.
+    #[tokio::test]
+    async fn an_upgrade_is_a_proposal_whose_conflict_blocks_until_resolved() {
+        let world = World::start().await;
+        let ann = version_two_published(&world).await;
+        let upgrade = json!({"patch_id": "p_upgrade", "proposal": "pr_upgrade", "to": 2});
+        let drafted = saved(ok(
+            &post(&ann, &format!("{JOURNEY}/upgrade"), &upgrade).await
+        ));
+        // The title both sides changed conflicts, the estimate only the journey changed is
+        // kept, and the workload version 2 removes is an orphan.
+        let about = items_about(&drafted.draft);
         let expected = [
             ("conflict", "n_access"),
             ("kept", "n_findings"),
@@ -142,8 +146,12 @@ mod in_process {
         let journey: Journey = get(&ann, JOURNEY).await;
         assert_eq!(journey.header.lineage.unwrap().version.get(), 1, "not yet");
 
-        let review: ProposalReview =
-            ok(&post(&ann, "/api/proposals/pr_upgrade/preview", &json!({})).await);
+        let review: ProposalReview = ok(&post(
+            &ann,
+            "/api/journeys/j_vendor_eval/proposals/pr_upgrade/preview",
+            &json!({}),
+        )
+        .await);
         assert_ne!(review.preview.unresolved.len(), 0);
         let apply = |patch_id: &str, reviewed: u32| json!({"patch_id": patch_id, "reviewed_revision": reviewed});
         let blocked = post(&ann, UPGRADE_APPLY, &apply("p_blocked", 1)).await;
@@ -168,11 +176,19 @@ mod in_process {
         }
         let edit = json!({"patch_id": "p_resolve", "base_revision": 1, "draft": resolved});
         let edited = ann
-            .send(Method::PATCH, "/api/proposals/pr_upgrade", Some(&edit))
+            .send(
+                Method::PATCH,
+                "/api/journeys/j_vendor_eval/proposals/pr_upgrade",
+                Some(&edit),
+            )
             .await;
         ok::<ProposalAnswer>(&edited.unwrap());
-        let review: ProposalReview =
-            ok(&post(&ann, "/api/proposals/pr_upgrade/preview", &json!({})).await);
+        let review: ProposalReview = ok(&post(
+            &ann,
+            "/api/journeys/j_vendor_eval/proposals/pr_upgrade/preview",
+            &json!({}),
+        )
+        .await);
         let left = (
             review.preview.unresolved.len(),
             review.preview.violations.len(),

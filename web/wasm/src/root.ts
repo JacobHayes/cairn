@@ -15,6 +15,9 @@ export type TickListener = (ticks: Schema<"Tick">[], first: boolean) => void;
 /** The clock writes and documents are made at: an RFC 3339 timestamp. */
 export type Clock = () => string;
 
+/** Which open proposals to list (C14, C16): those under a destination, those waiting on the local user, or those that would create a journey or a route. */
+export type ProposalListScope = { destination: Schema<"Domain"> } | "waiting" | "new_journeys" | "new_routes";
+
 interface Subscriber {
   subscription: RootSubscription;
   listener: TickListener;
@@ -127,9 +130,15 @@ export class InBrowserHost {
     return answer;
   }
 
-  /** I6: a proposal by id, as `GET /api/proposals/{id}` answers it. */
-  proposal(id: string): Schema<"Proposal"> {
-    return parsed<Schema<"Proposal">>(hosted(() => this.#root.proposal(id)));
+  /** I6: a proposal under its destination, as `GET /api/{destination}/proposals/{proposal}` answers it. */
+  proposal(destination: Schema<"Domain">, id: string): Schema<"Proposal"> {
+    return parsed<Schema<"Proposal">>(hosted(() => this.#root.proposal(JSON.stringify(destination), id)));
+  }
+
+  /** C14, C16: a page of open proposals, as `GET /api/{destination}/proposals` and `GET /api/proposals?scope=` answer it. */
+  listProposals(scope: ProposalListScope, after?: Schema<"ProposalCursor">): Schema<"ProposalList"> {
+    const request = after === undefined ? { scope } : { scope, after };
+    return parsed<Schema<"ProposalList">>(hosted(() => this.#root.listProposals(JSON.stringify(request), this.#clock())));
   }
 
   /** I6: creates a proposal for `destination`, as `POST /api/{domain}/proposals` answers it. */
@@ -138,28 +147,28 @@ export class InBrowserHost {
   }
 
   /** I6: edits a proposal against the editing revision its editor saw, as `PATCH /api/proposals/{id}` answers it. */
-  editProposal(id: string, request: Schema<"ProposalEdit">): Schema<"ProposalAnswer"> {
-    return this.#proposalWrite(() => this.#root.editProposal(id, JSON.stringify(request), this.#clock()));
+  editProposal(destination: Schema<"Domain">, id: string, request: Schema<"ProposalEdit">): Schema<"ProposalAnswer"> {
+    return this.#proposalWrite(() => this.#root.editProposal(JSON.stringify(destination), id, JSON.stringify(request), this.#clock()));
   }
 
   /** I6: discards a proposal, as `POST /api/proposals/{id}/discard` answers it. */
-  discardProposal(id: string, request: Schema<"ProposalStep">): Schema<"ProposalAnswer"> {
-    return this.#proposalWrite(() => this.#root.discardProposal(id, JSON.stringify(request), this.#clock()));
+  discardProposal(destination: Schema<"Domain">, id: string, request: Schema<"ProposalStep">): Schema<"ProposalAnswer"> {
+    return this.#proposalWrite(() => this.#root.discardProposal(JSON.stringify(destination), id, JSON.stringify(request), this.#clock()));
   }
 
   /** I6: drafts a proposal again on its destination as it stands, as `POST /api/proposals/{id}/refresh` answers it. */
-  refreshProposal(id: string, request: Schema<"ProposalStep">): Schema<"ProposalAnswer"> {
-    return this.#proposalWrite(() => this.#root.refreshProposal(id, JSON.stringify(request), this.#clock()));
+  refreshProposal(destination: Schema<"Domain">, id: string, request: Schema<"ProposalStep">): Schema<"ProposalAnswer"> {
+    return this.#proposalWrite(() => this.#root.refreshProposal(JSON.stringify(destination), id, JSON.stringify(request), this.#clock()));
   }
 
   /** C14, I6: what applying a proposal now would do, as `POST /api/proposals/{id}/preview` answers it. */
-  previewProposal(id: string): Schema<"ProposalReview"> {
-    return parsed<Schema<"ProposalReview">>(hosted(() => this.#root.previewProposal(id, this.#clock())));
+  previewProposal(destination: Schema<"Domain">, id: string): Schema<"ProposalReview"> {
+    return parsed<Schema<"ProposalReview">>(hosted(() => this.#root.previewProposal(JSON.stringify(destination), id, this.#clock())));
   }
 
   /** I6, H2: applies a proposal as the local user, as `POST /api/proposals/{id}/apply` answers it. */
-  applyProposal(id: string, request: Schema<"ProposalApply">): Schema<"PatchAnswer"> {
-    const answer = parsed<Schema<"PatchAnswer">>(hosted(() => this.#root.applyProposal(id, JSON.stringify(request), this.#clock())));
+  applyProposal(destination: Schema<"Domain">, id: string, request: Schema<"ProposalApply">): Schema<"PatchAnswer"> {
+    const answer = parsed<Schema<"PatchAnswer">>(hosted(() => this.#root.applyProposal(JSON.stringify(destination), id, JSON.stringify(request), this.#clock())));
     this.#deliverAll();
     return answer;
   }

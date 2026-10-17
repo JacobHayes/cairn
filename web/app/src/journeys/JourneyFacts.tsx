@@ -4,6 +4,7 @@
 import { useState } from "react";
 import { Link } from "react-router";
 
+import { pathTo } from "../address.ts";
 import type { ListFlag } from "../acting/address.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
@@ -97,7 +98,7 @@ export function LineageBlock({ ready, lineage, readOnly = false }: { ready: Read
         <Link to={routeDetailPath(lineage.route)}>
           {lineage.name}, version {lineage.version}
         </Link>
-        <Link to={`/routes/${lineage.route}?version=${String(lineage.version)}`} className="no-print" data-testid="lineage">
+        <Link to={`${pathTo("route", { route: lineage.route })}?version=${String(lineage.version)}`} className="no-print" data-testid="lineage">
           See its graph
         </Link>
         {summary === undefined || upgradeWords(summary) === undefined ? null : (

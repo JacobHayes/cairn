@@ -14,6 +14,19 @@ mod in_process {
 
     use crate::api::support::{self, World, post, request};
 
+    /// An operation on a proposal, offered once under each destination.
+    fn under_each(
+        operation: &'static str,
+        of: fn(&'static at::ProposalEndpoints) -> &'static Endpoint,
+    ) -> (&'static str, Vec<&'static Endpoint>) {
+        let sets = [
+            &at::JOURNEY_PROPOSALS,
+            &at::ROUTE_PROPOSALS,
+            &at::DEPLOYMENT_PROPOSALS,
+        ];
+        (operation, sets.into_iter().map(of).collect())
+    }
+
     /// Each public operation of the service, and the endpoints that offer it. Adding an
     /// operation to the service fails the coverage test until it is listed here with its
     /// endpoint.
@@ -58,12 +71,14 @@ mod in_process {
                     &at::PROPOSE_DEPLOYMENT,
                 ],
             ),
-            ("proposal", vec![&at::PROPOSAL]),
-            ("edit_proposal", vec![&at::EDIT_PROPOSAL]),
-            ("preview_proposal", vec![&at::PREVIEW_PROPOSAL]),
-            ("apply_proposal", vec![&at::APPLY_PROPOSAL]),
-            ("discard_proposal", vec![&at::DISCARD_PROPOSAL]),
-            ("refresh_proposal", vec![&at::REFRESH_PROPOSAL]),
+            under_each("proposals", |set| &set.list),
+            ("proposals_waiting", vec![&at::PROPOSALS]),
+            under_each("proposal_at", |set| &set.get),
+            under_each("edit_proposal", |set| &set.edit),
+            under_each("preview_proposal", |set| &set.preview),
+            under_each("apply_proposal", |set| &set.apply),
+            under_each("discard_proposal", |set| &set.discard),
+            under_each("refresh_proposal", |set| &set.refresh),
             ("propose_upgrade", vec![&at::UPGRADE]),
             ("propose_save_as_route", vec![&at::SAVE_AS_ROUTE]),
             ("propose_relink", vec![&at::RELINK]),
@@ -72,9 +87,10 @@ mod in_process {
         ]
     }
 
-    /// Methods of the service that are not operations: assembling it, and the settings the
-    /// host reads.
-    const NOT_OPERATIONS: [&str; 2] = ["new", "settings"];
+    /// Methods of the service that are not operations: assembling it, the settings the host
+    /// reads, and a proposal by its id alone, which the MCP tools and the assistant name
+    /// their proposals by (the API addresses one under its destination).
+    const NOT_OPERATIONS: [&str; 3] = ["new", "settings", "proposal"];
 
     /// The public methods of every `impl<S: Store> Service<S>` block in the service's
     /// sources.
@@ -333,30 +349,39 @@ mod in_process {
             );
         }
         let edit = json!({"patch_id": "p_edit", "base_revision": 7, "draft": draft});
+        let under = "/api/journeys/j_vendor_eval/proposals";
         let edited = ann
-            .send(Method::PATCH, "/api/proposals/pr_note", Some(&edit))
+            .send(Method::PATCH, &format!("{under}/pr_note"), Some(&edit))
             .await;
-        conforms(&document, &at::EDIT_PROPOSAL, &edited.unwrap());
-        let get = ann.send(Method::GET, "/api/proposals/pr_note", None).await;
-        conforms(&document, &at::PROPOSAL, &get.unwrap());
+        conforms(&document, &at::JOURNEY_PROPOSALS.edit, &edited.unwrap());
+        let get = ann
+            .send(Method::GET, &format!("{under}/pr_note"), None)
+            .await;
+        conforms(&document, &at::JOURNEY_PROPOSALS.get, &get.unwrap());
         let missing = ann
-            .send(Method::GET, "/api/proposals/pr_missing", None)
+            .send(Method::GET, &format!("{under}/pr_missing"), None)
             .await;
-        conforms(&document, &at::PROPOSAL, &missing.unwrap());
-        let preview = post(&ann, "/api/proposals/pr_note/preview", &json!({})).await;
-        conforms(&document, &at::PREVIEW_PROPOSAL, &preview);
+        conforms(&document, &at::JOURNEY_PROPOSALS.get, &missing.unwrap());
+        let listed = ann.send(Method::GET, under, None).await;
+        conforms(&document, &at::JOURNEY_PROPOSALS.list, &listed.unwrap());
+        let waiting = ann
+            .send(Method::GET, "/api/proposals?scope=waiting", None)
+            .await;
+        conforms(&document, &at::PROPOSALS, &waiting.unwrap());
+        let preview = post(&ann, &format!("{under}/pr_note/preview"), &json!({})).await;
+        conforms(&document, &at::JOURNEY_PROPOSALS.preview, &preview);
         let refresh = json!({"patch_id": "p_refresh", "base_revision": 1});
-        let refreshed = post(&ann, "/api/proposals/pr_note/refresh", &refresh).await;
-        conforms(&document, &at::REFRESH_PROPOSAL, &refreshed);
+        let refreshed = post(&ann, &format!("{under}/pr_note/refresh"), &refresh).await;
+        conforms(&document, &at::JOURNEY_PROPOSALS.refresh, &refreshed);
         for reviewed in [1, 2, 2] {
             let apply =
                 json!({"patch_id": format!("p_apply_{reviewed}"), "reviewed_revision": reviewed});
-            let applied = post(&ann, "/api/proposals/pr_note/apply", &apply).await;
-            conforms(&document, &at::APPLY_PROPOSAL, &applied);
+            let applied = post(&ann, &format!("{under}/pr_note/apply"), &apply).await;
+            conforms(&document, &at::JOURNEY_PROPOSALS.apply, &applied);
         }
         let discard = json!({"patch_id": "p_discard", "base_revision": 2});
-        let discarded = post(&ann, "/api/proposals/pr_note/discard", &discard).await;
-        conforms(&document, &at::DISCARD_PROPOSAL, &discarded);
+        let discarded = post(&ann, &format!("{under}/pr_note/discard"), &discard).await;
+        conforms(&document, &at::JOURNEY_PROPOSALS.discard, &discarded);
     }
 
     /// Route files and drafted proposals, accepted and refused, answer what the document says.
@@ -420,8 +445,15 @@ mod in_process {
         {
             let create = json!({"patch_id": format!("p_{id}"), "id": id, "draft": draft});
             conforms(&document, endpoint, &post(&ann, &target, &create).await);
-            let preview = post(&ann, &format!("/api/proposals/{id}/preview"), &json!({})).await;
-            conforms(&document, &at::PREVIEW_PROPOSAL, &preview);
+            let preview = post(&ann, &format!("{target}/{id}/preview"), &json!({})).await;
+            let under = if target.starts_with("/api/journeys/") {
+                &at::JOURNEY_PROPOSALS
+            } else if target.starts_with("/api/routes/") {
+                &at::ROUTE_PROPOSALS
+            } else {
+                &at::DEPLOYMENT_PROPOSALS
+            };
+            conforms(&document, &under.preview, &preview);
         }
     }
 }

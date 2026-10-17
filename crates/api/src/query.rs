@@ -14,7 +14,7 @@ use cairn_schema::{
     ProposalId, Revision, RevisionOf, RouteId, RouteKind, SnapshotScope, SortBy, State, Timestamp,
     Title, UserId, VersionNumber,
 };
-use cairn_store::{EventQuery, JourneyQuery, PageSize, SearchQuery, Watch};
+use cairn_store::{EventQuery, JourneyQuery, PageSize, ProposalCursor, SearchQuery, Watch};
 use schemars::{JsonSchema, Schema, SchemaGenerator};
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
@@ -90,6 +90,65 @@ pub const JOURNEY_PARAMS: &[ParamSpec] = &[
     ParamSpec::one::<JourneyId>("after", "The page starts after this journey."),
     SIZE,
 ];
+
+/// `GET /api/{destination}/proposals`.
+pub const PROPOSAL_PARAMS: &[ParamSpec] = &[
+    ParamSpec::one::<Timestamp>(
+        "after_at",
+        "The page starts after the proposal created at this time (with `after`).",
+    ),
+    ParamSpec::one::<ProposalId>(
+        "after",
+        "The page starts after this proposal (with `after_at`).",
+    ),
+    SIZE,
+];
+
+/// `GET /api/proposals`.
+pub const PROPOSAL_SCOPE_PARAMS: &[ParamSpec] = &[
+    ParamSpec::needed::<ProposalListing>("scope", "Which open proposals to list."),
+    ParamSpec::one::<Timestamp>(
+        "after_at",
+        "The page starts after the proposal created at this time (with `after`).",
+    ),
+    ParamSpec::one::<ProposalId>(
+        "after",
+        "The page starts after this proposal (with `after_at`).",
+    ),
+    SIZE,
+];
+
+/// Which open proposals `GET /api/proposals` lists: those no one destination holds.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum ProposalListing {
+    /// Waiting on the caller: created by them, or drafted by an agent for an active journey
+    /// referring to one of their entities (C16).
+    Waiting,
+    /// Those whose destination is a journey that does not exist yet.
+    NewJourneys,
+    /// Those whose destination is a route that does not exist yet.
+    NewRoutes,
+}
+
+/// A proposal listing's page: where it starts and its size.
+///
+/// # Errors
+///
+/// A bad request for a parameter that does not parse, or a cursor given by only one of its
+/// two parameters.
+pub fn proposals(params: &Params) -> Result<(Option<ProposalCursor>, PageSize), ApiError> {
+    let after = match (params.one("after_at")?, params.one("after")?) {
+        (Some(created_at), Some(id)) => Some(ProposalCursor { created_at, id }),
+        (None, None) => None,
+        _ => {
+            return Err(ApiError::bad_request(
+                "after_at and after go together: pass both of the previous page's `next`",
+            ));
+        }
+    };
+    Ok((after, params.size()?))
+}
 
 /// `GET /api/routes`.
 pub const ROUTE_PARAMS: &[ParamSpec] = &[

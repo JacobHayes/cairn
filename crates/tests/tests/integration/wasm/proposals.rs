@@ -12,6 +12,11 @@ use serde_json::json;
 /// After every fixture scenario's last step.
 const NOW: &str = "2026-10-12T12:00:00Z";
 
+/// The scenario journey, and the route its saved draft creates, as destinations.
+const JOURNEY: &str = r#"{"journey":"j_vendor_eval"}"#;
+const BAKEOFF: &str = r#"{"journey":"j_bakeoff"}"#;
+const SAVED_ROUTE: &str = r#"{"route":"bake-off-route"}"#;
+
 fn thrown(error: &str) -> HostError {
     serde_json::from_str(error).unwrap()
 }
@@ -67,8 +72,8 @@ fn saved(answer: &str) -> cairn_schema::Proposal {
     }
 }
 
-fn review(root: &BrowserRoot, id: &str) -> ProposalReview {
-    let answer = root.preview_proposal_json(id, NOW).unwrap();
+fn review(root: &BrowserRoot, destination: &str, id: &str) -> ProposalReview {
+    let answer = root.preview_proposal_json(destination, id, NOW).unwrap();
     let parsed: wire::ProposalReview = serde_json::from_str(&answer).unwrap();
     assert_eq!(
         answer,
@@ -78,9 +83,15 @@ fn review(root: &BrowserRoot, id: &str) -> ProposalReview {
     serde_json::from_str(&answer).unwrap()
 }
 
-fn apply(root: &BrowserRoot, id: &str, name: &str, reviewed: u32) -> Result<String, String> {
+fn apply(
+    root: &BrowserRoot,
+    destination: &str,
+    id: &str,
+    name: &str,
+    reviewed: u32,
+) -> Result<String, String> {
     let request = json!({ "patch_id": patch_id(name), "reviewed_revision": reviewed }).to_string();
-    root.apply_proposal_json(id, &request, NOW)
+    root.apply_proposal_json(destination, id, &request, NOW)
 }
 
 /// B7, C14: the scenario journey upgraded to version 2 proposes its orphan, previews clean,
@@ -103,11 +114,12 @@ fn an_upgrade_is_drafted_previewed_and_applied() {
             .iter()
             .any(|item| matches!(item, ReviewItem::Orphan { node, keep: true, .. } if node.to_string() == "n_workload"))
     );
-    let reviewed = review(&root, "pr_upgrade");
+    let reviewed = review(&root, JOURNEY, "pr_upgrade");
     assert_eq!(reviewed.stale, None);
     assert!(reviewed.preview.violations.is_empty() && reviewed.preview.unresolved.is_empty());
     apply(
         &root,
+        JOURNEY,
         "pr_upgrade",
         "apply_upgrade",
         proposal.revision.get(),
@@ -154,10 +166,12 @@ fn a_stale_proposal_applies_only_after_a_refresh_at_its_new_revision() {
     });
     root.patch(&moved.to_string(), NOW).unwrap();
 
-    let stale = review(&root, "pr_note").stale.expect("the journey moved");
+    let stale = review(&root, JOURNEY, "pr_note")
+        .stale
+        .expect("the journey moved");
     assert_eq!(stale.conflict.expected.get(), base);
-    let refused =
-        thrown(&apply(&root, "pr_note", "too_early", created.revision.get()).unwrap_err());
+    let apply_note = |patch: &str, reviewed: u32| apply(&root, JOURNEY, "pr_note", patch, reviewed);
+    let refused = thrown(&apply_note("too_early", created.revision.get()).unwrap_err());
     assert!(matches!(
         refused,
         HostError::Rejected {
@@ -168,24 +182,22 @@ fn a_stale_proposal_applies_only_after_a_refresh_at_its_new_revision() {
     let step = json!({ "patch_id": patch_id("refresh"), "base_revision": created.revision });
     let refreshed = saved(
         &root
-            .refresh_proposal_json("pr_note", &step.to_string(), NOW)
+            .refresh_proposal_json(JOURNEY, "pr_note", &step.to_string(), NOW)
             .unwrap(),
     );
     assert!(refreshed.revision > created.revision);
-    assert_eq!(review(&root, "pr_note").stale, None);
-    let unreviewed =
-        thrown(&apply(&root, "pr_note", "old_review", created.revision.get()).unwrap_err());
+    assert_eq!(review(&root, JOURNEY, "pr_note").stale, None);
+    let unreviewed = thrown(&apply_note("old_review", created.revision.get()).unwrap_err());
     assert!(
         matches!(unreviewed, HostError::Rejected { .. }),
         "the review it had is of a revision the proposal has left: {unreviewed:?}"
     );
-    apply(&root, "pr_note", "reviewed_again", refreshed.revision.get()).unwrap();
+    apply_note("reviewed_again", refreshed.revision.get()).unwrap();
 }
 
-/// B8, B9: the routeless journey saved as a route, published, and re-linked to it.
-#[test]
-fn a_journey_saved_as_a_route_is_relinked_to_its_version() {
-    let root = BrowserRoot::seeded().unwrap();
+/// B8: the routeless journey saved as a route, with every participation mapping dropped, so
+/// the proposal previews clean; the proposal as saved.
+fn route_saved_with_mappings_dropped(root: &BrowserRoot) -> cairn_schema::Proposal {
     let save = json!({
         "patch_id": patch_id("save"),
         "proposal": "pr_save",
@@ -205,18 +217,32 @@ fn a_journey_saved_as_a_route_is_relinked_to_its_version() {
     }
     let edit =
         json!({ "patch_id": patch_id("map"), "base_revision": proposal.revision, "draft": draft });
-    let mapped = saved(
+    saved(
         &root
-            .edit_proposal_json("pr_save", &edit.to_string(), NOW)
+            .edit_proposal_json(SAVED_ROUTE, "pr_save", &edit.to_string(), NOW)
             .unwrap(),
-    );
-    let reviewed = review(&root, "pr_save");
+    )
+}
+
+/// B8, B9: the routeless journey saved as a route, published, and re-linked to it.
+#[test]
+fn a_journey_saved_as_a_route_is_relinked_to_its_version() {
+    let root = BrowserRoot::seeded().unwrap();
+    let mapped = route_saved_with_mappings_dropped(&root);
+    let reviewed = review(&root, SAVED_ROUTE, "pr_save");
     assert!(
         reviewed.preview.unresolved.is_empty(),
         "{:?}",
         reviewed.preview.unresolved
     );
-    apply(&root, "pr_save", "apply_save", mapped.revision.get()).unwrap();
+    apply(
+        &root,
+        SAVED_ROUTE,
+        "pr_save",
+        "apply_save",
+        mapped.revision.get(),
+    )
+    .unwrap();
     let publish = json!({
         "patch": {
             "id": patch_id("publish_saved"),
@@ -237,7 +263,14 @@ fn a_journey_saved_as_a_route_is_relinked_to_its_version() {
             .relink_json("j_bakeoff", &relink.to_string(), NOW)
             .unwrap(),
     );
-    apply(&root, "pr_relink", "apply_relink", proposal.revision.get()).unwrap();
+    apply(
+        &root,
+        BAKEOFF,
+        "pr_relink",
+        "apply_relink",
+        proposal.revision.get(),
+    )
+    .unwrap();
     let document = read_document(&root.document("j_bakeoff", NOW).unwrap()).unwrap();
     assert_eq!(
         document
@@ -261,8 +294,53 @@ fn what_cannot_be_drafted_or_found_is_refused() {
             .unwrap_err(),
     );
     assert!(matches!(refused, HostError::Failed { .. }), "{refused:?}");
-    let missing = thrown(&root.proposal("pr_absent").unwrap_err());
+    let missing = thrown(&root.proposal(JOURNEY, "pr_absent").unwrap_err());
     assert!(matches!(missing, HostError::Missing { .. }));
-    let missing = thrown(&root.preview_proposal_json("pr_absent", NOW).unwrap_err());
+    let missing = thrown(
+        &root
+            .preview_proposal_json(JOURNEY, "pr_absent", NOW)
+            .unwrap_err(),
+    );
     assert!(matches!(missing, HostError::Missing { .. }));
+}
+
+/// C14, C16: the root lists open proposals under their destination and on the viewer's
+/// waiting list in the API's JSON, and a closed one is gone.
+#[test]
+fn open_proposals_are_listed_as_the_api_lists_them() {
+    let root = BrowserRoot::seeded().unwrap();
+    let base = journey_revision(&root, "j_vendor_eval");
+    let draft = json!({
+        "title": "A note on kickoff",
+        "destination_revision": base,
+        "mutations": [{
+            "op": "add_annotation",
+            "annotation": { "key": "a_proposed", "node": "n_kickoff", "note": "Proposed." },
+        }],
+    });
+    let create = json!({ "patch_id": patch_id("create"), "id": "pr_note", "draft": draft });
+    let created = saved(&root.propose(JOURNEY, &create.to_string(), NOW).unwrap());
+    let list = |scope: serde_json::Value| {
+        let listed = root
+            .list_proposals_json(&json!({ "scope": scope }).to_string(), NOW)
+            .unwrap();
+        let parsed: wire::ProposalList = serde_json::from_str(&listed).unwrap();
+        assert_eq!(
+            listed,
+            serde_json::to_string(&parsed).unwrap(),
+            "the API's JSON"
+        );
+        parsed
+    };
+    let under = list(json!({ "destination": { "journey": "j_vendor_eval" } }));
+    let ids: Vec<_> = under.items.iter().map(|item| item.id.clone()).collect();
+    assert_eq!((under.count, ids), (1, vec![created.id.clone()]));
+    assert!(under.destination.is_some_and(|now| now.exists));
+    assert_eq!(list(json!("waiting")).count, 1, "the local user's own");
+    assert_eq!(list(json!("new_journeys")).count, 0);
+
+    let discard = json!({ "patch_id": patch_id("discard"), "base_revision": created.revision });
+    root.discard_proposal_json(JOURNEY, "pr_note", &discard.to_string(), NOW)
+        .unwrap();
+    assert_eq!(list(json!("waiting")).count, 0);
 }

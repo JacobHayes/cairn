@@ -6,6 +6,7 @@
 // in one chip. The `All | Routes | Segments` control keeps it to one type; `New route` opens the
 // form that starts a route or segment empty, to author by hand (A12), or imports a route file as
 // a new route or draft (A13). Each read says whether it is still going or failed. Kept current (H6).
+import { NewDestinations } from "../proposals/NewDestinations.tsx";
 import { Link, useSearchParams } from "react-router";
 
 import { valueOf, type ReadView } from "../data/keyed-read.ts";
@@ -137,7 +138,7 @@ export function RouteIndex() {
       : readingOf(active.view, () => ({ kind: "journeys", count: counts.get(route.header.id) ?? 0 }));
   const newWords = type === "segments" ? "New segment" : "New route";
   return (
-    <section className="stack index-page" aria-label="Routes" data-testid="routes">
+    <section className="stack index-page" aria-label="Routes" data-testid="routes" data-rows-page tabIndex={-1}>
       <div className="row index-head">
         <h1>Routes</h1>
         <span className="spacer" />
@@ -145,6 +146,7 @@ export function RouteIndex() {
           {newWords}
         </Link>
       </div>
+      <NewDestinations scope="new_routes" segments={type === "all" ? undefined : type === "segments"} />
       <Segmented
         label="Show"
         value={type}

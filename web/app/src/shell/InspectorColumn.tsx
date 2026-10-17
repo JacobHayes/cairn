@@ -1,9 +1,9 @@
 // The inspector column of the frame (design 3.1, 3.3): a chrome column on the right at
 // 1100px and wider, a bottom sheet from 720 to 1099px (with a drag handle that snaps between
-// two heights), and stacked under the workspace on a phone. Its head has two tabs, INSPECTOR
-// and ASSISTANT, when the assistant is on offer, the sheet's grip in the middle, and one control
+// two heights), and stacked under the workspace on a phone. Its head has a tab for each pane on offer, INSPECTOR,
+// ASSISTANT (where the assistant is offered) and PROPOSALS (a journey's or route's open proposals), the sheet's grip in the middle, and one control
 // at the right that hides it. Hidden, the column folds to a rail on the right edge (a slim bar
-// at the bottom for the sheet) that shows it again, with a vertical tab for each of Inspector and Assistant that opens it on that tab. The panes are empty slots: the
+// at the bottom for the sheet) that shows it again, with a vertical tab for each pane that opens it on that tab. The panes are empty slots: the
 // screens' content arrives through portals (frame.tsx). The inspector pane is the column's one
 // scroller; the assistant pane holds its own (a transcript above a pinned composer).
 import { useRef, type PointerEvent as ReactPointerEvent, type Ref, type RefObject } from "react";
@@ -66,16 +66,31 @@ export interface InspectorColumnProps {
   folded: boolean;
   tab: InspectorTab;
   snap: SheetSnap;
-  /** The assistant can be opened: show the tab bar. */
-  assistantOffered: boolean;
+  /** The tabs on offer, in order; the bar shows when there is more than one. */
+  tabs: readonly InspectorTab[];
+  /** How many open proposals the Proposals tab holds, once read. */
+  proposalsCount: number | undefined;
   onTab: (tab: InspectorTab) => void;
   onSnap: (snap: SheetSnap) => void;
   onToggle: () => void;
   inspectorRef: Ref<HTMLDivElement>;
   assistantRef: Ref<HTMLDivElement>;
+  proposalsRef: Ref<HTMLDivElement>;
 }
 
-export function InspectorColumn({ present, folded, tab, snap, assistantOffered, onTab, onSnap, onToggle, inspectorRef, assistantRef }: InspectorColumnProps) {
+const TAB_WORDS: Record<InspectorTab, string> = { inspector: "inspector", assistant: "assistant", proposals: "proposals" };
+
+/** A tab's name, with the count of open proposals in mono beside Proposals when there are any. */
+function TabName({ tab, count }: { tab: InspectorTab; count: number | undefined }) {
+  return (
+    <>
+      {TAB_WORDS[tab]}
+      {tab === "proposals" && count !== undefined && count > 0 ? <span className="tab-count" data-testid="proposals-count" title={`${String(count)} open ${count === 1 ? "proposal" : "proposals"}`}>{count}</span> : null}
+    </>
+  );
+}
+
+export function InspectorColumn({ present, folded, tab, snap, tabs, proposalsCount, onTab, onSnap, onToggle, inspectorRef, assistantRef, proposalsRef }: InspectorColumnProps) {
   const column = useRef<HTMLElement>(null);
   const drag = useSheetDrag(column, snap, onSnap);
   return (
@@ -84,7 +99,7 @@ export function InspectorColumn({ present, folded, tab, snap, assistantOffered, 
         <button type="button" className="rail-show" aria-label="Show inspector" title="Show the inspector  ]" onClick={onToggle}>
           <FoldIcon toward="left" />
         </button>
-        {(assistantOffered ? (["inspector", "assistant"] as const) : (["inspector"] as const)).map((each) => (
+        {tabs.map((each) => (
           <button
             key={each}
             type="button"
@@ -97,14 +112,14 @@ export function InspectorColumn({ present, folded, tab, snap, assistantOffered, 
               onToggle();
             }}
           >
-            {each}
+            <TabName tab={each} count={proposalsCount} />
           </button>
         ))}
       </div>
       <div className="inspector-head" hidden={folded}>
-        {assistantOffered ? (
+        {tabs.length > 1 || tabs[0] === "proposals" ? (
           <div className="segmented on-chrome" role="tablist" aria-label="Inspector">
-            {(["inspector", "assistant"] as const).map((each) => (
+            {tabs.map((each) => (
               <button
                 key={each}
                 type="button"
@@ -115,7 +130,7 @@ export function InspectorColumn({ present, folded, tab, snap, assistantOffered, 
                   onTab(each);
                 }}
               >
-                {each}
+                <TabName tab={each} count={proposalsCount} />
               </button>
             ))}
           </div>
@@ -130,6 +145,7 @@ export function InspectorColumn({ present, folded, tab, snap, assistantOffered, 
       </div>
       <div ref={inspectorRef} className="inspector-body" data-pane="inspector" hidden={folded || tab !== "inspector"} />
       <div ref={assistantRef} className="assistant-pane" data-pane="assistant" hidden={folded || tab !== "assistant"} />
+      <div ref={proposalsRef} className="inspector-body" data-pane="proposals" hidden={folded || tab !== "proposals"} />
     </aside>
   );
 }

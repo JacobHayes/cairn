@@ -12,6 +12,7 @@ import type { Route } from "../data/host.ts";
 import { ImportFile, type ImportedHandler } from "../routes/ImportFile.tsx";
 import { useExport } from "../routes/exporting.ts";
 import { openDraft } from "../routes/model.ts";
+import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
 import { routeDetailPath } from "../routes/address.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Refused } from "../screens/Refused.tsx";
@@ -84,6 +85,7 @@ export function RouteHeader({ route, of, write, blocked, onPublish, onImported, 
               <Link role="menuitem" className="menu-item" to={routeDetailPath(id)} onClick={close}>
                 Versions and journeys
               </Link>
+              <OpenProposalsItem destination={{ route: id }} close={close} />
               <button type="button" role="menuitem" className="menu-item" onClick={() => { close(); void exporting(drafting ? undefined : of); }}>
                 {drafting ? "Export the draft" : "Export this version"}
               </button>

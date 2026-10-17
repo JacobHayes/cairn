@@ -72,7 +72,7 @@ describe("a control waiting on its write", () => {
       about: aboutNode(),
     });
     await settled();
-    expect(session.root.getSnapshot().context.recent.saves.map((save) => save.address)).toEqual(["/proposals/pr_new"]);
+    expect(session.root.getSnapshot().context.recent.saves.map((save) => save.address)).toEqual(["/journeys/j_one/proposals/pr_new"]);
     expect(session.edits.getSnapshot().context.writes).toEqual({});
   });
 

@@ -5,6 +5,7 @@ import { Link } from "react-router";
 
 import type { Schema } from "@cairn/client";
 
+import { proposalsAddress } from "../address.ts";
 import { Badge } from "../ui/kit.tsx";
 import { ROUTES_PATH, SEGMENTS_PATH } from "./address.ts";
 
@@ -17,6 +18,7 @@ export function DetailHeader({ header, children }: { header: Schema<"RouteHeader
       {header.retired === true ? <Badge data-testid="retired">{segment ? "Retired: hidden from new insertions" : "Retired: hidden from new journeys"}</Badge> : null}
       <span className="spacer" />
       {children}
+      <Link to={proposalsAddress({ route: header.id })} data-testid="detail-proposals">Open proposals</Link>
       <Link to={segment ? SEGMENTS_PATH : ROUTES_PATH}>{segment ? "All segments" : "All routes"}</Link>
     </span>
   );

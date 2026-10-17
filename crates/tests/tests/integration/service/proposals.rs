@@ -196,7 +196,7 @@ async fn a_proposal_is_previewed_and_applied_with_its_confirming_user<S: Store>(
     drafted_and_edited(&service, &agent).await;
     let reviewer = call("u_reviewer", AT);
     let review = service
-        .preview_proposal(&reviewer, &proposal)
+        .preview_proposal(&reviewer, &target, &proposal)
         .await
         .unwrap();
     assert_eq!(review.stale, None);
@@ -331,7 +331,10 @@ async fn applying_after_the_destination_moved_is_stale_with_what_intervened<S: S
         "- op: add_annotation\n  annotation: {key: a_note, node: n_work, note: Meanwhile.}\n",
     );
     applied(service.patch(&lead, &domain(note)).await);
-    let review = service.preview_proposal(&lead, &pr_one()).await.unwrap();
+    let review = service
+        .preview_proposal(&lead, &destination(), &pr_one())
+        .await
+        .unwrap();
     let stale = review.stale.expect("the journey moved");
     assert_eq!(
         (stale.conflict.expected, stale.conflict.current),
@@ -376,7 +379,10 @@ async fn a_proposal_creates_its_destination_at_revision_zero<S: Store>(store: Ar
             .await
             .unwrap(),
     );
-    let review = service.preview_proposal(&agent, &pr_one()).await.unwrap();
+    let review = service
+        .preview_proposal(&agent, &fresh, &pr_one())
+        .await
+        .unwrap();
     let graph = review.preview.graph.expect("the journey it would create");
     assert!(graph.nodes.get(&"n_first".parse().unwrap()).is_some());
     let reviewer = call("u_lead", AT);
@@ -594,7 +600,7 @@ fn every_proposal_operation_can_be_awaited_on_another_thread() {
             draft("A", 1),
         ));
         send(&service.discard_proposal(&lead, patch_id("p_three"), &target, &id, revision(1)));
-        send(&service.preview_proposal(&lead, &id));
+        send(&service.preview_proposal(&lead, &target, &id));
         send(&service.apply_proposal(&lead, patch_id("p_four"), &target, &id, revision(1), None));
         send(&service.proposal(&id));
     }

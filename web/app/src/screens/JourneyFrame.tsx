@@ -26,6 +26,7 @@ import { indexPath, nodeOpened, type Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { SummaryPage } from "../summary/SummaryPage.tsx";
 import { isStock, useViewState, ViewStateContext, withViewState, type ViewState, type ViewStateValue } from "../journeys/view.ts";
+import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
 import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
@@ -227,6 +228,7 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       {/* After the head: a node opened from the assistant brings its detail forward last. */}
       <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} walkCard={walkCard} />
       </InsertEntryContext>
+      <DestinationProposals destination={{ journey }} />
     </MapBand>
     </ConnectContext>
     </ViewStateContext>

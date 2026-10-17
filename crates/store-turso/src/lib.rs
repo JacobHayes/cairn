@@ -34,8 +34,8 @@ use cairn_store::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, AuthStore, Commit, CommitError, Committed,
     ConversationRecord, ConversationStore, ConversationSummary, Document, EventQuery, Faults,
     IdentityRecord, JourneyMatches, JourneyQuery, JourneySummary, LoadTarget, LoggedAuthEntry,
-    LoggedEvent, OAuthStateRecord, Page, PageSize, Revisions, RouteDetail, SearchQuery, SecretHash,
-    SessionRecord, Store, StoreError, UserRecord,
+    LoggedEvent, OAuthStateRecord, Page, PageSize, ProposalPage, ProposalQuery, Revisions,
+    RouteDetail, SearchQuery, SecretHash, SessionRecord, Store, StoreError, UserRecord,
 };
 
 #[cfg(feature = "io-seam")]
@@ -245,6 +245,10 @@ impl Store for TursoStore {
 
     async fn proposal(&self, id: &ProposalId) -> Result<Option<Proposal>, StoreError> {
         read!(self, connection => load::proposal(connection, id))
+    }
+
+    async fn proposals(&self, query: &ProposalQuery) -> Result<ProposalPage, StoreError> {
+        read!(self, connection => queries::proposals(connection, query))
     }
 
     fn health(&self) -> Result<(), StoreError> {

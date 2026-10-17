@@ -18,7 +18,10 @@ use cairn_schema::{
     ProposalStatus, Record, Rejection, Revision, RevisionConflict, RevisionOf, Subject, TouchedSet,
     Write,
 };
-use cairn_store::{Document, EventQuery, LoadTarget, PageSize, Store};
+use cairn_store::{
+    Document, EventQuery, LoadTarget, PageSize, ProposalCursor, ProposalPage, ProposalQuery,
+    ProposalScope, Store,
+};
 
 use crate::write::engine;
 use crate::{Call, ReadError, Service, ServiceError, WriteError, Written, consequence, load};
@@ -181,6 +184,66 @@ impl<S: Store> Service<S> {
         Ok(self.store.proposal(id).await?)
     }
 
+    /// I6: the proposal with this id when it is under `destination`, or none: a proposal is
+    /// addressed under its destination, so another destination's is missing.
+    ///
+    /// # Errors
+    ///
+    /// When the store fails.
+    pub async fn proposal_at(
+        &self,
+        destination: &Domain,
+        id: &ProposalId,
+    ) -> Result<Option<Proposal>, ServiceError> {
+        Ok(self
+            .store
+            .proposal(id)
+            .await?
+            .filter(|found| found.destination == *destination))
+    }
+
+    /// C14: the open proposals of a destination scope (a destination, or the journeys or
+    /// routes proposals would create), newest first, with the scope's open count.
+    ///
+    /// # Errors
+    ///
+    /// When the store fails.
+    pub async fn proposals(
+        &self,
+        scope: ProposalScope,
+        after: Option<ProposalCursor>,
+        size: PageSize,
+    ) -> Result<ProposalPage, ServiceError> {
+        Ok(self
+            .store
+            .proposals(&ProposalQuery { scope, after, size })
+            .await?)
+    }
+
+    /// C16: the open proposals waiting on `call`'s user: the ones they created, and the ones
+    /// an agent drafted for an active journey referring to one of their entities.
+    ///
+    /// # Errors
+    ///
+    /// When the store fails.
+    pub async fn proposals_waiting(
+        &self,
+        call: &Call,
+        after: Option<ProposalCursor>,
+        size: PageSize,
+    ) -> Result<ProposalPage, ServiceError> {
+        let viewer = self.viewer(call).await?;
+        self.proposals(
+            ProposalScope::Waiting {
+                user: viewer.user,
+                entities: viewer.entities,
+            },
+            after,
+            size,
+        )
+        .await
+    }
+
     /// C14, D7, I6: what applying the proposal now would do, at `call`'s today: its items still
     /// unresolved (their effect left out), every violation of the candidate, the destination's
     /// graph after, a journey's frontier after, the consequences by journey, and, when the
@@ -188,23 +251,22 @@ impl<S: Store> Service<S> {
     ///
     /// # Errors
     ///
-    /// [`ReadError::ProposalMissing`] when there is no such proposal; [`ReadError::Failed`]
+    /// [`ReadError::ProposalMissing`] when there is no such proposal under `destination`; [`ReadError::Failed`]
     /// when the store fails or the engine panics.
     pub async fn preview_proposal(
         &self,
         call: &Call,
+        destination: &Domain,
         id: &ProposalId,
     ) -> Result<ProposalReview, ReadError> {
         let proposal = self
-            .store
-            .proposal(id)
+            .proposal_at(destination, id)
             .await?
             .ok_or_else(|| ReadError::ProposalMissing(id.clone()))?;
-        let destination = proposal.destination.clone();
         // What its apply would load: the destination, the proposal, and what its mutations read.
         let reads = Patch {
             id: proposal_read_id(),
-            target: domain_target(&destination),
+            target: domain_target(destination),
             base_revision: proposal.draft.destination_revision,
             deployment_revision: None,
             mutations: one(Mutation::ApplyProposal {
@@ -216,9 +278,9 @@ impl<S: Store> Service<S> {
         let records = &loaded.records;
         let stale = self
             .stale_base(
-                &destination,
+                destination,
                 proposal.draft.destination_revision,
-                records.revision(&destination),
+                records.revision(destination),
             )
             .await?;
         let today = self.settings.today(call.now);
@@ -231,10 +293,10 @@ impl<S: Store> Service<S> {
         let derive_inputs =
             self.settings
                 .derive_inputs(today, BTreeSet::new(), records.deployment.clone());
-        let (preview, consequences) = engine(&destination, || {
+        let (preview, consequences) = engine(destination, || {
             let preview = cairn_engine::preview(
                 records,
-                &destination,
+                destination,
                 &proposal.draft,
                 &inputs,
                 &derive_inputs,

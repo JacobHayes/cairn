@@ -3,10 +3,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_schema::{Actor, Entity, EntityKey, Event, JourneyId, Revision, RouteId};
+use cairn_schema::{
+    Actor, Domain, Entity, EntityKey, Event, JourneyId, Revision, RevisionOf, RouteId, RouteKind,
+};
 use cairn_store::backend;
 use cairn_store::{
-    EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page, RouteDetail,
+    DestinationKind, DestinationNow, EventQuery, JourneyMatches, JourneyQuery, JourneySummary,
+    LoggedEvent, Page, ProposalPage, ProposalQuery, ProposalScope, ProposalSummary, RouteDetail,
     SearchHit, SearchQuery, StoreError, VersionJourneys,
 };
 use turso::{Connection, Value};
@@ -133,11 +136,25 @@ async fn latest_versions(
     Ok(latest)
 }
 
-/// E6: the journeys referring to any of `entities`, directly or through an alias.
+/// E6: the journeys referring to any of `entities`, directly or through an alias, at their
+/// current revisions.
 pub(crate) async fn referencing(
     connection: &Connection,
     entities: &BTreeSet<EntityKey>,
 ) -> Result<BTreeMap<JourneyId, Revision>, StoreError> {
+    let mut found = BTreeMap::new();
+    for journey in referencing_ids(connection, entities).await? {
+        let of = RevisionOf::Domain(Domain::Journey(journey.clone()));
+        found.insert(journey, load::revision_of(connection, &of).await?);
+    }
+    Ok(found)
+}
+
+/// E6: the ids of the journeys referring to any of `entities`, directly or through an alias.
+async fn referencing_ids(
+    connection: &Connection,
+    entities: &BTreeSet<EntityKey>,
+) -> Result<BTreeSet<JourneyId>, StoreError> {
     let mut aliases = BTreeMap::new();
     for row in rows(
         connection,
@@ -168,7 +185,7 @@ pub(crate) async fn referencing(
             true,
         ),
     ];
-    let mut found = BTreeMap::new();
+    let mut found = BTreeSet::new();
     for key in backend::query::with_aliases(entities, &aliases) {
         for (select, quoted) in selects {
             let param = if quoted {
@@ -177,20 +194,119 @@ pub(crate) async fn referencing(
                 key.to_string()
             };
             for row in rows(connection, select, vec![text(&param)]).await? {
-                let Some(journey) = journey_of_graph(&row.text(0)?)? else {
-                    continue;
-                };
-                if found.contains_key(&journey) {
-                    continue;
+                if let Some(journey) = journey_of_graph(&row.text(0)?)? {
+                    found.insert(journey);
                 }
-                let of = cairn_schema::RevisionOf::Domain(cairn_schema::Domain::Journey(
-                    journey.clone(),
-                ));
-                found.insert(journey, load::revision_of(connection, &of).await?);
             }
         }
     }
     Ok(found)
+}
+
+/// A destination as it is now.
+async fn destination_now(
+    connection: &Connection,
+    destination: &Domain,
+) -> Result<DestinationNow, StoreError> {
+    Ok(match destination {
+        Domain::Journey(id) => {
+            let found = load::journey_row(connection, id).await?;
+            DestinationNow {
+                exists: found.is_some(),
+                name: found.as_ref().map(|(header, _)| header.name.clone()),
+                revision: found
+                    .as_ref()
+                    .map(|(_, revision)| *revision)
+                    .unwrap_or_default(),
+                kind: DestinationKind::Journey,
+                status: found.map(|(header, _)| header.status),
+            }
+        }
+        Domain::Route(id) => {
+            let found = load::route_row(connection, id).await?;
+            let kind = match &found {
+                Some((header, _)) if header.kind == RouteKind::Segment => DestinationKind::Segment,
+                _ => DestinationKind::Route,
+            };
+            DestinationNow {
+                exists: found.is_some(),
+                name: found.as_ref().map(|(header, _)| header.name.clone()),
+                revision: found.map(|(_, revision)| revision).unwrap_or_default(),
+                kind,
+                status: None,
+            }
+        }
+        Domain::Deployment => DestinationNow {
+            exists: true,
+            name: None,
+            revision: load::revision_of(connection, &RevisionOf::Domain(Domain::Deployment))
+                .await?,
+            kind: DestinationKind::Deployment,
+            status: None,
+        },
+    })
+}
+
+/// C14, C16: the open proposals of a scope. A destination scope reads its own rows; the
+/// others read every open proposal and the shared page builder narrows them.
+pub(crate) async fn proposals(
+    connection: &Connection,
+    query: &ProposalQuery,
+) -> Result<ProposalPage, StoreError> {
+    let columns = "SELECT id, destination_kind, destination_id, title, revision, \
+                   destination_revision, created_by, proposing_agent, created_at FROM proposals";
+    let (select, params) = match &query.scope {
+        ProposalScope::Destination(destination) => {
+            let (kind, id) = domain_columns(destination);
+            (
+                format!(
+                    "{columns} WHERE status = 'open' AND destination_kind = ?1 \
+                     AND destination_id IS ?2"
+                ),
+                vec![text(kind), id],
+            )
+        }
+        _ => (format!("{columns} WHERE status = 'open'"), Vec::new()),
+    };
+    let mut nows: BTreeMap<Domain, DestinationNow> = BTreeMap::new();
+    let mut candidates = Vec::new();
+    for row in rows(connection, &select, params).await? {
+        let destination = crate::sql::domain_from(&row.text(1)?, row.opt_text(2)?)?;
+        if !nows.contains_key(&destination) {
+            let now = destination_now(connection, &destination).await?;
+            nows.insert(destination.clone(), now);
+        }
+        candidates.push(ProposalSummary {
+            id: row.parse(0)?,
+            now: nows[&destination].clone(),
+            destination,
+            title: row.parse(3)?,
+            revision: row.number(4)?,
+            drafted_against: row.number(5)?,
+            created_by: row.parse(6)?,
+            proposing_agent: row.opt_parse(7)?,
+            created_at: row.timestamp(8)?,
+        });
+    }
+    let waiting = match &query.scope {
+        ProposalScope::Waiting { entities, .. } => {
+            Some(referencing_ids(connection, entities).await?)
+        }
+        _ => None,
+    };
+    let destination = match &query.scope {
+        ProposalScope::Destination(destination) => Some(match nows.remove(destination) {
+            Some(now) => now,
+            None => destination_now(connection, destination).await?,
+        }),
+        _ => None,
+    };
+    Ok(backend::query::proposal_page(
+        query,
+        candidates,
+        waiting.as_ref(),
+        destination,
+    ))
 }
 
 pub(crate) async fn resolve_entity(

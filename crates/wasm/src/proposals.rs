@@ -14,6 +14,7 @@ use cairn_schema::{
     TouchedSet, VersionNumber,
 };
 use cairn_service::{ProposalWritten, ProposeError, ReadError, WriteError};
+use cairn_store::{PageSize, ProposalCursor, ProposalPage, ProposalScope};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
 
@@ -33,7 +34,7 @@ pub struct ProposalCreate {
     pub draft: ProposalDraft,
 }
 
-/// `PATCH /api/proposals/{id}`'s body, as the API's `ProposalEdit`.
+/// `PATCH /api/{destination}/proposals/{proposal}`'s body, as the API's `ProposalEdit`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalEdit {
@@ -45,7 +46,7 @@ pub struct ProposalEdit {
     pub draft: ProposalDraft,
 }
 
-/// The body of `POST /api/proposals/{id}/discard` and `.../refresh`, as the API's `ProposalStep`.
+/// The body of `POST /api/{destination}/proposals/{proposal}/discard` and `.../refresh`, as the API's `ProposalStep`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalStep {
@@ -55,7 +56,7 @@ pub struct ProposalStep {
     pub base_revision: Revision,
 }
 
-/// `POST /api/proposals/{id}/apply`'s body, as the API's `ProposalApply`.
+/// `POST /api/{destination}/proposals/{proposal}/apply`'s body, as the API's `ProposalApply`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalApply {
@@ -106,6 +107,32 @@ pub struct RelinkRequest {
     pub lineage: Lineage,
 }
 
+/// Which open proposals to list: the browser host's `GET /api/{destination}/proposals` and
+/// `GET /api/proposals?scope=`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", deny_unknown_fields)]
+pub enum ProposalListScope {
+    /// The proposals under this destination.
+    Destination(Domain),
+    /// Waiting on the local user.
+    Waiting,
+    /// Those that would create a journey.
+    NewJourneys,
+    /// Those that would create a route.
+    NewRoutes,
+}
+
+/// A proposal listing's request: the scope and where the page starts.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ProposalListRequest {
+    /// Which proposals.
+    pub scope: ProposalListScope,
+    /// The page starts after this proposal.
+    #[serde(default)]
+    pub after: Option<ProposalCursor>,
+}
+
 /// What a write to a proposal answers (I6), as the API's `ProposalAnswer`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "outcome", rename_all = "snake_case", deny_unknown_fields)]
@@ -152,7 +179,7 @@ pub struct StaleBase {
     pub intervening: TouchedSet,
 }
 
-/// `POST /api/proposals/{id}/preview`'s answer (C14, D7, I6), as the API's `ProposalReview`.
+/// `POST /api/{destination}/proposals/{proposal}/preview`'s answer (C14, D7, I6), as the API's `ProposalReview`.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ProposalReview {
@@ -206,17 +233,56 @@ fn journey_id(id: &str) -> Result<JourneyId, HostError> {
 }
 
 impl BrowserRoot {
-    /// I6: the proposal with this id, as `GET /api/proposals/{id}` answers it.
+    /// I6: the proposal with this id under `destination`, as
+    /// `GET /api/{destination}/proposals/{proposal}` answers it.
     ///
     /// # Errors
     ///
     /// [`HostError::Missing`] when there is none; when the store fails.
-    pub fn proposal_of(&self, id: &ProposalId) -> Result<Proposal, HostError> {
-        now_or_never(self.service().proposal(id))
+    pub fn proposal_of(
+        &self,
+        destination: &Domain,
+        id: &ProposalId,
+    ) -> Result<Proposal, HostError> {
+        now_or_never(self.service().proposal_at(destination, id))
             .map_err(failed)?
             .ok_or_else(|| HostError::Missing {
                 message: format!("no proposal {id}"),
             })
+    }
+
+    /// C14, C16: a page of open proposals, as `GET /api/{destination}/proposals` and
+    /// `GET /api/proposals?scope=` answer it.
+    ///
+    /// # Errors
+    ///
+    /// When the store fails.
+    pub fn list_proposals(
+        &self,
+        request: ProposalListRequest,
+        now: &str,
+    ) -> Result<ProposalPage, HostError> {
+        let ProposalListRequest { scope, after } = request;
+        let size = PageSize::MAX;
+        let service = self.service();
+        match scope {
+            ProposalListScope::Waiting => {
+                let call = self.call(now)?;
+                now_or_never(service.proposals_waiting(&call, after, size))
+            }
+            ProposalListScope::Destination(destination) => now_or_never(service.proposals(
+                ProposalScope::Destination(destination),
+                after,
+                size,
+            )),
+            ProposalListScope::NewJourneys => {
+                now_or_never(service.proposals(ProposalScope::CreatingJourneys, after, size))
+            }
+            ProposalListScope::NewRoutes => {
+                now_or_never(service.proposals(ProposalScope::CreatingRoutes, after, size))
+            }
+        }
+        .map_err(failed)
     }
 
     /// I6: creates a proposal for `destination` as the local user at `now`, as
@@ -245,7 +311,7 @@ impl BrowserRoot {
     }
 
     /// I6, H5: replaces the proposal's content against the editing revision its editor saw,
-    /// as `PATCH /api/proposals/{id}` answers it.
+    /// as `PATCH /api/{destination}/proposals/{proposal}` answers it.
     ///
     /// # Errors
     ///
@@ -253,16 +319,17 @@ impl BrowserRoot {
     /// moved, is not open, or the patch id is reused; when the store fails.
     pub fn edit_proposal(
         &self,
+        destination: &Domain,
         id: &ProposalId,
         request: &ProposalEdit,
         now: &str,
     ) -> Result<ProposalAnswer, HostError> {
         let call = self.call(now)?;
-        let destination = self.proposal_of(id)?.destination;
+        self.proposal_of(destination, id)?;
         now_or_never(self.service().edit_proposal(
             &call,
             request.patch_id.clone(),
-            &destination,
+            destination,
             id,
             request.base_revision,
             request.draft.clone(),
@@ -271,23 +338,24 @@ impl BrowserRoot {
         .map_err(write_failed)
     }
 
-    /// I6: discards the proposal, as `POST /api/proposals/{id}/discard` answers it.
+    /// I6: discards the proposal, as `POST /api/{destination}/proposals/{proposal}/discard` answers it.
     ///
     /// # Errors
     ///
     /// As [`BrowserRoot::edit_proposal`].
     pub fn discard_proposal(
         &self,
+        destination: &Domain,
         id: &ProposalId,
         request: &ProposalStep,
         now: &str,
     ) -> Result<ProposalAnswer, HostError> {
         let call = self.call(now)?;
-        let destination = self.proposal_of(id)?.destination;
+        self.proposal_of(destination, id)?;
         now_or_never(self.service().discard_proposal(
             &call,
             request.patch_id.clone(),
-            &destination,
+            destination,
             id,
             request.base_revision,
         ))
@@ -296,7 +364,7 @@ impl BrowserRoot {
     }
 
     /// I6: drafts the proposal again on its destination as it stands, the reviewer's choices
-    /// carried over, as `POST /api/proposals/{id}/refresh` answers it. Its revision moves, so it
+    /// carried over, as `POST /api/{destination}/proposals/{proposal}/refresh` answers it. Its revision moves, so it
     /// must be reviewed again.
     ///
     /// # Errors
@@ -304,6 +372,7 @@ impl BrowserRoot {
     /// As [`BrowserRoot::edit_proposal`], and when it cannot be drafted again.
     pub fn refresh_proposal(
         &self,
+        destination: &Domain,
         id: &ProposalId,
         request: &ProposalStep,
         now: &str,
@@ -312,6 +381,7 @@ impl BrowserRoot {
         now_or_never(self.service().refresh_proposal(
             &call,
             request.patch_id.clone(),
+            destination,
             id,
             request.base_revision,
         ))
@@ -320,26 +390,25 @@ impl BrowserRoot {
     }
 
     /// C14, D7, I6: what applying the proposal now would do, and what moved since it was
-    /// drafted, as `POST /api/proposals/{id}/preview` answers it.
+    /// drafted, as `POST /api/{destination}/proposals/{proposal}/preview` answers it.
     ///
     /// # Errors
     ///
     /// [`HostError::Missing`] when there is no such proposal; when the store fails.
     pub fn preview_proposal(
         &self,
+        destination: &Domain,
         id: &ProposalId,
         now: &str,
     ) -> Result<ProposalReview, HostError> {
         let call = self.call(now)?;
-        let review =
-            now_or_never(self.service().preview_proposal(&call, id)).map_err(
-                |error| match error {
-                    ReadError::ProposalMissing(id) => HostError::Missing {
-                        message: format!("no proposal {id}"),
-                    },
-                    error => failed(error),
+        let review = now_or_never(self.service().preview_proposal(&call, destination, id))
+            .map_err(|error| match error {
+                ReadError::ProposalMissing(id) => HostError::Missing {
+                    message: format!("no proposal {id}"),
                 },
-            )?;
+                error => failed(error),
+            })?;
         Ok(ProposalReview {
             proposal: review.proposal,
             preview: review.preview,
@@ -352,7 +421,7 @@ impl BrowserRoot {
     }
 
     /// I6, H2: applies the proposal as the local user, its confirming user, at the editing
-    /// revision they reviewed, as `POST /api/proposals/{id}/apply` answers it.
+    /// revision they reviewed, as `POST /api/{destination}/proposals/{proposal}/apply` answers it.
     ///
     /// # Errors
     ///
@@ -360,16 +429,17 @@ impl BrowserRoot {
     /// stale, invalid, or for a reused patch id; when the store fails.
     pub fn apply_proposal(
         &self,
+        destination: &Domain,
         id: &ProposalId,
         request: &ProposalApply,
         now: &str,
     ) -> Result<PatchAnswer, HostError> {
         let call = self.call(now)?;
-        let destination = self.proposal_of(id)?.destination;
+        self.proposal_of(destination, id)?;
         match now_or_never(self.service().apply_proposal(
             &call,
             request.patch_id.clone(),
-            &destination,
+            destination,
             id,
             request.reviewed_revision,
             request.note.clone(),
@@ -456,13 +526,26 @@ impl BrowserRoot {
 
 #[wasm_bindgen]
 impl BrowserRoot {
-    /// I6: proposal `id`, as `GET /api/proposals/{id}` answers it.
+    /// I6: proposal `id`, as `GET /api/{destination}/proposals/{proposal}` answers it.
     ///
     /// # Errors
     ///
     /// The JSON of a [`HostError`]: no such proposal, or an unreadable input.
-    pub fn proposal(&self, id: &str) -> Result<String, String> {
-        Ok(json(&self.proposal_of(&proposal_id(id)?)?))
+    pub fn proposal(&self, destination: &str, id: &str) -> Result<String, String> {
+        let destination: Domain = read("destination", destination)?;
+        Ok(json(&self.proposal_of(&destination, &proposal_id(id)?)?))
+    }
+
+    /// C14, C16: a page of open proposals: `request` is the JSON of a
+    /// [`ProposalListRequest`]; the answer is the JSON of a page, as the API's `ProposalList`.
+    ///
+    /// # Errors
+    ///
+    /// The JSON of a [`HostError`].
+    #[wasm_bindgen(js_name = listProposals)]
+    pub fn list_proposals_json(&self, request: &str, now: &str) -> Result<String, String> {
+        let request: ProposalListRequest = read("proposal list request", request)?;
+        Ok(json(&self.list_proposals(request, now)?))
     }
 
     /// I6: creates a proposal for `destination` (the JSON of a `Domain`) at `now`: `request`
@@ -483,9 +566,17 @@ impl BrowserRoot {
     ///
     /// The JSON of a [`HostError`], the rejection among them.
     #[wasm_bindgen(js_name = editProposal)]
-    pub fn edit_proposal_json(&self, id: &str, request: &str, now: &str) -> Result<String, String> {
+    pub fn edit_proposal_json(
+        &self,
+        destination: &str,
+        id: &str,
+        request: &str,
+        now: &str,
+    ) -> Result<String, String> {
+        let destination: Domain = read("destination", destination)?;
         let request: ProposalEdit = read("proposal edit", request)?;
         Ok(json(&self.edit_proposal(
+            &destination,
             &proposal_id(id)?,
             &request,
             now,
@@ -500,12 +591,15 @@ impl BrowserRoot {
     #[wasm_bindgen(js_name = discardProposal)]
     pub fn discard_proposal_json(
         &self,
+        destination: &str,
         id: &str,
         request: &str,
         now: &str,
     ) -> Result<String, String> {
+        let destination: Domain = read("destination", destination)?;
         let request: ProposalStep = read("proposal step", request)?;
         Ok(json(&self.discard_proposal(
+            &destination,
             &proposal_id(id)?,
             &request,
             now,
@@ -521,12 +615,15 @@ impl BrowserRoot {
     #[wasm_bindgen(js_name = refreshProposal)]
     pub fn refresh_proposal_json(
         &self,
+        destination: &str,
         id: &str,
         request: &str,
         now: &str,
     ) -> Result<String, String> {
+        let destination: Domain = read("destination", destination)?;
         let request: ProposalStep = read("proposal step", request)?;
         Ok(json(&self.refresh_proposal(
+            &destination,
             &proposal_id(id)?,
             &request,
             now,
@@ -540,8 +637,18 @@ impl BrowserRoot {
     ///
     /// The JSON of a [`HostError`].
     #[wasm_bindgen(js_name = previewProposal)]
-    pub fn preview_proposal_json(&self, id: &str, now: &str) -> Result<String, String> {
-        Ok(json(&self.preview_proposal(&proposal_id(id)?, now)?))
+    pub fn preview_proposal_json(
+        &self,
+        destination: &str,
+        id: &str,
+        now: &str,
+    ) -> Result<String, String> {
+        let destination: Domain = read("destination", destination)?;
+        Ok(json(&self.preview_proposal(
+            &destination,
+            &proposal_id(id)?,
+            now,
+        )?))
     }
 
     /// I6: applies proposal `id`: `request` is the JSON of a [`ProposalApply`]; the answer
@@ -553,12 +660,15 @@ impl BrowserRoot {
     #[wasm_bindgen(js_name = applyProposal)]
     pub fn apply_proposal_json(
         &self,
+        destination: &str,
         id: &str,
         request: &str,
         now: &str,
     ) -> Result<String, String> {
+        let destination: Domain = read("destination", destination)?;
         let request: ProposalApply = read("proposal apply", request)?;
         Ok(json(&self.apply_proposal(
+            &destination,
             &proposal_id(id)?,
             &request,
             now,

@@ -11,6 +11,7 @@ import { useSelector } from "@xstate/react";
 import { useEffect, useLayoutEffect, useMemo, useRef } from "react";
 import { Link } from "react-router";
 
+import { proposalAddress } from "../address.ts";
 import { targetKey, type AssistantAction, type AssistantTarget } from "../data/assistant.ts";
 import { useDraft } from "../data/drafts.ts";
 import { linesOf, mayNotApply } from "../data/activity.ts";
@@ -103,7 +104,7 @@ function Proposed({ action }: { action: Extract<AssistantAction, { outcome: "pro
           {toolWords(action.tool)}, drafted for review: {becauseWords(action.because)}.
         </span>
       </span>
-      <Link className="button primary" to={`/proposals/${action.proposal}`} data-testid="review-proposal">
+      <Link className="button primary" to={proposalAddress(action.destination, action.proposal)} data-testid="review-proposal">
         Review proposal
       </Link>
     </div>

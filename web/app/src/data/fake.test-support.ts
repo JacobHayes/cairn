@@ -9,7 +9,7 @@ import type { KeptTurn } from "../assistant/model.ts";
 import type { KeptTurns } from "../assistant/conversation.ts";
 import type { AssistantHost } from "./assistant.ts";
 import type { Answer, Command } from "./edit-record.ts";
-import type { ProposalHost, ProposalWritten } from "./proposals.ts";
+import type { Domain, ProposalHost, ProposalWritten } from "./proposals.ts";
 import { Missing, ReadFailed, Skewed, type Deriver, type Host, type JourneyIndexQuery, type JourneyPage, type Route, type RouteFile, type RouteImport, type RouteVersion, type Viewer } from "./host.ts";
 import type { WriteEnv } from "./write-machine.ts";
 
@@ -200,7 +200,7 @@ export class FakeHost implements Host {
 
 /** A host with no proposals held, whose writes answer from the fake's script. */
 function scriptedProposals(host: FakeHost): ProposalHost {
-  const missing = (id: string) => Promise.reject(new Missing(id));
+  const missing = (_destination: Domain, id: string) => Promise.reject(new Missing(id));
   const write = (call: string) => {
     host.called.push(call);
     const answer = host.proposed.shift();
@@ -210,6 +210,8 @@ function scriptedProposals(host: FakeHost): ProposalHost {
   const written = write as unknown as <A>(call: string) => Promise<ProposalWritten<A>>;
   return {
     get: missing,
+    list: () => Promise.reject(new Missing("proposals")),
+    listing: () => Promise.reject(new Missing("proposals")),
     preview: missing,
     create: () => written("create"),
     edit: () => written("edit"),

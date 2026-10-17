@@ -8,9 +8,9 @@
 use std::collections::BTreeMap;
 
 use cairn_schema::{
-    Consequences, JourneyId, Lineage, Markdown, PatchId, PatchReceipt, Proposal, ProposalDraft,
-    ProposalId, ProposalPreview, Revision, RevisionConflict, RouteFile, RouteId, Title, TouchedSet,
-    VersionNumber,
+    AgentId, Consequences, Domain, JourneyId, JourneyStatus, Lineage, Markdown, PatchId,
+    PatchReceipt, Proposal, ProposalDraft, ProposalId, ProposalPreview, Revision, RevisionConflict,
+    RouteFile, RouteId, Timestamp, Title, TouchedSet, UserId, VersionNumber,
 };
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
@@ -223,4 +223,165 @@ pub struct RouteImport {
     /// A note for each of its events (J1).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub note: Option<Markdown>,
+}
+
+/// What a proposal's destination is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(rename_all = "snake_case")]
+pub enum DestinationKind {
+    /// A journey.
+    Journey,
+    /// A process route.
+    Route,
+    /// A segment route.
+    Segment,
+    /// The deployment.
+    Deployment,
+}
+
+/// A proposal's destination as it is now (C14).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct DestinationNow {
+    /// Whether it exists.
+    pub exists: bool,
+    /// Its name, when it exists and has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<Title>,
+    /// Its revision; 0 when it does not exist.
+    pub revision: Revision,
+    /// What it is.
+    pub kind: DestinationKind,
+    /// A journey's status.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<JourneyStatus>,
+}
+
+/// An open proposal in a listing (C14).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProposalSummary {
+    /// The proposal.
+    pub id: ProposalId,
+    /// Its destination.
+    pub destination: Domain,
+    /// What it proposes, in a line.
+    pub title: Title,
+    /// Its editing revision.
+    pub revision: Revision,
+    /// The destination's revision it was drafted against.
+    pub drafted_against: Revision,
+    /// The user it was created by or for.
+    pub created_by: UserId,
+    /// The agent that drafted it, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposing_agent: Option<AgentId>,
+    /// When it was created.
+    pub created_at: Timestamp,
+    /// Its destination as it is now.
+    pub now: DestinationNow,
+}
+
+/// Where a proposal listing resumes: pass its two fields as `after_at` and `after`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProposalCursor {
+    /// When the last proposal of the page before was created.
+    pub created_at: Timestamp,
+    /// Its id.
+    pub id: ProposalId,
+}
+
+/// A page of open proposals, newest first (C14, C16).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ProposalList {
+    /// How many open proposals the listing holds in all.
+    pub count: u32,
+    /// A destination's listing: the destination as it is now, so a header does not depend on
+    /// having rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub destination: Option<DestinationNow>,
+    /// The proposals.
+    pub items: Vec<ProposalSummary>,
+    /// Pass as `after_at` and `after` for the next page.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<ProposalCursor>,
+}
+
+impl From<cairn_store::DestinationKind> for DestinationKind {
+    fn from(kind: cairn_store::DestinationKind) -> Self {
+        match kind {
+            cairn_store::DestinationKind::Journey => Self::Journey,
+            cairn_store::DestinationKind::Route => Self::Route,
+            cairn_store::DestinationKind::Segment => Self::Segment,
+            cairn_store::DestinationKind::Deployment => Self::Deployment,
+        }
+    }
+}
+
+impl From<cairn_store::DestinationNow> for DestinationNow {
+    fn from(now: cairn_store::DestinationNow) -> Self {
+        let cairn_store::DestinationNow {
+            exists,
+            name,
+            revision,
+            kind,
+            status,
+        } = now;
+        Self {
+            exists,
+            name,
+            revision,
+            kind: kind.into(),
+            status,
+        }
+    }
+}
+
+impl From<cairn_store::ProposalSummary> for ProposalSummary {
+    fn from(summary: cairn_store::ProposalSummary) -> Self {
+        let cairn_store::ProposalSummary {
+            id,
+            destination,
+            title,
+            revision,
+            drafted_against,
+            created_by,
+            proposing_agent,
+            created_at,
+            now,
+        } = summary;
+        Self {
+            id,
+            destination,
+            title,
+            revision,
+            drafted_against,
+            created_by,
+            proposing_agent,
+            created_at,
+            now: now.into(),
+        }
+    }
+}
+
+impl From<cairn_store::ProposalPage> for ProposalList {
+    fn from(page: cairn_store::ProposalPage) -> Self {
+        let cairn_store::ProposalPage {
+            count,
+            destination,
+            items,
+            next,
+        } = page;
+        Self {
+            count,
+            destination: destination.map(Into::into),
+            items: items.into_iter().map(Into::into).collect(),
+            next: next.map(|cursor| ProposalCursor {
+                created_at: cursor.created_at,
+                id: cursor.id,
+            }),
+        }
+    }
 }

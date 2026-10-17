@@ -3,10 +3,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use cairn_schema::{Entity, EntityKey, GraphId, JourneyId, RouteId, VersionNumber};
+use cairn_schema::{
+    Domain, Entity, EntityKey, GraphId, JourneyId, ProposalStatus, RouteId, RouteKind,
+    VersionNumber,
+};
 
 use super::State;
 use crate::backend;
+use crate::query::{
+    DestinationKind, DestinationNow, ProposalPage, ProposalQuery, ProposalScope, ProposalSummary,
+};
 use crate::query::{
     EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page, RouteDetail,
     SearchHit, SearchQuery, VersionJourneys, text_matches,
@@ -49,6 +55,79 @@ impl State {
             }
         }
         Page::cut(items, query.size, |summary| summary.id.clone())
+    }
+
+    /// A destination as it is now.
+    fn destination_now(&self, destination: &Domain) -> DestinationNow {
+        match destination {
+            Domain::Journey(id) => {
+                let found = self.domains.journeys.get(id);
+                DestinationNow {
+                    exists: found.is_some(),
+                    name: found.map(|(header, _)| header.name.clone()),
+                    revision: found.map(|(_, revision)| *revision).unwrap_or_default(),
+                    kind: DestinationKind::Journey,
+                    status: found.map(|(header, _)| header.status),
+                }
+            }
+            Domain::Route(id) => {
+                let found = self.domains.routes.get(id);
+                let kind = match found {
+                    Some((header, _)) if header.kind == RouteKind::Segment => {
+                        DestinationKind::Segment
+                    }
+                    _ => DestinationKind::Route,
+                };
+                DestinationNow {
+                    exists: found.is_some(),
+                    name: found.map(|(header, _)| header.name.clone()),
+                    revision: found.map(|(_, revision)| *revision).unwrap_or_default(),
+                    kind,
+                    status: None,
+                }
+            }
+            Domain::Deployment => DestinationNow {
+                exists: true,
+                name: None,
+                revision: self.domains.deployment.revision,
+                kind: DestinationKind::Deployment,
+                status: None,
+            },
+        }
+    }
+
+    pub(super) fn proposals(&self, query: &ProposalQuery) -> ProposalPage {
+        let waiting = match &query.scope {
+            ProposalScope::Waiting { entities, .. } => Some(
+                self.domains
+                    .journeys_referencing(entities)
+                    .into_keys()
+                    .collect(),
+            ),
+            _ => None,
+        };
+        let candidates = self
+            .domains
+            .proposals
+            .values()
+            .filter(|proposal| proposal.status == ProposalStatus::Open)
+            .map(|proposal| ProposalSummary {
+                id: proposal.id.clone(),
+                destination: proposal.destination.clone(),
+                title: proposal.draft.title.clone(),
+                revision: proposal.revision,
+                drafted_against: proposal.draft.destination_revision,
+                created_by: proposal.created_by.clone(),
+                proposing_agent: proposal.proposing_agent.clone(),
+                created_at: proposal.created_at,
+                now: self.destination_now(&proposal.destination),
+            })
+            .collect();
+        let destination = match &query.scope {
+            ProposalScope::Destination(destination) => Some(self.destination_now(destination)),
+            _ => None,
+        };
+        backend::query::proposal_page(query, candidates, waiting.as_ref(), destination)
     }
 
     pub(super) fn route_detail(&self, route: &RouteId) -> Option<RouteDetail> {

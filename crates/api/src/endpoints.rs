@@ -120,31 +120,99 @@ pub static PROPOSE_DEPLOYMENT: Endpoint = endpoint(
     "/api/deployment/proposals",
     "proposeToDeployment",
 );
-/// `GET /api/proposals/{id}`: a proposal by its client-generated id (I6).
-pub static PROPOSAL: Endpoint = endpoint(Method::GET, "/api/proposals/{id}", "getProposal");
-/// `PATCH /api/proposals/{id}`: replaces a proposal's content against its editing revision.
-pub static EDIT_PROPOSAL: Endpoint = endpoint(Method::PATCH, "/api/proposals/{id}", "editProposal");
-/// `POST /api/proposals/{id}/preview`: what applying it now would do (C14, D7).
-pub static PREVIEW_PROPOSAL: Endpoint = endpoint(
-    Method::POST,
-    "/api/proposals/{id}/preview",
-    "previewProposal",
-);
-/// `POST /api/proposals/{id}/apply`: applies it, the caller confirming (H2, I6).
-pub static APPLY_PROPOSAL: Endpoint =
-    endpoint(Method::POST, "/api/proposals/{id}/apply", "applyProposal");
-/// `POST /api/proposals/{id}/discard`: discards it.
-pub static DISCARD_PROPOSAL: Endpoint = endpoint(
-    Method::POST,
-    "/api/proposals/{id}/discard",
-    "discardProposal",
-);
-/// `POST /api/proposals/{id}/refresh`: drafts it again against its destination as it stands (I6).
-pub static REFRESH_PROPOSAL: Endpoint = endpoint(
-    Method::POST,
-    "/api/proposals/{id}/refresh",
-    "refreshProposal",
-);
+/// A destination's endpoints for the proposals under it, which are addressed under it (I6):
+/// the open ones listed, and each read, edited, previewed, applied, discarded, and refreshed
+/// at `/proposals/{proposal}`.
+pub struct ProposalEndpoints {
+    /// `GET .../proposals`: the destination's open proposals.
+    pub list: Endpoint,
+    /// `GET .../proposals/{proposal}`: a proposal by its client-generated id.
+    pub get: Endpoint,
+    /// `PATCH .../proposals/{proposal}`: replaces its content against its editing revision.
+    pub edit: Endpoint,
+    /// `POST .../proposals/{proposal}/preview`: what applying it now would do (C14, D7).
+    pub preview: Endpoint,
+    /// `POST .../proposals/{proposal}/apply`: applies it, the caller confirming (H2, I6).
+    pub apply: Endpoint,
+    /// `POST .../proposals/{proposal}/discard`: discards it.
+    pub discard: Endpoint,
+    /// `POST .../proposals/{proposal}/refresh`: drafts it again against its destination as it
+    /// stands (I6).
+    pub refresh: Endpoint,
+}
+
+impl ProposalEndpoints {
+    /// The endpoints in the order the OpenAPI document lists them.
+    #[must_use]
+    pub fn all(&self) -> [&Endpoint; 7] {
+        [
+            &self.list,
+            &self.get,
+            &self.edit,
+            &self.preview,
+            &self.apply,
+            &self.discard,
+            &self.refresh,
+        ]
+    }
+}
+
+/// The proposal endpoints of one destination: `$prefix` is its path, `$noun` its name in the
+/// operation ids.
+macro_rules! proposal_endpoints {
+    ($prefix:literal, $noun:literal) => {
+        ProposalEndpoints {
+            list: endpoint(
+                Method::GET,
+                concat!($prefix, "/proposals"),
+                concat!("list", $noun, "Proposals"),
+            ),
+            get: endpoint(
+                Method::GET,
+                concat!($prefix, "/proposals/{proposal}"),
+                concat!("get", $noun, "Proposal"),
+            ),
+            edit: endpoint(
+                Method::PATCH,
+                concat!($prefix, "/proposals/{proposal}"),
+                concat!("edit", $noun, "Proposal"),
+            ),
+            preview: endpoint(
+                Method::POST,
+                concat!($prefix, "/proposals/{proposal}/preview"),
+                concat!("preview", $noun, "Proposal"),
+            ),
+            apply: endpoint(
+                Method::POST,
+                concat!($prefix, "/proposals/{proposal}/apply"),
+                concat!("apply", $noun, "Proposal"),
+            ),
+            discard: endpoint(
+                Method::POST,
+                concat!($prefix, "/proposals/{proposal}/discard"),
+                concat!("discard", $noun, "Proposal"),
+            ),
+            refresh: endpoint(
+                Method::POST,
+                concat!($prefix, "/proposals/{proposal}/refresh"),
+                concat!("refresh", $noun, "Proposal"),
+            ),
+        }
+    };
+}
+
+/// A journey's proposals, addressed under it.
+pub static JOURNEY_PROPOSALS: ProposalEndpoints =
+    proposal_endpoints!("/api/journeys/{id}", "Journey");
+/// A route's proposals, addressed under it.
+pub static ROUTE_PROPOSALS: ProposalEndpoints = proposal_endpoints!("/api/routes/{id}", "Route");
+/// The deployment's proposals, addressed under it.
+pub static DEPLOYMENT_PROPOSALS: ProposalEndpoints =
+    proposal_endpoints!("/api/deployment", "Deployment");
+/// `GET /api/proposals?scope=`: the open proposals across destinations that no one
+/// destination holds: those waiting on the caller, and those that would create a journey or
+/// a route. A collection only; no proposal is addressed here (C14, C16).
+pub static PROPOSALS: Endpoint = endpoint(Method::GET, "/api/proposals", "listProposals");
 /// `POST /api/journeys/{id}/upgrade`: proposes upgrading it to a newer route version (B7).
 pub static UPGRADE: Endpoint =
     endpoint(Method::POST, "/api/journeys/{id}/upgrade", "proposeUpgrade");
@@ -281,7 +349,7 @@ pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = endpoint(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 51] = [
+pub static ALL: [&Endpoint; 67] = [
     &HEALTH,
     &CAPABILITIES,
     &PATCH_JOURNEY,
@@ -290,12 +358,28 @@ pub static ALL: [&Endpoint; 51] = [
     &PROPOSE_JOURNEY,
     &PROPOSE_ROUTE,
     &PROPOSE_DEPLOYMENT,
-    &PROPOSAL,
-    &EDIT_PROPOSAL,
-    &PREVIEW_PROPOSAL,
-    &APPLY_PROPOSAL,
-    &DISCARD_PROPOSAL,
-    &REFRESH_PROPOSAL,
+    &JOURNEY_PROPOSALS.list,
+    &JOURNEY_PROPOSALS.get,
+    &JOURNEY_PROPOSALS.edit,
+    &JOURNEY_PROPOSALS.preview,
+    &JOURNEY_PROPOSALS.apply,
+    &JOURNEY_PROPOSALS.discard,
+    &JOURNEY_PROPOSALS.refresh,
+    &ROUTE_PROPOSALS.list,
+    &ROUTE_PROPOSALS.get,
+    &ROUTE_PROPOSALS.edit,
+    &ROUTE_PROPOSALS.preview,
+    &ROUTE_PROPOSALS.apply,
+    &ROUTE_PROPOSALS.discard,
+    &ROUTE_PROPOSALS.refresh,
+    &DEPLOYMENT_PROPOSALS.list,
+    &DEPLOYMENT_PROPOSALS.get,
+    &DEPLOYMENT_PROPOSALS.edit,
+    &DEPLOYMENT_PROPOSALS.preview,
+    &DEPLOYMENT_PROPOSALS.apply,
+    &DEPLOYMENT_PROPOSALS.discard,
+    &DEPLOYMENT_PROPOSALS.refresh,
+    &PROPOSALS,
     &UPGRADE,
     &SAVE_AS_ROUTE,
     &RELINK,

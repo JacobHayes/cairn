@@ -83,13 +83,13 @@ describe("a turn's writes in the panel (I5, D7)", () => {
 
   it("opens a drafted proposal in proposal review, whatever made it a proposal", () => {
     const reasons: AssistantAction[] = [
-      { outcome: "proposed", tool: "apply_patch", proposal: "pr_one", because: { reason: "structural" } },
-      { outcome: "proposed", tool: "assign", proposal: "pr_two", because: { reason: "too_many_nodes", count: 12 } },
-      { outcome: "proposed", tool: "create_proposal", proposal: "pr_three", because: { reason: "asked" } },
+      { outcome: "proposed", tool: "apply_patch", proposal: "pr_one", destination: { journey: "j_one" }, because: { reason: "structural" } },
+      { outcome: "proposed", tool: "assign", proposal: "pr_two", destination: { route: "r_two" }, because: { reason: "too_many_nodes", count: 12 } },
+      { outcome: "proposed", tool: "create_proposal", proposal: "pr_three", destination: "deployment", because: { reason: "asked" } },
     ];
     const markup = shown(reasons);
-    for (const id of ["pr_one", "pr_two", "pr_three"]) {
-      expect(markup).toContain(`href="/proposals/${id}"`);
+    for (const href of ["/journeys/j_one/proposals/pr_one", "/routes/r_two/proposals/pr_two", "/entities/proposals/pr_three"]) {
+      expect(markup).toContain(`href="${href}"`);
     }
     expect(count(markup, 'data-testid="review-proposal"')).toBe(reasons.length);
   });

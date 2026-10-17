@@ -4,8 +4,10 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use serde::{Deserialize, Serialize};
+
 use cairn_schema::{
-    AttachmentKey, Domain, EntityKey, Event, EventType, GraphId, InsertionKey, JourneyId,
+    AgentId, AttachmentKey, Domain, EntityKey, Event, EventType, GraphId, InsertionKey, JourneyId,
     JourneyStatus, Lineage, NodeKey, PatchId, ProposalId, Revision, RouteHeader, RouteId,
     Timestamp, Title, UserId, VersionNumber,
 };
@@ -175,6 +177,117 @@ pub struct InsertionUse {
     pub title: Title,
     /// Whether the segment has a later published version.
     pub upgrade_available: bool,
+}
+
+/// C14: which open proposals a listing holds.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ProposalScope {
+    /// The ones whose destination is this domain.
+    Destination(Domain),
+    /// The ones whose destination is a journey that does not exist yet.
+    CreatingJourneys,
+    /// The ones whose destination is a route that does not exist yet.
+    CreatingRoutes,
+    /// C16: the ones waiting on a viewer: created by `user`, or drafted by an agent for an
+    /// active journey referring to any of `entities`, directly or through an alias.
+    Waiting {
+        /// The viewer.
+        user: UserId,
+        /// The viewer's entities.
+        entities: BTreeSet<EntityKey>,
+    },
+}
+
+/// Where a proposal listing resumes: after this proposal in newest-first order. It names the
+/// proposal's own position, so it stays valid when that proposal closes.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProposalCursor {
+    /// When the last proposal of the previous page was created.
+    pub created_at: Timestamp,
+    /// Its id.
+    pub id: ProposalId,
+}
+
+/// C14: the open proposals of a scope, newest first.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ProposalQuery {
+    /// Which proposals.
+    pub scope: ProposalScope,
+    /// The page starts after this one.
+    pub after: Option<ProposalCursor>,
+    /// The page's size.
+    pub size: PageSize,
+}
+
+/// What a proposal's destination is.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DestinationKind {
+    /// A journey.
+    Journey,
+    /// A process route.
+    Route,
+    /// A segment route.
+    Segment,
+    /// The deployment.
+    Deployment,
+}
+
+/// A proposal's destination as it is now: read at listing time, never stored.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DestinationNow {
+    /// Whether it exists.
+    pub exists: bool,
+    /// Its name, when it exists and has one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub name: Option<Title>,
+    /// Its revision; 0 when it does not exist.
+    pub revision: Revision,
+    /// What it is (what it would be, for a route that does not exist yet: a process).
+    pub kind: DestinationKind,
+    /// A journey's status.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub status: Option<JourneyStatus>,
+}
+
+/// An open proposal in a listing.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProposalSummary {
+    /// The proposal.
+    pub id: ProposalId,
+    /// Its destination.
+    pub destination: Domain,
+    /// What it proposes, in a line.
+    pub title: Title,
+    /// Its editing revision.
+    pub revision: Revision,
+    /// The destination's revision it was drafted against.
+    pub drafted_against: Revision,
+    /// The user it was created by or for.
+    pub created_by: UserId,
+    /// The agent that drafted it, if any.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub proposing_agent: Option<AgentId>,
+    /// When it was created.
+    pub created_at: Timestamp,
+    /// Its destination as it is now.
+    pub now: DestinationNow,
+}
+
+/// One page of open proposals, with the scope's whole open count.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProposalPage {
+    /// How many open proposals the scope holds, counted in the same read.
+    pub count: u32,
+    /// A destination scope's destination as it is now, so its header does not depend on
+    /// having rows.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub destination: Option<DestinationNow>,
+    /// The proposals.
+    pub items: Vec<ProposalSummary>,
+    /// Where the next page starts, if there is one.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub next: Option<ProposalCursor>,
 }
 
 /// J5: event filters. Every filter given must hold.

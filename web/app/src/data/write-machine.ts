@@ -127,13 +127,13 @@ function callOf(proposals: ProposalHost, call: ProposalCall): Promise<ProposalWr
     case "create":
       return proposals.create(call.destination, call.request);
     case "edit":
-      return proposals.edit(call.proposal, call.request);
+      return proposals.edit(call.destination, call.proposal, call.request);
     case "discard":
-      return proposals.discard(call.proposal, call.request);
+      return proposals.discard(call.destination, call.proposal, call.request);
     case "refresh":
-      return proposals.refresh(call.proposal, call.request);
+      return proposals.refresh(call.destination, call.proposal, call.request);
     case "apply":
-      return proposals.apply(call.proposal, call.request);
+      return proposals.apply(call.destination, call.proposal, call.request);
     case "upgrade":
       return proposals.upgrade(call.journey, call.request);
     case "save_as_route":

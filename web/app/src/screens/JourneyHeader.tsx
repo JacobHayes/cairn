@@ -14,6 +14,7 @@ import { statusActions } from "../journeys/lifecycle.ts";
 import type { JourneyStatus, Screen } from "../journeys/address.ts";
 import { useInsertEntry } from "../segments/entry.ts";
 import { useSuggested } from "../journeys/suggested.ts";
+import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
 import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
@@ -134,6 +135,7 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
             {item("menu-save", "Save as route...", "save")}
             {item("menu-relink", "Re-link...", "relink")}
             <hr />
+            <OpenProposalsItem destination={{ journey: header.id }} close={close} />
             {screen !== "summary" ? null : (
               <button type="button" role="menuitem" className="menu-item" data-testid="menu-print" onClick={() => { close(); globalThis.print(); }}>
                 Print the summary

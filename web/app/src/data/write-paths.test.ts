@@ -52,7 +52,7 @@ const paths: Path[] = [
   {
     name: "a proposal review",
     edit: "proposal:pr_one",
-    command: (id) => proposalCommand({ op: "apply", proposal: "pr_one", request: { reviewed_revision: 4 } }, id),
+    command: (id) => proposalCommand({ op: "apply", destination: { journey: "j_one" }, proposal: "pr_one", request: { reviewed_revision: 4 } }, id),
     refuse: (host) => {
       host.proposed = [rejected, rejected, rejected];
     },

@@ -7,8 +7,8 @@ import type { HttpFailure, Schema } from "@cairn/client";
 
 import type { Markdown, Patch } from "./host.ts";
 import { consequenceLines, warningOf, type ConsequenceLine, type SaveEvent, type TitleOf, type Unlocked } from "./activity.ts";
-import { proposalIdOf, type Answer, type Command } from "./edit-record.ts";
-import { proposalPath } from "./proposals.ts";
+import { destinationOf, proposalIdOf, type Answer, type Command } from "./edit-record.ts";
+import { proposalAddress } from "../address.ts";
 
 export type Mutation = Schema<"Mutation">;
 export type Rejection = Schema<"Rejection">;
@@ -150,7 +150,7 @@ export interface Save {
  */
 export function saveOf(command: Command, answer: Answer, began: number, titleOf: TitleOf): Save | undefined {
   if (command.kind === "proposal" && !isPatchAnswer(answer)) {
-    return DRAFTING.has(command.call.op) ? { text: "Drafted a proposal", lines: [], unlocked: undefined, address: proposalPath(proposalIdOf(command.call)) } : undefined;
+    return DRAFTING.has(command.call.op) ? { text: "Drafted a proposal", lines: [], unlocked: undefined, address: proposalAddress(destinationOf(command.call), proposalIdOf(command.call)) } : undefined;
   }
   if (!isPatchAnswer(answer)) {
     return undefined;

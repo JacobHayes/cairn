@@ -174,3 +174,42 @@ test("a route's canvas keeps its graph while its reads fail, says BEHIND, and ca
   await expect(two.locator("[data-testid=node-card]")).toHaveCount(2);
   await expect(syncChip(two)).not.toHaveAttribute("data-state", "behind");
 });
+
+test("C14: a proposal drafted in another page appears in a journey's Proposals tab with no reload", { tag: "@server" }, async ({ context }) => {
+  const [one, two] = [await context.newPage(), await context.newPage()];
+  await open(one, "server", "/entities");
+  const owner = await addEntity(one, fresh("Owner"));
+  const journey = await journeyOwnedBy(one.request, owner);
+  await openJourney(two, "server", journey);
+  await live(two);
+  // Nothing is open, so the page keeps no tab for it.
+  await expect(two.getByTestId("tab-proposals")).toHaveCount(0);
+  const drafted = await one.request.post(`/api/journeys/${journey}/proposals`, {
+    data: {
+      id: `pr_${crypto.randomUUID().replaceAll("-", "")}`,
+      patch_id: patchId(),
+      draft: { title: "Add a follow-up", destination_revision: 1, mutations: [{ op: "add_node", node: { key: "n_followup", id: "followup", kind: "action", title: "Follow up" } }] },
+    },
+  });
+  expect(drafted.ok(), await drafted.text()).toBe(true);
+  await expect(two.getByTestId("tab-proposals").getByTestId("proposals-count")).toHaveText("1");
+  await two.getByTestId("tab-proposals").click();
+  await expect(two.getByTestId("proposal-row")).toContainText("Add a follow-up");
+});
+
+test("C14: the deployment's open proposals are a panel on Entities, found at its own address", { tag: "@server" }, async ({ page }) => {
+  await open(page, "server", "/entities");
+  const deployment = (await (await page.request.get("/api/deployment")).json()) as { revision: number };
+  const drafted = await page.request.post("/api/deployment/proposals", {
+    data: {
+      id: `pr_${crypto.randomUUID().replaceAll("-", "")}`,
+      patch_id: patchId(),
+      draft: { title: "Add a reviewer", destination_revision: deployment.revision, mutations: [{ op: "create_entity", entity: { key: `e_reviewer_${crypto.randomUUID().slice(0, 8)}`, name: "Reviewer", emails: [] } }] },
+    },
+  });
+  expect(drafted.ok(), await drafted.text()).toBe(true);
+  await expect(page.getByTestId("deployment-proposals").getByTestId("proposal-row")).toContainText("Add a reviewer");
+  await page.getByTestId("deployment-proposals").getByRole("link", { name: "Add a reviewer" }).click();
+  await expect(page).toHaveURL(/\/entities\/proposals\/pr_[0-9a-f]+$/);
+  await expect(page.getByTestId("review-trail")).toContainText("Entities");
+});

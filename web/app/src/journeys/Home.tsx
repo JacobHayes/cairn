@@ -10,6 +10,7 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
+import { pathTo } from "../address.ts";
 import { NodeItem, NodePanel } from "../acting/NodeItem.tsx";
 import { factOf } from "../acting/reasons.ts";
 import { RowActions } from "../acting/RowActions.tsx";
@@ -19,6 +20,8 @@ import "../acting/acting.css";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive, useRetryJourney, useViewer } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex, type JourneySummary } from "../data/reads.ts";
+import { destinationWords, ProposalRow } from "../proposals/ProposalRows.tsx";
+import { listKey, proposalsListed, type Proposals } from "../proposals/read.ts";
 import { DEFAULT_FILTERS, indexPath, journeyPath, newJourneyPath, queryOf } from "./address.ts";
 import { heldBack, homeState, readyLine, type HomeJourney, type HomeState } from "./home-model.ts";
 import { JourneyTable } from "./JourneyTable.tsx";
@@ -133,6 +136,8 @@ function useHome() {
   const { view, refresh } = useLive(indexKey(query), journeyIndex(query));
   const routes = valueOf(useLive("routes", routeIndex).view) ?? [];
   const found = valueOf(view);
+  const proposals = useLive(listKey("waiting"), proposalsListed("waiting"));
+  const waitingProposals = valueOf(proposals.view);
   const items = useMemo(() => (found === undefined ? [] : [...found].sort((left, right) => left.name.localeCompare(right.name))), [found]);
   const [readings, setReadings] = useState<Record<string, JourneyReading>>({});
   const report = useCallback((id: string, reading: JourneyReading) => {
@@ -148,8 +153,29 @@ function useHome() {
     viewer: failed !== undefined ? "failed" : viewer === undefined ? "loading" : { entities: viewer.entities.length },
     index: view.status === "failed" ? "failed" : found === undefined ? "loading" : "ready",
     journeys,
+    proposals: proposals.view.status === "failed" ? "failed" : waitingProposals === undefined ? "loading" : { waiting: waitingProposals.count },
   });
-  return { failed, view, refresh, routes, found, items, report, known, journeys, state };
+  return { proposals, failed, view, refresh, routes, found, items, report, known, journeys, state };
+}
+
+/** C14, C16: the open proposals waiting on the viewer, with the destination each is for; its own read, so the rest of Home does not wait on it, and rows stay through a failed refresh. */
+function ProposalsToReview({ reading }: { reading: ReturnType<typeof useLive<Proposals>> }) {
+  const { view, refresh } = reading;
+  const found = valueOf(view);
+  const rows: PanelRow[] = (found?.items ?? []).map((item) => ({ key: item.id, render: () => <ProposalRow item={item} context={destinationWords(item)} /> }));
+  return (
+    <>
+      {view.status === "failed" || view.status === "behind" ? (
+        <p className="callout callout-bad" role="alert" data-testid="home-proposals-failed">
+          The proposals waiting on you could not be {found === undefined ? "read" : "refreshed"}: {view.error.message}{" "}
+          <button type="button" className="ghost" onClick={refresh}>
+            Try again
+          </button>
+        </p>
+      ) : null}
+      {rows.length === 0 ? null : <RowsPanel title="Proposals to review" testId="home-proposals" rows={rows} />}
+    </>
+  );
 }
 
 /** What Home says in place of its groups, for the states that have none. */
@@ -161,7 +187,7 @@ function Said({ state }: { state: HomeState }) {
       return (
         <Statement title="Cairn cannot match your sign-in to a person yet, so nothing shows as yours." testId="home-unlinked">
           <p>No person or team holds a verified email of yours.</p>
-          <Link to="/me">Check who you are &rsaquo;</Link>
+          <Link to={pathTo("me")}>Check who you are &rsaquo;</Link>
         </Statement>
       );
     case "unassigned":
@@ -186,7 +212,7 @@ function Said({ state }: { state: HomeState }) {
 }
 
 export function Home() {
-  const { failed, view, refresh, routes, found, items, report, known, journeys, state } = useHome();
+  const { proposals, failed, view, refresh, routes, found, items, report, known, journeys, state } = useHome();
   const readyOnes = known.flatMap((each) => (each.reading.status === "ready" && each.reading.ready.length > 0 ? [{ summary: each.summary, reading: each.reading }] : []));
   const waiting = known.flatMap((each) => (each.reading.status === "ready" && each.reading.ready.length === 0 ? [{ summary: each.summary, reading: each.reading }] : []));
   const reading = known.filter((each) => each.reading.status === "loading").length;
@@ -201,6 +227,7 @@ export function Home() {
           <span className="mono">{line.rows}</span> ready for you in <span className="mono">{line.journeys}</span> {line.journeys === 1 ? "journey" : "journeys"}
         </p>
       )}
+      <ProposalsToReview reading={proposals} />
       {failed === undefined ? null : <p className="callout callout-bad">Who you are could not be read: {failed}</p>}
       {view.status === "failed" ? (
         <p className="callout callout-bad">

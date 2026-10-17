@@ -168,6 +168,10 @@ mod mcp_in_process {
             "draft": draft, "patch_id": "p_propose" });
         let created = agent.ok("create_proposal", created).await;
         assert_eq!(created["proposal"]["revision"], 1);
+        let scope = json!({ "scope": "destination", "destination": { "journey": JOURNEY } });
+        let listed = agent.ok("list_proposals", scope).await;
+        assert_eq!(listed["count"], 1);
+        assert_eq!(listed["proposals"][0]["id"], "pr_workload");
         let review = json!({ "proposal": "pr_workload", "review": true });
         let review = agent.ok("get_proposal", review).await;
         assert_eq!(review["review"].get("violations"), None);
@@ -180,6 +184,12 @@ mod mcp_in_process {
             json!({ "proposal": "pr_workload", "reviewed_revision": 2, "patch_id": "p_apply" });
         let applied = agent.ok("apply_proposal", apply).await;
         assert_eq!(applied["receipt"]["revision"].as_u64(), Some(revision + 1));
+        let after = json!({ "scope": "destination", "destination": { "journey": JOURNEY } });
+        let listed = agent.ok("list_proposals", after).await;
+        assert_eq!(
+            listed["count"], 0,
+            "an applied proposal is no longer listed"
+        );
     }
 
     /// A13, A11, B7, B8, B9: a version exported and imported back as a draft, published as

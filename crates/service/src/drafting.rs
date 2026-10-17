@@ -202,19 +202,19 @@ impl<S: Store> Service<S> {
     ///
     /// # Errors
     ///
-    /// [`ProposeError::ProposalMissing`] when there is no such proposal;
+    /// [`ProposeError::ProposalMissing`] when there is no such proposal under `destination`;
     /// [`ProposeError::Draft`] as for drafting it; [`ProposeError::Write`] when the edit is
     /// stale, the proposal is not open, or the write fails.
     pub async fn refresh_proposal(
         &self,
         call: &Call,
         patch_id: PatchId,
+        destination: &Domain,
         id: &ProposalId,
         base_revision: Revision,
     ) -> Result<ProposalWritten, ProposeError> {
         let held = self
-            .store
-            .proposal(id)
+            .proposal_at(destination, id)
             .await?
             .ok_or_else(|| ProposeError::ProposalMissing(id.clone()))?;
         if let Some(answer) = self

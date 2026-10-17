@@ -231,7 +231,10 @@ fn a_proposal_review_and_a_publish_list_notices_and_a_draft_edit_lists_none() {
             .create_proposal(&author, id("p_spare"), &destination, &proposal, spare)
             .await
             .unwrap();
-        let review = service.preview_proposal(&author, &proposal).await.unwrap();
+        let review = service
+            .preview_proposal(&author, &destination, &proposal)
+            .await
+            .unwrap();
         let reviewed: Vec<String> = review
             .preview
             .notices
@@ -348,7 +351,10 @@ async fn an_upgrade_is_applied_once_its_conflict_is_resolved_and_an_agent_confir
         "{blocked:?}"
     );
     resolve(&service, &agent, &drafted).await;
-    let review = service.preview_proposal(&agent, &upgrade()).await.unwrap();
+    let review = service
+        .preview_proposal(&agent, &Domain::Journey(vendor()), &upgrade())
+        .await
+        .unwrap();
     assert_eq!(review.preview.unresolved, Vec::new());
     assert_eq!(review.preview.violations, Vec::new());
     applied(apply(&service, &agent, "p_apply", &journey, &upgrade(), 2).await);
@@ -410,7 +416,13 @@ async fn a_stale_upgrade_is_refreshed_with_its_choices_and_reviewed_again<S: Sto
     assert_ne!(intervening, cairn_schema::TouchedSet::default());
     let refreshed = saved(
         service
-            .refresh_proposal(&lead, id("p_refresh"), &upgrade(), revision(2))
+            .refresh_proposal(
+                &lead,
+                id("p_refresh"),
+                &Domain::Journey(vendor()),
+                &upgrade(),
+                revision(2),
+            )
             .await
             .unwrap(),
     );
@@ -563,7 +575,13 @@ fn every_route_operation_can_be_awaited_on_another_thread() {
             &vendor_route(),
             &id("Saved"),
         ));
-        send(&service.refresh_proposal(lead, id("p_five"), &proposal, revision(1)));
+        send(&service.refresh_proposal(
+            lead,
+            id("p_five"),
+            &Domain::Journey(vendor()),
+            &proposal,
+            revision(1),
+        ));
     }
     let path = fixtures_root().join("vendor-evaluation/route.yaml");
     let file: RouteFile = from_yaml(&std::fs::read_to_string(path).unwrap()).unwrap();
@@ -614,7 +632,13 @@ async fn a_resubmitted_draft_after_the_journey_moved_is_answered_from_its_receip
     );
     let refresh = async |patch_id: &str| {
         service
-            .refresh_proposal(&lead, id(patch_id), &upgrade(), revision(1))
+            .refresh_proposal(
+                &lead,
+                id(patch_id),
+                &Domain::Journey(vendor()),
+                &upgrade(),
+                revision(1),
+            )
             .await
     };
     let refreshed = saved(refresh("p_refresh").await.unwrap());
@@ -747,7 +771,13 @@ async fn a_patch_id_reused_for_another_drafted_request_is_refused<S: Store>(stor
     );
     reused(
         service
-            .refresh_proposal(&lead, id("p_propose"), &upgrade(), Revision::NONE)
+            .refresh_proposal(
+                &lead,
+                id("p_propose"),
+                &Domain::Journey(vendor()),
+                &upgrade(),
+                Revision::NONE,
+            )
             .await,
     );
     let elsewhere = upgrade_to(&lead, "p_propose_nine", 9).await;
@@ -760,7 +790,13 @@ async fn a_patch_id_reused_for_another_drafted_request_is_refused<S: Store>(stor
     applied(apply(&service, &lead, "p_apply", &journey, &upgrade(), 2).await);
     reused(
         service
-            .refresh_proposal(&lead, id("p_apply"), &upgrade(), revision(2))
+            .refresh_proposal(
+                &lead,
+                id("p_apply"),
+                &Domain::Journey(vendor()),
+                &upgrade(),
+                revision(2),
+            )
             .await,
     );
 }

@@ -10,6 +10,7 @@ import type { Schema } from "@cairn/client";
 import { useCallback, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate, useParams } from "react-router";
 
+import { destinationIn, proposalAddress, proposalsAddress, required } from "../address.ts";
 import { treeOf, type Graph, type Kind, type Role } from "../authoring/graph.ts";
 import { PREVIEW_SETTLE_MS } from "../authoring/write.ts";
 import type { Deployment, Deriver, Host, RouteVersion } from "../data/host.ts";
@@ -53,7 +54,7 @@ import {
   type ReviewFilter,
 } from "./model.ts";
 import { ProposalCanvas } from "./ProposalCanvas.tsx";
-import { proposalReview } from "./read.ts";
+import { proposalReview, reviewKey } from "./read.ts";
 import { BeforeAfter, BLOCKER_WORDS, FilterChips, ItemEditor, ProposalOrigin, ReviewHeader, ReviewList } from "./ReviewFrame.tsx";
 import { StalePanel } from "./Stale.tsx";
 import { itemHeading, mutationNode, namesOf, type Names } from "./words.ts";
@@ -196,6 +197,8 @@ interface BodyProps {
   ready: Ready | undefined;
   /** The destination's graph as it is (none for one the proposal creates). */
   before: Graph | undefined;
+  /** The destination's name as it is now, when it has one. */
+  name: string | undefined;
   deployment: Deployment;
 }
 
@@ -267,7 +270,7 @@ function useReviewing(review: ProposalReview, refetch: () => void) {
     },
     save: () => {
       if (kept !== undefined && invalid.size === 0) {
-        void write.run({ op: "edit", proposal: id, request: { base_revision: kept.base, draft: kept.draft } }).then((answer) => {
+        void write.run({ op: "edit", destination: proposal.destination, proposal: id, request: { base_revision: kept.base, draft: kept.draft } }).then((answer) => {
           if (answer !== undefined) {
             setKept(undefined);
           }
@@ -276,17 +279,17 @@ function useReviewing(review: ProposalReview, refetch: () => void) {
       }
     },
     refresh: () => {
-      void write.run({ op: "refresh", proposal: id, request: { base_revision: proposal.revision } }).then((answer) => {
+      void write.run({ op: "refresh", destination: proposal.destination, proposal: id, request: { base_revision: proposal.revision } }).then((answer) => {
         saved(answer, "refreshed");
       });
     },
     apply: () => {
       if (reviewed !== undefined) {
-        void write.run({ op: "apply", proposal: id, request: { reviewed_revision: reviewed } }).then(reread);
+        void write.run({ op: "apply", destination: proposal.destination, proposal: id, request: { reviewed_revision: reviewed } }).then(reread);
       }
     },
     discard: () => {
-      void write.run({ op: "discard", proposal: id, request: { base_revision: proposal.revision } }).then(reread);
+      void write.run({ op: "discard", destination: proposal.destination, proposal: id, request: { base_revision: proposal.revision } }).then(reread);
     },
   };
 }
@@ -413,6 +416,7 @@ interface InspectorProps {
   model: Model;
   reviewing: Reviewing;
   ready: Ready | undefined;
+  name: string | undefined;
   deployment: Deployment;
   journey: string | undefined;
   selected: string | undefined;
@@ -472,7 +476,7 @@ function ProposalCard(props: InspectorProps) {
   return (
     <aside className="detail-panel panel stack" aria-label="The proposal" data-testid="proposal-card">
       <h2>The proposal</h2>
-      <ProposalOrigin proposal={proposal} journeyTitle={ready?.journey.header.name} />
+      <ProposalOrigin proposal={proposal} name={props.name} />
       {proposal.draft.description == null ? null : <Markdown text={proposal.draft.description} />}
       {waiting.length === 0 ? null : (
         <section className="stack" aria-label="Still to decide" data-testid="to-decide">
@@ -537,16 +541,16 @@ function ReviewBody(props: BodyProps) {
   const listed = new URLSearchParams(search).get("view") === "list";
   const model = useReviewModel(props, kept?.draft ?? proposal.draft, reviewing.write.disabled);
   const journey = proposal.destination !== "deployment" && "journey" in proposal.destination ? proposal.destination.journey : undefined;
-  const base = `/proposals/${proposal.id}`;
+  const base = proposalAddress(proposal.destination, proposal.id);
   useEscapeTo(selected === undefined ? undefined : `${base}${search}`);
-  const onPick = (key: string) => void navigate(`${base}/nodes/${key}${search}`);
-  const inspector = { proposal, model, reviewing, ready, deployment: props.deployment, journey, selected, onPick, back: `${base}${search}` };
-  const here = (view: "graph" | "list") => `${selected === undefined ? base : `${base}/nodes/${selected}`}${view === "list" ? "?view=list" : ""}`;
+  const onPick = (key: string) => void navigate(`${proposalAddress(proposal.destination, proposal.id, key)}${search}`);
+  const inspector = { proposal, model, reviewing, ready, name: props.name, deployment: props.deployment, journey, selected, onPick, back: `${base}${search}` };
+  const here = (view: "graph" | "list") => `${proposalAddress(proposal.destination, proposal.id, selected)}${view === "list" ? "?view=list" : ""}`;
   return (
     <>
       <div className="ws-fill journey-frame route-frame" data-testid="proposal" data-proposal={proposal.id} data-status={proposal.status} data-revision={proposal.revision}>
         <div className="ws-head stack journey-head">
-          <ReviewHeader proposal={proposal} itemCount={model.counts.all} conflictCount={(model.draft.items ?? []).filter((item) => item.item === "conflict").length} blockers={reviewing.blockers} disabled={reviewing.write.disabled} onApply={reviewing.apply} onDiscard={reviewing.discard} />
+          <ReviewHeader proposal={proposal} name={props.name} itemCount={model.counts.all} conflictCount={(model.draft.items ?? []).filter((item) => item.item === "conflict").length} blockers={reviewing.blockers} disabled={reviewing.write.disabled} onApply={reviewing.apply} onDiscard={reviewing.discard} />
           <StalePanel review={review} disabled={!model.editable} onRefresh={reviewing.refresh} />
           <Problem write={reviewing.write} onRebase={reviewing.rebase} />
           <Receipt receipt={reviewing.write.receipt} />
@@ -577,14 +581,14 @@ function ReviewBody(props: BodyProps) {
 }
 
 /** A journey proposal: the journey derived in the tab, unless the proposal creates it. */
-function JourneyReview({ journey, ...props }: Omit<BodyProps, "ready" | "before"> & { journey: string }) {
+function JourneyReview({ journey, ...props }: Omit<BodyProps, "ready" | "before" | "name"> & { journey: string }) {
   const creates = props.review.proposal.draft.destination_revision === 0;
   const view = useJourney(journey);
   if (view.status === "ready") {
-    return <ReviewBody {...props} ready={view} before={view.journey.graph} />;
+    return <ReviewBody {...props} ready={view} before={view.journey.graph} name={view.journey.header.name} />;
   }
   if (creates && view.status === "missing") {
-    return <ReviewBody {...props} ready={undefined} before={undefined} />;
+    return <ReviewBody {...props} ready={undefined} before={undefined} name={undefined} />;
   }
   if (view.status === "failed") {
     return <p className="callout callout-bad">The journey could not be read: {view.message}</p>;
@@ -596,49 +600,58 @@ function JourneyReview({ journey, ...props }: Omit<BodyProps, "ready" | "before"
 }
 
 /** The graph a route proposal is reviewed against: the route's draft as it is, or its latest version; none for a route that does not exist yet. */
-const ROUTE_BEFORE: ReadSource<{ host: Host; route: string }, { graph: Graph | undefined }> = {
+const ROUTE_BEFORE: ReadSource<{ host: Host; route: string }, { graph: Graph | undefined; name: string }> = {
   policy: HOST_READ,
   read: async ({ host, route }) => {
     const found = await host.route(route);
+    const name = found.header.name;
     if (found.draft != null) {
-      return { graph: found.draft.graph };
+      return { graph: found.draft.graph, name };
     }
     const latest = Math.max(0, ...(found.versions ?? []));
-    return { graph: latest === 0 ? undefined : (await host.routeVersion(route, latest)).graph };
+    return { graph: latest === 0 ? undefined : (await host.routeVersion(route, latest)).graph, name };
   },
 };
 
 /** A route proposal: the route's draft as it is, or its latest version, or nothing for a new route. */
-function RouteReview({ route, ...props }: Omit<BodyProps, "ready" | "before"> & { route: string }) {
+function RouteReview({ route, ...props }: Omit<BodyProps, "ready" | "before" | "name"> & { route: string }) {
   const { host } = useSession();
   const revision = props.review.stale?.conflict.current ?? props.review.proposal.draft.destination_revision;
   const { view } = useKeyedRead(ROUTE_BEFORE, { identity: [route], freshness: [revision], args: { host, route } });
-  // A route that cannot be read, or is not there yet, is reviewed against nothing.
-  const before = valueOf(view) ?? (view.status === "failed" || view.status === "gone" ? { graph: undefined } : undefined);
+  // A route that is not there yet is reviewed against nothing; one that cannot be read is not reviewed at all.
+  const before = valueOf(view) ?? (view.status === "gone" ? { graph: undefined, name: undefined } : undefined);
+  if (view.status === "failed") {
+    return <p className="callout callout-bad" role="alert">The route could not be read: {view.error.message}</p>;
+  }
   if (before === undefined) {
     return <p className="muted small">Reading the route...</p>;
   }
-  return <ReviewBody {...props} ready={undefined} before={before.graph} />;
+  return <ReviewBody {...props} ready={undefined} before={before.graph} name={before.name} />;
 }
 
 export function ProposalScreen() {
-  const { id = "" } = useParams();
-  const { view, refresh: refetch } = useLive(`proposal:${id}`, proposalReview(id));
+  const params = useParams();
+  const id = required(params, "proposal");
+  const destination = destinationIn(params);
+  const { view, refresh: refetch } = useLive(reviewKey(destination, id), proposalReview(destination, id));
   const deployment = useDeployment();
   const review = valueOf(view);
   if (review === undefined) {
     if (view.status === "gone") {
-      return <p className="callout">This proposal does not exist. <Link to="/">All journeys</Link></p>;
+      return (
+        <p className="callout" data-testid="no-such-proposal">
+          There is no such proposal here. <Link to={proposalsAddress(destination)}>Open proposals</Link>
+        </p>
+      );
     }
     return view.status === "failed" ? <p className="callout callout-bad">The proposal could not be read: {view.error.message}</p> : <p className="muted small">Reading the proposal...</p>;
   }
   if (deployment === undefined) {
     return <p className="muted small">Reading the deployment...</p>;
   }
-  const destination = review.proposal.destination;
   const props = { review, refetch, deployment };
   if (destination === "deployment") {
-    return <ReviewBody key={id} {...props} ready={undefined} before={undefined} />;
+    return <ReviewBody key={id} {...props} ready={undefined} before={undefined} name={undefined} />;
   }
   return "journey" in destination ? <JourneyReview key={id} {...props} journey={destination.journey} /> : <RouteReview key={id} {...props} route={destination.route} />;
 }

@@ -11,8 +11,8 @@ use cairn_schema::{
 
 use crate::commit::{Commit, CommitError, Committed, StoreError};
 use crate::query::{
-    EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page, Revisions,
-    RouteDetail, SearchQuery,
+    EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page, ProposalPage,
+    ProposalQuery, Revisions, RouteDetail, SearchQuery,
 };
 use crate::records::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
@@ -42,6 +42,12 @@ pub trait Store: AuthStore + ConversationStore + Send + Sync {
         &self,
         id: &ProposalId,
     ) -> impl Future<Output = Result<Option<Proposal>, StoreError>> + Send;
+
+    /// C14, C16: the open proposals of a scope, newest first, with the scope's open count.
+    fn proposals(
+        &self,
+        query: &ProposalQuery,
+    ) -> impl Future<Output = Result<ProposalPage, StoreError>> + Send;
 
     /// H5: the receipt of a committed patch id, which a resubmission is answered from
     /// before anything is loaded or applied.

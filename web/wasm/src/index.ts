@@ -3,5 +3,5 @@
 // shell build on these.
 export { DerivedDocument, Engine, loadEngine, type WasmSource } from "./engine.ts";
 export { DeriveWorker } from "./derive-worker.ts";
-export { InBrowserHost, type Clock, type TickListener } from "./root.ts";
+export { InBrowserHost, type Clock, type ProposalListScope, type TickListener } from "./root.ts";
 export * from "./types.ts";

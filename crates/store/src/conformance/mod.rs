@@ -122,6 +122,7 @@ macro_rules! conformance_suite {
             queries::current_revisions_list_every_domain_and_proposal,
             queries::the_journey_index_filters_by_status_route_version_reference_and_upgrade,
             queries::the_journey_index_events_and_search_page,
+            queries::proposal_listings_hold_each_scope_newest_first_with_counts,
             queries::route_detail_lists_versions_with_their_journeys,
             queries::events_filter_by_journey_node_user_type_patch_and_time,
             queries::text_search_hits_names_nodes_notes_and_resources,
