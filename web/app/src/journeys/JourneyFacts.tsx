@@ -4,15 +4,15 @@
 import { useState } from "react";
 import { Link } from "react-router";
 
-import { pathTo } from "../address.ts";
 import type { ListFlag } from "../acting/address.ts";
+import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
 import type { Ready } from "../detail/model.ts";
 import { JourneyFlow } from "../proposals/Entries.tsx";
 import { Badge } from "../ui/kit.tsx";
-import { routeDetailPath } from "../routes/address.ts";
+import { routeCanvasPath, routeDetailPath } from "../routes/address.ts";
 import type { SummaryModel } from "../summary/model.ts";
 import { dateWords } from "../timeline/model.ts";
 import { upgradeWords } from "./figures-model.ts";
@@ -98,7 +98,7 @@ export function LineageBlock({ ready, lineage, readOnly = false }: { ready: Read
         <Link to={routeDetailPath(lineage.route)}>
           {lineage.name}, version {lineage.version}
         </Link>
-        <Link to={`${pathTo("route", { route: lineage.route })}?version=${String(lineage.version)}`} className="no-print" data-testid="lineage">
+        <Link to={routeCanvasPath(lineage.route, lineage.version, DEFAULT_VIEW)} className="no-print" data-testid="lineage">
           See its graph
         </Link>
         {summary === undefined || upgradeWords(summary) === undefined ? null : (

@@ -70,6 +70,20 @@ test("a bare journey opens the Summary, a node or an edge opens the Graph, and t
   }
 });
 
+test("C14: a proposal that is not there links somewhere that is: its journey's open proposals, or the journeys when the journey is not there either", async ({ page }) => {
+  await visit(page, "browser", "/journeys/j_vendor_eval/proposals/pr_gone");
+  await page.getByTestId("no-such-proposal").getByRole("link").click();
+  await expectAddress(page, "/journeys/j_vendor_eval/proposals");
+  await expect(page.getByTestId("proposals-pane")).toBeVisible();
+  await visit(page, "browser", "/journeys/j_gone/proposals/pr_gone");
+  await page.getByTestId("no-such-proposal").getByRole("link").click();
+  await expectAddress(page, "/journeys");
+  // An absent journey's open proposals fail closed like the journey: nothing would create it, so no tab.
+  await visit(page, "browser", "/journeys/j_gone/proposals");
+  await expect(page.getByTestId("journey-missing")).toBeVisible();
+  await expect(page.getByTestId("proposals-pane")).toHaveCount(0);
+});
+
 test("C4: a selected node is drawn with its container however the view is set, the address is as opened, and closing the container selects it", async ({ page }) => {
   const opened = "/journeys/j_vendor_eval/nodes/n_access?view=graph&depth=stages&q=nothing-is-called-this";
   await open(page, "browser", opened);

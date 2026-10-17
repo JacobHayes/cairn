@@ -2,13 +2,12 @@
 // dependencies that would unblock the earliest ones (waiting.ts), each with its own action when
 // it is on the acting frontier. Continue with everything turns the walkthrough off and keeps
 // the pass.
-import { useLocation } from "react-router";
 
 import { useProjected } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { namer, viaText } from "../detail/explain.ts";
 import { titleOf, type Ready } from "../detail/model.ts";
-import { nodeOpened } from "../journeys/address.ts";
+import { useNodeAddresses } from "../journeys/address.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { DetailLink } from "./Parts.tsx";
 import { RowActions } from "./RowActions.tsx";
@@ -16,7 +15,7 @@ import { WAITING_SHOWN_MAX, waitingDecisions, type Unblocker } from "./waiting.t
 import type { NodeRow } from "./why.ts";
 
 function UnblockerLine({ view, unblocker, row }: { view: Ready; unblocker: Unblocker; row: NodeRow | undefined }) {
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   const name = namer(view);
   return (
     <li className="stack unblocker" data-testid="unblocker" data-node={unblocker.node} data-kind={unblocker.kind}>
@@ -27,7 +26,7 @@ function UnblockerLine({ view, unblocker, row }: { view: Ready; unblocker: Unblo
           {unblocker.through === undefined ? "" : ` of ${titleOf(view, unblocker.through)}, which holds it`})
         </span>
       </span>
-      {row === undefined ? null : <RowActions view={view} row={row} to={nodeOpened(pathname, search, unblocker.node)} />}
+      {row === undefined ? null : <RowActions view={view} row={row} to={addresses.open(unblocker.node)} />}
     </li>
   );
 }

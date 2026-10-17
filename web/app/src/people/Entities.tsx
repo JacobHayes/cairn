@@ -18,7 +18,7 @@ import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "../screens/write.ts";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { MergeEntities } from "./MergeEntities.tsx";
-import { aliasesOf, byName, entityOf, newEntityKey, type Entity } from "./model.ts";
+import { aliasesOf, byName, entityOf, mergeAsked, newEntityKey, type Entity } from "./model.ts";
 
 /** An entity's edit as typed, and the deployment revision its author saw when they opened it (H5). */
 interface EntityDraft {
@@ -132,7 +132,7 @@ export function Entities() {
   const deployment = useDeployment();
   const { viewer } = useViewer();
   const { search } = useLocation();
-  const asked = (new URLSearchParams(search).get("merge") ?? "").split(",").filter((key) => key !== "");
+  const asked = mergeAsked(search);
   if (deployment === undefined) {
     return <p className="muted small">Reading the entities...</p>;
   }

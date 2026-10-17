@@ -17,11 +17,13 @@ import type { Deployment, Deriver, Host, RouteVersion } from "../data/host.ts";
 import { beforeWork, HOST_READ, previewPolicy, valueOf, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
 import { useDraft } from "../data/drafts.ts";
 import type { Answer } from "../data/edit-record.ts";
-import type { ProposalReview } from "../data/proposals.ts";
+import type { Domain, ProposalReview } from "../data/proposals.ts";
 import { useDeployment, useJourney, useKeyedRead, useLive, useSession, useViewer } from "../data/react.ts";
 import { isPatchAnswer } from "../data/writes.ts";
 import type { Ready } from "../detail/model.ts";
 import { Section } from "../detail/parts.tsx";
+import { indexPath } from "../journeys/address.ts";
+import { ROUTES_INDEX_PATH } from "../routes/address.ts";
 import { ShortfallView } from "../detail/ShortfallView.tsx";
 import { addedRoles, insertionMembers, noteOrigins } from "../segments/model.ts";
 import { useSegmentNames } from "../segments/read.ts";
@@ -54,7 +56,7 @@ import {
   type ReviewFilter,
 } from "./model.ts";
 import { ProposalCanvas } from "./ProposalCanvas.tsx";
-import { proposalReview, reviewKey } from "./read.ts";
+import { listKey, proposalReview, proposalsUnder, reviewKey } from "./read.ts";
 import { BeforeAfter, BLOCKER_WORDS, FilterChips, ItemEditor, ProposalOrigin, ReviewHeader, ReviewList } from "./ReviewFrame.tsx";
 import { StalePanel } from "./Stale.tsx";
 import { itemHeading, mutationNode, namesOf, type Names } from "./words.ts";
@@ -629,6 +631,28 @@ function RouteReview({ route, ...props }: Omit<BodyProps, "ready" | "before" | "
   return <ReviewBody {...props} ready={undefined} before={before.graph} name={before.name} />;
 }
 
+/**
+ * No proposal of this id under `destination`: the way to its open proposals, or, when the
+ * destination does not exist and nothing would create it, to the index of its kind, so the link
+ * never leads to a page that is not there.
+ */
+function NoSuchProposal({ destination }: { destination: Domain }) {
+  const { view } = useLive(listKey(destination), proposalsUnder(destination));
+  const found = valueOf(view);
+  const absent = found?.destination?.exists === false && found.count === 0;
+  const forRoute = destination !== "deployment" && "route" in destination;
+  return (
+    <p className="callout" data-testid="no-such-proposal">
+      There is no such proposal here.{" "}
+      {found === undefined && view.status !== "failed" ? null : absent ? (
+        <Link to={forRoute ? ROUTES_INDEX_PATH : indexPath()}>{forRoute ? "All routes" : "All journeys"}</Link>
+      ) : (
+        <Link to={proposalsAddress(destination)}>Open proposals</Link>
+      )}
+    </p>
+  );
+}
+
 export function ProposalScreen() {
   const params = useParams();
   const id = required(params, "proposal");
@@ -638,11 +662,7 @@ export function ProposalScreen() {
   const review = valueOf(view);
   if (review === undefined) {
     if (view.status === "gone") {
-      return (
-        <p className="callout" data-testid="no-such-proposal">
-          There is no such proposal here. <Link to={proposalsAddress(destination)}>Open proposals</Link>
-        </p>
-      );
+      return <NoSuchProposal destination={destination} />;
     }
     return view.status === "failed" ? <p className="callout callout-bad">The proposal could not be read: {view.error.message}</p> : <p className="muted small">Reading the proposal...</p>;
   }

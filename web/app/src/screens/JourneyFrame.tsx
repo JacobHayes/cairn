@@ -22,7 +22,7 @@ import type { Ready } from "../detail/model.ts";
 import { EdgeCard } from "../detail/EdgeCard.tsx";
 import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
-import { indexPath, nodeOpened, type Screen } from "../journeys/address.ts";
+import { indexPath, useNodeAddresses, type Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { SummaryPage } from "../summary/SummaryPage.tsx";
 import { isStock, useViewState, ViewStateContext, withViewState, type ViewState, type ViewStateValue } from "../journeys/view.ts";
@@ -71,9 +71,9 @@ export function JourneyGate({ id, children }: { id: string; children: (ready: Re
 
 /** Back from a node opened off the pass to the pass rail, which the cards put in the inspector's place. */
 function BackToPass() {
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   return (
-    <Link className="back-to-pass" to={nodeOpened(pathname, search, undefined)} data-testid="back-to-pass">
+    <Link className="back-to-pass" to={addresses.close()} data-testid="back-to-pass">
       ‹ Back to pass
     </Link>
   );
@@ -173,6 +173,7 @@ function SummaryNote() {
 
 function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<FrameProps, "id">) {
   const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   const navigate = useNavigate();
   const journey = ready.journey.header.id;
   const params = useMemo(() => new URLSearchParams(search), [search]);
@@ -194,12 +195,12 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const authored = useMemo(() => (planned && view.edit ? journeyAuthored(ready) : undefined), [ready, planned, view.edit]);
   const drawing = useEdgeDrawing(authored);
   // The set is the frame's, so it survives a switch between the graph and the list; each opens a node on its own screen.
-  const selection = useSelection(selected, (node) => void navigate(nodeOpened(pathname, search, node)));
+  const selection = useSelection(selected, (node) => void navigate(node === undefined ? addresses.close() : addresses.open(node)));
   const inserting = useInserting(`journey:${journey}`);
   const [sheetOpen, setSheetOpen] = useState(false);
   useJourneyKeys({ screen, selected, sheetOpen, setSheetOpen, state: view.state, steps, onState });
   const node = authored === undefined || selected === undefined ? undefined : authored.tree.byKey.get(selected);
-  const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(nodeOpened(pathname, search, undefined))} />;
+  const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(addresses.close())} />;
   // The graph is a gesture surface that fills the workspace under the head; the rest scroll.
   const fills = planned || inserting.preview !== undefined;
   // A phone's open map covers the head, so the drawing's banner is the map's, not the head's.
@@ -228,13 +229,18 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       {/* After the head: a node opened from the assistant brings its detail forward last. */}
       <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} walkCard={walkCard} />
       </InsertEntryContext>
-      <DestinationProposals destination={{ journey }} />
     </MapBand>
     </ConnectContext>
     </ViewStateContext>
   );
 }
 
+/** A journey's page, and its open proposals in the inspector's Proposals tab (C14), also while it is read or before a proposal creates it. */
 export function JourneyFrame({ id, screen, selected, edge }: FrameProps) {
-  return <JourneyGate id={id}>{(ready) => <ReadyFrame ready={ready} screen={screen} selected={selected} edge={edge} />}</JourneyGate>;
+  return (
+    <>
+      <JourneyGate id={id}>{(ready) => <ReadyFrame ready={ready} screen={screen} selected={selected} edge={edge} />}</JourneyGate>
+      <DestinationProposals destination={{ journey: id }} />
+    </>
+  );
 }

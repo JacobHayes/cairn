@@ -16,7 +16,7 @@ import { collapsedAt, drawnStep, stepOf } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
 import { nodeOf, titleOf, type Ready } from "../detail/model.ts";
 import { NodeLink } from "../detail/parts.tsx";
-import { nodeOpened, withParam } from "../journeys/address.ts";
+import { useNodeAddresses, withParam } from "../journeys/address.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
 import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
@@ -286,7 +286,7 @@ function useReveal(chart: React.RefObject<HTMLElement | null>, selected: string 
 
 /** The tracks: one drawing beside the labels, so every row's date falls where the axis says. */
 function Tracks({ chart, axis, selected }: { chart: Chart; axis: Axis; selected: string | undefined }) {
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   const navigate = useNavigate();
   const height = chart.rows.length * ROW_PX;
   return (
@@ -299,7 +299,7 @@ function Tracks({ chart, axis, selected }: { chart: Chart; axis: Axis; selected:
         const floatTo = row.float === undefined ? undefined : positionOf(axis, row.float.to);
         return (
           <g key={row.key} className="timeline-row" data-state={row.state} data-faded={row.faded} data-selected={row.key === selected} data-testid="timeline-track" data-node={row.key}>
-            <rect className="timeline-hit" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} onClick={() => { void navigate(nodeOpened(pathname, search, row.key)); }} />
+            <rect className="timeline-hit" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} onClick={() => { void navigate(addresses.open(row.key)); }} />
             {row.late > 0 ? <rect className="timeline-overdue" x={percent(positionOf(axis, row.to))} y={y - BAR_PX} width={percent(Math.max(0, axis.today - positionOf(axis, row.to)))} height={BAR_PX * 2} /> : null}
             {floatFrom === undefined || floatTo === undefined ? null : (
               <g className="timeline-float" data-testid="timeline-float" data-from={row.float?.from} data-to={row.float?.to}>
@@ -415,7 +415,8 @@ export function TimelineChart({ ready, timeline, drawn, open, onFold, faded, sel
 
 /** C13, C2: the timeline view: the toolbar, then the dated nodes of the journey's level, folded by the ladder and the viewer's flips (which hold until another depth), lit by Frontier and dimmed below the depth by Fade. */
 export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Ready; state: ViewState; picks: number; selected: string | undefined }) {
-  const { pathname, search } = useLocation();
+  const { search } = useLocation();
+  const addresses = useNodeAddresses();
   const { range } = useMemo(() => timelineSettingsFrom(new URLSearchParams(search)), [search]);
   const nodes = ready.journey.graph.nodes ?? [];
   const depth = stepOf({ step: state.depth }, nodes);
@@ -425,7 +426,7 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
   const timelineRead = useProjected(ready, { projection: "timeline" });
   const timeline = valueOf(timelineRead);
   const navigate = useNavigate();
-  const { open, fold: onFold } = useFolds(ready, state.depth, step, picks, selected, (key) => void navigate(nodeOpened(pathname, search, key)));
+  const { open, fold: onFold } = useFolds(ready, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const current = useMemo(() => currentStagesOf(ready), [ready]);
   const base = useMemo(() => litOf("timeline", state, ready), [state, ready]);
   const lit = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);

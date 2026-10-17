@@ -10,7 +10,7 @@ import { lazy, StrictMode, type ReactElement } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Route, Routes } from "react-router";
 
-import { ADDRESSES, type AddressName } from "./address.ts";
+import { AddressContext, ADDRESSES, type AddressName } from "./address.ts";
 
 import { boot } from "./boot.ts";
 import { LayoutsContext } from "./canvas/hooks.ts";
@@ -65,7 +65,11 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
         <BrowserRouter>
           <Routes>
             <Route element={<Shell />}>
-              {ADDRESSES.map(({ name, path }) => (name === "home" ? <Route key={name} index element={SCREENS.home} /> : <Route key={name} path={path.slice(1)} element={SCREENS[name]} />))}
+              {ADDRESSES.map(({ name, path }) => {
+                // Each page is told the pattern the router matched, so nothing reads the path again.
+                const element = <AddressContext value={name}>{SCREENS[name]}</AddressContext>;
+                return name === "home" ? <Route key={name} index element={element} /> : <Route key={name} path={path.slice(1)} element={element} />;
+              })}
               <Route path="*" element={<NoSuchPage />} />
             </Route>
           </Routes>

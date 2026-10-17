@@ -4,6 +4,7 @@
 // the set when it commits; reads resolve the merged key through its alias afterwards.
 import type { Schema } from "@cairn/client";
 
+import { pathTo } from "../address.ts";
 import type { Mutation } from "../data/writes.ts";
 
 export type Entity = Schema<"Entity">;
@@ -66,4 +67,14 @@ export function byName(entities: readonly Entity[]): Entity[] {
 export function offeredMerge(offer: readonly string[] | null | undefined): { survivor: string; merged: string } | undefined {
   const [survivor, merged] = [...(offer ?? [])].sort();
   return survivor === undefined || merged === undefined ? undefined : { survivor, merged };
+}
+
+/** H3: the entities screen with the merge of `merged` into `survivor` open (`?merge=<survivor>,<merged>`). */
+export function mergePath(survivor: string, merged: string): string {
+  return `${pathTo("entities")}?${new URLSearchParams({ merge: `${survivor},${merged}` }).toString()}`;
+}
+
+/** The entities the entities screen's `search` asks to merge (`mergePath`), the survivor first. */
+export function mergeAsked(search: string): string[] {
+  return (new URLSearchParams(search).get("merge") ?? "").split(",").filter((key) => key !== "");
 }

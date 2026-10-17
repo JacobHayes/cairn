@@ -10,7 +10,7 @@ import type { Capabilities, Viewer } from "../data/host.ts";
 import { useCapabilities, useDeployment, useSession, useViewer } from "../data/react.ts";
 import { Segmented } from "../ui/kit.tsx";
 import { THEME_CHOICES, useThemeChoice, type ThemeChoice } from "../ui/theme.ts";
-import { byName, offeredMerge } from "./model.ts";
+import { byName, mergePath, offeredMerge } from "./model.ts";
 
 /** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
 export function signInHref(name: string): string {
@@ -67,7 +67,7 @@ function YourEntities({ viewer }: { viewer: Viewer }) {
       {merge === undefined ? null : (
         <div className="callout stack" data-testid="merge-offer">
           <span>Your verified emails name {entities.length} entities: they are one person. "Mine" already covers them all; merging makes them one.</span>
-          <Link to={`${pathTo("entities")}?merge=${merge.survivor},${merge.merged}`}>Merge them</Link>
+          <Link to={mergePath(merge.survivor, merge.merged)}>Merge them</Link>
         </div>
       )}
     </section>

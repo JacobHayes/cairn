@@ -3,7 +3,7 @@
 // (acting/SelectionActions.tsx) or, while the structure is edited, Remove. One member is not
 // here: it is the node's own detail.
 import { useEffect } from "react";
-import { Link, useLocation } from "react-router";
+import { Link } from "react-router";
 
 import { RemoveSelected } from "../authoring/RemoveSelected.tsx";
 import type { Authored } from "../authoring/target.ts";
@@ -11,13 +11,13 @@ import type { Selection } from "../canvas/selection.ts";
 import { selectionOf } from "../acting/acts.ts";
 import { NodePanel } from "../acting/NodeItem.tsx";
 import { SelectionActions } from "../acting/SelectionActions.tsx";
-import { nodeOpened } from "../journeys/address.ts";
+import { useNodeAddresses } from "../journeys/address.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { Badge, Button } from "../ui/kit.tsx";
 import { titleOf, type Ready } from "./model.ts";
 
 export function SelectionPanel({ ready, selection, authored }: { ready: Ready; selection: Selection; authored: Authored | undefined }) {
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   const members = selectionOf(ready, selection.members);
   // Removed nodes leave the journey and so the list; the panel stays up through a removal that goes node by node, and goes when none is left.
   const { clear } = selection;
@@ -42,7 +42,7 @@ export function SelectionPanel({ ready, selection, authored }: { ready: Ready; s
             <div className="node-row-main">
               <Badge tone={statusTone(derived.display_state)}>{statusWord(derived.display_state, node.kind)}</Badge>
               <span className="node-row-text">
-                <Link to={nodeOpened(pathname, search, node.key)} className="node-title" data-node={node.key} onClick={selection.release}>
+                <Link to={addresses.open(node.key)} className="node-title" data-node={node.key} onClick={selection.release}>
                   {titleOf(ready, node.key)}
                 </Link>
                 <span className="node-fact muted">{node.kind}</span>

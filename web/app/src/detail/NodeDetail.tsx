@@ -8,7 +8,7 @@ import type { ReactNode } from "react";
 import { Link, useLocation } from "react-router";
 
 import { graphPath, graphViewFrom } from "../canvas/settings.ts";
-import { nodeOpened } from "../journeys/address.ts";
+import { useNodeAddresses } from "../journeys/address.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { Actions } from "./Actions.tsx";
 import { Affects } from "./Affects.tsx";
@@ -75,8 +75,9 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
   const rename = useRename(view, nodeKey, detail?.node.title ?? nodeKey);
   const row = useRankRow(view, nodeKey);
   // Closing keeps the screen it is open on and what that screen shows (5.2).
-  const { pathname, search } = useLocation();
-  const close = nodeOpened(pathname, search, undefined);
+  const { search } = useLocation();
+  const addresses = useNodeAddresses();
+  const close = addresses.close();
   if (detail === undefined) {
     return (
       <aside className="detail-panel panel" data-testid="node-detail-missing">

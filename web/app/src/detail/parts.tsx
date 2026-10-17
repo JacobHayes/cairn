@@ -2,10 +2,10 @@
 // everything, so most of it starts folded: progressive disclosure), a link to another node's
 // detail, and a list of contributing nodes.
 import { createContext, use, type ReactNode } from "react";
-import { Link, useLocation } from "react-router";
+import { Link } from "react-router";
 
 import "./detail.css";
-import { nodeOpened } from "../journeys/address.ts";
+import { useNodeAddresses } from "../journeys/address.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { setFold, useFold } from "./folds.ts";
 import { titleOf, type Ready } from "./model.ts";
@@ -22,9 +22,9 @@ export function Rationale({ text }: { text: string | undefined }) {
 
 /** A link to another node's detail, by its title, keeping the view and what it shows (5.2). */
 export function NodeLink({ view, node }: { view: Ready; node: string }) {
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   return (
-    <Link to={nodeOpened(pathname, search, node)} data-node={node}>
+    <Link to={addresses.open(node)} data-node={node}>
       {titleOf(view, node)}
     </Link>
   );

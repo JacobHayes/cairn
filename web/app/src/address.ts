@@ -1,17 +1,18 @@
 // Every address pattern of the app, defined once (C16, C17, C14). The router registers its
-// routes from `ADDRESSES`, every link is built with `pathTo` or one of the helpers below, and
-// every reader that needs to know what a path names asks `addressOf`. Nothing else in the app
-// writes or splits a path by hand. A proposal lives under its destination, so a proposal has
+// routes from `ADDRESSES` and tells each page which pattern it matched (`usePage`), every link
+// is built with `pathTo` or one of the helpers below, and the rail asks `sectionOf`. Nothing
+// else in the app writes or splits a path by hand. A proposal lives under its destination, so a proposal has
 // no address of its own: `/journeys/<journey>/proposals/<proposal>`, `/routes/<route>/proposals/<proposal>`,
 // or `/entities/proposals/<proposal>` for the deployment; each has the same `/nodes/<key>` below it.
-import { generatePath, matchPath } from "react-router";
+import { createContext, useContext, useMemo } from "react";
+import { generatePath, matchPath, useParams } from "react-router";
 
 import type { Schema } from "@cairn/client";
 
 /** The rail entry a page belongs to. */
 export type Section = "home" | "journeys" | "routes" | "entities" | "me";
 
-/** Each pattern, in the order they are tried: the static `new` pages before the ones with a parameter in their place. */
+/** Each pattern; the router ranks the static `new` pages above the ones with a parameter in their place. */
 export const ADDRESSES = [
   { name: "home", path: "/", section: "home" },
   { name: "journeys", path: "/journeys", section: "journeys" },
@@ -61,22 +62,20 @@ export function pathTo<N extends AddressName>(name: N, ...params: keyof AddressP
   return generatePath(entryOf(name).path, (params[0] ?? {}) as Record<string, string>);
 }
 
-/** What a path is: which pattern it matches, with its parameters, or none for a path that is no page. */
-export interface Matched {
+/** The page being rendered: the pattern the router matched for it, with its parameters. */
+export interface Page {
   name: AddressName;
-  section: Section;
   params: Readonly<Record<string, string | undefined>>;
 }
 
-export function addressOf(pathname: string): Matched | undefined {
-  const trimmed = pathname.length > 1 ? pathname.replace(/\/+$/, "") : pathname;
-  for (const { name, path, section } of ADDRESSES) {
-    const found = matchPath({ path, end: true }, trimmed);
-    if (found !== null) {
-      return { name, section, params: found.params };
-    }
-  }
-  return undefined;
+/** The pattern the router matched, given to each page by its route (main.tsx); none outside a page. */
+export const AddressContext = createContext<AddressName | undefined>(undefined);
+
+/** The page being rendered, as the router matched it, or none outside a page's route. */
+export function usePage(): Page | undefined {
+  const name = useContext(AddressContext);
+  const params = useParams();
+  return useMemo(() => (name === undefined ? undefined : { name, params }), [name, params]);
 }
 
 /** A parameter an address of this pattern always has; reading one a pattern lacks is a bug. */
@@ -119,25 +118,7 @@ export function destinationIn(params: Readonly<Record<string, string | undefined
   return params.route === undefined ? "deployment" : { route: params.route };
 }
 
-/** The destination a proposal address is under, and the proposal, or none when `matched` is no proposal's. */
-export function proposalIn(matched: Matched): { destination: Domain; proposal: string; key: string | undefined } | undefined {
-  const { params } = matched;
-  switch (matched.name) {
-    case "journeyProposal":
-    case "journeyProposalNode":
-      return { destination: { journey: required(params, "journey") }, proposal: required(params, "proposal"), key: params.key };
-    case "routeProposal":
-    case "routeProposalNode":
-      return { destination: { route: required(params, "route") }, proposal: required(params, "proposal"), key: params.key };
-    case "deploymentProposal":
-    case "deploymentProposalNode":
-      return { destination: "deployment", proposal: required(params, "proposal"), key: params.key };
-    default:
-      return undefined;
-  }
-}
-
-/** The rail entry the page at `pathname` belongs to. */
+/** The rail entry the page at `pathname` belongs to, or none for a path that is no page. */
 export function sectionOf(pathname: string): Section | undefined {
-  return addressOf(pathname)?.section;
+  return ADDRESSES.find(({ path }) => matchPath({ path, end: true }, pathname) !== null)?.section;
 }

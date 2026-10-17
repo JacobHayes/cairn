@@ -16,9 +16,12 @@
 // own settings (the graph's `open`, `shut`, `lens`, `edit`, `map`; the list's `sort`, `cols`; the
 // timeline's `range`), which stay in the query when the view changes, so switching back restores
 // them. Nothing redirects, and no earlier address is kept.
+import { useMemo } from "react";
+import { useLocation } from "react-router";
+
 import type { Schema } from "@cairn/client";
 
-import { addressOf, pathTo, proposalAddress, proposalIn, required } from "../address.ts";
+import { destinationIn, pathTo, proposalAddress, required, usePage, type Page } from "../address.ts";
 import type { JourneyIndexQuery } from "../data/host.ts";
 
 export type JourneyStatus = Schema<"JourneyStatus">;
@@ -215,36 +218,62 @@ export function journeyPath(target: JourneyTarget, screen: Screen = defaultScree
 }
 
 /**
- * From the page at `pathname` + `search`, the same page with node `key` open, or none when `key`
- * is undefined; an open edge closes either way. On a journey page the view stays the one shown
- * (the address's default can change with the node, the view does not). A route's draft and a
- * proposal's review (under any destination) take the node in their own path; any other page is
- * unchanged.
+ * From `page` + `search`, the same page with node `key` open, or none when `key` is undefined; an
+ * open edge closes either way. On a journey page the view stays the one shown (the address's
+ * default can change with the node, the view does not). A route's draft and a proposal's review
+ * (under any destination) take the node in their own path. A journey's or route's open
+ * proposals have no node to close; a node opened from them opens on the journey, or in the
+ * route's draft. Any other page, the deployment's open proposals among them, is unchanged.
  */
-export function nodeOpened(location: string, search: string, key: string | undefined): string {
-  const at = addressOf(location);
+export function nodeAddress(page: Page, search: string, key: string | undefined): string {
+  const { name, params } = page;
   const query = withQuestion(search);
-  // The open proposals have no node to close; a node opened from them is opened on the journey.
-  if (at?.name === "journeyProposals") {
-    return key === undefined ? `${location}${query}` : journeyPath({ journey: required(at.params, "journey"), node: key }, "graph", search);
-  }
-  switch (at?.name) {
+  switch (name) {
     case "journey":
     case "journeyNode":
     case "journeyEdge": {
-      const target = { journey: required(at.params, "journey"), node: at.params.key, edge: at.params.edge };
+      const target = { journey: required(params, "journey"), node: params.key, edge: params.edge };
       return journeyPath({ journey: target.journey, node: key }, screenOf(target, new URLSearchParams(search)), search);
     }
+    case "journeyProposals": {
+      const journey = required(params, "journey");
+      return key === undefined ? `${pathTo("journeyProposals", { journey })}${query}` : journeyPath({ journey, node: key }, "graph", search);
+    }
     case "routeDraft":
-    case "routeDraftNode": {
-      const route = required(at.params, "route");
-      return `${key === undefined ? pathTo("routeDraft", { route }) : pathTo("routeDraftNode", { route, key })}${query}`;
+    case "routeDraftNode":
+    case "routeProposals": {
+      const route = required(params, "route");
+      if (key === undefined) {
+        return `${name === "routeProposals" ? pathTo("routeProposals", { route }) : pathTo("routeDraft", { route })}${query}`;
+      }
+      return `${pathTo("routeDraftNode", { route, key })}${query}`;
     }
-    default: {
-      const proposal = at === undefined ? undefined : proposalIn(at);
-      return proposal === undefined ? `${location}${query}` : `${proposalAddress(proposal.destination, proposal.proposal, key)}${query}`;
-    }
+    case "journeyProposal":
+    case "journeyProposalNode":
+    case "routeProposal":
+    case "routeProposalNode":
+    case "deploymentProposal":
+    case "deploymentProposalNode":
+      return `${proposalAddress(destinationIn(params), required(params, "proposal"), key)}${query}`;
+    default:
+      return `${pathTo(name, params as never)}${query}`;
   }
+}
+
+/** Where a node of the page being rendered opens, and where closing it goes. */
+export interface NodeAddresses {
+  open(key: string): string;
+  close(): string;
+}
+
+/** The page's node addresses (`nodeAddress`), from the pattern the router matched; outside a page, the current location. */
+export function useNodeAddresses(): NodeAddresses {
+  const page = usePage();
+  const { pathname, search } = useLocation();
+  return useMemo(() => {
+    const at = (key: string | undefined) => (page === undefined ? `${pathname}${withQuestion(search)}` : nodeAddress(page, search, key));
+    return { open: (key) => at(key), close: () => at(undefined) };
+  }, [page, pathname, search]);
 }
 
 /**

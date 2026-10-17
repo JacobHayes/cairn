@@ -3,10 +3,11 @@
 // discarded. The tab is there while any is open, so a page with none keeps the column it would
 // otherwise not need; its count is the page's, so the tab does not wait on the rows. The
 // address `/journeys/<id>/proposals` (or the route's) opens the page with the tab in view even
-// when none is open, which is where the `⋯` "Open proposals" and the review's way back go.
+// when none is open, which is where the `⋯` "Open proposals" and the review's way back go. A
+// destination that does not exist yet has the tab only while a proposal would create it.
 import { Link, useLocation } from "react-router";
 
-import { addressOf, proposalsAddress } from "../address.ts";
+import { proposalsAddress, usePage } from "../address.ts";
 import { RowsPanel } from "../acting/RowsPanel.tsx";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
@@ -18,8 +19,7 @@ import { listKey, proposalsUnder } from "./read.ts";
 
 /** Whether the page is at its destination's `/proposals` address. */
 function useAtProposals(): boolean {
-  const { pathname } = useLocation();
-  const name = addressOf(pathname)?.name;
+  const name = usePage()?.name;
   return name === "journeyProposals" || name === "routeProposals";
 }
 
@@ -28,8 +28,10 @@ export function DestinationProposals({ destination }: { destination: Domain }) {
   const { view, refresh } = useLive(listKey(destination), proposalsUnder(destination));
   const found = valueOf(view);
   const reveal = useAtProposals();
-  // Nothing open and not asked for: no tab, and no column held open for one.
-  if (!reveal && (found?.count ?? 0) === 0 && view.status !== "failed") {
+  // Nothing open and not asked for, or nothing open under a destination that does not exist (its
+  // page says so): no tab, and no column held open for one.
+  const none = (found?.count ?? 0) === 0 && view.status !== "failed";
+  if (none && (!reveal || found?.destination?.exists === false)) {
     return null;
   }
   return (

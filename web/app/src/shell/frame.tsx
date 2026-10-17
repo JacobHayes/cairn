@@ -11,7 +11,7 @@ import { createContext, useContext, useEffect, useLayoutEffect, useSyncExternalS
 import { createPortal } from "react-dom";
 import { useLocation } from "react-router";
 
-import { nodeOpened } from "../journeys/address.ts";
+import { useNodeAddresses } from "../journeys/address.ts";
 
 export type InspectorTab = "inspector" | "assistant" | "proposals";
 
@@ -110,8 +110,9 @@ function useScrollToColumn(column: HTMLElement | null | undefined, focus: string
 export function Inspector({ focus, reveal = true, children }: { focus: string; reveal?: boolean; children: ReactNode }) {
   const actions = useFrameActions();
   const state = useFrameState();
-  const { pathname, search } = useLocation();
-  const close = nodeOpened(pathname, search, undefined);
+  const { search } = useLocation();
+  const addresses = useNodeAddresses();
+  const close = addresses.close();
   // Layout effects, so the column appears in the same commit as the screen that fills it: a second
   // render after paint could land in a ResizeObserver delivery and make the canvas resize twice.
   useLayoutEffect(() => actions?.mount("inspector"), [actions]);

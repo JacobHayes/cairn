@@ -25,7 +25,7 @@ import { planOrder } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
-import { nodeOpened } from "../journeys/address.ts";
+import { useNodeAddresses } from "../journeys/address.ts";
 import { withListSettings, type ListSettings } from "./address.ts";
 import { Checks } from "./Controls.tsx";
 import { Cell, type CellContext } from "./ListCells.tsx";
@@ -68,7 +68,7 @@ function Row({ line, columns, context, selection, current, faded }: { line: Line
   const chosen = selection.members.length > 1 && selection.members.includes(line.key);
   const navigate = useNavigate();
   const frame = useFrameActions();
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   const item = useRef<HTMLTableRowElement>(null);
   // j and k move the selection: keep the selected row in view.
   useEffect(() => {
@@ -105,7 +105,7 @@ function Row({ line, columns, context, selection, current, faded }: { line: Line
         if (!own) {
           // The selected row clicked again changes no address, so the inspector must be asked to come back.
           frame?.show("inspector");
-          void navigate(nodeOpened(pathname, search, line.key));
+          void navigate(addresses.open(line.key));
         }
       }}
     >
@@ -193,7 +193,7 @@ function RowEnd({ list, decisionColumns, total }: { list: ListSettings; decision
 
 /** C10: under the table while Frontier is on, what the viewer holds that cannot be done yet, what needs a look, what is snoozed, and, when nothing can move, why. */
 function FrontierPanels({ view, drawn }: { view: Ready; drawn: ReadonlySet<string> | undefined }) {
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   const mine = useMineOf(view.journey.header.id);
   // The stalled panel already says what the journey waits on, so the line that says the same is left out.
   const stalled = view.derived.stalled != null;
@@ -202,7 +202,7 @@ function FrontierPanels({ view, drawn }: { view: Ready; drawn: ReadonlySet<strin
     <>
       {!stalled ? <NextForYou view={view} entries={entries} /> : null}
       {stalled ? <StalledPanel view={view} /> : null}
-      <Folds view={view} drawn={drawn} toOf={(key) => nodeOpened(pathname, search, key)} />
+      <Folds view={view} drawn={drawn} toOf={(key) => addresses.open(key)} />
     </>
   );
 }
@@ -226,9 +226,9 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const ranks = useMemo(() => rankPositions(view, state.frontier), [view, state.frontier]);
   const order = useMemo(() => new Map(planOrder(view).map((key, at) => [key, at])), [view]);
   const tree = list.sort === undefined;
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   const navigate = useNavigate();
-  const folds = useFolds(view, state.depth, shown, picks, selected, (key) => void navigate(nodeOpened(pathname, search, key)));
+  const folds = useFolds(view, state.depth, shown, picks, selected, (key) => void navigate(addresses.open(key)));
   const kept = useMemo(() => (rows === undefined || drawn === undefined ? undefined : rows.filter((row) => drawn.has(row.key))), [rows, drawn]);
   const lines = useMemo(
     () => (kept === undefined || level === undefined ? [] : tree ? treeLines(level.nodes, new Map(kept.map((row) => [row.key, row])), folds.open, order) : flatLines(view, kept, list.sort)),

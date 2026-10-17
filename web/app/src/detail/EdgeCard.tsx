@@ -2,9 +2,9 @@
 // both ends as links with a way to go to each, and the sources of an implicit gate (which
 // condition, stage, or ancestor produced it). An edge is addressed by its two nodes
 // (`/edges/<from>~<to>`): it is a dependency of `to` on `from`.
-import { Link, useLocation } from "react-router";
+import { Link } from "react-router";
 
-import { nodeOpened } from "../journeys/address.ts";
+import { useNodeAddresses } from "../journeys/address.ts";
 import { statusWord } from "../status/words.ts";
 import { namer, viaText } from "./explain.ts";
 import { nodeDetail, nodeOf, type Ready } from "./model.ts";
@@ -56,7 +56,7 @@ function kindOf(via: ReturnType<typeof sourcesOf>[number] | undefined): string {
 
 export function EdgeCard({ view, edge }: { view: Ready; edge: string }) {
   const ends = edgeEnds(edge);
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   const from = ends === undefined ? undefined : nodeOf(view, ends.from);
   const to = ends === undefined ? undefined : nodeOf(view, ends.to);
   const missing = (
@@ -94,10 +94,10 @@ export function EdgeCard({ view, edge }: { view: Ready; edge: string }) {
         </ul>
       </div>
       <span className="row">
-        <Link className="button" to={nodeOpened(pathname, search, ends.from)}>
+        <Link className="button" to={addresses.open(ends.from)}>
           Go to {from.title}
         </Link>
-        <Link className="button" to={nodeOpened(pathname, search, ends.to)}>
+        <Link className="button" to={addresses.open(ends.to)}>
           Go to {to.title}
         </Link>
       </span>

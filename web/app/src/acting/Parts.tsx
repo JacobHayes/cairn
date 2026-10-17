@@ -1,17 +1,17 @@
 // What a row on the acting surfaces shows besides its actions: a link to the node's detail
 // beside the screen, its breadcrumb (C9), and its derived flags (D3).
-import { Link, useLocation } from "react-router";
+import { Link } from "react-router";
 
 import { startedEarly, titleOf, type Ready } from "../detail/model.ts";
-import { nodeOpened } from "../journeys/address.ts";
+import { useNodeAddresses } from "../journeys/address.ts";
 import { Badge, type Tone } from "../ui/kit.tsx";
 import type { NodeRow } from "./why.ts";
 
 /** Node `key`'s detail in the inspector beside the screen it is on, keeping what the screen shows (5.1). */
 export function DetailLink({ view, node, className }: { view: Ready; node: string; className?: string }) {
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   return (
-    <Link to={nodeOpened(pathname, search, node)} data-node={node} {...(className === undefined ? {} : { className })}>
+    <Link to={addresses.open(node)} data-node={node} {...(className === undefined ? {} : { className })}>
       {titleOf(view, node)}
     </Link>
   );

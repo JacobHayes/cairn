@@ -8,7 +8,7 @@ import { Link, useLocation } from "react-router";
 
 import type { DecisionRow } from "../decisions/model.ts";
 import { nodeOf, type Ready } from "../detail/model.ts";
-import { nodeOpened, screenSwitched } from "../journeys/address.ts";
+import { screenSwitched, useNodeAddresses } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { entityName } from "../detail/sections.tsx";
 import { rollups } from "../plan/tree.ts";
@@ -86,11 +86,11 @@ function Guides({ line }: { line: Line }) {
 
 /** C10: under a frontier row's title, why it is there and its primary action; the Owner column says who, so the action leaves the owner out unless there is none. */
 function Acting({ line, context }: { line: Line; context: CellContext }) {
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   return line.row === undefined ? null : (
     <span className="list-acting stack" data-testid="list-acting">
       <Fact line={line} context={context} />
-      <RowActions view={context.view} row={line.row} to={nodeOpened(pathname, search, line.key)} owner={false} />
+      <RowActions view={context.view} row={line.row} to={addresses.open(line.key)} owner={false} />
     </span>
   );
 }

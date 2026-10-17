@@ -2,10 +2,9 @@
 // passed, and what was finished since the pass began, each a row that opens that node in the
 // inspector (with a way back to the pass). A long queue shows its first few and says how many
 // more there are.
-import { useLocation } from "react-router";
 
 import { titleOf, type Ready } from "../detail/model.ts";
-import { nodeOpened } from "../journeys/address.ts";
+import { useNodeAddresses } from "../journeys/address.ts";
 import { Button } from "../ui/kit.tsx";
 import { NodeItem, NodePanel } from "./NodeItem.tsx";
 import { doneThisPass, unlockedBy, type Pass } from "./pass.ts";
@@ -20,7 +19,7 @@ function finished(view: Ready, key: string): boolean {
 }
 
 function Group({ view, title, keys, testId, pass }: { view: Ready; title: string; keys: readonly string[]; testId: string; pass?: Pass }) {
-  const { pathname, search } = useLocation();
+  const addresses = useNodeAddresses();
   if (keys.length === 0) {
     return null;
   }
@@ -28,7 +27,7 @@ function Group({ view, title, keys, testId, pass }: { view: Ready; title: string
   return (
     <NodePanel title={title} count={keys.length} testId={testId}>
       {keys.slice(0, SHOWN).map((key) => (
-        <NodeItem key={key} view={view} node={key} to={nodeOpened(pathname, search, key)} fact={by(key) === undefined ? undefined : `Unlocked by ${titleOf(view, by(key) ?? key)}`} />
+        <NodeItem key={key} view={view} node={key} to={addresses.open(key)} fact={by(key) === undefined ? undefined : `Unlocked by ${titleOf(view, by(key) ?? key)}`} />
       ))}
       {keys.length > SHOWN ? <li className="node-row muted small">and {keys.length - SHOWN} more</li> : null}
     </NodePanel>

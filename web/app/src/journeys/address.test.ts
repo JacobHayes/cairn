@@ -3,6 +3,7 @@
 // node and an edge each have one address; the view is its `view=`, written only off the default.
 import { describe, expect, it } from "vitest";
 
+import type { AddressName, Page } from "../address.ts";
 import { viewStateFrom } from "./view.ts";
 import {
   DEFAULT_FILTERS,
@@ -14,7 +15,7 @@ import {
   journeyPath,
   newJourneyPath,
   nextProjection,
-  nodeOpened,
+  nodeAddress,
   queryOf,
   screenOf,
   screenSwitched,
@@ -104,11 +105,6 @@ describe("a journey's address", () => {
     expect(screenOf(NODE, new URLSearchParams("view=bogus"))).toBe("graph");
   });
 
-  it("opens a node from a slash-ended journey address as from the bare one", () => {
-    expect(nodeOpened("/journeys/j_a/", "", "n_x")).toBe(nodeOpened("/journeys/j_a", "", "n_x"));
-    expect(nodeOpened("/journeys/j_a/", "", "n_x")).toBe("/journeys/j_a/nodes/n_x?view=summary");
-  });
-
   it("gives the index, the new-journey form and the walkthrough addresses the router names", () => {
     expect(indexPath().startsWith("/journeys")).toBe(true);
     expect(indexPath({ ...DEFAULT_FILTERS, mine: true })).toBe("/journeys?mine=1");
@@ -120,32 +116,41 @@ describe("a journey's address", () => {
   });
 });
 
+/** The page the router matched: pattern `name` with `params`. */
+const page = (name: AddressName, params: Record<string, string> = {}): Page => ({ name, params });
+const J = { journey: "j_a" };
+
 describe("opening and closing a node keeps the view", () => {
   it.each([
-    ["opens a node on the list", "/journeys/j_a", "?view=list", "n_x", "/journeys/j_a/nodes/n_x?view=list"],
-    ["closes it back on the list", "/journeys/j_a/nodes/n_x", "?view=list", undefined, "/journeys/j_a?view=list"],
-    ["opens a node on the Summary and keeps it there", "/journeys/j_a", "", "n_x", "/journeys/j_a/nodes/n_x?view=summary"],
-    ["closes it back to the bare journey", "/journeys/j_a/nodes/n_x", "?view=summary", undefined, "/journeys/j_a"],
-    ["opens a node on the Graph with no view named", "/journeys/j_a", "?view=graph&depth=stages", "n_x", "/journeys/j_a/nodes/n_x?depth=stages"],
-    ["closes a node on the default Graph and names the Graph", "/journeys/j_a/nodes/n_x", "?depth=stages", undefined, "/journeys/j_a?view=graph&depth=stages"],
-    ["closes an edge", "/journeys/j_a/edges/n_x~n_y", "?lens=gravity", undefined, "/journeys/j_a?view=graph&lens=gravity"],
-    ["opens a node from an edge", "/journeys/j_a/edges/n_x~n_y", "", "n_y", "/journeys/j_a/nodes/n_y"],
-    ["moves to the next node", "/journeys/j_a/nodes/n_x", "?view=timeline&range=3m", "n_z", "/journeys/j_a/nodes/n_z?view=timeline&range=3m"],
-  ])("%s", (_, pathname, search, key, expected) => {
-    expect(nodeOpened(pathname, search, key)).toBe(expected);
+    ["opens a node on the list", page("journey", J), "?view=list", "n_x", "/journeys/j_a/nodes/n_x?view=list"],
+    ["closes it back on the list", page("journeyNode", { ...J, key: "n_x" }), "?view=list", undefined, "/journeys/j_a?view=list"],
+    ["opens a node on the Summary and keeps it there", page("journey", J), "", "n_x", "/journeys/j_a/nodes/n_x?view=summary"],
+    ["closes it back to the bare journey", page("journeyNode", { ...J, key: "n_x" }), "?view=summary", undefined, "/journeys/j_a"],
+    ["opens a node on the Graph with no view named", page("journey", J), "?view=graph&depth=stages", "n_x", "/journeys/j_a/nodes/n_x?depth=stages"],
+    ["closes a node on the default Graph and names the Graph", page("journeyNode", { ...J, key: "n_x" }), "?depth=stages", undefined, "/journeys/j_a?view=graph&depth=stages"],
+    ["closes an edge", page("journeyEdge", { ...J, edge: "n_x~n_y" }), "?lens=gravity", undefined, "/journeys/j_a?view=graph&lens=gravity"],
+    ["opens a node from an edge", page("journeyEdge", { ...J, edge: "n_x~n_y" }), "", "n_y", "/journeys/j_a/nodes/n_y"],
+    ["moves to the next node", page("journeyNode", { ...J, key: "n_x" }), "?view=timeline&range=3m", "n_z", "/journeys/j_a/nodes/n_z?view=timeline&range=3m"],
+  ])("%s", (_, at, search, key, expected) => {
+    expect(nodeAddress(at, search, key)).toBe(expected);
   });
 
   it("takes a node off a route's draft or a proposal under any destination and adds one", () => {
-    expect(nodeOpened("/routes/r/draft", "?edit=on", "n_x")).toBe("/routes/r/draft/nodes/n_x?edit=on");
-    expect(nodeOpened("/routes/r/draft/nodes/n_x", "", undefined)).toBe("/routes/r/draft");
-    expect(nodeOpened("/journeys/j_a/proposals/p_1/nodes/n_x", "", "n_y")).toBe("/journeys/j_a/proposals/p_1/nodes/n_y");
-    expect(nodeOpened("/routes/r/proposals/p_1", "?view=list", "n_y")).toBe("/routes/r/proposals/p_1/nodes/n_y?view=list");
-    expect(nodeOpened("/entities/proposals/p_1/nodes/n_x", "", undefined)).toBe("/entities/proposals/p_1");
+    expect(nodeAddress(page("routeDraft", { route: "r" }), "?edit=on", "n_x")).toBe("/routes/r/draft/nodes/n_x?edit=on");
+    expect(nodeAddress(page("routeDraftNode", { route: "r", key: "n_x" }), "", undefined)).toBe("/routes/r/draft");
+    expect(nodeAddress(page("journeyProposalNode", { ...J, proposal: "p_1", key: "n_x" }), "", "n_y")).toBe("/journeys/j_a/proposals/p_1/nodes/n_y");
+    expect(nodeAddress(page("routeProposal", { route: "r", proposal: "p_1" }), "?view=list", "n_y")).toBe("/routes/r/proposals/p_1/nodes/n_y?view=list");
+    expect(nodeAddress(page("deploymentProposalNode", { proposal: "p_1", key: "n_x" }), "", undefined)).toBe("/entities/proposals/p_1");
   });
 
-  it("opens a node from a journey's open proposals on the journey, and has none to close there", () => {
-    expect(nodeOpened("/journeys/j_a/proposals", "", "n_x")).toBe("/journeys/j_a/nodes/n_x");
-    expect(nodeOpened("/journeys/j_a/proposals", "", undefined)).toBe("/journeys/j_a/proposals");
+  it.each([
+    ["a journey's opens it on the journey", page("journeyProposals", J), "n_x", "/journeys/j_a/nodes/n_x"],
+    ["a route's opens it in the route's draft", page("routeProposals", { route: "r" }), "n_x", "/routes/r/draft/nodes/n_x"],
+    ["a journey's has none to close", page("journeyProposals", J), undefined, "/journeys/j_a/proposals"],
+    ["a route's has none to close", page("routeProposals", { route: "r" }), undefined, "/routes/r/proposals"],
+    ["the deployment's has no nodes", page("deploymentProposals"), "n_x", "/entities/proposals"],
+  ])("a node from open proposals: %s", (_, at, key, expected) => {
+    expect(nodeAddress(at, "", key)).toBe(expected);
   });
 });
 
