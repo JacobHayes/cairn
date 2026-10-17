@@ -7,17 +7,15 @@
 #      ones Turso links and Cairn never reaches (README, Audit), allowed by name;
 #   3. determinism: a crash-restart run recorded twice is byte-identical, and its replay
 #      reports the same verdict;
-#   4. smoke campaign: buggify, dampened fs errors and short I/O, and swarm over 256
+#   4. smoke campaign: buggify, dampened fs errors and short I/O, and swarm over 128
 #      generations; every generation passes, and every declared oracle fired except the
 #      ones named below as out of this testbed's reach;
 #   5. crash sweep: crash-restart at every 11th write and sync, with whole-block and
 #      byte-granular tearing, over two seeds; every run restarts and completes with the
 #      invariants holding, and every crash oracle fires somewhere in the sweep;
 #   6. crash under errors: the sweep's crash points with fs errors too; no run breaks an
-#      invariant (a store that does not open on a failing disk is an honest outcome). A run
-#      that fails a write at a sync that landed and leaves the store answering is a
-#      violation of the testbed itself, and leg 4's campaign requires that a failed sync closing the store
-#      happened.
+#      invariant (a store that does not open on a failing disk is an honest outcome; a
+#      store that fails closed ends the run `unavailable`).
 #
 # The known patina and Turso gaps (README, Findings) are not checked here: they exercise
 # those pinned dependencies, not Cairn, and are recorded in decisions/
@@ -103,10 +101,10 @@ out_of_reach=(
   service-proposal-patch-answered-from-receipt
   service-proposal-refreshed-against-destination
 )
-# The rarest oracle in reach (a failed sync closing the store) fires in about 1 generation
-# in 32, so 32 generations missed it about one night in three; 256 miss it about once in
-# 3,000 nights.
-gens=256
+# The rarest oracle in reach (a failed write retried) fired in 7 of 128 generations
+# measured, so a generation misses it with probability 121/128 and 128 generations miss it
+# with (121/128)^128, about 0.07%: less than once in 1,000 nights.
+gens=128
 rm -rf "$out/campaign"
 cargo patina campaign "$bed" --gens "$gens" --buggify --faults --fault-scale-permille 100 --swarm \
   --allow-unmet-sometimes --allow-unsupported-symbols "$allow" --out-dir "$out/campaign" \

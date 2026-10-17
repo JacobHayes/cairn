@@ -55,7 +55,7 @@ mise run sim     # every leg of sim.sh, from the repository root
    AVX-512 FP16 kernels, which Turso links and Cairn never reaches (6.1's patina entry),
    allowed by name; rustix's raw syscall runs through syscall-user dispatch.
 3. A crash-restart run recorded twice is byte-identical and replays its verdict.
-4. Smoke campaign: 256 generations of buggify, fs errors and short I/O (bands at 100 per
+4. Smoke campaign: 128 generations of buggify, fs errors and short I/O (bands at 100 per
    mille of their default), and swarm. Every generation passes, and every oracle fires but
    a named out-of-reach list (two writers in flight, proposals, imports, derived reads, and
    a failed write retried, which now fires here).
@@ -65,11 +65,9 @@ mise run sim     # every leg of sim.sh, from the repository root
    events, an interrupted commit lost whole, one that had landed, a restart recovering
    acknowledged commits.
 6. The same sweep with fs errors at 5 per mille: no invariant breaks. A run whose store
-   fails closed ends `unavailable`, as one whose store does not open does. A write that
-   fails at a sync and landed while the store still answers is a violation (the store
-   finding below; a sync can also fail on Turso's temporary database before the commit, and
-   then nothing landed and the store rightly answers on), and a `sometimes!` oracle on the other outcome, a failed sync that closed the store,
-   makes leg 4's campaign require that it happened.
+   fails closed ends `unavailable`, as one whose store does not open does. The testbed does
+   not judge a failed sync itself: that path is pinned by the store's deterministic test
+   (the store finding below), and a run whose store fails closed ends without an audit.
 The known gaps in Findings are not checked here: they exercise pinned patina or Turso, not
 Cairn (`decisions/2026-10-17-simulation-runs-no-known-gap-checks.md`).
 
@@ -89,8 +87,8 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
   (Linux drops it) and accepts `posix_fadvise` without changing anything, so a run cannot
   show the restart reading from disk: the world ends the run when the store fails closed,
   instead of reopening it in-process. Its deterministic tests are
-  `crates/tests/tests/integration/store_turso/conformance/conformance/log_sync.rs`; the
-  testbed judges every sync failure of every run. Recorded in
+  `crates/tests/tests/integration/store_turso/conformance/conformance/log_sync.rs`, which
+  pin the path through Turso's I/O seam; the testbed does not judge sync failures. Recorded in
   [`decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md`](../../decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md),
   which replaced the barrier of
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).

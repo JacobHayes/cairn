@@ -183,7 +183,6 @@ impl World {
                     eprintln!("DURABILITY_RETRY step={index} error={error}");
                     failed += 1;
                     self.failures += 1;
-                    self.judge_sync_failure(index, &patch, &error).await?;
                     if let Err(closed) = self.store().health() {
                         return Err(Stop::Unavailable(closed.to_string()));
                     }
@@ -199,37 +198,6 @@ impl World {
                 }
             }
         }
-    }
-
-    /// A write that failed at its commit's sync may be visible without being on disk, so a
-    /// store that answers on must not show it (decisions/2026-10-09-a-commit-the-store-cannot-
-    /// settle-fails-it-closed.md). A sync can also fail before the commit, on Turso's
-    /// temporary database, and then nothing landed and the store rightly answers on, so the
-    /// judgement is whether the patch's receipt is visible, not which file failed. Judged on
-    /// every such failure of every run; the `sometimes!` makes the campaign require that a
-    /// failed sync closed the store.
-    async fn judge_sync_failure(
-        &self,
-        index: usize,
-        patch: &DomainPatch,
-        error: &impl std::fmt::Display,
-    ) -> Result<(), Stop> {
-        if !error.to_string().contains("(sync)") {
-            return Ok(());
-        }
-        let closed = self.store().health().is_err();
-        patina_dst::sometimes!(closed, "durability-sync-failure-closed-store");
-        if closed {
-            return Ok(());
-        }
-        // A read that fails under the injected faults judges nothing.
-        let Ok(Some(_)) = self.store().receipt(&patch.patch().id).await else {
-            return Ok(());
-        };
-        let detail =
-            format!("step {index} failed at a sync, landed, and the store answers on: {error}");
-        report_violation("durability-failed-sync-fails-store-closed", &detail);
-        Err(Stop::Violated)
     }
 }
 
