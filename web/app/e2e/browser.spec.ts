@@ -10,6 +10,8 @@ import { expect, test } from "@playwright/test";
 
 import { newRoute, routeName } from "./authoring.ts";
 import { savedText } from "./around.ts";
+import { TOAST_MS } from "../src/data/toasts.ts";
+import { SYNC_POPOVER_LEAVE_MS } from "../src/shell/sync-popover.ts";
 import { derivedRevision, expectAddress, fresh, goTo, goWithin, open, openJourney, recentSaves, rename, syncChip, visit } from "./shell.ts";
 
 // Every error event the window sees, including the browser's own reports (a ResizeObserver
@@ -69,8 +71,8 @@ test("opening `/` shows Home first and the page never moves after", async ({ pag
   await visit(page, "browser", "/");
   await expect(page.getByTestId("home")).toBeVisible();
   await expect(page.getByTestId("home-journey").first()).toBeVisible();
-  // Past the point where a data-driven redirect would have moved the page.
-  await page.waitForTimeout(1000);
+  // Once the host has settled (its sync state is shown), past the point where a data-driven redirect would have moved the page.
+  await expect(syncChip(page)).toHaveAttribute("data-state", "demo");
   const painted = await page.evaluate(() => (window as unknown as { painted: string[] }).painted);
   const address = new URL(page.url()).pathname + new URL(page.url()).search;
   // Home's heading is in the first paint of the page, at the address it was opened at, and nothing after changes either.
@@ -120,24 +122,28 @@ test("the sync dot shows its popover on hover and focus, inside the window, and 
 });
 
 test("the sync dot's popover outlasts the pointer crossing the gap into it, and a pinned one closes on Esc (focus back on the dot), a press outside or a resize", async ({ page }) => {
+  // The page's timers are the test's to run (the leave delay is a timer), so a slow machine cannot stretch the beat between two moves.
+  await page.clock.install();
   await visit(page, "browser", "/");
   const chip = syncChip(page);
   const popover = page.getByTestId("sync-popover");
   await chip.hover();
   await expect(popover).toBeVisible();
   // Once it has settled (it rises in), where it is.
-  await page.waitForTimeout(400);
+  await popover.evaluate((element) => Promise.all(element.getAnimations().map((animation) => animation.finished)));
+  await page.clock.pauseAt(new Date(Date.now() + 60_000));
   const dot = await chip.boundingBox();
   const sheet = await popover.boundingBox();
   if (dot === null || sheet === null) {
     throw new Error("the dot and its popover have boxes");
   }
-  // The pointer leaves the dot and rests in the gap, then reaches the popover before the leave delay (150ms) is up, and the popover stays past the first leave's deadline.
+  // The pointer leaves the dot and rests in the gap, then reaches the popover before the leave delay is up, and the popover stays past the first leave's deadline.
   await page.mouse.move(dot.x + dot.width / 2, (dot.y + dot.height + sheet.y) / 2);
-  await page.waitForTimeout(100);
+  await page.clock.runFor(SYNC_POPOVER_LEAVE_MS / 2);
   await page.mouse.move(sheet.x + sheet.width / 2, sheet.y + 20);
-  await page.waitForTimeout(300);
+  await page.clock.runFor(2 * SYNC_POPOVER_LEAVE_MS);
   await expect(popover).toBeVisible();
+  await page.clock.resume();
   // Pinned, Esc closes it and the dot has the focus again.
   await chip.click();
   await page.keyboard.press("Escape");
@@ -171,20 +177,24 @@ test("the sync dot says OFFLINE while the browser is offline, and the state it h
 test("a toast stays while the pointer is on it, the next one replaces it, and it goes after the pointer leaves", async ({ page }) => {
   const route = await newRoute(page, "browser", routeName("Toasting"));
   await open(page, "browser", `/routes/${route}/versions`);
+  // The toast's time is a timer the test runs, so a slow machine cannot let it lapse before the pointer is on it.
+  await page.clock.install();
+  await page.clock.pauseAt(new Date(Date.now() + 60_000));
   const exportDraft = page.getByTestId("route-actions").getByRole("button", { name: "Export the draft" });
   const toast = page.getByTestId("toast");
   await savedText(page, () => exportDraft.click());
   await expect(toast).toHaveText("Route file exported");
   await toast.hover();
   // Past the toast's time, the pointer holds it.
-  await page.waitForTimeout(3500);
+  await page.clock.runFor(TOAST_MS.confirm + 1000);
   await expect(toast).toBeVisible();
   // The next toast, raised from the keyboard with the pointer still on the toast, replaces it and is held too.
   await exportDraft.focus();
   await savedText(page, () => page.keyboard.press("Enter"));
   await expect(toast).toHaveCount(1);
-  await page.waitForTimeout(3500);
+  await page.clock.runFor(TOAST_MS.confirm + 1000);
   await expect(toast).toBeVisible();
   await page.mouse.move(5, 5);
+  await page.clock.runFor(TOAST_MS.confirm + 1000);
   await expect(toast).toHaveCount(0);
 });
