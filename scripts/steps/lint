@@ -100,6 +100,34 @@ if [ "$rust" = 1 ]; then
   done <<<"$members"
   ladder_suite "workspace lints inherited" "$inheriting" crates
 
+  # A target that declares `test = false` (a binary with nothing to test) is not built or run by
+  # `cargo test`; tests added to its source would silently never run. Fail if its source holds a
+  # test, so the declaration is dropped with them.
+  # shellcheck disable=SC2016 # the backticks are a JavaScript template literal
+  untested=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
+    const fs = require("fs");
+    let text = "";
+    process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => {
+      const marker = /#\[test\]|#\[cfg\(test\)\]|\bmod\s+tests\b/;
+      let count = 0;
+      for (const item of JSON.parse(text).packages) {
+        for (const target of item.targets) {
+          // Examples, benches, and build scripts are never tests by default; only a declaration counts.
+          if (target.test !== false || target.kind.some((kind) => ["example", "bench", "custom-build"].includes(kind))) continue;
+          count++;
+          if (marker.test(fs.readFileSync(target.src_path, "utf8"))) {
+            console.error(`${target.src_path} holds tests but its target in ${item.manifest_path} declares test = false: drop test = false`);
+            process.exitCode = 1;
+          }
+        }
+      }
+      console.log(count);
+    });' 2>"$typescript/untested.err") || {
+    ladder_show <"$typescript/untested.err"
+    ladder_fail "a target declaring test = false holds tests"
+  }
+  ladder_suite "test = false targets without tests" "$untested" targets
+
   # The scoped lints of the clippy run below, raised to warn (explained there).
   raised=()
   for name in "${!scoped_lints[@]}"; do
