@@ -82,3 +82,46 @@ export function download(name: string, text: string): void {
     URL.revokeObjectURL(url);
   }, 0);
 }
+
+/** The routes index's types: every one, only routes (the processes a journey is started from), or only segments (the pieces inserted into them). */
+export type RouteType = "all" | "routes" | "segments";
+
+/** The type `?type=` names; every type when it names none. */
+export function typeOf(param: string | null): RouteType {
+  return param === "routes" || param === "segments" ? param : "all";
+}
+
+/** Whether `route` is of `type`. */
+export function ofType(route: Schema<"RouteSummary">, type: RouteType): boolean {
+  return type === "all" || (type === "segments") === (route.header.kind === "segment");
+}
+
+/** How many active journeys each route has: counted from the journeys' own lineage, never derived. */
+export function activeJourneyCounts(journeys: readonly JourneySummary[]): Map<string, number> {
+  const counts = new Map<string, number>();
+  for (const journey of journeys) {
+    if (journey.status === "active" && journey.lineage != null) {
+      counts.set(journey.lineage.route, (counts.get(journey.lineage.route) ?? 0) + 1);
+    }
+  }
+  return counts;
+}
+
+/** What a route or segment is used by: a route's active journeys, a segment's insertions (B13). */
+export type InUse = { kind: "journeys"; count: number } | { kind: "places"; places: number; behind: number };
+
+/** The use in words: `2 active journeys`, `Used in 6 places`, `2 of 6 behind`, and what none says. */
+export function inUseWords(use: InUse): string {
+  if (use.kind === "journeys") {
+    return use.count === 0 ? "No active journeys" : `${String(use.count)} active ${use.count === 1 ? "journey" : "journeys"}`;
+  }
+  if (use.places === 0) {
+    return "Not used yet";
+  }
+  return use.behind > 0 ? `${String(use.behind)} of ${String(use.places)} behind` : `Used in ${String(use.places)} ${use.places === 1 ? "place" : "places"}`;
+}
+
+/** The version a journey can be started from: the latest published, unless the route is retired (A19) or is a segment (A21); none otherwise. A draft being open does not stop it. */
+export function startableVersion(route: Schema<"RouteSummary">): number | undefined {
+  return route.header.kind === "segment" || route.header.retired === true ? undefined : (route.latest_version ?? undefined);
+}

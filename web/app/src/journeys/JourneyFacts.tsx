@@ -10,12 +10,12 @@ import { useLive } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
 import type { Ready } from "../detail/model.ts";
 import { JourneyFlow } from "../proposals/Entries.tsx";
+import { Badge } from "../ui/kit.tsx";
 import { routeDetailPath } from "../routes/address.ts";
 import type { SummaryModel } from "../summary/model.ts";
 import { dateWords } from "../timeline/model.ts";
-import { journeyPath } from "./address.ts";
-import { UpgradeMark } from "./JourneyIndex.tsx";
-import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, viewStateParams } from "./view.ts";
+import { upgradeWords } from "./figures-model.ts";
+import { listPath } from "./view.ts";
 
 const nodes = (count: number) => `${String(count)} ${count === 1 ? "node" : "nodes"}`;
 
@@ -43,7 +43,7 @@ export function Flags({ ready, model, toned = false }: { ready: Ready; model: Su
         <span key={each.flag}>
           {at === 0 ? "" : ", "}
           <Link
-            to={journeyPath({ journey }, "list", viewStateParams({ ...DEFAULT_VIEW_STATE, filter: { ...DEFAULT_FILTER, flags: [each.flag] } }).toString())}
+            to={listPath(journey, { flags: [each.flag] })}
             className={toned ? `flag-${each.tone}` : undefined}
             data-testid={`card-flag-${each.flag}`}
           >
@@ -100,7 +100,11 @@ export function LineageBlock({ ready, lineage, readOnly = false }: { ready: Read
         <Link to={`/routes/${lineage.route}?version=${String(lineage.version)}`} className="no-print" data-testid="lineage">
           See its graph
         </Link>
-        {summary === undefined ? null : <UpgradeMark summary={summary} />}
+        {summary === undefined || upgradeWords(summary) === undefined ? null : (
+          <Badge tone="warn" data-testid="upgrade" data-status="available">
+            {upgradeWords(summary)}
+          </Badge>
+        )}
         {lineage.latest === undefined || readOnly ? null : (
           <button type="button" className="chip" data-testid="journey-upgrade" title="Propose this journey's upgrade to the route's newer version" onClick={() => { setUpgrading(true); }}>
             Upgrade to v{lineage.latest}

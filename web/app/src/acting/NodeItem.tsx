@@ -76,14 +76,35 @@ export function NodeItem({ view, node, to, selected = false, fact, factTone, tes
   );
 }
 
-/** The bordered panel a list of rows sits in, with a band header naming it when it has a `title` and a foot for what acts on the whole list. */
-export function NodePanel({ title, count, testId, foot, children }: { title?: string; count?: number; testId?: string; foot?: ReactNode; children: ReactNode }) {
+/**
+ * The bordered panel a list of rows sits in, with a band header naming it when it has a `title`
+ * (a real heading; a string, or a link to the thing the rows belong to, then `label` names the panel),
+ * its `count` (or, in its place, an `aside` at the head's right end that names it), and a foot for what acts on the whole list.
+ */
+export function NodePanel({
+  title,
+  label,
+  count,
+  aside,
+  testId,
+  foot,
+  children,
+}: {
+  title?: ReactNode;
+  label?: string;
+  count?: number;
+  aside?: ReactNode;
+  testId?: string;
+  foot?: ReactNode;
+  children: ReactNode;
+}) {
+  const name = label ?? (typeof title === "string" ? title : undefined);
   return (
-    <section className="node-panel" aria-label={title} {...(testId === undefined ? {} : { "data-testid": testId })}>
+    <section className="node-panel" {...(name === undefined ? {} : { "aria-label": name })} {...(testId === undefined ? {} : { "data-testid": testId })}>
       {title === undefined ? null : (
         <header className="node-panel-head">
-          {title}
-          {count === undefined ? null : <span className="fold-count">{count}</span>}
+          <h2 className="node-panel-title">{title}</h2>
+          {aside !== undefined ? <span className="node-panel-aside">{aside}</span> : count === undefined ? null : <span className="fold-count">{count}</span>}
         </header>
       )}
       <ul className="plain-list node-rows">{children}</ul>

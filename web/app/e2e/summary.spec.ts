@@ -69,10 +69,10 @@ test("C18: a list past five rows shows five, and Show all reveals the rest with 
   await expect.poll(async () => await countOf(page, "summary-next")).toBeGreaterThan(5);
   const total = await countOf(page, "summary-next");
   await expect(shown).toHaveCount(5);
-  await next.getByTestId("summary-show-all").click();
+  await next.getByTestId("rows-show-all").click();
   await expect(shown).toHaveCount(total);
   await expect(shown.last().locator(".row-act button").first()).toBeAttached();
-  await next.getByTestId("summary-show-all").click();
+  await next.getByTestId("rows-show-all").click();
   await expect(shown).toHaveCount(5);
 });
 
@@ -113,7 +113,7 @@ test("C18, H6: print is the whole dated report: no controls, every row, owners, 
   await page.emulateMedia({ media: "print", colorScheme: "dark" });
   await expect(page.getByTestId("view-picker")).toBeHidden();
   await expect(page.getByTestId("journey-menu")).toBeHidden();
-  await expect(page.getByTestId("summary-show-all").first()).toBeHidden();
+  await expect(page.getByTestId("rows-show-all").first()).toBeHidden();
   await expect.poll(async () => await countOf(page, "summary-next")).toBeGreaterThan(0);
   const total = await countOf(page, "summary-next");
   await expect(rowsOf(page, "summary-next")).toHaveCount(total);
@@ -184,7 +184,7 @@ test("B11, C18: a completed journey prints its status beside its name, and not t
 
 test("C18, H6: a fold the viewer opened and closed again is open on paper", async ({ page }) => {
   await openAt(page, "browser", "j_bakeoff", "summary", fixed);
-  const fold = page.locator("details.summary-fold").first();
+  const fold = page.locator("details.rows-fold").first();
   await fold.locator("summary").click();
   await expect(fold).toHaveJSProperty("open", true);
   await fold.locator("summary").click();

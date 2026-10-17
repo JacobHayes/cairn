@@ -10,7 +10,7 @@ import { Link } from "react-router";
 
 import { NodePanel } from "../acting/NodeItem.tsx";
 import { NextForYou } from "../acting/NextForYou.tsx";
-import { reasonOf } from "../acting/reasons.ts";
+import { factOf } from "../acting/reasons.ts";
 import { StalledPanel } from "../acting/Stalled.tsx";
 import type { NodeRow } from "../acting/why.ts";
 import { nextForYou } from "../acting/yours.ts";
@@ -23,8 +23,9 @@ import { LineageBlock, Flags, useLineage } from "../journeys/JourneyFacts.tsx";
 import { progressOf } from "../journeys/figures-model.ts";
 import { useMineOf } from "../journeys/mine.ts";
 import { useAssistantAsk } from "../assistant/ask.ts";
+import { isSoon } from "../status/when.ts";
 import { dateWords, dayOf } from "../timeline/model.ts";
-import { Button } from "../ui/kit.tsx";
+import { Button, Meter } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { nodeAddress, planAddress, timelineAddress } from "./links.ts";
 import {
@@ -33,13 +34,11 @@ import {
   claimActions,
   claimedKeys,
   isEmpty,
-  isSoon,
   lifecycleLine,
   milestoneLine,
   ORIGIN_WORDS,
   ownersOf,
   recentlyFinished,
-  rowFact,
   shortfallWords,
   summaryModel,
   underWay,
@@ -47,7 +46,7 @@ import {
   type MilestoneLine,
   type SummaryModel,
 } from "./model.ts";
-import { RowsPanel, type Entry } from "./RowsPanel.tsx";
+import { EntriesPanel, type Entry } from "./Entries.tsx";
 import "./summary.css";
 
 /** The date of a milestone line in words, where it comes from on hover, and its own shortfall as a sentence of its own. */
@@ -106,9 +105,7 @@ function Lead({ ready, model, note }: { ready: Ready; model: SummaryModel; note:
         <span className="summary-asof">As of {dateWords(ready.derived.today, ready.derived.today)}</span>
       </div>
       {inScope === 0 ? null : (
-        <div className="summary-meter" role="img" aria-label={`${String(done)} of ${String(inScope)} in scope finished or skipped`} data-testid="summary-meter" data-done={done}>
-          <span style={{ width: `${String((done / inScope) * 100)}%` }} />
-        </div>
+        <Meter done={done} of={inScope} label={`${String(done)} of ${String(inScope)} in scope finished or skipped`} data-testid="summary-meter" data-done={done} />
       )}
       {model.byState.length === 0 ? null : (
         <p className="summary-states" data-testid="summary-states">
@@ -215,7 +212,7 @@ function Yours({ ready, entries, actions }: { ready: Ready; entries: Entry[]; ac
   const mine = useMineOf(ready.journey.header.id);
   const owned = mine.status === "ready" ? mine.entries.filter((entry) => entry.kinds.includes("k_owner")) : [];
   if (entries.length > 0) {
-    return <RowsPanel ready={ready} title="Waiting on you" testId="summary-yours" entries={entries} actions={actions} />;
+    return <EntriesPanel ready={ready} title="Waiting on you" testId="summary-yours" entries={entries} actions={actions} />;
   }
   return nextForYou(ready, owned) === undefined ? null : <NextForYou view={ready} entries={owned} nothing={false} />;
 }
@@ -226,9 +223,9 @@ function entriesOf(ready: Ready, model: SummaryModel, frontier: NodeRow[], viewe
   const line = milestoneLine(ready, model);
   const sets = line?.feeder;
   const rowEntry = (row: NodeRow): Entry => {
-    const { fact, tone } = rowFact(ready, row, reasonOf(ready, row, "rank"));
-    const says = tone === undefined && sets?.key === row.key ? `Sets the date of ${line?.title ?? "the final milestone"}` : fact;
-    return { key: row.key, fact: says, tone, act: row, owners: ownersOf(ready, row.key) };
+    const said = factOf(ready, row);
+    const says = said?.tone === undefined && sets?.key === row.key ? `Sets the date of ${line?.title ?? "the final milestone"}` : said?.words;
+    return { key: row.key, fact: says, tone: said?.tone, act: row, owners: ownersOf(ready, row.key) };
   };
   const plain = { tone: undefined, act: undefined } as const;
   const held = (each: { key: string; owners: string[]; fact: () => string | undefined }): Entry => ({ ...plain, key: each.key, fact: each.fact, owners: each.owners });
@@ -297,7 +294,7 @@ function Actions({ ready, entries, model }: { ready: Ready; entries: Entries; mo
   const closed = status !== "active";
   const open = entries.yours.length + entries.decide.length + entries.nextUp.length === 0;
   const panel = (title: string, testId: string, rows: Entry[], more: { acts?: boolean; fold?: boolean } = {}) =>
-    rows.length === 0 ? null : <RowsPanel ready={ready} title={title} testId={testId} entries={rows} actions={more.acts === true && actions} folded={more.fold === true} open={open} />;
+    rows.length === 0 ? null : <EntriesPanel ready={ready} title={title} testId={testId} entries={rows} actions={more.acts === true && actions} folded={more.fold === true} open={open} />;
   return (
     <div className="summary-main stack">
       {status === "active" ? <Yours ready={ready} entries={entries.yours} actions={actions} /> : null}
@@ -325,11 +322,11 @@ export function SummaryPage({ ready, note }: { ready: Ready; note?: ReactNode })
   const model = summaryModel(ready, summary);
   const entries = entriesOf(ready, model, frontier, viewer?.entities ?? []);
   return (
-    <div className="summary" data-testid="summary" data-status={status} tabIndex={-1}>
+    <div className="summary rows-page" data-testid="summary" data-status={status} data-rows-page tabIndex={-1}>
       <div className="summary-body stack">
         <Lead ready={ready} model={model} note={note} />
         {entries.attention.length === 0 ? null : (
-          <RowsPanel ready={ready} title="Needs attention" testId="summary-attention" entries={entries.attention} actions={false} bright foot={<NeedsLook ready={ready} model={model} />} />
+          <EntriesPanel ready={ready} title="Needs attention" testId="summary-attention" entries={entries.attention} actions={false} bright foot={<NeedsLook ready={ready} model={model} />} />
         )}
         <div className="summary-grid">
           <Actions ready={ready} entries={entries} model={model} />
@@ -355,7 +352,7 @@ function Context({ ready, entries, model, archived }: { ready: Ready; entries: E
   return (
     <div className="summary-side stack">
       <Dates ready={ready} model={model} skip={entries.milestoneSkip} />
-      {entries.recent.length === 0 ? null : <RowsPanel ready={ready} title="Recently finished" testId="summary-recent" entries={entries.recent} actions={false} bright />}
+      {entries.recent.length === 0 ? null : <EntriesPanel ready={ready} title="Recently finished" testId="summary-recent" entries={entries.recent} actions={false} bright />}
       <About ready={ready} readOnly={archived} />
     </div>
   );

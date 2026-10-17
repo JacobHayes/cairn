@@ -1,59 +1,144 @@
-// The figures of a journey in the index, as data (4.8): progress from the status summary, the one
-// flag, and the summary read for a derived journey. Pure but for the one hook.
-import { useMemo } from "react";
+// What a list of journeys says of each one, as data (4.8, C16): progress from the status summary,
+// what needs a look (worst first), what is the viewer's, the next milestone, and the one fact a
+// phone row leads with. Words come from the functions here, so the index, Home and the journey
+// card say a thing one way. Pure, so the unit tests check them without a page.
+import type { Schema } from "@cairn/client";
 
-import { useProjected } from "../canvas/hooks.ts";
-import { valueOf } from "../data/keyed-read.ts";
-import { isTerminal, nodeOf, recordOf, type Ready } from "../detail/model.ts";
-import { summaryModel, type SummaryModel } from "../summary/model.ts";
+import type { FactTone } from "../acting/reasons.ts";
+import { openForViewer } from "../acting/yours.ts";
+import type { Ready } from "../detail/model.ts";
+import { dueWords, isSoon } from "../status/when.ts";
+import type { SummaryModel } from "../summary/model.ts";
+import { dayOf } from "../timeline/model.ts";
+import type { JourneyStatus } from "./address.ts";
 import type { MineEntry } from "./mine.ts";
-
-/** The journey's status summary, read from its local derivation. */
-export function useStatusSummary(ready: Ready): SummaryModel | undefined {
-  const summary = valueOf(useProjected(ready, { projection: "status_summary" }));
-  return useMemo(() => (summary === undefined ? undefined : summaryModel(ready, summary)), [ready, summary]);
-}
 
 /** Done over in scope: what is in scope less what has work left on it. */
 export function progressOf(model: SummaryModel): { done: number; inScope: number } {
   return { done: model.inScope - model.remaining, inScope: model.inScope };
 }
 
-/** The one flag a journey carries in the index: stalled, else what is overdue, else what is stale, with `+N` for the rest. */
-export function flagOf(ready: Ready, model: SummaryModel | undefined): string {
-  if (ready.derived.stalled != null) {
-    return "STALLED";
-  }
-  if (model === undefined) {
-    return "";
-  }
-  const flags = [
-    model.overdue.length > 0 ? `${String(model.overdue.length)} OVERDUE` : undefined,
-    model.stale.length > 0 ? `${String(model.stale.length)} STALE` : undefined,
-    model.shortfalls.length > 0 ? `${String(model.shortfalls.length)} SHORT` : undefined,
-  ].filter((each) => each !== undefined);
-  const [first, ...rest] = flags;
-  return first === undefined ? "" : rest.length === 0 ? first : `${first} +${String(rest.length)}`;
+/**
+ * What is still the viewer's to do (2.4): of their nodes, those still open for them (`openForViewer`),
+ * and how many of those are on the acting frontier.
+ */
+export function yoursOf(ready: Ready, entries: readonly MineEntry[]): { open: number; actionable: number } {
+  const open = entries.filter((entry) => openForViewer(ready, entry.node));
+  const frontier = new Set(ready.derived.acting_frontier);
+  return { open: open.length, actionable: open.filter((entry) => frontier.has(entry.node)).length };
+}
+
+/** A kind of trouble a journey can be in; all but `stalled` are list flags of the same name. */
+export type TroubleKind = "overdue" | "shortfall" | "stale" | "stalled";
+
+/** One kind of trouble: how many nodes it touches, and the ink it is said in. */
+export interface Trouble {
+  kind: TroubleKind;
+  count: number;
+  tone: FactTone | undefined;
 }
 
 /**
- * What is still the viewer's to do (2.4): of their nodes, those in scope and not finished (an
- * auto-reached milestone is, a group is only a container), and how many of those are on the acting frontier.
+ * What needs a look in a journey, worst first: overdue and short of days (error), stale (warning),
+ * then that nothing can move yet (untoned: it is often an ordinary wait). Only what is not zero.
  */
-export function yoursOf(ready: Ready, entries: readonly MineEntry[]): { open: number; actionable: number } {
-  const open = entries.filter((entry) => {
-    const node = nodeOf(ready, entry.node);
-    const derived = ready.derived.nodes[entry.node];
-    return (
-      node !== undefined &&
-      node.kind !== "group" &&
-      derived !== undefined &&
-      derived.relevance.value !== "not_relevant" &&
-      derived.effectively_skipped !== true &&
-      derived.auto_reached !== true &&
-      !isTerminal(recordOf(ready, node).state)
-    );
-  });
-  const frontier = new Set(ready.derived.acting_frontier);
-  return { open: open.length, actionable: open.filter((entry) => frontier.has(entry.node)).length };
+export function troubleOf(model: SummaryModel, stalled: boolean): Trouble[] {
+  const found: Trouble[] = [
+    { kind: "overdue", count: model.overdue.length, tone: "bad" },
+    { kind: "shortfall", count: model.shortfalls.length, tone: "bad" },
+    { kind: "stale", count: model.stale.length, tone: "warn" },
+    { kind: "stalled", count: stalled ? 1 : 0, tone: undefined },
+  ];
+  return found.filter((each) => each.count > 0);
+}
+
+/** A trouble in words: `2 late`, `2 date shortfalls`, `1 finished node to recheck`, `Nothing can move yet`. */
+export function troubleWords(trouble: Trouble): string {
+  const { count } = trouble;
+  switch (trouble.kind) {
+    case "overdue":
+      return `${String(count)} late`;
+    case "shortfall":
+      return `${String(count)} date ${count === 1 ? "shortfall" : "shortfalls"}`;
+    case "stale":
+      return `${String(count)} finished ${count === 1 ? "node" : "nodes"} to recheck`;
+    case "stalled":
+      return "Nothing can move yet";
+  }
+}
+
+/** What is the viewer's in a journey, for the cell that says so. */
+export type ForYou =
+  | { kind: "ready"; count: number }
+  /** Open work of theirs, none of it able to move yet. */
+  | { kind: "waiting" }
+  /** They hold things here, none of them still open. */
+  | { kind: "nothing-open" }
+  | { kind: "nothing" }
+  /** The journey is completed or archived: it holds no current work (B11). */
+  | { kind: "inactive" };
+
+/** The viewer's part in a journey of `status` that they hold `mine` of, `ready` of which can move now. */
+export function forYouOf(view: Ready, status: JourneyStatus, mine: readonly MineEntry[], ready: number): ForYou {
+  if (status !== "active") {
+    return { kind: "inactive" };
+  }
+  if (ready > 0) {
+    return { kind: "ready", count: ready };
+  }
+  if (mine.length === 0) {
+    return { kind: "nothing" };
+  }
+  return mine.some((entry) => openForViewer(view, entry.node)) ? { kind: "waiting" } : { kind: "nothing-open" };
+}
+
+/** What a viewer's part is, in words. */
+export function forYouWords(forYou: ForYou): string {
+  switch (forYou.kind) {
+    case "ready":
+      return `${String(forYou.count)} ready`;
+    case "waiting":
+      return "Waiting";
+    case "nothing-open":
+      return "Nothing open";
+    case "nothing":
+      return "Nothing yours";
+    case "inactive":
+      return "Not active";
+  }
+}
+
+/**
+ * The one attention fact a phone row leads with: an error-toned trouble, else what is ready for
+ * the viewer, else a warning-toned trouble, else that they are waiting; otherwise nothing. The
+ * row shows only that cell, so nothing is said twice.
+ */
+export function leadFact(troubles: readonly Trouble[], forYou: ForYou): "trouble" | "for-you" | undefined {
+  if (troubles.some((each) => each.tone === "bad")) {
+    return "trouble";
+  }
+  if (forYou.kind === "ready") {
+    return "for-you";
+  }
+  if (troubles.some((each) => each.tone === "warn")) {
+    return "trouble";
+  }
+  return forYou.kind === "waiting" ? "for-you" : undefined;
+}
+
+/** The next milestone as the table says it: its title, its date in words (when it is due, or how late), and the ink for a soon or late date. */
+export function milestoneOf(model: SummaryModel, today: string): { title: string; when: string; tone: FactTone | undefined } | undefined {
+  const next = model.upcoming[0];
+  if (next === undefined) {
+    return undefined;
+  }
+  return { title: next.title, when: dueWords(next.date, today), tone: dayOf(next.date) < dayOf(today) ? "bad" : isSoon(next.date, today) ? "warn" : undefined };
+}
+
+/** C16: that a journey's route has a newer version, from the host's field and never worked out from versions; none when it has not. */
+export function upgradeWords(summary: Schema<"JourneySummary">): string | undefined {
+  if (!summary.upgrade_available) {
+    return undefined;
+  }
+  return summary.latest_version == null ? "Upgrade available" : `Version ${String(summary.latest_version)} available`;
 }

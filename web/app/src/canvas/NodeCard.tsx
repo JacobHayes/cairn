@@ -11,6 +11,7 @@ import { Handle, Position, useStore, type Node, type NodeProps } from "@xyflow/r
 import { createContext, useContext, type CSSProperties } from "react";
 
 import type { ContextGroup } from "../ui/ContextMenu.tsx";
+import { Meter } from "../ui/kit.tsx";
 import { statusTone, statusWord } from "../status/words.ts";
 import { BORDER_PX, CHIP_BORDER_PX, CHIP_FONT_PX, CHIP_LEADING, MARKER_ROW_PX, TITLE_LINE_PX, cardRows, headChipFits, headTitleBox, titleFitPx, titleLines, titleWordOverflows, type CardRows } from "./cards.ts";
 import { NEAR_ZOOM } from "./gestures.ts";
@@ -165,9 +166,7 @@ function Body({ body, card }: { body: CardBody; card: Card }) {
     case "progress":
       return (
         <div className="node-body-line node-progress" data-testid="card-progress" title={card.checklist.length === 0 ? undefined : card.checklist.map((item) => `${item.done ? "Done" : "To do"}: ${item.title}`).join("\n")}>
-          <span className="node-meter" aria-hidden="true">
-            <span style={{ width: `${String(Math.round((body.done / body.total) * 100))}%` }} />
-          </span>
+          <Meter done={body.done} of={body.total} />
           <span>{progressWords(body.done, body.total)}</span>
           {body.badge === undefined ? null : (
             <span className={body.badge.tone === "plain" ? "node-flag" : `node-flag ${body.badge.tone}`} data-testid="card-badge" data-status={body.badge.flag}>

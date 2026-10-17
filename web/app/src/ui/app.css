@@ -716,6 +716,227 @@ table.data {
     top: calc(-1 * var(--space-5));
   }
 }
+/* A quiet progress track: graphite on a hairline, as wide as its container. */
+.meter {
+  display: block;
+  height: 4px;
+  background: var(--color-border);
+}
+.meter > span {
+  display: block;
+  height: 100%;
+  background: var(--color-text);
+}
+
+/* What an index shows in place of its table: being read, failed, or empty, a line and the way on. */
+.index-state {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-2) var(--space-4);
+  padding: var(--space-4);
+  border: 1px solid var(--color-edge);
+  background: var(--color-surface);
+  font-size: 15px;
+}
+.index-state p {
+  margin: 0;
+}
+.index-state-loading {
+  border-style: dashed;
+  color: var(--color-muted);
+}
+.index-state-failed {
+  border-color: var(--color-error);
+}
+.index-state-failed p::before {
+  content: "Error ";
+  font: 500 11.5px / 1.6 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-error);
+}
+.index-state-action {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-4);
+}
+
+/* An index table (the journeys, the routes): a panel with corner ticks, a sticky band header, and
+   two-line rows of about 64px: the name or fact at 15px in ink, what qualifies it under it at 15px
+   in steel, numbers right-aligned in mono. The region is the one scroller, so the header sticks to it. */
+.index-table {
+  position: relative;
+  border: 1px solid var(--color-edge);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+.index-table::after {
+  --tick: linear-gradient(var(--color-tick), var(--color-tick));
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  pointer-events: none;
+  background:
+    var(--tick) left 3px top 3px / 8px 1px no-repeat,
+    var(--tick) left 3px top 3px / 1px 8px no-repeat,
+    var(--tick) right 3px top 3px / 8px 1px no-repeat,
+    var(--tick) right 3px top 3px / 1px 8px no-repeat,
+    var(--tick) left 3px bottom 3px / 8px 1px no-repeat,
+    var(--tick) left 3px bottom 3px / 1px 8px no-repeat,
+    var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
+    var(--tick) right 3px bottom 3px / 1px 8px no-repeat;
+}
+.index-table table.data {
+  font-size: 15px;
+}
+.index-table table.data th {
+  padding: var(--space-2) var(--space-4);
+  vertical-align: middle;
+}
+.index-table table.data td {
+  padding: var(--space-3) var(--space-4);
+  vertical-align: middle;
+  border-bottom: 1px solid var(--color-border);
+}
+.index-table table.data tbody tr:last-child td {
+  border-bottom: 0;
+}
+/* A row is the same height read or not, so a long table does not jump as rows near the view are read. */
+@media (min-width: 720px) {
+  .index-table table.data tbody tr {
+    height: 70px;
+  }
+}
+.index-table table.data td.num,
+.index-table table.data td .mono,
+.index-table table.data td.mono {
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+}
+.index-table table.data td.num {
+  text-align: right;
+  min-width: 140px;
+}
+.index-table table.data td .muted {
+  color: var(--color-muted);
+}
+.index-table .cell-first {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: var(--space-1) var(--space-2);
+  color: var(--color-text);
+}
+.index-table td.num .cell-first {
+  justify-content: flex-end;
+}
+.index-table .cell-second {
+  display: block;
+  color: var(--color-secondary);
+}
+.index-table .cell-second.flag-warn {
+  color: var(--color-warning);
+}
+.index-table .cell-second.flag-bad {
+  color: var(--color-error);
+}
+.index-table td.num .meter {
+  margin-top: var(--space-1);
+}
+.index-table .cell-description {
+  max-width: 48ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.index-table .cell-why {
+  display: inline;
+}
+.index-table .cell-why summary {
+  display: inline;
+  cursor: pointer;
+  color: var(--color-secondary);
+  text-decoration: underline;
+}
+
+/* On a phone each row is a block with an edge hairline, no inner cell borders. The header row stays
+   in the document for screen readers. Line 1 is the name; then the context, a wrapping steel line
+   (progress and next milestone, or type and version) whose pieces flow as one; then one attention
+   block in its own ink: the cell that leads (`data-lead`), the other left out, so nothing is said twice. */
+@media (max-width: 719px) {
+  .index-table table.data,
+  .index-table tbody {
+    display: block;
+    overflow: visible;
+  }
+  .index-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip-path: inset(50%);
+  }
+  .index-table tr {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 2px var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-bottom: 1px solid var(--color-edge);
+  }
+  .index-table tbody tr:last-child {
+    border-bottom: 0;
+  }
+  .index-table table.data td {
+    display: block;
+    flex: 0 1 auto;
+    min-width: 0;
+    padding: 0;
+    border: 0;
+    color: var(--color-secondary);
+  }
+  .index-table table.data td:first-child {
+    flex: 1 1 100%;
+    color: var(--color-text);
+  }
+  .index-table table.data td:is([data-column="progress"], [data-column="milestone"], [data-column="type"], [data-column="latest"]) {
+    display: contents;
+  }
+  .index-table table.data td:is([data-column="progress"], [data-column="milestone"]) > * {
+    order: 1;
+  }
+  .index-table table.data td[data-column="milestone"] > .cell-first::before,
+  .index-table table.data td[data-column="latest"]::before {
+    content: "\00b7";
+    margin-right: var(--space-2);
+  }
+  .index-table table.data td[data-column="milestone"] > .cell-second {
+    flex: 1 1 100%;
+  }
+  .index-table table.data td:is([data-column="trouble"], [data-column="for-you"], [data-column="use"], [data-column="act"], [data-column="reading"]) {
+    flex: 1 1 100%;
+    order: 0;
+  }
+  .index-table table.data td.num .cell-first {
+    justify-content: flex-start;
+  }
+  .index-table .cell-lineage,
+  .index-table td[data-column="trouble"] .cell-second,
+  .index-table td.num .meter,
+  .index-table table.data td[data-column="act"]:empty {
+    display: none;
+  }
+  .index-table tr[data-lead="trouble"] td[data-column="for-you"],
+  .index-table tr[data-lead="for-you"] td[data-column="trouble"],
+  .index-table tr[data-lead="none"] :is(td[data-column="trouble"], td[data-column="for-you"]) {
+    display: none;
+  }
+}
+
 .form-grid {
   display: grid;
   grid-template-columns: minmax(136px, max-content) minmax(0, 1fr);

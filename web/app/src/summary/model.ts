@@ -10,12 +10,13 @@
 import type { Schema } from "@cairn/client";
 
 import { unblockersOf } from "../acting/waiting.ts";
-import { dateReason } from "../acting/reasons.ts";
+import type { FactTone } from "../acting/reasons.ts";
 import type { NodeRow } from "../acting/why.ts";
 import { ownedBy } from "../acting/yours.ts";
 import { guardFailureText, namer } from "../detail/explain.ts";
 import { feedingDecision, nodeOf, recordOf, titleOf, type GraphNode, type Ready } from "../detail/model.ts";
 import { entityName } from "../detail/sections.tsx";
+import { daysWords } from "../status/when.ts";
 import { DISPLAY_STATES, stateWord, type DisplayState } from "../status/words.ts";
 import { treeOf } from "../plan/tree.ts";
 import { dateWords, dayOf, type DateOrigin } from "../timeline/model.ts";
@@ -167,16 +168,13 @@ export function whenWords(date: string, origin: DateOrigin | undefined, today: s
   const away = dayOf(date) - dayOf(today);
   const when = dateWords(date, today);
   if (away < 0) {
-    return `${days(-away)} late (${when})`;
+    return `${daysWords(-away)} late (${when})`;
   }
-  return away === 0 ? `due today (${when})` : `in ${days(away)} (${when})`;
+  return away === 0 ? `due today (${when})` : `in ${daysWords(away)} (${when})`;
 }
 
 /** The words for where a date comes from; an actual date says it by `whenWords`. */
 export const ORIGIN_WORDS: Record<DateOrigin, string | undefined> = { actual: undefined, pin: "pinned", due: "derived" };
-
-/** A tone a fact is said in: warning ink, or error ink (always with its words). */
-export type FactTone = "warn" | "bad";
 
 /** A node that needs a look, with every reason, worst first (C18). */
 export interface Attention {
@@ -185,9 +183,6 @@ export interface Attention {
   reasons: string[];
   tone: FactTone;
 }
-
-/** `1 day`, `3 days`. */
-export const days = (count: number) => `${String(count)} ${count === 1 ? "day" : "days"}`;
 
 /** `Reached 2 days off what its chain allows`, or `Needs 2 days more than its chain allows`: what a shortfall of `count` days means for node `key`. */
 export function shortfallWords(ready: Ready, key: string, count: number | undefined): string {
@@ -198,9 +193,9 @@ export function shortfallWords(ready: Ready, key: string, count: number | undefi
   const state = node === undefined ? undefined : recordOf(ready, node).state;
   // A recorded date can break a chain by being too late or too early, so a finished node's shortfall says only how far off it is.
   if (state === "reached") {
-    return `Reached ${days(count)} off what its chain allows`;
+    return `Reached ${daysWords(count)} off what its chain allows`;
   }
-  return state === "done" || state === "decided" ? `Finished ${days(count)} off what its chain allows` : `Needs ${days(count)} more than its chain allows`;
+  return state === "done" || state === "decided" ? `Finished ${daysWords(count)} off what its chain allows` : `Needs ${daysWords(count)} more than its chain allows`;
 }
 
 /**
@@ -215,7 +210,7 @@ export function attentionRows(ready: Ready, model: SummaryModel): Attention[] {
     found.set(key, held);
   };
   for (const each of model.overdue) {
-    add(each.key, 0, each.lateDays === undefined ? "Overdue" : `${days(each.lateDays)} late`);
+    add(each.key, 0, each.lateDays === undefined ? "Overdue" : `${daysWords(each.lateDays)} late`);
   }
   for (const each of model.shortfalls) {
     add(each.key, 1, shortfallWords(ready, each.key, each.days));
@@ -322,45 +317,6 @@ export function recentlyFinished(ready: Ready): Finished[] {
 /** C18: whether the journey has no node at all, as against one with nothing in scope. */
 export function isEmpty(ready: Ready): boolean {
   return (ready.journey.graph.nodes ?? []).length === 0;
-}
-
-/** What a row says under its title, and the ink it says it in. */
-export interface RowFact {
-  fact: string | undefined;
-  tone: FactTone | undefined;
-}
-
-/** A date this near (in days) is a soon date, said in warning ink (DESIGN, Dates). */
-const SOON_DAYS = 7;
-
-/** Whether `date` is today or within the soon window ahead of `today` (never one already gone by). */
-export function isSoon(date: string, today: string): boolean {
-  const away = dayOf(date) - dayOf(today);
-  return away >= 0 && away <= SOON_DAYS;
-}
-
-/**
- * C10, C11, D3: the one fact under an action row. A decision says when it is to be decided by
- * (`Decide by Oct 14`, with how late it is when it is), other work that is overdue says how
- * late, and anything else says what `reasonOf` does. Lateness is in error ink and a near
- * decide-by date in warning ink, always with the words.
- */
-export function rowFact(ready: Ready, row: NodeRow, reason: string | undefined): RowFact {
-  const today = ready.derived.today;
-  const late = row.overdue === true && row.due != null ? dayOf(today) - dayOf(row.due) : undefined;
-  if (row.kind === "decision" && row.due != null) {
-    const by = `Decide by ${dateWords(row.due, today)}`;
-    if (late !== undefined) {
-      return { fact: `${by}, ${days(late)} late`, tone: "bad" };
-    }
-    return { fact: by, tone: dayOf(row.due) - dayOf(today) <= SOON_DAYS ? "warn" : undefined };
-  }
-  if (late !== undefined) {
-    return { fact: `${days(late)} late`, tone: "bad" };
-  }
-  // The reason is the date when it says how near the deadline is: then a near one is a warning too.
-  const near = row.due != null && reason !== undefined && reason === dateReason(ready, row) && isSoon(row.due, today);
-  return { fact: reason, tone: near ? "warn" : undefined };
 }
 
 /** A node listed as under way or as blocked, who owns it, and what it says (read only when its row is drawn). */

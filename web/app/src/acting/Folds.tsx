@@ -14,6 +14,7 @@ import { namer } from "../detail/explain.ts";
 import { titleOf, type Ready, type Mutation } from "../detail/model.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
+import { daysWords } from "../status/when.ts";
 import { dateWords, dayOf } from "../timeline/model.ts";
 import { Button } from "../ui/kit.tsx";
 import type { ListFlag } from "./address.ts";
@@ -50,8 +51,6 @@ function Fold({ testId, title, count, children }: { testId: string; title: strin
 function untilWords(view: Ready, target: SnoozeTarget): string {
   return "date" in target ? `until ${dateWords(target.date, view.derived.today)}` : `until ${titleOf(view, target.node)} is done`;
 }
-
-const days = (count: number) => `${String(count)} ${count === 1 ? "day" : "days"}`;
 
 /** Add the note that stale work is missing, in one patch. */
 function AddNote({ write, node }: { write: NodeWrite; node: string }) {
@@ -121,11 +120,11 @@ function looksOf(view: Ready, stale: NodeRow[], short: NodeRow[], lapsed: NodeRo
     add({ row, reason: failure === undefined ? "Stale" : staleWords(view, failure), fix: failure === "missing_note" ? "note" : "open" });
   }
   for (const row of short) {
-    add({ row, reason: `${days(row.shortfall_days ?? 0)} short of its plan`, fix: "open" });
+    add({ row, reason: `${daysWords(row.shortfall_days ?? 0)} short of its plan`, fix: "open" });
   }
   for (const row of lapsed) {
     const late = row.due == null ? undefined : dayOf(view.derived.today) - dayOf(row.due);
-    add({ row, reason: late === undefined ? "Snoozed, and overdue" : `Snoozed, and ${days(late)} late`, fix: "unsnooze" });
+    add({ row, reason: late === undefined ? "Snoozed, and overdue" : `Snoozed, and ${daysWords(late)} late`, fix: "unsnooze" });
   }
   return [...found.values()];
 }

@@ -5,7 +5,7 @@ import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
 import type { RouteRead } from "../data/reads.ts";
-import { exportName, routeMoves, upgradable, versionRows } from "./model.ts";
+import { activeJourneyCounts, exportName, inUseWords, ofType, routeMoves, startableVersion, typeOf, upgradable, versionRows } from "./model.ts";
 
 type Summary = Schema<"JourneySummary">;
 
@@ -67,5 +67,46 @@ describe("what an author can do to a route (A11, A19)", () => {
   it("names an exported file by route and version, or draft", () => {
     expect(exportName("r", 2)).not.toBe(exportName("r", undefined));
     expect(exportName("r", 2)).toMatch(/\.yaml$/);
+  });
+});
+
+describe("the routes index", () => {
+  const route = (extra: Partial<Schema<"RouteSummary">["header"]>, latest: number | null): Schema<"RouteSummary"> => ({
+    header: { id: "r", name: "R", ...extra },
+    revision: 1,
+    latest_version: latest,
+    draft_open: false,
+  });
+
+  it("starts a journey from the latest published version of a route that is not retired, a draft being open or not", () => {
+    expect(startableVersion(route({}, 3))).toBe(3);
+    expect(startableVersion({ ...route({}, 3), draft_open: true })).toBe(3);
+    expect(startableVersion(route({ retired: true }, 3))).toBeUndefined();
+    expect(startableVersion(route({}, null))).toBeUndefined();
+    expect(startableVersion(route({ kind: "segment" }, 3))).toBeUndefined();
+  });
+
+  it("counts active journeys by the route they came from, and no others", () => {
+    const journey = (status: Schema<"JourneySummary">["status"], route: string | null): Schema<"JourneySummary"> => ({
+      ...summary("j", 1, 1),
+      status,
+      lineage: route === null ? null : { route, version: 1 },
+    });
+    const counts = activeJourneyCounts([journey("active", "a"), journey("active", "a"), journey("completed", "a"), journey("active", "b"), journey("active", null)]);
+    expect([counts.get("a"), counts.get("b"), counts.get("c")]).toEqual([2, 1, undefined]);
+  });
+
+  it("keeps the rows of one type, and every type with none named", () => {
+    const segment = route({ kind: "segment" }, 1);
+    expect([ofType(segment, "all"), ofType(segment, "segments"), ofType(segment, "routes"), ofType(route({}, 1), "routes")]).toEqual([true, true, false, true]);
+    expect([typeOf(null), typeOf("segments"), typeOf("routes"), typeOf("anything")]).toEqual(["all", "segments", "routes", "all"]);
+  });
+
+  it("says a use in words that agree with its figures", () => {
+    expect(inUseWords({ kind: "journeys", count: 0 })).not.toBe(inUseWords({ kind: "journeys", count: 2 }));
+    expect(inUseWords({ kind: "journeys", count: 2 })).toContain("2");
+    expect(inUseWords({ kind: "places", places: 6, behind: 2 })).toContain("2");
+    expect(inUseWords({ kind: "places", places: 6, behind: 0 })).toContain("6");
+    expect(inUseWords({ kind: "places", places: 0, behind: 0 })).not.toContain("0");
   });
 });

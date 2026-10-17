@@ -12,7 +12,7 @@ function RouteFilter({ filters, routes, onChange }: { filters: IndexFilters; rou
   return (
     <>
       <label className="row">
-        <span className="muted small">Route</span>
+        <span className="filter-label">Route</span>
         <select
           aria-label="Route"
           value={filters.route ?? ""}
@@ -28,7 +28,7 @@ function RouteFilter({ filters, routes, onChange }: { filters: IndexFilters; rou
       </label>
       {filters.route === undefined ? null : (
         <label className="row">
-          <span className="muted small">Version</span>
+          <span className="filter-label">Version</span>
           <select
             aria-label="Version"
             value={filters.version ?? ""}
@@ -49,9 +49,9 @@ function RouteFilter({ filters, routes, onChange }: { filters: IndexFilters; rou
 
 export function IndexFilterBar({ filters, routes, onChange }: { filters: IndexFilters; routes: readonly RouteSummary[]; onChange: (filters: IndexFilters) => void }) {
   return (
-    <div className="row acting-controls" data-testid="index-filters">
+    <div className="row index-filters" data-testid="index-filters">
       <label className="row">
-        <span className="muted small">Status</span>
+        <span className="filter-label">Status</span>
         <select
           aria-label="Status"
           value={filters.status}

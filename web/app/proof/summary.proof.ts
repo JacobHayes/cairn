@@ -180,7 +180,7 @@ test("the main flow, on video", async ({ page }) => {
   await expect(row).toHaveCount(0);
   await beat(page, 1800);
   // Show all on a list that holds more than five.
-  const more = page.getByTestId("summary-show-all").first();
+  const more = page.getByTestId("rows-show-all").first();
   if (await more.isVisible()) {
     await more.click();
     await beat(page, 1500);

@@ -5,7 +5,8 @@ import { renderToStaticMarkup } from "react-dom/server";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
-import { JourneyCells } from "./JourneyIndex.tsx";
+import { upgradeWords } from "./figures-model.ts";
+import { JourneyCell } from "./JourneyTable.tsx";
 
 function row(summary: Schema<"JourneySummary">): string {
   return renderToStaticMarkup(
@@ -13,7 +14,7 @@ function row(summary: Schema<"JourneySummary">): string {
       <table>
         <tbody>
           <tr>
-            <JourneyCells summary={summary} routes={[]} />
+            <JourneyCell summary={summary} routes={[]} />
           </tr>
         </tbody>
       </table>
@@ -38,8 +39,20 @@ describe("the index row's upgrade mark", () => {
     expect(row({ ...base, latest_version: 5, upgrade_available: false })).not.toContain('data-testid="upgrade"');
   });
 
-  it("links the journey's lineage to its route", () => {
+  it("names the newer version when the host gives one", () => {
+    expect(upgradeWords({ ...base, upgrade_available: true, latest_version: 5 })).toContain("5");
+    expect(upgradeWords({ ...base, upgrade_available: true, latest_version: null })).toBeDefined();
+    expect(upgradeWords(base)).toBeUndefined();
+  });
+
+  it("links the journey's lineage to its route, and says a journey that came from none started empty", () => {
     expect(row(base)).toContain('href="/routes/r/versions"');
     expect(row({ ...base, lineage: null })).not.toContain('data-testid="row-lineage"');
+    expect(row({ ...base, lineage: null })).toContain("row-lineage-none");
+  });
+
+  it("marks a journey that is not active with its status", () => {
+    expect(row({ ...base, status: "completed" })).toContain("completed");
+    expect(row(base)).not.toContain('class="badge');
   });
 });

@@ -47,18 +47,6 @@
   color: var(--color-secondary);
 }
 
-/* Finished or skipped of what is in scope, in graphite: the accent is for selection and focus. */
-.summary-meter {
-  height: 4px;
-  background: var(--color-border);
-}
-
-.summary-meter > span {
-  display: block;
-  height: 100%;
-  background: var(--color-text);
-}
-
 .summary-states {
   color: var(--color-secondary);
 }
@@ -100,10 +88,6 @@
   }
 }
 
-.summary-panel {
-  outline: none;
-}
-
 .summary:focus {
   outline: none;
 }
@@ -117,27 +101,9 @@
   opacity: 1;
 }
 
-/* Who has it is never cut short: a long name wraps. Row text is 15px (DESIGN, Typography). */
-.summary .row-owner {
-  max-width: 220px;
-  overflow-wrap: anywhere;
-}
-
-.summary :is(.node-fact, .row-owner, .summary-date-when, .summary-date-short, .node-panel-foot, .summary-flags) {
+/* The dates and flags of the Summary's own lines are row text too: 15px (DESIGN, Typography). */
+.summary :is(.summary-date-when, .summary-date-short, .summary-flags) {
   font-size: 15px;
-}
-
-.summary .fold-count {
-  margin-left: var(--space-2);
-}
-
-.summary .node-fact {
-  overflow-wrap: anywhere;
-}
-
-/* A long title keeps a readable measure: when the owner and buttons would squeeze it, they drop to a line under it. */
-.summary .node-row-main {
-  flex-basis: 360px;
 }
 
 /* What the viewer holds next is a plain paper line here, not the tinted block of the other screens: the accent is for selection and focus. */
@@ -148,55 +114,9 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* A list read for its finished work is not faded or muted: ink on paper, the chip's word in ink with its green edge, so it holds the contrast floor in both themes (DESIGN, status language). */
-.summary-bright .node-row[data-state="done"] > * {
-  opacity: 1;
-}
-
-.summary-bright .node-row[data-state="done"] .node-title {
-  color: var(--color-text);
-}
-
-.summary-bright .node-row[data-state="done"] .node-fact {
-  color: var(--color-muted);
-}
-
-.summary-bright .node-row[data-state="done"] .badge.done {
-  color: var(--color-text);
-}
-
-.summary-foot {
-  justify-content: space-between;
-}
-
-/* The decisions still waiting are a fold: a band head with a count, its rows under it. */
-.summary-fold {
-  position: relative;
-  border: 1px solid var(--color-edge);
-  background: var(--color-surface);
-  box-shadow: var(--shadow-sm);
-}
-
 /* DESIGN: panel borders are --color-edge; the lead and About are panels too, with their ticks over the band. */
 .summary .panel {
   border-color: var(--color-edge);
-}
-
-.summary-fold > summary {
-  border-bottom: 1px solid var(--color-edge);
-}
-
-.summary-fold:not([open]) > summary {
-  border-bottom: 0;
-}
-
-.summary-fold .node-panel {
-  border: 0;
-  box-shadow: none;
-}
-
-.summary-fold .node-panel::after {
-  display: none;
 }
 
 .summary-about {
@@ -204,7 +124,7 @@
 }
 
 /* The sections of the page are headed as DESIGN's section titles (Space Grotesk, 1.25rem / 700, uppercase) in their band, with the count in quiet mono. */
-.summary :is(.node-panel-head, .summary-fold > summary, :is(.summary-about, .summary-empty) > .label:first-child) {
+.summary :is(.node-panel-head, .rows-fold > summary, :is(.summary-about, .summary-empty) > .label:first-child) {
   padding: var(--space-3) var(--space-4);
   font: var(--type-heading-weight) 1.25rem / 1.2 var(--font-heading);
   letter-spacing: 0.02em;
@@ -264,101 +184,6 @@
   gap: var(--space-4);
 }
 
-/* Where a list is narrow (a column beside another, a phone): the chip sits beside the title and the owner (and any buttons) under the title in its column, not on a line of their own that the chip does not line up with. */
-.summary .node-panel {
-  container: rows / inline-size;
-}
-
-@container rows (max-width: 760px) {
-  .summary .node-row {
-    display: grid;
-    grid-template-columns: auto minmax(0, 1fr);
-    align-items: start;
-    gap: 2px var(--space-3);
-    min-height: 0;
-  }
-
-  .summary .node-row-main {
-    display: contents;
-  }
-
-  .summary .node-row-main > .badge {
-    grid-column: 1;
-    grid-row: 1;
-  }
-
-  .summary .node-row-text {
-    grid-column: 2;
-  }
-
-  /* Who has it is a line of its own, as wide as the title; what can be done is under it on a touch screen and over the row's corner where a hover reveals it, so neither squeezes the name nor holds a gap open while hidden. */
-  .summary .node-row > .row-side {
-    grid-column: 2;
-    flex-wrap: wrap;
-    justify-content: flex-start;
-    margin: 0;
-    padding: 0;
-  }
-
-  .summary .node-row > :not(.node-row-main, .row-side) {
-    grid-column: 1 / -1;
-    padding-left: 0;
-  }
-
-  .summary .row-owner {
-    flex: 1 1 100%;
-    min-width: 0;
-    max-width: none;
-    text-align: left;
-  }
-
-  .summary .row-act {
-    flex: none;
-    min-width: 0;
-    margin-left: auto;
-  }
-
-  @media (hover: hover) {
-    .summary .node-row {
-      position: relative;
-    }
-
-    .summary .node-row .row-act {
-      position: absolute;
-      right: var(--space-4);
-      bottom: var(--space-2);
-      margin: 0;
-    }
-
-    .summary .node-row:has(.row-act) .row-owner {
-      padding-right: 190px;
-    }
-  }
-
-  /* The quiet "Unassigned" (and the picker that replaces it) starts at the title's edge too. */
-  .summary .row-assign-slot {
-    justify-items: start;
-  }
-}
-
-/* On a phone the chip rides a line of its own above the title, which then has the whole inner width. */
-@container rows (max-width: 420px) {
-  .summary .node-row {
-    grid-template-columns: minmax(0, 1fr);
-  }
-
-  .summary .node-row-main > .badge,
-  .summary .node-row-text,
-  .summary .node-row > .row-side {
-    grid-column: 1;
-  }
-
-  .summary .node-row-main > .badge {
-    grid-row: auto;
-    justify-self: start;
-  }
-}
-
 /* On paper: whole lists, owners printed, no controls, and done work at full strength. */
 @media print {
   .summary {
@@ -381,7 +206,7 @@
   }
 
   .summary .node-panel-head,
-  .summary-fold > summary {
+  .rows-fold > summary {
     break-after: avoid;
   }
 
@@ -404,7 +229,7 @@
 
   .summary .row-act,
   .summary .row-assign,
-  .summary .summary-foot,
+  .summary .rows-foot,
   .summary-about :is(button, select, textarea) {
     display: none;
   }

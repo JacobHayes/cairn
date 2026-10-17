@@ -13,6 +13,25 @@ export function ownedBy(view: Ready, owners: readonly string[] | undefined, enti
   return (owners ?? []).some((key) => mine.has(resolveEntity(view, key)));
 }
 
+/**
+ * Whether node `key` is still the viewer's to do if it is in their "mine": in scope, not a
+ * container, not skipped, not a milestone that reaches itself, and not finished (2.4). The one
+ * rule Home's counts and the journey card's use, and the line for work that is all waiting.
+ */
+export function openForViewer(view: Ready, key: string): boolean {
+  const node = nodeOf(view, key);
+  const derived = view.derived.nodes[key];
+  return (
+    node !== undefined &&
+    derived !== undefined &&
+    node.kind !== "group" &&
+    derived.relevance.value !== "not_relevant" &&
+    derived.effectively_skipped !== true &&
+    derived.auto_reached !== true &&
+    !isTerminal(recordOf(view, node).state)
+  );
+}
+
 /** How many things the line names it waits on before it says "and N more". */
 const NAMED_MAX = 2;
 
@@ -34,8 +53,7 @@ export function nextForYou(view: Ready, entries: readonly MineEntry[]): NextForY
   const open = entries.flatMap((entry) => {
     const node = nodeOf(view, entry.node);
     const derived = view.derived.nodes[entry.node];
-    const live = node !== undefined && derived !== undefined && node.kind !== "group" && derived.relevance.value !== "not_relevant" && derived.effectively_skipped !== true && derived.display_state !== "done" && !isTerminal(recordOf(view, node).state);
-    return live ? [{ node, start: derived.dates.earliest_start?.date ?? "9999-12-31" }] : [];
+    return node !== undefined && derived !== undefined && openForViewer(view, entry.node) ? [{ node, start: derived.dates.earliest_start?.date ?? "9999-12-31" }] : [];
   });
   const first = open.sort((left, right) => left.start.localeCompare(right.start) || left.node.key.localeCompare(right.node.key))[0];
   if (first === undefined) {
@@ -56,11 +74,16 @@ function named(titles: readonly string[]): string {
   return more > 0 ? `${shown.join(", ")} and ${String(more)} more` : shown.join(" and ");
 }
 
+/** What the next item waits on, in words: `after A and B`, or `snoozed until Oct 20`; empty when it names nothing. */
+export function waitsOnWords(view: Ready, next: NextForYou): string {
+  if (next.after.length > 0) {
+    return `after ${named(next.after)}`;
+  }
+  return next.snoozedUntil === undefined ? "" : `snoozed until ${dateWords(next.snoozedUntil, view.derived.today)}`;
+}
+
 /** The line, in words. */
 export function nextForYouWords(view: Ready, next: NextForYou): string {
-  const title = titleOf(view, next.node);
-  if (next.after.length > 0) {
-    return `Next for you: ${title}, after ${named(next.after)}.`;
-  }
-  return next.snoozedUntil === undefined ? `Next for you: ${title}.` : `Next for you: ${title}, snoozed until ${dateWords(next.snoozedUntil, view.derived.today)}.`;
+  const waits = waitsOnWords(view, next);
+  return `Next for you: ${titleOf(view, next.node)}${waits === "" ? "" : `, ${waits}`}.`;
 }

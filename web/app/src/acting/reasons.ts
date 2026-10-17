@@ -1,9 +1,11 @@
-// C10: the one secondary fact a row or card says, in plain words: what the row needs
-// ("Note required"), or the largest reason it ranks where it does ("2 days late", "Due in 3
-// days", "Gates 6 nodes"). A conditional row says it may not apply. Nothing here is a code or a
-// number without a word.
+// C10, C11, D3: the one secondary fact a row says, in plain words and as data: that it may not
+// apply, how late or how near its date is, what it needs ("Note required"), or the largest
+// reason it ranks where it does ("Gates 6 nodes"). The fact is structured (`ActionFact`) so a
+// caller can tone it, and `factWords` says it. Every surface that shows a row's action-priority
+// fact takes it from `actionFact`, so a row reads the same wherever it is listed.
 import { nodeOf, type Ready } from "../detail/model.ts";
-import { dayOf } from "../timeline/model.ts";
+import { daysUntil, daysWords, dueWords, isSoon } from "../status/when.ts";
+import { dateWords } from "../timeline/model.ts";
 import { missingEvidence } from "./acts.ts";
 import type { SortBy } from "./address.ts";
 import { rankParts, type NodeRow, type RankPart } from "./why.ts";
@@ -11,26 +13,15 @@ import { rankParts, type NodeRow, type RankPart } from "./why.ts";
 /** Within this share of the largest part, a date reason beats a bigger weight: it is the one to act on today. */
 const CLOSE = 0.9;
 
-const days = (count: number) => `${String(count)} ${count === 1 ? "day" : "days"}`;
 const nodes = (count: number) => `${String(count)} ${count === 1 ? "node" : "nodes"}`;
 
-/** How near the row's dates are, in words; none when it has no deadline. */
-export function dateReason(view: Ready, row: NodeRow): string | undefined {
-  const today = dayOf(view.derived.today);
-  if (row.overdue === true && row.due != null) {
-    return `${days(today - dayOf(row.due))} late`;
-  }
+/** The date reason of a row with no pressing date: when it is due or must start, in words; none when it has no deadline. */
+function dateReason(view: Ready, row: NodeRow): string | undefined {
   const slack = row.slack_days;
   if (slack == null) {
     return undefined;
   }
-  if (slack < 0) {
-    return `Should have started ${days(-slack)} ago`;
-  }
-  if (slack === 0) {
-    return "Start today";
-  }
-  return row.due == null ? `Start within ${days(slack)}` : `Due in ${days(Math.max(dayOf(row.due) - today, 0))}`;
+  return row.due == null ? `Start within ${daysWords(slack)}` : dueWords(row.due, view.derived.today);
 }
 
 /** What the row holds up: the nodes downstream of it, less itself; nothing when its gravity is only its own weight. */
@@ -94,19 +85,91 @@ function requirement(view: Ready, row: NodeRow): string | undefined {
   return row.needs_breakdown === true ? "Needs breakdown" : undefined;
 }
 
+/** The ink a fact is said in: warning for date pressure, error for lateness (DESIGN, Dates), always with its words. */
+export type FactTone = "warn" | "bad";
+
 /**
- * The one fact under a row's title: that it may not apply (conditional), what it needs, or why
- * it ranks where it does, in that order of weight. When the list is sorted by one signal, that
- * signal's reason leads. None when the row has nothing worth saying.
+ * The one fact under an action row, as data. `late` is overdue work (`days` late; a decision names
+ * the date it was to be decided by), `behind` work past the latest start its chain allows, `due` a
+ * dated deadline (`date`; `decision` when it is decided by it rather than due on it) and `start`
+ * that the slack is spent. `needs` is what the row requires before it can finish and `reason` the
+ * largest reason it ranks where it does, both already in `words`.
  */
-export function reasonOf(view: Ready, row: NodeRow, sort: SortBy = "rank"): string | undefined {
+export type ActionFact =
+  | { kind: "conditional"; tone: undefined }
+  | { kind: "late"; tone: "bad"; days: number; decideBy: string | undefined }
+  | { kind: "behind"; tone: "bad"; days: number }
+  | { kind: "start"; tone: "warn" }
+  | { kind: "due"; tone: FactTone | undefined; date: string; decision: boolean }
+  | { kind: "needs" | "reason"; tone: undefined; words: string };
+
+/** The fact in words. */
+export function factWords(fact: ActionFact, today: string): string {
+  switch (fact.kind) {
+    case "conditional":
+      return "May not apply";
+    case "late": {
+      const late = `${daysWords(fact.days)} late`;
+      return fact.decideBy === undefined ? late : `Decide by ${dateWords(fact.decideBy, today)}, ${late}`;
+    }
+    case "behind":
+      return `Should have started ${daysWords(fact.days)} ago`;
+    case "start":
+      return "Start today";
+    case "due":
+      return dueWords(fact.date, today, fact.decision);
+    case "needs":
+    case "reason":
+      return fact.words;
+  }
+}
+
+/** The sorts whose own reason leads the fact, so a date that is merely near does not displace it. */
+const SIGNAL_SORTS: ReadonlySet<SortBy> = new Set<SortBy>(["gravity", "unlocks"]);
+
+/**
+ * C10, C11, D3: the one fact under a row's title. In order of weight: that the row may not apply;
+ * that it is late, or past the latest start its chain allows (whatever the list is sorted by);
+ * that its slack is spent or its date is within the soon window (unless the list is sorted by
+ * gravity or unlocks, which lead with their own reason); what the row needs; a decision's
+ * date; then the reason the sort asks for, else why it ranks where it does. None when the row has
+ * nothing worth saying.
+ */
+export function actionFact(view: Ready, row: NodeRow, sort: SortBy = "rank"): ActionFact | undefined {
   if (row.display_state === "conditional") {
-    return "May not apply";
+    return { kind: "conditional", tone: undefined };
+  }
+  const today = view.derived.today;
+  const decision = row.kind === "decision";
+  if (row.overdue === true && row.due != null) {
+    return { kind: "late", tone: "bad", days: -daysUntil(row.due, today), decideBy: decision ? row.due : undefined };
+  }
+  const slack = row.slack_days;
+  if (slack != null && slack < 0) {
+    return { kind: "behind", tone: "bad", days: -slack };
+  }
+  const led = SIGNAL_SORTS.has(sort);
+  if (!led) {
+    if (slack === 0) {
+      return { kind: "start", tone: "warn" };
+    }
+    if (row.due != null && isSoon(row.due, today)) {
+      return { kind: "due", tone: "warn", date: row.due, decision };
+    }
   }
   const needed = requirement(view, row);
   if (needed !== undefined) {
-    return needed;
+    return { kind: "needs", tone: undefined, words: needed };
   }
+  if (decision && row.due != null && !led) {
+    return { kind: "due", tone: undefined, date: row.due, decision };
+  }
+  const words = reasonWords(view, row, sort);
+  return words === undefined ? undefined : { kind: "reason", tone: undefined, words };
+}
+
+/** The reason the sort asks for, else why the row ranks where it does. */
+function reasonWords(view: Ready, row: NodeRow, sort: SortBy): string | undefined {
   switch (sort) {
     case "due":
     case "slack":
@@ -119,4 +182,10 @@ export function reasonOf(view: Ready, row: NodeRow, sort: SortBy = "rank"): stri
     case "effort":
       return rankReason(view, row);
   }
+}
+
+/** The fact and its tone, in words, for a row: what a list draws under a title. */
+export function factOf(view: Ready, row: NodeRow, sort: SortBy = "rank"): { words: string; tone: FactTone | undefined } | undefined {
+  const fact = actionFact(view, row, sort);
+  return fact === undefined ? undefined : { words: factWords(fact, view.derived.today), tone: fact.tone };
 }

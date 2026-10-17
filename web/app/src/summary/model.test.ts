@@ -7,10 +7,7 @@ import { describe, expect, it } from "vitest";
 import type { Ready } from "../detail/model.ts";
 import { testView } from "../detail/view.test-support.ts";
 import { DISPLAY_STATES } from "../status/words.ts";
-import type { NodeRow } from "../acting/why.ts";
-import { dateWords } from "../timeline/model.ts";
-import { dateReason } from "../acting/reasons.ts";
-import { rowFact, summaryModel, whenWords, type StatusSummary } from "./model.ts";
+import { summaryModel, whenWords, type StatusSummary } from "./model.ts";
 
 /** The test journey with the findings overdue since 2026-10-01, the report stale and short, and the meeting owned. */
 function summaryJourney(): Ready {
@@ -77,49 +74,6 @@ describe("C18: the status summary", () => {
     const model = summaryModel(summaryJourney(), { by_state: {}, by_display_state: {}, remaining: 0 });
     expect([model.byState, model.overdue, model.shortfalls, model.stale, model.upcoming, model.openDecisions]).toEqual([[], [], [], [], [], []]);
     expect(model.inScope).toBe(0);
-  });
-});
-
-/** A row of the next list with only what the page reads of it. */
-function rowOf(fields: Partial<NodeRow>): NodeRow {
-  return { key: "n_x", kind: "action", ...fields } as NodeRow;
-}
-
-describe("C10, C11, D3: the one fact under an action row", () => {
-  const view = summaryJourney();
-  const today = view.derived.today;
-
-  it.each([
-    ["a decision's date a week and a day off", "2026-10-14", false, undefined],
-    ["a decision's date a week off", "2026-10-13", false, "warn"],
-    ["a decision's date today", today, false, "warn"],
-    ["a decision's date gone by", "2026-10-01", true, "bad"],
-  ] as const)("%s: the tone, with the date in words", (_, due, overdue, tone) => {
-    const { fact, tone: said } = rowFact(view, rowOf({ kind: "decision", due, overdue }), "a reason");
-    expect(said).toBe(tone);
-    expect(fact).toContain(dateWords(due, today));
-  });
-
-  it("says how many days late overdue work is, in error ink, instead of its reason", () => {
-    const { fact, tone } = rowFact(view, rowOf({ due: "2026-10-01", overdue: true }), "Gates 3 nodes");
-    expect(tone).toBe("bad");
-    expect(fact).toContain("5");
-    expect(fact).not.toContain("Gates");
-  });
-
-  it("warns on a near deadline only when the reason it says is that deadline", () => {
-    const near = rowOf({ due: "2026-10-09", slack_days: 3 });
-    const far = rowOf({ due: "2026-10-30", slack_days: 20 });
-    const dated = dateReason(view, near) ?? "missing";
-    expect(dated).toMatch(/^Due in 3 days/);
-    expect(rowFact(view, near, dated)).toEqual({ fact: dated, tone: "warn" });
-    expect(rowFact(view, near, "Gates 3 nodes").tone).toBeUndefined();
-    expect(rowFact(view, far, dateReason(view, far)).tone).toBeUndefined();
-  });
-
-  it("passes the reason through for work that is not late, in no particular ink", () => {
-    expect(rowFact(view, rowOf({}), "Gates 3 nodes")).toEqual({ fact: "Gates 3 nodes", tone: undefined });
-    expect(rowFact(view, rowOf({}), undefined)).toEqual({ fact: undefined, tone: undefined });
   });
 });
 

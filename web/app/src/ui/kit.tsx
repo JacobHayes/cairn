@@ -105,6 +105,34 @@ export function Segmented<T extends string>({
   );
 }
 
+/**
+ * A quiet progress track (DESIGN, Charts): `done` of `of` in graphite on a hairline, as wide as its
+ * container, an empty track when nothing is in scope. It is hidden from assistive technology
+ * unless a `label` names it, since the figure beside it normally says the same.
+ */
+export function Meter({ done, of, label, ...rest }: { done: number; of: number; label?: string; "data-testid"?: string; "data-done"?: number }) {
+  const share = of === 0 ? 0 : Math.min(done / of, 1) * 100;
+  return (
+    <span className="meter" {...(label === undefined ? { "aria-hidden": true } : { role: "img", "aria-label": label })} {...rest}>
+      <span style={{ width: `${String(share)}%` }} />
+    </span>
+  );
+}
+
+/**
+ * What an index shows in place of its table: that it is being read, that reading it failed (with
+ * the way to try again, when there is one), or that it holds nothing (with the way to something
+ * else). Presentation only: the caller knows which read failed and whether a retry exists.
+ */
+export function IndexState({ kind, children, action, ...rest }: { kind: "loading" | "failed" | "empty"; children: ReactNode; action?: ReactNode; "data-testid"?: string }) {
+  return (
+    <div className={`index-state index-state-${kind}`} role={kind === "failed" ? "alert" : "status"} {...rest}>
+      <p>{children}</p>
+      {action === undefined ? null : <span className="index-state-action">{action}</span>}
+    </div>
+  );
+}
+
 /** Capabilities gating: renders `children` only when the host offers what `when` asks. */
 export function Gate({ when, children, otherwise = null }: { when: (capabilities: Capabilities) => boolean; children: ReactNode; otherwise?: ReactNode }) {
   return when(useCapabilities()) ? children : otherwise;

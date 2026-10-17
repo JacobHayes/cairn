@@ -20,7 +20,7 @@ import type { ListSettings } from "./address.ts";
 import type { Column, Line } from "./listModel.ts";
 import { firstParagraph } from "./listModel.ts";
 import { DetailLink } from "./Parts.tsx";
-import { reasonOf } from "./reasons.ts";
+import { factOf } from "./reasons.ts";
 import { RowActions } from "./RowActions.tsx";
 
 export interface CellContext {
@@ -64,10 +64,10 @@ function Progress({ view, line }: { view: Ready; line: Line }) {
 
 /** C10: the one fact that says why a row is on the frontier, in words. */
 function Fact({ line, context }: { line: Line; context: CellContext }) {
-  const fact = line.row === undefined ? undefined : reasonOf(context.view, line.row, context.sort ?? "rank");
+  const fact = line.row === undefined ? undefined : factOf(context.view, line.row, context.sort ?? "rank");
   return fact === undefined ? null : (
-    <span className="muted small" data-testid="fact">
-      {fact}
+    <span className={fact.tone === undefined ? "muted small" : `small node-fact-${fact.tone}`} data-testid="fact">
+      {fact.words}
     </span>
   );
 }

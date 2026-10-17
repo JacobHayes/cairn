@@ -13,6 +13,7 @@ import { createContext, useContext } from "react";
 import type { ListFlag } from "../acting/address.ts";
 import { overBytes, TITLE_BYTES_MAX } from "../authoring/limits.ts";
 import { STEPS, type Step } from "../canvas/model.ts";
+import { journeyPath } from "./address.ts";
 
 /** C9: the flags the Filter offers, in the order it lists them. */
 export const FILTER_FLAGS: readonly ListFlag[] = ["overdue", "stale", "unassigned", "shortfall", "snoozed"];
@@ -126,6 +127,11 @@ export function viewStateParams(state: ViewState): URLSearchParams {
     params.set("q", state.text);
   }
   return params;
+}
+
+/** The journey's list, filtered to `filter` (the stock filter with these settings changed): where a count of what needs a look leads. */
+export function listPath(journey: string, filter: Partial<ViewFilter>): string {
+  return journeyPath({ journey }, "list", viewStateParams({ ...DEFAULT_VIEW_STATE, filter: { ...DEFAULT_FILTER, ...filter } }).toString());
 }
 
 function searchOf(params: URLSearchParams): string {

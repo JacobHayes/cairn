@@ -1,122 +1,176 @@
-// The routes index (`/routes`): routes and segments in one table, each linking to its detail (C17,
-// C19) and saying one thing of itself: a segment how much it is used ("Used in 6 places", or "2 of
-// 6 behind"), a route how to start a journey, or that it has a draft open or is retired (A19:
-// hidden from new-journey creation, its journeys still upgrading). The `Routes` and `Segments`
-// chips keep it to one (both off shows all); `New route` opens the form that starts a route or
-// segment empty, to author by hand (A12), or imports a route file as a new route or draft (A13).
-// Kept current (H6).
+// The routes index (`/routes`): routes and segments in one table (C17, C19), each linking to its
+// detail with its latest version and how much it is used: a route its active journeys (counted
+// from their own lineage), a segment its places ("Used in 6 places", or "2 of 6 behind"), and a
+// route with a published version the way to start a journey from it. A retired route (A19:
+// hidden from new-journey creation, its journeys still upgrading) or one with a draft open says so
+// in one chip. The `All | Routes | Segments` control keeps it to one type; `New route` opens the
+// form that starts a route or segment empty, to author by hand (A12), or imports a route file as
+// a new route or draft (A13). Each read says whether it is still going or failed. Kept current (H6).
 import { Link, useSearchParams } from "react-router";
 
-import { segmentUses, routeIndex, type RouteSummary, type SegmentUse } from "../data/reads.ts";
-import { valueOf } from "../data/keyed-read.ts";
+import { valueOf, type ReadView } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
-import { newJourneyPath } from "../journeys/address.ts";
-import { Badge } from "../ui/kit.tsx";
+import { indexKey, journeyIndex, routeIndex, segmentUses, type RouteSummary } from "../data/reads.ts";
+import { DEFAULT_FILTERS, indexPath, newJourneyPath } from "../journeys/address.ts";
+import { Badge, IndexState, Segmented } from "../ui/kit.tsx";
 import { newRoutePath, routeDetailPath } from "./address.ts";
+import { activeJourneyCounts, inUseWords, ofType, startableVersion, typeOf, type InUse, type RouteType } from "./model.ts";
+import "../journeys/journeys.css";
 
-/** The one secondary fact of a segment: how many places use it, or how many of them are behind. */
-export function usageWords(use: SegmentUse | undefined): string {
-  if (use === undefined) {
-    return "";
-  }
-  if (use.places === 0) {
-    return "Not used yet";
-  }
-  return use.behind > 0 ? `${String(use.behind)} of ${String(use.places)} behind` : `Used in ${String(use.places)} ${use.places === 1 ? "place" : "places"}`;
-}
+const TYPES = [
+  { value: "all", label: "All" },
+  { value: "routes", label: "Routes" },
+  { value: "segments", label: "Segments" },
+] as const satisfies readonly { value: RouteType; label: string }[];
 
-/** The row's one fact: a segment's use; a route's way to start a journey, or the one thing that sets it apart (an open draft, retirement). */
-function Fact({ route, use }: { route: RouteSummary; use: SegmentUse | undefined }) {
-  const { header } = route;
-  const latest = route.latest_version ?? undefined;
-  if (header.kind === "segment") {
+const ACTIVE = { ...DEFAULT_FILTERS };
+
+/** What the use cell shows: the use, or that it is being read or could not be. */
+type UseReading = { kind: "reading" } | { kind: "failed"; message: string } | { kind: "known"; use: InUse };
+
+function UseCell({ route, reading }: { route: RouteSummary; reading: UseReading }) {
+  const segment = route.header.kind === "segment";
+  if (reading.kind === "reading") {
     return (
-      <span className="muted small" data-testid="segment-use">
-        {usageWords(use)}
-      </span>
+      <td data-column="use" className="muted">
+        Reading...
+      </td>
     );
   }
-  if (header.retired === true) {
-    return <Badge data-testid="retired">Retired</Badge>;
+  if (reading.kind === "failed") {
+    return (
+      <td data-column="use" title={reading.message}>
+        <span className="flag-bad">Could not be read</span>
+      </td>
+    );
   }
-  if (route.draft_open) {
-    return <Badge tone="warn">Draft open</Badge>;
-  }
-  return latest === undefined ? <span className="muted small">None published</span> : <Link to={newJourneyPath(header.id, latest)}>Start a journey</Link>;
+  const words = inUseWords(reading.use);
+  const nothing = reading.use.kind === "journeys" ? reading.use.count === 0 : reading.use.places === 0;
+  const behind = reading.use.kind === "places" && reading.use.behind > 0;
+  return (
+    <td data-column="use" data-testid={segment ? "segment-use" : "route-use"}>
+      {reading.use.kind === "journeys" && !nothing ? (
+        <Link to={indexPath({ ...ACTIVE, route: route.header.id })}>{words}</Link>
+      ) : (
+        <span className={nothing ? "muted" : behind ? "flag-warn" : undefined}>{words}</span>
+      )}
+    </td>
+  );
 }
 
-function RouteRow({ route, use }: { route: RouteSummary; use: SegmentUse | undefined }) {
+function RouteRow({ route, reading }: { route: RouteSummary; reading: UseReading }) {
   const { header } = route;
   const segment = header.kind === "segment";
+  const start = startableVersion(route);
+  const summary = header.description?.split("\n")[0]?.trim();
   return (
     <tr data-testid="route-row" data-route={header.id} data-kind={segment ? "segment" : "process"}>
-      <td>
-        <Link to={routeDetailPath(header.id)} title={header.description ?? undefined}>
-          {header.name}
-        </Link>
+      <td data-column="name">
+        <span className="cell-first">
+          <Link to={routeDetailPath(header.id)}>{header.name}</Link>
+          {header.retired === true ? <Badge data-testid="retired">Retired</Badge> : route.draft_open ? <Badge tone="warn">Draft open</Badge> : null}
+        </span>
+        {summary === undefined || summary === "" ? null : (
+          <span className="cell-second cell-description" title={header.description ?? undefined}>
+            {summary}
+          </span>
+        )}
       </td>
-      <td>{segment ? "Segment" : "Route"}</td>
-      <td>
-        <Fact route={route} use={use} />
+      <td data-column="type">{segment ? "Segment" : "Route"}</td>
+      <td data-column="latest" className="mono">
+        {route.latest_version == null ? <span className="muted">No version yet</span> : `Version ${String(route.latest_version)}`}
       </td>
+      <UseCell route={route} reading={reading} />
+      <td data-column="act">{start === undefined ? null : <Link to={newJourneyPath(header.id, start)}>Start a journey</Link>}</td>
     </tr>
   );
 }
 
-const TYPES = [
-  { id: "routes", label: "Routes" },
-  { id: "segments", label: "Segments" },
-] as const;
+/** What a read shows for the table's use column. */
+function readingOf<T>(view: ReadView<T>, known: (value: T) => InUse): UseReading {
+  const value = valueOf(view);
+  if (value !== undefined) {
+    return { kind: "known", use: known(value) };
+  }
+  return view.status === "failed" ? { kind: "failed", message: view.error.message } : { kind: "reading" };
+}
 
-/** The chips: each keeps the list to its type, pressed again it lets everything back (both off shows all). */
-function TypeChips({ type, onPick }: { type: string | null; onPick: (next: string | undefined) => void }) {
+/** The routes and segments as a table, each with its use as `useOf` reads it. */
+function RouteTable({ routes, useOf }: { routes: RouteSummary[]; useOf: (route: RouteSummary) => UseReading }) {
   return (
-    <div className="journey-chips" role="group" aria-label="Show" data-testid="routes-types">
-      {TYPES.map((each) => (
-        <button key={each.id} type="button" className="chip" aria-pressed={type === each.id} data-testid={`type-${each.id}`} onClick={() => { onPick(type === each.id ? undefined : each.id); }}>
-          {each.label}
-        </button>
-      ))}
+    <div className="index-table">
+      <table className="data">
+        <thead>
+          <tr>
+            <th scope="col">Name</th>
+            <th scope="col">Type</th>
+            <th scope="col">Latest</th>
+            <th scope="col">In use</th>
+            <th scope="col">
+              <span className="visually-hidden">Start a journey</span>
+            </th>
+          </tr>
+        </thead>
+        <tbody>
+          {routes.map((route) => (
+            <RouteRow key={route.header.id} route={route} reading={useOf(route)} />
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }
 
 export function RouteIndex() {
-  const { view } = useLive("routes", routeIndex);
-  const uses = useLive("segment-uses", segmentUses).view;
   const [params, setParams] = useSearchParams();
-  const type = params.get("type");
+  const type = typeOf(params.get("type"));
+  const { view, refresh } = useLive("routes", routeIndex);
+  const journeyQuery = { status: ["active" as const] };
+  const active = useLive(type === "segments" ? undefined : indexKey(journeyQuery), journeyIndex(journeyQuery));
+  const uses = useLive(type === "routes" ? undefined : "segment-uses", segmentUses);
   const routes = valueOf(view);
-  const shown = routes !== undefined ? routes.filter((route) => type === null || (type === "segments") === (route.header.kind === "segment")) : [];
+  const shown = (routes ?? []).filter((route) => ofType(route, type)).sort((left, right) => left.header.name.localeCompare(right.header.name));
+  const counts = activeJourneyCounts(valueOf(active.view) ?? []);
+  const useOf = (route: RouteSummary): UseReading =>
+    route.header.kind === "segment"
+      ? readingOf(uses.view, (all) => ({ kind: "places", places: all[route.header.id]?.places ?? 0, behind: all[route.header.id]?.behind ?? 0 }))
+      : readingOf(active.view, () => ({ kind: "journeys", count: counts.get(route.header.id) ?? 0 }));
+  const newWords = type === "segments" ? "New segment" : "New route";
   return (
-    <section className="stack" aria-label="Routes" data-testid="routes">
-      <div className="row">
+    <section className="stack index-page" aria-label="Routes" data-testid="routes">
+      <div className="row index-head">
         <h1>Routes</h1>
         <span className="spacer" />
-        <Link className="button" to={newRoutePath(type === "segments" ? "segment" : undefined)} data-testid="new-route-link">New route</Link>
+        <Link className="button" to={newRoutePath(type === "segments" ? "segment" : undefined)} data-testid="new-route-link">
+          {newWords}
+        </Link>
       </div>
-      <TypeChips type={type} onPick={(next) => { setParams(next === undefined ? {} : { type: next }, { replace: true }); }} />
-      {view.status === "idle" || view.status === "loading" ? <p className="muted small">Loading the routes...</p> : null}
-      {view.status === "failed" ? <p className="callout callout-bad">The routes could not be read: {view.error.message}</p> : null}
-      {routes !== undefined && shown.length === 0 ? <p className="muted small" data-testid="routes-empty">No routes match.</p> : null}
-      {routes !== undefined && shown.length > 0 ? (
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Name</th>
-                <th>Type</th>
-                <th>Use</th>
-              </tr>
-            </thead>
-            <tbody>
-              {shown.map((route) => (
-                <RouteRow key={route.header.id} route={route} use={valueOf(uses)?.[route.header.id]} />
-              ))}
-            </tbody>
-          </table>
-        </div>
+      <Segmented
+        label="Show"
+        value={type}
+        options={TYPES}
+        onChange={(next) => { setParams(next === "all" ? {} : { type: next }, { replace: true }); }}
+        data-testid="routes-types"
+      />
+      {view.status === "idle" || view.status === "loading" ? <IndexState kind="loading">Reading the routes...</IndexState> : null}
+      {view.status === "failed" ? (
+        <IndexState
+          kind="failed"
+          action={
+            <button type="button" className="ghost" onClick={refresh}>
+              Try again
+            </button>
+          }
+        >
+          The routes could not be read: {view.error.message}
+        </IndexState>
       ) : null}
+      {routes !== undefined && shown.length === 0 ? (
+        <IndexState kind="empty" action={<Link to={newRoutePath(type === "segments" ? "segment" : undefined)}>{newWords} &rsaquo;</Link>} data-testid="routes-empty">
+          {type === "segments" ? "No segments yet." : "No routes yet."}
+        </IndexState>
+      ) : null}
+      {routes !== undefined && shown.length > 0 ? <RouteTable routes={shown} useOf={useOf} /> : null}
     </section>
   );
 }

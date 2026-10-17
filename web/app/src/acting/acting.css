@@ -68,7 +68,7 @@
 }
 
 .node-panel::after,
-.summary-fold::after,
+.rows-fold::after,
 .summary .panel::after,
 .summary .for-you::after {
   --tick: linear-gradient(var(--color-tick), var(--color-tick));
@@ -93,6 +93,36 @@
   background: var(--color-band);
   font-size: 13px;
   font-weight: 600;
+}
+
+/* A named panel's head is one line: the name (a real heading, set as the head sets it), its count, and a short figure at the right end that drops under the name where the panel is narrow. */
+header.node-panel-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px var(--space-2);
+}
+
+.node-panel-title {
+  margin: 0;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+}
+
+.node-panel-aside {
+  margin-left: auto;
+  font: 500 14px / 1.4 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0;
+  color: var(--color-secondary);
+}
+
+@media (max-width: 719px) {
+  .node-panel-aside {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
 }
 
 details.node-panel:not([open]) > .node-panel-head {
@@ -676,14 +706,185 @@ button.list-sort {
   white-space: nowrap;
 }
 
-/* Home: each journey's group of waiting rows, in that journey's rank. */
-.home-list {
-  gap: var(--space-6);
+/* The pages made of bounded panels of rows (the Summary, Home): a page is `rows-page`, and each panel is a container, so rows lay out by the width of their panel. */
+/* Who has it is never cut short: a long name wraps. Row text is 15px (DESIGN, Typography). */
+.rows-page .row-owner {
+  max-width: 220px;
+  overflow-wrap: anywhere;
 }
 
-.home-head {
-  padding: 0 var(--space-4);
-  gap: var(--space-4);
+.rows-page :is(.node-fact, .row-owner, .node-panel-foot) {
+  font-size: 15px;
+}
+
+.rows-page .fold-count {
+  margin-left: var(--space-2);
+}
+
+.rows-page .node-fact {
+  overflow-wrap: anywhere;
+}
+
+/* A long title keeps a readable measure: when the owner and buttons would squeeze it, they drop to a line under it. */
+.rows-page .node-row-main {
+  flex-basis: 360px;
+}
+
+/* A list read for its finished work is not faded or muted: ink on paper, the chip's word in ink with its green edge, so it holds the contrast floor in both themes (DESIGN, status language). */
+.rows-bright .node-row[data-state="done"] > * {
+  opacity: 1;
+}
+
+.rows-bright .node-row[data-state="done"] .node-title {
+  color: var(--color-text);
+}
+
+.rows-bright .node-row[data-state="done"] .node-fact {
+  color: var(--color-muted);
+}
+
+.rows-bright .node-row[data-state="done"] .badge.done {
+  color: var(--color-text);
+}
+
+.rows-foot {
+  justify-content: space-between;
+}
+
+/* The decisions still waiting are a fold: a band head with a count, its rows under it. */
+.rows-fold {
+  position: relative;
+  border: 1px solid var(--color-edge);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.rows-fold > summary {
+  border-bottom: 1px solid var(--color-edge);
+}
+
+.rows-fold:not([open]) > summary {
+  border-bottom: 0;
+}
+
+.rows-fold .node-panel {
+  border: 0;
+  box-shadow: none;
+}
+
+.rows-fold .node-panel::after {
+  display: none;
+}
+
+/* Where a list is narrow (a column beside another, a phone): the chip sits beside the title and the owner (and any buttons) under the title in its column, not on a line of their own that the chip does not line up with. */
+.rows-page .node-panel {
+  container: rows / inline-size;
+}
+
+@container rows (max-width: 760px) {
+  .rows-page .node-row {
+    display: grid;
+    grid-template-columns: auto minmax(0, 1fr);
+    align-items: start;
+    gap: 2px var(--space-3);
+    min-height: 0;
+  }
+
+  .rows-page .node-row-main {
+    display: contents;
+  }
+
+  .rows-page .node-row-main > .badge {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .rows-page .node-row-text {
+    grid-column: 2;
+  }
+
+  /* Who has it is a line of its own, as wide as the title; what can be done is under it on a touch screen and over the row's corner where a hover reveals it, so neither squeezes the name nor holds a gap open while hidden. */
+  .rows-page .node-row > .row-side {
+    grid-column: 2;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    margin: 0;
+    padding: 0;
+  }
+
+  .rows-page .node-row > :not(.node-row-main, .row-side) {
+    grid-column: 1 / -1;
+    padding-left: 0;
+  }
+
+  .rows-page .row-owner {
+    flex: 1 1 100%;
+    min-width: 0;
+    max-width: none;
+    text-align: left;
+  }
+
+  .rows-page .row-act {
+    flex: none;
+    min-width: 0;
+    margin-left: auto;
+  }
+
+  @media (hover: hover) {
+    .rows-page .node-row {
+      position: relative;
+    }
+
+    .rows-page .node-row .row-act {
+      position: absolute;
+      right: var(--space-4);
+      bottom: var(--space-2);
+      margin: 0;
+    }
+
+    .rows-page .node-row:has(.row-act) .row-owner {
+      padding-right: 190px;
+    }
+  }
+
+  /* The quiet "Unassigned" (and the picker that replaces it) starts at the title's edge too. */
+  .rows-page .row-assign-slot {
+    justify-items: start;
+  }
+}
+
+/* On a phone the chip rides a line of its own above the title, which then has the whole inner width. */
+@container rows (max-width: 420px) {
+  .rows-page .node-row {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .rows-page .node-row-main > .badge,
+  .rows-page .node-row-text,
+  .rows-page .node-row > .row-side {
+    grid-column: 1;
+  }
+
+  /* With one column the actions have no side to sit at, so they follow the text. */
+  @media (hover: hover) {
+    .rows-page .node-row .row-act {
+      position: static;
+      margin-left: auto;
+    }
+
+    .rows-page .node-row:has(.row-act) .row-owner {
+      padding-right: 0;
+    }
+  }
+
+  .rows-page .node-row-main > .badge {
+    grid-row: auto;
+    justify-self: start;
+  }
+}
+
+.rows-panel {
+  outline: none;
 }
 
 .back-to-pass {

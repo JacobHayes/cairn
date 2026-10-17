@@ -424,17 +424,9 @@
   align-items: center;
 }
 
-.node-meter {
+.node-progress .meter {
   flex: none;
   width: 36px;
-  height: 4px;
-  background: var(--color-border);
-}
-
-.node-meter > span {
-  display: block;
-  height: 100%;
-  background: var(--color-text);
 }
 
 .node-flag {

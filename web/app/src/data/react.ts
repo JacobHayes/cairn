@@ -38,6 +38,17 @@ export function useJourney(id: string): JourneyView {
   return useSelector(journeys, (snapshot) => journeyView(snapshot, id));
 }
 
+/** Asks again for a journey that could not be read: its read looks again, and the view follows. */
+export function useRetryJourney(): (id: string) => void {
+  const { journeys } = useSession();
+  return useCallback(
+    (id) => {
+      journeys.send({ type: "retry", id });
+    },
+    [journeys],
+  );
+}
+
 /** What the journey on screen is derived at: its revision, its deployment's, and its today. */
 export function useDerivation(): Derivation | undefined {
   return useSelector(useSession().journeys, derivationOf, sameDerivation);
@@ -253,9 +264,9 @@ export function useKeyedRead<A, T>(
 
 /**
  * A read kept current while shown (H6), made afresh whenever `key` changes: `key` names
- * everything `spec` depends on, since the spec itself is rebuilt on every render.
+ * everything `spec` depends on, since the spec itself is rebuilt on every render. No key reads nothing.
  */
-export function useLive<T>(key: string, spec: (session: Session) => LiveSpec<T>): { view: ReadView<T>; refresh: () => void } {
+export function useLive<T>(key: string | undefined, spec: (session: Session) => LiveSpec<T>): { view: ReadView<T>; refresh: () => void } {
   const session = useSession();
-  return useKeyedRead(liveSource<T>(), { identity: [key], freshness: [], args: { spec: spec(session) } });
+  return useKeyedRead(liveSource<T>(), key === undefined ? undefined : { identity: [key], freshness: [], args: { spec: spec(session) } });
 }

@@ -155,6 +155,7 @@ export interface JourneysContext extends JourneysInput {
 export type JourneysEvent =
   | { type: "mount"; id: string }
   | { type: "unmount"; id: string }
+  | { type: "retry"; id: string }
   | { type: `xstate.snapshot.${string}`; snapshot: ReadSnapshot };
 
 const SNAPSHOT_PREFIX = "xstate.snapshot.";
@@ -191,6 +192,13 @@ export const journeyManager = setup({
       }
       enqueue.sendTo(entry.ref, { type: "show" });
       if (heldValue(entry.snapshot) === undefined) {
+        enqueue.sendTo(entry.ref, { type: "refresh" });
+      }
+    }),
+    // The person asked again for a journey that could not be read: its read looks again.
+    retry: enqueueActions(({ context, event, enqueue }) => {
+      const entry = context.entries[idOf(event)];
+      if (entry !== undefined) {
         enqueue.sendTo(entry.ref, { type: "refresh" });
       }
     }),
@@ -249,6 +257,7 @@ export const journeyManager = setup({
   on: {
     mount: { guard: "valid", actions: ["mount", "greet"] },
     unmount: { actions: "park" },
+    retry: { guard: "valid", actions: "retry" },
     "xstate.snapshot.*": { actions: "relay" },
   },
 });

@@ -1,138 +1,241 @@
-// Home (`/`; C16, E4): what the viewer can do now in each active journey, journey by journey
-// (alphabetical; no ranking across journeys), each in that journey's own rank with the frontier's
-// rows, then the viewer's active journeys as the index's table. It renders in the first paint: the
-// headings are there and the reading lines sit under them. A row opens the node's own address (the
-// graph, with the node selected); a row's actions (Start, Done, Mark reached, Assign) act in place,
-// and Decide opens the node's answer form, which is the inspector's. A journey where nothing of
-// theirs can be done yet says what is theirs next. Completed journeys leave it (B11). The
-// candidates are the active journeys referring to the caller's entities (the host's filter, a
-// superset); each is derived in the tab and its own "mine" decides (H3: every entity of the
-// caller's counts). Kept current (H6).
-import type { NextQuery } from "@cairn/wasm";
-import { useMemo } from "react";
+// Home (`/`; C16, E4): what the viewer can move now, journey by journey (alphabetical; no ranking
+// across journeys), each in that journey's own rank and bounded to five rows with the rest one
+// click away; then the journeys where their work is not ready yet, then their active journeys as
+// the index's table. It renders in the first paint: the title is there and the reading line sits
+// under it, and a journey's group appears as it is read. A row opens the node's own address; its
+// actions (Start, Done, Mark reached, Assign) act in place, and Decide opens the node's answer
+// form, which is the inspector's. The candidates are the active journeys referring to the
+// caller's entities (the host's filter, a superset); each is read in the tab and its own "mine"
+// decides (H3: every entity of the caller's counts). Kept current (H6).
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
-import { NextForYou } from "../acting/NextForYou.tsx";
 import { NodeItem, NodePanel } from "../acting/NodeItem.tsx";
-import { reasonOf } from "../acting/reasons.ts";
+import { factOf } from "../acting/reasons.ts";
 import { RowActions } from "../acting/RowActions.tsx";
+import { RowsPanel, type PanelRow } from "../acting/RowsPanel.tsx";
+import { nextForYou, waitsOnWords } from "../acting/yours.ts";
 import "../acting/acting.css";
-import { useProjected } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
+import { useLive, useRetryJourney, useViewer } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex, type JourneySummary } from "../data/reads.ts";
-import { useLive, useViewer } from "../data/react.ts";
-import type { Ready } from "../detail/model.ts";
-import { DEFAULT_FILTERS, indexPath, journeyPath, queryOf } from "./address.ts";
-import { progressOf, useStatusSummary } from "./figures-model.ts";
-import { JourneyTable } from "./JourneyIndex.tsx";
-import { useMineCounts, useMineOf, useReportMine, type MineEntry } from "./mine.ts";
+import { DEFAULT_FILTERS, indexPath, journeyPath, newJourneyPath, queryOf } from "./address.ts";
+import { heldBack, homeState, readyLine, type HomeJourney, type HomeState } from "./home-model.ts";
+import { JourneyTable } from "./JourneyTable.tsx";
+import { useJourneyReading, type JourneyReading } from "./reading.ts";
+import { listPath } from "./view.ts";
+import "./journeys.css";
 
-const HOME_NEXT: NextQuery = { sort: "rank", mine: true, kinds: [], for_viewer: false };
+type Ready = Extract<JourneyReading, { status: "ready" }>;
 
-/** The journey's progress in one line. */
-function Progress({ view }: { view: Ready }) {
-  const model = useStatusSummary(view);
-  if (model === undefined) {
-    return null;
-  }
-  const { done, inScope } = progressOf(model);
-  return (
-    <span className="muted" data-testid="home-progress">
-      {done} of {inScope} done
-    </span>
-  );
+/** Reads journey `id` and hands what it read up to the page, which draws it: nothing of its own is drawn. */
+function Reader({ id, report }: { id: string; report: (id: string, reading: JourneyReading) => void }) {
+  const reading = useJourneyReading(id, false);
+  useEffect(() => {
+    report(id, reading);
+  }, [id, reading, report]);
+  return null;
 }
 
-/** The viewer's rows in one journey, in that journey's rank, and the line for when none can be done yet. */
-function WaitingRows({ view, entries }: { view: Ready; entries: MineEntry[] }) {
-  const request = useMemo(() => ({ projection: "next" as const, query: HOME_NEXT }), []);
-  const next = valueOf(useProjected(view, request));
-  const journey = view.journey.header.id;
-  const rows = next?.items ?? [];
+/** A journey whose reading failed: its name, the short words, why on request, and the way to try again. */
+function FailedGroup({ summary, message }: { summary: JourneySummary; message: string }) {
+  const retry = useRetryJourney();
   return (
-    <>
-      {rows.length === 0 ? null : (
-        <NodePanel>
-          {rows.map((row) => {
-            const to = journeyPath({ journey, node: row.key }, "graph");
-            return (
-              <NodeItem key={row.key} view={view} node={row.key} to={to} fact={reasonOf(view, row, "rank")} testId="home-item">
-                <RowActions view={view} row={row} to={to} owner={false} />
-              </NodeItem>
-            );
-          })}
-        </NodePanel>
-      )}
-      {next !== undefined && rows.length === 0 ? <NextForYou view={view} entries={entries} nothing={false} /> : null}
-    </>
-  );
-}
-
-function WaitingJourney({ summary, report }: { summary: JourneySummary; report: (id: string, count: number) => void }) {
-  const mine = useMineOf(summary.id);
-  useReportMine(summary.id, mine, report);
-  if (mine.status === "loading") {
-    return <li className="muted small">Deriving {summary.name}...</li>;
-  }
-  if (mine.status === "failed") {
-    return <li className="callout callout-bad" data-testid="home-failed">What is yours in {summary.name} could not be read: {mine.message}</li>;
-  }
-  if (mine.status !== "ready" || mine.entries.length === 0) {
-    return null;
-  }
-  return (
-    <li className="stack home-journey" data-testid="home-journey" data-journey={summary.id}>
-      <span className="row home-head">
-        <Link to={journeyPath({ journey: summary.id })}>
-          <strong>{summary.name}</strong>
-        </Link>
-        <Progress view={mine.view} />
-      </span>
-      <WaitingRows view={mine.view} entries={mine.entries} />
+    <li className="home-journey" data-testid="home-failed" data-journey={summary.id}>
+      <NodePanel title={<Link to={journeyPath({ journey: summary.id })}>{summary.name}</Link>} label={summary.name}>
+        <li className="home-failed-row">
+          <span className="flag-bad">Could not be read.</span>{" "}
+          <details className="cell-why">
+            <summary>Why</summary>
+            {message}
+          </details>{" "}
+          <button type="button" className="ghost" onClick={() => { retry(summary.id); }}>
+            Try again
+          </button>
+        </li>
+      </NodePanel>
     </li>
   );
 }
 
-export function Home() {
+/** One journey's group: the viewer's rows that can move now, in the journey's rank, and what of theirs is held back. */
+function Group({ summary, reading }: { summary: JourneySummary; reading: Ready }) {
+  const { view, ready, mine } = reading;
+  const journey = summary.id;
+  const rows: PanelRow[] = ready.map((row) => ({
+    key: `${journey}/${row.key}`,
+    render: (shown) => {
+      const to = journeyPath({ journey, node: row.key }, "graph");
+      const said = factOf(view, row);
+      return (
+        <NodeItem view={view} node={row.key} to={to} fact={said?.words} factTone={said?.tone} testId="home-item">
+          {shown ? <RowActions view={view} row={row} to={to} owner={false} /> : null}
+        </NodeItem>
+      );
+    },
+  }));
+  const held = heldBack(view, mine, ready);
+  return (
+    <li className="home-journey" data-testid="home-journey" data-journey={journey}>
+      <RowsPanel
+        title={<Link to={journeyPath({ journey })}>{summary.name}</Link>}
+        label={summary.name}
+        aside={`${String(ready.length)} ready for you`}
+        testId="home-group"
+        rows={rows}
+        foot={
+          held.count === 0 ? undefined : (
+            <Link to={listPath(journey, { mine: true })} data-testid="home-held">
+              {held.count} more of yours not ready yet
+              {held.late === 0 ? null : <span className="flag-bad">, {held.late} late</span>} &rsaquo;
+            </Link>
+          )
+        }
+      />
+    </li>
+  );
+}
+
+/** The journeys where the viewer has open work and none of it can move yet: each names their next item and what it waits on. */
+function NotReady({ entries, folded }: { entries: { summary: JourneySummary; reading: Ready }[]; folded: boolean }) {
+  const rows: PanelRow[] = entries.flatMap(({ summary, reading }) => {
+    const next = nextForYou(reading.view, reading.mine);
+    if (next === undefined) {
+      return [];
+    }
+    const waits = waitsOnWords(reading.view, next);
+    return [
+      {
+        key: `${summary.id}/${next.node}`,
+        render: () => (
+          <NodeItem view={reading.view} node={next.node} to={journeyPath({ journey: summary.id, node: next.node }, "graph")} fact={waits === "" ? summary.name : `${summary.name}: ${waits}`} testId="home-waiting-item" />
+        ),
+      },
+    ];
+  });
+  return rows.length === 0 ? null : <RowsPanel title="Not ready yet" testId="home-waiting" rows={rows} folded={folded} />;
+}
+
+/** The panel Home shows in place of the groups when there is nothing to do or nobody to do it for. */
+function Statement({ title, children, testId }: { title: string; children: ReactNode; testId: string }) {
+  return (
+    <section className="panel stack home-statement" aria-label={title} data-testid={testId}>
+      <p className="home-statement-title">{title}</p>
+      {children}
+    </section>
+  );
+}
+
+/** What Home reads: the viewer, the candidate journeys, and each journey's reading as it settles. */
+function useHome() {
   const { viewer, failed } = useViewer();
   const query = viewer === undefined ? undefined : queryOf({ ...DEFAULT_FILTERS, mine: true }, viewer.entities);
-  const { view } = useLive(indexKey(query), journeyIndex(query));
+  const { view, refresh } = useLive(indexKey(query), journeyIndex(query));
   const routes = valueOf(useLive("routes", routeIndex).view) ?? [];
-  const entities = viewer?.entities ?? [];
   const found = valueOf(view);
   const items = useMemo(() => (found === undefined ? [] : [...found].sort((left, right) => left.name.localeCompare(right.name))), [found]);
-  const { report, none } = useMineCounts(items);
-  const settled = found !== undefined && viewer !== undefined;
+  const [readings, setReadings] = useState<Record<string, JourneyReading>>({});
+  const report = useCallback((id: string, reading: JourneyReading) => {
+    setReadings((held) => (held[id] === reading ? held : { ...held, [id]: reading }));
+  }, []);
+  const known = items.map((summary) => ({ summary, reading: readings[summary.id] ?? ({ status: "loading" } as const) }));
+  const journeys: HomeJourney[] = known.map(({ reading }) => ({
+    reading: reading.status,
+    participates: reading.status === "ready" && reading.mine.length > 0,
+    ready: reading.status === "ready" ? reading.ready.length : 0,
+  }));
+  const state = homeState({
+    viewer: failed !== undefined ? "failed" : viewer === undefined ? "loading" : { entities: viewer.entities.length },
+    index: view.status === "failed" ? "failed" : found === undefined ? "loading" : "ready",
+    journeys,
+  });
+  return { failed, view, refresh, routes, found, items, report, known, journeys, state };
+}
+
+/** What Home says in place of its groups, for the states that have none. */
+function Said({ state }: { state: HomeState }) {
+  switch (state) {
+    case "loading":
+      return <p className="muted home-reading">Reading your journeys...</p>;
+    case "unlinked":
+      return (
+        <Statement title="Cairn cannot match your sign-in to a person yet, so nothing shows as yours." testId="home-unlinked">
+          <p>No person or team holds a verified email of yours.</p>
+          <Link to="/me">Check who you are &rsaquo;</Link>
+        </Statement>
+      );
+    case "unassigned":
+      return (
+        <Statement title="No work in an active journey is assigned to you." testId="home-unassigned">
+          <span className="row">
+            <Link to={indexPath()}>All journeys &rsaquo;</Link>
+            <Link to={newJourneyPath()}>Start a journey &rsaquo;</Link>
+          </span>
+        </Statement>
+      );
+    case "quiet":
+      return (
+        <Statement title="Nothing needs you now." testId="home-quiet">
+          <p>What is yours is waiting on other work, or already finished.</p>
+        </Statement>
+      );
+    case "failed":
+    case "ready":
+      return null;
+  }
+}
+
+export function Home() {
+  const { failed, view, refresh, routes, found, items, report, known, journeys, state } = useHome();
+  const readyOnes = known.flatMap((each) => (each.reading.status === "ready" && each.reading.ready.length > 0 ? [{ summary: each.summary, reading: each.reading }] : []));
+  const waiting = known.flatMap((each) => (each.reading.status === "ready" && each.reading.ready.length === 0 ? [{ summary: each.summary, reading: each.reading }] : []));
+  const reading = known.filter((each) => each.reading.status === "loading").length;
+  const line = readyLine(journeys);
+  const showTable = state === "ready" || state === "quiet";
   return (
-    <section className="stack home" aria-label="Home" data-testid="home">
+    <section className="stack home rows-page" aria-label="Home" data-testid="home" data-rows-page data-state={state} tabIndex={-1}>
       <h1>Waiting on you</h1>
-      <span className="muted">
-        What you can do now in each active journey.{" "}
-        {viewer !== undefined && entities.length === 0 ? "No entity holds a verified email of yours, so nothing is yours yet." : ""}
-      </span>
+      {found === undefined ? null : items.map((summary) => <Reader key={summary.id} id={summary.id} report={report} />)}
+      {line === undefined ? null : (
+        <p className="home-count" data-testid="home-count">
+          <span className="mono">{line.rows}</span> ready for you in <span className="mono">{line.journeys}</span> {line.journeys === 1 ? "journey" : "journeys"}
+        </p>
+      )}
       {failed === undefined ? null : <p className="callout callout-bad">Who you are could not be read: {failed}</p>}
-      {failed === undefined && (viewer === undefined || view.status === "loading") ? <p className="muted small">Reading your journeys...</p> : null}
-      {view.status === "failed" ? <p className="callout callout-bad">The journeys could not be read: {view.error.message}</p> : null}
-      {settled && none ? (
-        <p className="muted small" data-testid="home-empty">
-          Nothing in any active journey is yours. <Link to={indexPath()}>All journeys &rsaquo;</Link>
+      {view.status === "failed" ? (
+        <p className="callout callout-bad">
+          The journeys could not be read: {view.error.message}{" "}
+          <button type="button" className="ghost" onClick={refresh}>
+            Try again
+          </button>
         </p>
       ) : null}
-      {settled ? (
+      <Said state={state} />
+      {showTable ? (
         <ul className="plain-list stack home-list">
-          {items.map((summary) => (
-            <WaitingJourney key={summary.id} summary={summary} report={report} />
-          ))}
+          {known.map(({ summary, reading: each }) =>
+            each.status === "failed" ? (
+              <FailedGroup key={summary.id} summary={summary} message={each.message} />
+            ) : each.status === "ready" && each.ready.length > 0 ? (
+              <Group key={summary.id} summary={summary} reading={each} />
+            ) : null,
+          )}
         </ul>
       ) : null}
-      {settled && !none ? (
+      {state === "ready" && reading > 0 ? (
+        <p className="muted home-reading" data-testid="home-reading">
+          Reading {reading} more {reading === 1 ? "journey" : "journeys"}...
+        </p>
+      ) : null}
+      {showTable ? <NotReady entries={waiting} folded={readyOnes.length > 0} /> : null}
+      {showTable ? (
         <>
-          <div className="row">
+          <div className="row home-table-head">
             <h2>Your active journeys</h2>
             <span className="spacer" />
             <Link to={indexPath()}>All journeys &rsaquo;</Link>
           </div>
-          <JourneyTable items={items} routes={routes} mine />
+          <JourneyTable items={items} routes={routes} mine none={null} />
         </>
       ) : null}
     </section>

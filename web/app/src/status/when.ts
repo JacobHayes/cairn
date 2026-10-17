@@ -6,6 +6,15 @@ import { dateWords, dayOf } from "../timeline/model.ts";
 /** Days a date is called by its distance rather than by its name. */
 export const NEAR_DAYS = 14;
 
+/** A date this near (in days) is a soon date, said in warning ink (DESIGN, Dates). */
+export const SOON_DAYS = 7;
+
+/** Whether `date` is today or within the soon window ahead of `today` (never one already gone by). */
+export function isSoon(date: string, today: string): boolean {
+  const away = dayOf(date) - dayOf(today);
+  return away >= 0 && away <= SOON_DAYS;
+}
+
 /** A count of days in words: "1 day", "3 days". */
 export function daysWords(days: number): string {
   return days === 1 ? "1 day" : `${String(days)} days`;

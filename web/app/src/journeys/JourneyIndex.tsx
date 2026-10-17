@@ -1,126 +1,54 @@
-// C16: the journey index, a table: each journey with its route and version, status, progress,
-// next milestone, one flag, and what is the viewer's (Figures.tsx). It keeps every journey the
-// filters keep (status, lineage route and version, "mine", "upgrade available"), kept current
-// (H6). "Upgrade available" is the host's field on each journey, never worked out here.
-// "Mine" keeps the journeys where the caller holds something.
+// C16: the journey index, a table opened in full (DESIGN, Table): each journey with its route and
+// version, what needs a look, what is the viewer's, its progress and its next milestone
+// (JourneyTable.tsx). It keeps every journey the filters keep (status, lineage route and version,
+// "mine", "upgrade available"), by name, kept current (H6). "Mine" keeps the journeys where the
+// caller holds something. A read that is still going, one that failed, and an empty answer each
+// say so, with the way on.
 import { Link, useLocation, useNavigate } from "react-router";
 
-import { journeyIndex, indexKey, isSegment, routeIndex, type JourneySummary, type RouteSummary } from "../data/reads.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive, useViewer } from "../data/react.ts";
-import { Badge } from "../ui/kit.tsx";
-import { filtersFrom, indexPath, journeyPath, newJourneyPath, queryOf } from "./address.ts";
+import { indexKey, isSegment, journeyIndex, routeIndex } from "../data/reads.ts";
+import { IndexState } from "../ui/kit.tsx";
+import { DEFAULT_FILTERS, filtersFrom, indexPath, newJourneyPath, queryOf, type IndexFilters } from "./address.ts";
 import { IndexFilterBar } from "./IndexFilterBar.tsx";
-import { Figures } from "./Figures.tsx";
-import { useMineCounts, useMineOf, useReportMine } from "./mine.ts";
-import { routeDetailPath } from "../routes/address.ts";
+import { JourneyTable } from "./JourneyTable.tsx";
+import "./journeys.css";
 
-/** C16: the mark a journey's row carries when its route has a newer version: the host's field. */
-export function UpgradeMark({ summary }: { summary: JourneySummary }) {
-  return summary.upgrade_available ? (
-    <Badge tone="warn" data-testid="upgrade" data-status="available">
-      Upgrade available{summary.latest_version == null ? "" : ` (version ${String(summary.latest_version)})`}
-    </Badge>
-  ) : null;
+/** Whether `filters` are the index's stock ones, which show the active journeys. */
+function isStock(filters: IndexFilters): boolean {
+  return indexPath(filters) === indexPath(DEFAULT_FILTERS);
 }
 
-/** A journey's lineage: its route, by name when the route index has it, and version. */
-export function LineageCell({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
-  const lineage = summary.lineage;
-  if (lineage == null) {
-    return <span className="muted small">Started empty</span>;
-  }
-  const route = routes.find((each) => each.header.id === lineage.route);
-  return (
-    <Link to={routeDetailPath(lineage.route)} data-testid="row-lineage">
-      {route?.header.name ?? lineage.route}, version {lineage.version}
-    </Link>
-  );
-}
-
-/** A journey's name, route and status: the cells that need nothing derived. */
-export function JourneyCells({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
-  return (
-    <>
-      <td data-column="title">
-        <Link to={journeyPath({ journey: summary.id })} title={summary.id}>{summary.name}</Link>
-      </td>
-      <td data-column="route">
-        <span className="stack">
-          <LineageCell summary={summary} routes={routes} />
-          <UpgradeMark summary={summary} />
-        </span>
-      </td>
-      <td data-column="status">
-        <Badge>{summary.status}</Badge>
-      </td>
-    </>
-  );
-}
-
-export function JourneyRow({ summary, routes }: { summary: JourneySummary; routes: readonly RouteSummary[] }) {
-  return (
-    <tr data-testid="journey-row" data-journey={summary.id} data-status={summary.status} data-revision={summary.revision}>
-      <JourneyCells summary={summary} routes={routes} />
-      <Figures id={summary.id} />
-    </tr>
-  );
-}
-
-/** A row kept only when the caller holds something in the journey (E4). */
-function MineRow({ summary, routes, report }: { summary: JourneySummary; routes: readonly RouteSummary[]; report: (id: string, count: number) => void }) {
-  const mine = useMineOf(summary.id);
-  useReportMine(summary.id, mine, report);
-  if (mine.status === "failed") {
+/** What the index says when it keeps no journey, and where to go from there. */
+function Nothing({ filters }: { filters: IndexFilters }) {
+  if (filters.mine) {
     return (
-      <tr data-testid="journey-row-failed" data-journey={summary.id}>
-        <td colSpan={7} className="callout callout-bad">
-          What is yours in {summary.name} could not be read: {mine.message}
-        </td>
-      </tr>
+      <IndexState kind="empty" action={<Link to={indexPath()}>Clear filters &rsaquo;</Link>} data-testid="index-empty">
+        Nothing in these journeys is yours.
+      </IndexState>
     );
   }
-  if (mine.status !== "ready" || mine.entries.length === 0) {
-    return null;
+  if (isStock(filters)) {
+    return (
+      <IndexState
+        kind="empty"
+        action={
+          <>
+            <Link to={indexPath({ ...DEFAULT_FILTERS, status: "any" })}>Show every status &rsaquo;</Link>
+            <Link to={newJourneyPath()}>New journey &rsaquo;</Link>
+          </>
+        }
+        data-testid="index-empty"
+      >
+        No active journeys.
+      </IndexState>
+    );
   }
-  return <JourneyRow summary={summary} routes={routes} />;
-}
-
-/**
- * The journeys as a table of figures: every one of `items`, or with `mine` only those where the
- * caller holds something (E4), which says so when none does. Home shows the same table.
- */
-export function JourneyTable({ items, routes, mine }: { items: JourneySummary[]; routes: RouteSummary[]; mine: boolean }) {
-  const { report, none } = useMineCounts(mine ? items : []);
-  if (items.length === 0) {
-    return <p className="muted small" data-testid="index-empty">No journeys match.</p>;
-  }
-  // With "mine", every candidate stays mounted (kept current) though its row may be empty.
-  const empty = mine && none;
   return (
-    <div className="table-wrap">
-      {empty ? <p className="muted small" data-testid="index-empty">No journeys match: nothing in them is yours.</p> : null}
-      <table className="data journey-table">
-        {empty ? null : (
-          <thead>
-            <tr>
-              <th>Journey</th>
-              <th>Route</th>
-              <th>Status</th>
-              <th>Progress</th>
-              <th>Next milestone</th>
-              <th>Flag</th>
-              <th>Mine</th>
-            </tr>
-          </thead>
-        )}
-        <tbody>
-          {items.map((summary) =>
-            mine ? <MineRow key={summary.id} summary={summary} routes={routes} report={report} /> : <JourneyRow key={summary.id} summary={summary} routes={routes} />,
-          )}
-        </tbody>
-      </table>
-    </div>
+    <IndexState kind="empty" action={<Link to={indexPath()}>Clear filters &rsaquo;</Link>} data-testid="index-empty">
+      No journeys match these filters.
+    </IndexState>
   );
 }
 
@@ -131,22 +59,36 @@ export function JourneyIndex() {
   const { viewer, failed } = useViewer();
   const query = queryOf(filters, viewer?.entities ?? []);
   const waiting = filters.mine && viewer === undefined && failed === undefined;
-  const { view } = useLive(indexKey(waiting ? undefined : query), journeyIndex(waiting ? undefined : query));
+  const { view, refresh } = useLive(indexKey(waiting ? undefined : query), journeyIndex(waiting ? undefined : query));
   const routes = useLive("routes", routeIndex).view;
   const known = valueOf(routes) ?? [];
   const found = valueOf(view);
+  const unknownViewer = filters.mine && viewer === undefined && failed !== undefined;
   return (
-    <section className="stack" aria-label="Journeys">
-      <div className="row">
+    <section className="stack index-page" aria-label="Journeys">
+      <div className="row index-head">
         <h1>Journeys</h1>
         <span className="spacer" />
-        <Link className="button" to={newJourneyPath()} data-testid="new-journey">New journey</Link>
+        <Link className="button" to={newJourneyPath()} data-testid="new-journey">
+          New journey
+        </Link>
       </div>
       <IndexFilterBar filters={filters} routes={known.filter((route) => !isSegment(route))} onChange={(next) => void navigate(indexPath(next))} />
-      {filters.mine && viewer === undefined && failed !== undefined ? <p className="callout callout-bad">Who you are could not be read, so neither can what is yours: {failed}</p> : null}
-      {view.status === "loading" || waiting ? <p className="muted small">Loading the journeys...</p> : null}
-      {view.status === "failed" ? <p className="callout callout-bad">The journeys could not be read: {view.error.message}</p> : null}
-      {found !== undefined && !waiting ? <JourneyTable items={found} routes={known} mine={filters.mine} /> : null}
+      {unknownViewer ? <IndexState kind="failed">Who you are could not be read, so neither can what is yours: {failed}</IndexState> : null}
+      {!unknownViewer && (waiting || view.status === "loading" || view.status === "idle") ? <IndexState kind="loading">Reading the journeys...</IndexState> : null}
+      {view.status === "failed" ? (
+        <IndexState
+          kind="failed"
+          action={
+            <button type="button" className="ghost" onClick={refresh}>
+              Try again
+            </button>
+          }
+        >
+          The journeys could not be read: {view.error.message}
+        </IndexState>
+      ) : null}
+      {found !== undefined && !waiting ? <JourneyTable items={found} routes={known} mine={filters.mine} none={<Nothing filters={filters} />} /> : null}
     </section>
   );
 }

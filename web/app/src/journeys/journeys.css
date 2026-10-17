@@ -1,34 +1,96 @@
-/* Narrow: each journey is a stacked row (title, status, "19 of 24 done · next milestone"), not a
-   table to scroll sideways; Route, Flag and Mine are left to the journey itself. */
-@media (max-width: 719px) {
-  table.data.journey-table,
-  .journey-table tbody {
-    display: block;
-    overflow: visible;
-  }
-  .journey-table thead,
-  .journey-table td:is([data-column="route"], [data-column="flag"], [data-column="mine"]) {
-    display: none;
-  }
-  .journey-table tr {
-    display: flex;
-    flex-wrap: wrap;
-    align-items: center;
-    gap: var(--space-1) var(--space-3);
-    padding: var(--space-3) 0;
-    border-top: 1px solid var(--color-border);
-  }
-  .journey-table td {
-    display: block;
-    padding: 0;
-    border: 0;
-    min-width: 0;
-  }
-  .journey-table td[data-column="title"] {
-    flex: 0 0 100%;
-    font-weight: 600;
-  }
-  .journey-table td[data-column="milestone"]::before {
-    content: "\00b7\00a0";
-  }
+/* The index pages' head and filter bar, and Home. The tables are `.index-table` (ui/app.css). */
+.index-head {
+  align-items: baseline;
+}
+
+.index-head h1 {
+  margin-bottom: 0;
+}
+
+/* The filters are controls at the shared height, their labels at the 15px row floor. */
+.index-filters {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2) var(--space-4);
+}
+
+.index-filters label {
+  gap: var(--space-2);
+}
+
+.filter-label {
+  font-size: 15px;
+  color: var(--color-secondary);
+}
+
+.index-filters .check {
+  font-size: 15px;
+}
+
+/* Home: one bounded panel for each journey, a group apart (DESIGN: groups sit 24px apart). */
+.home-list {
+  gap: var(--space-5);
+}
+
+.home-count {
+  margin: 0;
+  font-size: 15px;
+  color: var(--color-secondary);
+}
+
+.home-reading {
+  margin: 0;
+  font-size: 15px;
+}
+
+/* A journey is named by a link, in the author's own words: a sentence-case heading at row size, not the uppercase section title. */
+.home-journey .node-panel-head {
+  font: 600 15px / 1.4 var(--font-body);
+  letter-spacing: var(--type-letter-spacing);
+}
+
+.home-journey .node-panel-title,
+.home .node-panel-title {
+  text-transform: none;
+}
+
+.home .node-panel-head {
+  padding: var(--space-3) var(--space-4);
+  font-size: 15px;
+}
+
+.home .rows-fold > summary {
+  padding: var(--space-3) var(--space-4);
+  font: 600 15px / 1.4 var(--font-body);
+  cursor: pointer;
+}
+
+.home-failed-row {
+  padding: var(--space-3) var(--space-4);
+  font-size: 15px;
+}
+
+/* What Home says in place of its groups: a paper panel with its ticks, the statement first. */
+.home-statement {
+  gap: var(--space-2);
+  padding: var(--space-4);
+  border-color: var(--color-edge);
+}
+
+.home-statement p {
+  margin: 0;
+  font-size: 15px;
+}
+
+.home-statement-title {
+  font-weight: 600;
+}
+
+.home-table-head {
+  align-items: baseline;
+  margin-top: var(--space-2);
+}
+
+.home-table-head h2 {
+  margin: 0;
 }
