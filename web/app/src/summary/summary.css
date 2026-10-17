@@ -114,11 +114,6 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* DESIGN: panel borders are --color-edge; the lead and About are panels too, with their ticks over the band. */
-.summary .panel {
-  border-color: var(--color-edge);
-}
-
 .summary-about {
   gap: var(--space-3);
 }

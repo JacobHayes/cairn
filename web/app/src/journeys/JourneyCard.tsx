@@ -11,6 +11,7 @@ import type { Ready } from "../detail/model.ts";
 import { NodeLink, Section } from "../detail/parts.tsx";
 import { summaryModel, type SummaryModel } from "../summary/model.ts";
 import { dateAway } from "../timeline/model.ts";
+import { Meter } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { yoursOf } from "./figures-model.ts";
 import { Flags, LineageBlock, useLineage } from "./JourneyFacts.tsx";
@@ -29,7 +30,7 @@ function LineageFold({ ready }: { ready: Ready }) {
     return null;
   }
   return (
-    <Section title="Lineage" summary={`${lineage.name} v${String(lineage.version)}`} open={lineage.latest !== undefined} testId="card-lineage">
+    <Section title="Lineage" open={lineage.latest !== undefined} testId="card-lineage">
       <LineageBlock ready={ready} lineage={lineage} />
     </Section>
   );
@@ -91,7 +92,7 @@ function Folds({ ready, model, selected }: { ready: Ready; model: SummaryModel; 
   const { header } = ready.journey;
   const annotations = (ready.journey.graph.state?.annotations ?? []).filter((annotation) => annotation.body.node == null);
   return (
-    <div className="stack" data-testid="card-folds">
+    <div className="detail-folds" data-testid="card-folds">
       {model.openDecisions.length === 0 ? null : (
         <Section title="Open decisions" summary={String(model.openDecisions.length)} testId="card-open-decisions">
           <ul className="detail-list">
@@ -133,7 +134,7 @@ export function JourneyCard({ ready, selected }: { ready: Ready; selected?: stri
           <span data-testid="card-progress" data-done={done} data-in-scope={model.inScope} data-remaining={model.remaining}>
             {done} of {model.inScope} in scope done{model.remaining === 0 ? "" : `, ${String(model.remaining)} to go`}
           </span>
-          <progress value={done} max={Math.max(model.inScope, 1)} aria-label="Progress" />
+          <Meter done={done} of={model.inScope} />
           <Yours ready={ready} />
           <Flags ready={ready} model={model} />
           <NextUp ready={ready} />

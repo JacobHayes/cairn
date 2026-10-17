@@ -28,28 +28,30 @@ export function AuthoringPanel({ authored, node, onRemoved }: AuthoringPanelProp
     <div key={node.key} className="stack author-panel" data-testid="authoring" data-node={node.key}>
       <NodeForm key={node.key} authored={authored} node={node} />
       <p className="muted small">The sections below save as you change them.</p>
-      <Section title="People" summary={Object.keys(node.participations ?? {}).length === 0 ? undefined : String(Object.keys(node.participations ?? {}).length)} testId="author-participations">
-        <ParticipationWiring authored={authored} node={node} />
-      </Section>
-      <Section title="Guidance" summary={resources.length === 0 ? undefined : String(resources.length)} testId="author-resources">
-        <ResourceEditor authored={authored} node={node} />
-      </Section>
-      <Section title="Requirements" summary={requires.length === 0 ? undefined : String(requires.length)} testId="author-edges">
-        <EdgesEditor authored={authored} node={node} />
-      </Section>
-      <Section title="Where it sits" summary={node.parent == null ? undefined : (authored.tree.byKey.get(node.parent)?.title ?? node.parent)} testId="author-place">
-        <PlaceEditor authored={authored} node={node} />
-      </Section>
-      {breaksDown ? (
-        <Section title="Break it down" summary={node.placeholder === true ? "a placeholder" : undefined} open={node.placeholder === true} testId="author-breakdown">
-          <Breakdown authored={authored} node={node} />
+      <div className="detail-folds">
+        <Section title="People" summary={Object.keys(node.participations ?? {}).length === 0 ? undefined : String(Object.keys(node.participations ?? {}).length)} testId="author-participations">
+          <ParticipationWiring authored={authored} node={node} />
         </Section>
-      ) : null}
-      {isJourney(authored) ? (
-        <Section title="Provenance and local edits" summary={(authored.graph.state?.local_edits?.[node.key] ?? []).length === 0 ? undefined : `${String((authored.graph.state?.local_edits?.[node.key] ?? []).length)} edited here`} testId="author-local-edits">
-          <LocalEdits authored={authored} node={node} />
+        <Section title="Guidance" summary={resources.length === 0 ? undefined : String(resources.length)} testId="author-resources">
+          <ResourceEditor authored={authored} node={node} />
         </Section>
-      ) : null}
+        <Section title="Requirements" summary={requires.length === 0 ? undefined : String(requires.length)} testId="author-edges">
+          <EdgesEditor authored={authored} node={node} />
+        </Section>
+        <Section title="Where it sits" summary={node.parent == null ? undefined : (authored.tree.byKey.get(node.parent)?.title ?? node.parent)} testId="author-place">
+          <PlaceEditor authored={authored} node={node} />
+        </Section>
+        {breaksDown ? (
+          <Section title="Break it down" summary={node.placeholder === true ? "a placeholder" : undefined} open={node.placeholder === true} testId="author-breakdown">
+            <Breakdown authored={authored} node={node} />
+          </Section>
+        ) : null}
+        {isJourney(authored) ? (
+          <Section title="Provenance and local edits" summary={(authored.graph.state?.local_edits?.[node.key] ?? []).length === 0 ? undefined : `${String((authored.graph.state?.local_edits?.[node.key] ?? []).length)} edited here`} testId="author-local-edits">
+            <LocalEdits authored={authored} node={node} />
+          </Section>
+        ) : null}
+      </div>
       <RemoveNode authored={authored} node={node} onRemoved={onRemoved} />
     </div>
   );

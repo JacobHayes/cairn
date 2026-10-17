@@ -14,7 +14,7 @@ import "./canvas.css";
 import { Controls, ReactFlow, ReactFlowProvider, useNodesInitialized, useReactFlow, useStore, useStoreApi, type EdgeChange, type NodeChange } from "@xyflow/react";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type MouseEvent as ReactMouseEvent, type ReactNode, type RefObject } from "react";
 
-import { PHONE_WIDTH, SHEET, useFrameState } from "../shell/frame.tsx";
+import { useFrameState } from "../shell/frame.tsx";
 import { useResolvedTheme } from "../ui/theme.ts";
 import { ContextMenu } from "../ui/ContextMenu.tsx";
 import { typing } from "../ui/typing.ts";
@@ -188,9 +188,14 @@ function boundsOf(model: CanvasModel, layout: Layout): { width: number; height: 
   return { width, height };
 }
 
-/** The height (px) the inspector's sheet or its folded rail lies over the canvas's lower part: a tablet's, or a phone map's. */
-function coveredBy(sheet: HTMLElement | null | undefined): number {
-  return sheet !== null && sheet !== undefined && (globalThis.matchMedia(SHEET).matches || globalThis.matchMedia(PHONE_WIDTH).matches) ? sheet.getBoundingClientRect().height : 0;
+/** Whether the inspector is a sheet fixed over the workspace (a tablet's, or a phone map's), not a column beside it or stacked under the page. */
+function isSheet(column: HTMLElement | null | undefined): column is HTMLElement {
+  return column !== null && column !== undefined && getComputedStyle(column).position === "fixed";
+}
+
+/** The height (px) the inspector's sheet or its folded rail lies over the canvas's lower part. */
+function coveredBy(column: HTMLElement | null | undefined): number {
+  return isSheet(column) ? column.getBoundingClientRect().height : 0;
 }
 
 /** The padding a manual fit keeps, read when it runs: FIT_PADDING, and more at the bottom under the sheet or rail. */
@@ -209,11 +214,14 @@ function useCenterAboveSheet(selected: string | undefined, live: boolean): void 
   const store = useStoreApi();
   const sheet = useFrameState()?.inspector?.parentElement;
   useEffect(() => {
-    if (!live || selected === undefined || sheet === null || sheet === undefined || !(globalThis.matchMedia(SHEET).matches || globalThis.matchMedia(PHONE_WIDTH).matches)) {
+    if (!live || selected === undefined || sheet === null || sheet === undefined) {
       return undefined;
     }
-    // After the commit that shows the sheet, so its height is there to read.
+    // After the commit that shows the sheet, so it is one (a phone's column becomes the map's sheet only once the node is in it) and its height is there to read.
     const frame = requestAnimationFrame(() => {
+      if (!isSheet(sheet)) {
+        return;
+      }
       // A card inside a container is placed relative to it: the flow knows where it is on the canvas.
       const card = flow.getInternalNode(selected);
       if (card === undefined) {

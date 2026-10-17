@@ -57,8 +57,12 @@ export interface AssistantDock {
 
 /** What a screen tells the shell. Stable for the shell's life, so effects keyed on it run once. */
 export interface FrameActions {
-  /** Something is in `slot`'s pane until the returned function is called. */
-  mount: (slot: InspectorTab) => () => void;
+  /**
+   * Something is in `slot`'s pane until the returned function is called. `asked` is false for
+   * what is there without being asked for (the journey card): over a phone's full-screen map
+   * that stays in the page behind it rather than becoming a sheet.
+   */
+  mount: (slot: InspectorTab, asked?: boolean) => () => void;
   /** Brings `tab` into view whatever the viewer left in its way: the other tab, a hidden column. */
   show: (tab: InspectorTab) => void;
   /** The assistant can be opened (its tab is offered) until the returned function is called. */
@@ -115,7 +119,7 @@ export function Inspector({ focus, reveal = true, children }: { focus: string; r
   const close = addresses.close();
   // Layout effects, so the column appears in the same commit as the screen that fills it: a second
   // render after paint could land in a ResizeObserver delivery and make the canvas resize twice.
-  useLayoutEffect(() => actions?.mount("inspector"), [actions]);
+  useLayoutEffect(() => actions?.mount("inspector", reveal), [actions, reveal]);
   useLayoutEffect(() => {
     if (reveal) {
       actions?.show("inspector");
@@ -166,15 +170,15 @@ export function ProposalsSlot({ count, reveal, children }: { count: number | und
   return state.proposals === null ? null : createPortal(children, state.proposals);
 }
 
-/** The assistant's panel, rendered in the inspector column's assistant tab and brought into view. */
+/**
+ * The assistant's panel, rendered in the inspector column's assistant tab. Mounting it chooses no
+ * tab: a remount (a reload, a resize that rebuilds the page) leaves the tab in view alone, and
+ * only a person's click (the tab, or a screen's button through `openAssistant`) brings it forward.
+ */
 export function AssistantSlot({ children }: { children: ReactNode }) {
   const actions = useFrameActions();
   const state = useFrameState();
-  useLayoutEffect(() => {
-    const unmount = actions?.mount("assistant");
-    actions?.show("assistant");
-    return unmount;
-  }, [actions]);
+  useLayoutEffect(() => actions?.mount("assistant"), [actions]);
   if (actions === undefined || state === undefined) {
     return children;
   }

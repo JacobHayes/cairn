@@ -97,7 +97,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
         {node.kind === "decision" || description === "" ? null : <Markdown text={description} data-testid="description" />}
         <Actions view={view} detail={detail} onRename={rename.start} />
         {extra}
-        <div className="stack detail-folds">
+        <div className="detail-folds">
           <Checklist view={view} detail={detail} />
           {node.kind === "decision" ? <Affects view={view} detail={detail} /> : null}
           <Connections view={view} detail={detail} />

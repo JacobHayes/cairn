@@ -74,9 +74,17 @@ function useFrameKeys({ tab, dock, closeTo }: { tab: InspectorTab; dock: Assista
   }, [tab, dock, closeTo, navigate, fold]);
 }
 
+/** How many screens have something in each pane, and how much of the inspector's was not asked for. */
+interface Counts {
+  inspector: number;
+  assistant: number;
+  proposals: number;
+  unasked: number;
+}
+
 /** The setters the frame's actions write through. */
 interface Setters {
-  setCounts: Dispatch<SetStateAction<{ inspector: number; assistant: number; proposals: number }>>;
+  setCounts: Dispatch<SetStateAction<Counts>>;
   setTab: (tab: InspectorTab) => void;
   setHidden: (hidden: boolean) => void;
   setDock: Dispatch<SetStateAction<AssistantDock | undefined>>;
@@ -88,10 +96,11 @@ interface Setters {
 function useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo }: Setters): FrameActions {
   return useMemo<FrameActions>(
     () => ({
-      mount: (slot) => {
-        setCounts((now) => ({ ...now, [slot]: now[slot] + 1 }));
+      mount: (slot, asked = true) => {
+        const unasked = asked ? 0 : 1;
+        setCounts((now) => ({ ...now, [slot]: now[slot] + 1, unasked: now.unasked + unasked }));
         return () => {
-          setCounts((now) => ({ ...now, [slot]: now[slot] - 1 }));
+          setCounts((now) => ({ ...now, [slot]: now[slot] - 1, unasked: now.unasked - unasked }));
         };
       },
       show: (next) => {
@@ -121,7 +130,7 @@ export function useFrame(): Frame {
   const [assistant, setAssistant] = useState<HTMLElement | null>(null);
   const [proposals, setProposals] = useState<HTMLElement | null>(null);
   const [proposalsCount, setProposalsCount] = useState<number | undefined>(undefined);
-  const [counts, setCounts] = useState({ inspector: 0, assistant: 0, proposals: 0 });
+  const [counts, setCounts] = useState<Counts>({ inspector: 0, assistant: 0, proposals: 0, unasked: 0 });
   const [tab, setTab] = useState<InspectorTab>("inspector");
   const [dock, setDock] = useState<AssistantDock | undefined>(undefined);
   const [hidden, setHidden] = useState(false);
@@ -133,8 +142,12 @@ export function useFrame(): Frame {
   const shown: InspectorTab = order.find((each) => counts[each] > 0) ?? "inspector";
   // An offered assistant keeps the column, and so its tabs, on screen: they are its only way in.
   const present = counts.inspector > 0 || counts.assistant > 0 || counts.proposals > 0 || dock !== undefined;
-  // A phone stacks the inspector under the page, except over the full-screen map, where it is a sheet that can be hidden.
-  const stacked = useMedia(PHONE_WIDTH) && new URLSearchParams(useLocation().search).get("map") !== "1";
+  // A phone stacks the inspector under the page, except over the full-screen map, where it is a sheet that can be hidden...
+  const phone = useMedia(PHONE_WIDTH);
+  const mapOpen = new URLSearchParams(useLocation().search).get("map") === "1";
+  const stacked = phone && !mapOpen;
+  // ...for what was asked for: the inspector holding only what was not (the journey card) stays in the page behind the map.
+  const behindMap = phone && mapOpen && shown === "inspector" && counts.inspector === counts.unasked;
   const toggleFolded = useCallback(() => {
     setHidden((now) => !now);
   }, []);
@@ -150,9 +163,9 @@ export function useFrame(): Frame {
     state,
     actions,
     // The stacked inspector has no way to hide it.
-    open: present && (!hidden || stacked),
+    open: present && !behindMap && (!hidden || stacked),
     present,
-    folded: present && hidden && !stacked,
+    folded: present && !behindMap && hidden && !stacked,
     toggleFolded,
     snap,
     setSnap,
@@ -160,9 +173,8 @@ export function useFrame(): Frame {
     choose: (next) => {
       if (next === "assistant" && counts.assistant === 0) {
         dock?.open();
-      } else {
-        setTab(next);
       }
+      setTab(next);
     },
     setInspector,
     setAssistant,

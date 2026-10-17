@@ -182,8 +182,9 @@ function useConversation(target: AssistantTarget): ConversationRef | undefined {
   return useSelector(conversations, (snapshot) => snapshot.context.conversations[key]);
 }
 
-/** The message being typed (a draft kept across reloads), and sending it. */
-function Composer({ draftKey, ready, sending, send }: { draftKey: string; ready: boolean; sending: boolean; send: (text: string) => Promise<boolean> }) {
+/** The message being typed (a draft kept across reloads) under its label, which says what to ask, and sending it. */
+function Composer({ target, ready, sending, send }: { target: AssistantTarget; ready: boolean; sending: boolean; send: (text: string) => Promise<boolean> }) {
+  const draftKey = `assistant:${targetKey(target)}`;
   const [draft, setDraft] = useDraft<string>(draftKey);
   const text = (draft ?? "").trim();
   const submit = async () => {
@@ -203,49 +204,51 @@ function Composer({ draftKey, ready, sending, send }: { draftKey: string; ready:
         void submit();
       }}
     >
-      <textarea
-        aria-label="Message to the assistant"
-        data-testid="assistant-message"
-        value={draft ?? ""}
-        disabled={sending}
-        onChange={(event) => {
-          setDraft(event.target.value === "" ? undefined : event.target.value);
-        }}
-        onKeyDown={(event) => {
-          if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
-            event.preventDefault();
-            void submit();
-          }
-        }}
-      />
+      <label className="stack assistant-ask">
+        <span>Ask about {aboutWords(target)}, or ask for a change</span>
+        <textarea
+          data-testid="assistant-message"
+          value={draft ?? ""}
+          disabled={sending}
+          onChange={(event) => {
+            setDraft(event.target.value === "" ? undefined : event.target.value);
+          }}
+          onKeyDown={(event) => {
+            if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
+              event.preventDefault();
+              void submit();
+            }
+          }}
+        />
+      </label>
       <span className="row">
         <Button primary type="submit" data-testid="assistant-send" disabled={sending || text === "" || !ready}>
           Send
         </Button>
-        <span className="muted small">Ctrl+Enter sends.</span>
+        <span className="muted small assistant-keys">
+          <kbd>Ctrl+Enter</kbd> sends.
+        </span>
       </span>
     </form>
   );
 }
 
-/** What the panel says before the first message. */
-function Empty({ target }: { target: AssistantTarget }) {
+/** What the panel says before the first message: how a change is made (I5, I7); the composer's label says what to ask. */
+function Empty() {
   return (
     <p className="muted" data-testid="assistant-empty">
-      Ask about {aboutWords(target)}, or ask for a change. Changes to state (an answer, a transition, a note, an assignment, a pin,
-      a snooze) are made directly and reported here; changes to structure, and any change touching more than ten nodes, come back
-      as a proposal for you to review and apply. You can always ask for a proposal instead.
+      Small changes are made directly and reported here. Changes to structure, or to more than ten nodes, come back as a proposal for you to review.
     </p>
   );
 }
 
 /** The panel itself: the conversation, and the message being typed. */
-function AssistantPanel({ target, titleOf, onClose }: { target: AssistantTarget; titleOf: TitleOf | undefined; onClose: () => void }) {
+function AssistantPanel({ target, titleOf }: { target: AssistantTarget; titleOf: TitleOf | undefined }) {
   const conversation = useConversation(target);
-  return conversation === undefined ? null : <Conversing conversation={conversation} target={target} titleOf={titleOf} onClose={onClose} />;
+  return conversation === undefined ? null : <Conversing conversation={conversation} target={target} titleOf={titleOf} />;
 }
 
-function Conversing({ conversation, target, titleOf, onClose }: { conversation: ConversationRef; target: AssistantTarget; titleOf: TitleOf | undefined; onClose: () => void }) {
+function Conversing({ conversation, target, titleOf }: { conversation: ConversationRef; target: AssistantTarget; titleOf: TitleOf | undefined }) {
   const key = targetKey(target);
   const snapshot = useSelector(conversation, (each) => each);
   const { read, kept, unsaved, sending, failure } = useMemo(() => conversationView(snapshot), [snapshot]);
@@ -258,17 +261,10 @@ function Conversing({ conversation, target, titleOf, onClose }: { conversation: 
   }, [entries.length, sending]);
   return (
     <section className="panel assistant-panel" aria-label="Assistant" data-testid="assistant-panel" data-target={key} data-status={sending === undefined ? "idle" : "working"}>
-      <div className="row assistant-head">
-        <span className="muted small">About {aboutWords(target)}</span>
-        <span className="spacer" />
-        <Button aria-label="Close the assistant" title="Close the assistant" onClick={onClose}>
-          Close
-        </Button>
-      </div>
       <div ref={scroller} className="assistant-scroll inspector-body">
         {read.status === "loading" ? <p className="muted small">Reading the conversation...</p> : null}
         {read.status === "failed" ? <p className="callout callout-bad">The conversation could not be read: {read.message}</p> : null}
-        {read.status === "ready" && entries.length === 0 && sending === undefined ? <Empty target={target} /> : null}
+        {read.status === "ready" && entries.length === 0 && sending === undefined ? <Empty /> : null}
         <Transcript entries={entries} titleOf={titleOf} />
         {sending === undefined ? null : (
           <>
@@ -286,7 +282,7 @@ function Conversing({ conversation, target, titleOf, onClose }: { conversation: 
           {failure.status === 503 ? "The assistant is busy; try again in a moment." : `The message was not answered: ${failure.message}.`}
         </p>
       )}
-      <Composer draftKey={`assistant:${key}`} ready={read.status === "ready"} sending={sending !== undefined} send={send} />
+      <Composer target={target} ready={read.status === "ready"} sending={sending !== undefined} send={send} />
     </section>
   );
 }
@@ -317,14 +313,7 @@ export function AssistantDock({ target, titleOf }: { target: AssistantTarget; ti
   }
   return open === true ? (
     <AssistantSlot>
-      <AssistantPanel
-        key={targetKey(target)}
-        target={target}
-        titleOf={titleOf}
-        onClose={() => {
-          setOpen(undefined);
-        }}
-      />
+      <AssistantPanel key={targetKey(target)} target={target} titleOf={titleOf} />
     </AssistantSlot>
   ) : null;
 }

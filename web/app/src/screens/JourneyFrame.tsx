@@ -205,11 +205,13 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const fills = planned || inserting.preview !== undefined;
   // A phone's open map covers the head, so the drawing's banner is the map's, not the head's.
   const onMap = useMapOpen() && fills;
-  // The journey card is the inspector's empty state where the inspector has a column of its own;
-  // narrower, it follows the projection (a graph that fills the page has no room for it on a tablet).
+  // The journey card is the inspector's empty state where the inspector has a column of its own,
+  // and on a phone, whose column stacks right under the projection, so its tabs follow the map
+  // (over the full-screen map it stays in the page behind, useFrame). On a tablet it follows the
+  // projection, and a graph that fills the page has no room for it: a sheet would cover the canvas unasked.
   const wide = useMedia(COLUMN);
   const phone = useMedia(PHONE_WIDTH);
-  const card = selected !== undefined || edge !== undefined || screen === "summary" || screen === "walk" ? "none" : wide ? "column" : fills && !phone ? "none" : "inline";
+  const card = selected !== undefined || edge !== undefined || screen === "summary" || screen === "walk" ? "none" : wide || phone ? "column" : fills ? "none" : "inline";
   return (
     <ViewStateContext value={viewState}>
     <ConnectContext value={authored === undefined ? undefined : drawing}>

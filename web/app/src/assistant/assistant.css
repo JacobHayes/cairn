@@ -1,6 +1,7 @@
 /* The assistant panel: the inspector column's ASSISTANT tab (shell/InspectorColumn.tsx). The
    transcript is the one scroller (`.inspector-body`) and the composer is pinned under it. Drawn
-   with Graticule's tokens, light and dark; the column is chrome, so the panel sits on a paper card. */
+   with Graticule's tokens, light and dark; the column is chrome, so the panel sits on a paper card,
+   its content at the inspector's inset, where the inspector's cards start theirs. */
 .assistant-panel {
   flex: 1 1 0;
   min-height: 0;
@@ -10,23 +11,33 @@
   padding: 0;
 }
 
-.assistant-head {
-  flex: none;
-  padding: var(--space-2) var(--space-3);
-  background: var(--color-band);
-  border-bottom: 1px solid var(--color-border);
+.assistant-panel > .assistant-scroll {
+  padding: var(--inspector-pad);
 }
 
-.assistant-scroll {
-  padding: var(--space-3);
+.assistant-scroll > p {
+  margin: 0;
 }
 
 .assistant-panel > form,
 .assistant-panel > p {
   flex: none;
   margin: 0;
-  padding: var(--space-3);
+  padding: var(--space-4) var(--inspector-pad);
   border-top: 1px solid var(--color-border);
+}
+
+/* A touch screen has no keys to hint at. */
+@media (pointer: coarse) {
+  .assistant-keys {
+    display: none;
+  }
+}
+
+/* The composer's label says what to ask, in the inspector's text size. */
+.assistant-ask {
+  gap: var(--space-2);
+  font-size: 15px;
 }
 
 .assistant-transcript {
@@ -86,4 +97,12 @@
 .assistant-panel textarea {
   min-height: 64px;
   resize: vertical;
+}
+
+/* On a phone the column stacks under the page, which is the one scroller: the panel is as tall as
+   its conversation, the composer after it. Over the full-screen map the column is a sheet again. */
+@media (max-width: 719px) {
+  .frame:not([data-map="open"]) :is(.assistant-panel, .assistant-panel > .assistant-scroll) {
+    flex: none;
+  }
 }

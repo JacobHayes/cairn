@@ -174,6 +174,9 @@ test.describe("a phone's map", () => {
     await expect(page.getByTestId("map-full")).toBeVisible();
     const sheet = (await page.locator(".inspector").boundingBox())?.y ?? 0;
     expect(sheet).toBeGreaterThan(300);
+    // The tapped card is brought above the sheet it opened.
+    const tapped = page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]');
+    await expect.poll(async () => (await tapped.evaluate((element) => element.getBoundingClientRect().bottom)) <= sheet).toBe(true);
     // The sheet is bounded and its body scrolls, so the end of the node's detail is reachable.
     await reachHistory(page, "n_make_offer", 844);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -182,5 +185,26 @@ test.describe("a phone's map", () => {
     await expect(panel).toBeHidden();
     await page.getByRole("button", { name: "Show inspector" }).click();
     await expect(panel).toBeVisible();
+  });
+});
+
+test.describe("a phone's inspector", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  test("stacks the journey card in the inspector right under the map, whose fit is not padded for the column below it", async ({ page }) => {
+    await openJourney(page, "browser", "j_vendor_eval");
+    const column = page.locator(".inspector");
+    await expect(column.getByTestId("journey-card")).toBeVisible();
+    const preview = page.getByTestId("map-preview");
+    const map = await preview.boundingBox();
+    const under = await column.boundingBox();
+    expect(map).not.toBeNull();
+    expect(under).not.toBeNull();
+    // Only the workspace's own padding lies between the map and the column's head.
+    expect((under?.y ?? 0) - ((map?.y ?? 0) + (map?.height ?? 0))).toBeLessThan(64);
+    // The fit `openJourney` asked for draws the graph across the preview, not shrunk to clear the column under it.
+    const cards = await preview.getByTestId("node-card").evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect()).map(({ top, bottom }) => ({ top, bottom })));
+    const drawn = Math.max(...cards.map((card) => card.bottom)) - Math.min(...cards.map((card) => card.top));
+    expect(drawn).toBeGreaterThan((map?.height ?? 0) / 4);
   });
 });

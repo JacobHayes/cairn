@@ -9,6 +9,7 @@
   --rail-w: 200px;
   --inspector-w: 400px;
   --fold-w: 32px; /* the hidden inspector's rail */
+  --inspector-pad: 20px; /* where the inspector's cards and the assistant start their content (DESIGN, More air) */
   /* The sheet's two heights. The tall one leaves room above it for a notice: a window's worth, less a notice. */
   --sheet-half: 40dvh;
   --sheet-full: min(85dvh, calc(100dvh - 160px));
@@ -408,10 +409,13 @@ body {
   display: flex;
   flex-direction: column;
 }
-/* Cards in the inspector are paper on the column's chrome. */
+/* Cards in the inspector are paper on the column's chrome, their content at the inspector's inset. */
 .inspector-body > .panel,
 .inspector-body > .detail-panel {
   flex: none;
+}
+.inspector-body > .detail-panel {
+  padding: var(--inspector-pad);
 }
 
 /* ---- the map on a phone, and the sheet on a tablet ---------------------------------------------- */
@@ -572,6 +576,7 @@ body {
   }
   .ws-canvas {
     display: block;
+    min-height: 0;
   }
   .ws-canvas > :is(p, .callout) {
     margin: var(--space-3) 0;
@@ -589,7 +594,8 @@ body {
   .inspector-body {
     overflow: visible;
   }
-  .frame[data-map="open"] > .inspector {
+  /* Over the full-screen map the column is a sheet, unless it is off (it holds only the journey card) and stays in the page behind. */
+  .frame[data-map="open"]:not([data-inspector="off"]) > .inspector {
     display: flex;
     position: fixed;
     z-index: 60;
@@ -600,7 +606,7 @@ body {
     height: var(--sheet-h, var(--sheet-half));
     box-shadow: var(--shadow-lg);
   }
-  .frame[data-map="open"] > .inspector[data-snap="full"] {
+  .frame[data-map="open"]:not([data-inspector="off"]) > .inspector[data-snap="full"] {
     height: var(--sheet-h, var(--sheet-full));
   }
   .frame[data-map="open"] .inspector-head .sheet-handle {
@@ -722,16 +728,16 @@ table.data {
     top: calc(-1 * var(--space-5));
   }
 }
-/* A quiet progress track: graphite on a hairline, as wide as its container. */
+/* A quiet progress track: graphite chart ink on the chart's hairline, as wide as its container. */
 .meter {
   display: block;
   height: 4px;
-  background: var(--color-border);
+  background: var(--chart-grid);
 }
 .meter > span {
   display: block;
   height: 100%;
-  background: var(--color-text);
+  background: var(--chart-ink);
 }
 
 /* What an index shows in place of its table: being read, failed, or empty, a line and the way on. */

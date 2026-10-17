@@ -69,3 +69,21 @@ test("I5, I7: a direct change reported with its node, and a breakdown proposed, 
   await expect(page.getByTestId("assistant-panel")).toHaveAttribute("data-target", "route:product-launch");
   await expect(page.getByTestId("assistant-panel").getByTestId("assistant-said")).toHaveCount(0);
 });
+
+test("only a person brings the assistant forward: a reload or a phone's width keeps the tab they left", { tag: "@server" }, async ({ page }) => {
+  await page.setViewportSize({ width: 1440, height: 860 });
+  await openJourney(page, "server", "j_vendor_eval");
+  await openPanel(page);
+  const inspector = page.getByTestId("tab-inspector");
+  await inspector.click();
+  await expect(inspector).toHaveAttribute("aria-selected", "true");
+  // The panel stays open behind its tab, and coming back mounts it again.
+  await page.reload();
+  await expect(page.getByTestId("journey-card")).toBeVisible();
+  await expect(page.getByTestId("assistant-panel")).toHaveCount(1);
+  await expect(inspector).toHaveAttribute("aria-selected", "true");
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.getByTestId("map-preview")).toBeVisible();
+  await expect(inspector).toHaveAttribute("aria-selected", "true");
+  await expect(page.getByTestId("journey-card")).toBeVisible();
+});
