@@ -126,17 +126,25 @@ unwrap_used = "deny"
 disallowed_types = "allow"
 
 # Debug builds, and the test profile that inherits them: one setting for every crate, so
-# `serve`, the tests and the checks share one set of artifacts. Optimized because the engine's
-# property and cost tests, and the cases the browser tests compare with, took 5 to 50 s
-# unoptimized; measured against optimizing only the computing crates, an engine edit's
-# check:fast is no slower (103 s against 115 s). Debug assertions and overflow checks stay on.
-# Line tables for the workspace's own crates, so panics and backtraces still name file and
-# line, and no debug info for dependencies: with full debug info every test binary was
-# hundreds of megabytes, each with its own copy of Turso's. Lower both locally to step through
-# code in a debugger.
+# `serve`, the tests and the checks share one set of artifacts. Level 1 is what makes the
+# build cheap: from level 1 down rustc shares generic instantiations between crates, where at
+# level 2 every final binary compiles its own copy of serde's and tokio's; the engine's
+# property and cost tests still run in seconds, where level 0 takes minutes. No LTO: Cargo's
+# default (thin, within a crate) cost about a third of a full build's CPU. The test crate
+# alone is level 0: its code is the tests (serde and harness glue), so it compiles in 15 s
+# instead of 65 and runs no slower. Measured in
+# decisions/2026-10-17-the-dev-profile-builds-at-opt-level-1-without-lto.md.
+# Debug assertions and overflow checks stay on. Line tables for the workspace's own crates,
+# so panics and backtraces still name file and line, and no debug info for dependencies: with
+# full debug info every test binary was hundreds of megabytes, each with its own copy of
+# Turso's. Lower both locally to step through code in a debugger.
 [profile.dev]
-opt-level = 2
+opt-level = 1
+lto = "off"
 debug = "line-tables-only"
+
+[profile.dev.package.cairn-tests]
+opt-level = 0
 
 [profile.dev.package."*"]
 debug = false

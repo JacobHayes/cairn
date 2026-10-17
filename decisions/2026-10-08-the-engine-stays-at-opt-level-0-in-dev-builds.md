@@ -1,5 +1,7 @@
 # The engine stays at opt-level 0 in dev builds
 
+Superseded by `2026-10-17-the-dev-profile-builds-at-opt-level-1-without-lto.md`: the dev profile has been opt-level 2 since 2026-10-09 and is now 1 (the test crate 0). The measurement below is of the engine alone at the time.
+
 - Question: should the dev profile, which tests and the check build with, compile `cairn-engine` at opt-level 1 or 2, so its tests (the cost tests at the limits, the property tests) run faster?
 - Measured (one host, other agents' builds alongside, so a few seconds of noise either way), each setting in its own fresh target directory:
 
