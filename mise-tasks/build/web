@@ -1,10 +1,14 @@
-#!/usr/bin/env bash
-#MISE description="Build the web app the binary embeds: the packages and the browser host's module (its dependencies), then the app's Vite build into web/app/dist/build/"
+#!/usr/bin/env -S bash -euo pipefail
+#MISE description="Build the web app: the app's Vite build into web/app/dist/build/ for the binary to embed, or with `demo` the static demo site on the in-browser host into web/app/dist/demo/; installs the packages and builds the browser host's module first"
 #MISE depends=["packages", "build:wasm"]
-# ARCHITECTURE, Build, run, deploy: web assets and the wasm package are built before `cargo
-# build` and embedded with rust-embed (crates/cairn/src/assets.rs). Build outputs, never
-# checked in.
-set -euo pipefail
-cd "$(dirname "$0")/../.."
-(cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts)
-[ -f web/app/dist/build/index.html ] || { echo "build:web: the build wrote no index.html" >&2; exit 1; }
+# ARCHITECTURE, Build, run, deploy: the web build is made before `cargo build` and embedded
+# with rust-embed (crates/cairn/src/assets.rs). ARCHITECTURE, Web UI: the demo site is the
+# app with no server, seeded from the fixtures on every load, for a static host that answers
+# every path with index.html. Build outputs, never checked in.
+case ${1:-} in
+  "") mode=production out=build ;;
+  demo) mode=demo out=demo ;;
+  *) echo "build:web: the argument is 'demo' or nothing, not '$1'" >&2; exit 1 ;;
+esac
+(cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts --mode "$mode")
+[ -f "web/app/dist/$out/index.html" ] || { echo "build:web: the build wrote no index.html" >&2; exit 1; }

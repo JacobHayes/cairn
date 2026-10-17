@@ -20,7 +20,7 @@
 #     servers start side by side (scripts/e2e-servers), as in the browser step. A spec with @server
 #     tests (the server host's) runs them against `cairn demo`, built with the web build it
 #     embeds, made first if stale; a spec with none starts no binary and builds no web app.
-# No lint. The mise task holds the machine-wide lock (mise-tasks/check/fast).
+# No lint. The mise task runs it under the machine-wide lock (scripts/locked).
 # Quiet, like the ladder: one line per part that ran, a failing test's name, output, and
 # rerun command, and the complete log in dist/ladder/filter.log. It fails when nothing matched.
 set -euo pipefail
@@ -126,7 +126,7 @@ for file in web/app/e2e/*.spec.ts; do
     if [ ! -f "$build" ] || [ -n "$(find web/app/src web/app/index.html web/app/vite.config.ts web/app/package.json \
       web/client/src web/client/package.json web/wasm/src web/wasm/package.json web/wasm/dist/bindgen design \
       package-lock.json -newer "$build" -print -quit)" ]; then
-      ladder_run "the app's web build" bash -c 'cd web/app && ../../node_modules/.bin/vite build --config vite.config.ts'
+      ladder_run "the app's web build" mise-tasks/build/web
     fi
     ladder_run "the build of the binary" cargo test --locked --quiet --workspace --all-features --tests --no-run
     export CAIRN_E2E_BINARY=1

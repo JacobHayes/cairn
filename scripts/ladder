@@ -29,7 +29,7 @@
 # workflow's matrix, so a part added here runs in CI with no workflow edit; every invocation
 # fails when a step of the full check belongs to no part, or to two.
 #
-# The mise tasks hold the machine-wide lock (mise-tasks/check/): one run at a time.
+# The mise tasks run it under the machine-wide lock (scripts/locked): one run at a time.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 

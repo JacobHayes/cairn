@@ -1,12 +1,10 @@
-#!/usr/bin/env bash
+#!/usr/bin/env -S bash -euo pipefail
 #MISE description="Regenerate web/wasm/generated/: the wasm-bindgen bindings of crates/wasm"
-# ARCHITECTURE, Generated artifacts. Builds the module (mise run build:wasm) and copies its
-# JavaScript bindings and type declarations into web/wasm/generated/, each with a header
-# saying so; the .wasm itself stays in web/wasm/dist/bindgen/, a build output. Writes only
-# into web/wasm/generated/.
-set -euo pipefail
-cd "$(dirname "$0")/../.."
-mise-tasks/build/wasm
+#MISE depends=["build:wasm"]
+# ARCHITECTURE, Generated artifacts. Copies the JavaScript bindings and type declarations of
+# the module build:wasm built into web/wasm/generated/, each with a header saying so; the
+# .wasm itself stays in web/wasm/dist/bindgen/, a build output. Writes only into
+# web/wasm/generated/.
 from=web/wasm/dist/bindgen
 to=web/wasm/generated
 rm -rf "$to"

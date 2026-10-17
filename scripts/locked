@@ -1,0 +1,13 @@
+#!/usr/bin/env -S bash -euo pipefail
+# Runs a command under the machine-wide check lock: one heavy check at a time on the machine
+# (PRACTICES, The validation ladder). The shell holds a kernel lock on descriptor 9, which the
+# command inherits through exec and the kernel drops when the last process holding it exits.
+# Descriptor 9 is not touched by scripts/ladder-lib.sh. A lock that cannot be opened or taken
+# stops here: only contention waits.
+lock=${TMPDIR:-/tmp}
+lock=${lock%/}/cairn-check.lock
+exec 9>>"$lock"
+# macOS has no flock command, and its lockf busy-waits; perl's flock(2) sleeps in the kernel,
+# and the lock stays on descriptor 9 (the shared open file) after perl exits.
+if command -v flock >/dev/null; then flock 9; else perl -MFcntl=:flock -e 'open(my $f, ">&=9") or die "$!\n"; flock($f, LOCK_EX) or die "$!\n"'; fi
+exec "$@"

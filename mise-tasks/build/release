@@ -1,8 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env -S bash -euo pipefail
 #MISE description="Build a release binary: the binary as build makes it, versioned by CAIRN_VERSION (a vX.Y.Z tag), copied to dist/release/cairn-<target> beside its SHA-256"
 # ARCHITECTURE, Build, run, deploy: releases. CI's release jobs run this on each target.
-set -euo pipefail
-cd "$(dirname "$0")/../.."
 [ -n "${CAIRN_VERSION:-}" ] || {
   echo "build:release: set CAIRN_VERSION to the release tag (vX.Y.Z)" >&2
   exit 1
@@ -10,9 +8,7 @@ cd "$(dirname "$0")/../.."
 version=${CAIRN_VERSION#v}
 # build.rs refuses a CAIRN_VERSION that is not a semantic version.
 mise run build
-target_dir=$(cargo metadata --no-deps --format-version 1 --locked | node -e '
-  let text = "";
-  process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => console.log(JSON.parse(text).target_directory));')
+target_dir=$(scripts/target-dir)
 binary=$target_dir/release/cairn
 # The binary must report the release's version: a build that kept an old one is not released.
 reported=$("$binary" version)

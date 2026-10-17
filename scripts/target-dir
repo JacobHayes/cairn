@@ -1,0 +1,5 @@
+#!/usr/bin/env -S bash -euo pipefail
+# Prints cargo's target directory: target/ unless CARGO_TARGET_DIR or a cargo config moves it.
+cargo metadata --no-deps --format-version 1 --locked | node -e '
+  let text = "";
+  process.stdin.on("data", (chunk) => (text += chunk)).on("end", () => console.log(JSON.parse(text).target_directory));'

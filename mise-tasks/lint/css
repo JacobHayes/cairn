@@ -1,5 +1,3 @@
-#!/usr/bin/env bash
+#!/usr/bin/env -S bash -euo pipefail
 #MISE description="Lint the app's CSS: one scroller per region, no vh heights, tokens for colour and radius (web/app/src/lint/css.ts); the lint step runs it too"
-set -euo pipefail
-cd "$(dirname "$0")/../.."
 exec node web/app/src/lint/run-css.ts

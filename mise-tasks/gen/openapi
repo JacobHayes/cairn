@@ -1,13 +1,11 @@
-#!/usr/bin/env bash
+#!/usr/bin/env -S bash -euo pipefail
 #MISE description="Regenerate openapi/ from crates/api and web/client/generated/ from it"
+#MISE depends=["packages"]
 # ARCHITECTURE, Generated artifacts. Writes only into openapi/ and web/client/generated/;
 # every file there is generated. The TypeScript types come from the OpenAPI document, so
 # one generator writes both, in that order. openapi-typescript is a devDependency of
-# web/client: run `npm ci` first.
-set -euo pipefail
-cd "$(dirname "$0")/../.."
+# web/client, installed by the packages task.
 generator=node_modules/.bin/openapi-typescript
-[ -x "$generator" ] || { echo "gen: $generator is missing: run npm ci" >&2; exit 1; }
 rm -rf openapi web/client/generated
 mkdir -p openapi web/client/generated
 cargo run --locked --quiet -p cairn-api --bin cairn-openapi -- openapi/cairn.json

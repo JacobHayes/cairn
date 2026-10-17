@@ -1,8 +1,6 @@
-#!/usr/bin/env bash
+#!/usr/bin/env -S bash -euo pipefail
 #MISE description="Regenerate schema/: the file format's JSON Schema, from crates/schema"
 # ARCHITECTURE, Generated artifacts. Writes only into schema/; every file there is generated.
-set -euo pipefail
-cd "$(dirname "$0")/../.."
 rm -rf schema
 mkdir -p schema
 cargo run --locked --quiet -p cairn-schema --bin cairn-schema-gen -- schema

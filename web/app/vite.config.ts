@@ -64,7 +64,7 @@ export default defineConfig(({ command, mode }) => ({
   resolve: { alias: [{ find: "@design", replacement: DESIGN }, { find: /^.*\/generated\/cairn_wasm\.js$/, replacement: `${BINDGEN}/cairn_wasm.js` }] },
   logLevel: "warn",
   // `mise run build:web` writes dist/build/, which the binary embeds (crates/cairn/src/assets.rs),
-  // and `mise run build:demo` dist/demo/; beside them sit the browser tests' reports.
+  // and `mise run build:web demo` dist/demo/; beside them sit the browser tests' reports.
   build: {
     outDir: mode === "demo" ? "dist/demo" : "dist/build",
     emptyOutDir: true,

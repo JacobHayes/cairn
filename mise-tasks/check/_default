@@ -1,15 +1,3 @@
-#!/usr/bin/env bash
+#!/usr/bin/env -S bash -euo pipefail
 #MISE description="The whole validation: lint, then the unit tests, then generated-files freshness, then property, integration, cost, and browser tests side by side; stops at the first failing stage; CI runs it a part per runner with --part NAME (scripts/ladder --parts)"
-set -e
-cd "$(dirname "$0")/../.."
-# One heavy check at a time on the machine (PRACTICES, The validation ladder): the shell holds a
-# kernel lock on descriptor 9, which everything it starts inherits and the kernel drops when
-# the last of them exits. Descriptor 9 is not touched by scripts/ladder-lib.sh. A lock that
-# cannot be opened or taken stops the task (set -e): only contention waits.
-lock=${TMPDIR:-/tmp}
-lock=${lock%/}/cairn-check.lock
-exec 9>>"$lock"
-# macOS has no flock command, and its lockf busy-waits; perl's flock(2) sleeps in the kernel,
-# and the lock stays on descriptor 9 (the shared open file) after perl exits.
-if command -v flock >/dev/null; then flock 9; else perl -MFcntl=:flock -e 'open(my $f, ">&=9") or die "$!\n"; flock($f, LOCK_EX) or die "$!\n"'; fi
-scripts/ladder "$@"
+exec scripts/locked scripts/ladder "$@"
