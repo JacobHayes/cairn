@@ -159,7 +159,7 @@ pub struct Choice {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(untagged)]
 #[schemars(rename = "Choice")]
-pub enum ChoiceWire {
+enum ChoiceWire {
     /// Just the id.
     Id(Slug),
     /// The id and a label.
@@ -479,7 +479,7 @@ pub struct DateRule<R: References> {
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, bound = "")]
 #[schemars(bound = "R: References", rename = "DateRule{R}", transform = date_rule_schema)]
-pub struct DateRuleWire<R: References> {
+struct DateRuleWire<R: References> {
     #[serde(
         default,
         deserialize_with = "crate::serde_util::present",
@@ -509,7 +509,7 @@ fn date_rule_schema(schema: &mut schemars::Schema) {
 
 /// A date rule with both or neither of `before` and `after`.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct DateRuleError;
+struct DateRuleError;
 
 impl fmt::Display for DateRuleError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -932,7 +932,7 @@ impl std::error::Error for NodeShapeError {}
 #[derive(Clone, Debug, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields, bound = "")]
 #[schemars(bound = "R: References", rename = "Node{R}", transform = crate::node_schema::restrict_by_kind)]
-pub struct NodeWire<R: References> {
+struct NodeWire<R: References> {
     #[serde(skip_serializing_if = "key_absent")]
     key: R::NodeKey,
     id: Slug,
@@ -1442,8 +1442,6 @@ mod tests {
             .map(|source| matches!(source, ParticipationSource::Role(_)))
             .collect();
         assert_eq!(sources, [false, true, false]);
-        let bad = json!({"id": "a", "kind": "action", "title": "A", "participations": {"owner": ["not-an-entity"]}});
-        assert!(!parses(bad));
     }
 
     #[test]
@@ -1471,11 +1469,13 @@ mod tests {
     #[test]
     fn explicit_edges_at_and_past_their_limit() {
         let requires =
-            |count: usize| -> Vec<String> { (0..count).map(|index| format!("n{index}")).collect() };
+            |count: u32| -> Vec<String> { (0..count).map(|index| format!("n{index}")).collect() };
+        let limit = crate::Limit::EdgeCountPerNode.max();
         assert!(parses(
-            json!({"id": "a", "kind": "action", "title": "A", "requires": requires(64)})
+            json!({"id": "a", "kind": "action", "title": "A", "requires": requires(limit)})
         ));
-        let past = json!({"id": "a", "kind": "action", "title": "A", "requires": requires(65)});
+        let past =
+            json!({"id": "a", "kind": "action", "title": "A", "requires": requires(limit + 1)});
         let error = serde_json::from_value::<Node<FileRefs>>(past).unwrap_err();
         assert!(
             error

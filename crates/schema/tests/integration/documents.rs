@@ -349,7 +349,12 @@ fn a_participation_source_says_what_is_wrong() {
             "{error}"
         );
     }
-    for bad in [r#"["e_a","e_a"]"#, r#"{"role":"owner_role"}"#, "1"] {
+    for bad in [
+        r#"["e_a","e_a"]"#,
+        r#"["not-an-entity"]"#,
+        r#"{"role":"owner_role"}"#,
+        "1",
+    ] {
         assert_eq!(
             parses::<Node<FileRefs>>(&node(bad)),
             [false, false],
