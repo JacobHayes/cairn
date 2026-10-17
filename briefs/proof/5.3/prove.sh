@@ -16,14 +16,13 @@ rm -rf "$work"
 mkdir -p "$work"
 
 mise run build:wasm
-mise exec -- cargo build --quiet --locked -p cairn-wasm --example fixture_server
 
 pictures=(1-walkthrough-at-the-start 2-the-answer-surfaces-partner-work 3-triage-every-kind 4-placeholder-card
   5-what-would-unblock-the-next-decisions 6-next-ranked-with-why 7-next-re-sorted-by-slack 8-stalled-with-unsnooze
   9-list-filtered-and-grouped 10-list-search-reads-notes 11-bulk-done-rejected-naming-the-node
   12-bulk-snoozed-in-one-patch)
 rm -f "$proof"/*.png "$proof"/*.webm
-(cd web/app && CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/acting.proof.ts --reporter=line)
+(cd web/app && CAIRN_E2E_BINARY=1 CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/acting.proof.ts --reporter=line)
 missing=0
 for picture in "${pictures[@]}"; do
   if [ -s "$work/$picture.png" ]; then cp "$work/$picture.png" "$proof/"; else echo "prove.sh: the picture $picture is missing" >&2; missing=1; fi

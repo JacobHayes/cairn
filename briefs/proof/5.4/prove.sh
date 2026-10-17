@@ -15,7 +15,6 @@ rm -rf "$work"
 mkdir -p "$work"
 
 mise run build:wasm
-mise exec -- cargo build --quiet --locked -p cairn-wasm --example fixture_server
 
 pictures=(1-decision-view 2-partner-decision-revised 3-timeline-final-anchor 4-timeline-shortfall-and-why
   5-timeline-without-a-final-milestone 6-summary 7-summary-printed)

@@ -27,7 +27,6 @@ rm -rf "$work"
 mkdir -p "$work"
 
 mise run build:wasm
-mise exec -- cargo build --quiet --locked -p cairn-wasm --example fixture_server
 
 # The screens' web unit tests.
 unit=$work/vitest.json
@@ -43,7 +42,7 @@ pictures=(1-route-index 2-route-detail-three-versions-retired 3-index-filtered-u
   9-lands-in-the-walkthrough 10-overview 11-archived-with-delete-behind-its-name 12-entities-merged
   13-the-journey-reads-the-survivor 14-identity-in-browser 15-identity-linked-on-the-server 16-dark-theme 17-narrow-screen)
 rm -f "$proof"/*.png "$proof"/*.webm
-(cd web/app && CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/around.proof.ts --reporter=line) \
+(cd web/app && CAIRN_E2E_BINARY=1 CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/around.proof.ts --reporter=line) \
   || miss "the proof run failed"
 for picture in "${pictures[@]}"; do
   if [ -s "$work/$picture.png" ]; then cp "$work/$picture.png" "$proof/"; else miss "the picture $picture is missing"; fi

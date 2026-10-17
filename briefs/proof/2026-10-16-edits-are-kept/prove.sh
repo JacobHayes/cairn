@@ -20,7 +20,7 @@ cargo test --locked --quiet --workspace --all-features --tests --no-run
 
 pictures=(1-rejected 2-away 3-after-reload 4-back 5-discarded 6-could-not-confirm 7-authoring-refused 8-authoring-after-reload)
 rm -f "$proof"/*.png "$proof"/*.webm
-(cd web/app && CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/edits.proof.ts --reporter=line)
+(cd web/app && CAIRN_E2E_BINARY=1 CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/edits.proof.ts --reporter=line)
 missing=0
 for picture in "${pictures[@]}"; do
   if [ -s "$work/$picture.png" ]; then cp "$work/$picture.png" "$proof/"; else echo "prove.sh: the picture $picture is missing" >&2; missing=1; fi

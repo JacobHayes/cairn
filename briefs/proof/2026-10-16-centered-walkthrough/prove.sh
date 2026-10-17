@@ -18,7 +18,7 @@ mkdir -p "$work"
 mise run build:wasm
 
 pictures=(1-desktop 2-phone 3-decisions-desktop)
-(cd web/app && CAIRN_E2E_BINARY=0 CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/walkthrough-center.proof.ts --reporter=line)
+(cd web/app && CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/walkthrough-center.proof.ts --reporter=line)
 missing=0
 for picture in "${pictures[@]}"; do
   if [ -s "$work/$picture.png" ]; then cp "$work/$picture.png" "$proof/after-$picture.png"; else echo "prove.sh: the picture $picture is missing" >&2; missing=1; fi

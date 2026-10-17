@@ -19,7 +19,7 @@ mise run build:wasm
 
 media=(1-graph.png 2-list.png 3-timeline.png 4-walk-through.png 5-timeline-filter.png 6-phone-view-menu.png 7-nothing-matches.png main-flow.webm)
 rm -f "$proof"/*.png "$proof"/*.webm
-(cd web/app && CAIRN_E2E_BINARY=0 CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/view-state.proof.ts --reporter=line)
+(cd web/app && CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/view-state.proof.ts --reporter=line)
 missing=0
 for each in "${media[@]}"; do
   if [ -s "$work/$each" ]; then cp "$work/$each" "$proof/"; else echo "prove.sh: $each is missing" >&2; missing=1; fi

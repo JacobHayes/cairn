@@ -12,12 +12,11 @@ proof=$repo/briefs/proof/4.6
 cd "$repo"
 
 mise run build:wasm
-mise exec -- cargo build --quiet --locked -p cairn-wasm --example fixture_server
 
 pictures=(1-index-in-browser 2-journey-derived-in-worker 3a-patch-saved-with-consequences
   3b-other-tab-updated-live 4-conflict-surfaced 5-version-skew-banner 6-draft-survives-reload)
 rm -f "$proof"/*.png "$proof"/*.webm
-(cd web/app && CAIRN_PROOF_OUT=$proof "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/shell.proof.ts --reporter=line)
+(cd web/app && CAIRN_E2E_BINARY=1 CAIRN_PROOF_OUT=$proof "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/shell.proof.ts --reporter=line)
 rm -rf "$proof/video"
 missing=0
 for picture in "${pictures[@]}"; do

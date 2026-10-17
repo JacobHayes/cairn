@@ -13,7 +13,7 @@ cd "$repo"
 rm -rf "$work"
 mkdir -p "$work"
 
-(cd web/app && CAIRN_E2E_BINARY=0 CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/addresses.proof.ts --reporter=line)
+(cd web/app && CAIRN_PROOF_OUT=$work "$repo/node_modules/.bin/playwright" test -c playwright.proof.config.ts proof/addresses.proof.ts --reporter=line)
 for file in 1-home.png 2-journeys.png 3-journey-summary.png 4-node-link-draws-the-node.png main-flow.webm; do
   [ -s "$work/$file" ] || { echo "prove.sh: $file is missing" >&2; exit 1; }
   cp "$work/$file" "$proof/"
