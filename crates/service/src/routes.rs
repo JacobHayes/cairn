@@ -137,7 +137,7 @@ impl<S: Store> Service<S> {
                     Ok(Written::AlreadyApplied { receipt })
                 }
                 Ok(_) | Err(WriteError::Rejected(_)) => Err(reused),
-                Err(failed @ WriteError::Failed(_)) => Err(failed),
+                Err(other @ (WriteError::ProposalMissing(_) | WriteError::Failed(_))) => Err(other),
             };
         }
         if let Some(number) = file.extends

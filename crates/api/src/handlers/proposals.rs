@@ -219,7 +219,6 @@ pub async fn edit<S: Store + 'static>(
         base_revision,
         draft,
     } = request;
-    held_at(&api, &destination, &id, &patch_id, "edit").await?;
     let (service, call) = (api.service.clone(), api.call(actor));
     let (logged_id, logged_patch) = (id.clone(), patch_id.clone());
     let written = committed(async move {
@@ -244,7 +243,6 @@ pub async fn discard<S: Store + 'static>(
         patch_id,
         base_revision,
     } = request;
-    held_at(&api, &destination, &id, &patch_id, "discard").await?;
     let (service, call) = (api.service.clone(), api.call(actor));
     let (logged_id, logged_patch) = (id.clone(), patch_id.clone());
     let written = committed(async move {
@@ -270,7 +268,6 @@ pub async fn refresh<S: Store + 'static>(
         patch_id,
         base_revision,
     } = request;
-    held_at(&api, &destination, &id, &patch_id, "refresh").await?;
     let (service, call) = (api.service.clone(), api.call(actor));
     let (logged_id, logged_patch) = (id.clone(), patch_id.clone());
     let drafted = committed(async move {
@@ -311,7 +308,6 @@ pub async fn apply<S: Store + 'static>(
         reviewed_revision,
         note,
     } = request;
-    held_at(&api, &destination, &id, &patch_id, "apply").await?;
     let (service, call) = (api.service.clone(), api.call(actor));
     let (logged_id, logged_patch) = (id.clone(), patch_id.clone());
     let answer = committed(async move {
@@ -341,25 +337,6 @@ async fn held<S: Store + 'static>(
         .proposal_at(destination, id)
         .await?
         .ok_or_else(|| ApiError::not_found(format_args!("proposal {id} under {destination}")))
-}
-
-/// [`held`] for a write: a proposal that is not there is logged and counted like any other
-/// refused write, then answered not found.
-async fn held_at<S: Store + 'static>(
-    api: &Api<S>,
-    destination: &Domain,
-    id: &ProposalId,
-    patch_id: &PatchId,
-    write: &'static str,
-) -> Result<(), ApiError> {
-    held(api, destination, id)
-        .await
-        .map(|_| ())
-        .inspect_err(|error| {
-            let outcome = refusal_outcome(error);
-            tracing::info!(patch_id = %patch_id, proposal = %id, write, outcome, "proposal");
-            observe::patch_outcome(outcome);
-        })
 }
 
 /// Logs and counts a proposal write, and answers it.

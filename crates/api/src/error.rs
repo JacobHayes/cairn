@@ -151,6 +151,7 @@ impl From<WriteError> for ApiError {
     fn from(error: WriteError) -> Self {
         match error {
             WriteError::Rejected(rejection) => ApiError::Rejected(rejection),
+            WriteError::ProposalMissing(id) => ApiError::not_found(format_args!("proposal {id}")),
             WriteError::Failed(error) => error.into(),
         }
     }
@@ -170,7 +171,6 @@ impl From<ProposeError> for ApiError {
                 | DraftError::NotNewer { .. }
                 | DraftError::TooLarge),
             ) => ApiError::problem(ProblemCode::CannotDraft, error.to_string()),
-            ProposeError::ProposalMissing(id) => ApiError::not_found(format_args!("proposal {id}")),
             ProposeError::Write(error) => error.into(),
         }
     }

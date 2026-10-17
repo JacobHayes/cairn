@@ -18,9 +18,7 @@ use cairn_schema::{
     Patch, PatchEvents, PatchReceipt, ProposalId, RankConstants, Revision, RevisionOf, RouteId,
     Timestamp, Title, VersionNumber,
 };
-use cairn_service::{
-    Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, WriteError, Written,
-};
+use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, Written};
 use cairn_store::{InProcessNotifier, MemoryStore, Subscription, Take, Watch};
 use jiff::tz::TimeZone;
 use serde::{Deserialize, Serialize};
@@ -280,11 +278,9 @@ impl BrowserRoot {
         let call = self.call(now)?;
         let submitted = DomainPatch::new(request.patch.clone(), request.note.clone())
             .map_err(|error| HostError::unreadable("patch", format!("{error:?}")))?;
-        match now_or_never(self.service.patch(&call, &submitted)) {
-            Ok(written) => Ok(written.into()),
-            Err(WriteError::Rejected(rejection)) => Err(HostError::Rejected { rejection }),
-            Err(WriteError::Failed(error)) => Err(failed(error)),
-        }
+        now_or_never(self.service.patch(&call, &submitted))
+            .map(Into::into)
+            .map_err(crate::proposals::write_failed)
     }
 
     /// J4: a page of the journey's history, or of the events naming `node`, from the log

@@ -52,6 +52,7 @@ on_both_stores!(
     a_resubmitted_apply_is_answered_from_its_receipt,
     a_proposal_write_ticks_the_proposal_and_its_apply_ticks_both,
     an_upgrade_or_relink_submitted_directly_is_refused,
+    another_destinations_proposal_is_missing_never_rejected,
 );
 
 const AT: &str = "2026-10-06T12:00:00Z";
@@ -580,6 +581,75 @@ async fn an_upgrade_or_relink_submitted_directly_is_refused<S: Store>(store: Arc
             );
         }
     }
+}
+
+/// I6: a proposal is addressed under its destination, so under another one it is missing
+/// to every read and write, before its receipt is consulted, and nothing is written.
+async fn another_destinations_proposal_is_missing_never_rejected<S: Store>(store: Arc<S>) {
+    use cairn_service::ReadError;
+    let (service, _) = service_over(store);
+    journey(&service).await;
+    let lead = call("u_lead", AT);
+    let created = service
+        .create_proposal(
+            &lead,
+            patch_id("p_pr"),
+            &destination(),
+            &pr_one(),
+            draft("Add", 2),
+        )
+        .await;
+    let created = saved(created.unwrap());
+    let id = pr_one();
+    for elsewhere in [
+        Domain::Journey("j_other".parse().unwrap()),
+        Domain::Route("r_other".parse().unwrap()),
+        Domain::Deployment,
+    ] {
+        assert_eq!(service.proposal_at(&elsewhere, &id).await.unwrap(), None);
+        let preview = service.preview_proposal(&lead, &elsewhere, &id).await;
+        assert_eq!(preview.err(), Some(ReadError::ProposalMissing(id.clone())));
+        for (write, answer) in writes_under(&service, &lead, &elsewhere).await {
+            let missing = Err(cairn_service::WriteError::ProposalMissing(id.clone()));
+            assert_eq!(answer, missing, "{write} under {elsewhere}");
+        }
+    }
+    let held = service.proposal_at(&destination(), &id).await.unwrap();
+    assert_eq!(held, Some(created));
+}
+
+/// Each write to `pr_one` under `elsewhere`, and what it answered. The discard reuses the
+/// create's patch id, so a receipt consulted before the address would answer it.
+async fn writes_under<S: Store>(
+    service: &Service<S>,
+    caller: &cairn_service::Call,
+    elsewhere: &Domain,
+) -> [(&'static str, Result<(), cairn_service::WriteError>); 4] {
+    use cairn_service::ProposeError;
+    let (id, base) = (pr_one(), revision(1));
+    let edit = service.edit_proposal(
+        caller,
+        patch_id("p_edit"),
+        elsewhere,
+        &id,
+        base,
+        draft("Add", 2),
+    );
+    let discard = service.discard_proposal(caller, patch_id("p_pr"), elsewhere, &id, base);
+    let refresh = service.refresh_proposal(caller, patch_id("p_refresh"), elsewhere, &id, base);
+    let apply = service.apply_proposal(caller, patch_id("p_apply"), elsewhere, &id, base, None);
+    [
+        ("edit", edit.await.map(drop)),
+        ("discard", discard.await.map(drop)),
+        (
+            "refresh",
+            refresh.await.map(drop).map_err(|error| match error {
+                ProposeError::Write(error) => error,
+                other @ ProposeError::Draft(_) => panic!("a refresh under {elsewhere}: {other:?}"),
+            }),
+        ),
+        ("apply", apply.await.map(drop)),
+    ]
 }
 
 /// The proposal operations' futures are `Send` over either store

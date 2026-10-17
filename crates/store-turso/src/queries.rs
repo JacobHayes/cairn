@@ -9,8 +9,8 @@ use cairn_schema::{
 use cairn_store::backend;
 use cairn_store::{
     DestinationKind, DestinationNow, EventQuery, JourneyMatches, JourneyQuery, JourneySummary,
-    LoggedEvent, Page, ProposalPage, ProposalQuery, ProposalScope, ProposalSummary, RouteDetail,
-    SearchHit, SearchQuery, StoreError, VersionJourneys,
+    LoggedEvent, Page, ProposalCursor, ProposalPage, ProposalQuery, ProposalScope, ProposalSummary,
+    RouteDetail, SearchHit, SearchQuery, StoreError, VersionJourneys,
 };
 use turso::{Connection, Value};
 
@@ -247,52 +247,125 @@ async fn destination_now(
     })
 }
 
-/// C14, C16: the open proposals of a scope. A destination scope reads its own rows; the
-/// others read every open proposal and the shared page builder narrows them.
+/// C14, C16: the condition on an open proposal that puts it in `scope`, and its parameters.
+/// A destination's proposals are read through `proposals_by_destination`, a creator's through
+/// `proposals_by_creator` (migration 0010).
+async fn proposal_scope(
+    connection: &Connection,
+    scope: &ProposalScope,
+) -> Result<(String, Vec<Value>), StoreError> {
+    Ok(match scope {
+        ProposalScope::Destination(destination) => {
+            let (kind, id) = domain_columns(destination);
+            (
+                "destination_kind = ?1 AND destination_id IS ?2".to_owned(),
+                vec![text(kind), id],
+            )
+        }
+        ProposalScope::CreatingJourneys => (
+            "destination_kind = 'journey' AND destination_id NOT IN (SELECT id FROM journeys)"
+                .to_owned(),
+            Vec::new(),
+        ),
+        ProposalScope::CreatingRoutes => (
+            "destination_kind = 'route' AND destination_id NOT IN (SELECT id FROM routes)"
+                .to_owned(),
+            Vec::new(),
+        ),
+        ProposalScope::Waiting { user, entities } => {
+            let mut params = vec![text(user)];
+            let mut names = Vec::new();
+            for journey in referencing_ids(connection, entities).await? {
+                params.push(text(&journey));
+                names.push(format!("?{}", params.len()));
+            }
+            let condition = if names.is_empty() {
+                "created_by = ?1".to_owned()
+            } else {
+                format!(
+                    "(created_by = ?1 OR (proposing_agent IS NOT NULL \
+                     AND destination_kind = 'journey' AND destination_id IN \
+                     (SELECT id FROM journeys WHERE status = 'active' AND id IN ({}))))",
+                    names.join(", ")
+                )
+            };
+            (condition, params)
+        }
+    })
+}
+
+/// A proposal listing's row, with its destination as it is now, looked up once per destination.
+async fn proposal_summary(
+    connection: &Connection,
+    row: &crate::sql::Row,
+    nows: &mut BTreeMap<Domain, DestinationNow>,
+) -> Result<ProposalSummary, StoreError> {
+    let destination = crate::sql::domain_from(&row.text(1)?, row.opt_text(2)?)?;
+    if !nows.contains_key(&destination) {
+        let now = destination_now(connection, &destination).await?;
+        nows.insert(destination.clone(), now);
+    }
+    Ok(ProposalSummary {
+        id: row.parse(0)?,
+        now: nows[&destination].clone(),
+        destination,
+        title: row.parse(3)?,
+        revision: row.number(4)?,
+        drafted_against: row.number(5)?,
+        created_by: row.parse(6)?,
+        proposing_agent: row.opt_parse(7)?,
+        created_at: row.timestamp(8)?,
+    })
+}
+
+/// C14, C16: the open proposals of a scope, newest first by creation time then id, after the
+/// cursor, with the scope's whole count; the filter, the count and the page are SQL, and only
+/// the page's rows read their destination as it is now.
 pub(crate) async fn proposals(
     connection: &Connection,
     query: &ProposalQuery,
 ) -> Result<ProposalPage, StoreError> {
-    let columns = "SELECT id, destination_kind, destination_id, title, revision, \
-                   destination_revision, created_by, proposing_agent, created_at FROM proposals";
-    let (select, params) = match &query.scope {
-        ProposalScope::Destination(destination) => {
-            let (kind, id) = domain_columns(destination);
-            (
-                format!(
-                    "{columns} WHERE status = 'open' AND destination_kind = ?1 \
-                     AND destination_id IS ?2"
-                ),
-                vec![text(kind), id],
+    let (scope, params) = proposal_scope(connection, &query.scope).await?;
+    let count = first(
+        connection,
+        &format!("SELECT COUNT(*) FROM proposals WHERE status = 'open' AND {scope}"),
+        params.clone(),
+    )
+    .await?
+    .ok_or_else(|| corrupt("a count answered no row"))?
+    .number(0)?;
+    let mut page_params = params;
+    let after = match &query.after {
+        Some(after) => {
+            page_params.push(time(after.created_at)?);
+            let at = page_params.len();
+            page_params.push(text(&after.id));
+            format!(
+                " AND (created_at < ?{at} OR (created_at = ?{at} AND id < ?{}))",
+                at + 1
             )
         }
-        _ => (format!("{columns} WHERE status = 'open'"), Vec::new()),
+        None => String::new(),
     };
+    let select = format!(
+        "SELECT id, destination_kind, destination_id, title, revision, destination_revision, \
+         created_by, proposing_agent, created_at FROM proposals \
+         WHERE status = 'open' AND {scope}{after} ORDER BY created_at DESC, id DESC LIMIT {}",
+        query.size.get() + 1
+    );
     let mut nows: BTreeMap<Domain, DestinationNow> = BTreeMap::new();
-    let mut candidates = Vec::new();
-    for row in rows(connection, &select, params).await? {
-        let destination = crate::sql::domain_from(&row.text(1)?, row.opt_text(2)?)?;
-        if !nows.contains_key(&destination) {
-            let now = destination_now(connection, &destination).await?;
-            nows.insert(destination.clone(), now);
-        }
-        candidates.push(ProposalSummary {
-            id: row.parse(0)?,
-            now: nows[&destination].clone(),
-            destination,
-            title: row.parse(3)?,
-            revision: row.number(4)?,
-            drafted_against: row.number(5)?,
-            created_by: row.parse(6)?,
-            proposing_agent: row.opt_parse(7)?,
-            created_at: row.timestamp(8)?,
-        });
+    let mut items = Vec::new();
+    for row in rows(connection, &select, page_params).await? {
+        items.push(proposal_summary(connection, &row, &mut nows).await?);
     }
-    let waiting = match &query.scope {
-        ProposalScope::Waiting { entities, .. } => {
-            Some(referencing_ids(connection, entities).await?)
-        }
-        _ => None,
+    let next = if items.len() > query.size.len() {
+        items.truncate(query.size.len());
+        items.last().map(|last| ProposalCursor {
+            created_at: last.created_at,
+            id: last.id.clone(),
+        })
+    } else {
+        None
     };
     let destination = match &query.scope {
         ProposalScope::Destination(destination) => Some(match nows.remove(destination) {
@@ -301,12 +374,12 @@ pub(crate) async fn proposals(
         }),
         _ => None,
     };
-    Ok(backend::query::proposal_page(
-        query,
-        candidates,
-        waiting.as_ref(),
+    Ok(ProposalPage {
+        count,
         destination,
-    ))
+        items,
+        next,
+    })
 }
 
 pub(crate) async fn resolve_entity(

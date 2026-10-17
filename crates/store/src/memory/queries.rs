@@ -11,7 +11,8 @@ use cairn_schema::{
 use super::State;
 use crate::backend;
 use crate::query::{
-    DestinationKind, DestinationNow, ProposalPage, ProposalQuery, ProposalScope, ProposalSummary,
+    DestinationKind, DestinationNow, ProposalCursor, ProposalPage, ProposalQuery, ProposalScope,
+    ProposalSummary,
 };
 use crate::query::{
     EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoggedEvent, Page, RouteDetail,
@@ -127,7 +128,7 @@ impl State {
             ProposalScope::Destination(destination) => Some(self.destination_now(destination)),
             _ => None,
         };
-        backend::query::proposal_page(query, candidates, waiting.as_ref(), destination)
+        proposal_page(query, candidates, waiting.as_ref(), destination)
     }
 
     pub(super) fn route_detail(&self, route: &RouteId) -> Option<RouteDetail> {
@@ -284,4 +285,70 @@ pub(super) fn referencing(
     entities: &BTreeSet<EntityKey>,
 ) -> BTreeMap<JourneyId, cairn_schema::Revision> {
     state.domains.journeys_referencing(entities)
+}
+
+/// C14, C16: whether an open proposal belongs in a listing's scope. `waiting` is the journeys
+/// referring to the scope's entities, when the scope is the viewer's waiting list.
+fn proposal_listed(
+    scope: &ProposalScope,
+    summary: &ProposalSummary,
+    waiting: Option<&BTreeSet<JourneyId>>,
+) -> bool {
+    match scope {
+        ProposalScope::Destination(destination) => summary.destination == *destination,
+        ProposalScope::CreatingJourneys => {
+            matches!(summary.destination, Domain::Journey(_)) && !summary.now.exists
+        }
+        ProposalScope::CreatingRoutes => {
+            matches!(summary.destination, Domain::Route(_)) && !summary.now.exists
+        }
+        ProposalScope::Waiting { user, .. } => {
+            summary.created_by == *user
+                || match (&summary.destination, waiting) {
+                    (Domain::Journey(journey), Some(found)) => {
+                        summary.proposing_agent.is_some()
+                            && summary.now.exists
+                            && summary.now.status == Some(cairn_schema::JourneyStatus::Active)
+                            && found.contains(journey)
+                    }
+                    _ => false,
+                }
+        }
+    }
+}
+
+/// C14: the page of a listing, from every open proposal `candidates`: the scope's members,
+/// newest first by creation time then id, after the cursor, with the scope's whole count. The
+/// reference the Turso backend's SQL answers alike (the conformance suite holds them to it).
+fn proposal_page(
+    query: &ProposalQuery,
+    candidates: Vec<ProposalSummary>,
+    waiting: Option<&BTreeSet<JourneyId>>,
+    destination: Option<DestinationNow>,
+) -> ProposalPage {
+    let mut listed: Vec<_> = candidates
+        .into_iter()
+        .filter(|summary| proposal_listed(&query.scope, summary, waiting))
+        .collect();
+    listed.sort_by(|left, right| (right.created_at, &right.id).cmp(&(left.created_at, &left.id)));
+    let count = u32::try_from(listed.len()).unwrap_or(u32::MAX);
+    if let Some(after) = &query.after {
+        listed.retain(|summary| (summary.created_at, &summary.id) < (after.created_at, &after.id));
+    }
+    let more = listed.len() > query.size.len();
+    listed.truncate(query.size.len());
+    let next = if more {
+        listed.last().map(|last| ProposalCursor {
+            created_at: last.created_at,
+            id: last.id.clone(),
+        })
+    } else {
+        None
+    };
+    ProposalPage {
+        count,
+        destination,
+        items: listed,
+        next,
+    }
 }

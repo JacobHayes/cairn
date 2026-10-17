@@ -789,6 +789,15 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
         (2, Open),
     )
     .await;
+    // Made in the same minute as pr_1, under the same destination: the id breaks the tie.
+    drafted(
+        &store,
+        "pr_0",
+        &journey("j_active"),
+        ("u_other", None),
+        (1, Open),
+    )
+    .await;
     drafted(
         &store,
         "pr_3",
@@ -853,7 +862,7 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
     let cases = [
         (
             ProposalScope::Destination(journey("j_active")),
-            vec!["pr_2", "pr_1"],
+            vec!["pr_2", "pr_1", "pr_0"],
         ),
         (ProposalScope::Destination(journey("j_done")), vec!["pr_3"]),
         (ProposalScope::Destination(route("r_new")), vec!["pr_7"]),
@@ -880,7 +889,7 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
         .proposals(&page(ProposalScope::Destination(journey("j_active"))))
         .await
         .unwrap();
-    assert_eq!((active.count, active.items.len()), (2, 1));
+    assert_eq!((active.count, active.items.len()), (3, 1));
     let now = active.destination.unwrap();
     assert_eq!(
         (now.exists, now.kind, now.status, now.revision),
@@ -935,6 +944,6 @@ pub async fn proposal_listings_hold_each_scope_newest_first_with_counts<B: Backe
                 .map(|item| item.id.to_string())
                 .collect::<Vec<_>>()
         ),
-        (1, vec!["pr_1".to_owned()])
+        (2, vec!["pr_1".to_owned()])
     );
 }

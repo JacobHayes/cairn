@@ -11,7 +11,6 @@ use cairn_schema::{
     PatchId, Revision, RouteFile, RouteHeader, RouteId, Slug, Timestamp, Title, UserId,
     VersionNumber,
 };
-use cairn_service::WriteError;
 use cairn_store::{JourneyQuery, PageSize};
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -306,11 +305,9 @@ impl BrowserRoot {
             &request.file,
             request.note.clone(),
         ));
-        match written {
-            Ok(written) => Ok(written.into()),
-            Err(WriteError::Rejected(rejection)) => Err(HostError::Rejected { rejection }),
-            Err(WriteError::Failed(error)) => Err(failed(error)),
-        }
+        written
+            .map(Into::into)
+            .map_err(crate::proposals::write_failed)
     }
 }
 

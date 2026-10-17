@@ -129,6 +129,7 @@ impl From<WriteError> for ToolError {
     fn from(error: WriteError) -> Self {
         match error {
             WriteError::Rejected(rejection) => ToolError::Rejected { rejection },
+            WriteError::ProposalMissing(id) => ToolError::not_found(format_args!("proposal {id}")),
             WriteError::Failed(error) => error.into(),
         }
     }
@@ -151,9 +152,6 @@ impl From<ProposeError> for ToolError {
     fn from(error: ProposeError) -> Self {
         match error {
             ProposeError::Draft(error) => ToolError::refused(error),
-            ProposeError::ProposalMissing(id) => {
-                ToolError::not_found(format_args!("proposal {id}"))
-            }
             ProposeError::Write(error) => error.into(),
         }
     }

@@ -196,10 +196,13 @@ pub struct ProposalReview {
     pub stale: Option<StaleBase>,
 }
 
-/// A proposal write's failure, as the root reports it: the rejection, or what is missing.
-fn write_failed(error: WriteError) -> HostError {
+/// A write's failure, as the root reports it: the rejection, or what is missing.
+pub(crate) fn write_failed(error: WriteError) -> HostError {
     match error {
         WriteError::Rejected(rejection) => HostError::Rejected { rejection },
+        WriteError::ProposalMissing(id) => HostError::Missing {
+            message: format!("no proposal {id}"),
+        },
         WriteError::Failed(error) => failed(error),
     }
 }
@@ -213,9 +216,6 @@ fn propose_failed(error: ProposeError) -> HostError {
             error @ (DraftError::JourneyMissing(_) | DraftError::VersionMissing(_)),
         ) => HostError::Missing {
             message: error.to_string(),
-        },
-        ProposeError::ProposalMissing(id) => HostError::Missing {
-            message: format!("no proposal {id}"),
         },
         ProposeError::Draft(error) => failed(error),
         ProposeError::Write(error) => write_failed(error),
@@ -325,7 +325,6 @@ impl BrowserRoot {
         now: &str,
     ) -> Result<ProposalAnswer, HostError> {
         let call = self.call(now)?;
-        self.proposal_of(destination, id)?;
         now_or_never(self.service().edit_proposal(
             &call,
             request.patch_id.clone(),
@@ -351,7 +350,6 @@ impl BrowserRoot {
         now: &str,
     ) -> Result<ProposalAnswer, HostError> {
         let call = self.call(now)?;
-        self.proposal_of(destination, id)?;
         now_or_never(self.service().discard_proposal(
             &call,
             request.patch_id.clone(),
@@ -435,18 +433,16 @@ impl BrowserRoot {
         now: &str,
     ) -> Result<PatchAnswer, HostError> {
         let call = self.call(now)?;
-        self.proposal_of(destination, id)?;
-        match now_or_never(self.service().apply_proposal(
+        now_or_never(self.service().apply_proposal(
             &call,
             request.patch_id.clone(),
             destination,
             id,
             request.reviewed_revision,
             request.note.clone(),
-        )) {
-            Ok(written) => Ok(written.into()),
-            Err(error) => Err(write_failed(error)),
-        }
+        ))
+        .map(Into::into)
+        .map_err(write_failed)
     }
 
     /// B7: proposes upgrading `journey` to a newer version of its route, as

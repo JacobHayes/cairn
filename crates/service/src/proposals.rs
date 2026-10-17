@@ -123,9 +123,9 @@ impl<S: Store> Service<S> {
     ///
     /// # Errors
     ///
-    /// [`WriteError::Rejected`] when the proposal moved past `base_revision` (stale), does not
-    /// exist, belongs to another destination, or is no longer open; [`WriteError::Failed`]
-    /// when the store fails.
+    /// [`WriteError::ProposalMissing`] when there is no such proposal under `destination`;
+    /// [`WriteError::Rejected`] when the proposal moved past `base_revision` (stale) or is no
+    /// longer open; [`WriteError::Failed`] when the store fails.
     pub async fn edit_proposal(
         &self,
         call: &Call,
@@ -142,6 +142,7 @@ impl<S: Store> Service<S> {
             base_revision,
             Mutation::EditProposal { proposal: draft },
         );
+        self.addressed(destination, id).await?;
         if let Some(answer) = self.saved_before(&patch).await? {
             return answer;
         }
@@ -168,6 +169,7 @@ impl<S: Store> Service<S> {
             base_revision,
             Mutation::DiscardProposal {},
         );
+        self.addressed(destination, id).await?;
         if let Some(answer) = self.saved_before(&patch).await? {
             return answer;
         }
@@ -200,6 +202,19 @@ impl<S: Store> Service<S> {
             .proposal(id)
             .await?
             .filter(|found| found.destination == *destination))
+    }
+
+    /// I6: the proposal with this id under `destination`, which a write to it is addressed to:
+    /// checked before its receipt (H5), so another destination's proposal is missing, never
+    /// rejected.
+    async fn addressed(
+        &self,
+        destination: &Domain,
+        id: &ProposalId,
+    ) -> Result<Proposal, WriteError> {
+        self.proposal_at(destination, id)
+            .await?
+            .ok_or_else(|| WriteError::ProposalMissing(id.clone()))
     }
 
     /// C14: the open proposals of a destination scope (a destination, or the journeys or
@@ -333,6 +348,7 @@ impl<S: Store> Service<S> {
     ///
     /// # Errors
     ///
+    /// [`WriteError::ProposalMissing`] when there is no such proposal under `destination`;
     /// [`WriteError::Rejected`] as stale (with what intervened) when either revision moved, as
     /// invalid with every violation, or for a reused patch id; [`WriteError::Failed`] when the
     /// store fails or the engine panics.
@@ -345,23 +361,16 @@ impl<S: Store> Service<S> {
         reviewed_revision: Revision,
         note: Option<Markdown>,
     ) -> Result<Written, WriteError> {
+        let found = self.addressed(destination, id).await?;
         // H5: a resubmission is rebuilt as its receipt says it was committed (the destination
         // revision it applied to), since the proposal it applied is no longer open.
         let committed = self.store.receipt(&patch_id).await?;
         let base_revision = match committed {
             Some(receipt) => crate::write::before(receipt.revision),
-            None => match self.store.proposal(id).await? {
-                Some(found)
-                    if found.destination == *destination
-                        && found.status == ProposalStatus::Open =>
-                {
-                    found.draft.destination_revision
-                }
-                // At the destination's current revision, so the engine names what is wrong
-                // rather than a stale base: no such proposal, another destination's, or one
-                // applied or discarded.
-                _ => self.current_revision(destination).await?,
-            },
+            None if found.status == ProposalStatus::Open => found.draft.destination_revision,
+            // At the destination's current revision, so the engine names what is wrong rather
+            // than a stale base: a proposal applied or discarded.
+            None => self.current_revision(destination).await?,
         };
         let patch = Patch {
             id: patch_id,

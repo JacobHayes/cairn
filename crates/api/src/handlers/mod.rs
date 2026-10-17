@@ -162,6 +162,7 @@ pub(crate) fn refused_outcome(error: &WriteError) -> &'static str {
         WriteError::Rejected(Rejection::Invalid { .. }) => "invalid",
         WriteError::Rejected(Rejection::Stale { .. }) => "stale",
         WriteError::Rejected(Rejection::PatchIdReused { .. }) => "patch_id_reused",
+        WriteError::ProposalMissing(_) => "not_found",
         WriteError::Failed(_) => "failed",
     }
 }

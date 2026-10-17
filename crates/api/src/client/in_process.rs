@@ -36,6 +36,10 @@ pub async fn patch<S: Store>(
             match service.patch(call, &submitted).await {
                 Ok(written) => Ok(written.into()),
                 Err(WriteError::Rejected(rejection)) => Err(Refused::Rejected(rejection)),
+                // Only a proposal's own operations answer a missing proposal.
+                Err(WriteError::ProposalMissing(_)) => {
+                    Err(Refused::Failed(InProcessError::NotADomainPatch))
+                }
                 Err(WriteError::Failed(error)) => {
                     Err(Refused::Failed(InProcessError::Service(error)))
                 }

@@ -1,0 +1,9 @@
+# Proposal listings are filtered, counted and paged in SQL
+
+Question (from a follow-up to the unit that made open proposals findable): the plan put each proposal listing's filter, count and page in SQL, served by the two indexes of migration 0010, but the Turso backend read every open proposal (for the waiting and creating scopes) or every open proposal of the destination, looked up each distinct destination, and filtered, counted and paged in Rust; the creator index went unused while ARCHITECTURE said it served the viewer's list. Do the SQL as planned, or keep the Rust and drop the index?
+
+Call: SQL. Each scope is one condition on the open proposals (a destination's kind and id; a journey or route destination with no row in `journeys` or `routes`; the viewer's own, or an agent's on an active journey among those referring to the viewer's entities), the count is a `COUNT(*)` under it, and the page is that condition after the cursor, `ORDER BY created_at DESC, id DESC LIMIT size + 1`. Only the page's rows look up their destination as it is now. The memory backend keeps its scan, which is the reference the conformance suite holds Turso to, so the page builder moved from the shared backend module into the memory backend.
+
+Alternatives: keep the Rust filter, drop the creator index and reword ARCHITECTURE (less SQL, but Home's waiting list and the indexes' Proposed panels would read and look up every open proposal of the deployment on every load, which grows with nothing to bound it); split the waiting scope into a union of the two index lookups (the planner question it answers is not one the conformance suite can see).
+
+What would change it: a planner that cannot use an index for the waiting scope's `OR` at real sizes, measured, which would make the union worth its second statement.

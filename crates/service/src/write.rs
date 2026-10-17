@@ -10,8 +10,8 @@ use std::panic::{AssertUnwindSafe, catch_unwind};
 use cairn_engine::{Applied, ApplyInputs, Records, apply};
 use cairn_schema::{
     Consequences, Domain, EventType, JourneyId, Location, Markdown, Mutation, Notice, Patch,
-    PatchReceipt, PatchTarget, Record, Rejection, Revision, RevisionOf, Subject, Violation,
-    ViolationCode, Violations, Write,
+    PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision, RevisionOf, Subject,
+    Violation, ViolationCode, Violations, Write,
 };
 use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize, Store};
 
@@ -90,12 +90,16 @@ impl Written {
     }
 }
 
-/// A domain patch that was not committed. Either way nothing was written.
+/// A patch that was not committed. Either way nothing was written.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum WriteError {
     /// The patch is stale (with what intervened), reuses a patch id, or is invalid (every
     /// violation): the engine's and the store's rejection shapes (A15, H5).
     Rejected(Rejection),
+    /// I6: a write to a proposal that is not under the destination it was addressed to,
+    /// another destination's included, is missing, never rejected. Only a proposal's own
+    /// operations answer it.
+    ProposalMissing(ProposalId),
     /// The service or the store failed.
     Failed(ServiceError),
 }
@@ -116,6 +120,7 @@ impl fmt::Display for WriteError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             WriteError::Rejected(rejection) => write!(formatter, "rejected: {rejection:?}"),
+            WriteError::ProposalMissing(id) => write!(formatter, "no proposal {id}"),
             WriteError::Failed(error) => error.fmt(formatter),
         }
     }

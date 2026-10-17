@@ -34,8 +34,6 @@ pub enum ProposeError {
     /// exist, the journey follows no route, the version is not newer, or the draft is too
     /// large (B7, B8, B9).
     Draft(DraftError),
-    /// No such proposal to refresh.
-    ProposalMissing(ProposalId),
     /// The proposal write was refused or failed.
     Write(WriteError),
 }
@@ -62,7 +60,6 @@ impl fmt::Display for ProposeError {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             ProposeError::Draft(error) => error.fmt(formatter),
-            ProposeError::ProposalMissing(id) => write!(formatter, "no proposal {id}"),
             ProposeError::Write(error) => error.fmt(formatter),
         }
     }
@@ -202,7 +199,7 @@ impl<S: Store> Service<S> {
     ///
     /// # Errors
     ///
-    /// [`ProposeError::ProposalMissing`] when there is no such proposal under `destination`;
+    /// [`WriteError::ProposalMissing`] when there is no such proposal under `destination`;
     /// [`ProposeError::Draft`] as for drafting it; [`ProposeError::Write`] when the edit is
     /// stale, the proposal is not open, or the write fails.
     pub async fn refresh_proposal(
@@ -216,7 +213,7 @@ impl<S: Store> Service<S> {
         let held = self
             .proposal_at(destination, id)
             .await?
-            .ok_or_else(|| ProposeError::ProposalMissing(id.clone()))?;
+            .ok_or_else(|| WriteError::ProposalMissing(id.clone()))?;
         if let Some(answer) = self
             .drafted_before(
                 call,

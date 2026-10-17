@@ -334,6 +334,46 @@ mod in_process {
         assert_eq!(listed.count, 0, "a closed proposal is history, not listed");
     }
 
+    /// C14, C16: `scope=new_journeys` and `scope=new_routes` list the open proposals that
+    /// would create a journey or a route, and none whose destination exists.
+    #[tokio::test]
+    async fn the_proposals_creating_a_journey_or_a_route_are_listed_by_kind() {
+        use cairn_api::wire::ProposalList;
+
+        let world = World::start().await;
+        let ann = world.vendor_after(3).await;
+        let mut created = crate::api::support::proposals_of_every_domain(&ann).await;
+        let journey = json!({
+            "title": "A new journey",
+            "destination_revision": 0,
+            "mutations": [{"op": "create_journey", "name": "New journey"}],
+        });
+        created.push((
+            &cairn_api::endpoints::PROPOSE_JOURNEY,
+            "/api/journeys/j_new_one/proposals".to_owned(),
+            "pr_journey",
+            journey,
+        ));
+        for (_, target, id, draft) in created {
+            let create = json!({"patch_id": format!("p_{id}"), "id": id, "draft": draft});
+            ok::<ProposalAnswer>(&post(&ann, &target, &create).await);
+        }
+        for (scope, expected) in [("new_journeys", "pr_journey"), ("new_routes", "pr_route")] {
+            let listed: ProposalList = get(&ann, &format!("/api/proposals?scope={scope}")).await;
+            let ids: Vec<_> = listed
+                .items
+                .iter()
+                .map(|item| item.id.to_string())
+                .collect();
+            assert_eq!(
+                (listed.count, ids),
+                (1, vec![expected.to_owned()]),
+                "{scope}"
+            );
+            assert!(!listed.items[0].now.exists, "{scope}");
+        }
+    }
+
     /// A proposal that does not exist is not found; a body that does not parse is malformed.
     #[tokio::test]
     async fn each_malformed_proposal_request_answers_its_problem() {
