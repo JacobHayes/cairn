@@ -1,0 +1,49 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE description="Land the current change: under a lock, rebase it onto main, run the fast check on the result, and move the main bookmark to it (never pushes)"
+# usage: mise run land
+# The lock (scripts/locked, with CAIRN_LOCK_FILE) is a file in the jj repository's directory, so every workspace of the repository
+# lands one at a time and a change is always checked on the main it will sit on. The change
+# is the working copy, or its parent when the working copy is empty. The rebase moves the
+# change and its working copy with it; a stack of more than one commit, or a conflict, stops the landing.
+# The fast check runs with the machine-wide check lock (scripts/locked) as it does anywhere;
+# the main bookmark moves only when it passes. The log of the check is dist/land-check.log.
+cd "$(dirname "$0")/.."
+# Everything below runs under the lock (scripts/locked takes it, then runs this script again).
+if [ -z "${CAIRN_LANDING:-}" ]; then
+  repo=.jj/repo
+  # A secondary workspace's .jj/repo is a file holding the path of the shared repository.
+  if [ -f "$repo" ]; then repo=$(cd .jj && cd "$(cat repo)" && pwd); fi
+  CAIRN_LANDING=1 CAIRN_LOCK_FILE=$repo/cairn-land.lock exec scripts/locked "$0" "$@"
+fi
+unset CAIRN_LANDING CAIRN_LOCK_FILE
+
+# The change is the working copy, or its parent when the working copy is empty.
+head=@
+if [ -n "$(jj log -r '@ & empty()' --no-graph -T 'change_id')" ]; then head='@-'; fi
+# One logical commit per landing: the fast check picks its steps from the working copy's (or its
+# parent's) files, so a stack could skip the steps its lower commits need.
+count=$(jj log -r "main..$head" --no-graph -T '"x"' | wc -c)
+if [ "$count" -ne 1 ]; then
+  echo "land: $count commits above main; squash them into one change and land again" >&2
+  exit 1
+fi
+jj rebase -b "$head" -d main
+if [ -n "$(jj log -r "$head" --no-graph -T 'if(conflict, "conflict")')" ]; then
+  echo "land: the rebase onto main left conflicts; resolve them and land again" >&2
+  exit 1
+fi
+mkdir -p dist
+if ! mise run check:fast >dist/land-check.log 2>&1; then
+  tail -n 40 dist/land-check.log >&2
+  echo "land: the fast check failed on the rebased change; main did not move (log: dist/land-check.log)" >&2
+  exit 1
+fi
+# The check fixes what it can (formatting, lint fixes) in the working copy; with an empty working
+# copy waiting above the change they would be left behind, so main would get what was not checked.
+if [ "$head" = '@-' ] && [ -z "$(jj log -r '@ & empty()' --no-graph -T 'change_id')" ]; then
+  echo "land: the check changed files; squash them into the change (jj squash) and land again" >&2
+  exit 1
+fi
+tail -n 1 dist/land-check.log
+jj bookmark set main -r "$head"
+jj log -r main --no-graph -T 'change_id.short() ++ " " ++ description.first_line() ++ "\n"'

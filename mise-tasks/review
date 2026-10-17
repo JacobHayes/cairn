@@ -1,0 +1,65 @@
+#!/usr/bin/env -S bash -euo pipefail
+#MISE description="Review the current change: codex reviews the diff against a base and, when screenshots are given, a second codex judges them against DESIGN.md; both run side by side, and their findings are written to files"
+# usage: mise run review [--base REV] [--out DIR] [--round N] [--intent TEXT] [SCREENSHOT...]
+#   --base REV     what the change is reviewed against (default main; a later round passes the
+#                  commit the earlier round reviewed, with the fixes as new changes
+#                  on top of it, so it sees only the fixes)
+#   --out DIR      where the outputs go (default dist/review)
+#   --round N      the round number in the file names (default 1)
+#   --intent TEXT  what the change is meant to do, for the UI critique
+#   SCREENSHOT     image files; with any, the UI critique runs too
+# Writes DIR/rN.md (the code review's findings) and DIR/rN.log (the whole session, whose last
+# line is the token count), and with screenshots DIR/ui-rN.md and DIR/ui-rN.log. The models
+# come from the environment: CAIRN_REVIEW_MODEL (default gpt-6.1-sol) and CAIRN_CRITIQUE_MODEL
+# (default gpt-6-astra), both at CAIRN_REVIEW_EFFORT (default high). Exits non-zero when either
+# review failed to run; findings are for a person (or the agent) to read, not an exit status.
+# Needs the codex CLI. The working copy must be a colocated jj workspace, which codex reads as git.
+cd "$(dirname "$0")/.."
+base=main out=dist/review round=1 intent="the change under review"
+shots=()
+while [ $# -gt 0 ]; do
+  case $1 in
+    --base) base=${2:?--base needs a revision}; shift 2 ;;
+    --out) out=${2:?--out needs a directory}; shift 2 ;;
+    --round) round=${2:?--round needs a number}; shift 2 ;;
+    --intent) intent=${2:?--intent needs text}; shift 2 ;;
+    -*) echo "review: unknown option $1" >&2; exit 2 ;;
+    *) [ -f "$1" ] || { echo "review: no such screenshot: $1" >&2; exit 2; }; shots+=("$(realpath "$1")"); shift ;;
+  esac
+done
+command -v codex >/dev/null || { echo "review: the codex CLI is not installed" >&2; exit 1; }
+review_model=${CAIRN_REVIEW_MODEL:-gpt-6.1-sol}
+critique_model=${CAIRN_CRITIQUE_MODEL:-gpt-6-astra}
+effort=${CAIRN_REVIEW_EFFORT:-high}
+repo=$PWD
+mkdir -p "$out"
+out=$(realpath "$out")
+
+timeout 3600 codex exec review --base "$base" -m "$review_model" -c "model_reasoning_effort=$effort" \
+  -o "$out/r$round.md" </dev/null >"$out/r$round.log" 2>&1 &
+code_pid=$!
+critique_pid=
+if [ ${#shots[@]} -gt 0 ]; then
+  prompt=$out/ui-r$round.prompt
+  cat >"$prompt" <<PROMPT
+You are a demanding product designer. Judge the attached screenshots against DESIGN.md in this
+repository (tokens, type, spacing, alignment, hierarchy, consistency between views, phone
+width, empty and edge states) and against the intent of the change: $intent.
+List concrete problems by severity (severe, medium, minor), each naming the screenshot and
+what is wrong, and say what you would change. Do not praise. Change nothing.
+PROMPT
+  image_args=()
+  for shot in "${shots[@]}"; do image_args+=(-i "$shot"); done
+  # The prompt is stdin (`-`); the images are options.
+  timeout 2400 codex exec -m "$critique_model" -c "model_reasoning_effort=$effort" -s read-only -C "$repo" \
+    "${image_args[@]}" -o "$out/ui-r$round.md" - <"$prompt" >"$out/ui-r$round.log" 2>&1 &
+  critique_pid=$!
+fi
+
+status=0
+wait "$code_pid" || { echo "review: the code review failed; see $out/r$round.log" >&2; status=1; }
+if [ -n "$critique_pid" ]; then
+  wait "$critique_pid" || { echo "review: the UI critique failed; see $out/ui-r$round.log" >&2; status=1; }
+fi
+echo "review: findings in $out/r$round.md${critique_pid:+ and $out/ui-r$round.md}"
+exit "$status"

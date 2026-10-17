@@ -4,8 +4,9 @@
 # command inherits through exec and the kernel drops when the last process holding it exits.
 # Descriptor 9 is not touched by scripts/ladder-lib.sh. A lock that cannot be opened or taken
 # stops here: only contention waits.
+# CAIRN_LOCK_FILE names another lock (mise run land takes one of its own); unset by default.
 lock=${TMPDIR:-/tmp}
-lock=${lock%/}/cairn-check.lock
+lock=${CAIRN_LOCK_FILE:-${lock%/}/cairn-check.lock}
 exec 9>>"$lock"
 # macOS has no flock command, and its lockf busy-waits; perl's flock(2) sleeps in the kernel,
 # and the lock stays on descriptor 9 (the shared open file) after perl exits.
