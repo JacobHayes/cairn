@@ -12,7 +12,7 @@ Proof: `briefs/proof/6.1/README.md`.
 store on a file in the run's virtual filesystem, the in-process notifier, the dev sign-in
 provider (no token: every request is the dev user), and 4.2's `cairn_api::router`, served by
 axum on `127.0.0.1:7878`. Everything runs as tasks on one current-thread tokio runtime with a
-1 ms ticker (the configuration the spike, 1.3, found the shim carries; DECISIONS.md, 1.3).
+1 ms ticker (the configuration the simulation spike, 1.3, found the shim carries; DECISIONS.md, 1.3).
 
 Setup creates journey `j_shared` with three nodes and one pair of entities. Then:
 
@@ -79,7 +79,7 @@ up after 64 attempts, or the server would not stop), 64 bad arguments; never 2.
 
 ## Commands
 
-Its own Cargo workspace, like the spike, so the check ladder never builds it; its
+Its own Cargo workspace, so the check ladder never builds it; its
 `Cargo.lock` started as the root's, so the crates under test resolve as `check` tests them.
 
 ```
@@ -115,7 +115,7 @@ the campaign tolerates no finding.
 
 ## Patina gap report
 
-Three gaps beyond the spike's (`testbeds/spike/README.md`, gaps 1 to 3), each with a
+Three gaps beyond the three the spike found (gaps 1 to 3, tracked as patina issues), each with a
 `DECISIONS.md` entry tagged patina and a leg in `sim.sh` that fails once it stops
 reproducing. Reproducers for gaps 5 and 6 are the binaries in `gaps/`.
 
@@ -134,9 +134,8 @@ surface are neither interposed by the deterministic runtime nor known-safe (defa
 `turso_core` links `libloading` unconditionally (extension loading, never called by Cairn)
 and its default `simd` feature, which the `turso` and `turso_sdk_kit` crates turn on with no
 way to turn it off downstream, links simsimd's AVX-512 FP16 kernels, whose instructions
-patina's decoder cannot read. Neither is called on Cairn's paths. The spike's crates needed no
-allowance. Every run passes `--allow-unsupported-symbols` naming exactly these 19, never
-`all`; leg 2 fails if the audit finds any other.
+patina's decoder cannot read. Neither is called on Cairn's paths. Every run passes
+`--allow-unsupported-symbols` naming exactly these 19, never `all`; leg 2 fails if the audit finds any other.
 
 ### Gap 5: a site label holding a space breaks a campaign
 
@@ -164,7 +163,7 @@ PATINA_INFRA native_run signal=6 trace=incomplete trace_path="abort.patina" reas
 `always!` aborts the process before the native recorder finalizes, so a failing seed found
 by `always!` cannot be replayed, and `cargo patina minimize --generation N` fails even with
 `--no-trace-phase` (`failed to load the trace recorded from the reduced knobs`). The testbed
-therefore reports each invariant through `verdict` and exits 1, as the spike did, rather than
+therefore reports each invariant through `verdict` and exits 1 rather than
 with `always!` as the brief asked.
 
 ## Limits and choices

@@ -17,7 +17,7 @@
 #      that fixes one gets its README section and DECISIONS.md entry updated.
 #
 # One current-thread runtime with the 1 ms ticker (the testbed's default) is the
-# configuration the spike (1.3) found the shim carries.
+# configuration the simulation spike (1.3) found the shim carries.
 set -euo pipefail
 cd "$(dirname "$0")"
 

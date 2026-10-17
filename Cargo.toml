@@ -24,7 +24,7 @@ cairn-store = { path = "crates/store" }
 cairn-store-turso = { path = "crates/store-turso" }
 cairn-wasm = { path = "crates/wasm" }
 # The auth crate (ARCHITECTURE, Auth): axum for the layer and the providers' own routes
-# (HTTP/1 on tokio, as the spike proved, plus forms, queries, and JSON for the OAuth
+# (HTTP/1 on tokio, plus forms, queries, and JSON for the OAuth
 # endpoints); base64 for the built-in server's client ids; chrono only for the clock
 # openidconnect checks expiry against (and the claims of the demo's stub issuer); cookie for
 # the session and sign-in cookies; ed25519-dalek only to sign the ID tokens of `cairn demo`'s
