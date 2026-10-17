@@ -104,8 +104,8 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
   sweep early, which leg 5 catches. Recorded in
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
 - **Turso: opens under injected faults.** A log size error at open panics; a short read of
-  the log header fails the open (both are cases in
-  `crates/tests/tests/integration/store_turso/open_faults.rs`); an open retried in-process
+  the log header fails the open (both were cases of the store's tests, removed as they only
+  re-proved the pinned Turso's gaps); an open retried in-process
   after a failed one panics in the page cache (a testbed-only path: Cairn's server exits and is restarted instead); `EINTR` is reported, not retried.
   Recorded in
   [`decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md`](../../decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md).

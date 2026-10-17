@@ -2,5 +2,4 @@
 
 mod conformance;
 mod open;
-mod open_faults;
 mod property_round_trip;
