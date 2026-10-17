@@ -89,6 +89,8 @@ test("a click on the empty canvas deselects and a drag that pans does not", asyn
 test("a menu's arrow keys move over the items that can take the focus, never stalling at a disabled one", async ({ page }) => {
   await openJourney(page, "browser", "j_bakeoff");
   await nodeCard(page, "n_trial_a").getByTestId("card-open").click();
+  // The open lands (the address, then the selection it names) before the shift-click adds to it.
+  await expect(nodePanel(page, "n_trial_a")).toBeVisible();
   await nodeCard(page, "n_wrap_up").click({ modifiers: ["Shift"] });
   await expect(page.getByTestId("selection-panel")).toHaveAttribute("data-count", "2");
   // The trial is already active, so Start is disabled; the other items of the Status menu are not.

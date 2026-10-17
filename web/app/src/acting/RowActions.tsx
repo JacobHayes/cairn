@@ -20,27 +20,37 @@ import { ownedBy } from "./yours.ts";
 
 /**
  * C11: "Decide" opens the inspector, opens the node's answer form, and puts the focus in it once it is
- * drawn. It waits up to a second for the node's detail: from a screen that is not the journey's (Home)
- * the navigation loads the graph's chunk first.
+ * drawn. It waits for the node's detail for as long as the page takes (from a screen that is not the
+ * journey's, such as Home, the navigation loads the graph's chunk first, and a loaded machine takes
+ * its time), and gives up when the person does something else: a key or a press.
  */
 function focusAnswerForm(node: string): void {
-  const until = performance.now() + 1000;
   let opened = false;
+  let waiting = true;
+  const stop = () => {
+    waiting = false;
+    document.removeEventListener("keydown", stop, true);
+    document.removeEventListener("pointerdown", stop, true);
+  };
+  document.addEventListener("keydown", stop, true);
+  document.addEventListener("pointerdown", stop, true);
   const look = () => {
+    if (!waiting) {
+      return;
+    }
     const detail = document.querySelector(`[data-testid="node-detail"][data-node="${node}"]`);
     const field = detail?.querySelector<HTMLElement>('[data-testid="answer-editor"] :is(select, input, textarea)');
     const answer = detail?.querySelector<HTMLElement>('[data-testid="actions"] button.primary');
     if (field !== null && field !== undefined) {
       field.focus();
+      stop();
       return;
     }
     if (answer !== null && answer !== undefined && !opened) {
       opened = true;
       answer.click();
     }
-    if (performance.now() < until) {
-      requestAnimationFrame(look);
-    }
+    requestAnimationFrame(look);
   };
   requestAnimationFrame(look);
 }
