@@ -1,4 +1,4 @@
-// What the acting surfaces' browser tests and proof share: opening the list, the list with Frontier
+// What the acting surfaces' browser tests share: opening the list, the list with Frontier
 // on, and the walk through the way a person does, reading their rows and cards, and starting a fresh journey
 // from the vendor evaluation's route on the server host (the creation screen is 5.5's).
 import { readFileSync } from "node:fs";

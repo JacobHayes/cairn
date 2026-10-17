@@ -4,7 +4,7 @@ A route's structure can now be built by hand on its canvas, from an empty draft,
 journey's structure edited in an edit mode on its canvas: nodes, edges, conditions, date
 rules, stages, roles, resources, breakdowns, and removals with their cascade, each previewed
 by the engine so a problem shows at its field before anything is sent. The pictures and video
-are made by `prove.sh` on the in-browser host.
+are from the in-browser host.
 
 ![An empty draft](2-empty-draft.png)
 A new route starts with an empty draft; the palette adds nodes to it.

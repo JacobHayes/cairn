@@ -55,8 +55,6 @@ inspector without opening the journey.
 
 A short video of a walkthrough pass: [a-walkthrough-pass.webm](a-walkthrough-pass.webm).
 
-`prove.sh` regenerates every picture and the video.
-
 ## Known limits
 
 - Undo on receipts, rows that collapse in place when someone else finishes them, and a

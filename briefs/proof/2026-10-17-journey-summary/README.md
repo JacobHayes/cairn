@@ -4,7 +4,6 @@ Open a journey and the first thing you see answers "where are we, and
 what needs me?": what is left, the end date, what to act on, the work
 under way, what is blocked and by what, and what just finished. Rows act
 in place (Done, Decide), and the page prints as a dated status report.
-`./prove.sh` regenerates everything here.
 
 ![Mid-journey](1-mid-journey.png)
 

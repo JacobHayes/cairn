@@ -3,7 +3,7 @@
 A journey's header is one line: its title, a "View: Graph ▾" picker that lists every view
 including the Walkthrough, and `⋯`, which now holds the journey's status. The row of Graph, List,
 Timeline and Summary tabs and the Walk through button are gone. A journey that is not active also
-says so beside its title, in a read-only chip. Regenerate the media with `prove.sh`.
+says so beside its title, in a read-only chip.
 
 These shots use the fixture vendor evaluation, in the light theme.
 

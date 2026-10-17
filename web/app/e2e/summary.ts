@@ -1,4 +1,4 @@
-// What the Summary's browser tests and proof share: a fresh journey from a route, a journey
+// What the Summary's browser tests share: a fresh journey from a route, a journey
 // stalled by snoozing what could be acted on, and reading the page's lists.
 import { expect, type Locator, type Page } from "@playwright/test";
 

@@ -4,7 +4,7 @@ One Depth control replaces the Detail steps and the Decisions button. It has fou
 after the deepest kind each draws: Stages, Decisions, Deliverables and Actions. Actions is the
 default. Keys 1 to 4 pick the step, on every view but the summary. Under it, "Fade the rest
 instead of hiding it" draws every card and dims the ones the depth would hide. The address says
-`depth=` and `fade=1`. Regenerate the media with `prove.sh`.
+`depth=` and `fade=1`.
 
 These shots use the fixture vendor evaluation, in the light theme.
 

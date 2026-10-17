@@ -43,8 +43,6 @@ Main flow: [main-flow.webm](main-flow.webm) goes Home, a row to its node, Journe
 | Rows shown | 19.8s | 0.7s |
 | Heap | 148MB | 68MB |
 
-Regenerate the media with `prove.sh`.
-
 ## Known limits
 
 - The loading, failure and empty states are drawn by the same `IndexState` and are covered by

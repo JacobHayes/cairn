@@ -50,8 +50,6 @@ reload brings back the same refusal at the same field, with the edit still on th
 
 [Video of the main flow](main-flow.webm)
 
-`prove.sh` regenerates the media.
-
 ## Known limits
 
 - The browser host's failures all count as unconfirmed (it has no status to tell a refusal

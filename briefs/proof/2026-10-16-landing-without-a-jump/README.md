@@ -17,7 +17,6 @@ Mine is one click away in the rail.
 | Data read to decide | the viewer, the index, every journey's "mine" | none |
 
 The decision is recorded in `decisions/2026-10-16-the-journey-index-lives-at-the-root.md`.
-`prove.sh` regenerates the picture.
 
 ## Known limits
 

@@ -1,4 +1,4 @@
-// What authoring's browser tests and proof share (brief 5.6): starting a route with an empty
+// What authoring's browser tests share (brief 5.6): starting a route with an empty
 // draft, adding a node from the palette and reaching its structure, a node form's fields,
 // roles, and a journey's edit mode, each the way a person does it.
 import { expect, type Locator, type Page } from "@playwright/test";

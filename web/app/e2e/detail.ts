@@ -1,4 +1,4 @@
-// What the node detail's browser tests and proof share: opening a node's detail the way a
+// What the node detail's browser tests share: opening a node's detail the way a
 // person does (from its card on the journey's canvas), and its sections, forms, and dates.
 import type { Locator, Page } from "@playwright/test";
 

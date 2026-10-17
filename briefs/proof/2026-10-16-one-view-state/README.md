@@ -4,7 +4,6 @@ Detail, Frontier, Filter and search are now one set of settings. Set them on one
 view draws from the same level: the graph, the list, the timeline and the walk through keep the
 same nodes, and each switch of view carries the settings with it. Frontier and Decisions only
 highlight. A view that cannot honour a setting keeps it set, shown disabled with the reason.
-Regenerate the media with `prove.sh`.
 
 These shots use a fresh vendor evaluation the viewer owns. Two decisions have dates, and their
 titles hold "shortlist": X is on the frontier, and Y waits on the plan. The settings are Detail at

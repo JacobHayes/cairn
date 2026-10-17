@@ -41,7 +41,7 @@ summary: the address gains and loses `view=`), Journeys, a node link, Routes.*
 | `/mine`, `/new`, `/library`, per-view paths | pages or redirects | no page |
 
 The calls are in `decisions/2026-10-17-one-address-per-journey-and-node.md` and
-`decisions/2026-10-17-a-selected-node-is-always-drawn.md`. `prove.sh` regenerates the media.
+`decisions/2026-10-17-a-selected-node-is-always-drawn.md`.
 
 ## Known limits
 

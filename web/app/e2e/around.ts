@@ -73,13 +73,6 @@ export async function routeAction(page: Page, name: string | RegExp): Promise<vo
   await expect.poll(() => routeRevision(page)).toBeGreaterThan(before);
 }
 
-/** The journeys route detail lists on `version`, each with whether an upgrade is available. */
-export async function versionJourneys(page: Page, version: number): Promise<Record<string, string>> {
-  const rows = page.locator(`[data-testid="version"][data-version="${String(version)}"] [data-testid="version-journey"]`);
-  const pairs: [string, string][] = await rows.evaluateAll((items) => items.map((item): [string, string] => [item.getAttribute("data-journey") ?? "", item.getAttribute("data-upgrade") ?? ""]));
-  return Object.fromEntries(pairs);
-}
-
 /** The text of the file a click saves. */
 export async function savedText(page: Page, click: () => Promise<void>): Promise<string> {
   const [download] = await Promise.all([page.waitForEvent("download"), click()]);

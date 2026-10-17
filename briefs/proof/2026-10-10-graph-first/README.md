@@ -3,7 +3,7 @@
 A journey is one page that opens on its graph. The views (Graph, List, Timeline, Summary) are one
 control, the Frontier is a lens on all of them rather than a page, and every list of nodes reads
 like the list's table. Each picture is shown in the light theme and the dark theme, which are both
-native. Regenerate them with `prove.sh`.
+native.
 
 ## The graph, and the Frontier
 

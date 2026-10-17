@@ -32,7 +32,7 @@ it unlocked comes next, labeled with that node:
 | Next list | rank order | rank order, unchanged |
 
 Passing a card sends it to the back and drops its label for good; Start a new pass returns to
-rank order. `prove.sh` regenerates the pictures.
+rank order.
 
 ## Known limits
 

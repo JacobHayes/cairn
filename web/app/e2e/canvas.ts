@@ -1,4 +1,4 @@
-// What the canvas's browser tests and proofs share: the lines a canvas draws, read the way the
+// What the canvas's browser tests share: the lines a canvas draws, read the way the
 // page shows them, and its viewport.
 import { expect, type Locator, type Page } from "@playwright/test";
 

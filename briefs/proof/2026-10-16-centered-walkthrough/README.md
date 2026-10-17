@@ -3,9 +3,8 @@
 The walkthrough now sits in the middle of the canvas area, at every width, and the "Back to
 graph" link is gone (the view picker and the browser's back button already lead there). The card,
 its position and Pass line, the introduction, and the end-of-pass and stalled notes share one
-560px column. On a phone the column fills the width, to the screen's gutter. Regenerate the
-"after" pictures with `prove.sh`; the "before" pictures were taken on the commit before this
-change.
+560px column. On a phone the column fills the width, to the screen's gutter. The "before"
+pictures were taken on the commit before this change.
 
 ## A desktop
 

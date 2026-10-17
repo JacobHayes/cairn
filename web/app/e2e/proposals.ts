@@ -1,4 +1,4 @@
-// What proposal review's browser tests and proof share (brief 5.7): the vendor evaluation's
+// What proposal review's browser tests share (brief 5.7): the vendor evaluation's
 // version 2 published from its file, the journey's local edits that meet it, a proposal's
 // review items and controls, and confirming and applying it, each the way a person does it.
 import { fileURLToPath } from "node:url";

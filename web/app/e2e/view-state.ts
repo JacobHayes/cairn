@@ -1,10 +1,10 @@
-// What the view state's browser tests and proof share: setting Depth, the highlights, the
+// What the view state's browser tests share: setting Depth, the highlights, the
 // Filter and the search from the toolbar the way a person does, and giving a node of a fresh
 // journey an owner, a pin and a title the search can find.
 import { expect, type Locator, type Page } from "@playwright/test";
 
 import { setFrontier } from "./acting.ts";
-import { pin, state } from "./detail.ts";
+import { pin } from "./detail.ts";
 import { menuItem, nodePanel, openFilter, openFromCanvas, rename, setDepth } from "./shell.ts";
 
 /** The viewer's entity on the in-browser host, as the vendor evaluation names it. */
@@ -53,17 +53,6 @@ export async function retitleAndPin(page: Page, node: string, title: string, dat
 
 /** As `retitleAndPin`, and makes the viewer the node's owner from its detail first. */
 export const ownAndPin = (page: Page, node: string, title: string, date: string) => retitleAndPin(page, node, title, date, true);
-
-/** On the journey's graph, answers the decision that fills the vendor evaluation's owner role with the viewer, from its detail. */
-export async function viewerOwnsTheJourney(page: Page): Promise<void> {
-  const panel = await openFromCanvas(page, "n_who_owns");
-  const editor = panel.getByTestId("answer-editor");
-  await editor.getByLabel("Answer").selectOption(VIEWER);
-  await editor.getByRole("button", { name: "Save", exact: true }).click();
-  await expect(state(panel)).toHaveAttribute("data-status", "done");
-  await page.keyboard.press("Escape");
-  await expect(nodePanel(page, "n_who_owns")).toHaveCount(0);
-}
 
 /** What the Filter is set to: Only mine, an owner, flags, and the two display-state switches. */
 export interface FilterSettings {

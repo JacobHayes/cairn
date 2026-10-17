@@ -59,4 +59,3 @@ changes. The List is the same review as rows, a cascaded removal beneath its cau
 Known limits:
 - A route draft has no trace or Signals lens yet; they need a trace and gravity from the host.
 - Remove on a selection confirms one node at a time.
-- Regenerate the pictures with `proof/authoring-review.proof.ts`.
