@@ -107,10 +107,10 @@ export async function openJourney(page: Page, host: HostKind, journey: string, q
   await open(page, host, `/journeys/${journey}?view=graph${query === "" ? "" : `&${query.replace(/^\?/, "")}`}`);
   await derived(page);
   await expect(page.getByTestId("node-card").first()).toBeVisible();
+  // Once the opening fit has moved the viewport off its start, so it cannot land after what the spec does next.
+  await page.waitForFunction(() => document.querySelector<HTMLElement>(".react-flow__viewport")?.style.transform !== "translate(0px, 0px) scale(1)");
   // The default opens the whole graph at every depth, fitted, so a spec reaches any node.
   if (query !== "") {
-    // After the opening fit has moved the viewport off its start, so it cannot land after this one.
-    await page.waitForFunction(() => document.querySelector<HTMLElement>(".react-flow__viewport")?.style.transform !== "translate(0px, 0px) scale(1)");
     await page.keyboard.press("f");
   }
 }

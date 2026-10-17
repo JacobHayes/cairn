@@ -62,7 +62,9 @@ function App({ session, layouts }: { session: Session; layouts: Layouts }) {
   return (
     <SessionContext value={session}>
       <LayoutsContext value={layouts}>
-        <BrowserRouter>
+        {/* A navigation is an urgent update, never a transition: every click and key acts on where the
+            page already is, so a key pressed before a slow render lands cannot undo the move before it. */}
+        <BrowserRouter useTransitions={false}>
           <Routes>
             <Route element={<Shell />}>
               {ADDRESSES.map(({ name, path }) => {

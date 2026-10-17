@@ -503,9 +503,10 @@ function OpenedForm({ opened, footer, ...props }: OpenProps & { opened: Opened; 
 }
 
 /**
- * What the graph's context menu chose for this node: it selects the node and leaves the choice in
- * the navigation's state, which the node's own Actions carry out once, with the handlers its `⋯`
- * and buttons use. The choice is taken off the history entry as it is run, so a reload does not repeat it.
+ * What the graph's context menu, or a row's Decide, chose for this node: it opens the node and
+ * leaves the choice in the navigation's state, which the node's own Actions carry out once they
+ * are drawn (however long the screen takes to load), with the handlers its `⋯` and buttons use.
+ * The choice is taken off the history entry as it is run, so a reload does not repeat it.
  */
 function useContextChoice(node: string, run: (id: ContextId) => void): void {
   const navigate = useNavigate();
@@ -526,14 +527,17 @@ function useContextChoice(node: string, run: (id: ContextId) => void): void {
 }
 
 /**
- * The `⋯` menu's groups and what each entry does, and the choice the graph's context menu left
- * for this node (done with the same handlers).
+ * The `⋯` menu's groups and what each entry does, and the choice the graph's context menu or a
+ * row's Decide left for this node (done with the same handlers), and whether Decide asked the
+ * answer form for the focus (`focusAnswer`, which the form calls once it has taken it).
  */
-function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runners: Record<MenuId, () => void> } {
+function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runners: Record<MenuId, () => void>; focusAnswer: (() => void) | undefined } {
   const { view, detail, write, form } = menus;
   const navigate = useNavigate();
   const { search } = useLocation();
   const insertHere = useInsertEntry();
+  // C11: Decide shows the answer form in place of any other form and asks it for the focus, which it takes once drawn.
+  const [focusAsked, setFocusAsked] = useState(false);
   // Only a frame with a stepper can insert: elsewhere the entry is not offered.
   const groups = menuOf(view, detail)
     .map((group) => group.filter((item) => item.id !== "insert-segment" || insertHere !== undefined))
@@ -544,7 +548,10 @@ function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runn
       runners[id as MenuId]();
       return;
     }
-    if (id === "done-with-evidence") {
+    if (id === "decide") {
+      form.close();
+      setFocusAsked(true);
+    } else if (id === "done-with-evidence") {
       // Opening the open case again keeps what was typed; another case takes the form's place.
       form.openForm("evidence", { artifact: "", note: "" });
     } else {
@@ -557,7 +564,7 @@ function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runn
       }
     }
   });
-  return { groups, runners };
+  return { groups, runners, focusAnswer: focusAsked ? () => { setFocusAsked(false); } : undefined };
 }
 
 export function Actions({ view, detail, onRename }: { view: Ready; detail: NodeDetail; onRename: () => void }) {
@@ -598,7 +605,7 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
           resent: form.resent,
         }
       : undefined;
-  const { groups, runners } = useMenu({ view, detail, write, form, onRename, onCopied: () => { setCopied(true); } });
+  const { groups, runners, focusAnswer } = useMenu({ view, detail, write, form, onRename, onCopied: () => { setCopied(true); } });
   const menu = <Overflow groups={groups} runners={runners} />;
   const acts = [...(offers.primary === undefined ? [] : [offers.primary]), ...offers.secondary];
   const moving = movesFrom(node.kind, record.state).includes("start") ? "Starting" : "Finishing";
@@ -606,7 +613,7 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
   const inDialog = open?.case === "snooze";
   return (
     <div className="stack" data-testid="actions">
-      {showsAnswer ? <AnswerEditor view={view} detail={detail} menu={menu} anyway={anyway} /> : null}
+      {showsAnswer ? <AnswerEditor view={view} detail={detail} menu={menu} anyway={anyway} focus={focusAnswer} /> : null}
       {showsAnswer && offers.secondary.includes("unsnooze") ? (
         <span>
           <ActButton act="unsnooze" view={view} detail={detail} write={write} form={form} waiting={false} />

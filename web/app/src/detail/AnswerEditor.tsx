@@ -7,7 +7,7 @@
 // (B3, E6). A blocked decision shows its form with Save disabled; answering anyway is a guard
 // bypass with a reason (D4).
 import type { Schema } from "@cairn/client";
-import { useId, useMemo, useState, type ReactNode } from "react";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 import { useProjected } from "../canvas/hooks.ts";
 import { valueOf } from "../data/keyed-read.ts";
@@ -447,12 +447,28 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
   };
 }
 
+/** C11: a ref for the form's box; with `focus`, the focus goes to its first field once that is drawn, and `focus` is called. */
+function useFocusOnRequest(focus: (() => void) | undefined) {
+  const box = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const field = box.current?.querySelector<HTMLElement>(":is(select, input, textarea, summary)");
+    if (focus === undefined || field === null || field === undefined) {
+      return;
+    }
+    field.focus();
+    focus();
+  });
+  return box;
+}
+
 /**
  * The decision's answer form. `menu` ends its action row (the inspector's `⋯`); `anyway` is the
- * bypass's reason draft, opened from that menu on a blocked decision.
+ * bypass's reason draft, opened from that menu on a blocked decision. With `focus` (C11: Decide
+ * asked for it), the focus goes to its first field once that is drawn, and `focus` is called.
  */
-export function AnswerEditor({ view, detail, menu, anyway }: { view: Ready; detail: NodeDetail; menu?: ReactNode; anyway?: Anyway | undefined }) {
+export function AnswerEditor({ view, detail, menu, anyway, focus }: { view: Ready; detail: NodeDetail; menu?: ReactNode; anyway?: Anyway | undefined; focus?: (() => void) | undefined }) {
   const state = useAnswerForm(view, detail, anyway);
+  const box = useFocusOnRequest(focus);
   const { node, rationale } = detail;
   const { write, form, why, stored, bypass } = state;
   if (!state.open) {
@@ -463,6 +479,7 @@ export function AnswerEditor({ view, detail, menu, anyway }: { view: Ready; deta
   const description = node.description ?? "";
   return (
     <div
+      ref={box}
       className="stack answer-form"
       data-testid="answer-editor"
       onKeyDown={(event) => {

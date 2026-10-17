@@ -102,10 +102,8 @@ async function walkHolds(page: Page, x: string, word: string): Promise<void> {
   await page.keyboard.press("m");
   await expect.poll(() => new URL(page.url()).searchParams.get("mine")).toBeNull();
   expect(new URL(page.url()).searchParams.get("frontier")).toBe("1");
-  await expect(async () => {
-    await page.keyboard.press("m");
-    await expect.poll(() => canon(page.url()), { timeout: 1000 }).toBe(before);
-  }).toPass();
+  await page.keyboard.press("m");
+  await expect.poll(() => canon(page.url())).toBe(before);
   await openFilter(page);
   await expect(filterOf(page).getByTestId("show-conditional").locator("input")).toBeDisabled();
   await expect(filterOf(page).getByTestId("show-not-relevant").locator("input")).toBeDisabled();

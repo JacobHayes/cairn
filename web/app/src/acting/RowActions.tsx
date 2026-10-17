@@ -19,43 +19,6 @@ import type { NodeRow } from "./why.ts";
 import { ownedBy } from "./yours.ts";
 
 /**
- * C11: "Decide" opens the inspector, opens the node's answer form, and puts the focus in it once it is
- * drawn. It waits for the node's detail for as long as the page takes (from a screen that is not the
- * journey's, such as Home, the navigation loads the graph's chunk first, and a loaded machine takes
- * its time), and gives up when the person does something else: a key or a press.
- */
-function focusAnswerForm(node: string): void {
-  let opened = false;
-  let waiting = true;
-  const stop = () => {
-    waiting = false;
-    document.removeEventListener("keydown", stop, true);
-    document.removeEventListener("pointerdown", stop, true);
-  };
-  document.addEventListener("keydown", stop, true);
-  document.addEventListener("pointerdown", stop, true);
-  const look = () => {
-    if (!waiting) {
-      return;
-    }
-    const detail = document.querySelector(`[data-testid="node-detail"][data-node="${node}"]`);
-    const field = detail?.querySelector<HTMLElement>('[data-testid="answer-editor"] :is(select, input, textarea)');
-    const answer = detail?.querySelector<HTMLElement>('[data-testid="actions"] button.primary');
-    if (field !== null && field !== undefined) {
-      field.focus();
-      stop();
-      return;
-    }
-    if (answer !== null && answer !== undefined && !opened) {
-      opened = true;
-      answer.click();
-    }
-    requestAnimationFrame(look);
-  };
-  requestAnimationFrame(look);
-}
-
-/**
  * E1: pick an owner for an unowned row, in the owner's slot: choosing sends it. The slot says
  * "Unassigned" quietly until the row is hovered, focused or selected, which swaps in the picker.
  */
@@ -153,10 +116,8 @@ export function RowActions({ view, row, to, owner = true }: { view: Ready; row: 
           {acts.includes("answer") ? (
             <Button
               primary
-              onClick={() => {
-                void navigate(to);
-                focusAnswerForm(row.key);
-              }}
+              // C11: the node's detail opens its answer form and focuses it when it arrives with this choice (detail/Actions.tsx).
+              onClick={() => void navigate(to, { state: { choice: { node: row.key, id: "decide" } } })}
             >
               Decide
             </Button>

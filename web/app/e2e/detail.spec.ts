@@ -35,9 +35,10 @@ test("a later pin is rejected with its chain, kept across a reload and counted a
   await needsYou.getByRole("button", { name: "Go to it" }).click();
   await expect(conflict).toBeVisible();
   await conflict.locator('[data-testid="resolution"][data-op="shift_pin"]').getByRole("button").click();
+  // The receipt goes after its few seconds: it is looked for first, from the click, so a slow check before it cannot outlast it.
+  await expect(panel.getByTestId("receipt").first()).toHaveText(/Saved/);
   await expect(conflict).toHaveCount(0);
   await expect(panel.getByTestId("pin-date")).toHaveText("Nov 20");
-  await expect(panel.getByTestId("receipt").first()).toHaveText(/Saved/);
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
 });
 
