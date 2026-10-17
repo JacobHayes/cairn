@@ -35,8 +35,8 @@ locally and nightly in CI; `mise run check` never builds it (its own Cargo works
   that the step in flight, resubmitted, is answered from its receipt exactly when it
   landed.
 
-Arguments: `--dir`, `--steps`, `--plan-seed`, `--open-attempts` (only to reproduce a Turso
-gap), `--bug ack-before-commit` (the planted client bug). A run ends with a `pass` verdict
+Arguments: `--dir`, `--steps`, `--plan-seed`, `--bug ack-before-commit` (the planted
+client bug). A run ends with a `pass` verdict
 whose detail is echoed as `DURABILITY_RESULT outcome=complete ...`, or `outcome=unavailable`
 when the store did not open on an erroring disk or failed closed (the server would exit and
 be restarted).
@@ -70,9 +70,8 @@ mise run sim     # every leg of sim.sh, from the repository root
    finding below; a sync can also fail on Turso's temporary database before the commit, and
    then nothing landed and the store rightly answers on), and a `sometimes!` oracle on the other outcome, a failed sync that closed the store,
    makes leg 4's campaign require that it happened.
-7. Known gaps still reproduce: the page-cache panic of a retried open (the first of 64
-   seeds that shows it; no check names a seed) and the absence of a partial Turso log
-   frame after a crash. The other Turso gaps are cases of the store's own tests.
+The known gaps in Findings are not checked here: they exercise pinned patina or Turso, not
+Cairn (`decisions/2026-10-17-simulation-runs-no-known-gap-checks.md`).
 
 No check here depends on one seed's outcome: a seed reproduces a run on one binary only
 (`decisions/2026-10-16-simulation-checks-pin-no-seed.md`).
@@ -107,7 +106,7 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
 - **Turso: opens under injected faults.** A log size error at open panics; a short read of
   the log header fails the open (both are cases in
   `crates/tests/tests/integration/store_turso/open_faults.rs`); an open retried in-process
-  after a failed one panics in the page cache (leg 7); `EINTR` is reported, not retried.
+  after a failed one panics in the page cache (a testbed-only path: Cairn's server exits and is restarted instead); `EINTR` is reported, not retried.
   Recorded in
   [`decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md`](../../decisions/2026-10-07-turso-an-open-under-injected-i-o-faults-panics-or-fails.md).
 - **Patina: no crash in campaigns, no partial Turso frame.** A campaign never draws a crash,

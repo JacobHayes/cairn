@@ -214,11 +214,9 @@ if [ "$rust" = 1 ]; then
   # `buggify!` site carries a literal kebab-case label. A campaign reads the labels declared
   # anywhere in a binary, and one holding a space breaks every campaign over it (patina gap 5,
   # decisions/2026-10-06-patina-a-site-label-holding-a-space-breaks-every-campaign.md). The
-  # exceptions: the one reproducer of that gap, and the durability testbed's crash oracles,
-  # whose kebab-case labels are constants so a campaign, which draws no crash, does not
-  # declare them (decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md).
+  # exception: the durability testbed's crash oracles, whose kebab-case labels are constants
+  # so a campaign, which draws no crash, does not declare them (decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md).
   label_exceptions=(
-    testbeds/multiplayer/gaps/src/bin/spaced_label.rs
     testbeds/durability/src/restart.rs
   )
   for exception in "${label_exceptions[@]}"; do

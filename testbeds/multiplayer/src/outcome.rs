@@ -284,7 +284,7 @@ impl Outcome {
     /// Reports the run through patina's verdict channel: a `violation` under each broken
     /// invariant's label, in [`INVARIANTS`] order, or a `pass` under `multiplayer-outcome`
     /// carrying the counts. Not `always!`, whose abort leaves no trace to replay (README,
-    /// gap 6); the exit code is 1 instead.
+    /// gap 6, patina issue); the exit code is 1 instead.
     pub fn judge(&self) -> ExitCode {
         let report = &self.report;
         let caught_up_us = self

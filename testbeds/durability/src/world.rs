@@ -50,9 +50,6 @@ pub struct World {
     faults: Faults,
     /// The open store and the service over it; none only while it is being reopened.
     open: Option<Open>,
-    /// Opens tried before the store counts as unavailable: 1 but to reproduce the Turso gap
-    /// of an open retried in-process (`--open-attempts`).
-    open_attempts: u32,
     /// The planted client bug (`--bug ack-before-commit`): each step is recorded as
     /// acknowledged, at the revision it will produce, before it is submitted.
     pub ack_before_commit: bool,
@@ -66,12 +63,7 @@ impl World {
     /// Opens the store in `directory` with the commit-point hook, which records in the
     /// ledger each point the in-flight step's commit reaches, so a crash-restart sweep can
     /// stop the process right after one (`--fs-crash-at sync:N`).
-    pub async fn open(
-        directory: PathBuf,
-        plan: Plan,
-        ledger: Ledger,
-        open_attempts: u32,
-    ) -> Result<World, Stop> {
+    pub async fn open(directory: PathBuf, plan: Plan, ledger: Ledger) -> Result<World, Stop> {
         let ledger = Arc::new(Mutex::new(ledger));
         let faults = Faults::default();
         let hooked = Arc::clone(&ledger);
@@ -85,14 +77,13 @@ impl World {
             Box::pin(std::future::ready(()))
         });
         faults.pause_with(hook);
-        let open = Open::new(&directory, &faults, open_attempts).await?;
+        let open = Open::new(&directory, &faults).await?;
         Ok(World {
             directory,
             plan,
             ledger,
             faults,
             open: Some(open),
-            open_attempts,
             ack_before_commit: false,
             reopened: 0,
             failures: 0,
@@ -120,7 +111,7 @@ impl World {
     /// loses nothing the store acknowledged.
     pub async fn reopen(&mut self) -> Result<(), Stop> {
         self.open = None;
-        self.open = Some(Open::new(&self.directory, &self.faults, self.open_attempts).await?);
+        self.open = Some(Open::new(&self.directory, &self.faults).await?);
         self.reopened += 1;
         Ok(())
     }
@@ -249,15 +240,8 @@ struct Open {
 }
 
 impl Open {
-    async fn new(directory: &Path, faults: &Faults, attempts: u32) -> Result<Open, Stop> {
-        let mut opened = Err(Stop::Unavailable("no open was attempted".to_owned()));
-        for _ in 0..attempts.max(1) {
-            opened = open_store(directory, faults).await;
-            if opened.is_ok() {
-                break;
-            }
-        }
-        let store = Arc::new(opened?);
+    async fn new(directory: &Path, faults: &Faults) -> Result<Open, Stop> {
+        let store = Arc::new(open_store(directory, faults).await?);
         let zone = TimeZone::fixed(Offset::constant(-5));
         let settings = DeploymentSettings::new(parse("Etc/GMT+5"), zone, RankConstants::default());
         let service = Service::new(Parts {

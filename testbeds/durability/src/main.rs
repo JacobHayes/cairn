@@ -16,8 +16,7 @@
 //! Arguments: `--dir PATH` (the data directory; default `/cairn-durability`, which exists
 //! only in patina's in-memory filesystem, so a native run passes one), `--steps N` (the
 //! plan's length, default 24), `--plan-seed N` (default: drawn from the run's seed),
-//! `--open-attempts N` (default 1: opens tried in-process before the store counts as
-//! unavailable; more only to reproduce a Turso gap), `--bug ack-before-commit` (the planted
+//! `--bug ack-before-commit` (the planted
 //! client bug: a step is recorded as acknowledged before it is submitted, which only a crash
 //! between the two can expose).
 
@@ -41,7 +40,6 @@ struct Options {
     directory: PathBuf,
     steps: usize,
     plan_seed: Option<u64>,
-    open_attempts: u32,
     ack_before_commit: bool,
 }
 
@@ -50,7 +48,6 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, Stri
         directory: PathBuf::from("/cairn-durability"),
         steps: DEFAULT_STEPS,
         plan_seed: None,
-        open_attempts: 1,
         ack_before_commit: false,
     };
     while let Some(flag) = args.next() {
@@ -67,12 +64,6 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, Stri
                     .parse()
                     .map_err(|error| format!("--plan-seed: {error}"))?;
                 options.plan_seed = Some(seed);
-            }
-            "--open-attempts" => {
-                let attempts = value()?
-                    .parse()
-                    .map_err(|error| format!("--open-attempts: {error}"))?;
-                options.open_attempts = attempts;
             }
             "--bug" => match value()?.as_str() {
                 "ack-before-commit" => options.ack_before_commit = true,
@@ -144,13 +135,7 @@ async fn run(options: &Options) -> Result<String, Stop> {
     let restarted = !ledger.entries().is_empty();
     let plan = plan_of(&mut ledger, options)?;
     let before = restart::Before::read(&options.directory, &ledger)?;
-    let mut world = World::open(
-        options.directory.clone(),
-        plan,
-        ledger,
-        options.open_attempts,
-    )
-    .await?;
+    let mut world = World::open(options.directory.clone(), plan, ledger).await?;
     world.ack_before_commit = options.ack_before_commit;
     let mut resubmit = None;
     if restarted {

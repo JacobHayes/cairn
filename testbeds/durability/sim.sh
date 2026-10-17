@@ -17,12 +17,12 @@
 #      invariant (a store that does not open on a failing disk is an honest outcome). A run
 #      that fails a write at a sync that landed and leaves the store answering is a
 #      violation of the testbed itself, and leg 4's campaign requires that a failed sync closing the store
-#      happened;
-#   7. known patina gaps and the Turso gap that needs a sweep (README, Findings): each must
-#      still reproduce. One that stops reproducing fails this leg, so a bump that fixes it
-#      gets its README section and its file in decisions/ updated instead of going stale.
-#      No check here depends on one seed's outcome
-#      (decisions/2026-10-16-simulation-checks-pin-no-seed.md).
+#      happened.
+#
+# The known patina and Turso gaps (README, Findings) are not checked here: they exercise
+# those pinned dependencies, not Cairn, and are recorded in decisions/
+# (decisions/2026-10-17-simulation-runs-no-known-gap-checks.md). No check here depends on
+# one seed's outcome (decisions/2026-10-16-simulation-checks-pin-no-seed.md).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -178,7 +178,7 @@ for err in "${crash_logs[@]}"; do
   grep -q '^DURABILITY_RESULT outcome=complete ' "$err" || fail "crash sweep: the store did not open or finish: $err"
 done
 # The torn-tail oracle is not required: at the pinned patina no crash leaves part of a Turso
-# log frame on disk (README, Findings), which leg 7 checks still holds.
+# log frame on disk (README, Findings).
 crash_oracles='durability-crash-between-state-and-events
 durability-crash-interrupted-commit-landed
 durability-crash-interrupted-commit-lost
@@ -205,20 +205,3 @@ while read -r status err; do
 done <"$out/crash-errors.runs"
 complete=$(grep -l '^DURABILITY_RESULT outcome=complete ' $(awk '{print $2}' "$out/crash-errors.runs") | wc -l)
 say "leg 6 passed: crash under errors, $complete of $(wc -l <"$out/crash-errors.runs") runs completed, no invariant broke"
-
-# The Turso gaps whose injected fault is deterministic are cases of the store's own tests
-# (crates/tests, store_turso/open_faults.rs). The last one needs a failed open at a point only
-# a run's fault draws reach, so it is a sweep: the gap still reproduces if any of the first
-# 64 seeds reproduces it, whichever seed that is on this binary.
-pattern='Attempted to insert different page with same key'
-for seed in $(seq 1 64); do
-  run --seed "$seed" --fs-error-permille 20 -- --open-attempts 64 >"$out/gap-reopen.log" 2>&1 || true
-  grep -Eq "$pattern" "$out/gap-reopen.log" && break
-done
-grep -Eq "$pattern" "$out/gap-reopen.log" ||
-  fail "Turso gap 'reopen-page-cache-panic' no longer reproduces in 64 seeds: update testbeds/durability/README.md and its file in decisions/"
-say "gap reopen-page-cache-panic still reproduces: $pattern"
-torn=$(grep -l '^DURABILITY_RESTART .*torn_tail=true' "${crash_logs[@]}" || true)
-[ -z "$torn" ] || fail "patina gap 'no-partial-log-frame' no longer reproduces ($torn): require durability-torn-log-tail-discarded in leg 5 and update README.md and its file in decisions/"
-say "gap no-partial-log-frame still reproduces: no crash left part of a Turso log frame"
-say "leg 7 passed: known gaps reproduce as recorded"

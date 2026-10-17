@@ -13,8 +13,10 @@
 #   5. faulted sweep: 8 seeds with dropped, refused, reset, and delayed connections; every
 #      run passes, every run resent a request, some patch was answered from its receipt,
 #      and no fault knob was inert;
-#   6. known patina gaps: each must still reproduce exactly as recorded, so a patina bump
-#      that fixes one gets its README section and DECISIONS.md entry updated.
+#
+# The known patina gaps (README, Patina gap report) are not checked here: they exercise the
+# pinned patina, not Cairn, and are recorded in decisions/
+# (decisions/2026-10-17-simulation-runs-no-known-gap-checks.md).
 #
 # One current-thread runtime with the 1 ms ticker (the testbed's default) is the
 # configuration the simulation spike (1.3) found the shim carries.
@@ -161,30 +163,3 @@ applied=$(grep -c '^PATINA_NET_FAULT_REPORT .* vacuous=0' "$out/sweep.log" || tr
 [ "$receipts" -gt 0 ] || fail "faulted sweep: no patch was answered from its receipt"
 [ "$applied" -eq "$seeds" ] || fail "faulted sweep: a net fault knob was inert"
 say "leg 5 passed: faulted sweep, $seeds seeds, every run resent, $receipts answered from a receipt"
-
-# gap NAME PATTERN COMMAND...: COMMAND must fail and print PATTERN.
-gap() {
-  local name=$1 pattern=$2 status=0
-  shift 2
-  "$@" >"$out/gap-$name.log" 2>&1 || status=$?
-  if [ "$status" -eq 0 ] || ! grep -Eq "$pattern" "$out/gap-$name.log"; then
-    fail "patina gap '$name' no longer reproduces (exit $status): update testbeds/multiplayer/README.md and DECISIONS.md"
-  fi
-  say "gap $name still reproduces: $(grep -Eo "$pattern" "$out/gap-$name.log" | head -1)"
-}
-gap unsupported-symbols 'refusing to run .* neither interposed by the deterministic runtime nor known-safe' \
-  cargo patina run "$testbed" --seed 1
-# Built from inside its own workspace first, so `target` is the managed symlink there too.
-(cd gaps && cargo build --locked --quiet) || fail "the gap reproducers do not build"
-for reproducer in spaced_label always_abort; do
-  cargo patina build gaps --bin "$reproducer" --output "$out/$reproducer" >"$out/$reproducer-build.log" 2>&1 || {
-    cat "$out/$reproducer-build.log" >&2
-    fail "cargo patina build gaps --bin $reproducer"
-  }
-done
-rm -rf "$out/spaced-campaign" "$out/always-abort.patina"
-gap spaced-label 'malformed SDK declared-site token' \
-  cargo patina campaign "$out/spaced_label" --gens 1 --out-dir "$out/spaced-campaign" --progress-every 0
-gap always-abort 'record finalization did not complete' \
-  cargo patina run "$out/always_abort" --seed 1 --record "$out/always-abort.patina"
-say "leg 6 passed: known gaps reproduce as recorded"

@@ -95,7 +95,8 @@ recorded twice is byte-identical, its replay reports the same verdict); the smok
 (16 generations, `--buggify --sched-pct`, every oracle in reach fired, no failure); the
 faulted sweep (8 seeds of dropped, delayed, refused, and reset
 connections, every run passing and resending, some patch answered from its receipt, no inert
-knob); and one leg per patina gap that fails once the gap stops reproducing.
+knob). The patina gaps below are not checked: they exercise the pinned patina, not Cairn
+(`decisions/2026-10-17-simulation-runs-no-known-gap-checks.md`).
 
 ## The product finding (fixed)
 
@@ -115,9 +116,9 @@ the campaign tolerates no finding.
 
 ## Patina gap report
 
-Three gaps beyond the three the spike found (gaps 1 to 3, tracked as patina issues), each with a
-`DECISIONS.md` entry tagged patina and a leg in `sim.sh` that fails once it stops
-reproducing. Reproducers for gaps 5 and 6 are the binaries in `gaps/`.
+Three gaps beyond the three the spike found (gaps 1 to 3, tracked as patina issues), each
+with a `DECISIONS.md` entry tagged patina. They are history: no leg checks that they still
+reproduce, and whoever bumps patina reads them.
 
 ### Gap 4: Turso links symbols the shim refuses to run beside
 
