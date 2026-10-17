@@ -221,6 +221,16 @@ fn an_empty_group_waits_for_its_opening_gate() {
     assert!(waiting.blocking().blocked(&key("n_stage")));
     assert!(!waiting.blocking().satisfies(&key("n_stage")));
     assert_eq!(
+        blockers(&waiting, "n_stage"),
+        BTreeSet::from([blocker(
+            "n_opens",
+            DependencyVia::StageOpening {
+                group: key("n_stage")
+            }
+        )]),
+        "an empty stage waits on its opening alone"
+    );
+    assert_eq!(
         blockers(&waiting, "n_next"),
         BTreeSet::from([blocker("n_stage", DependencyVia::Explicit)])
     );

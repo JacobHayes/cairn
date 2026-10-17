@@ -4,7 +4,9 @@
 
 use crate::engine::support;
 
-use cairn_schema::{Graph, ParticipationSource, ProposalStatus, State};
+use std::collections::BTreeSet;
+
+use cairn_schema::{Graph, Mutation, ParticipationSource, ProposalStatus, State};
 use support::{finished, key};
 
 #[test]
@@ -16,6 +18,65 @@ fn every_fixture_scenario_applies() {
             assert_eq!(result.events().len(), step.patch.mutations.len(), "{name}");
         }
     }
+}
+
+/// What a fixture's scenario submits, read from its source, so an expected count follows the
+/// fixture rather than being written down a second time: each step's mutations, with those of
+/// a proposal it drafts.
+fn submitted(name: &str) -> Vec<Vec<Mutation>> {
+    let scenario = support::scenario(name);
+    let mut steps = Vec::new();
+    for step in scenario.steps.as_slice() {
+        let mut mutations = Vec::new();
+        for mutation in step.patch.mutations.as_slice() {
+            if let Mutation::CreateProposal { proposal } = mutation {
+                mutations.extend(proposal.mutations.as_slice().iter().cloned());
+            }
+            mutations.push(mutation.clone());
+        }
+        steps.push(mutations);
+    }
+    steps
+}
+
+/// The nodes a fixture's scenario adds under `parent`.
+fn added_under(name: &str, parent: &str) -> usize {
+    let parent = Some(key(parent));
+    submitted(name)
+        .iter()
+        .flatten()
+        .filter(|mutation| matches!(mutation, Mutation::AddNode { node } if node.parent == parent))
+        .count()
+}
+
+/// The nodes a fixture's scenario adds anywhere.
+fn added(name: &str) -> usize {
+    let adds = |mutation: &&Mutation| matches!(mutation, Mutation::AddNode { .. });
+    submitted(name).iter().flatten().filter(adds).count()
+}
+
+/// The decisions a fixture's scenario answers.
+fn answered(name: &str) -> BTreeSet<cairn_schema::NodeKey> {
+    let decision = |mutation: &Mutation| match mutation {
+        Mutation::Answer { decision, .. } => Some(decision.clone()),
+        _ => None,
+    };
+    submitted(name)
+        .iter()
+        .flatten()
+        .filter_map(decision)
+        .collect()
+}
+
+/// E6: the deployment's revision after a fixture's scenario: one for each step that creates
+/// entities, directly or in the proposal it drafts (whose creates ride in its apply).
+fn entity_steps(name: &str) -> u32 {
+    let creates = |step: &Vec<Mutation>| {
+        step.iter()
+            .any(|mutation| matches!(mutation, Mutation::CreateEntity { .. }))
+    };
+    let steps = submitted(name).iter().filter(|step| creates(step)).count();
+    u32::try_from(steps).unwrap()
 }
 
 fn only_graph(records: &cairn_engine::Records) -> &Graph {
@@ -39,14 +100,33 @@ fn the_vendor_evaluation_ends_broken_down_and_pinned() {
         .values()
         .filter(|node| node.parent == Some(key("n_workload")))
         .count();
-    assert!(children > 0, "the placeholder was broken down (B10)");
+    let breakdown = added_under("vendor-evaluation", "n_workload");
+    assert!(breakdown > 0, "the scenario breaks the placeholder down");
+    assert_eq!(children, breakdown, "the placeholder was broken down (B10)");
     assert!(graph.state.snoozes.is_empty(), "B6");
     assert_eq!(
         graph.state.pins[&key("n_final_report")],
         "2026-11-02".parse().unwrap()
     );
-    let entities = &records.deployment.entities;
-    assert!(entities.get(&"e_reviewer".parse().unwrap()).is_some(), "E6");
+    let answers: BTreeSet<_> = graph.state.answers.keys().cloned().collect();
+    assert_eq!(
+        answers,
+        answered("vendor-evaluation"),
+        "every decision answered, once (B2)"
+    );
+    let deployment = &records.deployment;
+    assert!(
+        deployment
+            .entities
+            .get(&"e_reviewer".parse().unwrap())
+            .is_some(),
+        "E6"
+    );
+    assert_eq!(
+        deployment.revision.get(),
+        entity_steps("vendor-evaluation"),
+        "each patch that created entities moved the deployment once (E6)"
+    );
 }
 
 /// A2, B10, E3: a skipped screen, and interviews that each name one explicit panelist.
@@ -56,10 +136,14 @@ fn the_hiring_loop_ends_with_explicit_panelists() {
     let graph = only_graph(&records);
     assert_eq!(state_of(graph, "n_screen"), State::Skipped);
     assert_eq!(state_of(graph, "n_interviews"), State::Done);
-    let interviews = graph
+    let interviews: Vec<_> = graph
         .nodes
         .values()
-        .filter(|node| node.parent == Some(key("n_interviews")));
+        .filter(|node| node.parent == Some(key("n_interviews")))
+        .collect();
+    let broken_down = added_under("hiring-loop", "n_interviews");
+    assert!(broken_down > 0, "the scenario breaks the interviews down");
+    assert_eq!(interviews.len(), broken_down);
     for interview in interviews {
         let source = interview.participations.as_map().values().next();
         assert!(
@@ -90,7 +174,12 @@ fn the_bake_off_applies_its_proposal() {
     let proposal = records.proposals.values().next().unwrap();
     assert_eq!(proposal.status, ProposalStatus::Applied);
     let graph = only_graph(&records);
+    assert_eq!(
+        graph.nodes.len(),
+        added("bake-off"),
+        "every node the proposal drafted"
+    );
     assert!(graph.roles.get(&"r_judges".parse().unwrap()).is_some());
     assert_eq!(state_of(graph, "n_trial_a"), State::Active);
-    assert_eq!(records.deployment.revision.get(), 1);
+    assert_eq!(records.deployment.revision.get(), entity_steps("bake-off"));
 }

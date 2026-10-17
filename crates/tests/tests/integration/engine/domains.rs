@@ -300,7 +300,20 @@ fn walk_deployment(records: &Records, ops: &mut BTreeSet<String>) -> Records {
         panic!("a merge naming a journey's old revision is stale (E6)")
     };
     assert!(matches!(conflicts[0].of, RevisionOf::Domain(_)));
+    let informed = |records: &Records| {
+        support::vendor_graph(records).state.answers[&support::key("n_who_informed")].clone()
+    };
+    let before = informed(&records);
+    assert!(
+        matches!(&before, cairn_schema::AnswerValue::EntityList(list) if list.as_set().contains(&"e_stakeholder_b".parse().unwrap())),
+        "the journey names the entity the merge folds away"
+    );
     let records = accept(&records, "deployment", &merge, ops);
+    assert_eq!(
+        informed(&records),
+        before,
+        "a merge does not rewrite journey references (E6)"
+    );
     let deployment = &records.deployment;
     assert!(
         deployment

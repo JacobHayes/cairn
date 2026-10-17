@@ -61,7 +61,7 @@ impl Fixture {
         Ok(self.after.get(step).ok_or("no such step")?)
     }
 
-    /// The journey's graph and derive in `records`, at the matrix's clock.
+    /// The journey's graph and derive in `records`, at the scenario tests' fixed clock.
     fn derive(&self, records: &Records) -> Result<(Graph, Derived)> {
         let journey = records.journeys.get(&self.journey).ok_or("no journey")?;
         let graph =

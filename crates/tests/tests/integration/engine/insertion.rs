@@ -47,6 +47,15 @@ fn with_first_review() -> Records {
     support::accepted_to(&finished, HIRING, &insert_review("i_one", WIRE))
 }
 
+/// How many nodes the inserted version of the security review holds.
+fn segment_size(records: &Records) -> usize {
+    let versions = records.versions.values();
+    let found = versions
+        .into_iter()
+        .find(|v| v.route.as_str() == "security-review" && v.version.get() == 1);
+    found.unwrap().graph.nodes.len()
+}
+
 /// The key of the first insertion's `reviewer` role.
 fn reviewer_in(records: &Records) -> cairn_schema::RoleKey {
     let roles = hiring(records).roles.values();
@@ -97,7 +106,18 @@ fn a_segment_inserted_twice_gets_its_own_keys_and_resolves_through_the_first_rol
             .filter(|s| s.provenance == Provenance::FromSegment)
             .count()
     };
+    let segment = segment_size(&one);
+    assert_eq!(
+        from_segment(&one),
+        segment,
+        "the first insertion copies every segment node, each with its initial state"
+    );
     let added_by_two = from_segment(&two) - from_segment(&one);
+    assert_eq!(
+        added_by_two,
+        segment - 1,
+        "the second leaves its Who reviews? out"
+    );
     assert_eq!(
         added_by_two,
         graph

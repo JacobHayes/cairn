@@ -373,7 +373,7 @@ fn next_re_sorts_by_one_signal() {
 /// window: gravity and unlocks rank, so the launch leads, then the work feeding it, and the
 /// retrospective, with no deadline, sorts last by slack too.
 #[test]
-fn the_launch_ranks_by_gravity_at_the_matrix_day_and_re_sorts_by_slack() {
+fn the_launch_ranks_by_gravity_at_the_scenario_day_and_re_sorts_by_slack() {
     let launch = Derive::on(
         &support::finished("product-launch"),
         "j_launch",

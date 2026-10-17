@@ -397,7 +397,7 @@ fn the_projection_lines_are_what_the_engine_projects() {
 }
 
 /// C18: each fixture's status-summary line, read at the end of its scenario on the scenario
-/// matrix's day: the in-scope nodes by display state, how many remain, the overdue, short and
+/// tests' fixed day: the in-scope nodes by display state, how many remain, the overdue, short and
 /// stale nodes, the milestones not yet reached with their dates, and the open decisions.
 #[test]
 fn the_status_summary_lines_are_what_the_engine_summarizes() {

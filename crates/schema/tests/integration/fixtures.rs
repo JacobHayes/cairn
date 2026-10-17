@@ -17,7 +17,7 @@ fn fixtures_root() -> PathBuf {
 }
 
 /// Each segment fixture: a route file of kind segment, with no scenario of its own (the
-/// scenario that inserts it is in the engine's matrix).
+/// engine's insertion tests insert it).
 fn segments() -> Vec<(String, RouteFile)> {
     let mut found = Vec::new();
     for entry in std::fs::read_dir(fixtures_root()).unwrap() {

@@ -16,7 +16,7 @@ file is that version. Route files carry every key, so scenario patches can refer
 roles, and kinds by key. Every file is written in canonical form: parsing and writing it
 gives the same bytes, which `crates/schema/tests/integration/fixtures.rs` checks. A segment
 fixture holds a `segment.yaml` (a route file of kind `segment`) and no scenario of its own:
-the engine's matrix inserts it into another fixture's journey.
+the engine's insertion tests insert it into another fixture's journey.
 
 The derived values below are read from this file by
 `crates/tests/tests/integration/engine/fixture_readme.rs` and checked against the engine: its
@@ -250,7 +250,7 @@ After the two insertions the journey holds the root paths `security-review` (ins
 `i_review_one`, four members) and `security-review-2` (`i_review_two`, three), with disjoint
 keys. The frontier is `offer`, each insertion's `sensitivity`, and the first insertion's
 `who-reviews`; the threat models are conditional until their sensitivity is answered. The
-matrix scenario checks the root paths and the frontier.
+engine's insertion test checks the root paths and the frontier.
 
 ## Status summaries
 

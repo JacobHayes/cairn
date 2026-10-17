@@ -94,6 +94,28 @@ fn keep_exempts_a_subtree_and_becomes_kept_work() {
     assert!(skips.kept_work(&key("n_plan_draft")).is_empty());
 }
 
+/// D1a, D4: an effectively skipped intermediate container satisfies its dependents only
+/// once the kept work beneath it does, and the effectively skipped work leaves the
+/// frontier.
+#[test]
+fn a_cascaded_skip_holds_dependents_on_the_kept_work() {
+    let pending = vendor(&[keep("n_plan_review"), skip("n_setup")]);
+    let blocking = pending.blocking();
+    assert!(!blocking.satisfies(&key("n_plan")), "kept work pending");
+    assert!(blocking.blocked(&key("n_comparison_set")));
+    assert!(blocking.frontier().contains(&key("n_plan_review")));
+    for skipped in ["n_access", "n_plan_draft"] {
+        assert!(!blocking.frontier().contains(&key(skipped)), "{skipped}");
+    }
+    let done = vendor(&[
+        keep("n_plan_review"),
+        skip("n_setup"),
+        "- op: transition\n  node: n_plan_review\n  transition: complete\n".to_owned(),
+    ]);
+    assert!(done.blocking().satisfies(&key("n_plan")));
+    assert!(done.blocking().actionable(&key("n_comparison_set")));
+}
+
 #[test]
 fn only_in_scope_work_is_skipped_or_kept() {
     // After step 4 the partner-led branch is not relevant (partner runs: no).
