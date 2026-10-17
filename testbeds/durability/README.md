@@ -55,7 +55,7 @@ mise run sim     # every leg of sim.sh, from the repository root
    AVX-512 FP16 kernels, which Turso links and Cairn never reaches (6.1's patina entry),
    allowed by name; rustix's raw syscall runs through syscall-user dispatch.
 3. A crash-restart run recorded twice is byte-identical and replays its verdict.
-4. Smoke campaign: 32 generations of buggify, fs errors and short I/O (bands at 100 per
+4. Smoke campaign: 256 generations of buggify, fs errors and short I/O (bands at 100 per
    mille of their default), and swarm. Every generation passes, and every oracle fires but
    a named out-of-reach list (two writers in flight, proposals, imports, derived reads, and
    a failed write retried, which now fires here).
@@ -66,8 +66,9 @@ mise run sim     # every leg of sim.sh, from the repository root
    acknowledged commits.
 6. The same sweep with fs errors at 5 per mille: no invariant breaks. A run whose store
    fails closed ends `unavailable`, as one whose store does not open does. A write that
-   fails at a sync while the store still answers is a violation (the store finding below),
-   and a `sometimes!` oracle on the other outcome, a failed sync that closed the store,
+   fails at a sync and landed while the store still answers is a violation (the store
+   finding below; a sync can also fail on Turso's temporary database before the commit, and
+   then nothing landed and the store rightly answers on), and a `sometimes!` oracle on the other outcome, a failed sync that closed the store,
    makes leg 4's campaign require that it happened.
 7. Known gaps still reproduce: the page-cache panic of a retried open (the first of 64
    seeds that shows it; no check names a seed) and the absence of a partial Turso log

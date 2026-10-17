@@ -34,8 +34,11 @@ Alternatives:
 - A baseline schema for fresh stores, skipping the migrations: a second copy of the schema to
   keep equal to the migrated one, for a harness limit.
 - `temp_store = MEMORY` on every connection: also removes any later statement's temporary
-  files, but lets a large sort grow in memory; the migrations are the only statements known
-  to remove a directory, and the sweep fails if another one starts to.
+  files, but lets a large sort grow in memory. The migrations are not the only statements
+  that use one: a 256-generation smoke campaign saw a step's statement create, sync and
+  remove Turso's temporary database. The sweep still reaches its crash points, so the
+  pragma stays on the migrations, and the sweep fails if a statement it reaches starts to
+  stop them.
 - Fixing patina (a removed directory should not stop crash points): the right place for the
   limit, and a pin bump would let the pragma go. Not done here: patina is another repository.
 

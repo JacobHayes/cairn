@@ -7,7 +7,7 @@
 #      ones Turso links and Cairn never reaches (README, Audit), allowed by name;
 #   3. determinism: a crash-restart run recorded twice is byte-identical, and its replay
 #      reports the same verdict;
-#   4. smoke campaign: buggify, dampened fs errors and short I/O, and swarm over 32
+#   4. smoke campaign: buggify, dampened fs errors and short I/O, and swarm over 256
 #      generations; every generation passes, and every declared oracle fired except the
 #      ones named below as out of this testbed's reach;
 #   5. crash sweep: crash-restart at every 11th write and sync, with whole-block and
@@ -15,8 +15,8 @@
 #      invariants holding, and every crash oracle fires somewhere in the sweep;
 #   6. crash under errors: the sweep's crash points with fs errors too; no run breaks an
 #      invariant (a store that does not open on a failing disk is an honest outcome). A run
-#      that fails a write at a sync and leaves the store answering is a violation of the
-#      testbed itself, and leg 4's campaign requires that a failed sync closing the store
+#      that fails a write at a sync that landed and leaves the store answering is a
+#      violation of the testbed itself, and leg 4's campaign requires that a failed sync closing the store
 #      happened;
 #   7. known patina gaps and the Turso gap that needs a sweep (README, Findings): each must
 #      still reproduce. One that stops reproducing fails this leg, so a bump that fixes it
@@ -103,14 +103,18 @@ out_of_reach=(
   service-proposal-patch-answered-from-receipt
   service-proposal-refreshed-against-destination
 )
+# The rarest oracle in reach (a failed sync closing the store) fires in about 1 generation
+# in 32, so 32 generations missed it about one night in three; 256 miss it about once in
+# 3,000 nights.
+gens=256
 rm -rf "$out/campaign"
-cargo patina campaign "$bed" --gens 32 --buggify --faults --fault-scale-permille 100 --swarm \
+cargo patina campaign "$bed" --gens "$gens" --buggify --faults --fault-scale-permille 100 --swarm \
   --allow-unmet-sometimes --allow-unsupported-symbols "$allow" --out-dir "$out/campaign" \
   --progress-every 0 >"$out/campaign.log" 2>&1 || {
   sed -n '/campaign summary/,$p' "$out/campaign.log" >&2
   fail "smoke campaign"
 }
-grep -q '^generations=32 failures=0 ' "$out/campaign.log" || fail "smoke campaign: a generation failed"
+grep -q "^generations=$gens failures=0 " "$out/campaign.log" || fail "smoke campaign: a generation failed"
 # The coverage gate, by hand: --allow-unmet-sometimes waives every site, so this requires
 # every site but the ones named above.
 unmet=$(jq -r '.sites[] | select((.kind == "sometimes" or .kind == "reachable") and .satisfied_gens == 0) | .label' \
@@ -124,7 +128,7 @@ for label in "${out_of_reach[@]}"; do
 done
 inert=$(jq -r '.sites[] | select(.kind == "fault" and .fires == 0) | .label' "$out/campaign/sites.json")
 [ -z "$inert" ] || fail "smoke campaign: buggify sites never fired: $inert"
-say "leg 4 passed: smoke campaign, 32 generations, $(jq '[.sites[] | select(.satisfied_gens > 0)] | length' \
+say "leg 4 passed: smoke campaign, $gens generations, $(jq '[.sites[] | select(.satisfied_gens > 0)] | length' \
   "$out/campaign/sites.json") oracles fired, every one in reach"
 
 # sweep NAME [FLAG...]: crash-restart at every 11th write and sync from the 2nd to the
