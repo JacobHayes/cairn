@@ -6,6 +6,7 @@ import { DeriveWorker, InBrowserHost, loadEngine } from "@cairn/wasm";
 
 import wasmUrl from "../../wasm/dist/bindgen/cairn_wasm_bg.wasm?url";
 
+import { forgetEarlierKeptTurns } from "./assistant/conversation.ts";
 import { browserHost } from "./data/browser-host.ts";
 import { tabStorage } from "./data/drafts.ts";
 import { tabEditStore } from "./data/edit-record.ts";
@@ -33,5 +34,6 @@ export async function boot(): Promise<Session> {
   const [host, deriver] = await Promise.all([startHost(__CAIRN_HOST__), DeriveWorker.start(wasm)]);
   // Before the session restores the tab's edit records: a tab open across a deploy holds the old drafts.
   migrateTabDrafts(tabStorage(), tabEditStore());
+  forgetEarlierKeptTurns(tabStorage());
   return Session.start({ host, deriver });
 }

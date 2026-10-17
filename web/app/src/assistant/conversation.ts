@@ -13,7 +13,7 @@ import { networkFailure, type HttpFailure } from "@cairn/client";
 import { assign, fromPromise, setup, waitFor, type ActorRefFrom, type SnapshotFrom } from "xstate";
 
 import type { AssistantHost, AssistantTarget, Conversation, TurnOutcome, TurnReply } from "../data/assistant.ts";
-import { readDraft, writeDraft } from "../data/drafts.ts";
+import { DRAFT_PREFIX, readDraft, writeDraft } from "../data/drafts.ts";
 import { answeredEntries, holdsTurn, keeping, keptTurn, latestAnswerAt, type KeptTurn, type Unsaved } from "./model.ts";
 
 export type Read = { status: "loading" } | { status: "failed"; message: string } | { status: "ready"; conversation: Conversation };
@@ -35,7 +35,35 @@ export interface KeptTurns {
   write(conversation: string, turns: KeptTurn[]): void;
 }
 
-const keptKey = (conversation: string): string => `assistant-turns:${conversation}`;
+/**
+ * Where a conversation's kept turns are stored. The version names the turns' shape: a tab open
+ * across a deploy that changed it holds turns under an earlier version's key, which this build
+ * never reads (a proposed action kept before proposals named their destination has no address).
+ */
+export const keptKey = (conversation: string): string => `assistant-turns-2:${conversation}`;
+
+/** What every earlier build's kept-turn keys start with. */
+const EARLIER_KEPT = `${DRAFT_PREFIX}assistant-turns:`;
+
+/**
+ * Removes the turns an earlier build kept in `storage` (a tab's session storage; none where it
+ * is unavailable), once at boot. Unread, they would only take space: without them the
+ * conversation shows those turns' reports as Cairn kept them, as text. Goes once one release has
+ * shipped it.
+ */
+export function forgetEarlierKeptTurns(storage: Storage | undefined): void {
+  if (storage === undefined) {
+    return;
+  }
+  try {
+    const earlier = Array.from({ length: storage.length }, (_, at) => storage.key(at)).filter((key): key is string => key?.startsWith(EARLIER_KEPT) === true);
+    for (const key of earlier) {
+      storage.removeItem(key);
+    }
+  } catch {
+    // Storage refused: the earlier keys stay, unread.
+  }
+}
 
 export const draftTurns: KeptTurns = {
   read: (conversation) => readDraft<KeptTurn[]>(keptKey(conversation)) ?? [],

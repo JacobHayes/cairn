@@ -5,8 +5,9 @@
 import { createActor } from "xstate";
 import { describe, expect, it } from "vitest";
 
-import { memoryTurns, settled } from "../data/fake.test-support.ts";
-import { conversationMachine, conversationView, sendTurn, type ConversationRef } from "./conversation.ts";
+import { DRAFT_PREFIX } from "../data/drafts.ts";
+import { memoryStorage, memoryTurns, settled } from "../data/fake.test-support.ts";
+import { conversationMachine, conversationView, forgetEarlierKeptTurns, keptKey, sendTurn, type ConversationRef } from "./conversation.ts";
 import { HandHost, answered, holding, replied, said, target } from "./hand-host.test-support.ts";
 import { shown } from "./model.ts";
 
@@ -194,5 +195,19 @@ describe("the turns a conversation keeps", () => {
     host.reads[1]?.fail(new Error("down"));
     await settled();
     expect(conversationView(ref.getSnapshot()).read).toEqual({ status: "failed", message: "down" });
+  });
+});
+
+describe("turns kept by an earlier build", () => {
+  it("are removed at boot, and this build's turns stay", () => {
+    const storage = memoryStorage();
+    // A proposed action kept before proposals named their destination: this build cannot address it.
+    const earlier = [{ at: "t2", actions: [{ outcome: "proposed", tool: "create_proposal", proposal: "p_1", because: { reason: "asked" } }], ended: { status: "replied" } }];
+    storage.setItem(`${DRAFT_PREFIX}assistant-turns:c_1`, JSON.stringify(earlier));
+    storage.setItem(`${DRAFT_PREFIX}${keptKey("c_1")}`, JSON.stringify([]));
+    storage.setItem(`${DRAFT_PREFIX}title:j_one:n_a`, JSON.stringify("Unrelated"));
+    forgetEarlierKeptTurns(storage);
+    const keys = Array.from({ length: storage.length }, (_, at) => storage.key(at)).sort();
+    expect(keys).toEqual([`${DRAFT_PREFIX}${keptKey("c_1")}`, `${DRAFT_PREFIX}title:j_one:n_a`].sort());
   });
 });
