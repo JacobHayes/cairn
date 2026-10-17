@@ -11,11 +11,12 @@ import { useViewer } from "../data/react.ts";
 import { DoneButton, EvidenceForm, type Needs } from "../detail/DoneEvidence.tsx";
 import { transition, type Ready } from "../detail/model.ts";
 import { Rejected } from "../detail/Rejected.tsx";
-import { entityName, resolveEntity } from "../detail/sections.tsx";
+import { entityName } from "../detail/sections.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { Button } from "../ui/kit.tsx";
 import { actsFor, assignOwner, doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
 import type { NodeRow } from "./why.ts";
+import { ownedBy } from "./yours.ts";
 
 /**
  * C11: "Decide" opens the inspector, opens the node's answer form, and puts the focus in it once it is
@@ -42,12 +43,6 @@ function focusAnswerForm(node: string): void {
     }
   };
   requestAnimationFrame(look);
-}
-
-/** Whether one of the viewer's entities, through any merge, owns the row. */
-function ownedBy(view: Ready, row: NodeRow, entities: readonly string[]): boolean {
-  const mine = new Set(entities.map((key) => resolveEntity(view, key)));
-  return (row.owners ?? []).some((key) => mine.has(resolveEntity(view, key)));
 }
 
 /**
@@ -121,7 +116,7 @@ export function RowActions({ view, row, to, owner = true }: { view: Ready; row: 
       <div className="row-side">
         {row.unassigned === true ? (
           <AssignInline view={view} write={write} node={row.key} />
-        ) : !owner ? null : ownedBy(view, row, viewer?.entities ?? []) ? (
+        ) : !owner ? null : ownedBy(view, row.owners, viewer?.entities ?? []) ? (
           <span className="row-owner">You</span>
         ) : (
           <span className="row-owner row-owner-other" title={owners === "" ? undefined : `Owned by ${owners}`}>

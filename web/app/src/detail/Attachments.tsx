@@ -100,7 +100,7 @@ function Editor({ write, node, form, types }: { write: NodeWrite; node: string |
   );
 }
 
-function Item({ annotation, today, write, onEdit }: { annotation: Annotation; today: string; write: NodeWrite; onEdit: () => void }) {
+function Item({ annotation, today, write, onEdit, readOnly }: { annotation: Annotation; today: string; write: NodeWrite; onEdit: () => void; readOnly: boolean }) {
   const { body } = annotation;
   const { type, text } = contentOf(body);
   const link = type !== "note";
@@ -118,7 +118,7 @@ function Item({ annotation, today, write, onEdit }: { annotation: Annotation; to
         Added by {userWords(annotation.created_by)} on {dateWords(annotation.created_at.slice(0, 10), today)}
         {annotation.edited_at == null ? "" : `; edited ${dateWords(annotation.edited_at.slice(0, 10), today)}`}
       </span>
-      <span className="row">
+      {readOnly ? null : <span className="row">
         <Button disabled={write.disabled} onClick={onEdit}>Edit</Button>
         {designates ? (
           <Button disabled={write.disabled} onClick={() => void write.run([{ op: "edit_annotation", annotation: designated(body, type !== "artifact") }])}>
@@ -128,7 +128,7 @@ function Item({ annotation, today, write, onEdit }: { annotation: Annotation; to
         <Button disabled={write.disabled} onClick={() => void write.run([{ op: "remove_annotation", annotation: body.key }])}>
           Remove
         </Button>
-      </span>
+      </span>}
     </li>
   );
 }
@@ -146,6 +146,8 @@ export function AnnotationList({
   bare = false,
   open = true,
   fold,
+  readOnly = false,
+  showNone = true,
 }: {
   view: Ready;
   node: string | null;
@@ -155,6 +157,10 @@ export function AnnotationList({
   /** Whether the section starts open, and the key its fold is remembered under (folds.ts). */
   open?: boolean;
   fold?: string;
+  /** An archived journey accepts no change (A19): the notes are listed, none added, edited or removed. */
+  readOnly?: boolean;
+  /** Whether an empty list says "None yet." */
+  showNone?: boolean;
 }) {
   const write = useNodeWrite(view, `annotations:${node ?? "journey"}`, node ?? undefined);
   const form = useFormDraft<AnnotationDraft>(write.journey, node ?? "journey", "annotation");
@@ -165,13 +171,13 @@ export function AnnotationList({
   };
   const body = (
     <>
-      {annotations.length === 0 ? <span className="muted small">None yet.</span> : null}
+      {annotations.length === 0 && showNone ? <span className="muted small">None yet.</span> : null}
       <ul className="checklist stack">
         {annotations.map((annotation) => (
-          <Item key={annotation.body.key} annotation={annotation} today={view.derived.today} write={write} onEdit={() => { edit(annotation); }} />
+          <Item key={annotation.body.key} annotation={annotation} today={view.derived.today} write={write} onEdit={() => { edit(annotation); }} readOnly={readOnly} />
         ))}
       </ul>
-      {form.draft === undefined ? (
+      {readOnly ? null : form.draft === undefined ? (
         <span className="row">
           <Button disabled={write.disabled} onClick={() => { form.open({ key: newAttachmentKey(), adding: true, type: "note", title: "", text: "" }, write.seen); }}>
             Add a note or link

@@ -42,6 +42,8 @@ export interface FrameState {
   inspector: HTMLElement | null;
   assistant: HTMLElement | null;
   tab: InspectorTab;
+  /** Opens the assistant panel; undefined where none is offered. */
+  openAssistant: (() => void) | undefined;
 }
 
 /** The assistant's controls, which the inspector column's tabs and Esc use from the shell. */

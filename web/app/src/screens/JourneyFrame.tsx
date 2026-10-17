@@ -1,7 +1,7 @@
 // A journey's page (2.2): the header (title, status, the View picker, `⋯`), the active
 // filters, and the view the address names (the graph first), with the inspector column beside
 // it: the open node's detail, or the journey card when nothing is selected. The Summary is the
-// card at full width. The head stays put and the projection and the inspector scroll on
+// journey's front page. The head stays put and the projection and the inspector scroll on
 // their own (screens.css; the frame's slots are shell/frame.tsx). The journey is read and derived in the tab and kept current (H6); what it
 // shows is in the address (journeys/address.ts, canvas/settings.ts), so every link keeps it: the
 // view state every view shares is parsed here once (journeys/view.ts) and handed to the views.
@@ -24,6 +24,7 @@ import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import { SelectionPanel } from "../detail/SelectionPanel.tsx";
 import { indexPath, nodeOpened, type Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
+import { SummaryPage } from "../summary/SummaryPage.tsx";
 import { isStock, useViewState, ViewStateContext, withViewState, type ViewState, type ViewStateValue } from "../journeys/view.ts";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
@@ -154,12 +155,7 @@ function Workspace({ ready, view, screen, selected, edge, authored, drawing, sel
     );
   }
   if (screen === "summary") {
-    return (
-      <>
-        <SummaryNote />
-        <JourneyCard ready={ready} selected={selected} full />
-      </>
-    );
+    return <SummaryPage ready={ready} note={<SummaryNote />} />;
   }
   return <ProjectionBody ready={ready} view={view} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} onCard={onCard} />;
 }

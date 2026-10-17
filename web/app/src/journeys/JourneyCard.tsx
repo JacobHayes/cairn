@@ -1,77 +1,36 @@
-// C16, C18: the journey card, the inspector's empty state, and the Summary, which is the same
-// component at full width (4.7). An observer gets the status summary's figures with no click: how much is done, what needs a look, what is next, the next milestone.
-// Open decisions, the description, the notes and links, and the lineage are folds. On the
-// Summary page every fold is open and each list is whole: the status summary's parts, with
-// the print view (C18). Kept current (H6): both read the journey's local derivation.
-// What is still the viewer's to do is one muted line under the progress.
-import { Link, useLocation } from "react-router";
-
-import type { ListFlag } from "../acting/address.ts";
+// C16: the journey card, the inspector's empty state on the views other than the Summary: how
+// much is done, what needs a look, what is still the viewer's, what is next, the next
+// milestone, with the open decisions, the description, the notes and links, and the lineage as
+// folds. The Summary (summary/SummaryPage.tsx) is the same journey at full width. Kept current
+// (H6): both read the journey's local derivation.
 import { DetailLink } from "../acting/Parts.tsx";
 import { useProjected } from "../canvas/hooks.ts";
 import { errorWords, valueOf } from "../data/keyed-read.ts";
-import { useLive } from "../data/react.ts";
-import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
 import { AnnotationList } from "../detail/Attachments.tsx";
 import type { Ready } from "../detail/model.ts";
 import { NodeLink, Section } from "../detail/parts.tsx";
 import { summaryModel, type SummaryModel } from "../summary/model.ts";
-import { StatusSummaryView } from "../summary/StatusSummary.tsx";
-import { dateAway, dateWords } from "../timeline/model.ts";
+import { dateAway } from "../timeline/model.ts";
 import { Markdown } from "../ui/markdown.tsx";
-import { Badge, Button } from "../ui/kit.tsx";
-import { journeyPath, screenSwitched } from "./address.ts";
-import { useJourneyTarget } from "./useJourneyTarget.ts";
-import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, viewStateParams } from "./view.ts";
 import { yoursOf } from "./figures-model.ts";
-import { JourneyFlow } from "../proposals/Entries.tsx";
-import { UpgradeMark } from "./JourneyIndex.tsx";
+import { Flags, LineageBlock, useLineage } from "./JourneyFacts.tsx";
 import { useMineOf } from "./mine.ts";
-import { routeDetailPath } from "../routes/address.ts";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import "./journeys.css";
 
-/** The most items "next up" lists on the card; the Summary page lists every one. */
+/** The most items "next up" lists on the card; the Summary lists the whole frontier. */
 const NEXT_UP_SHOWN = 3;
 
-/**
- * C16: the lineage fold: the route and version it is named by (the journey's row in the host's
- * index gives the host's "upgrade available"), and the day it started.
- */
-function LineageFold({ ready, full }: { ready: Ready; full: boolean }) {
-  const [upgrading, setUpgrading] = useState(false);
-  const { header } = ready.journey;
-  const lineage = header.lineage ?? undefined;
-  const query = lineage === undefined ? undefined : { route: lineage.route, version: lineage.version };
-  const { view } = useLive(indexKey(query), journeyIndex(query));
-  const routes = useLive("routes", routeIndex).view;
-  const summary = valueOf(view)?.find((item) => item.id === header.id);
-  const route = lineage === undefined ? undefined : valueOf(routes)?.find((each) => each.header.id === lineage.route);
+/** C16: the lineage fold: the route and version the journey is named by, and the day it started. */
+function LineageFold({ ready }: { ready: Ready }) {
+  const lineage = useLineage(ready);
   // A journey that did not come from a route has no lineage to show.
   if (lineage === undefined) {
     return null;
   }
-  const name = route?.header.name ?? lineage.route;
-  const latest = route?.latest_version ?? undefined;
-  const upgradable = latest !== undefined && latest > lineage.version;
   return (
-    <Section title="Lineage" summary={`${name} v${String(lineage.version)}`} open={full || upgradable} testId="card-lineage">
-      <span className="row" data-testid="overview-lineage">
-        <Link to={routeDetailPath(lineage.route)}>
-          {name}, version {lineage.version}
-        </Link>
-        <Link to={`/routes/${lineage.route}?version=${String(lineage.version)}`} data-testid="lineage">
-          See its graph
-        </Link>
-        {summary === undefined ? null : <UpgradeMark summary={summary} />}
-        {!upgradable ? null : (
-          <button type="button" className="chip" data-testid="journey-upgrade" title="Propose this journey's upgrade to the route's newer version" onClick={() => { setUpgrading(true); }}>
-            Upgrade to v{latest}
-          </button>
-        )}
-      </span>
-      {upgrading ? <JourneyFlow ready={ready} flow="upgrade" onClose={() => { setUpgrading(false); }} /> : null}
-      <span className="muted small">Started {dateWords(header.created_on, ready.derived.today)}</span>
+    <Section title="Lineage" summary={`${lineage.name} v${String(lineage.version)}`} open={lineage.latest !== undefined} testId="card-lineage">
+      <LineageBlock ready={ready} lineage={lineage} />
     </Section>
   );
 }
@@ -93,57 +52,22 @@ function Yours({ ready }: { ready: Ready }) {
   );
 }
 
-/** What needs a look, as one short sentence of links into the plan list: only what is not zero. */
-function Flags({ ready, model }: { ready: Ready; model: SummaryModel }) {
-  const journey = ready.journey.header.id;
-  const all: { count: number; words: string; flag: ListFlag }[] = [
-    { count: model.overdue.length, words: "overdue", flag: "overdue" },
-    { count: model.stale.length, words: "stale", flag: "stale" },
-    { count: model.shortfalls.length, words: "short of days", flag: "shortfall" },
-  ];
-  const flags = all.filter((each) => each.count > 0);
-  if (flags.length === 0) {
-    return null;
-  }
-  return (
-    <span data-testid="card-flags">
-      {flags.map((each, at) => (
-        <span key={each.flag}>
-          {at === 0 ? "" : ", "}
-          <Link to={journeyPath({ journey }, "list", viewStateParams({ ...DEFAULT_VIEW_STATE, filter: { ...DEFAULT_FILTER, flags: [each.flag] } }).toString())} data-testid={`card-flag-${each.flag}`}>
-            {each.count} {each.words}
-          </Link>
-        </span>
-      ))}
-    </span>
-  );
-}
-
-function NextUp({ ready, all }: { ready: Ready; all: boolean }) {
+function NextUp({ ready }: { ready: Ready }) {
   const next = valueOf(useProjected(ready, { projection: "next" }));
-  const items = (next?.items ?? []).slice(0, all ? undefined : NEXT_UP_SHOWN);
+  const items = (next?.items ?? []).slice(0, NEXT_UP_SHOWN);
   if (items.length === 0) {
     return null;
   }
-  const list = (
-    <ul className="detail-list">
-      {items.map((row) => (
-        <li key={row.key} data-node={row.key}>
-          <DetailLink view={ready} node={row.key} />
-        </li>
-      ))}
-    </ul>
-  );
-  // On the Summary page it is a panel among the others; on the card, a muted label over a short list.
-  return all ? (
-    <section className="panel stack summary-part" aria-label="Next up" data-testid="card-next-up">
-      <h2 className="title">Next up</h2>
-      {list}
-    </section>
-  ) : (
+  return (
     <section className="stack" aria-label="Next up" data-testid="card-next-up">
       <span className="muted small">Next up</span>
-      {list}
+      <ul className="detail-list">
+        {items.map((row) => (
+          <li key={row.key} data-node={row.key}>
+            <DetailLink view={ready} node={row.key} />
+          </li>
+        ))}
+      </ul>
     </section>
   );
 }
@@ -163,12 +87,12 @@ function NextMilestone({ ready, model }: { ready: Ready; model: SummaryModel }) 
   );
 }
 
-function Folds({ ready, model, full, selected }: { ready: Ready; model: SummaryModel; full: boolean; selected: string | undefined }) {
+function Folds({ ready, model, selected }: { ready: Ready; model: SummaryModel; selected: string | undefined }) {
   const { header } = ready.journey;
   const annotations = (ready.journey.graph.state?.annotations ?? []).filter((annotation) => annotation.body.node == null);
   return (
     <div className="stack" data-testid="card-folds">
-      {full || model.openDecisions.length === 0 ? null : (
+      {model.openDecisions.length === 0 ? null : (
         <Section title="Open decisions" summary={String(model.openDecisions.length)} testId="card-open-decisions">
           <ul className="detail-list">
             {model.openDecisions.map((each) => (
@@ -180,52 +104,27 @@ function Folds({ ready, model, full, selected }: { ready: Ready; model: SummaryM
           </ul>
         </Section>
       )}
-      <Section title="Description" open={full} testId="card-description">
+      <Section title="Description" testId="card-description">
         {header.description == null ? <span className="muted small">No description.</span> : <Markdown text={header.description} data-testid="overview-description" />}
       </Section>
-      <Section title="Notes and links" summary={String(annotations.length)} open={full} testId="card-notes">
+      <Section title="Notes and links" summary={String(annotations.length)} testId="card-notes">
         <AnnotationList view={ready} node={null} annotations={annotations} bare />
       </Section>
-      <LineageFold ready={ready} full={full} />
+      <LineageFold ready={ready} />
     </div>
   );
 }
 
-/**
- * The journey card: the inspector's empty state (`full` off), or the Summary page, the same
- * card at full width with every fold open and each list whole (`full`).
- */
-export function JourneyCard({ ready, selected, full = false }: { ready: Ready; selected?: string | undefined; full?: boolean }) {
-  const { search } = useLocation();
-  const target = useJourneyTarget();
+/** The journey card: the inspector's empty state on every view but the Summary, which is the journey's front page. */
+export function JourneyCard({ ready, selected }: { ready: Ready; selected?: string | undefined }) {
   const summaryRead = useProjected(ready, { projection: "status_summary" });
   const summary = valueOf(summaryRead);
   const summaryError = errorWords(summaryRead);
   const model = useMemo(() => (summary === undefined ? undefined : summaryModel(ready, summary)), [ready, summary]);
-  const { header } = ready.journey;
   const done = model === undefined ? undefined : model.inScope - model.remaining;
   return (
-    <section
-      className={full ? "journey-card journey-card-full panel stack" : "journey-card detail-panel panel stack"}
-      aria-label={full ? "Summary" : "Journey"}
-      data-testid="journey-card"
-      data-full={full}
-    >
-      <div className="row">
-        <span className="muted small">{full ? `Summary, as of ${dateWords(ready.derived.today, ready.derived.today)}` : "Journey"}</span>
-        {full ? <Badge data-testid="card-status" data-status={header.status}>{header.status}</Badge> : null}
-        <span className="spacer" />
-        {full ? (
-          <>
-            <Button className="no-print" onClick={() => { globalThis.print(); }}>
-              Print
-            </Button>
-            <Link to={screenSwitched(target, search, "graph")} className="no-print" data-testid="summary-close" aria-label="Close the summary">
-              Close
-            </Link>
-          </>
-        ) : null}
-      </div>
+    <section className="journey-card detail-panel panel stack" aria-label="Journey" data-testid="journey-card">
+      <span className="muted small">Journey</span>
       {summaryError === undefined ? null : <p className="callout callout-bad">The summary could not be read: {summaryError}</p>}
       {model === undefined || done === undefined ? (
         summaryError === undefined ? <p className="muted small">Summing up the journey...</p> : null
@@ -237,9 +136,9 @@ export function JourneyCard({ ready, selected, full = false }: { ready: Ready; s
           <progress value={done} max={Math.max(model.inScope, 1)} aria-label="Progress" />
           <Yours ready={ready} />
           <Flags ready={ready} model={model} />
-          {full ? null : <NextUp ready={ready} all={false} />}
-          {full ? <StatusSummaryView ready={ready} model={model} selected={selected} lead={<NextUp ready={ready} all />} /> : <NextMilestone ready={ready} model={model} />}
-          <Folds ready={ready} model={model} full={full} selected={selected} />
+          <NextUp ready={ready} />
+          <NextMilestone ready={ready} model={model} />
+          <Folds ready={ready} model={model} selected={selected} />
         </>
       )}
     </section>

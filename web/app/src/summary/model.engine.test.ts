@@ -1,0 +1,287 @@
+// C18 against the real engine: the front page's own values (the final milestone, what needs
+// attention, who has which action, what finished recently) read from fixtures and from patches
+// of them, so they cannot drift from what the engine derives.
+import type { Schema } from "@cairn/client";
+import type { InBrowserHost } from "@cairn/wasm";
+import { afterEach, beforeAll, describe, expect, it } from "vitest";
+
+import { derivedJourney, journeyAfter, seeded, type DerivedJourney } from "../authoring/engine.test-support.ts";
+import type { Mutation } from "../authoring/graph.ts";
+import { transition } from "../detail/model.ts";
+import { attentionRows, blockedRows, claimActions, claimedKeys, lifecycleLine, milestoneLine, recentlyFinished, summaryModel, underWay } from "./model.ts";
+
+let host: InBrowserHost;
+const held: DerivedJourney[] = [];
+
+beforeAll(async () => {
+  host = await seeded();
+});
+
+afterEach(() => {
+  held.splice(0).forEach((each) => { each.free(); });
+});
+
+/** A fixture journey, after `mutations`, derived. */
+function open(journey: string, mutations: Mutation[] = []): DerivedJourney {
+  const text = mutations.length === 0 ? host.documentText(journey) : journeyAfter(host, journey, mutations);
+  const derived = derivedJourney(host, text);
+  held.push(derived);
+  return derived;
+}
+
+let fresh = 0;
+
+/** A new journey from the vendor evaluation route's first version, derived: nothing is answered yet. */
+function openFresh(mutations: Mutation[] = []): DerivedJourney {
+  fresh += 1;
+  const id = `j_summary_fresh_${String(fresh)}`;
+  host.patch({ patch: { id: `p_summary_fresh_${String(fresh)}`, target: { journey: id }, base_revision: 0, mutations: [{ op: "create_journey", name: "A fresh evaluation", from: { route: "vendor-evaluation", version: 1 } }] } });
+  const text = mutations.length === 0 ? host.documentText(id) : journeyAfter(host, id, mutations);
+  const derived = derivedJourney(host, text);
+  held.push(derived);
+  return derived;
+}
+
+function pageOf(journey: DerivedJourney, viewer?: readonly string[]) {
+  const model = summaryModel(journey.ready, journey.project({ projection: "status_summary" }));
+  const frontier = journey.project({ projection: "next" }).items;
+  return { model, frontier, actions: claimActions(journey.ready, model, frontier, viewer ?? [...(journey.ready.inputs.viewer ?? [])]) };
+}
+
+const keys = (rows: { key: string }[]) => rows.map((row) => row.key);
+const owner = (node: string, entity: string): Mutation => ({ op: "set_participation", node, kind: "k_owner", source: [entity] });
+
+describe("C13, F1, F6: the lead's milestone line", () => {
+  it("names the final milestone with its pin", () => {
+    const journey = open("j_vendor_eval");
+    const { model } = pageOf(journey);
+    expect(milestoneLine(journey.ready, model)).toMatchObject({ role: "final", key: "n_decision_meeting", date: "2026-11-20", origin: "pin" });
+  });
+
+  it("gives the final milestone its own shortfall and no other node's", () => {
+    const journey = open("j_launch");
+    const { model } = pageOf(journey);
+    const line = milestoneLine(journey.ready, model);
+    expect(line).toMatchObject({ role: "final", key: "n_launch", shortfallDays: journey.ready.derived.nodes["n_launch"]?.dates.shortfall?.shortfall_days });
+    expect(line?.shortfallDays).toBeGreaterThan(0);
+    expect(model.shortfalls.map((each) => each.key)).toContain("n_code_freeze");
+  });
+
+  it("names an undated final milestone's feeding decision", () => {
+    const journey = openFresh();
+    const line = milestoneLine(journey.ready, pageOf(journey).model);
+    expect(line).toMatchObject({ role: "final", key: "n_decision_meeting", date: undefined });
+    expect(line?.feeder?.key).toBe(journey.ready.journey.graph.nodes?.find((node) => node.feeds_milestone === "n_decision_meeting")?.key);
+  });
+
+  it("calls only the final milestone the end: without one it is the next milestone, or nothing", () => {
+    const hiring = open("j_hiring");
+    expect(milestoneLine(hiring.ready, pageOf(hiring).model)).toBeUndefined();
+    const meeting = open("j_vendor_eval", [{ op: "set_node_field", node: "n_decision_meeting", value: { final: false } as Schema<"NodeFieldValueResolved"> }]);
+    const { model } = pageOf(meeting);
+    const line = milestoneLine(meeting.ready, model);
+    expect(line?.role).toBe("next");
+    expect(line?.key).toBe(model.upcoming[0]?.key);
+  });
+
+  it("says a reached final milestone reached, from an actual date", () => {
+    const journey = open("j_bakeoff", [
+      { op: "transition", node: "n_wrap_up", transition: "reach" },
+    ]);
+    const line = milestoneLine(journey.ready, pageOf(journey).model);
+    expect(line).toMatchObject({ role: "final", key: "n_wrap_up", origin: "actual" });
+  });
+});
+
+describe("F1, C13: the final milestone line says when it is reached", () => {
+  it("is not reached while open, and is once reached", () => {
+    const before = open("j_bakeoff");
+    expect(milestoneLine(before.ready, pageOf(before).model)).toMatchObject({ role: "final", reached: false });
+    const after = open("j_bakeoff", [transition("n_wrap_up", "reach")]);
+    expect(milestoneLine(after.ready, pageOf(after).model)).toMatchObject({ role: "final", reached: true });
+  });
+});
+
+describe("C18, D3, D4, F6: what needs attention", () => {
+  it("lists a node once with every reason, overdue first, and the worst nodes first", () => {
+    const journey = open("j_launch");
+    const { model } = pageOf(journey);
+    const rows = attentionRows(journey.ready, model);
+    expect(new Set(keys(rows)).size).toBe(rows.length);
+    const flagged = new Set([...model.overdue, ...model.shortfalls, ...model.stale].map((each) => each.key));
+    expect(new Set(keys(rows))).toEqual(flagged);
+    const worst = rows.map((row) => (model.overdue.some((each) => each.key === row.key) ? 0 : model.shortfalls.some((each) => each.key === row.key) ? 1 : 2));
+    expect(worst).toEqual([...worst].sort((a, b) => a - b));
+  });
+
+  it("says a reached node's shortfall as a late reach, and open work's as the days it needs", () => {
+    const journey = open("j_launch");
+    const { model } = pageOf(journey);
+    const reasons = (key: string) => attentionRows(journey.ready, model).find((row) => row.key === key)?.reasons.join(";") ?? "";
+    const stateOf = (key: string) => journey.ready.journey.graph.state?.nodes?.[key]?.state;
+    const short = model.shortfalls.map((each) => each.key);
+    const reached = short.filter((key) => stateOf(key) === "reached");
+    const open_ = short.filter((key) => stateOf(key) !== "reached");
+    expect(reached.length).toBeGreaterThan(0);
+    expect(open_.length).toBeGreaterThan(0);
+    reached.forEach((key) => { expect(reasons(key)).toMatch(/Reached \d+ days? off/); });
+    open_.forEach((key) => { expect(reasons(key)).toMatch(/Needs \d+ days? more/); });
+  });
+
+  it("keeps both reasons of a node that is overdue and short, the overdue one first", () => {
+    const model = {
+      ...summaryModel(open("j_launch").ready, { by_state: {}, by_display_state: {}, remaining: 0 }),
+      overdue: [{ key: "n_a", title: "A", due: "2026-10-01", lateDays: 3 }],
+      shortfalls: [{ key: "n_a", title: "A", days: 2 }, { key: "n_b", title: "B", days: 1 }],
+      stale: [{ key: "n_a", title: "A", reasons: ["missing artifact"] }],
+    };
+    const [first, second] = attentionRows(open("j_launch").ready, model);
+    expect(first).toMatchObject({ key: "n_a", tone: "bad" });
+    expect(first?.reasons).toHaveLength(3);
+    expect(first?.reasons[0]).toContain("late");
+    expect(first?.reasons[2]).toMatch(/stale/i);
+    expect(second?.key).toBe("n_b");
+  });
+});
+
+describe("C10, C11, E1, E4: one action row per node", () => {
+  it("claims the viewer's owned frontier items first, whatever their kind, and the rest by kind", () => {
+    const journey = open("j_bakeoff", [owner("n_trial_a", "e_owner")]);
+    const { frontier, actions } = pageOf(journey);
+    expect(keys(actions.yours)).toEqual(["n_trial_a"]);
+    expect(keys(actions.nextUp)).toEqual(keys(frontier).filter((key) => key !== "n_trial_a"));
+  });
+
+  it("does not claim another person's or an informed participant's item", () => {
+    const informed = (node: string): Mutation => ({ op: "set_participation", node, kind: "k_informed", source: ["e_lead"] });
+    const journey = open("j_vendor_eval", [owner("n_review_opens", "e_reviewer"), owner("n_decision_meeting", "e_stakeholder_a"), informed("n_review_opens"), informed("n_decision_meeting")]);
+    const { actions } = pageOf(journey, ["e_lead"]);
+    expect(keys(actions.yours)).toEqual([]);
+    expect(keys(actions.nextUp)).toEqual(["n_review_opens", "n_decision_meeting"]);
+  });
+
+  it("claims an item owned through a merged entity", () => {
+    const journey = open("j_bakeoff", [owner("n_trial_a", "e_writer")]);
+    const aliased = { ...journey.ready, inputs: { ...journey.ready.inputs, deployment: { ...journey.ready.inputs.deployment, aliases: { e_writer: "e_owner" } } } };
+    const { model, frontier } = pageOf(journey);
+    expect(keys(claimActions(aliased, model, frontier, ["e_owner"]).yours)).toEqual(["n_trial_a"]);
+  });
+
+  it("claims a viewer's six decisions all in Waiting on you, none in Decide now", () => {
+    const decisions = ["d1", "d2", "d3", "d4", "d5", "d6"];
+    const journey = open("j_bakeoff", [
+      ...decisions.map((id): Mutation => ({ op: "add_node", node: { key: `n_${id}`, id, kind: "decision", title: `Choose ${id}`, prompt: "Which?", answer_type: "text" } })),
+      ...decisions.map((id) => owner(`n_${id}`, "e_owner")),
+    ]);
+    const { actions } = pageOf(journey);
+    expect(keys(actions.yours).filter((key) => key.startsWith("n_d"))).toHaveLength(6);
+    expect(keys(actions.decide)).toEqual([]);
+  });
+
+  it("puts each node in one set, whatever the viewer", () => {
+    for (const id of ["j_vendor_eval", "j_launch", "j_bakeoff", "j_hiring"]) {
+      const journey = open(id);
+      for (const viewer of [[], ["e_owner"], ["e_lead", "e_manager"]]) {
+        const { actions, frontier } = pageOf(journey, viewer);
+        const all = [...keys(actions.yours), ...keys(actions.decide), ...keys(actions.nextUp), ...keys(actions.waiting)];
+        expect(new Set(all).size).toBe(all.length);
+        expect(new Set([...keys(actions.yours), ...keys(actions.decide), ...keys(actions.nextUp)])).toEqual(new Set(keys(frontier)));
+      }
+    }
+  });
+
+  it("holds every frontier row once on a journey of 2,000 nodes", () => {
+    const work = Array.from({ length: 1000 }, (_, at): Mutation => ({ op: "add_node", node: { key: `n_w${String(at)}`, id: `w${String(at)}`, kind: "action", title: `Work ${String(at)}` } }));
+    const decisions = Array.from({ length: 900 }, (_, at): Mutation => ({ op: "add_node", node: { key: `n_x${String(at)}`, id: `x${String(at)}`, kind: "decision", title: `Open ${String(at)}`, prompt: "Which?", answer_type: "text" } }));
+    const waits = Array.from({ length: 80 }, (_, at): Mutation => ({ op: "add_edge", edge: { node: `n_x${String(at)}`, requires: `n_w${String(at)}` } }));
+    const journey = open("j_bakeoff", [...work, ...decisions, ...waits]);
+    const { frontier, actions, model } = pageOf(journey, ["e_owner"]);
+    const all = [...actions.yours, ...actions.decide, ...actions.nextUp];
+    expect(all.length).toBe(frontier.length);
+    expect(new Set(keys(all)).size).toBe(frontier.length);
+    expect(model.inScope).toBeGreaterThan(1900);
+  });
+});
+
+describe("C11: decisions waiting", () => {
+  it("names a waiting decision's first unblocker", () => {
+    const journey = open("j_bakeoff");
+    const { actions } = pageOf(journey);
+    const winner = actions.waiting.find((each) => each.key === "n_winner");
+    expect(winner?.fact).toMatch(/^Waiting for /);
+    expect(winner?.fact).toContain(journey.ready.journey.graph.nodes?.find((node) => node.key === "n_summary")?.title ?? "missing");
+  });
+
+  it("says a snoozed decision is snoozed until its date", () => {
+    const fresh = openFresh();
+    const decision = pageOf(fresh).actions.decide[0]?.key ?? "";
+    const journey = openFresh([{ op: "snooze", node: decision, until: { date: "2026-10-20" } }]);
+    expect(keys(pageOf(journey).frontier)).not.toContain(decision);
+    expect(pageOf(journey).actions.waiting.find((each) => each.key === decision)?.fact).toBe("Snoozed until Oct 20");
+  });
+});
+
+describe("F2: recently finished", () => {
+  it("lists the newest recorded finishes first, at most five, and never a node that is not finished", () => {
+    const journey = open("j_vendor_eval");
+    const rows = recentlyFinished(journey.ready);
+    expect(rows.length).toBeLessThanOrEqual(5);
+    const record = (key: string) => journey.ready.journey.graph.state?.nodes?.[key];
+    const dates = rows.map((row) => record(row.key)?.finished_on ?? "");
+    expect(dates).toEqual([...dates].sort().reverse());
+    for (const row of rows) {
+      expect(["done", "decided", "reached"]).toContain(record(row.key)?.state);
+    }
+  });
+
+  it("leaves out a reopened node and a skipped one", () => {
+    const before = recentlyFinished(open("j_vendor_eval").ready);
+    const reopened = before[0]?.key ?? "";
+    const journey = open("j_vendor_eval", [{ op: "transition", node: reopened, transition: "reopen" }]);
+    expect(keys(recentlyFinished(journey.ready))).not.toContain(reopened);
+  });
+});
+
+describe("D8, C18: what is under way and what is blocked", () => {
+  it("lists an active container with how much inside it is open, off the action lists", () => {
+    const journey = open("j_vendor_eval");
+    const { actions } = pageOf(journey);
+    const rows = underWay(journey.ready, claimedKeys(actions));
+    const active = (journey.ready.journey.graph.nodes ?? []).filter((node) => journey.ready.derived.nodes[node.key]?.display_state === "active").map((node) => node.key);
+    expect(new Set(keys(rows))).toEqual(new Set(active.filter((key) => !claimedKeys(actions).has(key))));
+    expect(rows.length).toBeGreaterThan(0);
+    expect(rows[0]?.fact()).toMatch(/\d+ of \d+ inside still open/);
+  });
+
+  it("names what holds a blocked node, a blocked container included", () => {
+    const journey = open("j_vendor_eval");
+    const { actions } = pageOf(journey);
+    const rows = blockedRows(journey.ready, claimedKeys(actions));
+    const report = rows.find((each) => each.key === "n_final_report");
+    expect(report?.fact()).toContain(journey.ready.journey.graph.nodes?.find((node) => node.key === "n_review_opens")?.title ?? "missing");
+    expect(keys(rows)).toContain("n_final_review");
+    expect(rows.find((each) => each.key === "n_final_review")?.fact()).toContain(journey.ready.journey.graph.nodes?.find((node) => node.key === "n_review_opens")?.title ?? "missing");
+  });
+
+  it.each(["j_vendor_eval", "j_launch", "j_bakeoff", "j_hiring"])("puts a node on one list only in %s", (name) => {
+    const journey = open(name);
+    const { actions } = pageOf(journey);
+    const taken = claimedKeys(actions);
+    const all = [...taken, ...keys(underWay(journey.ready, taken)), ...keys(blockedRows(journey.ready, taken))];
+    expect(new Set(all).size).toBe(all.length);
+  });
+});
+
+describe("B11, A19, C18: a closed journey says what it left", () => {
+  const as = (journey: DerivedJourney, status: "active" | "completed" | "archived") => ({ ...journey.ready, journey: { ...journey.ready.journey, header: { ...journey.ready.journey.header, status } } });
+
+  it("says nothing while active, and counts what is unfinished once completed or archived", () => {
+    const journey = open("j_bakeoff");
+    const { model } = pageOf(journey);
+    expect(lifecycleLine(as(journey, "active"), model)).toBeUndefined();
+    expect(model.remaining).toBeGreaterThan(0);
+    expect(lifecycleLine(as(journey, "completed"), model)).toContain(String(model.remaining));
+    expect(lifecycleLine(as(journey, "archived"), model)).toContain(String(model.remaining));
+    expect(lifecycleLine(as(journey, "archived"), model)).not.toBe(lifecycleLine(as(journey, "completed"), model));
+  });
+});

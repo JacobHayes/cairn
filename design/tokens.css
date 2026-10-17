@@ -32,7 +32,7 @@
   --color-border: var(--n-4); /* hairlines */
   --color-error: #b8342c;
   --color-success: #1f7a55;
-  --color-warning: #a66a12;
+  --color-warning: #8a5608;
   --radius-none: 0;
   --radius-sm: 0;
   --radius-md: 2px;
@@ -105,7 +105,9 @@
     --color-border: var(--n-9);
     --color-secondary: var(--n-6);
     --color-primary: var(--n-11);
-    --color-error: #c53b32;
+    --color-error: #f07a70;
+    --color-success: #45c08c;
+    --color-warning: #e0a23c;
     --color-band: var(--n-10);
     --color-rule: rgba(255, 255, 255, 0.06);
     --color-tick: var(--n-6);
@@ -140,7 +142,9 @@
   --color-border: var(--n-9);
   --color-secondary: var(--n-6);
   --color-primary: var(--n-11);
-  --color-error: #c53b32;
+  --color-error: #f07a70;
+  --color-success: #45c08c;
+  --color-warning: #e0a23c;
   --color-band: var(--n-10);
   --color-rule: rgba(255, 255, 255, 0.06);
   --color-tick: var(--n-6);

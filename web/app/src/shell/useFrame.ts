@@ -27,6 +27,21 @@ export interface Frame {
   setAssistant: (element: HTMLElement | null) => void;
 }
 
+/** The assistant's opener for screens: opens it, and brings it into view when already open but hidden or behind the other tab. */
+function useOpenAssistant(dock: AssistantDock | undefined, actions: FrameActions): (() => void) | undefined {
+  const open = dock?.open;
+  return useMemo(
+    () =>
+      open === undefined
+        ? undefined
+        : () => {
+            open();
+            actions.show("assistant");
+          },
+    [open, actions],
+  );
+}
+
 /**
  * `]` hides and shows the inspector; Esc closes the tablet's sheet, unless a field has focus:
  * the assistant when its tab is in view, else the open node by going back to the screen it is
@@ -97,7 +112,8 @@ export function useFrame(): Frame {
     setHidden((now) => !now);
   }, []);
   useFrameKeys({ tab: shown, dock, closeTo }, toggleFolded);
-  const state = useMemo<FrameState>(() => ({ inspector, assistant, tab: shown }), [inspector, assistant, shown]);
+  const openAssistant = useOpenAssistant(dock, actions);
+  const state = useMemo<FrameState>(() => ({ inspector, assistant, tab: shown, openAssistant }), [inspector, assistant, shown, openAssistant]);
   return {
     state,
     actions,

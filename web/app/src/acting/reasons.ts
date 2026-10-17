@@ -15,7 +15,7 @@ const days = (count: number) => `${String(count)} ${count === 1 ? "day" : "days"
 const nodes = (count: number) => `${String(count)} ${count === 1 ? "node" : "nodes"}`;
 
 /** How near the row's dates are, in words; none when it has no deadline. */
-function dateReason(view: Ready, row: NodeRow): string | undefined {
+export function dateReason(view: Ready, row: NodeRow): string | undefined {
   const today = dayOf(view.derived.today);
   if (row.overdue === true && row.due != null) {
     return `${days(today - dayOf(row.due))} late`;

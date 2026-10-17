@@ -59,9 +59,32 @@
    when it has a name, and opaque paper rows (about 64px, with one fact) with an edge hairline
    under each. The owner and the primary action wait for hover, focus or selection, so the list
    reads calmly and nothing moves when they appear. */
+/* DESIGN's panel: paper, a 1px border, the shadow, and the four corner ticks (drawn over the band and the rows, which are opaque). */
 .node-panel {
+  position: relative;
   border: 1px solid var(--color-edge);
   background: var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+
+.node-panel::after,
+.summary-fold::after,
+.summary .panel::after,
+.summary .for-you::after {
+  --tick: linear-gradient(var(--color-tick), var(--color-tick));
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    var(--tick) left 3px top 3px / 8px 1px no-repeat,
+    var(--tick) left 3px top 3px / 1px 8px no-repeat,
+    var(--tick) right 3px top 3px / 8px 1px no-repeat,
+    var(--tick) right 3px top 3px / 1px 8px no-repeat,
+    var(--tick) left 3px bottom 3px / 8px 1px no-repeat,
+    var(--tick) left 3px bottom 3px / 1px 8px no-repeat,
+    var(--tick) right 3px bottom 3px / 8px 1px no-repeat,
+    var(--tick) right 3px bottom 3px / 1px 8px no-repeat;
 }
 
 .node-panel-head {
@@ -683,4 +706,19 @@ button.list-sort {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* A fact in a tone: lateness in error ink and a near date in warning ink, always with its words (DESIGN, Dates). */
+.node-fact-bad {
+  color: var(--color-error);
+}
+
+.node-fact-warn {
+  color: var(--color-warning);
+}
+
+.node-panel-foot {
+  padding: var(--space-2) var(--space-4);
+  border-top: 1px solid var(--color-edge);
+  font-size: 14px;
 }

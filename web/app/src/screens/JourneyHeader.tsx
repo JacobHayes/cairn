@@ -106,7 +106,7 @@ function copyLink(): void {
 }
 
 /** The journey's `⋯`, in groups: Edit and the structure flows, its link, and its status. */
-function JourneyMenu({ ready, view, selected, write, onPanel }: { ready: Ready; view: GraphView; selected: string | undefined; write: ScreenWrite; onPanel: (panel: Panel) => void }) {
+function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready: Ready; view: GraphView; screen: Screen; selected: string | undefined; write: ScreenWrite; onPanel: (panel: Panel) => void }) {
   const { header } = ready.journey;
   const { search } = useLocation();
   const insert = useInsertEntry();
@@ -134,6 +134,11 @@ function JourneyMenu({ ready, view, selected, write, onPanel }: { ready: Ready; 
             {item("menu-save", "Save as route...", "save")}
             {item("menu-relink", "Re-link...", "relink")}
             <hr />
+            {screen !== "summary" ? null : (
+              <button type="button" role="menuitem" className="menu-item" data-testid="menu-print" onClick={() => { close(); globalThis.print(); }}>
+                Print the summary
+              </button>
+            )}
             <button type="button" role="menuitem" className="menu-item" data-testid="menu-copy-link" onClick={() => { close(); copyLink(); }}>
               Copy link
             </button>
@@ -162,7 +167,7 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
         <div className="journey-header-actions">
           <ViewPicker screen={screen} />
-          <JourneyMenu ready={ready} view={view} selected={selected} write={write} onPanel={setPanel} />
+          <JourneyMenu ready={ready} view={view} screen={screen} selected={selected} write={write} onPanel={setPanel} />
         </div>
       </div>
       {header.status === "active" && suggested ? (

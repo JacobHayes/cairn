@@ -75,9 +75,13 @@ export function deleteConfirmed(status: JourneyStatus, name: string, typed: stri
 /**
  * B11: completion is suggested when every relevant or undecided node satisfies dependencies
  * (the status summary's remaining count is the engine's count of those that do not) or the
- * graph's `final` milestone is reached, stored or auto-reached (F1).
+ * graph's `final` milestone is reached, stored or auto-reached (F1). A journey with no node
+ * has nothing to complete, so it is never suggested.
  */
 export function completionSuggested(graph: Graph, derived: Derived, summary: StatusSummary): boolean {
+  if ((graph.nodes ?? []).length === 0) {
+    return false;
+  }
   if (summary.remaining === 0) {
     return true;
   }

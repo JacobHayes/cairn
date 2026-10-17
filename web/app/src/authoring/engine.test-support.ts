@@ -65,3 +65,21 @@ export function journeyAfter(host: InBrowserHost, journey: string, mutations: Mu
 export function journeyDocument(host: InBrowserHost, journey: string): Schema<"DomainDocument"> {
   return JSON.parse(host.documentText(journey)) as Schema<"DomainDocument">;
 }
+
+/** A journey as the tab holds it once derived: its view, projections and a way to release the derivation. */
+export interface DerivedJourney {
+  ready: Extract<import("../data/journeys.ts").JourneyView, { status: "ready" }>;
+  project: <R extends import("@cairn/wasm").ProjectionRequest>(request: R) => import("@cairn/wasm").ProjectionAnswer<R>;
+  free: () => void;
+}
+
+/** The journey in document `text` (a fixture's, or one `journeyAfter` returned), derived by the real engine. */
+export function derivedJourney(host: InBrowserHost, text: string): DerivedJourney {
+  const document = JSON.parse(text) as Schema<"DomainDocument">;
+  const derivation = host.engine.derive(text);
+  return {
+    ready: { status: "ready", journey: document.journey, inputs: document.inputs, key: derivation.key, derived: derivation.derived() },
+    project: (request) => derivation.project(request),
+    free: () => { derivation.free(); },
+  };
+}

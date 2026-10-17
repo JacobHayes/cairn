@@ -23,13 +23,17 @@ export interface NodeItemProps {
   to: string;
   selected?: boolean;
   /** The one fact the row says under its title, in words. */
-  fact?: string | undefined;
+  fact?: ReactNode;
+  /** The ink a date or trouble fact is said in, beside its words: warning or error. */
+  factTone?: "warn" | "bad" | undefined;
   testId?: string;
+  /** Another class for the row, for a list that styles its own. */
+  className?: string;
   /** What the row offers at its right end, and the forms it opens under it. */
   children?: ReactNode;
 }
 
-export function NodeItem({ view, node, to, selected = false, fact, testId = "node-row", children }: NodeItemProps) {
+export function NodeItem({ view, node, to, selected = false, fact, factTone, testId = "node-row", className, children }: NodeItemProps) {
   const navigate = useNavigate();
   const item = useRef<HTMLLIElement>(null);
   const state = view.derived.nodes[node]?.display_state;
@@ -43,7 +47,7 @@ export function NodeItem({ view, node, to, selected = false, fact, testId = "nod
   return (
     <li
       ref={item}
-      className="node-row"
+      className={className === undefined ? "node-row" : `node-row ${className}`}
       data-testid={testId}
       data-node={node}
       data-state={state}
@@ -61,7 +65,7 @@ export function NodeItem({ view, node, to, selected = false, fact, testId = "nod
             {titleOf(view, node)}
           </Link>
           {fact === undefined ? null : (
-            <span className="node-fact muted" data-testid="fact">
+            <span className={factTone === undefined ? "node-fact muted" : `node-fact node-fact-${factTone}`} data-testid="fact" {...(typeof fact === "string" ? { title: fact } : {})}>
               {fact}
             </span>
           )}
@@ -72,8 +76,8 @@ export function NodeItem({ view, node, to, selected = false, fact, testId = "nod
   );
 }
 
-/** The bordered panel a list of rows sits in, with a band header naming it when it has a `title`. */
-export function NodePanel({ title, count, testId, children }: { title?: string; count?: number; testId?: string; children: ReactNode }) {
+/** The bordered panel a list of rows sits in, with a band header naming it when it has a `title` and a foot for what acts on the whole list. */
+export function NodePanel({ title, count, testId, foot, children }: { title?: string; count?: number; testId?: string; foot?: ReactNode; children: ReactNode }) {
   return (
     <section className="node-panel" aria-label={title} {...(testId === undefined ? {} : { "data-testid": testId })}>
       {title === undefined ? null : (
@@ -83,6 +87,7 @@ export function NodePanel({ title, count, testId, children }: { title?: string; 
         </header>
       )}
       <ul className="plain-list node-rows">{children}</ul>
+      {foot === undefined ? null : <footer className="node-panel-foot">{foot}</footer>}
     </section>
   );
 }

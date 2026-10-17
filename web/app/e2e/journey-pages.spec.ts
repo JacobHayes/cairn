@@ -359,7 +359,7 @@ test("the window does not scroll: the head stays, a popover scrolls inside itsel
   await expect(page.getByTestId("list-row").first()).toBeVisible();
   expect(await body.evaluate((region) => region.scrollWidth <= region.clientWidth)).toBe(true);
   await openAt(page, "browser", "j_vendor_eval", "summary", { fixedToday: FIXED_TODAY });
-  await expect(page.getByTestId("summary-upcoming")).toBeVisible();
+  await expect(page.getByTestId("summary-milestones")).toBeVisible();
 });
 
 test("a done row fades its content like a done card, lifts the fade under keyboard focus, and leaves the checkbox at full strength", async ({ page }) => {

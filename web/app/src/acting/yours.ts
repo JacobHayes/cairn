@@ -3,8 +3,15 @@
 // "mine" projection says what they hold (E4); the date network says which starts first.
 import type { MineEntry } from "../journeys/mine.ts";
 import { isTerminal, nodeOf, recordOf, titleOf, type Ready } from "../detail/model.ts";
+import { resolveEntity } from "../detail/sections.tsx";
 import { dateWords } from "../timeline/model.ts";
 import { unblockersOf } from "./waiting.ts";
+
+/** E1, E2: whether one of the viewer's `entities`, through any merge, owns the node whose owners are `owners`. */
+export function ownedBy(view: Ready, owners: readonly string[] | undefined, entities: readonly string[]): boolean {
+  const mine = new Set(entities.map((key) => resolveEntity(view, key)));
+  return (owners ?? []).some((key) => mine.has(resolveEntity(view, key)));
+}
 
 /** How many things the line names it waits on before it says "and N more". */
 const NAMED_MAX = 2;
