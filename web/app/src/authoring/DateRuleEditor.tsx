@@ -122,7 +122,7 @@ export function StageBoundsEditor({ opensAt, closesAt, gates, closes, onChange, 
           <Picker aria-label="Opens at" value={opensAt} none="No opening" options={options} onChange={(event) => { onChange({ opens_at: event.target.value }); }} />
           <label className="row">
             <input type="checkbox" checked={gates} disabled={opensAt === ""} onChange={(event) => { onChange({ gates: event.target.checked }); }} />
-            its contents wait for it
+            Its contents wait for it
           </label>
         </span>
       </FieldBox>
@@ -131,7 +131,7 @@ export function StageBoundsEditor({ opensAt, closesAt, gates, closes, onChange, 
           <Picker aria-label="Closes at" value={closesAt} none="No closing" options={options} onChange={(event) => { onChange({ closes_at: event.target.value }); }} />
           <label className="row">
             <input type="checkbox" checked={closes} disabled={closesAt === ""} onChange={(event) => { onChange({ closes: event.target.checked }); }} />
-            it finishes by then
+            It finishes by then
           </label>
         </span>
       </FieldBox>

@@ -10,7 +10,7 @@ import { ConditionEditor } from "../authoring/ConditionEditor.tsx";
 import { planRemoval, removalMutations } from "../authoring/cascade.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, draftProblems, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
-import { KINDS, canHoldChildren, childrenOf, edgeRefusal, moveTargets, nodesByPath, pathOf, type GraphNode, type Mutation, type NodeField, type NodeKind, type Role, type Tree } from "../authoring/graph.ts";
+import { KINDS, canHoldChildren, kindOption, childrenOf, edgeRefusal, moveTargets, nodesByPath, pathOf, type GraphNode, type Mutation, type NodeField, type NodeKind, type Role, type Tree } from "../authoring/graph.ts";
 import { mintKey, slugOf, uniqueId } from "../authoring/keys.ts";
 import { BasicsFields, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
 import { problemsOf } from "../authoring/NodeForm.tsx";
@@ -263,7 +263,7 @@ function AddNode({ context }: { context: ChangesContext }) {
   };
   return (
     <form className="row" data-testid="proposal-add-node" onSubmit={(event) => { event.preventDefault(); add(); }}>
-      <Picker aria-label="Kind" value={kind} options={KINDS.map((each) => ({ value: each, label: each }))} onChange={(event) => { setKind(event.target.value as NodeKind); }} />
+      <Picker aria-label="Kind" value={kind} options={KINDS.map(kindOption)} onChange={(event) => { setKind(event.target.value as NodeKind); }} />
       <Field aria-label="New node title" placeholder="Title" value={title} onChange={(event) => { setTitle(event.target.value); }} />
       <Picker aria-label="Inside" value={parent} none="At the top level" options={containers.map((node) => ({ value: node.key, label: `${node.title} (${pathOf(context.tree, node.key)})` }))} onChange={(event) => { setParent(event.target.value); }} />
       <Button type="submit" disabled={title.trim() === ""}>

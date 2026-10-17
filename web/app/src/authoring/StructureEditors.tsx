@@ -12,7 +12,7 @@ import { CascadeDialog } from "./CascadeDialog.tsx";
 import { planRemoval, removalMutations } from "./cascade.ts";
 import { useConnecting } from "./connect.tsx";
 import { EDGE_COUNT_PER_NODE_MAX, TITLE_BYTES_MAX, overBytes } from "./limits.ts";
-import { canHoldChildren, childrenOf, edgeRefusal, moveTargets, nodesByPath, pathOf, titleIn, type GraphNode, type Mutation, type NodeKind } from "./graph.ts";
+import { canHoldChildren, childrenOf, edgeRefusal, kindOption, moveTargets, nodesByPath, pathOf, titleIn, type GraphNode, type Mutation, type NodeKind } from "./graph.ts";
 import { mintKey, slugOf, uniqueId } from "./keys.ts";
 import { Picker } from "./parts.tsx";
 import { domainOf, isJourney, named, type Authored } from "./target.ts";
@@ -185,7 +185,7 @@ export function Breakdown({ authored, node }: NodeEditorProps) {
       <span className="muted small">{children === 0 ? "Nothing beneath it yet." : `${String(children)} beneath it.`}</span>
       {pieces.map((piece, at) => (
         <span key={at} className="row" data-testid="piece">
-          <Picker aria-label="Kind of piece" value={piece.kind} options={[{ value: "action", label: "action" }, { value: "deliverable", label: "deliverable" }]} onChange={(event) => { setPieces(pieces.map((each, index) => (index === at ? { ...each, kind: event.target.value as NodeKind } : each))); }} />
+          <Picker aria-label="Kind of piece" value={piece.kind} options={(["action", "deliverable"] as const).map(kindOption)} onChange={(event) => { setPieces(pieces.map((each, index) => (index === at ? { ...each, kind: event.target.value as NodeKind } : each))); }} />
           <Field aria-label="Piece title" placeholder="What it is" value={piece.title} onChange={(event) => { setPieces(pieces.map((each, index) => (index === at ? { ...each, title: event.target.value } : each))); }} />
         </span>
       ))}

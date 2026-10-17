@@ -100,7 +100,7 @@ function SlotForm({ editing, setEditing, kind, slots, write, revision }: { editi
         <Field aria-label={`${kind.words} id`} value={slot.id} onChange={(event) => { setSlot({ ...slot, id: event.target.value }); }} />
         <label className="row">
           <input type="checkbox" checked={slot.multi ?? false} onChange={(event) => { setSlot({ ...slot, multi: event.target.checked }); }} />
-          several at once
+          Several at once
         </label>
       </span>
       {problem === undefined ? null : <span className="author-problem" role="alert">{problem}</span>}

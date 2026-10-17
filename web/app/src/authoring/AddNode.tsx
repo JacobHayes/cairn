@@ -6,7 +6,7 @@
 import { useDraft } from "../data/drafts.ts";
 import { wrapRoots } from "../segments/model.ts";
 import { Button, Field } from "../ui/kit.tsx";
-import { KINDS, canHoldChildren, childrenOf, nodesByPath, pathOf, type GraphNode, type NodeKind } from "./graph.ts";
+import { KINDS, canHoldChildren, kindOption, childrenOf, nodesByPath, pathOf, type GraphNode, type NodeKind } from "./graph.ts";
 import { mintKey, slugOf, uniqueId } from "./keys.ts";
 import { NODE_COUNT_MAX, TITLE_BYTES_MAX, overBytes } from "./limits.ts";
 import { Picker } from "./parts.tsx";
@@ -90,7 +90,7 @@ export function AddNode({ authored, container, onAdded }: AddNodeProps) {
   };
   return (
     <form className="stack" data-testid="add-node" onSubmit={(event) => { event.preventDefault(); add(); }}>
-      <Picker aria-label="Kind" value={kind} options={KINDS.map((each) => ({ value: each, label: each }))} onChange={(event) => { setKind(event.target.value as NodeKind); }} />
+      <Picker aria-label="Kind" value={kind} options={KINDS.map(kindOption)} onChange={(event) => { setKind(event.target.value as NodeKind); }} />
       <Field aria-label="New node title" placeholder="Title" value={title} onChange={(event) => { setTitle(event.target.value); }} />
       <Picker aria-label="Inside" value={parent} none="At the top level" options={containers.map((node) => ({ value: node.key, label: `${node.title} (${pathOf(authored.tree, node.key)})` }))} onChange={(event) => { setParent(event.target.value); }} />
       {second ? (

@@ -23,13 +23,13 @@ export interface FieldsProps {
 }
 
 const ANSWER_TYPES: { value: AnswerType; label: string }[] = [
-  { value: "boolean", label: "yes or no" },
-  { value: "single_choice", label: "one choice" },
-  { value: "multi_choice", label: "several choices" },
-  { value: "text", label: "text" },
-  { value: "date", label: "a date" },
-  { value: "entity", label: "a person or team" },
-  { value: "entity_list", label: "people or teams" },
+  { value: "boolean", label: "Yes or no" },
+  { value: "single_choice", label: "One choice" },
+  { value: "multi_choice", label: "Several choices" },
+  { value: "text", label: "Text" },
+  { value: "date", label: "A date" },
+  { value: "entity", label: "A person or team" },
+  { value: "entity_list", label: "People or teams" },
 ];
 
 /** Whether the kind (and answer type) has `field`, so its control is offered (A1a). */

@@ -1,9 +1,10 @@
 // The inspector column of the frame (design 3.1, 3.3): a chrome column on the right at
 // 1100px and wider, a bottom sheet from 720 to 1099px (with a drag handle that snaps between
-// two heights), and stacked under the workspace on a phone. Its head has a tab for each pane on offer, INSPECTOR,
-// ASSISTANT (where the assistant is offered) and PROPOSALS (a journey's or route's open proposals), the sheet's grip in the middle, and one control
-// at the right that hides it. Hidden, the column folds to a rail on the right edge (a slim bar
-// at the bottom for the sheet) that shows it again, with a vertical tab for each pane that opens it on that tab. The panes are empty slots: the
+// two heights), and stacked under the workspace on a phone. Its head has a tab for each pane on offer, Inspector,
+// Assistant (where the assistant is offered) and Proposals (a journey's or route's open proposals), in sentence case as
+// DESIGN's tabs are, the sheet's grip in the middle, and one control at the right that hides it. Hidden, the column
+// folds to a rail on the right edge (a slim bar at the bottom for the sheet) that shows it again, with a vertical tab
+// for each pane that opens it on that tab, in the rail's uppercase mono (app.css). The panes are empty slots: the
 // screens' content arrives through portals (frame.tsx). The inspector pane is the column's one
 // scroller; the assistant pane holds its own (a transcript above a pinned composer).
 import { useRef, type PointerEvent as ReactPointerEvent, type Ref, type RefObject } from "react";
@@ -78,7 +79,7 @@ export interface InspectorColumnProps {
   proposalsRef: Ref<HTMLDivElement>;
 }
 
-const TAB_WORDS: Record<InspectorTab, string> = { inspector: "inspector", assistant: "assistant", proposals: "proposals" };
+const TAB_WORDS: Record<InspectorTab, string> = { inspector: "Inspector", assistant: "Assistant", proposals: "Proposals" };
 
 /** A tab's name, with the count of open proposals in mono beside Proposals when there are any. */
 function TabName({ tab, count }: { tab: InspectorTab; count: number | undefined }) {

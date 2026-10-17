@@ -18,14 +18,13 @@ import { journeyPath } from "./address.ts";
 /** C9: the flags the Filter offers, in the order it lists them. */
 export const FILTER_FLAGS: readonly ListFlag[] = ["overdue", "stale", "unassigned", "shortfall", "snoozed"];
 
-/** The flags' words, as the chips under the toolbar say them. */
+/** The flags' words, as the Filter's checks and the chips under the toolbar say them. */
 export const FLAG_WORDS: Partial<Record<ListFlag, string>> = {
-  mine: "mine",
-  overdue: "overdue",
-  stale: "stale",
-  unassigned: "unassigned",
-  shortfall: "short of days",
-  snoozed: "snoozed",
+  overdue: "Overdue",
+  stale: "Stale",
+  unassigned: "Unassigned",
+  shortfall: "Short of days",
+  snoozed: "Snoozed",
 };
 
 /** C1, C9: the Filter: what a node must match to be drawn, and which relevance classes are drawn. */
@@ -185,19 +184,19 @@ export function filterChips(state: ViewState, ownerName: (key: string) => string
   const withFilter = (changed: Partial<ViewFilter>): ViewState => ({ ...state, filter: { ...filter, ...changed } });
   const chips: FilterChip[] = [];
   if (filter.mine) {
-    chips.push({ id: "mine", label: "mine", without: withFilter({ mine: false }) });
+    chips.push({ id: "mine", label: "Mine", without: withFilter({ mine: false }) });
   }
   if (filter.owner !== undefined) {
-    chips.push({ id: "owner", label: `owner: ${ownerName(filter.owner)}`, without: withFilter({ owner: undefined }) });
+    chips.push({ id: "owner", label: `Owner: ${ownerName(filter.owner)}`, without: withFilter({ owner: undefined }) });
   }
   for (const flag of filter.flags) {
     chips.push({ id: `flag-${flag}`, label: FLAG_WORDS[flag] ?? flag, without: withFilter({ flags: filter.flags.filter((each) => each !== flag) }) });
   }
   if (filter.notRelevant) {
-    chips.push({ id: "not-relevant", label: "with not relevant", without: withFilter({ notRelevant: false }) });
+    chips.push({ id: "not-relevant", label: "With not relevant", without: withFilter({ notRelevant: false }) });
   }
   if (!filter.conditional) {
-    chips.push({ id: "no-conditional", label: "without conditional", without: withFilter({ conditional: true }) });
+    chips.push({ id: "no-conditional", label: "Without conditional", without: withFilter({ conditional: true }) });
   }
   if (state.text !== "") {
     chips.push({ id: "text", label: `"${state.text}"`, without: { ...state, text: "" } });

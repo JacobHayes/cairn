@@ -20,6 +20,11 @@ export type Edge = Schema<"Edge">;
 /** The fixed set of kinds (PRD glossary), in the order a palette offers them. */
 export const KINDS: readonly NodeKind[] = ["group", "deliverable", "action", "decision", "milestone"];
 
+/** A kind as a picker offers it: its name in sentence case (DESIGN, Type), the kind as its value. */
+export function kindOption(kind: NodeKind): { value: NodeKind; label: string } {
+  return { value: kind, label: `${kind.charAt(0).toUpperCase()}${kind.slice(1)}` };
+}
+
 /** A2: decisions and milestones are leaves; every other kind may hold children of any kind. */
 export function canHoldChildren(kind: NodeKind): boolean {
   return kind !== "decision" && kind !== "milestone";

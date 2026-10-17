@@ -2,6 +2,7 @@
 // single checkbox, and the flags a filter offers.
 import type { ReactNode } from "react";
 
+import { FLAG_WORDS } from "../journeys/view.ts";
 import type { ListFlag } from "./address.ts";
 
 /** One checkbox; `disabled` where the view cannot honour it, keeping the value it carries (DESIGN, disabled controls). */
@@ -49,8 +50,6 @@ export function Checks<T extends string>({
     </fieldset>
   );
 }
-
-const FLAG_WORDS: Partial<Record<ListFlag, string>> = { overdue: "Overdue", stale: "Stale", unassigned: "Unassigned", shortfall: "Short of days", snoozed: "Snoozed" };
 
 /** The flags a filter offers, one to a line; the change is the chosen set in `options`' order. */
 export function FlagChecks({ options, chosen, onChange }: { options: readonly ListFlag[]; chosen: readonly ListFlag[]; onChange: (chosen: ListFlag[]) => void }) {
