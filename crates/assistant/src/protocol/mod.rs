@@ -10,11 +10,12 @@ pub mod openai;
 
 use std::fmt;
 
+use async_trait::async_trait;
 use serde_json::Value;
 use url::Url;
 
 use crate::limits::PROVIDER_RESPONSE_BYTES_MAX;
-use crate::provider::{Answer, Exchange, Protocol, Provider, ProviderError, Reply};
+use crate::provider::{Exchange, Protocol, Provider, ProviderError, Reply};
 
 /// A deployment-wide API key (ARCHITECTURE, Assistant): configuration, never stored in the
 /// database, and never shown: its `Debug` prints no part of it.
@@ -124,9 +125,10 @@ impl HttpProvider {
     }
 }
 
+#[async_trait]
 impl Provider for HttpProvider {
-    fn send<'a>(&'a self, exchange: &'a Exchange) -> Answer<'a> {
-        Box::pin(self.call(exchange))
+    async fn send(&self, exchange: &Exchange) -> Result<Reply, ProviderError> {
+        self.call(exchange).await
     }
 }
 

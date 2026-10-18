@@ -31,7 +31,7 @@ pub use gcp_iap::{GcpIapConfig, GcpIapProvider, GoogleEndpoints, RelayClient};
 pub use layer::{Auth, Authenticate};
 pub use oauth::{OAuthConfig, OAuthServer};
 pub use oidc::{OidcConfig, OidcProvider};
-pub use provider::{AuthProvider, BoxFuture, Listener, Peer, Presented, Verdict};
+pub use provider::{AuthProvider, Listener, Peer, Presented, Verdict};
 pub use secret::Secret;
 pub use tailscale::{
     ProxySource, TailscaleConfig, TailscaleMode, TailscaleProvider, TrustedProxies,

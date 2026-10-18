@@ -9,6 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+async-trait.workspace = true
 axum.workspace = true
 base64.workspace = true
 cairn-schema.workspace = true

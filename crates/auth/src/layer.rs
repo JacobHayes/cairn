@@ -10,6 +10,7 @@
 use std::net::SocketAddr;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::Router;
 use axum::extract::{ConnectInfo, Request, State};
 use axum::http::header::{AUTHORIZATION, WWW_AUTHENTICATE};
@@ -23,17 +24,18 @@ use url::Url;
 use crate::accounts::Accounts;
 use crate::cookies::{self, SESSION_COOKIE};
 use crate::error::Refusal;
-use crate::provider::{AuthProvider, BoxFuture, Listener, Peer, Presented, Verdict};
+use crate::provider::{AuthProvider, Listener, Peer, Presented, Verdict};
 
 /// Authenticates a request the way the layer does; what a provider's own routes use to
 /// learn who the browser is (the built-in OAuth server's consent).
+#[async_trait]
 pub trait Authenticate: Send + Sync {
     /// The actor a request's credentials name; none when it carries none.
-    fn authenticate<'a>(
-        &'a self,
-        headers: &'a HeaderMap,
-        extensions: &'a Extensions,
-    ) -> BoxFuture<'a, Result<Option<Actor>, Refusal>>;
+    async fn authenticate(
+        &self,
+        headers: &HeaderMap,
+        extensions: &Extensions,
+    ) -> Result<Option<Actor>, Refusal>;
 }
 
 /// Who a browser is at a sign-in step (an OIDC sign-in, an OAuth consent).
@@ -228,17 +230,18 @@ impl Auth {
     }
 }
 
+#[async_trait]
 impl Authenticate for Auth {
-    fn authenticate<'a>(
-        &'a self,
-        headers: &'a HeaderMap,
-        extensions: &'a Extensions,
-    ) -> BoxFuture<'a, Result<Option<Actor>, Refusal>> {
+    async fn authenticate(
+        &self,
+        headers: &HeaderMap,
+        extensions: &Extensions,
+    ) -> Result<Option<Actor>, Refusal> {
         let request = Presented {
             headers,
             peer: self.peer(extensions),
         };
-        Box::pin(self.authenticate_request(request))
+        self.authenticate_request(request).await
     }
 }
 

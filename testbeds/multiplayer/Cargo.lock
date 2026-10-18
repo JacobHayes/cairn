@@ -420,6 +420,7 @@ dependencies = [
 name = "cairn-assistant"
 version = "0.0.0"
 dependencies = [
+ "async-trait",
  "cairn-auth",
  "cairn-mcp",
  "cairn-schema",
@@ -441,6 +442,7 @@ dependencies = [
 name = "cairn-auth"
 version = "0.0.0"
 dependencies = [
+ "async-trait",
  "axum",
  "base64 0.22.1",
  "cairn-schema",

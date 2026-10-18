@@ -7,13 +7,13 @@ mod oidc {
     use std::sync::atomic::{AtomicBool, Ordering};
     use std::sync::{Arc, OnceLock};
 
+    use async_trait::async_trait;
     use axum::Router;
     use axum::body::Body;
     use axum::http::StatusCode;
     use axum::http::header::LOCATION;
     use cairn_auth::{
-        AuthProvider, BoxFuture, DevConfig, DevProvider, OidcConfig, OidcProvider, Presented,
-        Refusal, Verdict,
+        AuthProvider, DevConfig, DevProvider, OidcConfig, OidcProvider, Presented, Refusal, Verdict,
     };
     use cairn_schema::{Actor, Identity, Slug, UserId};
     use cairn_store::AuthStore;
@@ -410,18 +410,18 @@ mod oidc {
     #[tokio::test]
     async fn a_provider_that_cannot_be_asked_fails_the_callback() {
         struct Failing(AtomicBool);
+        #[async_trait]
         impl AuthProvider for Failing {
             fn name(&self) -> &Slug {
                 static NAME: OnceLock<Slug> = OnceLock::new();
                 NAME.get_or_init(|| "failing".parse().unwrap())
             }
-            fn authenticate<'a>(&'a self, _: Presented<'a>) -> BoxFuture<'a, Verdict> {
-                let verdict = if self.0.load(Ordering::SeqCst) {
+            async fn authenticate(&self, _: Presented<'_>) -> Verdict {
+                if self.0.load(Ordering::SeqCst) {
                     Verdict::Refused(Refusal::Unavailable("down".to_owned()))
                 } else {
                     Verdict::Absent
-                };
-                Box::pin(async move { verdict })
+                }
             }
         }
         let world = World::new();

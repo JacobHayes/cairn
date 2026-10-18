@@ -11,6 +11,7 @@
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::Router;
 use axum::extract::{Query, State};
 use axum::http::header::LOCATION;
@@ -36,7 +37,7 @@ use crate::error::{AuthError, ConfigError, Refusal};
 use crate::layer::{Authenticate, browser};
 use crate::lifetimes::{BROWSER_STEP_LIFETIME, SESSION_LIFETIME};
 use crate::outbound::{Outbound, is_trusted_origin};
-use crate::provider::{AuthProvider, BoxFuture, Presented, Verdict};
+use crate::provider::{AuthProvider, Presented, Verdict};
 use crate::secret::{digest, secrets_equal};
 
 /// The OIDC provider's configuration.
@@ -483,6 +484,7 @@ async fn finish(
     finished.unwrap_or_else(IntoResponse::into_response)
 }
 
+#[async_trait]
 impl AuthProvider for OidcProvider {
     fn name(&self) -> &Slug {
         &self.inner.config.name
@@ -490,9 +492,9 @@ impl AuthProvider for OidcProvider {
 
     /// The OIDC provider signs a browser in through its routes; requests after that carry
     /// the session cookie, so a request on its own holds nothing of this provider's.
-    fn authenticate<'a>(&'a self, request: Presented<'a>) -> BoxFuture<'a, Verdict> {
+    async fn authenticate(&self, request: Presented<'_>) -> Verdict {
         let _ = request;
-        Box::pin(async { Verdict::Absent })
+        Verdict::Absent
     }
 
     fn auto_link(&self) -> bool {

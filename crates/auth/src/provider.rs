@@ -3,11 +3,10 @@
 //! Providers are configured independently and run together; each may serve its own routes
 //! (a login and its callback, the OAuth endpoints).
 
-use std::future::Future;
 use std::net::{IpAddr, SocketAddr};
-use std::pin::Pin;
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::Router;
 use axum::http::HeaderMap;
 use axum::http::header::AUTHORIZATION;
@@ -15,10 +14,6 @@ use cairn_schema::{Actor, Identity, Slug};
 
 use crate::error::Refusal;
 use crate::layer::Authenticate;
-
-/// A boxed future, so that providers stay trait objects (PRACTICES, Not adopted: the auth
-/// provider is a trait object by design).
-pub type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
 
 /// What one provider makes of one request.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -104,13 +99,14 @@ impl Presented<'_> {
 }
 
 /// One way of authenticating (ARCHITECTURE, Auth).
+#[async_trait]
 pub trait AuthProvider: Send + Sync {
     /// The provider's configured name: the `provider` of every identity it vouches for.
     fn name(&self) -> &Slug;
 
     /// What this provider makes of a request. A provider refuses only a credential of its
     /// own; one it does not read is [`Verdict::Absent`].
-    fn authenticate<'a>(&'a self, request: Presented<'a>) -> BoxFuture<'a, Verdict>;
+    async fn authenticate(&self, request: Presented<'_>) -> Verdict;
 
     /// Whether `token`, presented as a bearer token, is this provider's to check. A bearer
     /// token no provider claims is refused, so a mistyped token never passes unnoticed.

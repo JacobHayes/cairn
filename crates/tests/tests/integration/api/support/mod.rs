@@ -12,11 +12,12 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::sync::atomic::{AtomicI64, Ordering};
 
+use async_trait::async_trait;
 use axum::http::Method;
 use cairn_api::client::{Reply, Transport};
 use cairn_auth::{
-    Accounts, Auth, AuthProvider, BoxFuture, Clock, GcpIapConfig, GcpIapProvider, GoogleEndpoints,
-    Listener, OAuthConfig, OAuthServer, Presented, RelayClient, Verdict,
+    Accounts, Auth, AuthProvider, Clock, GcpIapConfig, GcpIapProvider, GoogleEndpoints, Listener,
+    OAuthConfig, OAuthServer, Presented, RelayClient, Verdict,
 };
 use cairn_engine::from_file;
 use cairn_schema::{
@@ -67,17 +68,18 @@ struct TeamProvider {
     name: Slug,
 }
 
+#[async_trait]
 impl AuthProvider for TeamProvider {
     fn name(&self) -> &Slug {
         &self.name
     }
 
-    fn authenticate<'a>(&'a self, request: Presented<'a>) -> BoxFuture<'a, Verdict> {
+    async fn authenticate(&self, request: Presented<'_>) -> Verdict {
         let member = request
             .bearer()
             .and_then(|token| token.strip_prefix("team-"))
             .and_then(|name| TEAM.iter().find(|(member, _)| *member == name));
-        let verdict = match member {
+        match member {
             None => Verdict::Absent,
             Some((name, email)) => Verdict::Identity(Identity {
                 provider: self.name.clone(),
@@ -85,8 +87,7 @@ impl AuthProvider for TeamProvider {
                 display: name.parse().unwrap(),
                 verified_emails: BTreeSet::from([email.parse().unwrap()]),
             }),
-        };
-        Box::pin(async move { verdict })
+        }
     }
 
     fn claims_bearer(&self, token: &str) -> bool {

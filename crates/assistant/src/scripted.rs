@@ -6,9 +6,10 @@ use std::collections::VecDeque;
 use std::sync::Mutex;
 use std::time::Duration;
 
+use async_trait::async_trait;
 use serde_json::Value;
 
-use crate::provider::{Answer, Exchange, Provider, ProviderError, Reply, ToolCall};
+use crate::provider::{Exchange, Provider, ProviderError, Reply, ToolCall};
 
 /// One scripted answer.
 #[derive(Clone, Debug, PartialEq)]
@@ -93,24 +94,23 @@ impl ScriptedProvider {
     }
 }
 
+#[async_trait]
 impl Provider for ScriptedProvider {
-    fn send<'a>(&'a self, exchange: &'a Exchange) -> Answer<'a> {
+    async fn send(&self, exchange: &Exchange) -> Result<Reply, ProviderError> {
         lock(&self.seen).push(exchange.clone());
         let step = lock(&self.steps).pop_front();
-        Box::pin(async move {
-            match step {
-                Some(Step::Reply(reply)) => Ok(reply),
-                Some(Step::Fail(error)) => Err(error),
-                Some(Step::Hang) => std::future::pending().await,
-                Some(Step::Slow(after, reply)) => {
-                    tokio::time::sleep(after).await;
-                    Ok(reply)
-                }
-                None => Err(ProviderError::Failed {
-                    message: "the script has ended".to_owned(),
-                }),
+        match step {
+            Some(Step::Reply(reply)) => Ok(reply),
+            Some(Step::Fail(error)) => Err(error),
+            Some(Step::Hang) => std::future::pending().await,
+            Some(Step::Slow(after, reply)) => {
+                tokio::time::sleep(after).await;
+                Ok(reply)
             }
-        })
+            None => Err(ProviderError::Failed {
+                message: "the script has ended".to_owned(),
+            }),
+        }
     }
 }
 

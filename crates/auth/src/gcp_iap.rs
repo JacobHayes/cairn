@@ -24,6 +24,7 @@ mod relay;
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::Router;
 use cairn_schema::{Email, Identity, Slug, Timestamp, Title};
 use openidconnect::core::{
@@ -42,7 +43,7 @@ use crate::layer::Authenticate;
 use crate::limits::{IAP_ASSERTION_CLOCK_SKEW_MAX, IAP_KEY_SET_REFETCH_INTERVAL_MIN};
 use crate::oidc::chrono_time;
 use crate::outbound::{Outbound, is_trusted_origin};
-use crate::provider::{AuthProvider, BoxFuture, Presented, Verdict};
+use crate::provider::{AuthProvider, Presented, Verdict};
 
 /// The header IAP puts its signed assertion in.
 pub const ASSERTION_HEADER: &str = "x-goog-iap-jwt-assertion";
@@ -319,6 +320,7 @@ impl GcpIapProvider {
     }
 }
 
+#[async_trait]
 impl AuthProvider for GcpIapProvider {
     fn name(&self) -> &Slug {
         &self.config.name
@@ -327,7 +329,7 @@ impl AuthProvider for GcpIapProvider {
     /// H1, I2: the request's assertion names its user. A Google ID token as the bearer
     /// (the relay's) counts only beside a valid assertion: alone, it is refused rather than
     /// left for another provider, and it is never read for who the user is.
-    fn authenticate<'a>(&'a self, request: Presented<'a>) -> BoxFuture<'a, Verdict> {
+    async fn authenticate(&self, request: Presented<'_>) -> Verdict {
         let assertion = request
             .headers
             .get(ASSERTION_HEADER)
@@ -335,14 +337,12 @@ impl AuthProvider for GcpIapProvider {
         let google_bearer = request
             .bearer()
             .is_some_and(|token| self.claims_bearer(token));
-        Box::pin(async move {
-            match assertion {
-                None if google_bearer => Verdict::Refused(Refusal::Credential),
-                None => Verdict::Absent,
-                Some(Ok(assertion)) if !assertion.is_empty() => self.verify(assertion).await,
-                Some(_) => Verdict::Refused(Refusal::Credential),
-            }
-        })
+        match assertion {
+            None if google_bearer => Verdict::Refused(Refusal::Credential),
+            None => Verdict::Absent,
+            Some(Ok(assertion)) if !assertion.is_empty() => self.verify(assertion).await,
+            Some(_) => Verdict::Refused(Refusal::Credential),
+        }
     }
 
     /// With the relay on, a bearer shaped as an ID token is the relay's Google ID token,

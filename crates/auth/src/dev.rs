@@ -5,10 +5,11 @@
 
 use std::collections::BTreeSet;
 
+use async_trait::async_trait;
 use cairn_schema::{Email, Identity, Slug, Title};
 
 use crate::error::{ConfigError, Refusal};
-use crate::provider::{AuthProvider, BoxFuture, Listener, Presented, Verdict};
+use crate::provider::{AuthProvider, Listener, Presented, Verdict};
 use crate::secret::{SECRET_PREFIX, secrets_equal};
 
 /// The dev provider's configuration.
@@ -93,14 +94,14 @@ impl DevProvider {
     }
 }
 
+#[async_trait]
 impl AuthProvider for DevProvider {
     fn name(&self) -> &Slug {
         &self.config.name
     }
 
-    fn authenticate<'a>(&'a self, request: Presented<'a>) -> BoxFuture<'a, Verdict> {
-        let verdict = self.verdict(request);
-        Box::pin(async move { verdict })
+    async fn authenticate(&self, request: Presented<'_>) -> Verdict {
+        self.verdict(request)
     }
 
     fn claims_bearer(&self, token: &str) -> bool {

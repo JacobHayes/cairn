@@ -4,9 +4,8 @@
 //! ([`crate::protocol`]), and a scripted one drives the tests ([`crate::scripted`]).
 
 use std::fmt;
-use std::future::Future;
-use std::pin::Pin;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 
@@ -108,15 +107,13 @@ impl fmt::Display for ProviderError {
 
 impl std::error::Error for ProviderError {}
 
-/// A boxed provider answer.
-pub type Answer<'a> = Pin<Box<dyn Future<Output = Result<Reply, ProviderError>> + Send + 'a>>;
-
 /// A model provider (I5: deployment-configurable, not tied to one vendor). The turn loop
 /// holds the call to [`PROVIDER_CALL_DURATION_MAX`](crate::limits::PROVIDER_CALL_DURATION_MAX),
 /// so an implementation need not time itself.
+#[async_trait]
 pub trait Provider: Send + Sync {
     /// Sends `exchange` and answers the model's reply.
-    fn send<'a>(&'a self, exchange: &'a Exchange) -> Answer<'a>;
+    async fn send(&self, exchange: &Exchange) -> Result<Reply, ProviderError>;
 }
 
 /// The wire protocols a deployment can configure (ARCHITECTURE, Assistant).

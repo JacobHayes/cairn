@@ -13,6 +13,7 @@ publish.workspace = true
 server = ["cairn-wasm/server"]
 
 [dev-dependencies]
+async-trait.workspace = true
 axum.workspace = true
 base64.workspace = true
 cairn-api.workspace = true

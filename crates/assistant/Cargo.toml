@@ -9,6 +9,7 @@ repository.workspace = true
 publish.workspace = true
 
 [dependencies]
+async-trait.workspace = true
 cairn-auth.workspace = true
 cairn-mcp.workspace = true
 cairn-schema.workspace = true

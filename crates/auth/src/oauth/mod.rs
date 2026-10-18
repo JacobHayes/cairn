@@ -21,6 +21,7 @@ pub(crate) mod reply;
 
 use std::sync::Arc;
 
+use async_trait::async_trait;
 use axum::Router;
 use axum::routing::{get, post};
 use cairn_schema::Slug;
@@ -29,7 +30,7 @@ use url::Url;
 use crate::accounts::Accounts;
 use crate::error::Refusal;
 use crate::layer::Authenticate;
-use crate::provider::{AuthProvider, BoxFuture, Presented, Verdict};
+use crate::provider::{AuthProvider, Presented, Verdict};
 use crate::secret::SECRET_PREFIX;
 use metadata::Metadata;
 
@@ -86,13 +87,14 @@ impl Server {
     }
 }
 
+#[async_trait]
 impl AuthProvider for OAuthServer {
     fn name(&self) -> &Slug {
         &self.inner.config.name
     }
 
-    fn authenticate<'a>(&'a self, request: Presented<'a>) -> BoxFuture<'a, Verdict> {
-        Box::pin(self.inner.verdict(request))
+    async fn authenticate(&self, request: Presented<'_>) -> Verdict {
+        self.inner.verdict(request).await
     }
 
     /// Every bearer token with Cairn's prefix is this provider's: a session token or a code

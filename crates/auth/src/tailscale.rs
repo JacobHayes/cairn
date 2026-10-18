@@ -21,6 +21,7 @@ use std::net::{IpAddr, SocketAddr};
 use std::path::PathBuf;
 use std::str::FromStr;
 
+use async_trait::async_trait;
 use axum::body::Bytes;
 use axum::http::header::HOST;
 use axum::http::{HeaderMap, Request, StatusCode};
@@ -32,7 +33,7 @@ use serde::Deserialize;
 
 use crate::error::{ConfigError, Refusal};
 use crate::limits::IDENTITY_CALL_DURATION_MAX;
-use crate::provider::{AuthProvider, BoxFuture, Listener, Peer, Presented, Verdict};
+use crate::provider::{AuthProvider, Listener, Peer, Presented, Verdict};
 
 /// How the provider learns who a request is from.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -236,18 +237,16 @@ impl TailscaleProvider {
     }
 }
 
+#[async_trait]
 impl AuthProvider for TailscaleProvider {
     fn name(&self) -> &Slug {
         &self.config.name
     }
 
-    fn authenticate<'a>(&'a self, request: Presented<'a>) -> BoxFuture<'a, Verdict> {
+    async fn authenticate(&self, request: Presented<'_>) -> Verdict {
         match &self.config.mode {
-            TailscaleMode::Proxy { trusted } => {
-                let verdict = self.proxied(trusted, request);
-                Box::pin(async move { verdict })
-            }
-            TailscaleMode::Direct { socket } => Box::pin(self.looked_up(socket, request.peer)),
+            TailscaleMode::Proxy { trusted } => self.proxied(trusted, request),
+            TailscaleMode::Direct { socket } => self.looked_up(socket, request.peer).await,
         }
     }
 
