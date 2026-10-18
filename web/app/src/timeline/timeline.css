@@ -96,7 +96,10 @@
   white-space: nowrap;
 }
 
+/* One line: a long sentence ends in an ellipsis and its title attribute holds it whole. */
 .timeline-words {
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 

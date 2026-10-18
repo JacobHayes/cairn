@@ -9,7 +9,7 @@ import { rollups } from "../plan/tree.ts";
 import type { DisplayState } from "../status/words.ts";
 import { currentStages, isStage } from "./ladder.ts";
 import type { CardBadge, CardBody, CardState, JourneyExtras, LevelNode, Looks, Signals } from "./model.ts";
-import { dependsWords, firstParagraph, footWords, snoozeTarget } from "./words.ts";
+import { dependsWords, firstParagraph, footWords, snoozeWords } from "./words.ts";
 
 /** A node's display state (D8): the engine's one state, which the canvas shows as it is. */
 export function stateOf(view: Ready, node: GraphNode): DisplayState {
@@ -102,16 +102,9 @@ function bodyOf(context: Context, node: GraphNode, derived: NodeDerived, at: Lev
 /** The foot's date, or where a snooze ends, or the container a snooze holds through (7.4). */
 function footOf(context: Context, node: GraphNode, derived: NodeDerived, state: DisplayState): CardState["foot"] {
   const { view } = context;
-  if (derived.snoozed_via != null) {
-    const via = nodeOf(view, derived.snoozed_via)?.title ?? derived.snoozed_via;
-    return { words: `Via ${via}`, title: `Snoozed through ${via}`, tone: "plain" };
-  }
-  const target = derived.snoozed;
-  if (state === "snoozed" && target != null) {
-    const until = snoozeTarget(view, derived) ?? "";
-    // The chip already says snoozed, so the foot is where it ends, the one fact that must not be cut; a long node name takes the ellipsis, never the "Until".
-    const tail = "date" in target ? undefined : " is done";
-    return { words: `Until ${until}`, ...(tail === undefined ? {} : { tail }), title: `Snoozed until ${until}${tail ?? ""}`, tone: "plain" };
+  const snoozed = snoozeWords(view, derived);
+  if (snoozed !== undefined) {
+    return { ...snoozed, tone: "plain" };
   }
   const { due, latest_start: latestStart, effective_date: effective } = derived.dates;
   return footWords({

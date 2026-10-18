@@ -232,7 +232,7 @@ function Label({ axis, row, selected, onFold, title }: { axis: Axis; row: ChartR
         <TreeFold container={row.foldable} open={row.open} label={row.title} testId="timeline-fold" onFold={() => { onFold(row.key); }} />
         <div className="timeline-text" title={row.title}>
           {title(row.key)}
-          <span className={row.late > 0 || row.shortfallDays !== undefined ? "small timeline-words timeline-late" : "muted small timeline-words"} data-testid="timeline-words">
+          <span className={row.late > 0 || row.shortfallDays !== undefined ? "small timeline-words timeline-late" : "muted small timeline-words"} data-testid="timeline-words" title={row.words}>
             {row.words}
           </span>
         </div>

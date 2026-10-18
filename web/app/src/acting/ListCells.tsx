@@ -11,6 +11,7 @@ import { screenSwitched, useNodeAddresses } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { entityName } from "../detail/sections.tsx";
 import { rollups } from "../plan/tree.ts";
+import { snoozeWords } from "../canvas/words.ts";
 import { statusTone, statusWord } from "../status/words.ts";
 import { dateWords } from "../timeline/model.ts";
 import { daysWords, dueWords } from "../status/when.ts";
@@ -43,6 +44,18 @@ function Under({ view, line }: { view: Ready; line: Line }) {
   return ancestor === undefined ? null : (
     <span className="muted small" data-testid="breadcrumb">
       in <DetailLink view={view} node={ancestor} />
+    </span>
+  );
+}
+
+/** Where a snoozed row's snooze ends, in the card foot's words, as the row's one secondary fact (the Due column stays its due date). */
+function Return({ view, line }: { view: Ready; line: Line }) {
+  const derived = view.derived.nodes[line.key];
+  const snoozed = derived === undefined ? undefined : snoozeWords(view, derived);
+  return snoozed === undefined ? null : (
+    <span className="muted small" data-testid="list-return" title={snoozed.title}>
+      {snoozed.words}
+      {snoozed.tail}
     </span>
   );
 }
@@ -97,6 +110,7 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
       <div className="list-node">
         <DetailLink view={view} node={line.key} />
         {acting ? <Acting line={line} context={context} /> : tree ? (line.container ? <Progress view={view} line={line} /> : null) : <Under view={view} line={line} />}
+        <Return view={view} line={line} />
       </div>
     </div>
   );

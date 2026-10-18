@@ -48,15 +48,21 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   await expect(snoozed.getByTestId("card-foot")).toHaveText(/^Until /);
   expect(await opacityOf(nodeCard(page, "n_beta_end").locator(".node-title"))).toBe(1);
   await expectRowsInsideCards(page);
+  const footWords = await snoozed.getByTestId("card-foot").innerText();
   await goTo(page, "list");
   const row = page.locator('[data-testid="list-row"][data-node="n_docs"]');
-  expect(await opacityOf(row.locator('[data-column="title"] .list-content'))).toBe(onCard);
+  // Under its title the row says where the snooze ends, in the words of the card's foot; an unsnoozed row says nothing.
+  await expect(row.getByTestId("list-return")).toHaveText(footWords);
+  expect(await row.getByTestId("list-return").evaluate((element) => Number(getComputedStyle(element.closest(".list-content") ?? element).opacity))).toBe(1);
+  await expect(page.locator('[data-testid="list-row"][data-node="n_beta_end"]').getByTestId("list-return")).toHaveCount(0);
+  expect(await opacityOf(row.locator('[data-column="title"] .list-node > a'))).toBe(onCard);
   expect(await opacityOf(row.locator('[data-column="status"] .list-content'))).toBe(1);
   expect(await opacityOf(page.locator('[data-testid="list-row"][data-node="n_beta_end"] [data-column="title"] .list-content'))).toBe(1);
   await goTo(page, "timeline");
   const label = page.locator('[data-testid="timeline-entry"][data-node="n_docs"] .timeline-text');
   expect(await opacityOf(label.locator("> :not(.timeline-words)"))).toBe(onCard);
   expect(await opacityOf(label.getByTestId("timeline-words"))).toBe(1);
+  await expect(label.getByTestId("timeline-words")).toContainText(footWords);
   await goTo(page, "list");
   await page.keyboard.press("Shift+F");
   await expect(fold).toHaveAttribute("data-count", "2");

@@ -433,9 +433,10 @@ table.data.list-table .badge {
   opacity: 0.5;
 }
 
-/* Snoozed rows are not now: the content at --opacity-snoozed, as on a card and a Timeline label, the status and due cells left alone. Before the out-of-focus rule, so that lowest opacity wins. */
+/* Snoozed rows are not now: the content at --opacity-snoozed, as on a card and a Timeline label, the status and due cells left alone, and in the title cell only the title link, so the return words under it stay at full strength. Before the out-of-focus rule, so that lowest opacity wins. */
 .node-row[data-state="snoozed"]:not([data-faded="true"]) .node-title,
-.list-table tr[data-state="snoozed"]:not([data-faded="true"]) td:not(.list-check, [data-column="status"], [data-column="due"]) > .list-content {
+.list-table tr[data-state="snoozed"]:not([data-faded="true"]) td:not(.list-check, [data-column="status"], [data-column="due"], [data-column="title"]) > .list-content,
+.list-table tr[data-state="snoozed"]:not([data-faded="true"]) td[data-column="title"] .list-node > a {
   opacity: var(--opacity-snoozed);
 }
 

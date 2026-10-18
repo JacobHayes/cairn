@@ -13,6 +13,7 @@ import type { RouteSchedule, ScheduleEntry } from "@cairn/wasm";
 
 import { childrenOf, nodesByPath, titleIn, type Tree } from "../authoring/graph.ts";
 import { nodeOf, recordOf, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
+import { snoozeWords } from "../canvas/words.ts";
 import { ancestorsOf, planOrder, rollups, treeOf } from "../plan/tree.ts";
 import { daysWords, dueWords, daysUntil } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
@@ -224,6 +225,7 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
     const progress = container ? rolls.get(key) : undefined;
     const late = entries.get(key)?.overdue === true && own !== undefined ? Math.max(0, -daysUntil(own.to, today)) : 0;
     const shortfallDays = entries.get(key)?.shortfall_days ?? undefined;
+    const snoozed = snoozeWords(view, derived);
     rows.push({
       key,
       title: node.title,
@@ -235,7 +237,7 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
       from: dayOf(own?.from ?? span.from),
       to: dayOf(own?.to ?? span.to),
       origin: own?.origin,
-      words: [wordsOf(view, node, own, progress, late), shortfallDays === undefined ? "" : `${daysWords(shortfallDays)} short`].filter(Boolean).join(", "),
+      words: [snoozed === undefined ? "" : `${snoozed.words}${snoozed.tail ?? ""}`, wordsOf(view, node, own, progress, late), shortfallDays === undefined ? "" : `${daysWords(shortfallDays)} short`].filter(Boolean).join(", "),
       late,
       shortfallDays,
       end: entries.get(key)?.final === true,

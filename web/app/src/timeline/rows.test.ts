@@ -24,6 +24,20 @@ const timeline: Timeline = {
 
 const keys = (rows: { key: string }[]) => rows.map((row) => row.key);
 
+describe("a snoozed row says where its snooze ends, in the card's words, before its date", () => {
+  it("leads a snoozed node's words with the snooze's and leaves another's alone", () => {
+    const view = testView();
+    const report = view.derived.nodes["n_report"];
+    if (report === undefined) {
+      throw new Error("the fixture has the report");
+    }
+    Object.assign(report, { display_state: "snoozed", snoozed: { date: "2026-11-09" } });
+    const words = (key: string) => chartOf(view, timeline, options).rows.find((row) => row.key === key)?.words ?? "";
+    expect(words("n_report")).toMatch(/^Until Nov 9, /);
+    expect(words("n_findings")).not.toMatch(/Until/);
+  });
+});
+
 describe("the rows are the drawn nodes with dates", () => {
   it("opens a stage to its work as one bar over what is done, puts the final milestone last, and lists the undated", () => {
     const chart = chartOf(testView(), timeline, options);

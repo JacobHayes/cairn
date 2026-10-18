@@ -488,6 +488,7 @@
   overflow: visible;
 }
 
+/* A line with a tail that must not be cut (a card's "Until <node>" and " is done"): the words take the ellipsis, the tail stays whole. */
 .node-date-lead {
   min-width: 0;
   overflow: hidden;

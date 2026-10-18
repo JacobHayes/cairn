@@ -1,7 +1,7 @@
 // What a card says in plain words (5.5, the density call): the one date in its foot, a
 // condition's "if" sentence, a snooze's target, a container's progress. Pure and apart from the
 // components, so the unit tests read the same sentences the canvas draws.
-import type { GraphNode, NodeDerived, NodeKind, Ready } from "../detail/model.ts";
+import { nodeOf, type GraphNode, type NodeDerived, type NodeKind, type Ready } from "../detail/model.ts";
 import type { DisplayState } from "../status/words.ts";
 import type { Tone } from "./model.ts";
 
@@ -76,6 +76,27 @@ export function snoozeTarget(view: Ready, derived: NodeDerived): string | undefi
     return undefined;
   }
   return "date" in target ? dateWords(target.date, view.derived.today) : (view.journey.graph.nodes ?? []).find((node) => node.key === target.node)?.title;
+}
+
+/**
+ * Where a snooze ends, in words, for every surface that shows it (a card's foot, a list row, a
+ * timeline row): `Until Oct 20`, `Until <node> is done` (the `tail` is what a short room must not
+ * cut, so the name takes the ellipsis), or `Via <container>` for a node held by its container's
+ * snooze. `title` is the full sentence for a tooltip. None when the node is not snoozed.
+ */
+export function snoozeWords(view: Ready, derived: NodeDerived): { words: string; tail?: string; title: string } | undefined {
+  if (derived.snoozed_via != null) {
+    const via = nodeOf(view, derived.snoozed_via)?.title ?? derived.snoozed_via;
+    return { words: `Via ${via}`, title: `Snoozed through ${via}` };
+  }
+  const target = derived.snoozed;
+  if (derived.display_state !== "snoozed" || target == null) {
+    return undefined;
+  }
+  const until = snoozeTarget(view, derived) ?? "";
+  // The chip already says snoozed, so the words are where it ends, the one fact that must not be cut.
+  const tail = "date" in target ? undefined : " is done";
+  return { words: `Until ${until}`, ...(tail === undefined ? {} : { tail }), title: `Snoozed until ${until}${tail ?? ""}` };
 }
 
 /** Progress as words: `3 of 10 done`. */
