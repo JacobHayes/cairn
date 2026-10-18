@@ -238,6 +238,8 @@ textarea {
   background: var(--color-surface);
   color: var(--color-text);
   min-height: var(--control-h);
+  /* A select is as wide as its longest option: never wider than the box it sits in. */
+  max-width: 100%;
 }
 input:hover,
 select:hover,
@@ -829,6 +831,8 @@ svg.chart .datum-line {
   color: var(--color-text);
   border: 1px solid var(--color-frame);
   box-shadow: var(--shadow-md);
+  /* A word with no break in it (a name, a path) wraps at the popover's edge instead of running out of it. */
+  overflow-wrap: anywhere;
 }
 /* A menu of actions: items 4px 12px, a hairline between groups, an optional mono group label. */
 .popover[role="menu"] > .popover-body {

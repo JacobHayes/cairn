@@ -6,7 +6,7 @@
 // The timed parts of the shell that only a mounted page shows are here too: the sync dot's
 // popover (peek, pin, the leave delay, Esc, a press outside, a resize), its OFFLINE state, and
 // the toast held by the pointer.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 
 import { newRoute, routeName } from "./authoring.ts";
 import { openRoute, routeMenuItem, savedText } from "./around.ts";

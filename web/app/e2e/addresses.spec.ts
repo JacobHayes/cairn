@@ -1,7 +1,7 @@
 // One address per journey and node (C2, C9, C11, C16, E4): Home at `/`, the pages each path names and
 // the ones that are gone, the rail's current item, a selected node drawn whatever the view hides, and the
 // walk keeping its address. They run on the in-browser host, whose fixtures hold the same journeys.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 
 import { journeyName, startJourney } from "./around.ts";
 import { expectAddress, goTo, nodeCard, nodePanel, open, openAt, visit } from "./shell.ts";

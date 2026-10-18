@@ -7,7 +7,9 @@
 // on each view, by pointer and by keys, and the journey's status moves from its `⋯`. The addresses and requests behind them
 // are vitest's (journeys/view.test.ts and journeys/requests.test.ts). Depth and its Fade follow
 // every view, Fade moves nothing, and the walk through at Decisions is the decision walkthrough.
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { type Locator, type Page } from "@playwright/test";
+
+import { expect, test } from "./test.ts";
 
 import { journeyName, setStatus, startJourney } from "./around.ts";
 import { viewportOf, viewportSettled } from "./canvas.ts";

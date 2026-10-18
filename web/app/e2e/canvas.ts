@@ -70,56 +70,33 @@ export async function zoomToReading(page: Page): Promise<void> {
 }
 
 /**
- * Every card's rows lie inside the card's box and below the row above (in the card's own px, so
- * the zoom does not matter): none is cut by the border or printed over the next. A row a zoomed-out
- * container head hides has no box and is left out. The cards are
- * counted so a canvas that drew none does not pass.
+ * Every card's title wraps to the lines layout counted for it (`--title-lines`, from the title's
+ * measured width, cards.ts): not a line fewer (cut with an ellipsis for nothing) and not a blank
+ * one more (a card taller than its text). The title's lines are read from its text's own boxes,
+ * which a clamp does not hide. An open container is left out: its width is ELK's, around its
+ * children, so the header's lines are counted for the usual card width and its title may take fewer.
  */
-export async function expectRowsInsideCards(page: Page): Promise<void> {
-  const problems = await page.evaluate(() => {
-    const found: string[] = [];
-    // A title's lines that a clip (the clamp, a row's box) hides are not drawn, so only what shows counts; any other row is its own box.
-    const shown = (row: HTMLElement, card: HTMLElement): { top: number; bottom: number; right: number; height: number } => {
-      if (row.dataset["testid"] !== "title") {
-        return row.getBoundingClientRect();
-      }
-      const clips: DOMRect[] = [];
-      for (let up: HTMLElement | null = row; up !== null && up !== card; up = up.parentElement) {
-        if (getComputedStyle(up).overflow !== "visible") {
-          clips.push(up.getBoundingClientRect());
-        }
+export async function expectTitleLinesAsLaidOut(page: Page): Promise<void> {
+  const off = await page.evaluate(() => {
+    const wrong: string[] = [];
+    let checked = 0;
+    for (const card of document.querySelectorAll<HTMLElement>('[data-testid="node-card"]')) {
+      const title = card.querySelector<HTMLElement>('[data-testid="title"]');
+      const row = card.querySelector<HTMLElement>(".node-title-row");
+      if (title === null || row === null || card.classList.contains("node-container")) {
+        continue;
       }
       const range = document.createRange();
-      range.selectNodeContents(row);
-      // A text rect is the glyphs' box, taller than the line: the line box is the computed line height centred on it.
-      const scale = card.getBoundingClientRect().height / card.offsetHeight;
-      const half = (Number.parseFloat(getComputedStyle(row).lineHeight) * scale) / 2;
-      const lines = [...range.getClientRects()]
-        .map((line) => ({ top: (line.top + line.bottom) / 2 - half, bottom: (line.top + line.bottom) / 2 + half, right: line.right }))
-        .filter((line) => clips.every((clip) => line.top < clip.bottom - 0.5 && line.bottom > clip.top));
-      const [top, bottom, right] = [Math.min(...lines.map((line) => line.top)), Math.max(...lines.map((line) => Math.min(line.bottom, ...clips.map((clip) => clip.bottom)))), Math.max(...lines.map((line) => line.right))];
-      return lines.length === 0 ? { top: 0, bottom: 0, right: 0, height: 0 } : { top, bottom, right, height: bottom - top };
-    };
-    const cards = [...document.querySelectorAll<HTMLElement>('[data-testid="node-card"]')];
-    for (const card of cards) {
-      const box = card.getBoundingClientRect();
-      const scale = box.height / card.offsetHeight;
-      const rows = [...card.querySelectorAll<HTMLElement>(".node-head, .node-title-row, [data-testid=\"title\"], .node-body-line, .node-foot")].map((row) => ({ row, at: shown(row, card) })).filter(({ at }) => at.height > 0);
-      for (const { row, at } of rows) {
-        // The border is 1px: a row ends above it.
-        if (at.bottom > box.bottom - scale + 0.5 * scale || at.top < box.top || at.right > box.right + 0.5 * scale) {
-          found.push(`${card.dataset["node"] ?? ""}: ${row.dataset["testid"] ?? row.className} sticks out of the card (${String(Math.round(at.top - box.top))}..${String(Math.round(at.bottom - box.top))} of ${String(Math.round(box.height))}, right ${String(Math.round(at.right - box.right))})`);
-        }
-      }
-      for (const [index, { row, at }] of rows.entries()) {
-        const next = rows.slice(index + 1).find((other) => !row.contains(other.row) && !other.row.contains(row) && other.at.top >= at.top - 0.5 * scale);
-        if (next !== undefined && at.bottom > next.at.top + 0.5 * scale) {
-          found.push(`${card.dataset["node"] ?? ""}: ${row.dataset["testid"] ?? row.className} runs over ${next.row.dataset["testid"] ?? next.row.className}`);
-        }
+      range.selectNodeContents(title);
+      const natural = new Set([...range.getClientRects()].map((line) => Math.round(line.top / 2))).size;
+      const laid = Number(row.style.getPropertyValue("--title-lines"));
+      checked += 1;
+      if (Math.min(natural, 2) !== laid) {
+        wrong.push(`${card.dataset["node"] ?? ""}: laid out as ${String(laid)} lines, drawn as ${String(natural)}`);
       }
     }
-    return [`${String(cards.length)} cards`, ...found];
+    return { checked, wrong };
   });
-  expect(Number.parseInt(problems[0] ?? "0", 10)).toBeGreaterThan(5);
-  expect(problems.slice(1)).toEqual([]);
+  expect(off.checked, "titles looked at").toBeGreaterThan(5);
+  expect(off.wrong).toEqual([]);
 }

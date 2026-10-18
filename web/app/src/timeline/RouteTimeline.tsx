@@ -70,7 +70,7 @@ export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTi
           range={undefined}
           onFold={onFold}
           selected={selected}
-          title={(key) => (onOpen === undefined ? titleOf(key) : <Link to={addresses.open(key)} data-node={key} onClick={(event) => { event.preventDefault(); onOpen(key); }}>{titleOf(key)}</Link>)}
+          title={(key) => (onOpen === undefined ? <span>{titleOf(key)}</span> : <Link to={addresses.open(key)} data-node={key} onClick={(event) => { event.preventDefault(); onOpen(key); }}>{titleOf(key)}</Link>)}
           endTitle={titleOf}
           activate={onOpen}
           anchorNote={

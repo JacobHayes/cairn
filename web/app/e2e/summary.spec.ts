@@ -3,7 +3,7 @@
 // What each value is (the final milestone, the claimed rows, what finished lately) is the
 // engine-backed model's (summary/model.engine.test.ts); this is what only a browser shows. Every
 // test runs on the in-browser host, whose fixtures are fresh on every load.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 
 import { setStatus } from "./around.ts";
 import { countOf, keysOf, panelOf, rowsOf, stall, startOnSummary } from "./summary.ts";

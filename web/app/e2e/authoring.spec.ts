@@ -3,7 +3,9 @@
 // published, exported, and imported back to the same graph (A12, A1a, A13); and, on a fixture
 // journey, a local node added and a route-copied title edited and reset (B4). The forms'
 // own rules (fields, violations, removal, conditions, breakdowns) are vitest's.
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { expect, test } from "./test.ts";
 
 import { importIntoDraft, openRoute, publishDraft, routeMenuItem, savedText, versionSelect } from "./around.ts";
 import { addNode, addRole, formField, newRoute, nodeForm, openEditing, openForm, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";

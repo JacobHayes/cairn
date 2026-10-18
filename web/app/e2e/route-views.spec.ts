@@ -3,7 +3,9 @@
 // header, and its timeline is the earliest schedule from day 0. Run on the in-browser host,
 // which reseeds the store on each load, so moves within a test go through links and
 // `goWithin`, never a reload. What the views draw (levels, schedule, rows) is the unit tests'.
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { expect, test } from "./test.ts";
 
 import { openRoute, pickVersion, publishDraft, routeMenuItem, versionSelect } from "./around.ts";
 import { publishVersionTwo } from "./proposals.ts";

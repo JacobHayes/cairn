@@ -64,8 +64,13 @@
   white-space: nowrap;
 }
 
+/* A name as long as one may be takes two lines and ends in an ellipsis; the title holds it whole. */
 .journey-header h1 {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
   min-width: 0;
+  overflow: hidden;
   overflow-wrap: anywhere;
 }
 

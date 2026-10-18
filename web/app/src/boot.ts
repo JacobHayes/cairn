@@ -7,6 +7,7 @@ import { DeriveWorker, InBrowserHost, compileEngine, loadEngine, type WasmModule
 
 import wasmUrl from "../../wasm/dist/bindgen/cairn_wasm_bg.wasm?url";
 
+import { installTitleMeasure } from "./canvas/measure.ts";
 import { forgetEarlierKeptTurns } from "./assistant/conversation.ts";
 import { browserHost } from "./data/browser-host.ts";
 import { tabStorage } from "./data/drafts.ts";
@@ -33,7 +34,8 @@ async function startHost(kind: HostKind, compiled: Promise<WasmModule>): Promise
 /** The tab's session over the build's host. */
 export async function boot(): Promise<Session> {
   const module = compileEngine(wasm);
-  const [host, deriver] = await Promise.all([startHost(__CAIRN_HOST__, module), DeriveWorker.start(module)]);
+  // Before any card is laid out: a card's size is counted from its title's width in the loaded face.
+  const [host, deriver] = await Promise.all([startHost(__CAIRN_HOST__, module), DeriveWorker.start(module), installTitleMeasure()]);
   // Before the session restores the tab's edit records: a tab open across a deploy holds the old drafts.
   migrateTabDrafts(tabStorage(), tabEditStore());
   forgetEarlierKeptTurns(tabStorage());

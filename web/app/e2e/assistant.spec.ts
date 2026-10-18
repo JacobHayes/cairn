@@ -5,7 +5,7 @@
 // target, read back after a reload, on a route's draft too. The test is tagged @server:
 // the demo's scripted model is one for the whole server, so it runs one at a time with the
 // other tests that write to it. The conversation's own rules are vitest's.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 
 import { startVendorJourney } from "./acting.ts";
 import { ask, openPanel, patchId, script } from "./assistant.ts";

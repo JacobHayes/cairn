@@ -1,7 +1,7 @@
 // A screen at a phone's width: the list with Frontier on shows its content with nothing off the
 // side of the window, the journey's menus, the View picker, Depth and the Filter open inside it. One representative
 // screen: the page never scrolls sideways. On the in-browser host, fresh on every load.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 
 import { frontierKeys, openActing } from "./acting.ts";
 import { section } from "./authoring.ts";

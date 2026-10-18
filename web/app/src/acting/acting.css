@@ -539,10 +539,15 @@ table.data.list-table .badge {
   min-width: 112px;
 }
 
+/* A word with no break in it (an identifier, a long path) breaks at the cell's edge instead of widening the table past its panel. */
+.list-table td[data-column="title"] {
+  overflow-wrap: anywhere;
+}
+
 @container journey-scroll (min-width: 561px) {
   .list-table td[data-column="title"],
   .list-table th[data-column="title"] {
-    min-width: 224px;
+    min-width: 200px;
   }
 }
 
@@ -884,4 +889,14 @@ button.list-sort {
   padding: var(--space-2) var(--space-4);
   border-top: 1px solid var(--color-edge);
   font-size: 14px;
+}
+
+/* A node's title in a list row or an overview list takes two lines and ends in an ellipsis, so one of the longest a title may be is not a paragraph; the link's title holds it whole. */
+.list-node > a,
+.detail-list > li > a {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }

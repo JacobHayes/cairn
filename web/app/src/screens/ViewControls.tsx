@@ -52,7 +52,7 @@ function Dotted({ badge, testId, children }: { badge: Badge | undefined; testId:
     <>
       {children}
       {badge === undefined || badge.count === 0 ? null : (
-        <span className="view-badge" aria-hidden="true" data-testid={testId}>
+        <span className="view-badge" aria-hidden="true" data-overhang="" data-testid={testId}>
           {badge.count > 9 ? "9+" : badge.count}
         </span>
       )}

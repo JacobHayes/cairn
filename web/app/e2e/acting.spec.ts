@@ -4,11 +4,13 @@
 // completed from the pass, C11), over a journey started from a route's form (B1). Every test
 // runs on the in-browser host, whose fixtures are fresh on every load. The rules behind both
 // (ranking, filters, guards, the pass's order) are the engine's and vitest's.
-import { expect, test, type Locator } from "@playwright/test";
+import type { Locator } from "@playwright/test";
+
+import { expect, test } from "./test.ts";
 
 import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { expectRowsInsideCards } from "./canvas.ts";
+import { expectContained } from "./containment.ts";
 import { derivedRevision, goTo, nodeCard, nodePanel, setDepth } from "./shell.ts";
 
 test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an unsnooze returns them", async ({ page }) => {
@@ -47,7 +49,7 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   expect(await opacityOf(snoozed.getByTestId("card-foot"))).toBe(1);
   await expect(snoozed.getByTestId("card-foot")).toHaveText(/^Until /);
   expect(await opacityOf(nodeCard(page, "n_beta_end").locator(".node-title"))).toBe(1);
-  await expectRowsInsideCards(page);
+  await expectContained(page);
   const footWords = await snoozed.getByTestId("card-foot").innerText();
   await goTo(page, "list");
   const row = page.locator('[data-testid="list-row"][data-node="n_docs"]');

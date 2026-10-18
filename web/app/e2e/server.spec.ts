@@ -4,7 +4,9 @@
 // what another wrote (H6), a deployment tick re-derives what it moved, and an identity
 // signed in at the demo's stub issuer links to the user (H3). Each test makes what it
 // changes, so the fixtures other tests read stay as seeded.
-import { expect, test, type APIRequestContext } from "@playwright/test";
+import type { APIRequestContext } from "@playwright/test";
+
+import { expect, test } from "./test.ts";
 
 import { startVendorJourney } from "./acting.ts";
 import { addEntity, mergeEntities } from "./around.ts";

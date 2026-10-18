@@ -92,7 +92,7 @@ export function ContextMenu({ at, groups, label, onChoose, onClose }: { at: { x:
     }
   };
   return createPortal(
-    <div ref={root} className="popover context-menu" role="menu" aria-label={label} data-popover="" data-testid="context-menu" onKeyDown={onKeyDown} onContextMenu={(event) => { event.preventDefault(); }}>
+    <div ref={root} className="popover context-menu" role="menu" aria-label={label} data-popover="" data-overhang="" data-testid="context-menu" onKeyDown={onKeyDown} onContextMenu={(event) => { event.preventDefault(); }}>
       <div className="popover-body">
         {groups.map((group, index) => (
           <Group key={index} group={group} first={index === 0} onChoose={(id) => { onClose(); onChoose(id); }} />

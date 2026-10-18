@@ -53,7 +53,7 @@ export function KeysHint() {
         ?
       </button>
       {place === undefined ? null : (
-        <div id="keys-hint-list" role="tooltip" className="popover keys-popover" style={place} data-testid="keys-hint">
+        <div id="keys-hint-list" role="tooltip" className="popover keys-popover" data-overhang="" style={place} data-testid="keys-hint">
           <div className="popover-head">Keys</div>
           <div className="popover-body">
             <KeyTable />

@@ -11,7 +11,7 @@ import type { NodeRow } from "./why.ts";
 export function DetailLink({ view, node, className }: { view: Ready; node: string; className?: string }) {
   const addresses = useNodeAddresses();
   return (
-    <Link to={addresses.open(node)} data-node={node} {...(className === undefined ? {} : { className })}>
+    <Link to={addresses.open(node)} data-node={node} title={titleOf(view, node)} {...(className === undefined ? {} : { className })}>
       {titleOf(view, node)}
     </Link>
   );

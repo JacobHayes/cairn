@@ -166,7 +166,7 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
     <section className="stack journey-header" aria-label={header.name} data-testid="journey-header">
       <div className="row">
         <div className="journey-header-title">
-          <h1 data-testid="journey-name">{header.name}</h1>
+          <h1 data-testid="journey-name" title={header.name}>{header.name}</h1>
           <JourneyStatusChip status={header.status} />
         </div>
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />

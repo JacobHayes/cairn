@@ -206,7 +206,7 @@ export function Menu({
         {trigger}
       </button>
       {open ? (
-        <div ref={popover} className="popover dropdown-popover" role={role} data-popover="" data-testid={`${testId}-menu`} onKeyDown={keyboard.onPopoverKeyDown}>
+        <div ref={popover} className="popover dropdown-popover" role={role} data-popover="" data-overhang="" data-testid={`${testId}-menu`} onKeyDown={keyboard.onPopoverKeyDown}>
           <div ref={body} className="popover-body stack">
             {children(closeToButton)}
           </div>

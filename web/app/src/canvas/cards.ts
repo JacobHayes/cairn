@@ -1,9 +1,11 @@
 // A card's size, worked out from what it shows before anything is drawn, so the layout (C15)
 // reads the same sizes the cards render at and lays out the same graph identically: a head, a
 // title of up to two lines, and at most a body line, a foot line and the hidden-prerequisites
-// line (5.5). NodeCard draws each row at exactly these heights. What an overlay or the Signals
+// line (5.5). NodeCard draws each row at exactly these heights. A title's lines are counted from
+// its width as the browser measures it (measure.ts), so the count is what the drawing wraps to. What an overlay or the Signals
 // lens adds hangs outside the card, so neither moves a node.
 import type { LayoutRequest } from "./layout.ts";
+import { emWidthOf } from "./measure.ts";
 import type { Card, CanvasModel } from "./model.ts";
 
 /** A card's width (px): ten of the ruling's cells. */
@@ -108,10 +110,7 @@ export function layoutRequestOf(model: CanvasModel): Omit<LayoutRequest, "hints"
   };
 }
 
-/** A character's width as a share of its size: capitals and digits are wide, the rest average; a space; and a line's height. */
-const CHAR_EM = 0.58;
-const WIDE_CHAR_EM = 0.78;
-const SPACE_EM = 0.3;
+/** A zoomed-out title's line height as a share of its size. */
 const LEADING_EM = 1.15;
 /** The sizes (layout px) a zoomed-out container title is set between: the most its room gives, and the least a narrow head can shrink to. */
 export const TITLE_FIT_MAX_PX = 60;
@@ -120,21 +119,21 @@ export const TITLE_FIT_MIN_PX = 5;
 export const TITLE_READING_PX = 15;
 export const TITLE_SCREEN_PX = 13;
 
-const wordEm = (word: string) => Array.from(word).reduce((sum, char) => sum + (/[\p{Lu}\p{N}]/u.test(char) ? WIDE_CHAR_EM : CHAR_EM), 0);
-const wordsOf = (title: string) => title.split(/\s+/).filter(Boolean).map(wordEm);
+const wordsOf = (title: string) => title.split(/\s+/).filter(Boolean).map(emWidthOf);
 
 /** The lines a title takes wrapped between its words in `width` ems, or undefined when a word is wider than a line. */
 function wrappedLines(title: string, width: number): number | undefined {
   let lines = 1;
   let used = 0;
+  const space = emWidthOf(" ");
   for (const word of wordsOf(title)) {
     if (word > width) {
       return undefined;
     }
     if (used === 0) {
       used = word;
-    } else if (used + SPACE_EM + word <= width) {
-      used += SPACE_EM + word;
+    } else if (used + space + word <= width) {
+      used += space + word;
     } else {
       lines += 1;
       used = word;

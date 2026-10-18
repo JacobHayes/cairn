@@ -112,7 +112,7 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
   const skew = useSkew();
   const heading = useId();
   return (
-    <div className="popover sync-popover" role="dialog" aria-labelledby={heading} tabIndex={-1} data-popover="" data-testid="sync-popover" style={anchor}>
+    <div className="popover sync-popover" role="dialog" aria-labelledby={heading} tabIndex={-1} data-popover="" data-overhang="" data-testid="sync-popover" style={anchor}>
       <div className="popover-head" id={heading}>
         Sync
       </div>

@@ -12,6 +12,14 @@ export default defineConfig(
   js.configs.recommended,
   ...tseslint.configs.strictTypeChecked,
   {
+    // Every browser spec takes `test` from e2e/test.ts, which checks the containment invariant after each test.
+    files: ["web/app/e2e/**/*.ts"],
+    ignores: ["web/app/e2e/test.ts"],
+    rules: {
+      "no-restricted-imports": ["error", { paths: [{ name: "@playwright/test", importNames: ["test"], message: "Import test from ./test.ts: it checks the containment invariant after every test." }] }],
+    },
+  },
+  {
     languageOptions: {
       parserOptions: { projectService: true, tsconfigRootDir: import.meta.dirname },
     },

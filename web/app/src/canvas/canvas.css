@@ -290,7 +290,30 @@
   display: flex;
   gap: var(--space-2);
   align-items: center;
+  min-width: 0;
   height: 24px;
+}
+
+/* The head gives way in order, so the state chip and the fold control are never pushed out of the card: CURRENT is dropped first (it wraps to a second line the label's box clips), then the kind takes an ellipsis. */
+.node-head-label {
+  display: flex;
+  flex: 0 1 auto;
+  flex-wrap: wrap;
+  column-gap: var(--space-2);
+  min-width: 0;
+  height: 24px;
+  overflow: hidden;
+}
+
+.node-head-label > * {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-head > :is(.node-state, .node-toggle) {
+  flex: none;
 }
 
 .node-kind,
@@ -316,6 +339,9 @@
 
 /* A20: a route card's advisory notice, a hollow warning chip. */
 .node-notice {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
   margin-left: auto;
   padding: 0 var(--space-2);
   border: 1px solid var(--color-warning);
@@ -348,6 +374,7 @@
   -webkit-box-orient: vertical;
   -webkit-line-clamp: var(--title-lines, 2);
   overflow: hidden;
+  overflow-wrap: anywhere;
   width: 100%;
 }
 
@@ -729,6 +756,7 @@
 /* A title breaks only between words and shows whole lines: the line count is what the room holds at the fit size, the rest ends in an ellipsis. */
 .react-flow[data-lod="out"] .node-container .node-title > * {
   width: auto;
+  max-width: 100%;
 }
 
 .react-flow[data-lod="out"] .node-container .node-title-text {

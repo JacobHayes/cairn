@@ -5,7 +5,9 @@
 // and the wiring edge before anything applies, and a member's Origin names the segment and
 // version. A second insertion's id, where a segment is used and its newer versions are the
 // service's tests (insertion.rs).
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { expect, test } from "./test.ts";
 
 import { menuItem, openJourney } from "./shell.ts";
 import { publishSegment, startInsert, stepper } from "./segments.ts";

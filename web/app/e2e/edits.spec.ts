@@ -10,7 +10,9 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { expect, test } from "./test.ts";
 
 import { importIntoDraft, openRoute, openRouteMenu, versionSelect } from "./around.ts";
 import { addNode, formField, newRoute, nodeForm, routeName, saveForm, structure } from "./authoring.ts";

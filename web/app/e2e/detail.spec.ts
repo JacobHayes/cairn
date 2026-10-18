@@ -4,7 +4,7 @@
 // sync chip wherever you go, and resolved with a listed move. A node's actions hold one open
 // form, which a reload brings back (D1, B6), also from the drafts an older build kept. The
 // inspector's sections, forms and offers are vitest's.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 
 import { openNode, pin } from "./detail.ts";
 import { fresh, goWithin, menuItem, nodeCard, nodePanel, syncChip } from "./shell.ts";

@@ -3,9 +3,10 @@
 // the viewport). It opens fitted at every detail, expands in place, traces a selection, follows an
 // edge, and pans and zooms. What the canvas draws (its levels, lines, lens, layout) is the
 // model's tests'.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 
-import { expectRowsInsideCards, lineBetween, pointOn, publishLongTitleRoute, viewportOf, viewportSettled, zoomToReading } from "./canvas.ts";
+import { expectContained } from "./containment.ts";
+import { expectTitleLinesAsLaidOut, lineBetween, pointOn, publishLongTitleRoute, viewportOf, viewportSettled, zoomToReading } from "./canvas.ts";
 import { journeyName, startJourney } from "./around.ts";
 import { nodeCard, nodePanel, openJourney, setDepth, setFade } from "./shell.ts";
 
@@ -13,6 +14,7 @@ test("C2 to C7: the graph opens fitted at every depth, expands in place, traces 
   await openJourney(page, "browser", "j_vendor_eval", "");
   // It opens at the stock view: every depth, fitted to the whole graph, as Fit does.
   await expect(page.getByTestId("depth-button")).toHaveAccessibleName("Depth: Actions");
+  await expectTitleLinesAsLaidOut(page);
   // At Stages the stage holding the work is open and says so, the others fold.
   await setDepth(page, "Stages");
   await expect(nodeCard(page, "n_reporting").getByTestId("card-current")).toBeAttached();
@@ -304,20 +306,22 @@ test("C2, DESIGN opacity: nodes Reveal draws are dimmed by the depth under Fade 
   }
 });
 
-test("a card's rows stay inside its box whatever its title's length, on a route's graph and a journey's, fitted and at the reading zoom", async ({ page }) => {
+test("a card's content stays inside its box whatever its title's length, on a route's graph and a journey's, fitted and at the reading zoom", async ({ page }) => {
   const route = await publishLongTitleRoute(page);
   await page.getByTestId("view-picker").click();
   await page.getByTestId("view-graph").click();
   await expect(page.getByTestId("node-card").first()).toBeVisible();
   await page.keyboard.press("f");
   await viewportSettled(page);
-  await expectRowsInsideCards(page);
+  await expectContained(page);
   await zoomToReading(page);
-  await expectRowsInsideCards(page);
+  await expectContained(page);
+  await expectTitleLinesAsLaidOut(page);
   const journey = await startJourney(page, "browser", journeyName("Long titles"), { route });
   await openJourney(page, "browser", journey, "?depth=actions");
   await viewportSettled(page);
-  await expectRowsInsideCards(page);
+  await expectContained(page);
   await zoomToReading(page);
-  await expectRowsInsideCards(page);
+  await expectContained(page);
+  await expectTitleLinesAsLaidOut(page);
 });

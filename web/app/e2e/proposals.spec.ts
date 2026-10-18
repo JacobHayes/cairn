@@ -2,7 +2,7 @@
 // journey upgraded to the fixture's version 2 with each kind of conflict that version raises
 // resolved and applied (B7, C14), where the review screen meets the canvas, the inspector and
 // the host. What a proposal offers, blocks and reads as stale is model and host tests'.
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./test.ts";
 
 import { openJourneyCard } from "./around.ts";
 import { blockers, confirmAndApply, editWhereVersionTwoChanges, pickNode, publishVersionTwo, resolve, reviewItem, reviewOpen, saveEdits, scrollsOnce } from "./proposals.ts";

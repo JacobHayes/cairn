@@ -90,12 +90,14 @@ function Head({ card, collapsible }: { card: Card; collapsible: boolean }) {
   const journey = card.journey;
   return (
     <div className="node-head">
-      <span className="node-kind">{kindLabel(card)}</span>
-      {journey?.current === true ? (
-        <span className="node-current" data-testid="card-current">
-          current
-        </span>
-      ) : null}
+      <span className="node-head-label">
+        <span className="node-kind">{kindLabel(card)}</span>
+        {journey?.current === true ? (
+          <span className="node-current" data-testid="card-current">
+            current
+          </span>
+        ) : null}
+      </span>
       <span className="spacer" />
       {journey === undefined ? null : (
         <span className={`badge ${statusTone(journey.state)} node-state`} data-testid="card-state" data-state={journey.state}>
@@ -250,17 +252,17 @@ function Hanging({ data }: { data: CardData }) {
   return (
     <>
       {rank === undefined || rank > RANK_TAG_COUNT ? null : (
-        <span className="node-rank rank-tag" data-testid="card-rank" aria-label={`ranked ${String(rank)}`}>
+        <span className="node-rank rank-tag" data-overhang="" data-testid="card-rank" aria-label={`ranked ${String(rank)}`}>
           {rank}
         </span>
       )}
       {mark === undefined || mark.quiet === true ? null : (
-        <span className={`node-mark hang-tag top node-mark-${mark.tone}${overlay?.screenTags === true ? " node-mark-screen" : ""}`} data-testid="card-mark" data-status={mark.label} title={mark.note}>
+        <span className={`node-mark hang-tag top node-mark-${mark.tone}${overlay?.screenTags === true ? " node-mark-screen" : ""}`} data-overhang="" data-testid="card-mark" data-status={mark.label} title={mark.note}>
           {mark.label}
         </span>
       )}
       {lens === undefined ? null : (
-        <span className={`node-lens hang-tag bottom lens-tier-${String(lens.tier)}`} data-testid="card-lens" data-lens={lens.name} title={lens.chip.title}>
+        <span className={`node-lens hang-tag bottom lens-tier-${String(lens.tier)}`} data-overhang="" data-testid="card-lens" data-lens={lens.name} title={lens.chip.title}>
           {lens.chip.text}
         </span>
       )}
@@ -325,7 +327,7 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
       data-y={data.place.y}
       title={here.length === 0 ? undefined : `I am here: ${here.join(", ")}`}
     >
-      <Handle type="target" position={Position.Left} isConnectable={false} className="node-handle" />
+      <Handle type="target" position={Position.Left} isConnectable={false} className="node-handle" data-overhang="" />
       {header === undefined ? (
         <div className="node-inner" style={{ height: "100%" }}>
           <Head card={card} collapsible={data.collapsible} />
@@ -351,7 +353,7 @@ export function NodeCard({ data, width, height }: NodeProps<CardNode>) {
         </>
       )}
       <Hanging data={data} />
-      <Handle type="source" position={Position.Right} isConnectable={false} className="node-handle" />
+      <Handle type="source" position={Position.Right} isConnectable={false} className="node-handle" data-overhang="" />
     </div>
   );
 }

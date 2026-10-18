@@ -2,7 +2,9 @@
 // inspector (or the tablet's sheet) at each width, the page itself never scrolls from it; a
 // phone's map is a preview that leaves swipes to the page and opens full screen, where they
 // pan. On the in-browser host.
-import { expect, test, type Page } from "@playwright/test";
+import type { Page } from "@playwright/test";
+
+import { expect, test } from "./test.ts";
 
 import { expectAddress, nodeCard, nodePanel, openAt, openJourney } from "./shell.ts";
 
