@@ -22,6 +22,7 @@ import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf,
 import type { ViewState } from "../journeys/view.ts";
 import { journeySubject, ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { Button, Segmented } from "../ui/kit.tsx";
+import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import { axisOf, calendarSpec, dateOf, dateWords, dayWords, positionOf, rangeWindow, RANGES, type Axis, type AxisSpec, type Range, type Window } from "./model.ts";
 import { chartOf, type Chart, type ChartRow, type Dependency } from "./rows.ts";
 import "./timeline.css";
@@ -40,7 +41,7 @@ const BAR_WIDTH_MIN = 0.004;
 /** The most ticks the axis names when its width is not known; with more, every second or third one is. */
 const TICK_LABEL_COUNT_MAX = 7;
 
-/** The least room (px) a tick's name takes along the axis, and what a name keeps clear of the right edge. */
+/** The least room (px) a tick's name takes along the axis, and what a name keeps clear of the right edge and of the end line. */
 const TICK_LABEL_PX = 68;
 const TICK_LABEL_EDGE_PX = 48;
 
@@ -113,9 +114,10 @@ function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => 
   const dx = (at: number) => (at > LABEL_FLIP_AT ? -4 : 4);
   const [first, second] = axis.ticks;
   const apart = width > 0 && first !== undefined && second !== undefined ? width * (second.at - first.at) : 0;
-  // Names no closer than they fit, and none running off the right edge.
+  // Names no closer than they fit, and none running off the right edge or across the end line.
   const every = apart > 0 ? Math.ceil(TICK_LABEL_PX / apart) : Math.ceil(axis.ticks.length / TICK_LABEL_COUNT_MAX);
-  const named = (tick: { at: number }, at: number) => at % every === 0 && (width === 0 || tick.at * width < width - TICK_LABEL_EDGE_PX);
+  const clear = (tick: { at: number }) => width === 0 || (tick.at * width < width - TICK_LABEL_EDGE_PX && (anchorAt === undefined || tick.at >= anchorAt || (anchorAt - tick.at) * width >= TICK_LABEL_EDGE_PX));
+  const named = (tick: { at: number }, at: number) => at % every === 0 && clear(tick);
   return (
     <svg ref={svg} className="timeline-axis-svg" width="100%" height={AXIS_PX} aria-hidden="true" data-testid="timeline-axis" data-unit={axis.unit}>
       <Backdrop axis={axis} height={AXIS_PX} />
@@ -222,16 +224,12 @@ function Label({ axis, row, selected, onFold, title }: { axis: Axis; row: ChartR
       data-shape={row.shape}
       data-faded={row.faded}
       data-selected={selected}
+      data-container={row.shape === "span"}
       style={{ height: ROW_PX }}
     >
       <div className="timeline-title" style={{ paddingInlineStart: `calc(${String(row.depth)} * var(--space-5))` }}>
-        {row.foldable ? (
-          <button type="button" className="timeline-fold" aria-expanded={row.open} aria-label={`${row.open ? "Fold" : "Open"} ${row.title}`} data-testid="timeline-fold" onClick={() => { onFold(row.key); }}>
-            {row.open ? "▾" : "▸"}
-          </button>
-        ) : (
-          <span className="timeline-fold" aria-hidden="true" />
-        )}
+        <TreeGuides depth={row.depth} guides={row.guides} open={row.open} />
+        <TreeFold container={row.foldable} open={row.open} label={row.title} testId="timeline-fold" onFold={() => { onFold(row.key); }} />
         <div className="timeline-text" title={row.title}>
           {title(row.key)}
           <span className={row.late > 0 || row.shortfallDays !== undefined ? "small timeline-words timeline-late" : "muted small timeline-words"} data-testid="timeline-words">
@@ -291,30 +289,33 @@ function useReveal(chart: React.RefObject<HTMLElement | null>, selected: string 
 function Tracks({ chart, axis, selected, activate }: { chart: Chart; axis: Axis; selected: string | undefined; activate: ((key: string) => void) | undefined }) {
   const height = chart.rows.length * ROW_PX;
   return (
-    <svg className="timeline-tracks" width="100%" height={height} aria-hidden="true">
-      <Defs />
-      <Backdrop axis={axis} height={height} />
-      {chart.rows.map((row, at) => {
-        const y = at * ROW_PX + ROW_PX / 2;
-        const floatFrom = row.float === undefined ? undefined : positionOf(axis, row.float.from);
-        const floatTo = row.float === undefined ? undefined : positionOf(axis, row.float.to);
-        return (
-          <g key={row.key} className="timeline-row" data-state={row.state} data-faded={row.faded} data-selected={row.key === selected} data-testid="timeline-track" data-node={row.key}>
-            <rect className="timeline-hit" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} data-activatable={activate !== undefined} onClick={activate === undefined ? undefined : () => { activate(row.key); }} />
-            {row.late > 0 ? <rect className="timeline-overdue" x={percent(positionOf(axis, row.to))} y={y - BAR_PX} width={percent(Math.max(0, axis.now - positionOf(axis, row.to)))} height={BAR_PX * 2} /> : null}
-            {floatFrom === undefined || floatTo === undefined ? null : (
-              <g className="timeline-float" data-testid="timeline-float" data-from={row.float?.from} data-to={row.float?.to}>
-                <line x1={percent(floatFrom)} x2={percent(floatTo)} y1={y} y2={y} />
-                <line x1={percent(floatFrom)} x2={percent(floatFrom)} y1={y - 5} y2={y + 5} />
-                <line x1={percent(floatTo)} x2={percent(floatTo)} y1={y - 5} y2={y + 5} />
-              </g>
-            )}
-            <Mark row={row} axis={axis} y={y} />
-          </g>
-        );
-      })}
-      <Lines lines={chart.dependencies} axis={axis} rows={chart.rows} />
-    </svg>
+    <div className="timeline-canvas">
+      <svg className="timeline-tracks" width="100%" height={height} aria-hidden="true">
+        <Defs />
+        {chart.rows.map((row, at) => (row.shape === "span" ? <rect key={row.key} className="timeline-band" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} /> : null))}
+        <Backdrop axis={axis} height={height} />
+        {chart.rows.map((row, at) => {
+          const y = at * ROW_PX + ROW_PX / 2;
+          const floatFrom = row.float === undefined ? undefined : positionOf(axis, row.float.from);
+          const floatTo = row.float === undefined ? undefined : positionOf(axis, row.float.to);
+          return (
+            <g key={row.key} className="timeline-row" data-state={row.state} data-faded={row.faded} data-selected={row.key === selected} data-testid="timeline-track" data-node={row.key}>
+              <rect className="timeline-hit" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} data-activatable={activate !== undefined} onClick={activate === undefined ? undefined : () => { activate(row.key); }} />
+              {row.late > 0 ? <rect className="timeline-overdue" x={percent(positionOf(axis, row.to))} y={y - BAR_PX} width={percent(Math.max(0, axis.now - positionOf(axis, row.to)))} height={BAR_PX * 2} /> : null}
+              {floatFrom === undefined || floatTo === undefined ? null : (
+                <g className="timeline-float" data-testid="timeline-float" data-from={row.float?.from} data-to={row.float?.to}>
+                  <line x1={percent(floatFrom)} x2={percent(floatTo)} y1={y} y2={y} />
+                  <line x1={percent(floatFrom)} x2={percent(floatFrom)} y1={y - 5} y2={y + 5} />
+                  <line x1={percent(floatTo)} x2={percent(floatTo)} y1={y - 5} y2={y + 5} />
+                </g>
+              )}
+              <Mark row={row} axis={axis} y={y} />
+            </g>
+          );
+        })}
+        <Lines lines={chart.dependencies} axis={axis} rows={chart.rows} />
+      </svg>
+    </div>
   );
 }
 

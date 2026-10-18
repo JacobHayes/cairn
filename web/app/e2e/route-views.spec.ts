@@ -49,6 +49,9 @@ test("C17, C2, C9: the depth and the search follow a route across Graph, List an
     // The graph is the address's default and writes no view.
     expect(url.searchParams.get("view")).toBe(to === "graph" ? null : to);
   }
+  // Emptying the box takes the search off at once, on any view: no filter stays on unseen.
+  await page.getByTestId("toolbar-search").fill("");
+  await expect.poll(() => new URL(page.url()).searchParams.has("q")).toBe(false);
 });
 
 test("C17: ?mine=1&view=list lists every node and is normalised, since a route has no owners", async ({ page }) => {

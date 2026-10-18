@@ -26,6 +26,8 @@ export interface ChartRow {
   title: string;
   kind: NodeKind;
   depth: number;
+  /** The tree's guide lines (ui/Tree.tsx): at `depth - 1` the row's own elbow, before it each ancestor's line, true while that level's parent has more rows below. */
+  guides: boolean[];
   state: DisplayState;
   shape: Shape;
   /** The extent on the axis, in days: the same day for a point. */
@@ -208,7 +210,7 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
   const today = view.derived.today;
   const children = treeOfRows(view, dated, options.drawn);
   const rows: ChartRow[] = [];
-  const visit = (key: string, depth: number) => {
+  const visit = (key: string, depth: number, guides: boolean[]) => {
     const node = nodeOf(view, key);
     const span = spans.get(key);
     const derived = view.derived.nodes[key];
@@ -227,6 +229,7 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
       title: node.title,
       kind: node.kind,
       depth,
+      guides,
       state: derived.display_state,
       shape: own?.shape ?? "span",
       from: dayOf(own?.from ?? span.from),
@@ -243,10 +246,10 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
       faded: false,
     });
     if (open) {
-      kids.forEach((child) => { visit(child, depth + 1); });
+      kids.forEach((child, at) => { visit(child, depth + 1, [...guides, at < kids.length - 1]); });
     }
   };
-  (children.get(undefined) ?? []).forEach((root) => { visit(root, 0); });
+  (children.get(undefined) ?? []).forEach((root) => { visit(root, 0, []); });
   return rows;
 }
 
@@ -368,8 +371,8 @@ function reachesOf(tree: Tree, entries: ReadonlyMap<string, ScheduleEntry>): (ke
 }
 
 /** One row of a route's chart: `key` at `depth`, spanning `reach`, with `kids` drawn under it when it is `open`. */
-function routeRowOf(tree: Tree, schedule: RouteSchedule, options: ChartOptions, at: { key: string; depth: number; reach: Reach; entry: ScheduleEntry | undefined; kids: number; open: boolean }): ChartRow {
-  const { key, depth, reach, entry } = at;
+function routeRowOf(tree: Tree, schedule: RouteSchedule, options: ChartOptions, at: { key: string; depth: number; guides: boolean[]; reach: Reach; entry: ScheduleEntry | undefined; kids: number; open: boolean }): ChartRow {
+  const { key, depth, guides, reach, entry } = at;
   const node = tree.byKey.get(key);
   const shape: Shape = childrenOf(tree, key).length > 0 ? "span" : node?.kind === "milestone" ? "milestone" : node?.kind === "decision" ? "decision" : reach.from < reach.to ? "bar" : "tick";
   const waiting = (entry?.waiting ?? []).map((decision) => titleIn(tree, decision));
@@ -378,6 +381,7 @@ function routeRowOf(tree: Tree, schedule: RouteSchedule, options: ChartOptions, 
     title: node?.title ?? key,
     kind: node?.kind ?? "action",
     depth,
+    guides,
     state: entry?.conditional === true ? "conditional" : "ready",
     shape,
     from: reach.from,
@@ -431,19 +435,19 @@ export function routeChartOf(tree: Tree, schedule: RouteSchedule, options: Chart
     kids.sort((left, right) => (reachOf(left)?.from ?? 0) - (reachOf(right)?.from ?? 0) || (reachOf(left)?.to ?? 0) - (reachOf(right)?.to ?? 0) || place(left) - place(right));
   }
   const rows: ChartRow[] = [];
-  const visit = (key: string, depth: number) => {
+  const visit = (key: string, depth: number, guides: boolean[]) => {
     const reach = reachOf(key);
     if (!tree.byKey.has(key) || reach === undefined) {
       return;
     }
     const kids = children.get(key) ?? [];
     const open = kids.length > 0 && options.open(key);
-    rows.push(routeRowOf(tree, schedule, options, { key, depth, reach, entry: entries.get(key), kids: kids.length, open }));
+    rows.push(routeRowOf(tree, schedule, options, { key, depth, guides, reach, entry: entries.get(key), kids: kids.length, open }));
     if (open) {
-      kids.forEach((child) => { visit(child, depth + 1); });
+      kids.forEach((child, at) => { visit(child, depth + 1, [...guides, at < kids.length - 1]); });
     }
   };
-  (children.get(undefined) ?? []).forEach((root) => { visit(root, 0); });
+  (children.get(undefined) ?? []).forEach((root) => { visit(root, 0, []); });
   const drawn = new Set(options.drawn.map((node) => node.key));
   const gaps = (schedule.undated ?? []).filter((gap) => drawn.has(gap.node));
   const undated = gaps.map((gap) => gap.node);

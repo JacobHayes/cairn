@@ -3,7 +3,6 @@
 // say a signal in words beside its number. A row with nothing to say in a column leaves it blank.
 // With Frontier on, a row on the acting frontier says why it is there and carries its primary
 // action under its title (C10, RowActions), at every width.
-import type { CSSProperties } from "react";
 import { Link, useLocation } from "react-router";
 
 import type { DecisionRow } from "../decisions/model.ts";
@@ -16,6 +15,7 @@ import { statusTone, statusWord } from "../status/words.ts";
 import { dateWords } from "../timeline/model.ts";
 import { daysWords, dueWords } from "../status/when.ts";
 import { Badge } from "../ui/kit.tsx";
+import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import type { ListSettings } from "./address.ts";
 import type { Column, Line } from "./listModel.ts";
 import { firstParagraph } from "./listModel.ts";
@@ -72,18 +72,6 @@ function Fact({ line, context }: { line: Line; context: CellContext }) {
   );
 }
 
-/** The classic tree guides through the title cell's full height: each ancestor's line while it has more below, the row's own elbow into its chevron or bullet, and from an open container's chevron down to its first child. */
-function Guides({ line }: { line: Line }) {
-  return (
-    <>
-      {line.guides.map((more, level) =>
-        more || level === line.depth - 1 ? <span key={level} className="list-guide" data-more={more} data-elbow={level === line.depth - 1} style={{ "--level": level } as CSSProperties} aria-hidden="true" /> : null,
-      )}
-      {line.open ? <span className="list-guide" data-down="true" style={{ "--level": line.depth } as CSSProperties} aria-hidden="true" /> : null}
-    </>
-  );
-}
-
 /** C10: under a frontier row's title, why it is there and its primary action; the Owner column says who, so the action leaves the owner out unless there is none. */
 function Acting({ line, context }: { line: Line; context: CellContext }) {
   const addresses = useNodeAddresses();
@@ -102,16 +90,8 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
     <div className="list-title" style={{ paddingInlineStart: `calc(${String(line.depth)} * var(--space-5))` }}>
       {tree ? (
         <>
-          <Guides line={line} />
-          {line.container ? (
-            <button type="button" className="list-fold" aria-expanded={line.open} aria-label={`${line.open ? "Fold" : "Open"} ${nodeOf(view, line.key)?.title ?? line.key}`} data-testid="list-fold" onClick={() => { context.onFold(line.key); }}>
-              <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" className="list-chevron">
-                <path d="M4 2l4 4-4 4" />
-              </svg>
-            </button>
-          ) : (
-            <span className="list-fold list-stub" aria-hidden="true" />
-          )}
+          <TreeGuides depth={line.depth} guides={line.guides} open={line.open} />
+          <TreeFold container={line.container} open={line.open} label={nodeOf(view, line.key)?.title ?? line.key} testId="list-fold" onFold={() => { context.onFold(line.key); }} />
         </>
       ) : null}
       <div className="list-node">

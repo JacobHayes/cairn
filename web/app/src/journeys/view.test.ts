@@ -82,9 +82,8 @@ describe("changing the view state", () => {
     expect(chips.length).toBeGreaterThan(0);
     for (const chip of chips) {
       const changed = (Object.keys(narrowed.filter) as (keyof ViewState["filter"])[]).filter((name) => JSON.stringify(chip.without.filter[name]) !== JSON.stringify(narrowed.filter[name]));
-      const text = chip.without.text !== narrowed.text;
-      expect(changed.length + (text ? 1 : 0), chip.id).toBe(1);
-      expect({ ...chip.without, filter: narrowed.filter, text: narrowed.text }).toEqual(narrowed);
+      expect(changed.length, chip.id).toBe(1);
+      expect({ ...chip.without, filter: narrowed.filter }).toEqual(narrowed);
     }
   });
 

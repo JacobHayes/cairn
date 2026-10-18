@@ -189,14 +189,14 @@ export function stockView(state: ViewState): ViewState {
   return { ...DEFAULT_VIEW_STATE, frontier: state.frontier, fade: state.fade };
 }
 
-/** One setting of the Filter or the search as a removable chip: its words and the state without it. */
+/** One setting of the Filter as a removable chip: its words and the state without it. */
 export interface FilterChip {
   id: string;
   label: string;
   without: ViewState;
 }
 
-/** C9: the Filter's settings off stock and the search, each as a chip that takes it off, in the Filter's order. */
+/** C9: the Filter's settings off stock, each as a chip that takes it off, in the Filter's order. The search is not one: its box shows the text on every view, and clears it. */
 export function filterChips(state: ViewState, ownerName: (key: string) => string): FilterChip[] {
   const { filter } = state;
   const withFilter = (changed: Partial<ViewFilter>): ViewState => ({ ...state, filter: { ...filter, ...changed } });
@@ -215,9 +215,6 @@ export function filterChips(state: ViewState, ownerName: (key: string) => string
   }
   if (!filter.conditional) {
     chips.push({ id: "no-conditional", label: "Without conditional", without: withFilter({ conditional: true }) });
-  }
-  if (state.text !== "") {
-    chips.push({ id: "text", label: `"${state.text}"`, without: { ...state, text: "" } });
   }
   return chips;
 }

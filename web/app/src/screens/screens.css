@@ -331,24 +331,46 @@
   box-shadow: inset 2px 0 0 var(--color-accent);
 }
 
-.route-list-row[data-faded="true"] > :not(.route-list-fold) {
+.route-list-row[data-faded="true"] > :not(.tree-fold, .tree-guide) {
   opacity: 0.3;
-}
-
-.route-list-fold {
-  flex: none;
-  width: var(--space-4);
-  background: none;
-  border: none;
-  padding: 0;
-  font: inherit;
-  text-align: center;
-  text-decoration: none;
 }
 
 .route-list-row .node-kind {
   flex: none;
   width: 6.5rem;
+}
+
+/* The route page's List: paper rows in a bordered panel, a container's row banded with a 600-weight title, as the Plan list is (DESIGN, Table). The kind is a quiet word at the row's end, not a column ahead of the title. */
+.route-tree {
+  border: 1px solid var(--color-edge);
+}
+
+.route-tree > .route-list-row {
+  position: relative;
+  background: var(--color-surface);
+  border-bottom-color: var(--color-edge);
+}
+
+.route-tree > .route-list-row:last-child {
+  border-bottom: 0;
+}
+
+.route-tree > .route-list-row[data-container="true"] {
+  background: var(--color-band);
+  font-weight: 600;
+}
+
+.route-tree > .route-list-row[aria-current="true"] {
+  background: var(--color-tint);
+}
+
+.route-tree .node-kind {
+  width: auto;
+}
+
+/* The title starts the same distance after the fold slot as the Plan list's and the timeline's do. */
+.route-tree .tree-fold {
+  margin-inline-end: calc(var(--space-1) - var(--space-3));
 }
 
 .route-list-title {

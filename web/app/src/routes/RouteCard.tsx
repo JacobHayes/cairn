@@ -34,8 +34,11 @@ export function RouteFacts({ read, children }: { read: RouteRead; children?: Rea
   const rows = versionRows(read);
   const waiting = header.kind === "segment" ? 0 : upgradable(rows).length;
   const latest = rows[0]?.version;
+  if (header.description == null && children == null && (waiting === 0 || latest === undefined)) {
+    return null;
+  }
   return (
-    <>
+    <div className="stack" data-testid="route-facts">
       {header.description == null ? null : <p data-testid="route-description">{header.description}</p>}
       {children}
       {waiting === 0 || latest === undefined ? null : (
@@ -45,7 +48,7 @@ export function RouteFacts({ read, children }: { read: RouteRead; children?: Rea
           </Link>
         </p>
       )}
-    </>
+    </div>
   );
 }
 
@@ -117,8 +120,10 @@ export function VersionCard({ read, version }: { read: RouteRead; version: numbe
   const uses = read.detail.versions.find((each) => each.version === version)?.insertions ?? [];
   return (
     <aside className="detail-panel panel stack version-card" aria-label={`Version ${String(version)}`} data-testid="version-card" data-version={version}>
-      <h2>Version {version}</h2>
-      {row === undefined ? null : <span className="muted small">Published {dateWords(row.publishedAt.slice(0, 10), todayOf())}</span>}
+      <div className="stack detail-lead">
+        <h2>Version {version}</h2>
+        {row === undefined ? null : <span className="muted small">Published {dateWords(row.publishedAt.slice(0, 10), todayOf())}</span>}
+      </div>
       <RouteFacts read={read}>
         {segment || header.retired === true ? null : (
           <Link className="button primary" to={newJourneyPath(header.id, version)} data-testid="start-from-version">

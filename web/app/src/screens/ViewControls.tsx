@@ -259,6 +259,10 @@ function SearchBox({ text, onSearch }: { text: string; onSearch: (text: string) 
         onChange={(event) => {
           event.target.setCustomValidity("");
           setTyped(event.target.value);
+          // Emptying the box (its own clear button too) takes an applied search off at once: no filter stays on unseen.
+          if (event.target.value === "" && text !== "") {
+            onSearch("");
+          }
         }}
       />
     </form>
@@ -357,7 +361,7 @@ export function ViewControls({ subject, screen, badges, end }: ViewControlsProps
   );
 }
 
-/** The row at the top of a list, timeline or walk pane, with the Filter's settings and the search as removable chips. */
+/** The row at the top of a list, timeline or walk pane, with the Filter's settings as removable chips. */
 export function ViewBar({ subject, screen, end, badges }: { subject: ViewSubject; screen: Screen; end?: ReactNode; badges?: Badges | undefined }) {
   const { pathname, search } = useLocation();
   const { state } = useViewState();

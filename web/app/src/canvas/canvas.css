@@ -8,7 +8,7 @@
   position: relative;
   height: 420px;
   border: 1px solid var(--color-border);
-  background: var(--ruling), var(--color-ground);
+  background: var(--corner-ticks), var(--ruling), var(--color-ground);
   overflow: hidden;
 }
 
@@ -57,6 +57,13 @@
   margin: var(--space-3);
 }
 
+/* From a tablet up, what floats at the canvas's sides starts where the header's title and the other views' toolbar do. */
+@media (min-width: 720px) {
+  .canvas .react-flow__panel {
+    margin-inline: var(--space-5);
+  }
+}
+
 /* A panel takes the pointer only where a control is, so a drag or a Shift-drag in the gaps between controls still reaches the canvas. */
 .canvas-panel,
 .canvas-panel .view-controls {
@@ -93,6 +100,12 @@
   left: 0;
   z-index: 5;
   margin: var(--space-3);
+}
+
+@media (min-width: 720px) {
+  .canvas-held {
+    margin-inline: var(--space-5);
+  }
 }
 
 .canvas-top {

@@ -125,16 +125,22 @@ export function JourneyCard({ ready, selected }: { ready: Ready; selected?: stri
   const done = model === undefined ? undefined : model.inScope - model.remaining;
   return (
     <section className="journey-card detail-panel panel stack" aria-label="Journey" data-testid="journey-card">
-      <span className="muted small">Journey</span>
+      <div className="stack detail-lead">
+        <span className="muted small">Journey</span>
+        {model === undefined || done === undefined ? null : (
+          <>
+            <span data-testid="card-progress" data-done={done} data-in-scope={model.inScope} data-remaining={model.remaining}>
+              {done} of {model.inScope} in scope done{model.remaining === 0 ? "" : `, ${String(model.remaining)} to go`}
+            </span>
+            <Meter done={done} of={model.inScope} />
+          </>
+        )}
+      </div>
       {summaryError === undefined ? null : <p className="callout callout-bad">The summary could not be read: {summaryError}</p>}
       {model === undefined || done === undefined ? (
         summaryError === undefined ? <p className="muted small">Summing up the journey...</p> : null
       ) : (
         <>
-          <span data-testid="card-progress" data-done={done} data-in-scope={model.inScope} data-remaining={model.remaining}>
-            {done} of {model.inScope} in scope done{model.remaining === 0 ? "" : `, ${String(model.remaining)} to go`}
-          </span>
-          <Meter done={done} of={model.inScope} />
           <Yours ready={ready} />
           <Flags ready={ready} model={model} />
           <NextUp ready={ready} />

@@ -7,6 +7,21 @@
   line-height: 1.55;
 }
 
+/* A card's rows are spaced by the stack's gap alone: a heading's or a paragraph's own margin would add to it (and in a flex column never collapses with it). */
+.detail-panel > :is(h2, p),
+.detail-panel .stack > p {
+  margin: 0;
+}
+
+/* A card's title with the one line under it. */
+.detail-lead {
+  gap: var(--space-1);
+}
+
+.detail-lead > h2 {
+  margin: 0;
+}
+
 /* The header: where the node sits and its state, its title, one line about it. */
 .detail-head {
   gap: var(--space-2);

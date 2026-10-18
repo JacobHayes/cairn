@@ -1,4 +1,4 @@
-// The Filter's settings and the search as removable chips under the toolbar (`overdue ×`, 2.3).
+// The Filter's settings as removable chips under the toolbar (`overdue ×`, 2.3).
 // The row is absent when nothing is on. Each chip takes its own setting off and leaves the rest
 // as they were (journeys/view.ts, `filterChips`).
 import { Link } from "react-router";

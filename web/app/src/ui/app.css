@@ -13,6 +13,16 @@
   /* The sheet's two heights. The tall one leaves room above it for a notice: a window's worth, less a notice. */
   --sheet-half: 40dvh;
   --sheet-full: min(85dvh, calc(100dvh - 160px));
+  /* DESIGN's four corner ticks (L-shaped, 8px, inset 3px) as background layers, for the ruled canvases: the graph, the timeline and the phone map. */
+  --corner-ticks:
+    linear-gradient(var(--color-tick), var(--color-tick)) left 3px top 3px / 8px 1px no-repeat,
+    linear-gradient(var(--color-tick), var(--color-tick)) left 3px top 3px / 1px 8px no-repeat,
+    linear-gradient(var(--color-tick), var(--color-tick)) right 3px top 3px / 8px 1px no-repeat,
+    linear-gradient(var(--color-tick), var(--color-tick)) right 3px top 3px / 1px 8px no-repeat,
+    linear-gradient(var(--color-tick), var(--color-tick)) left 3px bottom 3px / 8px 1px no-repeat,
+    linear-gradient(var(--color-tick), var(--color-tick)) left 3px bottom 3px / 1px 8px no-repeat,
+    linear-gradient(var(--color-tick), var(--color-tick)) right 3px bottom 3px / 8px 1px no-repeat,
+    linear-gradient(var(--color-tick), var(--color-tick)) right 3px bottom 3px / 1px 8px no-repeat;
 }
 
 /* ---- utilities -------------------------------------------------------------------------------- */
@@ -422,7 +432,7 @@ body {
 /* The canvas is transparent, so the preview and the map carry the ruling themselves. */
 .map-preview,
 .map-full {
-  background: var(--ruling), var(--color-ground);
+  background: var(--corner-ticks), var(--ruling), var(--color-ground);
 }
 .map-preview {
   position: relative;
@@ -1083,3 +1093,87 @@ input[type="radio"] {
     text-decoration: none;
   }
 }
+
+/* ---- trees (the Plan list and the timeline) ------------------------------------------------------- */
+/* Tree guides, a classic tree in --color-border through the title cell's full height (and over
+   its row hairline): one line per ancestor with more children below, centred on that
+   ancestor's chevron, and for the row itself a "├" or "└" (last child) that joins the line to its
+   chevron or bullet. The title cell is held at the left, which makes it the guides' anchor. */
+.tree-guide {
+  position: absolute;
+  inset-block: 0 -1px;
+  inset-inline-start: calc(var(--space-2) + var(--level) * var(--space-5) + 11.5px);
+  border-inline-start: 1px solid var(--color-border);
+  pointer-events: none;
+}
+
+.tree-guide[data-elbow="true"] {
+  /* Only to the row's middle when it is the last child. */
+  bottom: auto;
+  height: calc(50% + 1px);
+}
+
+.tree-guide[data-elbow="true"][data-more="true"] {
+  bottom: -1px;
+  height: auto;
+}
+
+/* A last child's guide is already only as tall as the row's middle, so its arm sits at the guide's foot. */
+.tree-guide[data-elbow="true"][data-more="false"]::after {
+  top: auto;
+  bottom: 0;
+}
+
+/* Below an open container's chevron, down to its first child. */
+.tree-guide[data-down="true"] {
+  top: calc(50% + 9px);
+}
+
+.tree-guide[data-elbow="true"]::after {
+  content: "";
+  position: absolute;
+  top: 50%;
+  inset-inline-start: 0;
+  width: 13px;
+  border-top: 1px solid var(--color-border);
+}
+
+.tree-fold {
+  position: relative;
+  flex: none;
+  width: var(--space-5);
+}
+
+/* A leaf has a small bullet where a chevron would be, so every title starts at its level's column. */
+span.tree-stub::after {
+  content: "";
+  position: absolute;
+  inset: 50% auto auto 50%;
+  width: 5px;
+  height: 5px;
+  margin: -2.5px 0 0 -2.5px;
+  border-radius: 50%;
+  background: var(--color-secondary);
+}
+
+button.tree-fold {
+  display: grid;
+  place-items: center;
+  height: var(--space-5);
+  min-height: var(--space-5);
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-sm, 4px);
+  background: none;
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+button.tree-fold:hover {
+  background: var(--color-hover);
+}
+
+button.tree-fold[aria-expanded="true"] .tree-chevron {
+  transform: rotate(90deg);
+}
+

@@ -36,6 +36,7 @@ describe("the rows are the drawn nodes with dates", () => {
     const stage = chart.rows.find((row) => row.key === "n_stage");
     expect([stage?.from, stage?.to]).toEqual([dayOf("2026-10-03"), dayOf("2026-11-02")]);
     expect(chart.undated).toEqual(["n_when"]);
+    expect(chart.rows.map((row) => [row.key, row.guides])).toEqual([["n_stage", []], ["n_findings", [true]], ["n_report", [false]], ["n_meeting", []]]);
   });
 
   it("folds a container as asked, which keeps its bar over what it holds", () => {
@@ -133,6 +134,8 @@ describe("C13: a route's rows are the drawn nodes at their earliest days", () =>
       ["n_ship", 0, "milestone", 14, 14],
     ]);
     expect(chart.rows.find((row) => row.key === "n_ship")?.end).toBe(true);
+    // The tree's guides: a child's own elbow is its last entry, true while a sibling follows.
+    expect(chart.rows.map((row) => [row.key, row.guides])).toEqual([["n_stage", []], ["n_design", [true]], ["n_build", [false]], ["n_ship", []]]);
   });
 
   it("gathers the drawn nodes with no earliest day in the folded list, and none that is not drawn", () => {
