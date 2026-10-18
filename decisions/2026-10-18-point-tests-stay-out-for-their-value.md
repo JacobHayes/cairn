@@ -1,0 +1,6 @@
+# Point tests stay out of the ladder for their value, not for the CLI
+
+- Question: PRACTICES (Simulation with patina, item 3) and the notifier decision said point tests (`#[patina_dst::test]`) are left out because they need the `cargo-patina` binary at test time. Is that the real reason? It is not: CI could cache the binary, and mise already builds it for `mise run sim`.
+- Call: point tests stay out because they would add little for their cost. Cairn's timing-sensitive code takes its time as an argument, and each interleaving that matters is an ordinary deterministic test. Each point test rebuilds its target under the shim (about 18 s for a trivial test) and puts the CLI in every `cargo test`. PRACTICES says this; the notifier decision keeps its own call (plain tests with the clock passed in), whose CLI remark is superseded by this record.
+- Alternatives: point tests with a cached CLI in CI (possible, but the build cost per test and the CLI in every local `cargo test` remain, for schedules the plain tests already spell out); keeping the CLI as the stated reason (untrue, and it would suggest caching the binary reverses the call).
+- What would change it: a timing-sensitive component that cannot take its time as an argument, whose interleavings only a seed sweep can reach.
