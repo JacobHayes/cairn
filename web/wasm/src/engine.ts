@@ -13,6 +13,7 @@ import init, {
   routeFileText,
   routeLevel,
   routeNotices,
+  routeSchedule,
   touched,
   touchedOverlaps,
 } from "../generated/cairn_wasm.js";
@@ -36,6 +37,8 @@ import {
   type RouteApplyRequest,
   type RouteLevelRequest,
   type RouteNoticesRequest,
+  type RouteSchedule,
+  type RouteScheduleRequest,
 } from "./types.ts";
 
 /** The compiled module: compiled once per page, then instantiated by the page and posted to the derive worker. */
@@ -205,6 +208,16 @@ export class Engine {
   /** A20: a route graph's notices, in path order. */
   routeNotices(request: RouteNoticesRequest): Schema<"Notice">[] {
     return parsed<Schema<"Notice">[]>(this.routeNoticesText(request));
+  }
+
+  /** C13: a route graph's schedule, as the module wrote it. */
+  routeScheduleText(request: RouteScheduleRequest): string {
+    return hosted(() => routeSchedule(JSON.stringify(request)));
+  }
+
+  /** C13: a route graph's earliest days from its start. */
+  routeSchedule(request: RouteScheduleRequest): RouteSchedule {
+    return parsed<RouteSchedule>(this.routeScheduleText(request));
   }
 
   /** The module's linear memory in bytes: the peak so far, since it never shrinks. */

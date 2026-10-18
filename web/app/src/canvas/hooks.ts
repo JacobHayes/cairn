@@ -10,11 +10,10 @@ import { createContext, useContext, useMemo, useState } from "react";
 import type { Deriver } from "../data/host.ts";
 import { PROJECTION, errorWords, valueOf, type ReadKey, type ReadSource, type ReadView } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession } from "../data/react.ts";
-import type { Ready } from "../detail/model.ts";
-import { currentStagesOf, selectedRequest, type LevelRequest } from "../journeys/requests.ts";
-import { ancestorsOf } from "../plan/tree.ts";
+import type { GraphNode, Ready } from "../detail/model.ts";
+import { selectedRequest, type LevelRequest } from "../journeys/requests.ts";
 import { layoutRequestOf } from "./cards.ts";
-import { openAt } from "./ladder.ts";
+import { ancestorsOf, openAt } from "./ladder.ts";
 import type { Layout } from "./layout.ts";
 import type { Layouts } from "./layouts.ts";
 import type { CanvasModel, Step } from "./model.ts";
@@ -75,11 +74,27 @@ export function useProjected<R extends ProjectionRequest>(view: Ready | undefine
  * is made from the plain read's value as held, and each read shows a value only for its own
  * request and derivation; selecting a node the plain level draws changes neither.
  */
-export function useLevel(view: Ready, request: LevelRequest | undefined, selected?: string): { level: Schema<"Level"> | undefined; drawn: ReadonlySet<string> | undefined; error: string | undefined } {
-  const plain = useProjected(view, request);
+export function useLevel(view: Ready, request: LevelRequest | undefined, selected?: string): LevelRead {
+  return useLevelBy((asked) => useProjected(view, asked), view.journey.graph.nodes ?? [], request, selected);
+}
+
+/** The level a view draws: the keys it draws, and why it could not be read. */
+export interface LevelRead {
+  level: Schema<"Level"> | undefined;
+  drawn: ReadonlySet<string> | undefined;
+  error: string | undefined;
+}
+
+/**
+ * `useLevel` over any subject's level read (`read`, called as a hook, once for the plain request
+ * and once for the widened one): a journey's projection, a route's level. One rule for what a
+ * selected node does to the level, whichever subject draws it.
+ */
+export function useLevelBy(read: (request: LevelRequest | undefined) => ReadView<Schema<"Level">>, nodes: readonly GraphNode[], request: LevelRequest | undefined, selected?: string): LevelRead {
+  const plain = read(request);
   const plainLevel = valueOf(plain);
-  const widening = request === undefined ? undefined : selectedRequest(request, plainLevel, selected, view.journey.graph.nodes ?? []);
-  const widened = useProjected(view, widening);
+  const widening = request === undefined ? undefined : selectedRequest(request, plainLevel, selected, nodes);
+  const widened = read(widening);
   const level = widening === undefined ? plainLevel : valueOf(widened);
   const drawn = useMemo(() => (level === undefined ? undefined : new Set(level.nodes.map((node) => node.key))), [level]);
   return { level, drawn, error: errorWords(plain) ?? (widening === undefined ? undefined : errorWords(widened)) };
@@ -191,17 +206,16 @@ export function useFlips(step: Step | undefined, picks: number): { flipped: Read
 }
 
 /**
- * C2, C7, 5.1: the folds of a view that folds for display (the list, the timeline): the containers
- * the drawn step opens and the viewer's flips since the depth was chosen, and a container above
+ * C2, C7, 5.1: the folds of a view that folds for display (the list, the timeline) over the graph's
+ * `nodes`, `current` being its current stages (none for a route): the containers the drawn step opens and the viewer's flips since the depth was chosen, and a container above
  * the selected node is open whatever either says. Folding such a container moves the selection to
  * it (`take`) and closes it: the node is no longer hidden inside a fold, and the address says
  * what is selected.
  */
-export function useFolds(view: Ready, depth: Step | undefined, drawn: Step, picks: number, selected: string | undefined, take: (key: string) => void): { open: (key: string) => boolean; fold: (key: string) => void } {
+export function useFolds(nodes: readonly GraphNode[], current: ReadonlySet<string>, depth: Step | undefined, drawn: Step, picks: number, selected: string | undefined, take: (key: string) => void): { open: (key: string) => boolean; fold: (key: string) => void } {
   const { flipped, flip, set } = useFlips(depth, picks);
-  const nodes = view.journey.graph.nodes ?? [];
-  const opens = useMemo(() => openAt(drawn, nodes, currentStagesOf(view)), [view, nodes, drawn]);
-  const holding = useMemo(() => new Set(selected === undefined ? [] : ancestorsOf(view, selected)), [view, selected]);
+  const opens = useMemo(() => openAt(drawn, nodes, current), [nodes, current, drawn]);
+  const holding = useMemo(() => new Set(selected === undefined ? [] : ancestorsOf(nodes, selected)), [nodes, selected]);
   const open = useMemo(() => (key: string) => holding.has(key) || opens(key) !== flipped.has(key), [holding, opens, flipped]);
   const fold = (key: string) => {
     if (holding.has(key)) {

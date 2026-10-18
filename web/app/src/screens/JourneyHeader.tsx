@@ -11,7 +11,8 @@ import { graphPath, type GraphView } from "../canvas/settings.ts";
 import type { Ready } from "../detail/model.ts";
 import { DeleteJourney } from "../journeys/DeleteJourney.tsx";
 import { statusActions } from "../journeys/lifecycle.ts";
-import type { JourneyStatus, Screen } from "../journeys/address.ts";
+import { SCREENS, screenSwitched, type JourneyStatus, type Screen } from "../journeys/address.ts";
+import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { useInsertEntry } from "../segments/entry.ts";
 import { useSuggested } from "../journeys/suggested.ts";
 import { OpenProposalsItem } from "../proposals/DestinationProposals.tsx";
@@ -19,7 +20,7 @@ import { JourneyFlow, type JourneyFlowName } from "../proposals/Entries.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
 import { Menu } from "./Menu.tsx";
-import { ViewPicker } from "./ViewPicker.tsx";
+import { JOURNEY_VIEW_TITLE, ViewPicker } from "./ViewPicker.tsx";
 import { Refused } from "./Refused.tsx";
 import { WriteStatus } from "./WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
@@ -158,6 +159,8 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
   const { header, revision } = ready.journey;
   const write = useScreenWrite(`journey-status:${header.id}`, header.name);
   const suggested = useSuggested(ready);
+  const target = useJourneyTarget();
+  const { search } = useLocation();
   const [panel, setPanel] = useState<Panel | undefined>(undefined);
   return (
     <section className="stack journey-header" aria-label={header.name} data-testid="journey-header">
@@ -168,7 +171,7 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
         </div>
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />
         <div className="journey-header-actions">
-          <ViewPicker screen={screen} />
+          <ViewPicker screen={screen} screens={SCREENS} to={(to) => screenSwitched(target, search, to)} title={JOURNEY_VIEW_TITLE} />
           <JourneyMenu ready={ready} view={view} screen={screen} selected={selected} write={write} onPanel={setPanel} />
         </div>
       </div>

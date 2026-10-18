@@ -38,26 +38,17 @@ export const LENSES = ["rank", "gravity", "unlocks", "slack"] as const;
 export type Lens = (typeof LENSES)[number];
 
 /**
- * What a route's canvas shows (C2, C4): `step` is the depth (none is its default), `open`
- * and `shut` the containers the viewer expanded and collapsed since, `container` the one drilled
- * into, and `lens` the Signals lens. A journey's graph reads its step from the journey's view state
- * (journeys/view.ts) and the rest from its own settings (settings.ts).
+ * What a graph shows (C2, C4): `step` is the depth (none is its default), `open` and `shut` the
+ * containers the viewer expanded and collapsed since, and `lens` the Signals lens. The graph of
+ * a journey or a route reads its step from the page's view state (journeys/view.ts) and the rest
+ * from its own settings (settings.ts).
  */
 export interface CanvasSettings {
-  container: string | undefined;
   step: Step | undefined;
   open: string[];
   shut: string[];
   lens: Lens | undefined;
 }
-
-export const DEFAULT_SETTINGS: CanvasSettings = {
-  container: undefined,
-  step: undefined,
-  open: [],
-  shut: [],
-  lens: undefined,
-};
 
 export type Tone = "plain" | "good" | "warn" | "bad";
 
@@ -102,7 +93,6 @@ export interface Card {
   /** A top-level group: a stage. */
   stage: boolean;
   /** It has children (it can be expanded and collapsed, C4). */
-  drillable: boolean;
   /** Its subtree is rolled up into it: the level collapsed it (5.3). */
   collapsed: boolean;
   /** The hidden work that rolled up into it, as a peek on hover (C4). */
@@ -303,7 +293,6 @@ export interface Looks {
 /** C2: the level's nodes as cards; on a journey, `looks` adds each card's state. */
 export function cardsOf(level: Level, graph: GraphNode[], looks?: Looks): Card[] {
   const nodes = nodesOf(graph);
-  const parents = new Set(graph.flatMap((node) => (node.parent == null ? [] : [node.parent])));
   return level.nodes.flatMap((at) => {
     const node = nodes.get(at.key);
     if (node === undefined) {
@@ -316,7 +305,6 @@ export function cardsOf(level: Level, graph: GraphNode[], looks?: Looks): Card[]
         title: node.title,
         parent: at.parent ?? undefined,
         stage: node.kind === "group" && node.parent == null,
-        drillable: parents.has(node.key),
         collapsed: level.collapsed?.includes(node.key) === true,
         // Work hidden by its kind is the card's checklist; a node of a shown kind that rolled up
         // was hidden for its relevance class or a collapsed container, not work to tick off.

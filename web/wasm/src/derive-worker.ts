@@ -20,6 +20,8 @@ import {
   type RouteApplyRequest,
   type RouteLevelRequest,
   type RouteNoticesRequest,
+  type RouteSchedule,
+  type RouteScheduleRequest,
 } from "./types.ts";
 
 type Pending = { resolve: (text: string) => void; reject: (failure: HostFailure) => void };
@@ -159,6 +161,11 @@ export class DeriveWorker {
   /** A20: a route graph's notices (nothing is held). */
   async routeNotices(request: RouteNoticesRequest): Promise<Schema<"Notice">[]> {
     return parsed<Schema<"Notice">[]>(await this.#ask({ op: "route_notices", request }));
+  }
+
+  /** C13: a route graph's earliest days from its start (nothing is held). */
+  async routeSchedule(request: RouteScheduleRequest): Promise<RouteSchedule> {
+    return parsed<RouteSchedule>(await this.#ask({ op: "route_schedule", request }));
   }
 
   /** Drops the derivation `handle`'s load made, unless a later load has replaced it. */

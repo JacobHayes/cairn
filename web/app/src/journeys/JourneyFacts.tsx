@@ -5,14 +5,13 @@ import { useState } from "react";
 import { Link } from "react-router";
 
 import type { ListFlag } from "../acting/address.ts";
-import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { valueOf } from "../data/keyed-read.ts";
 import { useLive } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex } from "../data/reads.ts";
 import type { Ready } from "../detail/model.ts";
 import { JourneyFlow } from "../proposals/Entries.tsx";
 import { Badge } from "../ui/kit.tsx";
-import { routeCanvasPath, routeDetailPath } from "../routes/address.ts";
+import { routePath } from "../routes/address.ts";
 import type { SummaryModel } from "../summary/model.ts";
 import { dateWords } from "../timeline/model.ts";
 import { upgradeWords } from "./figures-model.ts";
@@ -95,11 +94,8 @@ export function LineageBlock({ ready, lineage, readOnly = false }: { ready: Read
   return (
     <>
       <span className="row" data-testid="overview-lineage">
-        <Link to={routeDetailPath(lineage.route)}>
+        <Link to={routePath(lineage.route, { version: lineage.version })} data-testid="lineage">
           {lineage.name}, version {lineage.version}
-        </Link>
-        <Link to={routeCanvasPath(lineage.route, lineage.version, DEFAULT_VIEW)} className="no-print" data-testid="lineage">
-          See its graph
         </Link>
         {summary === undefined || upgradeWords(summary) === undefined ? null : (
           <Badge tone="warn" data-testid="upgrade" data-status="available">

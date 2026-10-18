@@ -2,7 +2,7 @@
 import { expect, test } from "vitest";
 
 import type { GraphNode } from "../detail/model.ts";
-import { collapsedAt, currentStages, leftOutAt, routeStepDrawing, routeStepOf, withStep } from "./ladder.ts";
+import { collapsedAt, currentStages, leftOutAt, stepOf, stepsFor, withStep } from "./ladder.ts";
 
 const node = (key: string, kind: GraphNode["kind"], parent?: string): GraphNode => ({ key, id: key, kind, title: key, ...(parent === undefined ? {} : { parent }) });
 const nodes = [node("s1", "group"), node("s1g", "group", "s1"), node("s1a", "action", "s1g"), node("s2", "group"), node("s3", "group")];
@@ -21,16 +21,12 @@ test("at Stages the stage holding the frontier is open and the rest collapsed; t
   expect(leftOutAt("deliverables", mixed).size).toBe(0);
 });
 
-test("a route has no stage to open at, so a route with no groups opens at Decisions and has no Stages rung", () => {
-  expect(routeStepOf({ step: undefined, container: undefined }, nodes)).toBe("stages");
-  // Drilled into a stage, Stages would draw nothing of what is inside it.
-  expect(routeStepOf({ step: undefined, container: "s1" }, nodes)).toBe("deliverables");
+test("a view opens at Actions, and has no Stages rung without stages", () => {
+  expect(stepOf({ step: undefined }, nodes)).toBe("actions");
+  expect(stepOf({ step: "stages" }, nodes)).toBe("stages");
   const flat = [node("d", "decision"), node("a", "action")];
-  expect(routeStepOf({ step: undefined, container: undefined }, flat)).toBe("decisions");
-  expect(routeStepOf({ step: "stages", container: undefined }, flat)).toBe("decisions");
-  expect(routeStepOf({ step: "deliverables", container: undefined }, flat)).toBe("deliverables");
-  // A node just added is shown at the first step that draws its kind.
-  expect(routeStepDrawing("stages", "group")).toBe("stages");
-  expect(routeStepDrawing("decisions", "deliverable")).toBe("deliverables");
-  expect(routeStepDrawing("stages", "action")).toBe("actions");
+  expect(stepOf({ step: "stages" }, flat)).toBe("actions");
+  expect(stepOf({ step: "deliverables" }, flat)).toBe("deliverables");
+  expect(stepsFor(flat)).not.toContain("stages");
+  expect(stepsFor(nodes)).toContain("stages");
 });

@@ -15,7 +15,7 @@ import { contextMenuOf } from "../detail/offers.ts";
 import { screenSwitched } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { badgesOf, currentStagesOf, depthFaded, journeyLayoutView, levelRequestOf, litOf, stepHides, type LevelRequest } from "../journeys/requests.ts";
-import { ResetView, ViewControls } from "../screens/ViewControls.tsx";
+import { journeySubject, ResetView, ViewControls } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { typing } from "../ui/typing.ts";
 import { RevealBox, SignalMenu } from "./Chrome.tsx";
@@ -204,7 +204,6 @@ function useActions(ready: Ready, view: GraphView, selected: string | undefined,
           selection.pick(key);
         }
       },
-      drill: undefined,
       // The refit rides on the navigation, not the address.
       // Closing a container that holds the selected node moves the selection to it (C7).
       expand: (key, expanded) => {
@@ -265,7 +264,7 @@ function outsideOf(trace: { upstream: string[]; downstream: string[] } | undefin
  * navigation changes the location, so an opening request is gone for good and never comes back to
  * centre the first node after a later reveal.
  */
-function useRevealed(selected: string | undefined): Reveal | undefined {
+export function useRevealed(selected: string | undefined): Reveal | undefined {
   const location = useLocation();
   const [opened] = useState(() => ({ key: location.key, node: selected }));
   const asked = (location.state as { reveal?: { key: string; how: Reveal["how"] } } | null)?.reveal;
@@ -295,7 +294,7 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
     // The controls stay, so a setting the engine refused can be changed or reset from here.
     return (
       <div className="stack">
-        <ViewControls ready={ready} screen="graph" badges={graph.badges} />
+        <ViewControls subject={journeySubject(ready)} screen="graph" badges={graph.badges} />
         <p className="callout callout-bad row">
           The canvas could not be drawn: {graph.error} <ResetView />
         </p>
@@ -331,7 +330,7 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
         reveal={reveal}
         held={
           <>
-            <ViewControls ready={ready} screen="graph" badges={graph.badges} />
+            <ViewControls subject={journeySubject(ready)} screen="graph" badges={graph.badges} />
             {laidOut.model.cards.length > 0 ? null : (
               <p className="callout row" role="status" data-testid="nothing-matches">
                 Nothing matches the depth, filter and search. <ResetView />

@@ -6,7 +6,8 @@
 // writes: the control reads its writes by its edit key, so a refusal stays with its file across
 // leaving the screen and a reload.
 import { useActorRef, useSelector } from "@xstate/react";
-import { useEffect } from "react";
+import type { ActorRefFrom } from "xstate";
+import { useCallback, useEffect } from "react";
 import { useNavigate } from "react-router";
 
 import type { Schema } from "@cairn/client";
@@ -18,21 +19,22 @@ import { isPatchAnswer } from "../data/writes.ts";
 import { Refused, violates } from "../screens/Refused.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button } from "../ui/kit.tsx";
-import { routeDetailPath } from "./address.ts";
+import { routePath } from "./address.ts";
 import { importFlow } from "./import.ts";
 
-/** What a screen does once a file is imported, in place of going to the route's detail: A20, the notices the import left. */
+/** What a screen does once a file is imported, in place of going to the route's page: A20, the notices the import left. */
 export type ImportedHandler = (file: RouteFile, notices: Schema<"Notice">[]) => void;
 
+/** The import workflow, owned by whoever calls this: keep it above anything that remounts while an import is under way. */
+export type ImportFlow = ActorRefFrom<typeof importFlow>;
+
 /**
- * An import control. `edit` is its own key (never a sibling control's): its import write is
+ * An import workflow. `edit` is its own key (never a sibling control's): its import write is
  * kept under it and its discard of an open draft under `${edit}:discard`.
  */
-export function ImportFile({ edit, label = "Import a route file", onImported }: { edit: string; label?: string; onImported?: ImportedHandler }) {
+export function useImportFlow(edit: string): ImportFlow {
   const session = useSession();
-  const navigate = useNavigate();
-  const skew = useSkew();
-  const flow = useActorRef(importFlow, {
+  return useActorRef(importFlow, {
     input: {
       edits: session.edits,
       keys: { import: edit, discard: `${edit}:discard` },
@@ -40,23 +42,47 @@ export function ImportFile({ edit, label = "Import a route file", onImported }: 
       route: (id) => session.host.route(id),
     },
   });
-  const working = useSelector(flow, (snapshot) => snapshot.hasTag("busy"));
-  const unreadable = useSelector(flow, (snapshot) => snapshot.context.unreadable);
-  const importing = useEdit(edit);
-  const discarding = useEdit(`${edit}:discard`);
-  // Told of a landing only while this control is on screen: a person who left is not taken anywhere.
+}
+
+/** Told of a landing only while the caller is on screen: a person who left is not taken anywhere. */
+export function useOnImported(flow: ImportFlow, onImported: ImportedHandler): void {
   useEffect(() => {
     const subscription = flow.on("imported", ({ file, answer }) => {
-      if (onImported === undefined) {
-        void navigate(routeDetailPath(file.route));
-      } else {
-        onImported(file, isPatchAnswer(answer) ? noticesOf(answer) : []);
-      }
+      onImported(file, isPatchAnswer(answer) ? noticesOf(answer) : []);
     });
     return () => {
       subscription.unsubscribe();
     };
-  }, [flow, navigate, onImported]);
+  }, [flow, onImported]);
+}
+
+/** An import control with its own workflow: on a landing it goes to the route's page, or tells `onImported`. */
+export function ImportFile({ edit, label = "Import a route file", onImported }: { edit: string; label?: string; onImported?: ImportedHandler }) {
+  const navigate = useNavigate();
+  const flow = useImportFlow(edit);
+  useOnImported(
+    flow,
+    useCallback(
+      (file, notices) => {
+        if (onImported === undefined) {
+          void navigate(routePath(file.route));
+        } else {
+          onImported(file, notices);
+        }
+      },
+      [navigate, onImported],
+    ),
+  );
+  return <ImportControl flow={flow} edit={edit} label={label} />;
+}
+
+/** The control over `flow`: the file chooser, the refusal that stays with its file across a reload, and the discard's state. */
+export function ImportControl({ flow, edit, label = "Import a route file" }: { flow: ImportFlow; edit: string; label?: string }) {
+  const skew = useSkew();
+  const working = useSelector(flow, (snapshot) => snapshot.hasTag("busy"));
+  const unreadable = useSelector(flow, (snapshot) => snapshot.context.unreadable);
+  const importing = useEdit(edit);
+  const discarding = useEdit(`${edit}:discard`);
   // The file lives in the refused import write, so importing over the open draft works after a reload.
   const refused = importing.rejection === undefined || importing.write?.command.kind !== "import" ? undefined : importing.write.command.request.file;
   return (

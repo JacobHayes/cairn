@@ -3,6 +3,7 @@
 // roles, and a journey's edit mode, each the way a person does it.
 import { expect, type Locator, type Page } from "@playwright/test";
 
+import { versionSelect } from "./around.ts";
 import { fresh, open, openJourney, type HostKind } from "./shell.ts";
 
 /** A fresh name for a route this run starts. */
@@ -15,7 +16,7 @@ export async function newRoute(page: Page, host: HostKind, name: string): Promis
   await form.getByLabel("New route name").fill(name);
   const id = await form.getByLabel("New route id").inputValue();
   await form.getByTestId("new-create").click();
-  await expect(page.getByTestId("route-graph")).toHaveAttribute("data-status", "draft");
+  await expect(versionSelect(page)).toContainText("Draft");
   return id;
 }
 

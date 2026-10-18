@@ -16,8 +16,9 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use cairn_schema::{
-    AnswerSpec, Condition, DateOrigin, DecisionEntry, DecisionView, DisplayState, LevelQuery,
-    NodeKey, NodeKind, OpenDecision, Payload, State, StatusSummary, Timeline, TimelineEntry,
+    AnswerSpec, Condition, Date, DateOrigin, DateSource, DecisionEntry, DecisionView, DisplayState,
+    Instant, KeyRefs, LevelQuery, Node, NodeKey, NodeKind, OpenDecision, Payload, Relevance,
+    RouteSchedule, ScheduleEntry, State, StatusSummary, Timeline, TimelineEntry, UndatedEntry,
     UpcomingMilestone,
 };
 
@@ -167,6 +168,106 @@ impl DerivedJourney<'_> {
             end,
             undated,
         }
+    }
+
+    /// C13: a route's schedule: the journey derived as one that starts on `start` (its
+    /// `created_on` and its today), with each in-scope node's earliest start and finish as
+    /// days from `start`. A node no bound reaches is `undated`; one whose date rules read a
+    /// date decision nothing answers yet says which it waits on (`waiting`). `final_conditional`
+    /// is set when the final milestone's earliest day passes through an undecided node.
+    ///
+    /// Cost: a pass over the nodes and one chain walk for the final milestone,
+    /// O(nodes log nodes).
+    #[must_use]
+    pub fn schedule(&self, start: Date) -> RouteSchedule {
+        let derived = self.derived;
+        let dates = derived.dates();
+        let document = self.graph.document();
+        let offset = |date: Date| date.since(start).map_or(0, |span| span.get_days());
+        let mut entries = Vec::new();
+        let mut undated = Vec::new();
+        let mut end = None;
+        for (key, node) in document.nodes.as_map() {
+            if !derived.relevance().in_scope(key) {
+                continue;
+            }
+            if matches!(&node.payload, Payload::Milestone(milestone) if milestone.is_final) {
+                end = Some(key.clone());
+            }
+            let waiting = self.waiting_on(node);
+            let Some(earliest) = dates.earliest_start(key) else {
+                undated.push(UndatedEntry {
+                    node: key.clone(),
+                    waiting,
+                });
+                continue;
+            };
+            let first = offset(earliest);
+            let last = dates.earliest_finish(key).map_or(first, offset).max(first);
+            entries.push(ScheduleEntry {
+                node: key.clone(),
+                kind: node.kind(),
+                start_day: first,
+                finish_day: last,
+                conditional: derived.relevance().value(key) == Relevance::Undecided,
+                waiting,
+            });
+        }
+        entries.sort_by(|a, b| {
+            a.start_day
+                .cmp(&b.start_day)
+                .then_with(|| a.node.cmp(&b.node))
+        });
+        let final_conditional = end.as_ref().is_some_and(|key| self.passes_undecided(key));
+        RouteSchedule {
+            entries,
+            end,
+            final_conditional,
+            undated,
+        }
+    }
+
+    /// The date decisions `node`'s date rules read that no answer settles yet, by key.
+    fn waiting_on(&self, node: &Node<KeyRefs>) -> Vec<NodeKey> {
+        let document = self.graph.document();
+        [node.due_by.as_ref(), node.not_before.as_ref()]
+            .into_iter()
+            .flatten()
+            .flat_map(|rule| rule.sources.as_set())
+            .filter_map(|source| match source {
+                DateSource::Node(decision)
+                    if self.graph.node(decision).is_some_and(|found| {
+                        found.kind() == NodeKind::Decision
+                            && !document.state.answers.contains_key(decision)
+                    }) =>
+                {
+                    Some(decision.clone())
+                }
+                DateSource::Node(_) | DateSource::CreatedAt => None,
+            })
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect()
+    }
+
+    /// Whether the earliest start of `key` rests on an undecided node or a conditional constraint.
+    fn passes_undecided(&self, key: &NodeKey) -> bool {
+        let derived = self.derived;
+        derived
+            .dates()
+            .node(self.graph, key)
+            .earliest_start
+            .is_some_and(|bound| {
+                bound.chain.constraints.iter().any(|constraint| {
+                    constraint.conditional
+                        || [&constraint.before, &constraint.after]
+                            .into_iter()
+                            .any(|instant| {
+                                matches!(instant, Instant::Node { node, .. }
+                                    if derived.relevance().value(node) == Relevance::Undecided)
+                            })
+                })
+            })
     }
 
     /// C18: counts by state, what remains, the overdue, shortfall, and stale nodes, upcoming

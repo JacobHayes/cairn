@@ -7,7 +7,7 @@
 // view state every view shares is parsed here once (journeys/view.ts) and handed to the views.
 // Edit mode (5.6) adds the structure's editors: the node's structure in its detail, and
 // drawing a requirement between two cards.
-import { lazy, Suspense, useCallback, useMemo, useState, type ReactNode } from "react";
+import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
 import { ConnectContext, DrawingBanner, useEdgeDrawing } from "../authoring/connect.tsx";
@@ -25,7 +25,7 @@ import { SelectionPanel } from "../detail/SelectionPanel.tsx";
 import { indexPath, useNodeAddresses, type Screen } from "../journeys/address.ts";
 import { JourneyCard } from "../journeys/JourneyCard.tsx";
 import { SummaryPage } from "../summary/SummaryPage.tsx";
-import { isStock, useViewState, ViewStateContext, withViewState, type ViewState, type ViewStateValue } from "../journeys/view.ts";
+import { isStock, useViewState, ViewStateContext } from "../journeys/view.ts";
 import { DestinationProposals } from "../proposals/DestinationProposals.tsx";
 import { COLUMN, Inspector, PHONE_WIDTH, useMedia } from "../shell/frame.tsx";
 import { InsertEntryContext, useInserting } from "../segments/entry.ts";
@@ -33,6 +33,7 @@ import { InsertStepper, type InsertPreview } from "../segments/Stepper.tsx";
 import { JourneyHeader } from "./JourneyHeader.tsx";
 import { KeySheet } from "./KeySheet.tsx";
 import { useJourneyKeys } from "./keys.ts";
+import { useViewStateValue } from "./useViewStateValue.ts";
 import { CanvasBars, ProjectionBody, type ProjectionProps } from "./Projections.tsx";
 import "./screens.css";
 
@@ -172,24 +173,15 @@ function SummaryNote() {
 }
 
 function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<FrameProps, "id">) {
-  const { pathname, search } = useLocation();
+  const { search } = useLocation();
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
   const journey = ready.journey.header.id;
   const params = useMemo(() => new URLSearchParams(search), [search]);
   const view = useMemo(() => graphViewFrom(params), [params]);
-  const [picks, setPicks] = useState(0);
   const [walkCard, setWalkCard] = useState<string | undefined>(undefined);
-  const onState = useCallback(
-    (next: ViewState, picked = false) => {
-      if (picked) {
-        setPicks((count) => count + 1);
-      }
-      void navigate(`${pathname}${withViewState(search, next, picked)}`);
-    },
-    [navigate, pathname, search],
-  );
-  const viewState = useMemo<ViewStateValue>(() => ({ state: view.state, onState, picks }), [view.state, onState, picks]);
+  const viewState = useViewStateValue(view.state);
+  const { onState } = viewState;
   const steps = useMemo(() => stepsFor(ready.journey.graph.nodes ?? []), [ready]);
   const planned = screen === "graph";
   const authored = useMemo(() => (planned && view.edit ? journeyAuthored(ready) : undefined), [ready, planned, view.edit]);

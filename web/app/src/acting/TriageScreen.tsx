@@ -21,7 +21,7 @@ import { NodeDetailPanel } from "../detail/NodeDetail.tsx";
 import type { Ready } from "../detail/model.ts";
 import { badgesOf, levelRequestOf, stepHides, walkQueryOf } from "../journeys/requests.ts";
 import { useViewState, type ViewState } from "../journeys/view.ts";
-import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
+import { journeySubject, ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { COLUMN, Inspector, useMedia } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { typing } from "../ui/typing.ts";
@@ -205,7 +205,7 @@ export function TriageBody({ view, state, selected, onCard }: { view: Ready; sta
   const open = decisions ? actingDecisions(view).length : 0;
   return (
     <>
-    <ViewBar ready={view} screen="walk" badges={badges} />
+    <ViewBar subject={journeySubject(view)} screen="walk" badges={badges} />
     <section className="stack pass" aria-label={decisions ? "Decision walkthrough" : "Triage"} data-testid="triage" data-order={order.join(" ")}>
       {decisions && view.journey.revision <= 1 && card !== undefined ? (
         <p className="for-you" data-testid="walkthrough-intro">

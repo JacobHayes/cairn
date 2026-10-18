@@ -5,8 +5,9 @@
 import { describe, expect, it } from "vitest";
 
 import { testView } from "../detail/view.test-support.ts";
-import type { Timeline } from "./model.ts";
-import { chartOf, type ChartOptions } from "./rows.ts";
+import { treeOf, type Graph } from "../authoring/graph.ts";
+import { dayOf, type Timeline } from "./model.ts";
+import { chartOf, routeChartOf, type ChartOptions } from "./rows.ts";
 
 /** The fixture's level at All: every node, each under its parent. */
 const whole = [{ key: "n_stage" }, { key: "n_report", parent: "n_stage" }, { key: "n_findings", parent: "n_stage" }, { key: "n_meeting" }, { key: "n_when" }];
@@ -33,14 +34,14 @@ describe("the rows are the drawn nodes with dates", () => {
       ["n_meeting", 0, "milestone"],
     ]);
     const stage = chart.rows.find((row) => row.key === "n_stage");
-    expect([stage?.from, stage?.to]).toEqual(["2026-10-03", "2026-11-02"]);
+    expect([stage?.from, stage?.to]).toEqual([dayOf("2026-10-03"), dayOf("2026-11-02")]);
     expect(chart.undated).toEqual(["n_when"]);
   });
 
   it("folds a container as asked, which keeps its bar over what it holds", () => {
     const folded = chartOf(testView(), timeline, { ...options, open: (key) => key !== "n_stage" });
     expect(keys(folded.rows)).toEqual(["n_stage", "n_meeting"]);
-    expect(folded.rows[0]).toMatchObject({ foldable: true, open: false, from: "2026-10-03", to: "2026-11-02" });
+    expect(folded.rows[0]).toMatchObject({ foldable: true, open: false, from: dayOf("2026-10-03"), to: dayOf("2026-11-02") });
   });
 
   it("leaves out what the level does not draw: a search's misses, and a hidden container's work goes under nothing", () => {
@@ -82,7 +83,7 @@ describe("a selection and the highlights fade what they do not reach", () => {
     const chart = chartOf(view, timeline, { ...options, selected: "n_report" });
     expect(chart.dependencies).toEqual([{ from: "n_findings", to: "n_report", kind: "needs" }]);
     expect(chart.rows.filter((row) => !row.faded).map((row) => row.key).sort()).toEqual(["n_findings", "n_report"]);
-    expect(chart.rows.filter((row) => row.float !== undefined).map((row) => [row.key, row.float])).toEqual([["n_report", { from: "2026-10-20", to: "2026-10-30" }]]);
+    expect(chart.rows.filter((row) => row.float !== undefined).map((row) => [row.key, row.float])).toEqual([["n_report", { from: dayOf("2026-10-20"), to: dayOf("2026-10-30") }]]);
   });
 
   it("fades the rows a highlight does not light and removes none", () => {
@@ -95,5 +96,98 @@ describe("a selection and the highlights fade what they do not reach", () => {
     const chart = chartOf(testView(), timeline, { ...options, selected: "n_report", faded: (key) => !["n_stage", "n_report"].includes(key) });
     expect(chart.rows.find((row) => row.key === "n_findings")?.faded).toBe(true);
     expect(chart.rows.find((row) => row.key === "n_report")?.faded).toBe(false);
+  });
+});
+
+/** A route: a stage holding two works, one waiting on a date decision, a milestone ending it, and a node nothing bounds. */
+const route = treeOf({
+  nodes: [
+    { key: "n_stage", kind: "group", title: "Build" },
+    { key: "n_design", kind: "action", title: "Design", parent: "n_stage" },
+    { key: "n_build", kind: "action", title: "Build it", parent: "n_stage" },
+    { key: "n_gate", kind: "decision", title: "Pick a date" },
+    { key: "n_ship", kind: "milestone", title: "Ship" },
+    { key: "n_loose", kind: "milestone", title: "Loose end" },
+  ],
+} as Graph);
+
+const schedule = {
+  entries: [
+    { node: "n_design", kind: "action" as const, start_day: 0, finish_day: 5 },
+    { node: "n_build", kind: "action" as const, start_day: 5, finish_day: 14, waiting: ["n_gate"] },
+    { node: "n_ship", kind: "milestone" as const, start_day: 14, finish_day: 14, conditional: true },
+  ],
+  end: "n_ship",
+  undated: [{ node: "n_loose", waiting: ["n_gate"] }],
+};
+
+const routeLevel = [{ key: "n_stage" }, { key: "n_design", parent: "n_stage" }, { key: "n_build", parent: "n_stage" }, { key: "n_gate" }, { key: "n_ship" }, { key: "n_loose" }];
+
+describe("C13: a route's rows are the drawn nodes at their earliest days", () => {
+  it("nests the work under its stage, whose bar spans it, with the final milestone last", () => {
+    const chart = routeChartOf(route, schedule, { ...options, drawn: routeLevel });
+    expect(chart.rows.map((row) => [row.key, row.depth, row.shape, row.from, row.to])).toEqual([
+      ["n_stage", 0, "span", 0, 14],
+      ["n_design", 1, "bar", 0, 5],
+      ["n_build", 1, "bar", 5, 14],
+      ["n_ship", 0, "milestone", 14, 14],
+    ]);
+    expect(chart.rows.find((row) => row.key === "n_ship")?.end).toBe(true);
+  });
+
+  it("gathers the drawn nodes with no earliest day in the folded list, and none that is not drawn", () => {
+    expect(routeChartOf(route, schedule, { ...options, drawn: routeLevel }).undated).toEqual(["n_loose"]);
+    expect(routeChartOf(route, schedule, { ...options, drawn: [{ key: "n_ship" }] }).undated).toEqual([]);
+  });
+
+  it("says which unanswered date a node with no day waits on", () => {
+    const chart = routeChartOf(route, schedule, { ...options, drawn: routeLevel });
+    expect(chart.undatedWords?.get("n_loose")).toContain("Pick a date");
+    expect(chart.undatedWords?.has("n_design")).toBe(false);
+  });
+
+  it("spans a deliverable's own work after its children's, and a stage by its children alone", () => {
+    const nested = treeOf({
+      nodes: [
+        { key: "n_stage", kind: "group", title: "Stage" },
+        { key: "n_deliverable", kind: "deliverable", title: "Deliverable", parent: "n_stage" },
+        { key: "n_step", kind: "action", title: "Step", parent: "n_deliverable" },
+      ],
+    } as Graph);
+    const days = {
+      entries: [
+        { node: "n_stage", kind: "group" as const, start_day: 0, finish_day: 20 },
+        { node: "n_deliverable", kind: "deliverable" as const, start_day: 3, finish_day: 8 },
+        { node: "n_step", kind: "action" as const, start_day: 0, finish_day: 3 },
+      ],
+    };
+    const drawn = [{ key: "n_stage" }, { key: "n_deliverable", parent: "n_stage" }, { key: "n_step", parent: "n_deliverable" }];
+    const chart = routeChartOf(nested, days, { ...options, drawn, open: () => true });
+    const span = (key: string) => chart.rows.find((row) => row.key === key);
+    expect([span("n_deliverable")?.from, span("n_deliverable")?.to]).toEqual([0, 8]);
+    // The stage's own bounds do not stretch it past what it holds.
+    expect([span("n_stage")?.from, span("n_stage")?.to]).toEqual([0, 8]);
+  });
+
+  it("marks a node in an undecided branch conditional and says what a row's date waits on", () => {
+    const chart = routeChartOf(route, schedule, { ...options, drawn: routeLevel });
+    expect(chart.rows.find((row) => row.key === "n_ship")?.state).toBe("conditional");
+    expect(chart.rows.find((row) => row.key === "n_design")?.state).not.toBe("conditional");
+    expect(chart.rows.find((row) => row.key === "n_build")?.words).toContain("Pick a date");
+    expect(chart.rows.find((row) => row.key === "n_design")?.words).not.toContain("waits");
+  });
+
+  it("draws only what the level draws, and folds a stage as asked", () => {
+    const narrowed = routeChartOf(route, schedule, { ...options, drawn: [{ key: "n_design" }, { key: "n_ship" }] });
+    expect(keys(narrowed.rows)).toEqual(["n_design", "n_ship"]);
+    const folded = routeChartOf(route, schedule, { ...options, drawn: routeLevel, open: (key) => key !== "n_stage" });
+    expect(keys(folded.rows)).toEqual(["n_stage", "n_ship"]);
+    expect(folded.rows[0]).toMatchObject({ foldable: true, open: false, from: 0, to: 14 });
+  });
+
+  it("orders siblings by their earliest day, not the graph's order", () => {
+    const reversed = { ...schedule, entries: schedule.entries.map((entry) => (entry.node === "n_design" ? { ...entry, start_day: 6, finish_day: 9 } : entry)) };
+    const chart = routeChartOf(route, reversed, { ...options, drawn: routeLevel });
+    expect(chart.rows.filter((row) => row.depth === 1).map((row) => row.key)).toEqual(["n_build", "n_design"]);
   });
 });

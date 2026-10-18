@@ -12,6 +12,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, test, type Page } from "@playwright/test";
 
+import { importIntoDraft, openRoute, openRouteMenu, versionSelect } from "./around.ts";
 import { addNode, formField, newRoute, nodeForm, routeName, saveForm, structure } from "./authoring.ts";
 import { fresh, goWithin, menuItem, nodeCard, nodePanel, open, openFromCanvas, openJourney, recentSaves, rename, renameOf, save, startRename, syncChip } from "./shell.ts";
 
@@ -237,27 +238,27 @@ test("a new route refused for an id in use stays under its control and on the ch
 test("an import refused for an open draft keeps its file across a reload, and imports over the draft", async ({ page }) => {
   const buffer = readFileSync(fileURLToPath(new URL("../../../fixtures/hiring-loop/route.yaml", import.meta.url)));
   const file = { name: "hiring-loop.yaml", mimeType: "text/yaml", buffer };
-  await open(page, "browser", "/routes/hiring-loop/versions");
-  const actions = page.getByTestId("route-actions");
-  const importing = actions.getByTestId("import");
-  const choose = () => actions.getByLabel("Import a file as a new draft").setInputFiles(file);
+  await openRoute(page, "browser", "hiring-loop");
+  const importing = page.getByTestId("route-menu-menu").getByTestId("import");
+  const choose = () => importIntoDraft(page, file);
   await choose();
-  await expect(page.getByTestId("draft")).toHaveAttribute("data-status", "open");
+  await expect(versionSelect(page)).toContainText("Draft");
   // Another draft is open now: the file is refused, and the option is to replace it.
   await choose();
   await expect(importing.locator('[data-testid="violation"][data-code="draft_exists"]')).toBeVisible();
   await importing.getByRole("button", { name: "Discard the open draft and import" }).click();
   await expect(importing.getByTestId("refused")).toHaveCount(0);
-  await expect(page.getByTestId("draft")).toHaveAttribute("data-status", "open");
+  await expect(versionSelect(page)).toContainText("Draft");
   // Refused again, the file is kept with the refusal across a reload, which also drops the draft the page held.
   await choose();
   await expect(importing.getByTestId("refused")).toBeVisible();
   await page.reload();
+  await openRouteMenu(page);
   await expect(importing.getByTestId("refused")).toBeVisible();
   await expect(syncChip(page)).toHaveAttribute("aria-label", /^NOT SAVED · 1\./);
   await importing.getByRole("button", { name: "Discard the open draft and import" }).click();
   await expect(importing.getByTestId("refused")).toHaveCount(0);
-  await expect(page.getByTestId("draft")).toHaveAttribute("data-status", "open");
+  await expect(versionSelect(page)).toContainText("Draft");
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
 });
 

@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, type Locator, type Page } from "@playwright/test";
 
-import { openRouteDetail, routeAction } from "./around.ts";
+import { importIntoDraft, openRoute, publishDraft, versionSelect } from "./around.ts";
 import { formField, openEditing, openForm, saveForm } from "./authoring.ts";
 import { nodeCard, openFromCanvas, type HostKind } from "./shell.ts";
 
@@ -14,10 +14,10 @@ export const VERSION_TWO = fileURLToPath(new URL("../../../fixtures/vendor-evalu
 
 /** Publishes the vendor evaluation's version 2: its file imported as a draft, then published. */
 export async function publishVersionTwo(page: Page, host: HostKind): Promise<void> {
-  await openRouteDetail(page, host, "vendor-evaluation");
-  await page.getByTestId("route-actions").getByLabel("Import a file as a new draft").setInputFiles(VERSION_TWO);
-  await expect(page.getByTestId("draft")).toHaveAttribute("data-status", "open");
-  await routeAction(page, "Publish the draft");
+  await openRoute(page, host, "vendor-evaluation");
+  await importIntoDraft(page, VERSION_TWO);
+  await expect(versionSelect(page)).toContainText("Draft");
+  await publishDraft(page);
 }
 
 /**

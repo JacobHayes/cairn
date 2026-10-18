@@ -23,6 +23,7 @@ import type { Schema } from "@cairn/client";
 
 import { destinationIn, pathTo, proposalAddress, required, usePage, type Page } from "../address.ts";
 import type { JourneyIndexQuery } from "../data/host.ts";
+import { routePath, routeScreenOf, spotOf } from "../routes/address.ts";
 
 export type JourneyStatus = Schema<"JourneyStatus">;
 
@@ -220,10 +221,11 @@ export function journeyPath(target: JourneyTarget, screen: Screen = defaultScree
 /**
  * From `page` + `search`, the same page with node `key` open, or none when `key` is undefined; an
  * open edge closes either way. On a journey page the view stays the one shown (the address's
- * default can change with the node, the view does not). A route's draft and a proposal's review
- * (under any destination) take the node in their own path. A journey's or route's open
- * proposals have no node to close; a node opened from them opens on the journey, or in the
- * route's draft. Any other page, the deployment's open proposals among them, is unchanged.
+ * default can change with the node, the view does not). A route's draft node and a proposal's
+ * review (under any destination) take the node in their own path; a route's published version
+ * has no node to open, so closing keeps the version. A journey's or route's open proposals
+ * have no node to close; a node opened from them opens on the journey, or in the route's
+ * draft. Any other page, the deployment's open proposals among them, is unchanged.
  */
 export function nodeAddress(page: Page, search: string, key: string | undefined): string {
   const { name, params } = page;
@@ -239,14 +241,14 @@ export function nodeAddress(page: Page, search: string, key: string | undefined)
       const journey = required(params, "journey");
       return key === undefined ? `${pathTo("journeyProposals", { journey })}${query}` : journeyPath({ journey, node: key }, "graph", search);
     }
-    case "routeDraft":
-    case "routeDraftNode":
+    case "route":
+    case "routeNode": {
+      const route = required(params, "route");
+      return routePath(route, { ...spotOf(new URLSearchParams(search)), node: key }, search);
+    }
     case "routeProposals": {
       const route = required(params, "route");
-      if (key === undefined) {
-        return `${name === "routeProposals" ? pathTo("routeProposals", { route }) : pathTo("routeDraft", { route })}${query}`;
-      }
-      return `${pathTo("routeDraftNode", { route, key })}${query}`;
+      return key === undefined ? `${pathTo("routeProposals", { route })}${query}` : routePath(route, { node: key, screen: routeScreenOf(new URLSearchParams(search)) }, search);
     }
     case "journeyProposal":
     case "journeyProposalNode":
@@ -256,7 +258,7 @@ export function nodeAddress(page: Page, search: string, key: string | undefined)
     case "deploymentProposalNode":
       return `${proposalAddress(destinationIn(params), required(params, "proposal"), key)}${query}`;
     default:
-      return `${pathTo(name, params as never)}${query}`;
+      return `${pathTo(name)}${query}`;
   }
 }
 

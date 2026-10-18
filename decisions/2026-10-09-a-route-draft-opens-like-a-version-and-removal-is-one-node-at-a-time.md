@@ -21,3 +21,8 @@ two removals sharing a reference could undo each other's rewrite).
 
 What would change it: a merged cascade built in the engine (one removal naming several roots)
 would make the selection a single confirmation.
+
+Superseded in part: the first call (a draft opens at Stages or Decisions, and adding a node moves
+the ladder) is replaced by [`2026-10-18-a-route-has-a-journeys-views-and-view-state.md`](2026-10-18-a-route-has-a-journeys-views-and-view-state.md),
+under which a route opens at the journey's stock view state and a selected node is always drawn.
+Removing one node at a time stands.

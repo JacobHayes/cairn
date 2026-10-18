@@ -10,7 +10,7 @@ import { Link } from "react-router";
 import { useRetryJourney } from "../data/react.ts";
 import type { JourneySummary, RouteSummary } from "../data/reads.ts";
 import { Badge, Meter } from "../ui/kit.tsx";
-import { routeDetailPath } from "../routes/address.ts";
+import { routePath } from "../routes/address.ts";
 import { forYouOf, forYouWords, leadFact, milestoneOf, progressOf, troubleOf, troubleWords, upgradeWords, type ForYou, type Trouble } from "./figures-model.ts";
 import { journeyPath } from "./address.ts";
 import { useMineCounts, useReportMine } from "./mine.ts";
@@ -26,7 +26,7 @@ function Lineage({ summary, routes }: { summary: JourneySummary; routes: readonl
   }
   const route = routes.find((each) => each.header.id === lineage.route);
   return (
-    <Link to={routeDetailPath(lineage.route)} data-testid="row-lineage">
+    <Link to={routePath(lineage.route, { version: lineage.version })} data-testid="row-lineage">
       {route?.header.name ?? lineage.route}, version {lineage.version}
     </Link>
   );

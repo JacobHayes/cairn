@@ -28,8 +28,7 @@ const Identity = lazy(() => import("./people/Identity.tsx").then((module) => ({ 
 const ProposalScreen = lazy(() => import("./proposals/ProposalScreen.tsx").then((module) => ({ default: module.ProposalScreen })));
 const NewRoutePage = lazy(() => import("./routes/NewRoute.tsx").then((module) => ({ default: module.NewRoutePage })));
 const RouteIndex = lazy(() => import("./routes/RouteIndex.tsx").then((module) => ({ default: module.RouteIndex })));
-const RouteDetailPage = lazy(() => import("./routes/RouteDetail.tsx").then((module) => ({ default: module.RouteDetailPage })));
-const RouteCanvasPage = lazy(() => import("./screens/RouteCanvasPage.tsx").then((module) => ({ default: module.RouteCanvasPage })));
+const RoutePage = lazy(() => import("./screens/RoutePage.tsx").then((module) => ({ default: module.RoutePage })));
 
 /** The screen each address pattern shows (address.ts); a journey's or route's `/proposals` opens its page with the inspector on the Proposals tab. */
 const SCREENS: Record<AddressName, ReactElement> = {
@@ -44,11 +43,9 @@ const SCREENS: Record<AddressName, ReactElement> = {
   journeyProposalNode: <ProposalScreen />,
   routes: <RouteIndex />,
   routeNew: <NewRoutePage />,
-  route: <RouteCanvasPage />,
-  routeDraft: <RouteCanvasPage />,
-  routeDraftNode: <RouteCanvasPage />,
-  routeVersions: <RouteDetailPage />,
-  routeProposals: <RouteCanvasPage />,
+  route: <RoutePage />,
+  routeNode: <RoutePage />,
+  routeProposals: <RoutePage />,
   routeProposal: <ProposalScreen />,
   routeProposalNode: <ProposalScreen />,
   entities: <Entities />,

@@ -124,13 +124,49 @@ export interface Loaded {
   handle: DerivationHandle;
 }
 
+/** The query of a level projection: the request without its tag, as a journey's level and a route's both take it (C2). */
+export type LevelQuery = Omit<Extract<ProjectionRequest, { projection: "level" }>, "projection">;
+
 /** `crates/wasm` `RouteLevelRequest`: one canvas level of a route's graph, which has no state (C2). */
 export interface RouteLevelRequest {
   graph: Schema<"Graph">;
   deployment: Schema<"Deployment">;
   today: string;
-  shown: Schema<"NodeKind">[];
-  container?: NodeKey;
+  query: LevelQuery;
+}
+
+/** `crates/wasm` `RouteScheduleRequest`: a route's graph whose schedule (C13) is asked for. */
+export interface RouteScheduleRequest {
+  graph: Schema<"Graph">;
+  deployment: Schema<"Deployment">;
+}
+
+/** `cairn_schema::ScheduleEntry`: the earliest days a node can start and finish, from day 0 (C13). */
+export interface ScheduleEntry {
+  node: NodeKey;
+  kind: Schema<"NodeKind">;
+  start_day: number;
+  finish_day: number;
+  /** In an undecided branch: it may not happen. */
+  conditional?: boolean;
+  /** The unanswered date decisions its date rules read. */
+  waiting?: NodeKey[];
+}
+
+/** `cairn_schema::RouteSchedule`: a route read as a journey that starts on day 0 (C13). */
+export interface RouteSchedule {
+  entries: ScheduleEntry[];
+  end?: NodeKey;
+  /** The end's day is bound through an undecided branch. */
+  final_conditional?: boolean;
+  /** In scope, with no earliest day. */
+  undated?: UndatedEntry[];
+}
+
+/** `cairn_schema::UndatedEntry`: a node no bound reaches, with the unanswered date decisions it waits on (C13). */
+export interface UndatedEntry {
+  node: NodeKey;
+  waiting?: NodeKey[];
 }
 
 /** `crates/wasm` `RouteNoticesRequest`: a route's graph, whose notices (A20) are asked for. */

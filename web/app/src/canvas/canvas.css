@@ -191,14 +191,6 @@
   font-size: 14px;
 }
 
-.crumbs {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-1);
-  align-items: center;
-  font-size: 14px;
-}
-
 /* Edge hover (5.7): a chip at the pointer says what the line is. */
 .edge-hover {
   position: absolute;

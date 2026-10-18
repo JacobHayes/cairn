@@ -277,6 +277,10 @@ export class FakeDeriver implements Deriver {
     return Promise.reject(new Error("no route levels in the fake"));
   }
 
+  routeSchedule(): Promise<never> {
+    return Promise.reject(new Error("no route schedules in the fake"));
+  }
+
   routeNotices(): Promise<never> {
     return Promise.reject(new Error("no route notices in the fake"));
   }

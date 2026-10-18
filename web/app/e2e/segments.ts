@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 import { expect, type Locator, type Page } from "@playwright/test";
 
+import { publishDraft, versionSelect } from "./around.ts";
 import { importRoute, menuItem, openFromCanvas, openJourney, type HostKind } from "./shell.ts";
 
 /** The security-review segment's file (fixtures/README.md). */
@@ -13,22 +14,9 @@ export const SEGMENT_FILE = fileURLToPath(new URL("../../../fixtures/security-re
 /** Imports the segment from its file as a new segment and publishes its draft as version 1. */
 export async function publishSegment(page: Page, host: HostKind): Promise<void> {
   await importRoute(page, host, SEGMENT_FILE);
-  await expect(page.getByTestId("route-detail")).toHaveAttribute("data-kind", "segment");
+  await expect(page.getByTestId("route-kind")).toBeVisible();
+  await expect(versionSelect(page)).toContainText("Draft");
   await publishDraft(page);
-}
-
-/** From a segment's detail, opens its draft (opening one first when none is) and publishes it. */
-export async function publishDraft(page: Page): Promise<void> {
-  const edit = page.getByTestId("edit-draft");
-  await expect(edit.or(page.getByTestId("open-draft-link"))).toBeVisible();
-  if (await edit.isVisible()) {
-    await edit.click();
-  } else {
-    await page.getByTestId("open-draft-link").click();
-  }
-  await expect(page.getByTestId("route-graph")).toHaveAttribute("data-status", "draft");
-  await page.getByTestId("publish-draft").click();
-  await expect(page.getByTestId("route-graph")).not.toHaveAttribute("data-status", "draft");
 }
 
 /** The insert stepper, once open. */

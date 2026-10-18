@@ -29,7 +29,7 @@ interface LevelArgs {
 
 const LEVEL: ReadSource<LevelArgs, { level: Level; graph: Graph }> = {
   policy: PROJECTION,
-  read: async ({ deriver, graph, deployment, today }) => ({ level: await deriver.routeLevel({ graph, deployment, today, shown: KINDS }), graph }),
+  read: async ({ deriver, graph, deployment, today }) => ({ level: await deriver.routeLevel({ graph, deployment, today, query: { shown: KINDS } }), graph }),
 };
 
 /** C2: the level of `graph` with every kind shown, or why there is none; `tried` is which of the canvas's graphs this is. */
@@ -87,7 +87,6 @@ export function ProposalCanvas({ domain, graphs, marks, edges, dim, deployment, 
   const actions = useMemo<CardActions>(
     () => ({
       open: onPick,
-      drill: undefined,
       expand: undefined,
       trace: undefined,
       title: (key) => (graph?.nodes ?? []).find((node) => node.key === key)?.title ?? key,

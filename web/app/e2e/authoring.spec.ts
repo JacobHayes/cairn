@@ -5,7 +5,7 @@
 // own rules (fields, violations, removal, conditions, breakdowns) are vitest's.
 import { expect, test, type Page } from "@playwright/test";
 
-import { savedText } from "./around.ts";
+import { importIntoDraft, openRoute, publishDraft, routeMenuItem, savedText, versionSelect } from "./around.ts";
 import { addNode, addRole, formField, newRoute, nodeForm, openEditing, openForm, pickByTitle, routeName, saveForm, section, structure } from "./authoring.ts";
 import { nodeCard, open, openFromCanvas, openJourney } from "./shell.ts";
 
@@ -97,15 +97,13 @@ test("A12, A1a: a route authored by hand from an empty draft, published, exporte
   await edges.getByRole("button", { name: "Add the requirement" }).click();
   await expect(nodeCard(page, handbook).getByTestId("card-notice")).toHaveCount(0);
   await expect(nodeCard(page, accounts).getByTestId("card-notice")).toHaveCount(0);
-  await open(page, "browser", `/routes/${route}/versions`);
-  await page.getByTestId("route-actions").getByRole("button", { name: "Publish the draft" }).click();
-  const version = page.locator('[data-testid="version"][data-version="1"]');
-  await expect(version).toBeVisible();
-  const exported = await savedText(page, () => version.getByRole("button", { name: "Export" }).click());
+  await openRoute(page, "browser", route);
+  await publishDraft(page);
+  const exported = await savedText(page, () => routeMenuItem(page, "menu-export"));
   expect(exported).toContain(`route: ${route}`);
-  await page.getByTestId("route-actions").getByLabel("Import a file as a new draft").setInputFiles({ name: `${route}.yaml`, mimeType: "text/yaml", buffer: Buffer.from(exported) });
-  await expect(page.getByTestId("draft")).toHaveAttribute("data-status", "open");
-  const reimported = await savedText(page, () => page.getByTestId("route-actions").getByRole("button", { name: "Export the draft" }).click());
+  await importIntoDraft(page, { name: `${route}.yaml`, mimeType: "text/yaml", buffer: Buffer.from(exported) });
+  await expect(versionSelect(page)).toContainText("Draft");
+  const reimported = await savedText(page, () => routeMenuItem(page, "menu-export"));
   expect(reimported).toBe(exported);
 });
 

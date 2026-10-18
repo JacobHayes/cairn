@@ -45,8 +45,8 @@ describe("the index row's upgrade mark", () => {
     expect(upgradeWords(base)).toBeUndefined();
   });
 
-  it("links the journey's lineage to its route, and says a journey that came from none started empty", () => {
-    expect(row(base)).toContain('href="/routes/r/versions"');
+  it("links the journey's lineage to the route at its version, and says a journey that came from none started empty", () => {
+    expect(row(base)).toContain('href="/routes/r?version=2"');
     expect(row({ ...base, lineage: null })).not.toContain('data-testid="row-lineage"');
     expect(row({ ...base, lineage: null })).toContain("row-lineage-none");
   });

@@ -9,11 +9,14 @@
 // so the unit tests check it without a page.
 //
 // Cost: O(nodes + selected dependencies) per timeline.
+import type { RouteSchedule, ScheduleEntry } from "@cairn/wasm";
+
+import { childrenOf, nodesByPath, titleIn, type Tree } from "../authoring/graph.ts";
 import { nodeOf, recordOf, type GraphNode, type NodeKind, type Ready } from "../detail/model.ts";
 import { ancestorsOf, planOrder, rollups, treeOf } from "../plan/tree.ts";
 import { daysWords, dueWords, daysUntil } from "../status/when.ts";
 import type { DisplayState } from "../status/words.ts";
-import { dateWords, type DateOrigin, type Timeline, type TimelineEntry } from "./model.ts";
+import { dateWords, dayOf, dayWords, type DateOrigin, type Timeline, type TimelineEntry } from "./model.ts";
 
 /** How a row is drawn. */
 export type Shape = "span" | "bar" | "tick" | "decision" | "milestone";
@@ -25,9 +28,9 @@ export interface ChartRow {
   depth: number;
   state: DisplayState;
   shape: Shape;
-  /** The extent on the axis: the same date for a point. */
-  from: string;
-  to: string;
+  /** The extent on the axis, in days: the same day for a point. */
+  from: number;
+  to: number;
   /** A milestone's date and where it comes from. */
   origin: DateOrigin | undefined;
   /** Its date in plain words: "Due in 3 days", "3 days late", "Pinned Oct 30". */
@@ -42,8 +45,8 @@ export interface ChartRow {
   /** It has rows of its own beneath it that can be opened or folded. */
   foldable: boolean;
   open: boolean;
-  /** The selected row's float: earliest to latest start. */
-  float: { from: string; to: string } | undefined;
+  /** The selected row's float, in days: earliest to latest start. */
+  float: { from: number; to: number } | undefined;
   /** Faded: the selection's trace does not reach it, or a highlight does not light it. */
   faded: boolean;
 }
@@ -59,9 +62,11 @@ export interface Chart {
   rows: ChartRow[];
   /** In-scope nodes with no date, not finished, and the selected node when no row stands for it: the folded list. */
   undated: string[];
+  /** What a node in the folded list says about why it has no day (a route's rule waiting on a decision). */
+  undatedWords?: ReadonlyMap<string, string>;
   dependencies: Dependency[];
-  /** Every date the rows and the selected row's float lie on, for the axis. */
-  dates: string[];
+  /** Every day the rows and the selected row's float lie on, for the axis. */
+  days: number[];
 }
 
 interface Extent {
@@ -224,8 +229,8 @@ function rowsOf(view: Ready, dated: Dated, options: ChartOptions): ChartRow[] {
       depth,
       state: derived.display_state,
       shape: own?.shape ?? "span",
-      from: own?.from ?? span.from,
-      to: own?.to ?? span.to,
+      from: dayOf(own?.from ?? span.from),
+      to: dayOf(own?.to ?? span.to),
       origin: own?.origin,
       words: [wordsOf(view, node, own, progress, late), shortfallDays === undefined ? "" : `${daysWords(shortfallDays)} short`].filter(Boolean).join(", "),
       late,
@@ -292,7 +297,7 @@ function selectionOf(view: Ready, rows: ChartRow[], selected: string): { row: st
   const dates = view.derived.nodes[selected]?.dates;
   const own = rows.find((each) => each.key === row);
   if (own !== undefined && row === selected && dates?.earliest_start != null && dates.latest_start != null && dates.earliest_start.date < dates.latest_start.date) {
-    own.float = { from: dates.earliest_start.date, to: dates.latest_start.date };
+    own.float = { from: dayOf(dates.earliest_start.date), to: dayOf(dates.latest_start.date) };
   }
   return { row, dependencies };
 }
@@ -326,6 +331,124 @@ export function chartOf(view: Ready, timeline: Timeline, options: ChartOptions):
     rows,
     undated,
     dependencies,
-    dates: rows.flatMap((row) => [row.from, row.to, ...(row.float === undefined ? [] : [row.float.from, row.float.to])]),
+    days: rows.flatMap((row) => [row.from, row.to, ...(row.float === undefined ? [] : [row.float.from, row.float.to])]),
   };
+}
+
+/** The days a node and what lies beneath it reach: from the earliest start to the latest finish. */
+interface Reach {
+  from: number;
+  to: number;
+}
+
+const reachUnion = (left: Reach | undefined, right: Reach | undefined): Reach | undefined =>
+  left === undefined ? right : right === undefined ? left : { from: Math.min(left.from, right.from), to: Math.max(left.to, right.to) };
+
+/** A route row's days in words: "Day 7" for a point, "Days 3 to 7" for a stretch. */
+function routeWords(reach: Reach): string {
+  return reach.from === reach.to ? dayWords(reach.from) : `Days ${String(reach.from)} to ${String(reach.to)}`;
+}
+
+/** The days each node of a route spans: its own earliest start and finish, or for a container the span of what it holds. */
+function reachesOf(tree: Tree, entries: ReadonlyMap<string, ScheduleEntry>): (key: string) => Reach | undefined {
+  const reaches = new Map<string, Reach | undefined>();
+  const reachOf = (key: string): Reach | undefined => {
+    if (!reaches.has(key)) {
+      const kids = childrenOf(tree, key);
+      const entry = entries.get(key);
+      const own = entry === undefined ? undefined : { from: entry.start_day, to: entry.finish_day };
+      // A stage is its children's span; a deliverable or action with children also has its own work, after theirs (PRD, Containment), so its own days count too.
+      const beneath = kids.reduce<Reach | undefined>((all, kid) => reachUnion(all, reachOf(kid.key)), undefined);
+      const stage = tree.byKey.get(key)?.kind === "group";
+      reaches.set(key, kids.length > 0 && beneath !== undefined ? (stage ? beneath : reachUnion(beneath, own)) : own);
+    }
+    return reaches.get(key);
+  };
+  return reachOf;
+}
+
+/** One row of a route's chart: `key` at `depth`, spanning `reach`, with `kids` drawn under it when it is `open`. */
+function routeRowOf(tree: Tree, schedule: RouteSchedule, options: ChartOptions, at: { key: string; depth: number; reach: Reach; entry: ScheduleEntry | undefined; kids: number; open: boolean }): ChartRow {
+  const { key, depth, reach, entry } = at;
+  const node = tree.byKey.get(key);
+  const shape: Shape = childrenOf(tree, key).length > 0 ? "span" : node?.kind === "milestone" ? "milestone" : node?.kind === "decision" ? "decision" : reach.from < reach.to ? "bar" : "tick";
+  const waiting = (entry?.waiting ?? []).map((decision) => titleIn(tree, decision));
+  return {
+    key,
+    title: node?.title ?? key,
+    kind: node?.kind ?? "action",
+    depth,
+    state: entry?.conditional === true ? "conditional" : "ready",
+    shape,
+    from: reach.from,
+    to: reach.to,
+    origin: undefined,
+    words: [routeWords(reach), waiting.length === 0 ? "" : `waits on ${waiting.join(", ")}`].filter(Boolean).join(", "),
+    late: 0,
+    shortfallDays: undefined,
+    end: key === schedule.end,
+    progress: undefined,
+    foldable: at.kids > 0,
+    open: at.open,
+    float: undefined,
+    faded: options.faded(key),
+  };
+}
+
+/**
+ * C13: a route's chart: the nodes the level draws, each at the earliest days the schedule gives it
+ * (from the journey's start, day 0), under the drawn node it is drawn under, folded as `open`
+ * says. A container is one span over what lies beneath it, siblings go by their earliest start
+ * (the bars are the before and after order) and then by the graph's own order, and a node
+ * inside an undecided branch is drawn conditional. A row whose date rule waits on a date decision
+ * nothing answers says so, since its day is the earliest the rules allow. Drawn nodes with no
+ * earliest day gather in the folded list. Pure, so the unit tests check it without a page.
+ *
+ * Cost: O(nodes log nodes) per route.
+ */
+export function routeChartOf(tree: Tree, schedule: RouteSchedule, options: ChartOptions): Chart {
+  const entries = new Map(schedule.entries.map((entry) => [entry.node, entry]));
+  const order = new Map(nodesByPath(tree).map((node, at) => [node.key, at]));
+  const place = (key: string) => order.get(key) ?? Number.MAX_SAFE_INTEGER;
+  const reachOf = reachesOf(tree, entries);
+  const parents = new Map(options.drawn.map((node) => [node.key, node.parent ?? undefined]));
+  const dated = (key: string) => reachOf(key) !== undefined;
+  const above = (key: string): string | undefined => {
+    let at = parents.get(key);
+    while (at !== undefined && !dated(at)) {
+      at = parents.get(at);
+    }
+    return at;
+  };
+  const children = new Map<string | undefined, string[]>();
+  for (const { key } of options.drawn) {
+    if (dated(key)) {
+      const parent = above(key);
+      children.set(parent, [...(children.get(parent) ?? []), key]);
+    }
+  }
+  for (const kids of children.values()) {
+    kids.sort((left, right) => (reachOf(left)?.from ?? 0) - (reachOf(right)?.from ?? 0) || (reachOf(left)?.to ?? 0) - (reachOf(right)?.to ?? 0) || place(left) - place(right));
+  }
+  const rows: ChartRow[] = [];
+  const visit = (key: string, depth: number) => {
+    const reach = reachOf(key);
+    if (!tree.byKey.has(key) || reach === undefined) {
+      return;
+    }
+    const kids = children.get(key) ?? [];
+    const open = kids.length > 0 && options.open(key);
+    rows.push(routeRowOf(tree, schedule, options, { key, depth, reach, entry: entries.get(key), kids: kids.length, open }));
+    if (open) {
+      kids.forEach((child) => { visit(child, depth + 1); });
+    }
+  };
+  (children.get(undefined) ?? []).forEach((root) => { visit(root, 0); });
+  const drawn = new Set(options.drawn.map((node) => node.key));
+  const gaps = (schedule.undated ?? []).filter((gap) => drawn.has(gap.node));
+  const undated = gaps.map((gap) => gap.node);
+  const undatedWords = new Map(gaps.filter((gap) => (gap.waiting ?? []).length > 0).map((gap) => [gap.node, `waits on ${(gap.waiting ?? []).map((decision) => titleIn(tree, decision)).join(", ")}`] as const));
+  // A selected node the chart has no row for is listed whatever it has: it is there to be seen (C7).
+  const lost = options.selected !== undefined && !rows.some((row) => row.key === options.selected) && !undated.includes(options.selected) && tree.byKey.has(options.selected);
+  return { rows, undated: lost && options.selected !== undefined ? [...undated, options.selected] : undated, undatedWords, dependencies: [], days: rows.flatMap((row) => [row.from, row.to]) };
 }

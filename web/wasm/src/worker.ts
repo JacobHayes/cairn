@@ -115,6 +115,8 @@ async function answer(request: WorkerRequest): Promise<string> {
       return ready().routeLevelText(request.request);
     case "route_notices":
       return ready().routeNoticesText(request.request);
+    case "route_schedule":
+      return ready().routeScheduleText(request.request);
     case "apply_route":
       return ready().applyRouteText(request.request);
     case "memory":

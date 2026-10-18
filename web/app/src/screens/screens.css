@@ -279,16 +279,24 @@
   flex-wrap: nowrap;
 }
 
+/* One line, so choosing a wider view picker never makes the header taller; the full name is the title's tooltip. */
 .route-header h1 {
-  flex: 1 1 12rem;
+  flex: 0 1 auto;
   min-width: 0;
-  overflow-wrap: break-word;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* On a phone the chip and the buttons drop under the title rather than squeezing it to a letter a line. */
 @media (max-width: 719px) {
   .route-header > .row {
     flex-wrap: wrap;
+  }
+
+  .route-header h1 {
+    white-space: normal;
+    overflow-wrap: break-word;
   }
 }
 
@@ -321,6 +329,21 @@
 .route-list-row[aria-current="true"] {
   background: var(--color-tint);
   box-shadow: inset 2px 0 0 var(--color-accent);
+}
+
+.route-list-row[data-faded="true"] > :not(.route-list-fold) {
+  opacity: 0.3;
+}
+
+.route-list-fold {
+  flex: none;
+  width: var(--space-4);
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  text-align: center;
+  text-decoration: none;
 }
 
 .route-list-row .node-kind {
@@ -364,5 +387,29 @@ button.route-list-title {
     height: auto;
     overflow: visible;
     padding: 0;
+  }
+}
+
+/* The route header's version selector: each item says the version on the left and when it was published, with its journeys, on the right, on one line. */
+.version-select .dropdown-popover {
+  min-width: 20rem;
+}
+
+.version-select .menu-item small {
+  font-size: 13px;
+}
+
+.version-select .menu-item {
+  display: flex;
+  gap: var(--space-4);
+  align-items: baseline;
+  justify-content: space-between;
+  white-space: nowrap;
+}
+
+/* On a phone the draft's "(from version 1)" is the menu's to say, so the header's controls stay on one line. */
+@media (max-width: 719px) {
+  .version-select > .dropdown-button .version-from {
+    display: none;
   }
 }

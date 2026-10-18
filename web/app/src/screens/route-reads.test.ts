@@ -3,18 +3,19 @@
 // holds, and what makes the level of a shown graph the same read or another.
 import { describe, expect, it } from "vitest";
 
-import type { Deployment, Route, RouteVersion } from "../data/host.ts";
+import type { Deployment, Deriver, Route, RouteVersion } from "../data/host.ts";
 import { sameKey, type ReadAt } from "../data/keyed-read.ts";
-import { DEFAULT_VIEW } from "../canvas/settings.ts";
+import { levelQueryOf, levelRequestOf } from "../journeys/requests.ts";
+import { DEFAULT_VIEW_STATE } from "../journeys/view.ts";
 import { FakeDeriver, FakeHost } from "../data/fake.test-support.ts";
-import { ROUTE_GRAPH, routeGraphKey, routeLevelKey, type RouteFound, type Shown } from "./route-reads.ts";
+import { ROUTE_GRAPH, ROUTE_LEVEL, ROUTE_SCHEDULE, routeGraphKey, routeLevelKey, routeScheduleKey, type RouteFound, type Shown } from "./route-reads.ts";
 
 const graph = { nodes: [] };
 const header = { id: "r_a", name: "A route", kind: "process" as const };
 const version = (number: number): RouteVersion => ({ route: "r_a", version: number, published_at: "2026-10-01T00:00:00Z", graph });
 const routeOf = (parts: Partial<Route>): Route => ({ header, revision: 3, ...parts });
 
-const at = (): ReadAt<RouteFound> => ({ held: undefined, signal: new AbortController().signal, compatible: () => true });
+const at = <T>(): ReadAt<T> => ({ held: undefined, signal: new AbortController().signal, compatible: () => true });
 
 async function found(route: Route, versions: RouteVersion[], wanted?: number): Promise<RouteFound> {
   const host = new FakeHost();
@@ -67,16 +68,18 @@ describe("the route graph read", () => {
 describe("the level of a shown graph", () => {
   const deployment: Deployment = { revision: 4 };
   const shown: Shown = { route: routeOf({}), graph, of: "draft" };
-  const key = (parts: { shown?: Shown; container?: string; step?: "decisions" | "stages"; deployment?: Deployment | undefined; today?: string }) =>
-    routeLevelKey(new FakeDeriver(), parts.shown ?? shown, { ...DEFAULT_VIEW, container: parts.container }, parts.step ?? "decisions", "deployment" in parts ? parts.deployment : deployment, parts.today ?? "2026-10-16");
+  const request = (step: "decisions" | "stages" | "actions", text = "") => levelRequestOf({ ...DEFAULT_VIEW_STATE, text }, step, []);
+  const key = (parts: { shown?: Shown; step?: "decisions" | "stages" | "actions"; text?: string; deployment?: Deployment | undefined; today?: string }) =>
+    routeLevelKey(new FakeDeriver(), parts.shown ?? shown, request(parts.step ?? "decisions", parts.text), "deployment" in parts ? parts.deployment : deployment, parts.today ?? "2026-10-16");
 
-  it("has nothing to read before the deployment is held", () => {
+  it("has nothing to read before the deployment is held, or without a request", () => {
     expect(key({ deployment: undefined })).toBeUndefined();
+    expect(routeLevelKey(new FakeDeriver(), shown, undefined, deployment, "2026-10-16")).toBeUndefined();
   });
 
-  it("is another read for another view of the same graph, laid out afresh", () => {
-    expect(key({ container: "n_a" })?.identity).not.toEqual(key({})?.identity);
+  it("is another read for another request of the same graph, laid out afresh", () => {
     expect(key({ step: "stages" })?.identity).not.toEqual(key({})?.identity);
+    expect(key({ text: "ship" })?.identity).not.toEqual(key({})?.identity);
   });
 
   it("is read again, keeping what it shows, when the graph, the deployment or the day moves", () => {
@@ -90,8 +93,49 @@ describe("the level of a shown graph", () => {
     expect(sameKey(key({})?.freshness, base?.freshness)).toBe(true);
   });
 
-  it("is another read for the same view of another route's graph", () => {
+  it("is another read for the same request of another route's graph", () => {
     const other: Shown = { ...shown, route: routeOf({ header: { ...header, id: "r_b" } }) };
     expect(key({ shown: other })?.identity).not.toEqual(key({})?.identity);
+  });
+
+  it("is derived from the graph and the day with the request's query, whole and without its tag", async () => {
+    const asked: unknown[] = [];
+    const answer = { nodes: [], edges: [], shown: [] };
+    const deriver = { routeLevel: (derive: unknown) => { asked.push(derive); return Promise.resolve(answer); } } as unknown as Deriver;
+    const args = routeLevelKey(deriver, shown, request("stages", "ship"), deployment, "2026-10-16")?.args;
+    if (args === undefined) {
+      throw new Error("no key");
+    }
+    expect(await ROUTE_LEVEL.read(args, at())).toBe(answer);
+    const query = levelQueryOf(request("stages", "ship"));
+    expect(asked).toEqual([{ graph, deployment, today: "2026-10-16", query }]);
+    expect(query).not.toHaveProperty("projection");
+    expect(query).toMatchObject({ text: "ship", top: ["group", "milestone"] });
+  });
+});
+
+describe("the schedule of a shown graph", () => {
+  const deployment: Deployment = { revision: 4 };
+  const shown: Shown = { route: routeOf({}), graph, of: 2 };
+
+  it("is keyed by the route and what it shows, and read again when the graph or the deployment moves", () => {
+    const base = routeScheduleKey(new FakeDeriver(), shown, deployment);
+    expect(base?.identity).toEqual(["r_a", 2]);
+    expect(routeScheduleKey(new FakeDeriver(), { ...shown, of: 1 }, deployment)?.identity).not.toEqual(base?.identity);
+    expect(sameKey(routeScheduleKey(new FakeDeriver(), { ...shown, graph: { nodes: [] } }, deployment)?.freshness, base?.freshness)).toBe(false);
+    expect(sameKey(routeScheduleKey(new FakeDeriver(), shown, { revision: 5 })?.freshness, base?.freshness)).toBe(false);
+    expect(routeScheduleKey(new FakeDeriver(), shown, undefined)).toBeUndefined();
+  });
+
+  it("asks the deriver for the shown graph's schedule", async () => {
+    const asked: unknown[] = [];
+    const schedule = { entries: [] };
+    const deriver = { routeSchedule: (derive: unknown) => { asked.push(derive); return Promise.resolve(schedule); } } as unknown as Deriver;
+    const args = routeScheduleKey(deriver, shown, deployment)?.args;
+    if (args === undefined) {
+      throw new Error("no key");
+    }
+    expect(await ROUTE_SCHEDULE.read(args, at())).toBe(schedule);
+    expect(asked).toEqual([{ graph, deployment }]);
   });
 });

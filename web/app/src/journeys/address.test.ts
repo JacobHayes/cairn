@@ -135,9 +135,13 @@ describe("opening and closing a node keeps the view", () => {
     expect(nodeAddress(at, search, key)).toBe(expected);
   });
 
-  it("takes a node off a route's draft or a proposal under any destination and adds one", () => {
-    expect(nodeAddress(page("routeDraft", { route: "r" }), "?edit=on", "n_x")).toBe("/routes/r/draft/nodes/n_x?edit=on");
-    expect(nodeAddress(page("routeDraftNode", { route: "r", key: "n_x" }), "", undefined)).toBe("/routes/r/draft");
+  it("opens and closes a node of a route's draft, keeping its view, and opens none on a version", () => {
+    expect(nodeAddress(page("route", { route: "r" }), "?view=list&depth=stages", "n_x")).toBe("/routes/r/nodes/n_x?view=list&depth=stages");
+    expect(nodeAddress(page("routeNode", { route: "r", key: "n_x" }), "?view=timeline&q=a", undefined)).toBe("/routes/r?view=timeline&q=a");
+    expect(nodeAddress(page("route", { route: "r" }), "?version=2&view=list", "n_x")).toBe("/routes/r?version=2&view=list");
+  });
+
+  it("takes a node off a proposal under any destination and adds one", () => {
     expect(nodeAddress(page("journeyProposalNode", { ...J, proposal: "p_1", key: "n_x" }), "", "n_y")).toBe("/journeys/j_a/proposals/p_1/nodes/n_y");
     expect(nodeAddress(page("routeProposal", { route: "r", proposal: "p_1" }), "?view=list", "n_y")).toBe("/routes/r/proposals/p_1/nodes/n_y?view=list");
     expect(nodeAddress(page("deploymentProposalNode", { proposal: "p_1", key: "n_x" }), "", undefined)).toBe("/entities/proposals/p_1");
@@ -145,7 +149,7 @@ describe("opening and closing a node keeps the view", () => {
 
   it.each([
     ["a journey's opens it on the journey", page("journeyProposals", J), "n_x", "/journeys/j_a/nodes/n_x"],
-    ["a route's opens it in the route's draft", page("routeProposals", { route: "r" }), "n_x", "/routes/r/draft/nodes/n_x"],
+    ["a route's opens it in the route's draft", page("routeProposals", { route: "r" }), "n_x", "/routes/r/nodes/n_x"],
     ["a journey's has none to close", page("journeyProposals", J), undefined, "/journeys/j_a/proposals"],
     ["a route's has none to close", page("routeProposals", { route: "r" }), undefined, "/routes/r/proposals"],
     ["the deployment's has no nodes", page("deploymentProposals"), "n_x", "/entities/proposals"],

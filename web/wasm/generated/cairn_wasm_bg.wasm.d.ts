@@ -47,6 +47,7 @@ export const rootsubscription_take: (a: number, b: number, c: number) => void;
 export const routeFileText: (a: number, b: number, c: number) => void;
 export const routeLevel: (a: number, b: number, c: number) => void;
 export const routeNotices: (a: number, b: number, c: number) => void;
+export const routeSchedule: (a: number, b: number, c: number) => void;
 export const start: () => void;
 export const touched: (a: number, b: number, c: number) => void;
 export const touchedOverlaps: (a: number, b: number, c: number, d: number, e: number) => void;

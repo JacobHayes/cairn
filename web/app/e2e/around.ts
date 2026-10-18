@@ -53,24 +53,46 @@ export async function setStatus(page: Page, to: "active" | "completed" | "archiv
   }
 }
 
-/** Route `route`'s detail, once read. */
-export async function openRouteDetail(page: Page, host: HostKind, route: string): Promise<Locator> {
-  await open(page, host, `/routes/${route}/versions`);
-  const detail = page.getByTestId("route-detail");
-  await expect(detail).toBeVisible();
-  return detail;
+/** Route `route`'s page, once read: its header is up. */
+export async function openRoute(page: Page, host: HostKind, route: string, search = ""): Promise<void> {
+  await open(page, host, `/routes/${route}${search}`);
+  await expect(page.getByTestId("route-header")).toBeVisible();
 }
 
-/** The route's revision as its detail shows it. */
-export async function routeRevision(page: Page): Promise<number> {
-  return Number(await page.getByTestId("route-revision").getAttribute("data-revision"));
+/** The version selector in a route's header: it says which version the views show. */
+export function versionSelect(page: Page): Locator {
+  return page.getByTestId("version-select");
 }
 
-/** Presses a route action on its detail and waits for the route to move past the revision shown. */
-export async function routeAction(page: Page, name: string | RegExp): Promise<void> {
-  const before = await routeRevision(page);
-  await page.getByTestId("route-actions").getByRole("button", { name }).click();
-  await expect.poll(() => routeRevision(page)).toBeGreaterThan(before);
+/** Chooses `item` (a test id) in the route header's `⋯`. */
+export async function routeMenuItem(page: Page, item: string): Promise<void> {
+  await openRouteMenu(page);
+  await page.getByTestId(item).click();
+}
+
+/** Opens the header's `⋯` unless it is open. */
+export async function openRouteMenu(page: Page): Promise<void> {
+  if ((await page.getByTestId("route-menu-menu").count()) === 0) {
+    await page.getByTestId("route-menu").click();
+  }
+}
+
+/** Imports `file` as a new draft of its route from the header's `⋯`; the menu stays open until the import has landed. */
+export async function importIntoDraft(page: Page, file: string | { name: string; mimeType: string; buffer: Buffer }): Promise<void> {
+  await openRouteMenu(page);
+  await page.getByTestId("route-menu-menu").getByLabel("Import a file into the draft").setInputFiles(file);
+}
+
+/** Publishes the open draft from the header and waits for the page to show the version it made. */
+export async function publishDraft(page: Page): Promise<void> {
+  await page.getByTestId("publish-draft").click();
+  await expect(versionSelect(page)).toContainText(/^Version \d+/);
+}
+
+/** Picks `item` (`draft` or a version number) in the version selector. */
+export async function pickVersion(page: Page, item: "draft" | number): Promise<void> {
+  await versionSelect(page).click();
+  await page.getByTestId(`version-${String(item)}`).click();
 }
 
 /** The text of the file a click saves. */

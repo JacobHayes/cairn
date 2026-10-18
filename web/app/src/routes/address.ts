@@ -1,9 +1,19 @@
 // The addresses of the route screens (C17): the routes index, `/routes`, which lists routes and
 // segments (`?type=routes|segments` keeps it to one), the new-route form, `/routes/new`, and a
-// route's detail. A route's canvas keeps its own address (screens/RouteCanvasPage.tsx). The
-// patterns are address.ts's.
+// route's page. A route is one page (screens/RoutePage.tsx) whose address says which version its
+// views show and which view is open:
+//
+//   /routes/<id>                      the route as it stands: its draft when one is open, else its latest version
+//   /routes/<id>?version=<n>          published version n
+//   /routes/<id>/nodes/<key>          a node of the draft, open in its form
+//   /routes/<id>?view=list|timeline   the view (the Graph when none; written only off the default)
+//
+// `version` absent names "the route as it currently stands" and follows it as drafts open and
+// versions publish; a version a link names is always written, the latest included, because a
+// version never changes and its link must keep meaning it. Beside them the view state every view
+// shares (journeys/view.ts) and the graph's own settings ride in the query. The patterns are address.ts's.
 import { pathTo } from "../address.ts";
-import { paramsOf, searchOf, type CanvasView } from "../canvas/settings.ts";
+import type { Screen } from "../journeys/address.ts";
 
 /** What the rail links to: the routes index, every type. */
 export const ROUTES_INDEX_PATH = pathTo("routes");
@@ -19,22 +29,69 @@ export function newRoutePath(kind?: "segment"): string {
   return kind === "segment" ? `${pathTo("routeNew")}?kind=segment` : pathTo("routeNew");
 }
 
-/** C17: route `route`'s versions with the journeys on each. */
-export function routeDetailPath(route: string): string {
-  return pathTo("routeVersions", { route });
+/** The views of a route, in the order its View picker lists them and `v` cycles them. */
+export const ROUTE_SCREENS: readonly Screen[] = ["graph", "list", "timeline"];
+
+/** Where on a route's page an address points: a published version (none is the route as it stands), a draft node, and the view. */
+export interface RouteSpot {
+  version?: number | undefined;
+  node?: string | undefined;
+  screen?: Screen | undefined;
 }
 
-/** The path of a route's canvas: its draft, or `version`, keeping what the canvas shows. */
-export function routeCanvasPath(route: string, version: number | undefined, view: CanvasView): string {
-  const params = paramsOf(view);
-  if (version !== undefined) {
-    params.set("version", String(version));
+/** The version `version=` names: a whole number from 1, else none. */
+export function versionIn(params: URLSearchParams): number | undefined {
+  const text = params.get("version");
+  const number = Number(text);
+  return text !== null && Number.isInteger(number) && number >= 1 ? number : undefined;
+}
+
+/** The view `view=` names, among a route's; the Graph when it names none of them. */
+export function routeScreenOf(params: URLSearchParams): Screen {
+  const view = params.get("view");
+  return ROUTE_SCREENS.find((each) => each === view) ?? "graph";
+}
+
+/** The version and the view an address names, to carry to another place on the same route. */
+export function spotOf(params: URLSearchParams): { version: number | undefined; screen: Screen } {
+  return { version: versionIn(params), screen: routeScreenOf(params) };
+}
+
+/**
+ * Route `route`'s page at `spot`, keeping `search`'s other parameters (the view state, the
+ * graph's settings) in their order. `version` and `view` are written from `spot`, never kept
+ * from `search`: a version when one is named, the view only off the Graph. A version's nodes have
+ * no address, so a node is written only on the route as it stands (its draft).
+ */
+export function routePath(route: string, spot: RouteSpot = {}, search = ""): string {
+  const kept = new URLSearchParams(search);
+  kept.delete("version");
+  kept.delete("view");
+  const params = new URLSearchParams();
+  if (spot.version !== undefined) {
+    params.set("version", String(spot.version));
+  }
+  if (spot.screen !== undefined && spot.screen !== "graph") {
+    params.set("view", spot.screen);
+  }
+  for (const [name, value] of kept) {
+    params.append(name, value);
   }
   const query = params.toString();
-  return `${version === undefined ? pathTo("routeDraft", { route }) : pathTo("route", { route })}${query === "" ? "" : `?${query}`}`;
+  const path = spot.node === undefined || spot.version !== undefined ? pathTo("route", { route }) : pathTo("routeNode", { route, key: spot.node });
+  return `${path}${query === "" ? "" : `?${query}`}`;
 }
 
-/** A draft node's form in the inspector beside the route's canvas, keeping what the canvas shows. */
-export function routeNodePath(route: string, view: CanvasView, node: string): string {
-  return `${pathTo("routeDraftNode", { route, key: node })}${searchOf(view)}`;
+/**
+ * View `to` from the route page at `search`: the whole query but `map` (the phone's full-screen
+ * map is a moment of the graph), so every view's own settings stay for the way back, and the
+ * version and the node stay.
+ */
+export function routeSwitched(route: string, search: string, to: Screen, node: string | undefined): string {
+  const params = new URLSearchParams(search);
+  const { version, screen } = spotOf(params);
+  if (screen !== to) {
+    params.delete("map");
+  }
+  return routePath(route, { version, node, screen: to }, params.toString());
 }

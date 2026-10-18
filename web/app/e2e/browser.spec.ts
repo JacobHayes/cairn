@@ -9,10 +9,10 @@
 import { expect, test } from "@playwright/test";
 
 import { newRoute, routeName } from "./authoring.ts";
-import { savedText } from "./around.ts";
+import { openRoute, routeMenuItem, savedText } from "./around.ts";
 import { TOAST_MS } from "../src/data/toasts.ts";
 import { SYNC_POPOVER_LEAVE_MS } from "../src/shell/sync-popover.ts";
-import { derivedRevision, expectAddress, fresh, goTo, goWithin, open, openJourney, recentSaves, rename, syncChip, visit } from "./shell.ts";
+import { derivedRevision, expectAddress, fresh, goTo, goWithin, openJourney, recentSaves, rename, syncChip, visit } from "./shell.ts";
 
 // Every error event the window sees, including the browser's own reports (a ResizeObserver
 // loop) that never reach Playwright's pageerror.
@@ -176,13 +176,12 @@ test("the sync dot says OFFLINE while the browser is offline, and the state it h
 
 test("a toast stays while the pointer is on it, the next one replaces it, and it goes after the pointer leaves", async ({ page }) => {
   const route = await newRoute(page, "browser", routeName("Toasting"));
-  await open(page, "browser", `/routes/${route}/versions`);
+  await openRoute(page, "browser", route);
   // The toast's time is a timer the test runs, so a slow machine cannot let it lapse before the pointer is on it.
   await page.clock.install();
   await page.clock.pauseAt(new Date(Date.now() + 60_000));
-  const exportDraft = page.getByTestId("route-actions").getByRole("button", { name: "Export the draft" });
   const toast = page.getByTestId("toast");
-  await savedText(page, () => exportDraft.click());
+  await savedText(page, () => routeMenuItem(page, "menu-export"));
   await expect(toast).toHaveText("Route file exported");
   // Whether the pointer is on the toast, as the browser has it: the time a pointer move has been taken in, since the toast's hold follows the browser's enter and leave.
   const pointerOn = (on: boolean) => expect.poll(() => toast.evaluate((element) => element.matches(":hover"))).toBe(on);
@@ -193,7 +192,8 @@ test("a toast stays while the pointer is on it, the next one replaces it, and it
   await expect(toast).toBeVisible();
   // The next toast, raised from the keyboard with the pointer still on the toast, replaces it (a new element) and is held too.
   const first = await toast.elementHandle();
-  await exportDraft.focus();
+  await page.getByTestId("route-menu").focus();
+  await page.keyboard.press("Enter");
   await savedText(page, () => page.keyboard.press("Enter"));
   await expect.poll(() => first.evaluate((element) => element.isConnected)).toBe(false);
   await expect(toast).toHaveCount(1);

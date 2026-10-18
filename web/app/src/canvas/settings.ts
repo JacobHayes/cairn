@@ -1,131 +1,26 @@
 // What a canvas shows lives in its address, so a view is shareable, survives a reload, and
-// follows the back button. A journey's graph reads the journey's view state (journeys/view.ts:
-// the step, the highlights, the Filter and the search, shared with every view) and its own
-// settings: the containers the viewer expanded and collapsed since picking the step (`open=`,
-// `shut=`, C4), the Signals lens (`lens=`, C6), whether its structure is being edited (5.6), and on
-// a phone whether the full-screen map is open. A route's canvas, which has no journey state,
-// keeps the same own settings beside its step (`depth=`) and names the container it drilled
-// into by `in=`; the parameters it does not own ride along untouched. Every setting at its
-// default leaves the address bare.
-import { DEFAULT_SETTINGS, LENSES, STEPS, type CanvasSettings, type Lens, type Step } from "./model.ts";
+// follows the back button. A graph, a journey's or a route's, reads the page's view state
+// (journeys/view.ts: the depth, the Filter and the search, shared with every view) and its own
+// settings: the containers the viewer expanded and collapsed since picking the depth (`open=`,
+// `shut=`, C4), the Signals lens (`lens=`, C6), whether its structure is being edited (5.6), and
+// on a phone whether the full-screen map is open. Every setting at its default leaves the
+// address bare.
+import { LENSES, type Lens } from "./model.ts";
 import { journeyPath } from "../journeys/address.ts";
-import { DEFAULT_VIEW_STATE, VIEW_PARAMS, viewStateFrom, viewStateParams, type ViewState } from "../journeys/view.ts";
+import { DEFAULT_VIEW_STATE, JOURNEY_OFFERS, VIEW_PARAMS, viewStateFrom, viewStateParams, type ViewOffers, type ViewState } from "../journeys/view.ts";
 
-/**
- * A route canvas's settings, whether the structure is edited, and whether the full-screen map is open (below 720px, where the canvas is otherwise a preview).
- */
-export interface CanvasView extends CanvasSettings {
-  edit: boolean;
-  map: boolean;
-  /** The address's other parameters, in order, kept as they were. */
-  rest: [string, string][];
-}
-
-/** Depth's step (C2). */
-const DEPTH = "depth";
-/** The containers the viewer expanded and collapsed since picking the step (C4). */
+/** The containers the viewer expanded and collapsed since picking the depth (C4). */
 const OPEN = "open";
 const SHUT = "shut";
-/** A route's canvas: the container drilled into. */
-const IN = "in";
 const LENS = "lens";
 const EDIT = "edit";
 /** The full-screen map's address parameter (MapFrame), so Back closes it. */
 export const MAP = "map";
 
-/** The parameters a route canvas reads; every other one is left to the page. */
-const OWN = new Set([DEPTH, OPEN, SHUT, IN, LENS, EDIT, MAP]);
-
 /** The values of `name`, split on commas, empty when the parameter is there but holds none. */
 function listOf(params: URLSearchParams, name: string): string[] | undefined {
   const value = params.get(name);
   return value === null ? undefined : value.split(",").filter(Boolean);
-}
-
-/** The earlier canvas's parameters that took other names or other values: see `graphQueryFromOld`. */
-export const OLD_CANVAS_PARAMS = ["hide", "in", "notrelevant", "undecided", "heat"];
-
-/** The old canvas's parameters whose meaning changed with the ladder: a bare `trace=on` goes, selecting traces. */
-const DROPPED_PARAMS = ["trace"];
-
-/**
- * An earlier canvas query as today's: `in=` becomes the container expanded (`open=`) and `heat=on`
- * the gravity lens. `hide=`, `notrelevant=` and `undecided=` go (a route has no relevance, and its
- * step chooses the kinds drawn), as does `trace=on` (selecting traces). Every other parameter stays.
- */
-export function graphQueryFromOld(params: URLSearchParams): URLSearchParams {
-  const next = new URLSearchParams();
-  if (params.has("in")) {
-    next.set(OPEN, params.get("in") ?? "");
-  }
-  if (params.get("heat") === "on") {
-    next.set(LENS, "gravity");
-  }
-  for (const [name, value] of params) {
-    if (!OLD_CANVAS_PARAMS.includes(name) && !DROPPED_PARAMS.includes(name)) {
-      next.append(name, value);
-    }
-  }
-  return next;
-}
-
-/** A route canvas's settings in an address's query. */
-export function viewFrom(params: URLSearchParams): CanvasView {
-  const step = params.get(DEPTH);
-  return {
-    container: params.get(IN) ?? undefined,
-    step: STEPS.find((each) => each === step),
-    open: listOf(params, OPEN) ?? [],
-    shut: listOf(params, SHUT) ?? [],
-    lens: lensFrom(params),
-    edit: params.get(EDIT) === "on",
-    map: params.get(MAP) === "1",
-    rest: [...params.entries()].filter(([name]) => !OWN.has(name)),
-  };
-}
-
-/** `view` as an address's query, leaving out what is at its default. */
-export function paramsOf(view: CanvasView): URLSearchParams {
-  const params = new URLSearchParams();
-  if (view.step !== undefined) {
-    params.set(DEPTH, view.step);
-  }
-  if (view.open.length > 0) {
-    params.set(OPEN, view.open.join(","));
-  }
-  if (view.shut.length > 0) {
-    params.set(SHUT, view.shut.join(","));
-  }
-  if (view.container !== undefined) {
-    params.set(IN, view.container);
-  }
-  if (view.lens !== undefined) {
-    params.set(LENS, view.lens);
-  }
-  if (view.edit) {
-    params.set(EDIT, "on");
-  }
-  if (view.map) {
-    params.set(MAP, "1");
-  }
-  for (const [name, value] of view.rest) {
-    params.append(name, value);
-  }
-  return params;
-}
-
-/** The query `view` makes, with its leading `?`, or nothing at the defaults. */
-export function searchOf(view: CanvasView): string {
-  const text = paramsOf(view).toString();
-  return text === "" ? "" : `?${text}`;
-}
-
-/** The view a fresh route canvas opens with. */
-export const DEFAULT_VIEW: CanvasView = { ...DEFAULT_SETTINGS, edit: false, map: false, rest: [] };
-
-/** What a route canvas is laid out for besides its graph: the step and the container drilled into. Expanding a container keeps it, so the layout keeps its positions (C15). */
-export function layoutViewOf(view: Pick<CanvasSettings, "container">, step?: Step): string {
-  return JSON.stringify([step ?? null, view.container ?? null]);
 }
 
 /** The lens `lens=` names; none when it names none. */
@@ -134,7 +29,7 @@ function lensFrom(params: URLSearchParams): Lens | undefined {
   return LENSES.find((each) => each === lens);
 }
 
-/** A journey graph's own settings: the viewer's expands and collapses, the lens, edit mode and the phone's map. */
+/** A graph's own settings: the viewer's expands and collapses, the lens, edit mode and the phone's map. */
 export interface GraphSettings {
   open: string[];
   shut: string[];
@@ -159,9 +54,9 @@ export function graphSettingsFrom(params: URLSearchParams): GraphSettings {
   };
 }
 
-/** What a journey's graph shows, from an address's query. */
-export function graphViewFrom(params: URLSearchParams): GraphView {
-  return { ...graphSettingsFrom(params), state: viewStateFrom(params) };
+/** What a graph shows, from an address's query, the view state as far as its subject `offers` (a route offers less than a journey). */
+export function graphViewFrom(params: URLSearchParams, offers: ViewOffers = JOURNEY_OFFERS): GraphView {
+  return { ...graphSettingsFrom(params), state: viewStateFrom(params, offers) };
 }
 
 /** The view a journey's graph opens with: the stock view state, nothing expanded, no lens. */
@@ -189,12 +84,10 @@ function graphParamsOf(view: GraphView): URLSearchParams {
 }
 
 /**
- * A journey's graph showing `view` at `target` (a node, an edge, or neither): the view state and
- * the graph's own settings rewritten in `search`, every other parameter kept, and `view=graph`
- * written only off its default (`journeyPath`). `search` is the query of the page the link is on;
- * links from anywhere else pass none.
+ * `search` with the view state and the graph's own settings rewritten to `view`'s, every other
+ * parameter kept after them: what a link to the graph keeps of the page it is on.
  */
-export function graphPath(journey: string, view: GraphView, target: { node?: string | undefined; edge?: string | undefined }, search: string): string {
+export function graphSearch(view: GraphView, search: string): string {
   const rest = new URLSearchParams(search);
   for (const name of [...VIEW_PARAMS, OPEN, SHUT, LENS, EDIT, MAP]) {
     rest.delete(name);
@@ -203,5 +96,15 @@ export function graphPath(journey: string, view: GraphView, target: { node?: str
   for (const [name, value] of rest) {
     params.append(name, value);
   }
-  return journeyPath({ journey, ...target }, "graph", params.toString());
+  return params.toString();
+}
+
+/**
+ * A journey's graph showing `view` at `target` (a node, an edge, or neither): the view state and
+ * the graph's own settings rewritten in `search`, every other parameter kept, and `view=graph`
+ * written only off its default (`journeyPath`). `search` is the query of the page the link is on;
+ * links from anywhere else pass none.
+ */
+export function graphPath(journey: string, view: GraphView, target: { node?: string | undefined; edge?: string | undefined }, search: string): string {
+  return journeyPath({ journey, ...target }, "graph", graphSearch(view, search));
 }

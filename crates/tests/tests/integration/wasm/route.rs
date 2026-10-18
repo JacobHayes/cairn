@@ -6,26 +6,39 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{EdgeOrigin, Level, NodeKind, Rejection, Route, RouteVersion, ViolationCode};
+use cairn_schema::{
+    EdgeOrigin, Level, LevelDisplay, LevelQuery, NodeKind, Payload, Rejection, Route, RouteVersion,
+    ViolationCode,
+};
 use cairn_wasm::{
     BrowserRoot, HostError, RouteApplyRequest, RouteLevelRequest, RouteNoticesRequest,
-    apply_route_locally, route_level, route_level_of, route_notices,
+    RouteScheduleRequest, apply_route_locally, route_level, route_level_of, route_notices,
+    route_schedule, route_schedule_of,
 };
 
 fn version_one(root: &BrowserRoot) -> RouteVersion {
     serde_json::from_str(&root.route_version("vendor-evaluation", "1").unwrap()).unwrap()
 }
 
-fn level(version: &RouteVersion, shown: &[NodeKind]) -> Level {
+fn deployment() -> cairn_schema::Deployment {
+    serde_json::from_str(&BrowserRoot::seeded().unwrap().deployment().unwrap()).unwrap()
+}
+
+fn level_of(version: &RouteVersion, query: LevelQuery) -> Level {
     route_level_of(&RouteLevelRequest {
         graph: version.graph.clone(),
-        deployment: serde_json::from_str(&BrowserRoot::seeded().unwrap().deployment().unwrap())
-            .unwrap(),
+        deployment: deployment(),
         today: "2026-10-06".parse().unwrap(),
-        shown: shown.iter().copied().collect(),
-        container: None,
+        query,
     })
     .unwrap()
+}
+
+fn level(version: &RouteVersion, shown: &[NodeKind]) -> Level {
+    level_of(
+        version,
+        LevelQuery::of_kinds(shown.iter().copied().collect(), None),
+    )
 }
 
 #[test]
@@ -105,6 +118,89 @@ fn a_route_graph_lists_the_work_its_final_milestone_cannot_see() {
         .map(|notice| notice.path.to_string())
         .collect();
     assert_eq!(paths, ["purpose", "setup/workload"]);
+}
+
+/// C2, C9: a route's level takes the query a journey's does: a hidden relevance class and a
+/// text search narrow it as they narrow a journey's, so the wasm entry carries the whole query.
+#[test]
+fn a_route_level_honours_the_classes_and_the_search_of_the_query() {
+    let version = version_one(&BrowserRoot::seeded().unwrap());
+    let everything = level(&version, &NodeKind::ALL);
+    let mut query = LevelQuery::of_kinds(NodeKind::ALL.iter().copied().collect(), None);
+    query.display = BTreeSet::from([LevelDisplay::Relevant]);
+    let relevant = level_of(&version, query);
+    assert!(relevant.nodes.len() < everything.nodes.len());
+    assert!(
+        relevant
+            .hidden_by_class
+            .get(&LevelDisplay::Conditional)
+            .copied()
+            .unwrap_or(0)
+            > 0
+    );
+    let title = everything.nodes[0].key.clone();
+    let word = version.graph.nodes.get(&title).unwrap().title.to_string();
+    let mut query = LevelQuery::of_kinds(NodeKind::ALL.iter().copied().collect(), None);
+    query.text = Some(word.parse().unwrap());
+    let found = level_of(&version, query);
+    assert!(found.nodes.iter().any(|node| node.key == title));
+    assert!(found.nodes.len() < everything.nodes.len());
+}
+
+/// C13: the product launch's schedule from day 0: the feature work starts the build and runs
+/// its estimate, hardening starts where it ends, and the code freeze that closes the build is
+/// no earlier than hardening's end. The estimates are read off the fixture, not typed in.
+#[test]
+fn a_route_schedule_places_the_work_in_days_from_the_start() {
+    let root = BrowserRoot::seeded().unwrap();
+    let launch: RouteVersion =
+        serde_json::from_str(&root.route_version("product-launch", "1").unwrap()).unwrap();
+    let request = RouteScheduleRequest {
+        graph: launch.graph.clone(),
+        deployment: deployment(),
+    };
+    let asked = serde_json::to_string(&request).unwrap();
+    let schedule: cairn_schema::RouteSchedule =
+        serde_json::from_str(&route_schedule(&asked).unwrap()).unwrap();
+    assert_eq!(schedule, route_schedule_of(&request).unwrap());
+    let estimate = |node: &str| {
+        let payload = &launch
+            .graph
+            .nodes
+            .get(&node.parse().unwrap())
+            .unwrap()
+            .payload;
+        let days = match payload {
+            Payload::Deliverable(deliverable) => deliverable.estimate,
+            Payload::Action(action) => action.estimate,
+            other => panic!("{node} is not work: {other:?}"),
+        };
+        i32::try_from(days.unwrap().get()).unwrap()
+    };
+    let days = |node: &str| {
+        let entry = schedule
+            .entries
+            .iter()
+            .find(|entry| entry.node.as_str() == node)
+            .unwrap_or_else(|| panic!("{node} has an earliest day"));
+        (entry.start_day, entry.finish_day)
+    };
+    assert_eq!(days("n_features"), (0, estimate("n_features")));
+    assert_eq!(
+        days("n_hardening"),
+        (
+            days("n_features").1,
+            days("n_features").1 + estimate("n_hardening")
+        )
+    );
+    assert!(days("n_code_freeze").0 >= days("n_hardening").1);
+    assert_eq!(schedule.end, Some("n_launch".parse().unwrap()));
+}
+
+#[test]
+fn an_unreadable_schedule_request_is_refused() {
+    let refused: HostError = serde_json::from_str(&route_schedule("{}").unwrap_err()).unwrap();
+    assert!(matches!(refused, HostError::Unreadable { .. }));
 }
 
 #[test]

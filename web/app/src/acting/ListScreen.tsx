@@ -23,7 +23,7 @@ import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf,
 import type { ViewState } from "../journeys/view.ts";
 import { planOrder } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
-import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
+import { journeySubject, ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { useNodeAddresses } from "../journeys/address.ts";
 import { withListSettings, type ListSettings } from "./address.ts";
@@ -228,7 +228,8 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const tree = list.sort === undefined;
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
-  const folds = useFolds(view, state.depth, shown, picks, selected, (key) => void navigate(addresses.open(key)));
+  const current = useMemo(() => currentStagesOf(view), [view]);
+  const folds = useFolds(nodes, current, state.depth, shown, picks, selected, (key) => void navigate(addresses.open(key)));
   const kept = useMemo(() => (rows === undefined || drawn === undefined ? undefined : rows.filter((row) => drawn.has(row.key))), [rows, drawn]);
   const lines = useMemo(
     () => (kept === undefined || level === undefined ? [] : tree ? treeLines(level.nodes, new Map(kept.map((row) => [row.key, row])), folds.open, order) : flatLines(view, kept, list.sort)),
@@ -237,9 +238,9 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const base = useMemo(() => litOf("list", state, view), [state, view]);
   const lit = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);
   const dimmed = useMemo(() => {
-    const hidden = collapsedAt(depth, nodes, currentStagesOf(view), [], []);
+    const hidden = collapsedAt(depth, nodes, current, [], []);
     return outOfFocus(lit, drawn === undefined ? new Set() : depthFaded(state, nodes, depth, hidden, drawn));
-  }, [state, view, nodes, depth, drawn, lit]);
+  }, [state, current, nodes, depth, drawn, lit]);
   const frontier = useMemo(() => (state.frontier ? new Set(view.derived.acting_frontier) : undefined), [state.frontier, view.derived.acting_frontier]);
   const badges = useMemo(() => badgesOf("list", level?.hidden_by_class ?? {}, base, stepHides(nodes, depth, []), state.fade), [level, base, nodes, depth, state.fade]);
   const everyLine = lines.flatMap((line) => (line.row === undefined ? [] : [line.row.key]));
@@ -248,7 +249,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const error = levelError ?? rowsError;
   return (
     <section className="stack list" aria-label="List" data-testid="list">
-      <ViewBar ready={view} screen="list" badges={badges} end={<RowEnd list={list} decisionColumns={decisionColumns} total={kept?.length} />} />
+      <ViewBar subject={journeySubject(view)} screen="list" badges={badges} end={<RowEnd list={list} decisionColumns={decisionColumns} total={kept?.length} />} />
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
       <Table list={list} lines={lines} columns={columns} context={context} selection={selection} selected={selected} everyLine={everyLine} outOfFocus={dimmed} />
       {kept !== undefined && level !== undefined && lines.length === 0 ? (

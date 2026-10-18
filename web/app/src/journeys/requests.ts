@@ -18,6 +18,13 @@ import { FILTER_FLAGS, type ViewState } from "./view.ts";
 
 export type LevelRequest = Extract<ProjectionRequest, { projection: "level" }>;
 
+/** The query a level request carries: the request without its tag, as the derive worker's route level takes it. */
+export function levelQueryOf(request: LevelRequest): Omit<LevelRequest, "projection"> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars -- the query is the request less its tag
+  const { projection, ...query } = request;
+  return query;
+}
+
 /** C9: the list flags the Filter asks for: Only mine first, then the flags in the Filter's order. */
 function flagsOf(state: ViewState): NonNullable<LevelRequest["flags"]> {
   return [...(state.filter.mine ? (["mine"] as const) : []), ...FILTER_FLAGS.filter((flag) => state.filter.flags.includes(flag))];

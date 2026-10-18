@@ -5,8 +5,10 @@ import { MemoryRouter } from "react-router";
 import { describe, expect, it } from "vitest";
 
 import { testView } from "../detail/view.test-support.ts";
-import type { Timeline } from "./model.ts";
-import { TimelineChart } from "./TimelineView.tsx";
+import { treeOf, type Graph } from "../authoring/graph.ts";
+import { calendarSpec, dayOf, routeSpec, type Timeline } from "./model.ts";
+import { chartOf, routeChartOf, type ChartOptions } from "./rows.ts";
+import { TimelineChart, type TimelineChartProps } from "./TimelineView.tsx";
 
 const view = testView();
 
@@ -21,12 +23,32 @@ const timeline: Timeline = {
 
 const level = [{ key: "n_stage" }, { key: "n_report", parent: "n_stage" }, { key: "n_findings", parent: "n_stage" }, { key: "n_meeting" }, { key: "n_when" }];
 
-function drawn(drawnTimeline: Timeline): string {
+const options: ChartOptions = { drawn: level, open: () => true, selected: undefined, faded: () => false };
+
+const shared: Omit<TimelineChartProps, "chart" | "spec"> = {
+  viewKey: "deliverables",
+  range: "fit",
+  onFold: () => undefined,
+  selected: undefined,
+  title: (key) => key,
+  endTitle: (key) => key,
+  activate: undefined,
+  anchorNote: "",
+  empty: { filtered: "", none: "" },
+  undated: "No date yet",
+  anyScheduled: true,
+};
+
+function render(props: TimelineChartProps): string {
   return renderToStaticMarkup(
     <MemoryRouter>
-      <TimelineChart ready={view} timeline={drawnTimeline} drawn={level} open={() => true} onFold={() => undefined} faded={() => false} selected={undefined} step="deliverables" range="fit" />
+      <TimelineChart {...props} />
     </MemoryRouter>,
   );
+}
+
+function drawn(drawnTimeline: Timeline): string {
+  return render({ ...shared, chart: chartOf(view, drawnTimeline, options), spec: calendarSpec(drawnTimeline, "2026-10-06") });
 }
 
 const count = (markup: string, needle: string) => markup.split(needle).length - 1;
@@ -34,7 +56,7 @@ const count = (markup: string, needle: string) => markup.split(needle).length - 
 describe("TimelineChart (C13)", () => {
   it("draws a row for each dated node, with a stage as one bar over the rows it holds", () => {
     const markup = drawn(timeline);
-    const rows = [...markup.matchAll(/data-testid="timeline-entry" data-node="([^"]+)" data-date="([^"]+)" data-origin="([^"]*)"/g)];
+    const rows = [...markup.matchAll(/data-testid="timeline-entry" data-node="([^"]+)" data-day="[^"]+" data-date="([^"]+)" data-origin="([^"]*)"/g)];
     expect(rows.map((row) => [row[1], row[2], row[3]])).toEqual([
       ["n_stage", "2026-11-02", ""],
       ["n_findings", "2026-10-30", "due"],
@@ -45,7 +67,7 @@ describe("TimelineChart (C13)", () => {
 
   it("anchors the end on the final milestone: down the tracks and named on the axis", () => {
     const markup = drawn(timeline);
-    expect(markup).toContain('data-end="n_meeting" data-end-date="2026-11-20"');
+    expect(markup).toContain(`data-end="n_meeting" data-end-date="2026-11-20" data-end-day="${String(dayOf("2026-11-20"))}"`);
     expect(count(markup, 'class="timeline-end"')).toBe(2);
   });
 
@@ -54,5 +76,33 @@ describe("TimelineChart (C13)", () => {
     expect(markup).toContain('data-end="" data-end-date=""');
     expect(count(markup, 'class="timeline-end"')).toBe(0);
     expect(markup).toContain('data-testid="timeline-no-end"');
+  });
+});
+
+describe("TimelineChart on a route's relative axis (C13)", () => {
+  const route = treeOf({ nodes: [{ key: "n_build", kind: "action", title: "Build" }, { key: "n_ship", kind: "milestone", title: "Ship" }] } as Graph);
+  const schedule = {
+    entries: [
+      { node: "n_build", kind: "action" as const, start_day: 0, finish_day: 12 },
+      { node: "n_ship", kind: "milestone" as const, start_day: 12, finish_day: 12 },
+    ],
+    end: "n_ship",
+  };
+  const markup = render({ ...shared, range: undefined, chart: routeChartOf(route, schedule, { ...options, drawn: [{ key: "n_build" }, { key: "n_ship" }] }), spec: routeSpec(schedule), undated: "No day yet" });
+
+  it("places rows by their day, with no calendar date, and ends on the final milestone's day", () => {
+    const rows = [...markup.matchAll(/data-testid="timeline-entry" data-node="([^"]+)" data-day="([^"]+)"([^>]*)>/g)];
+    expect(rows.map((row) => [row[1], row[2]])).toEqual([
+      ["n_build", "12"],
+      ["n_ship", "12"],
+    ]);
+    expect(markup).not.toContain("data-date=");
+    expect(markup).toContain('data-end="n_ship" data-end-date="" data-end-day="12"');
+  });
+
+  it("marks the start where a journey's timeline marks today, and offers no calendar presets", () => {
+    expect(markup).toContain('data-testid="timeline-now"');
+    expect(drawn(timeline)).toContain("timeline-range");
+    expect(markup).not.toContain("timeline-range");
   });
 });

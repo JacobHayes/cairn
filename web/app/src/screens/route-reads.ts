@@ -1,22 +1,30 @@
-// A route canvas's two reads (ARCHITECTURE, Web UI: reads), as keyed reads (data/keyed-read.ts): the
-// route's draft or version, kept current while shown (H6), and the level of that graph from the derive
-// worker. A refetch that fails keeps the good graph on screen and counts the canvas as behind on the
+// A route page's reads (ARCHITECTURE, Web UI: reads), as keyed reads (data/keyed-read.ts): the
+// route's draft or version, kept current while shown (H6), and the level and the schedule of that
+// graph from the derive worker. A refetch that fails keeps the good graph on screen and counts the canvas as behind on the
 // sync chip; a route that no longer exists is gone (A19).
 import type { Schema } from "@cairn/client";
 
-import { routeKindsAt } from "../canvas/ladder.ts";
-import type { Step } from "../canvas/model.ts";
-import { layoutViewOf, type CanvasView } from "../canvas/settings.ts";
+import type { RouteSchedule } from "@cairn/wasm";
+
 import type { Deployment, Deriver, Host, Level, Route } from "../data/host.ts";
 import { HOST_READ, PROJECTION, type ReadKey, type ReadSource } from "../data/keyed-read.ts";
 import { isRoute, routeOf } from "../data/reads.ts";
+import type { GraphNode } from "../detail/model.ts";
+import { levelQueryOf, type LevelRequest } from "../journeys/requests.ts";
 
-/** The graph a route's canvas shows: its draft, or one published version. */
+/** The graph a route's page shows: its draft, or one published version. */
 export interface Shown {
   route: Route;
   graph: Schema<"Graph">;
   /** "draft", or the version's number. */
   of: "draft" | number;
+}
+
+const NO_NODES: GraphNode[] = [];
+
+/** The nodes of the shown graph; one list for a graph with none, so what is derived from them is not made afresh with every render. */
+export function nodesOf(shown: Shown): GraphNode[] {
+  return shown.graph.nodes ?? NO_NODES;
 }
 
 /** What a route's read found: a graph to draw, or a route whose only draft was discarded and so has nothing to draw. */
@@ -59,36 +67,49 @@ interface LevelArgs {
   shown: Shown;
   deployment: Deployment;
   today: string;
-  step: Step;
-  view: CanvasView;
+  request: LevelRequest;
 }
 
-/** The level of a shown graph, and the graph and layout view it answers. */
-export interface RouteLevel {
-  level: Level;
-  shown: Shown;
-}
-
-export const ROUTE_LEVEL: ReadSource<LevelArgs, RouteLevel> = {
+export const ROUTE_LEVEL: ReadSource<LevelArgs, Level> = {
   policy: PROJECTION,
-  read: async ({ deriver, shown, deployment, today, step, view }) => ({
-    level: await deriver.routeLevel({ graph: shown.graph, deployment, today, shown: routeKindsAt(step), ...(view.container === undefined ? {} : { container: view.container }) }),
-    shown,
-  }),
+  read: ({ deriver, shown, deployment, today, request }) => deriver.routeLevel({ graph: shown.graph, deployment, today, query: levelQueryOf(request) }),
 };
 
 /**
- * The key of a shown graph's level: the route, what it shows and the view it is laid out for are
- * the identity (another view's level laid out under this one would hint its first layout with
- * another graph's positions); the graph, the deployment and the day are what it is read from.
+ * The key of a shown graph's level for `request` (journeys/requests.ts, `levelRequestOf`, the one
+ * place a view state becomes a level query, a journey's or a route's): the route, what it shows
+ * and the request are the identity (another request's level laid out under this one would hint
+ * its first layout with another graph's positions); the graph, the deployment and the day are
+ * what it is read from.
  */
-export function routeLevelKey(deriver: Deriver, shown: Shown, view: CanvasView, step: Step, deployment: Deployment | undefined, today: string): ReadKey<LevelArgs> | undefined {
-  if (deployment === undefined) {
+export function routeLevelKey(deriver: Deriver, shown: Shown, request: LevelRequest | undefined, deployment: Deployment | undefined, today: string): ReadKey<LevelArgs> | undefined {
+  if (deployment === undefined || request === undefined) {
     return undefined;
   }
   return {
-    identity: [shown.route.header.id, shown.of, layoutViewOf(view, step)],
+    identity: [shown.route.header.id, shown.of, JSON.stringify(request)],
     freshness: [shown.graph, deployment.revision, today],
-    args: { deriver, shown, deployment, today, step, view },
+    args: { deriver, shown, deployment, today, request },
   };
+}
+
+/** What a route's schedule is derived from. */
+interface ScheduleArgs {
+  deriver: Deriver;
+  shown: Shown;
+  deployment: Deployment;
+}
+
+/** The earliest days of a shown graph's nodes from its start (C13). */
+export const ROUTE_SCHEDULE: ReadSource<ScheduleArgs, RouteSchedule> = {
+  policy: PROJECTION,
+  read: ({ deriver, shown, deployment }) => deriver.routeSchedule({ graph: shown.graph, deployment }),
+};
+
+/** The key of a shown graph's schedule: the route and what it shows are the identity; the graph and the deployment are what it is read from. */
+export function routeScheduleKey(deriver: Deriver, shown: Shown, deployment: Deployment | undefined): ReadKey<ScheduleArgs> | undefined {
+  if (deployment === undefined) {
+    return undefined;
+  }
+  return { identity: [shown.route.header.id, shown.of], freshness: [shown.graph, deployment.revision], args: { deriver, shown, deployment } };
 }

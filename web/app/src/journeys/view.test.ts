@@ -3,7 +3,7 @@
 // viewer's expands and collapses. The chips take one setting off each; Reset keeps Frontier and Fade.
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, filterChanged, filterChips, isStock, stockView, viewStateFrom, viewStateParams, withViewState, type ViewState } from "./view.ts";
+import { DEFAULT_FILTER, DEFAULT_VIEW_STATE, ROUTE_OFFERS, filterChanged, filterChips, isStock, stockView, viewStateFrom, viewStateParams, withViewState, type ViewState } from "./view.ts";
 
 const narrowed: ViewState = {
   depth: "decisions",
@@ -104,5 +104,21 @@ describe("changing the view state", () => {
     expect(filterChanged(DEFAULT_FILTER)).toBe(false);
     expect(filterChanged({ ...DEFAULT_FILTER, conditional: false })).toBe(true);
     expect(filterChanged({ ...DEFAULT_FILTER, notRelevant: true })).toBe(true);
+  });
+});
+
+describe("the view state a route reads", () => {
+  const asked = "depth=stages&fade=1&frontier=1&mine=1&owner=e_lead&flag=overdue&show=notrelevant&q=ship";
+  const route = (search: string) => viewStateFrom(new URLSearchParams(search), ROUTE_OFFERS);
+
+  it("keeps the depth, Fade, the conditional class and the search, and nothing a route has no state for", () => {
+    expect(route(asked)).toEqual({ depth: "stages", fade: true, frontier: false, filter: { ...DEFAULT_FILTER, conditional: false }, text: "ship" });
+    // A journey reads every one of them.
+    expect(read(asked).filter).toMatchObject({ mine: true, owner: "e_lead", flags: ["overdue"], notRelevant: true });
+  });
+
+  it("writes back an address without what a route does not offer", () => {
+    const params = withViewState(`?${asked}&version=2`, route(asked));
+    expect(Object.fromEntries(new URLSearchParams(params))).toEqual({ depth: "stages", fade: "1", show: "", q: "ship", version: "2" });
   });
 });

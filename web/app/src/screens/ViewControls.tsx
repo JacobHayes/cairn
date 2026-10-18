@@ -1,5 +1,8 @@
-// The controls every view of a journey shares, one row in a fixed order: Depth (how deep is
-// drawn), Frontier (emphasis), Filter, and Search, then the view's own end slot. On the graph the
+// The controls every view of a journey or a route shares, one row in a fixed order: Depth (how
+// deep is drawn), Frontier (emphasis), Filter, and Search, then the view's own end slot. A route
+// has no state, owner or relevance to decide, so it offers Depth (with Fade), the Filter's
+// conditional class and Search; the rest is left out, not disabled (it is not a setting a
+// sibling view of the same subject honours). On the graph the
 // row floats at the canvas's top left (on a phone, folded into one Controls menu); on the list, the
 // timeline and the walk it sits at the top of the pane. Every control reads and writes the
 // journey's one view state (journeys/view.ts), so it means the same on every view: Depth, Filter
@@ -16,7 +19,7 @@ import { Check, FlagChecks } from "../acting/Controls.tsx";
 import { overBytes, TITLE_BYTES_MAX } from "../authoring/limits.ts";
 import { STEP_WORDS, stepOf, stepsFor } from "../canvas/ladder.ts";
 import type { Step } from "../canvas/model.ts";
-import type { Ready } from "../detail/model.ts";
+import type { GraphNode, Ready } from "../detail/model.ts";
 import { entityName } from "../detail/sections.tsx";
 import type { Screen } from "../journeys/address.ts";
 import { FILTER_FLAGS, filterChanged, filterChips, isStock, stockView, useViewState, withViewState, type ViewFilter } from "../journeys/view.ts";
@@ -62,11 +65,26 @@ function tip(words: string, badge: Badge | undefined): string {
   return badge === undefined || badge.count === 0 ? words : `${words}. ${badge.words}`;
 }
 
-/** The steps on offer for the journey and the one chosen. */
-function useSteps(ready: Ready): { steps: Step[]; step: Step } {
+/** What the controls are for: a graph's nodes and, for a journey, the journey, whose owners, frontier and state the journey-only controls read. */
+export interface ViewSubject {
+  nodes: readonly GraphNode[];
+  journey: Ready | undefined;
+}
+
+/** A journey's subject: everything the controls offer. */
+export function journeySubject(ready: Ready): ViewSubject {
+  return { nodes: ready.journey.graph.nodes ?? [], journey: ready };
+}
+
+/** A route's subject: its nodes alone. */
+export function routeSubject(nodes: readonly GraphNode[]): ViewSubject {
+  return { nodes, journey: undefined };
+}
+
+/** The steps on offer for the subject and the one chosen. */
+function useSteps(subject: ViewSubject): { steps: Step[]; step: Step } {
   const { state } = useViewState();
-  const nodes = ready.journey.graph.nodes ?? [];
-  return { steps: stepsFor(nodes), step: stepOf({ step: state.depth }, nodes) };
+  return { steps: stepsFor(subject.nodes), step: stepOf({ step: state.depth }, subject.nodes) };
 }
 
 /**
@@ -74,9 +92,9 @@ function useSteps(ready: Ready): { steps: Step[]; step: Step } {
  * hairline and the Fade checkbox. Choosing a step closes the menu it is in; the checkbox leaves it
  * open, so the canvas behind can be watched.
  */
-function DepthOptions({ ready, screen, close }: { ready: Ready; screen: Screen; close: () => void }) {
+function DepthOptions({ subject, screen, close }: { subject: ViewSubject; screen: Screen; close: () => void }) {
   const { state, onState } = useViewState();
-  const { steps, step } = useSteps(ready);
+  const { steps, step } = useSteps(subject);
   return (
     <div className="stack" data-testid="depth-panel">
       <div className="opts" role="radiogroup" aria-label="Depth" data-testid="ladder">
@@ -106,14 +124,14 @@ function DepthOptions({ ready, screen, close }: { ready: Ready; screen: Screen; 
   );
 }
 
-function DepthMenu({ ready, screen, badge }: { ready: Ready; screen: Screen; badge: Badge | undefined }) {
+function DepthMenu({ subject, screen, badge }: { subject: ViewSubject; screen: Screen; badge: Badge | undefined }) {
   const { state } = useViewState();
-  const { step } = useSteps(ready);
+  const { step } = useSteps(subject);
   const fading = state.fade && screen !== "walk";
   return (
     <Menu
       label={`Depth: ${STEP_WORDS[step]}`}
-      title={tip(`How deep the journey is drawn: each step draws down to its kind, 1 to 4${fading ? ". The rest is faded, not hidden" : ""}`, badge)}
+      title={tip(`How deep ${subject.journey === undefined ? "the route" : "the journey"} is drawn: each step draws down to its kind, 1 to 4${fading ? ". The rest is faded, not hidden" : ""}`, badge)}
       testId="depth-button"
       role="dialog"
       className="view-control"
@@ -123,36 +141,45 @@ function DepthMenu({ ready, screen, badge }: { ready: Ready; screen: Screen; bad
         </Dotted>
       }
     >
-      {(close) => <DepthOptions ready={ready} screen={screen} close={close} />}
+      {(close) => <DepthOptions subject={subject} screen={screen} close={close} />}
     </Menu>
   );
 }
 
-/** C9, C1: the one Filter body: only mine, the owner, the flags, then the relevance classes, those this view cannot draw disabled with the reason under them. */
-function FilterBody({ ready, screen }: { ready: Ready; screen: Screen }) {
+/**
+ * C9, C1: the one Filter body: for a journey only mine, the owner, the flags, then the relevance
+ * classes, those this view cannot draw disabled with the reason under them; for a route, the
+ * conditional class alone.
+ */
+export function FilterBody({ subject, screen }: { subject: ViewSubject; screen: Screen }) {
   const { state, onState } = useViewState();
   const { filter } = state;
   const set = (changed: Partial<ViewFilter>) => {
     onState({ ...state, filter: { ...filter, ...changed } });
   };
-  const owners = (ready.inputs.deployment.entities ?? []).map((entity) => ({ key: entity.key, text: entityName(ready, entity.key) }));
+  const { journey } = subject;
+  const owners = (journey?.inputs.deployment.entities ?? []).map((entity) => ({ key: entity.key, text: journey === undefined ? entity.key : entityName(journey, entity.key) }));
   const reason = CLASS_REASON[screen];
   return (
     <div className="stack" role="group" aria-label="Filter" data-testid="filter-body">
-      <Check label="Only mine" checked={filter.mine} testId="flag-mine" onChange={(mine) => { set({ mine }); }} />
-      <select aria-label="Owner" data-testid="filter-owner" value={filter.owner ?? ""} onChange={(event) => { set({ owner: event.target.value === "" ? undefined : event.target.value }); }}>
-        <option value="">Owner: any</option>
-        {owners.map((owner) => (
-          <option key={owner.key} value={owner.key}>
-            {owner.text}
-          </option>
-        ))}
-      </select>
-      <FlagChecks options={FILTER_FLAGS} chosen={filter.flags} onChange={(flags) => { set({ flags }); }} />
-      <hr />
+      {journey === undefined ? null : (
+        <>
+          <Check label="Only mine" checked={filter.mine} testId="flag-mine" onChange={(mine) => { set({ mine }); }} />
+          <select aria-label="Owner" data-testid="filter-owner" value={filter.owner ?? ""} onChange={(event) => { set({ owner: event.target.value === "" ? undefined : event.target.value }); }}>
+            <option value="">Owner: any</option>
+            {owners.map((owner) => (
+              <option key={owner.key} value={owner.key}>
+                {owner.text}
+              </option>
+            ))}
+          </select>
+          <FlagChecks options={FILTER_FLAGS} chosen={filter.flags} onChange={(flags) => { set({ flags }); }} />
+          <hr />
+        </>
+      )}
       <Check label="Show conditional" checked={filter.conditional} testId="show-conditional" disabled={screen === "walk"} onChange={(conditional) => { set({ conditional }); }} />
-      <Check label="Show not relevant" checked={filter.notRelevant} testId="show-not-relevant" disabled={reason !== undefined} onChange={(notRelevant) => { set({ notRelevant }); }} />
-      {reason === undefined ? null : (
+      {journey === undefined ? null : <Check label="Show not relevant" checked={filter.notRelevant} testId="show-not-relevant" disabled={reason !== undefined} onChange={(notRelevant) => { set({ notRelevant }); }} />}
+      {reason === undefined || journey === undefined ? null : (
         <span className="muted small" data-testid="filter-disabled-reason">
           {reason}
         </span>
@@ -161,7 +188,7 @@ function FilterBody({ ready, screen }: { ready: Ready; screen: Screen }) {
   );
 }
 
-function FilterMenu({ ready, screen, badge }: { ready: Ready; screen: Screen; badge: Badge | undefined }) {
+function FilterMenu({ subject, screen, badge }: { subject: ViewSubject; screen: Screen; badge: Badge | undefined }) {
   const { state } = useViewState();
   return (
     <Menu
@@ -178,7 +205,7 @@ function FilterMenu({ ready, screen, badge }: { ready: Ready; screen: Screen; ba
     >
       {() => (
         <div className="stack" data-testid="filter-panel">
-          <FilterBody ready={ready} screen={screen} />
+          <FilterBody subject={subject} screen={screen} />
         </div>
       )}
     </Menu>
@@ -268,7 +295,7 @@ export function ResetView() {
 }
 
 export interface ViewControlsProps {
-  ready: Ready;
+  subject: ViewSubject;
   screen: Screen;
   /** What the view's filter and depth hide, as badges. */
   badges?: Badges | undefined;
@@ -277,14 +304,14 @@ export interface ViewControlsProps {
 }
 
 /** The graph's controls on a phone, where the canvas has room for one button: the same controls in a Controls menu, with the depth and filter badges on it. */
-function PhoneControls({ ready, screen, badges }: { ready: Ready; screen: Screen; badges: Badges | undefined }) {
+function PhoneControls({ subject, screen, badges }: { subject: ViewSubject; screen: Screen; badges: Badges | undefined }) {
   const shown = [badges?.depth, badges?.filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
   const total = { count: shown.reduce((sum, badge) => sum + badge.count, 0), words: shown.map((badge) => badge.words).join(". ") };
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
       <Menu
         label="Controls"
-        title={tip("Depth, Frontier, filter and search", total)}
+        title={tip(subject.journey === undefined ? "Depth, filter and search" : "Depth, Frontier, filter and search", total)}
         testId="controls-button"
         role="dialog"
         className="view-control"
@@ -297,12 +324,14 @@ function PhoneControls({ ready, screen, badges }: { ready: Ready; screen: Screen
         {(close) => (
           <div className="stack" data-testid="controls-panel-phone">
             <span className="muted small">Depth</span>
-            <DepthOptions ready={ready} screen={screen} close={close} />
+            <DepthOptions subject={subject} screen={screen} close={close} />
             <hr className="menu-rule" />
-            <div className="row">
-              <FrontierChip ready={ready} screen={screen} />
-            </div>
-            <FilterBody ready={ready} screen={screen} />
+            {subject.journey === undefined ? null : (
+              <div className="row">
+                <FrontierChip ready={subject.journey} screen={screen} />
+              </div>
+            )}
+            <FilterBody subject={subject} screen={screen} />
             <Search onDone={close} />
           </div>
         )}
@@ -311,17 +340,17 @@ function PhoneControls({ ready, screen, badges }: { ready: Ready; screen: Screen
   );
 }
 
-export function ViewControls({ ready, screen, badges, end }: ViewControlsProps) {
+export function ViewControls({ subject, screen, badges, end }: ViewControlsProps) {
   // The graph's controls float over the canvas, where a phone has room for one: they fold into a Controls menu.
   const phone = useMedia(PHONE_WIDTH);
   if (screen === "graph" && phone) {
-    return <PhoneControls ready={ready} screen={screen} badges={badges} />;
+    return <PhoneControls subject={subject} screen={screen} badges={badges} />;
   }
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">
-      <DepthMenu ready={ready} screen={screen} badge={badges?.depth} />
-      <FrontierChip ready={ready} screen={screen} />
-      <FilterMenu ready={ready} screen={screen} badge={badges?.filter} />
+      <DepthMenu subject={subject} screen={screen} badge={badges?.depth} />
+      {subject.journey === undefined ? null : <FrontierChip ready={subject.journey} screen={screen} />}
+      <FilterMenu subject={subject} screen={screen} badge={badges?.filter} />
       <Search />
       {end === undefined ? null : <div className="view-controls-end">{end}</div>}
     </div>
@@ -329,13 +358,14 @@ export function ViewControls({ ready, screen, badges, end }: ViewControlsProps) 
 }
 
 /** The row at the top of a list, timeline or walk pane, with the Filter's settings and the search as removable chips. */
-export function ViewBar({ ready, screen, end, badges }: { ready: Ready; screen: Screen; end?: ReactNode; badges?: Badges | undefined }) {
+export function ViewBar({ subject, screen, end, badges }: { subject: ViewSubject; screen: Screen; end?: ReactNode; badges?: Badges | undefined }) {
   const { pathname, search } = useLocation();
   const { state } = useViewState();
-  const chips = filterChips(state, (key) => entityName(ready, key)).map((chip) => ({ id: chip.id, label: chip.label, without: `${pathname}${withViewState(search, chip.without)}` }));
+  const { journey } = subject;
+  const chips = filterChips(state, (key) => (journey === undefined ? key : entityName(journey, key))).map((chip) => ({ id: chip.id, label: chip.label, without: `${pathname}${withViewState(search, chip.without)}` }));
   return (
     <div className="view-bar stack">
-      <ViewControls ready={ready} screen={screen} end={end} badges={badges} />
+      <ViewControls subject={subject} screen={screen} end={end} badges={badges} />
       <ActiveFilters filters={chips} />
     </div>
   );

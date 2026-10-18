@@ -1,4 +1,4 @@
-// C1, C2, C9, C10, C11: the settings every view of a journey shares, as one value. Depth (the
+// C1, C2, C9, C10, C11: the settings every view of a journey or a route shares, as one value. Depth (the
 // ladder's step, each named after the deepest kind it draws), the Filter (only mine, an owner, the
 // flags, the two relevance classes) and the search choose what every view draws, through one
 // engine level request (requests.ts); Frontier only emphasises, and so does Depth with Fade on
@@ -54,6 +54,23 @@ export interface ViewState {
   text: string;
 }
 
+/**
+ * What a subject of the views offers of the shared state. A journey offers all of it; a route
+ * has no state, owner or relevance to decide, so it offers Depth (with Fade), the conditional
+ * class and the search, and the rest is neither shown nor read from its address.
+ */
+export interface ViewOffers {
+  frontier: boolean;
+  mine: boolean;
+  owner: boolean;
+  flags: boolean;
+  notRelevant: boolean;
+}
+
+export const JOURNEY_OFFERS: ViewOffers = { frontier: true, mine: true, owner: true, flags: true, notRelevant: true };
+
+export const ROUTE_OFFERS: ViewOffers = { frontier: false, mine: false, owner: false, flags: false, notRelevant: false };
+
 export const DEFAULT_FILTER: ViewFilter = { mine: false, owner: undefined, flags: [], notRelevant: false, conditional: true };
 
 export const DEFAULT_VIEW_STATE: ViewState = { depth: undefined, fade: false, frontier: false, filter: DEFAULT_FILTER, text: "" };
@@ -73,10 +90,11 @@ function searchFrom(text: string): string {
 }
 
 /**
- * The view state in an address's query. `show=` absent draws the conditional class and hides the
- * not-relevant one; present, it lists the classes drawn beyond the relevant one.
+ * The view state in an address's query, less what the subject does not `offer`. `show=` absent
+ * draws the conditional class and hides the not-relevant one; present, it lists the classes
+ * drawn beyond the relevant one.
  */
-export function viewStateFrom(params: URLSearchParams): ViewState {
+export function viewStateFrom(params: URLSearchParams, offers: ViewOffers = JOURNEY_OFFERS): ViewState {
   const flags = new Set((params.get("flag") ?? "").split(","));
   const show = params.get("show");
   const shown = show === null ? undefined : show.split(",");
@@ -84,12 +102,12 @@ export function viewStateFrom(params: URLSearchParams): ViewState {
   return {
     depth: stepFrom(params),
     fade: params.get("fade") === "1",
-    frontier: params.get("frontier") === "1",
+    frontier: offers.frontier && params.get("frontier") === "1",
     filter: {
-      mine: params.get("mine") === "1",
-      owner: owner === null || owner === "" ? undefined : owner,
-      flags: FILTER_FLAGS.filter((flag) => flags.has(flag)),
-      notRelevant: shown?.includes("notrelevant") ?? DEFAULT_FILTER.notRelevant,
+      mine: offers.mine && params.get("mine") === "1",
+      owner: !offers.owner || owner === null || owner === "" ? undefined : owner,
+      flags: offers.flags ? FILTER_FLAGS.filter((flag) => flags.has(flag)) : [],
+      notRelevant: offers.notRelevant && (shown?.includes("notrelevant") ?? DEFAULT_FILTER.notRelevant),
       conditional: shown === undefined ? DEFAULT_FILTER.conditional : shown.includes("conditional"),
     },
     text: searchFrom(params.get("q") ?? ""),
@@ -204,7 +222,7 @@ export function filterChips(state: ViewState, ownerName: (key: string) => string
   return chips;
 }
 
-/** The journey page's view state, and how a control changes it (`picked`: a depth was picked). */
+/** The page's view state, and how a control changes it (`picked`: a depth was picked). */
 export interface ViewStateValue {
   state: ViewState;
   onState: (next: ViewState, picked?: boolean) => void;
@@ -214,11 +232,11 @@ export interface ViewStateValue {
 
 export const ViewStateContext = createContext<ViewStateValue | undefined>(undefined);
 
-/** The journey page's view state (screens/JourneyFrame.tsx provides it). */
+/** The page's view state (screens/JourneyFrame.tsx and screens/RoutePage.tsx provide it). */
 export function useViewState(): ViewStateValue {
   const value = useContext(ViewStateContext);
   if (value === undefined) {
-    throw new Error("useViewState outside a journey page");
+    throw new Error("useViewState outside a view's page");
   }
   return value;
 }

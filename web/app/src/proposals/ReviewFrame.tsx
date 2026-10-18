@@ -12,8 +12,7 @@ import { Menu } from "../screens/Menu.tsx";
 import { Badge, Button } from "../ui/kit.tsx";
 import type { Graph } from "../authoring/graph.ts";
 import { indexPath, journeyPath } from "../journeys/address.ts";
-import { ROUTES_INDEX_PATH, routeCanvasPath } from "../routes/address.ts";
-import { DEFAULT_VIEW } from "../canvas/settings.ts";
+import { ROUTES_INDEX_PATH, routePath } from "../routes/address.ts";
 import {
   DIFF_LABELS,
   filterOf,
@@ -55,7 +54,7 @@ function destinationPage(proposal: Proposal): string | undefined {
   if (creates(proposal)) {
     return undefined;
   }
-  return "journey" in destination ? journeyPath({ journey: destination.journey }) : routeCanvasPath(destination.route, undefined, DEFAULT_VIEW);
+  return "journey" in destination ? journeyPath({ journey: destination.journey }) : routePath(destination.route);
 }
 
 /** How the destination is named: its name when it has one, else what the proposal would create. */

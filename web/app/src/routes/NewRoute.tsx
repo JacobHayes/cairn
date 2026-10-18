@@ -9,12 +9,11 @@ import { Link, useNavigate, useSearchParams } from "react-router";
 import { isSlug, slugOf } from "../authoring/keys.ts";
 import { useDraft, writeDraft } from "../data/drafts.ts";
 import { TITLE_BYTES_MAX, overBytes } from "../authoring/limits.ts";
-import { DEFAULT_VIEW } from "../canvas/settings.ts";
 import { Refused } from "../screens/Refused.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
-import { ROUTES_INDEX_PATH, routeCanvasPath } from "./address.ts";
+import { ROUTES_INDEX_PATH, routePath } from "./address.ts";
 import { ImportFile } from "./ImportFile.tsx";
 import { openDraft } from "./model.ts";
 
@@ -68,7 +67,7 @@ export function NewRoutePage() {
     const landed = await write.run({ target: { route: routeId }, baseRevision: 0, mutations: [{ op: "create_route", name, kind }, openDraft()] });
     if (landed) {
       writeDraft("new-route", undefined);
-      void navigate(routeCanvasPath(routeId, undefined, DEFAULT_VIEW));
+      void navigate(routePath(routeId));
     }
   };
   return (

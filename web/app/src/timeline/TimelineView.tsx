@@ -1,7 +1,9 @@
 // C13: the timeline. Rows are the dated nodes the journey's level draws (Depth's step, the
 // Filter and the search every view shares), under the containment tree, folded by the ladder;
 // each has its date in plain words beside a track on one shared time axis with today and the end
-// anchor (the `final` milestone) drawn across it. Selecting a row shows its float and the lines
+// anchor (the `final` milestone) drawn across it. A route's timeline (timeline/RouteTimeline.tsx)
+// draws the same chart over days from its start: `TimelineChart` takes the rows, the axis it lies on
+// and how a row is titled, so the journey's and the route's are one implementation. Selecting a row shows its float and the lines
 // to what it needs and unblocks (a shortfall's chain in error ink) and fades the rest; Frontier
 // fades what it does not light, and Depth's Fade what is below the depth. Two-finger horizontal scroll pans time, a pinch
 // zooms it, vertical scroll moves the rows (the workspace's own). Nodes with no date gather in
@@ -13,16 +15,15 @@ import { useLocation, useNavigate } from "react-router";
 
 import { useFolds, useLevel, useProjected } from "../canvas/hooks.ts";
 import { collapsedAt, drawnStep, stepOf } from "../canvas/ladder.ts";
-import type { Step } from "../canvas/model.ts";
-import { nodeOf, titleOf, type Ready } from "../detail/model.ts";
+import { titleOf, type Ready } from "../detail/model.ts";
 import { NodeLink } from "../detail/parts.tsx";
 import { useNodeAddresses, withParam } from "../journeys/address.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
-import { ResetView, ViewBar } from "../screens/ViewControls.tsx";
+import { journeySubject, ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { Button, Segmented } from "../ui/kit.tsx";
-import { dateWords, dayOf, positionOf, rangeWindow, RANGES, timelineAxis, type Axis, type Range, type Timeline, type Window } from "./model.ts";
-import { chartOf, type Chart, type ChartOptions, type ChartRow, type Dependency } from "./rows.ts";
+import { axisOf, calendarSpec, dateOf, dateWords, dayWords, positionOf, rangeWindow, RANGES, type Axis, type AxisSpec, type Range, type Window } from "./model.ts";
+import { chartOf, type Chart, type ChartRow, type Dependency } from "./rows.ts";
 import "./timeline.css";
 
 /** The height of one row's track, and of the axis above the rows (px). */
@@ -71,16 +72,16 @@ function Defs() {
   );
 }
 
-/** What every row's track draws behind it: the ticks, what lies after the end, today, the end. */
+/** What every row's track draws behind it: the ticks, what lies after the end, today (or the start), the end. */
 function Backdrop({ axis, height }: { axis: Axis; height: number }) {
-  const end = axis.anchor === undefined ? undefined : positionOf(axis, axis.anchor.date);
+  const end = axis.anchor === undefined ? undefined : positionOf(axis, axis.anchor.day);
   return (
     <>
       {end === undefined ? null : <rect className="timeline-after" x={percent(end)} y={0} width={percent(Math.max(0, 1 - end))} height={height} />}
       {axis.ticks.map((tick) => (
-        <line key={tick.date} className="timeline-grid" x1={percent(tick.at)} x2={percent(tick.at)} y1={0} y2={height} />
+        <line key={tick.day} className="timeline-grid" x1={percent(tick.at)} x2={percent(tick.at)} y1={0} y2={height} />
       ))}
-      <line className="timeline-today" x1={percent(axis.today)} x2={percent(axis.today)} y1={0} y2={height} />
+      <line className="timeline-today" x1={percent(axis.now)} x2={percent(axis.now)} y1={0} y2={height} />
       {end === undefined ? null : <line className="timeline-end" x1={percent(end)} x2={percent(end)} y1={0} y2={height} />}
     </>
   );
@@ -102,12 +103,12 @@ function useWidth(target: React.RefObject<Element | null>): number {
   return width;
 }
 
-/** C13: the axis: its ticks, today, and the end anchor, or the words that there is none. */
-function AxisHead({ ready, axis }: { ready: Ready; axis: Axis }) {
+/** C13: the axis: its ticks, today (the start, on a route), and the end anchor, or the words that there is none. */
+function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => string }) {
   const svg = useRef<SVGSVGElement>(null);
   const width = useWidth(svg);
   const end = axis.anchor;
-  const anchorAt = end === undefined ? undefined : positionOf(axis, end.date);
+  const anchorAt = end === undefined ? undefined : positionOf(axis, end.day);
   const textAnchor = (at: number) => (at > LABEL_FLIP_AT ? "end" : "start");
   const dx = (at: number) => (at > LABEL_FLIP_AT ? -4 : 4);
   const [first, second] = axis.ticks;
@@ -120,13 +121,13 @@ function AxisHead({ ready, axis }: { ready: Ready; axis: Axis }) {
       <Backdrop axis={axis} height={AXIS_PX} />
       {axis.ticks.map((tick, at) => (
         // Every few ticks are named, so the names do not run into each other; the rest are lines.
-        <text key={tick.date} className="timeline-tick" x={percent(tick.at)} y={15} dx={4} data-testid="timeline-tick" data-date={tick.date}>
+        <text key={tick.day} className="timeline-tick" x={percent(tick.at)} y={15} dx={4} data-testid="timeline-tick" data-day={tick.day}>
           {named(tick, at) ? tick.label : ""}
         </text>
       ))}
-      {axis.today < 0 || axis.today > 1 ? null : (
-        <text className="timeline-today-label" x={percent(axis.today)} y={32} dx={dx(axis.today)} textAnchor={textAnchor(axis.today)}>
-          Today
+      {axis.now < 0 || axis.now > 1 ? null : (
+        <text className="timeline-today-label" x={percent(axis.now)} y={32} dx={dx(axis.now)} textAnchor={textAnchor(axis.now)} data-testid="timeline-now">
+          {axis.mode === "calendar" ? "Today" : "Start"}
         </text>
       )}
       {end === undefined || anchorAt === undefined ? (
@@ -135,7 +136,8 @@ function AxisHead({ ready, axis }: { ready: Ready; axis: Axis }) {
         </text>
       ) : (
         <text className="timeline-end-label" x={percent(anchorAt)} y={32} dx={dx(anchorAt)} textAnchor={textAnchor(anchorAt)}>
-          Ends: {titleOf(ready, end.node)}
+          Ends: {endTitle(end.node)}
+          {axis.mode === "relative" ? ` · ${dayWords(end.day)}` : ""}
         </text>
       )}
     </svg>
@@ -204,13 +206,14 @@ function Lines({ lines, axis, rows }: { lines: Dependency[]; axis: Axis; rows: C
   );
 }
 
-function Label({ ready, row, selected, onFold }: { ready: Ready; row: ChartRow; selected: boolean; onFold: (key: string) => void }) {
+function Label({ axis, row, selected, onFold, title }: { axis: Axis; row: ChartRow; selected: boolean; onFold: (key: string) => void; title: (key: string) => ReactNode }) {
   return (
     <li
       className="timeline-label"
       data-testid="timeline-entry"
       data-node={row.key}
-      data-date={row.to}
+      data-day={row.to}
+      data-date={axis.mode === "calendar" ? dateOf(row.to) : undefined}
       data-origin={row.origin ?? ""}
       data-overdue={row.late > 0}
       data-shortfall={row.shortfallDays ?? ""}
@@ -230,7 +233,7 @@ function Label({ ready, row, selected, onFold }: { ready: Ready; row: ChartRow; 
           <span className="timeline-fold" aria-hidden="true" />
         )}
         <div className="timeline-text" title={row.title}>
-          <NodeLink view={ready} node={row.key} />
+          {title(row.key)}
           <span className={row.late > 0 || row.shortfallDays !== undefined ? "small timeline-words timeline-late" : "muted small timeline-words"} data-testid="timeline-words">
             {row.words}
           </span>
@@ -285,9 +288,7 @@ function useReveal(chart: React.RefObject<HTMLElement | null>, selected: string 
 }
 
 /** The tracks: one drawing beside the labels, so every row's date falls where the axis says. */
-function Tracks({ chart, axis, selected }: { chart: Chart; axis: Axis; selected: string | undefined }) {
-  const addresses = useNodeAddresses();
-  const navigate = useNavigate();
+function Tracks({ chart, axis, selected, activate }: { chart: Chart; axis: Axis; selected: string | undefined; activate: ((key: string) => void) | undefined }) {
   const height = chart.rows.length * ROW_PX;
   return (
     <svg className="timeline-tracks" width="100%" height={height} aria-hidden="true">
@@ -299,8 +300,8 @@ function Tracks({ chart, axis, selected }: { chart: Chart; axis: Axis; selected:
         const floatTo = row.float === undefined ? undefined : positionOf(axis, row.float.to);
         return (
           <g key={row.key} className="timeline-row" data-state={row.state} data-faded={row.faded} data-selected={row.key === selected} data-testid="timeline-track" data-node={row.key}>
-            <rect className="timeline-hit" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} onClick={() => { void navigate(addresses.open(row.key)); }} />
-            {row.late > 0 ? <rect className="timeline-overdue" x={percent(positionOf(axis, row.to))} y={y - BAR_PX} width={percent(Math.max(0, axis.today - positionOf(axis, row.to)))} height={BAR_PX * 2} /> : null}
+            <rect className="timeline-hit" x={0} y={at * ROW_PX} width="100%" height={ROW_PX} data-activatable={activate !== undefined} onClick={activate === undefined ? undefined : () => { activate(row.key); }} />
+            {row.late > 0 ? <rect className="timeline-overdue" x={percent(positionOf(axis, row.to))} y={y - BAR_PX} width={percent(Math.max(0, axis.now - positionOf(axis, row.to)))} height={BAR_PX * 2} /> : null}
             {floatFrom === undefined || floatTo === undefined ? null : (
               <g className="timeline-float" data-testid="timeline-float" data-from={row.float?.from} data-to={row.float?.to}>
                 <line x1={percent(floatFrom)} x2={percent(floatTo)} y1={y} y2={y} />
@@ -317,14 +318,17 @@ function Tracks({ chart, axis, selected }: { chart: Chart; axis: Axis; selected:
   );
 }
 
-/** The range, and the way back from a pan or a pinch. */
-function Controls({ range, panned, onChoose, onReset }: { range: Range; panned: boolean; onChoose: (value: string) => void; onReset: () => void }) {
+/** The range (a journey's: its calendar presets), and the way back from a pan or a pinch: Fit, the whole span, which a route has with no presets. */
+function Controls({ range, panned, onChoose, onReset }: { range: Range | undefined; panned: boolean; onChoose: (value: string) => void; onReset: () => void }) {
+  if (range === undefined && !panned) {
+    return null;
+  }
   return (
     <div className="row timeline-controls">
-      <Segmented label="Range" value={range} options={RANGES.map((each) => ({ value: each, label: RANGE_WORDS[each] }))} onChange={onChoose} data-testid="timeline-range" />
+      {range === undefined ? null : <Segmented label="Range" value={range} options={RANGES.map((each) => ({ value: each, label: RANGE_WORDS[each] }))} onChange={onChoose} data-testid="timeline-range" />}
       {panned ? (
         <Button ghost data-testid="timeline-reset" onClick={onReset}>
-          Back to {RANGE_WORDS[range].toLowerCase()}
+          {range === undefined ? "Fit" : `Back to ${RANGE_WORDS[range].toLowerCase()}`}
         </Button>
       ) : null}
     </div>
@@ -332,32 +336,46 @@ function Controls({ range, panned, onChoose, onReset }: { range: Range; panned: 
 }
 
 /** C13: the axis the rows lie on: the range's window, or the one a pan or a pinch moved to, which holds until the range or the step is chosen again. */
-function useAxis(timeline: Timeline, today: string, chart: Chart, key: string, range: Range) {
+function useAxis(spec: AxisSpec, days: readonly number[], key: string, preset: Window | undefined) {
   const [dragged, setDragged] = useState<{ for: string; window: Window } | undefined>(undefined);
-  const preset = rangeWindow(range, today);
-  const base = useMemo(() => timelineAxis(timeline, today, chart.dates, preset), [timeline, today, chart.dates, preset?.first, preset?.last]);
+  const base = useMemo(() => axisOf(spec, days, preset), [spec, days, preset?.first, preset?.last]);
   const held = dragged?.for === key ? dragged.window : undefined;
-  const axis = useMemo(() => (held === undefined ? base : timelineAxis(timeline, today, [], { first: Math.round(held.first), last: Math.round(held.last) })), [base, held, timeline, today]);
-  return { axis, panned: held !== undefined, window: held ?? { first: dayOf(base.start), last: dayOf(base.end) }, move: (window: Window) => { setDragged({ for: key, window }); }, reset: () => { setDragged(undefined); } };
+  const axis = useMemo(() => (held === undefined ? base : axisOf(spec, [], { first: Math.round(held.first), last: Math.round(held.last) })), [base, held, spec]);
+  return { axis, panned: held !== undefined, window: held ?? { first: base.start, last: base.end }, move: (window: Window) => { setDragged({ for: key, window }); }, reset: () => { setDragged(undefined); } };
 }
 
-/** C13: the timeline of a projected journey: the rows `drawn` holds, open as `open` says. `empty` is what follows the words when nothing dated is drawn. */
-export function TimelineChart({ ready, timeline, drawn, open, onFold, faded, selected, step, range, empty }: {
-  ready: Ready;
-  timeline: Timeline;
-  drawn: ChartOptions["drawn"];
-  open: ChartOptions["open"];
+export interface TimelineChartProps {
+  chart: Chart;
+  /** The axis the chart lies on: a journey's calendar, or a route's days from its start. */
+  spec: AxisSpec;
+  /** A new key starts a pan and a pinch afresh: the step and range chosen. */
+  viewKey: string;
+  /** A journey's range presets; none for a chart that opens on its whole span. */
+  range: Range | undefined;
   onFold: (key: string) => void;
-  faded: ChartOptions["faded"];
   selected: string | undefined;
-  step: Step;
-  range: Range;
-  empty?: ReactNode;
-}) {
+  /** A row's title, and a node's in the folded list of those with no day. */
+  title: (key: string) => ReactNode;
+  /** The words after "Ends:" for the end anchor. */
+  endTitle: (node: string) => string;
+  /** What a click on a row's track does; none when a row opens nothing. */
+  activate: ((key: string) => void) | undefined;
+  /** The line under the controls that says where the chart ends. */
+  anchorNote: ReactNode;
+  /** What follows the words when nothing is drawn, and the words when nothing at all has a day. */
+  empty: { filtered: ReactNode; none: string };
+  /** The folded list's summary: "No date yet", "No day yet". */
+  undated: string;
+  /** Whether the level drew anything with a day (else `empty.none` says why not). */
+  anyScheduled: boolean;
+}
+
+/** C13: a timeline: the rows of `chart` on one axis, with the controls, the end anchor's note and the folded list of what has no day. */
+export function TimelineChart({ chart, spec, viewKey, range, onFold, selected, title, endTitle, activate, anchorNote, empty, undated, anyScheduled }: TimelineChartProps) {
   const { pathname, search } = useLocation();
   const navigate = useNavigate();
-  const chart = useMemo(() => chartOf(ready, timeline, { drawn, open, selected, faded }), [ready, timeline, drawn, open, selected, faded]);
-  const { axis, panned, window, move, reset } = useAxis(timeline, ready.derived.today, chart, `${range}:${step}`, range);
+  const preset = range === undefined ? undefined : rangeWindow(range, dateOf(spec.now));
+  const { axis, panned, window, move, reset } = useAxis(spec, chart.days, viewKey, preset);
   const chartRef = useRef<HTMLDivElement>(null);
   useGestures(chartRef, window, move);
   useReveal(chartRef, selected);
@@ -366,44 +384,48 @@ export function TimelineChart({ ready, timeline, drawn, open, onFold, faded, sel
     void navigate(`${pathname}${withParam(search, "range", value === "fit" ? undefined : value)}`);
   };
   return (
-    <section className="stack timeline" aria-label="Timeline" data-testid="timeline" data-end={axis.anchor?.node ?? ""} data-end-date={axis.anchor?.date ?? ""}>
+    <section
+      className="stack timeline"
+      aria-label="Timeline"
+      data-testid="timeline"
+      data-end={axis.anchor?.node ?? ""}
+      data-end-date={axis.anchor === undefined || axis.mode !== "calendar" ? "" : dateOf(axis.anchor.day)}
+      data-end-day={axis.anchor === undefined ? "" : axis.anchor.day}
+    >
       <Controls range={range} panned={panned} onChoose={choose} onReset={reset} />
       <span className="muted small" data-testid="timeline-anchor">
-        {axis.anchor === undefined ? (
-          "No final milestone has a date yet, so the timeline ends after its latest date."
-        ) : (
-          <>
-            Ends at <NodeLink view={ready} node={axis.anchor.node} /> on <strong>{dateWords(axis.anchor.date, ready.derived.today)}</strong>, the final milestone.
-          </>
-        )}
+        {anchorNote}
       </span>
       {chart.rows.length === 0 ? (
         <p className="muted" data-testid="timeline-empty">
-          {timeline.entries.length > 0 ? <>Nothing dated is drawn at this depth, filter and search. {empty}</> : "Nothing in scope has a date yet: no milestone date, pin, or due date."}
+          {anyScheduled ? empty.filtered : empty.none}
         </p>
       ) : (
         <div className="timeline-chart" ref={chartRef}>
           <div className="timeline-axis">
             <span />
-            <AxisHead ready={ready} axis={axis} />
+            <AxisHead axis={axis} endTitle={endTitle} />
           </div>
           <div className="timeline-body">
             <ol className="timeline-labels">
               {chart.rows.map((row) => (
-                <Label key={row.key} ready={ready} row={row} selected={row.key === selected} onFold={onFold} />
+                <Label key={row.key} axis={axis} row={row} selected={row.key === selected} onFold={onFold} title={title} />
               ))}
             </ol>
-            <Tracks chart={chart} axis={axis} selected={selected} />
+            <Tracks chart={chart} axis={axis} selected={selected} activate={activate} />
           </div>
         </div>
       )}
       {chart.undated.length === 0 ? null : (
         <details className="timeline-undated" data-testid="timeline-undated" open={selected !== undefined && chart.undated.includes(selected) ? true : undefined}>
-          <summary>No date yet ({chart.undated.length})</summary>
+          <summary>
+            {undated} ({chart.undated.length})
+          </summary>
           <ul className="timeline-undated-list">
             {chart.undated.map((node) => (
-              <li key={node} data-node={node} data-kind={nodeOf(ready, node)?.kind}>
-                <NodeLink view={ready} node={node} />
+              <li key={node} data-node={node}>
+                {title(node)}
+                {chart.undatedWords?.get(node) === undefined ? null : <span className="muted small"> {chart.undatedWords.get(node)}</span>}
               </li>
             ))}
           </ul>
@@ -426,22 +448,47 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
   const timelineRead = useProjected(ready, { projection: "timeline" });
   const timeline = valueOf(timelineRead);
   const navigate = useNavigate();
-  const { open, fold: onFold } = useFolds(ready, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const current = useMemo(() => currentStagesOf(ready), [ready]);
+  const { open, fold: onFold } = useFolds(nodes, current, state.depth, step, picks, selected, (key) => void navigate(addresses.open(key)));
   const base = useMemo(() => litOf("timeline", state, ready), [state, ready]);
   const lit = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);
   const faded = useMemo(() => outOfFocus(lit, drawn === undefined ? new Set() : depthFaded(state, nodes, depth, collapsedAt(depth, nodes, current, [], []), drawn)), [state, nodes, depth, current, drawn, lit]);
   const badges = useMemo(() => badgesOf("timeline", level?.hidden_by_class ?? {}, base, stepHides(nodes, depth, []), state.fade), [level, base, nodes, depth, state.fade]);
   const error = levelError ?? errorWords(timelineRead);
+  const today = ready.derived.today;
+  const spec = useMemo(() => (timeline === undefined ? undefined : calendarSpec(timeline, today)), [timeline, today]);
+  const chart = useMemo(() => (timeline === undefined || level === undefined ? undefined : chartOf(ready, timeline, { drawn: level.nodes, open, selected, faded })), [ready, timeline, level, open, selected, faded]);
   return (
     <>
-      <ViewBar ready={ready} screen="timeline" badges={badges} />
+      <ViewBar subject={journeySubject(ready)} screen="timeline" badges={badges} />
       {error !== undefined ? (
         <p className="callout callout-bad">The timeline could not be read: {error}</p>
-      ) : timeline === undefined || level === undefined ? (
+      ) : timeline === undefined || level === undefined || spec === undefined || chart === undefined ? (
         <p className="muted small">Placing the dates...</p>
       ) : (
-        <TimelineChart ready={ready} timeline={timeline} drawn={level.nodes} open={open} onFold={onFold} faded={faded} selected={selected} step={step} range={range} empty={<ResetView />} />
+        <TimelineChart
+          chart={chart}
+          spec={spec}
+          viewKey={`${range}:${step}`}
+          range={range}
+          onFold={onFold}
+          selected={selected}
+          title={(key) => <NodeLink view={ready} node={key} />}
+          endTitle={(node) => titleOf(ready, node)}
+          activate={(key) => void navigate(addresses.open(key))}
+          anchorNote={
+            spec.anchor === undefined ? (
+              "No final milestone has a date yet, so the timeline ends after its latest date."
+            ) : (
+              <>
+                Ends at <NodeLink view={ready} node={spec.anchor.node} /> on <strong>{dateWords(dateOf(spec.anchor.day), today)}</strong>, the final milestone.
+              </>
+            )
+          }
+          empty={{ filtered: <>Nothing dated is drawn at this depth, filter and search. <ResetView /></>, none: "Nothing in scope has a date yet: no milestone date, pin, or due date." }}
+          undated="No date yet"
+          anyScheduled={timeline.entries.length > 0}
+        />
       )}
     </>
   );

@@ -25,8 +25,6 @@ import { progressWords } from "./words.ts";
 export interface CardActions {
   /** Open the node's detail; none on a canvas with no detail to open (a route's). */
   open: ((key: string) => void) | undefined;
-  /** C4: open a container's children as a sub-canvas; only a route's canvas drills. */
-  drill: ((key: string) => void) | undefined;
   /** C4: expand a collapsed container in place, or collapse an open one; none on a canvas that cannot. */
   expand: ((key: string, expanded: boolean) => void) | undefined;
   /** C7: trace the node (its hidden-prerequisites marker). */
@@ -87,7 +85,6 @@ function Title({ card }: { card: Card }) {
 }
 
 function Head({ card, collapsible }: { card: Card; collapsible: boolean }) {
-  const actions = useContext(CardActionsContext);
   const journey = card.journey;
   return (
     <div className="node-head">
@@ -107,20 +104,6 @@ function Head({ card, collapsible }: { card: Card; collapsible: boolean }) {
         <span className="node-notice" data-testid="card-notice" title="No chain links this to the final milestone, so neither priority nor dates reach it. Advisory: publishing is not blocked.">
           No path to final
         </span>
-      ) : null}
-      {card.drillable && actions?.drill !== undefined ? (
-        <button
-          type="button"
-          className="node-control nodrag"
-          aria-label={`Open ${card.title} as its own canvas`}
-          data-testid="card-drill"
-          onClick={(event) => {
-            event.stopPropagation();
-            actions.drill?.(card.key);
-          }}
-        >
-          Open
-        </button>
       ) : null}
       <Control card={card} collapsible={collapsible} />
     </div>

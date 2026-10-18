@@ -3,11 +3,15 @@
 // work at its due date, earliest first, with overdue and shortfall marked and the `final`
 // milestone named as the end anchor. This lays those dates on an axis: its span (today and
 // every date, with a margin), its ticks at a granularity that keeps them few, the end anchor,
-// and where each date falls along it as a fraction of its width. Pure, so the unit tests
-// check it without a page.
+// and where each day falls along it as a fraction of its width. A route's timeline lays days
+// from the journey's start on the same axis, relative: ticks on multiples of a step of whole
+// days, the start where a journey's has today. The axis works in day numbers (days since
+// 1970-01-01 for a journey, days from the start for a route), so nothing downstream can show a
+// made-up calendar date. Pure, so the unit tests check it without a page.
 //
 // Cost: O(entries) per timeline, plus O(ticks), which `TICK_COUNT_MAX` bounds.
 import type { Schema } from "@cairn/client";
+import type { RouteSchedule } from "@cairn/wasm";
 
 export type Timeline = Schema<"Timeline">;
 export type TimelineEntry = Schema<"TimelineEntry">;
@@ -64,16 +68,16 @@ export function dateOf(day: number): string {
 
 /** One labeled tick on the axis. */
 export interface Tick {
-  date: string;
+  day: number;
   label: string;
   /** Where it falls, from 0 (the axis's start) to 1 (its end). */
   at: number;
 }
 
-/** C13: the end anchor, the journey's `final` milestone at its date. */
+/** C13: the end anchor, the journey's `final` milestone at its day. */
 export interface Anchor {
   node: string;
-  date: string;
+  day: number;
 }
 
 /** The days an axis shows, from the first to the last. */
@@ -98,26 +102,40 @@ export function rangeWindow(range: Range, today: string): Window | undefined {
   return { first, last: first + RANGE_DAYS[range].length };
 }
 
-/** C13: the time axis the timeline's dates lie on. */
+/** How an axis names its days: calendar dates (a journey's), or days from the start (a route's). */
+export type AxisMode = "calendar" | "relative";
+
+/** C13: the time axis the timeline's days lie on. */
 export interface Axis {
-  start: string;
-  end: string;
-  /** The end anchor; none when the journey has no `final` milestone in scope with a date. */
+  mode: AxisMode;
+  /** The first and last day shown. */
+  start: number;
+  end: number;
+  /** The end anchor; none when there is no `final` milestone in scope with a day. */
   anchor: Anchor | undefined;
   unit: TickUnit;
   ticks: Tick[];
-  /** Where today falls. */
-  today: number;
+  /** Where today falls on a calendar axis, the start (day 0) on a relative one. */
+  now: number;
+}
+
+/** What an axis is laid out from: how it names days, the day it marks, the end anchor, and every day the data lies on. */
+export interface AxisSpec {
+  mode: AxisMode;
+  /** The day marked: today, or day 0. */
+  now: number;
+  anchor: Anchor | undefined;
+  days: readonly number[];
 }
 
 /**
- * C13: the end anchor: the `final` milestone the projection names, at its date. A journey
+ * C13: the end anchor: the `final` milestone the projection names, at its day. A journey
  * with no final milestone, or whose final milestone has no date yet, has none: the axis then
  * simply ends after its latest date.
  */
 export function endAnchor(timeline: Timeline): Anchor | undefined {
   const entry = timeline.entries.find((each) => each.node === timeline.end);
-  return entry === undefined ? undefined : { node: entry.node, date: entry.date };
+  return entry === undefined ? undefined : { node: entry.node, day: dayOf(entry.date) };
 }
 
 /** The finest step that keeps a span of `spanDays` within `TICK_COUNT_MAX` ticks; years beyond. */
@@ -185,34 +203,77 @@ function labelOf(day: number, unit: TickUnit, first: boolean): string {
 /** The ticks from day `first` to day `last` at `unit`, each placed along the span. */
 function ticksOf(first: number, last: number, unit: TickUnit): Tick[] {
   return stepDays(first, last, unit).map((day, index) => ({
-    date: dateOf(day),
+    day,
     label: labelOf(day, unit, index === 0),
     at: (day - first) / (last - first),
   }));
 }
 
+/** The steps (days) a relative axis ticks by, finest first: whole days, weeks, then months and longer. */
+const RELATIVE_STEPS = [1, 2, 5, 7, 10, 14, 30, 60, 90, 180, 365] as const;
+
+/** The finest relative step that keeps a span of `spanDays` within `TICK_COUNT_MAX` ticks; years beyond. */
+export function relativeStepFor(spanDays: number): number {
+  return RELATIVE_STEPS.find((step) => spanDays / step <= TICK_COUNT_MAX) ?? 365 * Math.ceil(spanDays / 365 / TICK_COUNT_MAX);
+}
+
+/** Day `day` of a journey that starts on day 0, in words: "Day 7". */
+export function dayWords(day: number): string {
+  return `Day ${String(day)}`;
+}
+
+/** The ticks of a relative axis: the multiples of the step that lie from day `first` to day `last`. */
+function relativeTicksOf(first: number, last: number): Tick[] {
+  const step = relativeStepFor(last - first);
+  const ticks: Tick[] = [];
+  for (let day = Math.ceil(first / step) * step; day <= last; day += step) {
+    ticks.push({ day, label: dayWords(day), at: (day - first) / (last - first) });
+  }
+  return ticks;
+}
+
 /**
- * C13: the axis for `timeline` read on `today`: today and every date (`dates` beside the
- * timeline's own, which the bars add), with a margin; or `window`, the days a range or a pan
- * and zoom picked.
+ * C13: the axis `spec` lays out: its marked day and every day (`days` beside `extra`, which the
+ * bars add) with a margin; or `window`, the days a range or a pan and zoom picked.
  */
-export function timelineAxis(timeline: Timeline, today: string, dates: readonly string[] = [], window?: Window): Axis {
-  const days = [today, ...timeline.entries.map((entry) => entry.date), ...dates].map(dayOf);
+export function axisOf(spec: AxisSpec, extra: readonly number[] = [], window?: Window): Axis {
+  const days = [spec.now, ...spec.days, ...extra];
   const first = window?.first ?? Math.min(...days) - AXIS_MARGIN_DAYS;
   const last = window?.last ?? Math.max(...days) + AXIS_MARGIN_DAYS;
-  const unit = unitFor(last - first);
+  const unit = spec.mode === "calendar" ? unitFor(last - first) : "day";
   return {
-    start: dateOf(first),
-    end: dateOf(last),
-    anchor: endAnchor(timeline),
+    mode: spec.mode,
+    start: first,
+    end: last,
+    anchor: spec.anchor,
     unit,
-    ticks: ticksOf(first, last, unit),
-    today: (dayOf(today) - first) / (last - first),
+    ticks: spec.mode === "calendar" ? ticksOf(first, last, unit) : relativeTicksOf(first, last),
+    now: (spec.now - first) / (last - first),
   };
 }
 
-/** Where `date` falls along `axis`, from 0 to 1. */
-export function positionOf(axis: Axis, date: string): number {
-  const first = dayOf(axis.start);
-  return (dayOf(date) - first) / (dayOf(axis.end) - first);
+/** C13: what a journey's axis is laid out from: today, the timeline's dates and its end anchor. */
+export function calendarSpec(timeline: Timeline, today: string): AxisSpec {
+  return { mode: "calendar", now: dayOf(today), anchor: endAnchor(timeline), days: timeline.entries.map((entry) => dayOf(entry.date)) };
+}
+
+/** C13: what a route's axis is laid out from: day 0 as its start, the schedule's days and its final milestone as the end anchor, at the day it can finish. */
+export function routeSpec(schedule: RouteSchedule): AxisSpec {
+  const end = schedule.entries.find((entry) => entry.node === schedule.end);
+  return {
+    mode: "relative",
+    now: 0,
+    anchor: end === undefined ? undefined : { node: end.node, day: end.finish_day },
+    days: schedule.entries.flatMap((entry) => [entry.start_day, entry.finish_day]),
+  };
+}
+
+/** C13: the axis for `timeline` read on `today`, with the days `dates` beside the timeline's own. */
+export function timelineAxis(timeline: Timeline, today: string, dates: readonly number[] = [], window?: Window): Axis {
+  return axisOf(calendarSpec(timeline, today), dates, window);
+}
+
+/** Where `day` falls along `axis`, from 0 to 1. */
+export function positionOf(axis: Axis, day: number): number {
+  return (day - axis.start) / (axis.end - axis.start);
 }

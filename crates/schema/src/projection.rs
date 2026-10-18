@@ -950,6 +950,59 @@ pub struct Timeline {
     pub undated: Vec<NodeKey>,
 }
 
+/// C13: one node of a route's schedule: the earliest it can start and finish, as days from
+/// the day the journey starts (day 0).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ScheduleEntry {
+    /// The node.
+    pub node: NodeKey,
+    /// Its kind.
+    pub kind: NodeKind,
+    /// The earliest day it can start; a decision's or milestone's one instant.
+    pub start_day: i32,
+    /// The earliest day it can finish; never before its start.
+    pub finish_day: i32,
+    /// It sits in an undecided branch, so it may not happen at all.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub conditional: bool,
+    /// The date decisions its date rules read that no answer settles yet: its day is the
+    /// earliest those rules allow, not a settled date.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub waiting: Vec<NodeKey>,
+}
+
+/// C13: a route read as a journey that starts on day 0: for each node in scope, the earliest
+/// day it can start and finish from the rules, estimates, stage bounds and dependencies alone.
+/// A route pins nothing, so there are no due days: this is how soon each thing can happen.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct RouteSchedule {
+    /// The nodes with an earliest day, earliest start first, then by key.
+    pub entries: Vec<ScheduleEntry>,
+    /// The `final` milestone, when it is in scope.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub end: Option<NodeKey>,
+    /// The final milestone's earliest day is bound through an undecided branch.
+    #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
+    pub final_conditional: bool,
+    /// Nodes in scope that nothing bounds: no earliest day at all.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub undated: Vec<UndatedEntry>,
+}
+
+/// C13: a node in scope of a route's schedule that nothing bounds, with the date decisions its
+/// date rules read that no answer settles yet.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UndatedEntry {
+    /// The node.
+    pub node: NodeKey,
+    /// The unanswered date decisions its date rules read: why it has no day yet.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub waiting: Vec<NodeKey>,
+}
+
 /// C18: an open decision and who owns it.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

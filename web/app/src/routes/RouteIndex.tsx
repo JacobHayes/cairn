@@ -14,7 +14,7 @@ import { useLive } from "../data/react.ts";
 import { indexKey, journeyIndex, routeIndex, segmentUses, type RouteSummary } from "../data/reads.ts";
 import { DEFAULT_FILTERS, indexPath, newJourneyPath } from "../journeys/address.ts";
 import { Badge, IndexState, Segmented } from "../ui/kit.tsx";
-import { newRoutePath, routeDetailPath } from "./address.ts";
+import { newRoutePath, routePath } from "./address.ts";
 import { activeJourneyCounts, inUseWords, ofType, startableVersion, typeOf, type InUse, type RouteType } from "./model.ts";
 import "../journeys/journeys.css";
 
@@ -68,7 +68,7 @@ function RouteRow({ route, reading }: { route: RouteSummary; reading: UseReading
     <tr data-testid="route-row" data-route={header.id} data-kind={segment ? "segment" : "process"}>
       <td data-column="name">
         <span className="cell-first">
-          <Link to={routeDetailPath(header.id)}>{header.name}</Link>
+          <Link to={routePath(header.id)}>{header.name}</Link>
           {header.retired === true ? <Badge data-testid="retired">Retired</Badge> : route.draft_open ? <Badge tone="warn">Draft open</Badge> : null}
         </span>
         {summary === undefined || summary === "" ? null : (

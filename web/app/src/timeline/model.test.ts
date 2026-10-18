@@ -11,8 +11,12 @@ import {
   dateWords,
   dayOf,
   endAnchor,
+  axisOf,
+  dayWords,
   positionOf,
   rangeWindow,
+  relativeStepFor,
+  routeSpec,
   timelineAxis,
   type Timeline,
   type TimelineEntry,
@@ -41,14 +45,14 @@ const withoutFinal: Timeline = {
 
 describe("C13: the end anchor", () => {
   it("is the final milestone at its date, even with a pin after it", () => {
-    expect(endAnchor(withFinal)).toEqual({ node: "n_meeting", date: "2026-11-20" });
-    expect(timelineAxis(withFinal, today).anchor).toEqual({ node: "n_meeting", date: "2026-11-20" });
+    expect(endAnchor(withFinal)).toEqual({ node: "n_meeting", day: dayOf("2026-11-20") });
+    expect(timelineAxis(withFinal, today).anchor).toEqual({ node: "n_meeting", day: dayOf("2026-11-20") });
   });
 
   it("is none without a final milestone, and the axis still ends after the latest date", () => {
     const axis = timelineAxis(withoutFinal, today);
     expect(axis.anchor).toBeUndefined();
-    expect(axis.end).toBe(dateOf(dayOf("2026-11-25") + AXIS_MARGIN_DAYS));
+    expect(axis.end).toBe(dayOf("2026-11-25") + AXIS_MARGIN_DAYS);
   });
 
   it("is none while the final milestone has no date", () => {
@@ -60,29 +64,29 @@ describe("C13: the end anchor", () => {
 describe("C13: the axis", () => {
   it("spans today and every date with a margin, today before the dates here", () => {
     const axis = timelineAxis(withFinal, today);
-    expect(axis.start).toBe(dateOf(dayOf(today) - AXIS_MARGIN_DAYS));
-    expect(axis.end).toBe(dateOf(dayOf("2026-11-25") + AXIS_MARGIN_DAYS));
-    expect(axis.today).toBeCloseTo(AXIS_MARGIN_DAYS / (dayOf(axis.end) - dayOf(axis.start)));
+    expect(axis.start).toBe(dayOf(today) - AXIS_MARGIN_DAYS);
+    expect(axis.end).toBe(dayOf("2026-11-25") + AXIS_MARGIN_DAYS);
+    expect(axis.now).toBeCloseTo(AXIS_MARGIN_DAYS / (axis.end - axis.start));
   });
 
   it("spans an actual date before today", () => {
     const past: Timeline = { entries: [entry("n_meeting", "2026-09-01", "actual")] };
     const axis = timelineAxis(past, today);
-    expect(axis.start).toBe(dateOf(dayOf("2026-09-01") - AXIS_MARGIN_DAYS));
-    expect(axis.end).toBe(dateOf(dayOf(today) + AXIS_MARGIN_DAYS));
+    expect(axis.start).toBe(dayOf("2026-09-01") - AXIS_MARGIN_DAYS);
+    expect(axis.end).toBe(dayOf(today) + AXIS_MARGIN_DAYS);
   });
 
   it("places each date in order along it, inside its ends", () => {
     const axis = timelineAxis(withFinal, today);
-    const placed = withFinal.entries.map((each) => positionOf(axis, each.date));
+    const placed = withFinal.entries.map((each) => positionOf(axis, dayOf(each.date)));
     expect(placed.every((at) => at > 0 && at < 1)).toBe(true);
     expect([...placed].sort((a, b) => a - b)).toEqual(placed);
   });
 
   it("shows only a range's days around today, whatever dates lie beyond", () => {
     const month = timelineAxis(withFinal, today, [], rangeWindow("month", today));
-    expect(month.start).toBe(dateOf(dayOf(today) - 3));
-    expect(dayOf(month.end) - dayOf(month.start)).toBe(31);
+    expect(month.start).toBe(dayOf(today) - 3);
+    expect(month.end - month.start).toBe(31);
     expect(rangeWindow("fit", today)).toBeUndefined();
   });
 
@@ -101,10 +105,10 @@ describe("C13: the axis", () => {
       expect(axis.ticks.length).toBeGreaterThan(0);
       expect(axis.ticks.length).toBeLessThanOrEqual(TICK_COUNT_MAX + 1);
       for (const tick of axis.ticks) {
-        const date = new Date(`${tick.date}T00:00:00Z`);
+        const date = new Date(`${dateOf(tick.day)}T00:00:00Z`);
         const starts = { day: true, week: date.getUTCDay() === 1, month: date.getUTCDate() === 1, quarter: date.getUTCDate() === 1 && date.getUTCMonth() % 3 === 0, year: date.getUTCDate() === 1 && date.getUTCMonth() === 0 };
         expect(starts[axis.unit]).toBe(true);
-        expect(tick.at).toBeCloseTo(positionOf(axis, tick.date));
+        expect(tick.at).toBeCloseTo(positionOf(axis, tick.day));
         expect(tick.at >= 0 && tick.at <= 1).toBe(true);
       }
     });
@@ -122,5 +126,51 @@ describe("dates in words", () => {
     expect(dateAway("2026-10-07", today)).toBe("Oct 7, in 1 day");
     expect(dateAway(today, today)).toMatch(/, today$/);
     expect(dateAway("2026-10-02", today)).toBe("Oct 2, 4 days late");
+  });
+});
+
+describe("C13: a route's axis, in days from its start", () => {
+  const schedule = {
+    entries: [
+      { node: "n_build", kind: "action" as const, start_day: 0, finish_day: 12 },
+      { node: "n_launch", kind: "milestone" as const, start_day: 40, finish_day: 40 },
+    ],
+    end: "n_launch",
+  };
+
+  it("starts at day 0 with the margin around the days, and ends at the final milestone's day", () => {
+    const spec = routeSpec(schedule);
+    expect(spec.anchor).toEqual({ node: "n_launch", day: 40 });
+    const axis = axisOf(spec);
+    expect(axis.mode).toBe("relative");
+    expect(axis.start).toBe(-AXIS_MARGIN_DAYS);
+    expect(axis.end).toBe(40 + AXIS_MARGIN_DAYS);
+    // The start is day 0's place along it, not a date's.
+    expect(axis.now).toBeCloseTo(positionOf(axis, 0));
+    expect(axis.now).toBeCloseTo(AXIS_MARGIN_DAYS / (40 + 2 * AXIS_MARGIN_DAYS));
+  });
+
+  it("ticks on whole multiples of one step, few enough, each placed where its day falls", () => {
+    const axis = axisOf(routeSpec(schedule));
+    const step = relativeStepFor(axis.end - axis.start);
+    expect(axis.ticks.length).toBeGreaterThan(1);
+    expect(axis.ticks.length).toBeLessThanOrEqual(TICK_COUNT_MAX + 1);
+    for (const tick of axis.ticks) {
+      expect(Math.abs(tick.day % step)).toBe(0);
+      expect(tick.at).toBeCloseTo(positionOf(axis, tick.day));
+      expect(tick.label).toBe(dayWords(tick.day));
+    }
+  });
+
+  it("widens its step as the span grows, never past the tick limit", () => {
+    for (const last of [3, 20, 90, 400, 3000]) {
+      const step = relativeStepFor(last);
+      expect(last / step).toBeLessThanOrEqual(TICK_COUNT_MAX);
+    }
+    expect(relativeStepFor(3000)).toBeGreaterThan(relativeStepFor(20));
+  });
+
+  it("has no end anchor while the final milestone has no day", () => {
+    expect(routeSpec({ entries: schedule.entries, end: "n_missing" }).anchor).toBeUndefined();
   });
 });

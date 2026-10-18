@@ -550,6 +550,13 @@ impl Dates {
         self.solved.earliest(self.network.start(at)).map(date)
     }
 
+    /// F3: the earliest the node can finish.
+    #[must_use]
+    pub fn earliest_finish(&self, key: &NodeKey) -> Option<Date> {
+        let at = self.index(key)?;
+        self.solved.earliest(self.network.finish(at)).map(date)
+    }
+
     /// F3: the latest the node can start without missing what caps it.
     #[must_use]
     pub fn latest_start(&self, key: &NodeKey) -> Option<Date> {

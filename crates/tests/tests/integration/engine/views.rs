@@ -3,6 +3,7 @@
 #![cfg(test)]
 
 use crate::engine::support;
+use std::fmt::Write as _;
 
 use cairn_engine::{Derived, DerivedJourney, DraftContext, Graph, Records};
 use cairn_schema::{
@@ -540,4 +541,130 @@ fn answer_effects_toggle_multi_choices_and_name_what_a_date_or_entity_answer_pin
         .unwrap()
         .unwrap();
     assert_eq!(meeting.pins, Some(key("n_decision_meeting")));
+}
+
+/// `add_node` mutations, one per node written as a YAML flow mapping.
+fn add_nodes(nodes: &[&str]) -> String {
+    nodes.iter().fold(String::new(), |mut out, node| {
+        let _ = writeln!(out, "- op: add_node\n  node: {node}");
+        out
+    })
+}
+
+/// C13: the schedule of the test journey (created on its first day) from that day.
+fn schedule_of(nodes: &[&str]) -> cairn_schema::RouteSchedule {
+    let derive = Derive::of(support::journey(&add_nodes(nodes)), support::JOURNEY);
+    derive.journey().schedule("2026-10-06".parse().unwrap())
+}
+
+fn days(schedule: &cairn_schema::RouteSchedule, node: &str) -> (i32, i32) {
+    let entry = schedule
+        .entries
+        .iter()
+        .find(|entry| entry.node.as_str() == node)
+        .unwrap_or_else(|| panic!("{node} has an earliest day"));
+    (entry.start_day, entry.finish_day)
+}
+
+/// C13: work is placed from the start by its estimate and what it waits on; a milestone that
+/// work gates sits where the work ends, and what follows a zero-length step starts on the
+/// same day rather than the next.
+#[test]
+fn the_schedule_places_work_by_its_estimates_and_dependencies() {
+    let schedule = schedule_of(&[
+        "{key: n_first, id: first, kind: action, title: First, estimate: 3}",
+        "{key: n_second, id: second, kind: action, title: Second, estimate: 4, requires: [n_first]}",
+        "{key: n_gate, id: gate, kind: milestone, title: Gate, requires: [n_second]}",
+        "{key: n_after, id: after, kind: action, title: After, estimate: 2, requires: [n_gate]}",
+    ]);
+    assert_eq!(days(&schedule, "n_first"), (0, 3));
+    assert_eq!(days(&schedule, "n_second"), (3, 7));
+    assert_eq!(days(&schedule, "n_gate"), (7, 7));
+    assert_eq!(days(&schedule, "n_after"), (7, 9));
+    assert_eq!(schedule.undated, [] as [cairn_schema::UndatedEntry; 0]);
+}
+
+/// C13: a date rule that reads a date decision nothing answers is placed at the earliest day
+/// its other bounds allow and names the decision it waits on; a milestone nothing bounds has
+/// no day at all, rather than being forced to one.
+#[test]
+fn the_schedule_says_what_waits_on_an_unanswered_date_and_what_nothing_bounds() {
+    let schedule = schedule_of(&[
+        "{key: n_date, id: date, kind: decision, title: Date, prompt: When?, answer_type: date}",
+        "{key: n_waits, id: waits, kind: action, title: Waits, estimate: 2, not_before: {after: n_date, offset: 3}}",
+        "{key: n_free, id: free, kind: action, title: Free, estimate: 2}",
+        "{key: n_alone, id: alone, kind: milestone, title: Alone}",
+        "{key: n_later, id: later, kind: milestone, title: Later, not_before: {after: n_date, offset: 3}}",
+    ]);
+    let waits = schedule
+        .entries
+        .iter()
+        .find(|entry| entry.node.as_str() == "n_waits")
+        .unwrap();
+    assert_eq!(names(&waits.waiting), ["n_date"]);
+    let free = schedule
+        .entries
+        .iter()
+        .find(|entry| entry.node.as_str() == "n_free")
+        .unwrap();
+    assert_eq!(free.waiting, [] as [cairn_schema::NodeKey; 0]);
+    let undated: Vec<_> = schedule
+        .undated
+        .iter()
+        .map(|each| each.node.as_str())
+        .collect();
+    assert_eq!(undated, ["n_alone", "n_later"]);
+    // A node with no day still says which unanswered date it waits on.
+    let later = schedule
+        .undated
+        .iter()
+        .find(|each| each.node.as_str() == "n_later")
+        .unwrap();
+    assert_eq!(names(&later.waiting), ["n_date"]);
+    assert!(
+        schedule
+            .entries
+            .iter()
+            .all(|entry| entry.node.as_str() != "n_alone")
+    );
+}
+
+/// C13: the end anchor says when its day is bound through an undecided branch, and not when
+/// only unconditional work binds it.
+#[test]
+fn the_schedule_marks_an_end_bound_through_an_undecided_branch() {
+    let decision =
+        "{key: n_flag, id: flag, kind: decision, title: Flag, prompt: Flag?, answer_type: boolean}";
+    let maybe = "{key: n_maybe, id: maybe, kind: action, title: Maybe, estimate: 5, relevant_when: {equals: {decision: n_flag, value: true}}}";
+    let sure = "{key: n_sure, id: sure, kind: action, title: Sure, estimate: 5}";
+    let through_branch = schedule_of(&[
+        decision,
+        maybe,
+        "{key: n_end, id: end, kind: milestone, title: End, final: true, requires: [n_maybe]}",
+    ]);
+    assert_eq!(through_branch.end, Some(key("n_end")));
+    assert!(through_branch.final_conditional);
+    assert!(
+        through_branch
+            .entries
+            .iter()
+            .any(|entry| entry.node.as_str() == "n_maybe" && entry.conditional)
+    );
+    let unconditional = schedule_of(&[
+        decision,
+        sure,
+        "{key: n_end, id: end, kind: milestone, title: End, final: true, requires: [n_sure]}",
+    ]);
+    assert_eq!(days(&unconditional, "n_end"), (5, 5));
+    assert!(!unconditional.final_conditional);
+}
+
+/// C13: a stage with no bounds pushes none of its children.
+#[test]
+fn an_unbounded_stage_does_not_push_its_children() {
+    let schedule = schedule_of(&[
+        "{key: n_stage, id: stage, kind: group, title: Stage}",
+        "{key: n_inside, id: inside, parent: n_stage, kind: action, title: Inside, estimate: 2}",
+    ]);
+    assert_eq!(days(&schedule, "n_inside"), (0, 2));
 }

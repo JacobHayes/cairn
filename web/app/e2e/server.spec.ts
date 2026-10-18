@@ -153,7 +153,7 @@ test("a route's canvas keeps its graph while its reads fail, says BEHIND, and ca
   const [one, two] = [await context.newPage(), await context.newPage()];
   const id = await newRoute(one, "server", routeName("Behind"));
   await addNode(one, "decision", "First choice");
-  await open(two, "server", `/routes/${id}/draft`);
+  await open(two, "server", `/routes/${id}`);
   await live(two);
   await expect(two.locator("[data-testid=node-card]")).toHaveCount(1);
   // The server cannot answer this route's reads for the page showing it.

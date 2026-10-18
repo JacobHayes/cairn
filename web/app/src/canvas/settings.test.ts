@@ -1,10 +1,10 @@
-// The canvas's settings in the address: a journey graph's own settings ride beside the view state
-// and a route canvas keeps its own.
+// The canvas's settings in the address: a graph's own settings ride beside the view state, a
+// journey's and a route's.
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_VIEW_STATE } from "../journeys/view.ts";
+import { DEFAULT_VIEW_STATE, ROUTE_OFFERS } from "../journeys/view.ts";
 import { screenOf } from "../journeys/address.ts";
-import { DEFAULT_GRAPH_VIEW, graphPath, graphViewFrom, paramsOf, viewFrom, type GraphView } from "./settings.ts";
+import { DEFAULT_GRAPH_VIEW, graphPath, graphSearch, graphViewFrom, type GraphView } from "./settings.ts";
 
 describe("a journey graph's address", () => {
   const query = (path: string) => new URLSearchParams(path.split("?")[1] ?? "");
@@ -30,11 +30,19 @@ describe("a journey graph's address", () => {
   });
 });
 
-describe("a route canvas's address", () => {
-  it("round-trips its settings and keeps the parameters it does not own", () => {
-    const params = new URLSearchParams("depth=deliverables&open=n_s&shut=n_t&in=n_c&lens=gravity&edit=on&view=list");
-    const view = viewFrom(params);
-    expect(view.rest).toEqual([["view", "list"]]);
-    expect(Object.fromEntries(paramsOf(view))).toEqual(Object.fromEntries(params));
+describe("a route graph's address", () => {
+  it("reads the view state as far as a route offers it, and the graph's own settings in full", () => {
+    const params = new URLSearchParams("depth=deliverables&fade=1&mine=1&owner=u&flag=blocked&frontier=1&show=notrelevant&open=n_s&shut=n_t&lens=gravity&map=1");
+    const view = graphViewFrom(params, ROUTE_OFFERS);
+    expect(view.state).toEqual({ ...DEFAULT_VIEW_STATE, depth: "deliverables", fade: true, filter: { ...DEFAULT_VIEW_STATE.filter, conditional: false } });
+    expect([view.open, view.shut, view.lens, view.map]).toEqual([["n_s"], ["n_t"], "gravity", true]);
+  });
+
+  it("rewrites the graph's settings in a route's query and keeps the version and the view it is on", () => {
+    const search = graphSearch({ ...DEFAULT_GRAPH_VIEW, open: ["n_s"] }, "?version=2&view=graph&depth=stages&shut=n_t&q=x");
+    const params = new URLSearchParams(search);
+    expect(params.get("open")).toBe("n_s");
+    expect(params.has("shut")).toBe(false);
+    expect([params.get("version"), params.get("view")]).toEqual(["2", "graph"]);
   });
 });

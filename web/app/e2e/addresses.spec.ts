@@ -56,14 +56,14 @@ test("the rail lights Home at `/` only, Journeys on the journey pages and their 
   }
 });
 
-test("a bare journey opens the Summary, a node or an edge opens the Graph, and the paths that are gone are no page", async ({ page }) => {
+test("a bare journey opens the Summary, a node or an edge opens the Graph, and the paths that are gone (a route's versions and draft pages among them) are no page", async ({ page }) => {
   await visit(page, "browser", "/journeys/j_vendor_eval");
   await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "summary");
   await visit(page, "browser", "/journeys/j_vendor_eval/nodes/n_plan");
   await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "graph");
   await visit(page, "browser", "/journeys/j_vendor_eval/edges/n_access~n_plan");
   await expect(page.getByTestId("journey-frame")).toHaveAttribute("data-screen", "graph");
-  for (const gone of ["/proposals/pr_gone", "/proposals/pr_gone/nodes/n_plan", "/mine", "/new", "/library", "/journeys/j_vendor_eval/graph", "/journeys/j_vendor_eval/summary", "/journeys/j_vendor_eval/walk/nodes/n_plan"]) {
+  for (const gone of ["/proposals/pr_gone", "/proposals/pr_gone/nodes/n_plan", "/mine", "/new", "/library", "/journeys/j_vendor_eval/graph", "/journeys/j_vendor_eval/summary", "/journeys/j_vendor_eval/walk/nodes/n_plan", "/routes/vendor-evaluation/versions", "/routes/vendor-evaluation/draft", "/routes/vendor-evaluation/draft/nodes/n_plan"]) {
     await visit(page, "browser", gone);
     await expect(page.getByTestId("no-such-page"), gone).toBeVisible();
     expect(new URL(page.url()).pathname, gone).toBe(gone);
