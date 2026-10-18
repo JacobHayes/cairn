@@ -23,14 +23,20 @@ export const BORDER_PX = 1;
 /** The hidden-prerequisites marker's row under a container's rule (px): a line and the padding below it. */
 export const MARKER_ROW_PX = BODY_PX + CARD_PAD_Y_PX;
 
-/** Characters that surely fit one line of a title at the card's width. */
-export const TITLE_LINE_CHARS = 24;
 /** The most lines a title takes; the rest is cut short with an ellipsis. */
 export const TITLE_LINES_MAX = 2;
+/** A card's title is set at this size (px), in the room between the padding. */
+export const TITLE_PX = 15;
+const TITLE_ROOM_PX = CARD_WIDTH_PX - 2 * (CARD_PAD_X_PX + BORDER_PX);
 
-/** The lines a text of `length` characters takes at `perLine` characters a line, at most `max`. */
-export function linesFor(length: number, perLine: number, max: number): number {
-  return Math.min(Math.max(1, Math.ceil(length / perLine)), max);
+/**
+ * The lines a card's title takes: how many it wraps to between its words in the card's room,
+ * at most TITLE_LINES_MAX. This is the one rule: layout sizes the card by it and NodeCard clips
+ * the title to exactly this many lines, so what is drawn never outgrows the height laid out. A
+ * word wider than a line is cut, so it counts as the most.
+ */
+export function titleLinesOf(title: string): number {
+  return Math.min(wrappedLines(title, TITLE_ROOM_PX / TITLE_PX) ?? TITLE_LINES_MAX, TITLE_LINES_MAX);
 }
 
 /** Each row of a card, and whether it is drawn, in the order NodeCard draws them. */
@@ -51,7 +57,7 @@ export function cardRows(card: Card): CardRows {
   const journey = card.journey;
   return {
     head: true,
-    title: linesFor(card.title.length, TITLE_LINE_CHARS, TITLE_LINES_MAX),
+    title: titleLinesOf(card.title),
     body: journey?.body !== undefined,
     foot: (journey !== undefined && (journey.foot !== undefined || journey.owner !== undefined)) || card.route?.foot !== undefined,
     marker: card.hiddenPrerequisites.length > 0,

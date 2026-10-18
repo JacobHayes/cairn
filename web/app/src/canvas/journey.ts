@@ -103,12 +103,15 @@ function bodyOf(context: Context, node: GraphNode, derived: NodeDerived, at: Lev
 function footOf(context: Context, node: GraphNode, derived: NodeDerived, state: DisplayState): CardState["foot"] {
   const { view } = context;
   if (derived.snoozed_via != null) {
-    return { words: `z via ${nodeOf(view, derived.snoozed_via)?.title ?? derived.snoozed_via}`, tone: "plain" };
+    const via = nodeOf(view, derived.snoozed_via)?.title ?? derived.snoozed_via;
+    return { words: `Via ${via}`, title: `Snoozed through ${via}`, tone: "plain" };
   }
   const target = derived.snoozed;
   if (state === "snoozed" && target != null) {
     const until = snoozeTarget(view, derived) ?? "";
-    return { words: "date" in target ? `Snoozed until ${until}` : `Snoozed until ${until} is done`, tone: "plain" };
+    // The chip already says snoozed, so the foot is where it ends, the one fact that must not be cut; a long node name takes the ellipsis, never the "Until".
+    const tail = "date" in target ? undefined : " is done";
+    return { words: `Until ${until}`, ...(tail === undefined ? {} : { tail }), title: `Snoozed until ${until}${tail ?? ""}`, tone: "plain" };
   }
   const { due, latest_start: latestStart, effective_date: effective } = derived.dates;
   return footWords({

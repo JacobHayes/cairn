@@ -69,7 +69,7 @@ export function kindLabel(card: Card): string {
 function Title({ card }: { card: Card }) {
   const actions = useContext(CardActionsContext);
   return actions?.open === undefined ? (
-    <span data-testid="title" title={card.title}>
+    <span className="node-title-text" data-testid="title" title={card.title}>
       {card.title}
     </span>
   ) : (
@@ -79,7 +79,9 @@ function Title({ card }: { card: Card }) {
       data-testid="card-open"
       title={card.title}
     >
-      <span data-testid="title">{card.title}</span>
+      <span className="node-title-text" data-testid="title">
+        {card.title}
+      </span>
     </button>
   );
 }
@@ -185,8 +187,15 @@ function Foot({ card, owner = true }: { card: Card; owner?: boolean }) {
   return (
     <div className="node-foot">
       {journey.foot === undefined ? null : (
-        <span className={journey.foot.tone === "plain" ? "node-date" : `node-date ${journey.foot.tone}`} data-testid="card-foot" data-status={journey.foot.tone} title={journey.foot.words}>
-          {journey.foot.words}
+        <span className={journey.foot.tone === "plain" ? "node-date" : `node-date ${journey.foot.tone}`} data-testid="card-foot" data-status={journey.foot.tone} title={journey.foot.title ?? journey.foot.words}>
+          {journey.foot.tail === undefined ? (
+            journey.foot.words
+          ) : (
+            <>
+              <span className="node-date-lead">{journey.foot.words}</span>
+              <span className="node-date-tail">{journey.foot.tail}</span>
+            </>
+          )}
         </span>
       )}
       <span className="spacer" />

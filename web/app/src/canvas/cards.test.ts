@@ -1,7 +1,7 @@
 // A zoomed-out container head's title: as large as lets the whole of it show, and the chip only when it costs the title nothing.
 import { describe, expect, it } from "vitest";
 
-import { CARD_WIDTH_PX, TITLE_FIT_MIN_PX, headChipFits, headTitleBox, titleFitPx, titleLines } from "./cards.ts";
+import { CARD_WIDTH_PX, TITLE_FIT_MIN_PX, headChipFits, headTitleBox, titleFitPx, titleLines, titleLinesOf, TITLE_LINES_MAX } from "./cards.ts";
 
 describe("titleFitPx", () => {
   const box = headTitleBox(CARD_WIDTH_PX, 112, false);
@@ -30,6 +30,16 @@ describe("titleFitPx", () => {
   it("counts whole lines of a title's size in a room", () => {
     expect(titleLines(20, 70)).toBe(3);
     expect(titleLines(60, 10)).toBe(1);
+  });
+});
+
+describe("titleLinesOf", () => {
+  it("counts the lines a title wraps to between its words, capitals taking more room than lowercase, never more than the most", () => {
+    const [short, caps, lower, long, unbroken] = [titleLinesOf("Short title"), titleLinesOf("WIDE WIDE WIDE WIDE WIDE"), titleLinesOf("wide wide wide wide wide"), titleLinesOf("word ".repeat(40)), titleLinesOf("x".repeat(80))];
+    expect(short).toBe(1);
+    expect(caps).toBeGreaterThan(lower);
+    expect(long).toBe(TITLE_LINES_MAX);
+    expect(unbroken).toBe(TITLE_LINES_MAX);
   });
 });
 

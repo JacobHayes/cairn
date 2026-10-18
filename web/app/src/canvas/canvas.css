@@ -338,11 +338,21 @@
   font: 600 15px / 21px var(--font-body);
 }
 
-.node-title > *,
-.node-open {
+/* The title is cut to the lines layout gave it (--title-lines, cards.ts), with an ellipsis, on the text's own box: a button cannot be a line-clamp box in every browser, so the button only holds it, and the row's box clips whatever a browser's wrap would add. */
+.node-title-row > .node-title {
+  overflow: hidden;
+}
+
+.node-title-text {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: var(--title-lines, 2);
+  overflow: hidden;
+  width: 100%;
+}
+
+.node-open {
+  display: block;
   overflow: hidden;
   width: 100%;
 }
@@ -470,6 +480,24 @@
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+/* A date with a tail ("Until <node>" and " is done"): the words take the ellipsis, the tail stays whole. */
+.node-foot > .node-date:has(> .node-date-tail) {
+  display: flex;
+  overflow: visible;
+}
+
+.node-date-lead {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.node-date-tail {
+  flex: none;
+  white-space: pre;
 }
 
 .node-foot > .node-owner {
@@ -694,6 +722,10 @@
 
 /* A title breaks only between words and shows whole lines: the line count is what the room holds at the fit size, the rest ends in an ellipsis. */
 .react-flow[data-lod="out"] .node-container .node-title > * {
+  width: auto;
+}
+
+.react-flow[data-lod="out"] .node-container .node-title-text {
   overflow-wrap: normal;
   word-break: normal;
   width: auto;
@@ -701,7 +733,7 @@
 }
 
 /* A word wider than the head even at the least size is cut with an ellipsis on one line, not clipped through its letters. */
-.react-flow[data-lod="out"] .node-container .node-title-row[data-cut] .node-title > * {
+.react-flow[data-lod="out"] .node-container .node-title-row[data-cut] .node-title-text {
   display: block;
   overflow: hidden;
   text-overflow: ellipsis;

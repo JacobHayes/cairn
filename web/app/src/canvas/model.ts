@@ -128,8 +128,8 @@ export interface CardState {
   /** Done or skipped: nothing is left to do. */
   finished: boolean;
   relevance: Relevance;
-  /** The foot's one date, in words, with the tone it reads in. */
-  foot: { words: string; tone: Tone } | undefined;
+  /** The foot's one date, in words, with the tone it reads in, a tail that is never cut when the words are (a node name takes the ellipsis, not what follows it), and the full sentence for its tooltip when the words are short for it. */
+  foot: { words: string; tone: Tone; tail?: string; title?: string } | undefined;
   /** The foot's owner: only when it is the viewer or missing. */
   owner: { words: string; missing: boolean } | undefined;
   /** Everyone who owns it, for the hover. */

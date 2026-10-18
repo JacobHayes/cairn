@@ -75,8 +75,16 @@ describe("C1: what a card says", () => {
       derivedOf(each, "n_build").snoozed = { date: "2026-10-20" };
     });
     const cards = model(wholeLevel(), [], [], snoozed);
-    expect(card(cards, "n_check").journey?.foot).toEqual({ words: "z via Build stage", tone: "plain" });
-    expect(card(cards, "n_build").journey?.foot).toEqual({ words: "Snoozed until Oct 20", tone: "plain" });
+    expect(card(cards, "n_check").journey?.foot).toEqual({ words: "Via Build stage", title: "Snoozed through Build stage", tone: "plain" });
+    expect(card(cards, "n_build").journey?.foot).toEqual({ words: "Until Oct 20", title: "Snoozed until Oct 20", tone: "plain" });
+  });
+
+  test("a node snoozed until another is done keeps 'is done' apart from the name, which is what a short foot cuts", () => {
+    const snoozed = changed((each) => {
+      derivedOf(each, "n_build").display_state = "snoozed";
+      derivedOf(each, "n_build").snoozed = { node: "n_stage" };
+    });
+    expect(card(model(wholeLevel(), [], [], snoozed), "n_build").journey?.foot).toEqual({ words: "Until Build stage", tail: " is done", title: "Snoozed until Build stage is done", tone: "plain" });
   });
 
   test("a container carries one roll-up badge, the most urgent", () => {

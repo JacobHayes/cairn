@@ -5,7 +5,7 @@
 // model's tests'.
 import { expect, test } from "@playwright/test";
 
-import { lineBetween, pointOn, viewportOf, viewportSettled } from "./canvas.ts";
+import { expectRowsInsideCards, lineBetween, pointOn, publishLongTitleRoute, viewportOf, viewportSettled, zoomToReading } from "./canvas.ts";
 import { journeyName, startJourney } from "./around.ts";
 import { nodeCard, nodePanel, openJourney, setDepth, setFade } from "./shell.ts";
 
@@ -291,4 +291,22 @@ test("C2, DESIGN opacity: nodes Reveal draws are dimmed by the depth under Fade 
     await expect(nodeCard(page, key), key).toBeVisible();
     await expect(nodeCard(page, key), key).toHaveCSS("opacity", "0.3");
   }
+});
+
+test("a card's rows stay inside its box whatever its title's length, on a route's graph and a journey's, fitted and at the reading zoom", async ({ page }) => {
+  const route = await publishLongTitleRoute(page);
+  await page.getByTestId("view-picker").click();
+  await page.getByTestId("view-graph").click();
+  await expect(page.getByTestId("node-card").first()).toBeVisible();
+  await page.keyboard.press("f");
+  await viewportSettled(page);
+  await expectRowsInsideCards(page);
+  await zoomToReading(page);
+  await expectRowsInsideCards(page);
+  const journey = await startJourney(page, "browser", journeyName("Long titles"), { route });
+  await openJourney(page, "browser", journey, "?depth=actions");
+  await viewportSettled(page);
+  await expectRowsInsideCards(page);
+  await zoomToReading(page);
+  await expectRowsInsideCards(page);
 });
