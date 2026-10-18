@@ -462,6 +462,18 @@
   font: 500 12.5px / 22px var(--font-mono);
   font-variant-numeric: tabular-nums;
   color: var(--color-secondary);
+  white-space: nowrap;
+}
+
+/* The foot is one line, as cards.ts sized it: a date too long for the card ends in an ellipsis (the card's title holds the rest) rather than wrap below the border. */
+.node-foot > .node-date {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.node-foot > .node-owner {
+  flex: none;
 }
 
 .node-date.warn {

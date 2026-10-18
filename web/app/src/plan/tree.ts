@@ -76,6 +76,11 @@ export function treeOf(view: Ready): Tree {
   return tree;
 }
 
+/** The nodes that hold others in the graph itself (C2): the one rule for what is a container, whatever a level draws or a search leaves. */
+export function containerKeys(nodes: readonly GraphNode[]): ReadonlySet<string> {
+  return new Set(nodes.flatMap((node) => (node.parent == null ? [] : [node.parent])));
+}
+
 /** `key`'s ancestors, root first. */
 export function ancestorsOf(view: Ready, key: string): string[] {
   const { parents } = treeOf(view);

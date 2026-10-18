@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import { actingView } from "./acting.test-support.ts";
-import { rollups } from "../plan/tree.ts";
+import { containerKeys, rollups } from "../plan/tree.ts";
 import type { DisplayState } from "../status/words.ts";
 import { planOrder } from "../plan/tree.ts";
 import type { ListSettings } from "./address.ts";
@@ -28,6 +28,7 @@ const row = (key: string, ancestors: string[] = []): NodeRow => ({
 const rows = [row("n_inner", ["n_stage"]), row("n_work"), row("n_stage")];
 const byKey = (each: readonly NodeRow[]) => new Map(each.map((one) => [one.key, one]));
 const order = new Map(planOrder(view).map((key, at) => [key, at]));
+const containers = containerKeys(view.journey.graph.nodes ?? []);
 /** The fixture's level at All: every node drawn under its parent. */
 const level = [{ key: "n_stage" }, { key: "n_inner", parent: "n_stage" }, { key: "n_work" }];
 const STOCK: ListSettings = { sort: undefined, columns: [] };
@@ -60,18 +61,23 @@ describe("the columns", () => {
 
 describe("the lines", () => {
   it("nest the drawn nodes as the level draws them, folded or open as asked", () => {
-    expect(treeLines(level, byKey(rows), () => false, order).map((line) => [line.key, line.depth, line.container, line.open])).toEqual([
+    expect(treeLines(level, byKey(rows), () => false, order, containers).map((line) => [line.key, line.depth, line.container, line.open])).toEqual([
       ["n_stage", 0, true, false],
       ["n_work", 0, false, false],
     ]);
-    expect(treeLines(level, byKey(rows), () => true, order).map((line) => [line.key, line.depth])).toEqual([["n_stage", 0], ["n_inner", 1], ["n_work", 0]]);
+    expect(treeLines(level, byKey(rows), () => true, order, containers).map((line) => [line.key, line.depth])).toEqual([["n_stage", 0], ["n_inner", 1], ["n_work", 0]]);
+  });
+
+  it("keep a container a container when the level draws none of what it holds, with nothing to fold", () => {
+    const [stage] = treeLines([{ key: "n_stage" }, { key: "n_work" }], byKey(rows), () => true, order, containers);
+    expect(stage).toMatchObject({ key: "n_stage", container: true, foldable: false });
   });
 
   it("draw a node under the drawn node the level puts it under, never a hidden ancestor, and skip a drawn node with no row", () => {
     // n_stage is hidden at this level: n_inner is a top-level line, not a child.
-    expect(treeLines([{ key: "n_inner" }, { key: "n_work" }], byKey(rows), () => true, order).map((line) => [line.key, line.depth])).toEqual([["n_inner", 0], ["n_work", 0]]);
+    expect(treeLines([{ key: "n_inner" }, { key: "n_work" }], byKey(rows), () => true, order, containers).map((line) => [line.key, line.depth])).toEqual([["n_inner", 0], ["n_work", 0]]);
     // n_stage has no row for a moment: its child stays, at the top.
-    expect(treeLines(level, byKey([row("n_inner", ["n_stage"]), row("n_work")]), () => true, order).map((line) => [line.key, line.depth])).toEqual([["n_inner", 0], ["n_work", 0]]);
+    expect(treeLines(level, byKey([row("n_inner", ["n_stage"]), row("n_work")]), () => true, order, containers).map((line) => [line.key, line.depth])).toEqual([["n_inner", 0], ["n_work", 0]]);
   });
 
   it("say per row which guide lines run beside it: its own elbow, and each ancestor's while that ancestor has more below", () => {
@@ -89,7 +95,7 @@ describe("the lines", () => {
     const everything = [row("n_inner", ["n_stage"]), row("n_leaf", ["n_stage", "n_inner"]), row("n_zlast", ["n_stage"]), row("n_stage"), row("n_work")];
     const drawn = [{ key: "n_stage" }, { key: "n_inner", parent: "n_stage" }, { key: "n_leaf", parent: "n_inner" }, { key: "n_zlast", parent: "n_stage" }, { key: "n_work" }];
     const placed = new Map(planOrder(deep).map((key, at) => [key, at]));
-    expect(treeLines(drawn, byKey(everything), () => true, placed).map((line) => [line.key, line.guides])).toEqual([
+    expect(treeLines(drawn, byKey(everything), () => true, placed, containers).map((line) => [line.key, line.guides])).toEqual([
       ["n_stage", []],
       ["n_inner", [true]],
       ["n_leaf", [true, false]],

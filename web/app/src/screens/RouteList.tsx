@@ -7,13 +7,14 @@ import { useMemo } from "react";
 import { useNavigate } from "react-router";
 
 import { ruleFoot } from "../authoring/dates.ts";
-import { childrenOf, nodesByPath, treeOf, type Tree } from "../authoring/graph.ts";
+import { nodesByPath, treeOf, type Tree } from "../authoring/graph.ts";
 import type { GraphNode } from "../detail/model.ts";
 import { useFolds } from "../canvas/hooks.ts";
 import { collapsedAt, drawnStep, stepOf } from "../canvas/ladder.ts";
 import { useNodeAddresses } from "../journeys/address.ts";
 import { badgesOf, depthFaded, levelRequestOf, outOfFocus, stepHides } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
+import { containerKeys } from "../plan/tree.ts";
 import { nodesOf, type Shown } from "./route-reads.ts";
 import { useRouteLevel } from "./route-views.ts";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
@@ -73,6 +74,7 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
   const faded = useMemo(() => outOfFocus(undefined, drawn === undefined ? NONE : depthFaded(state, nodes, depth, collapsedAt(depth, nodes, NONE, [], []), drawn)), [state, nodes, depth, drawn]);
   const badges = useMemo(() => badgesOf("list", level?.hidden_by_class ?? {}, undefined, stepHides(nodes, depth, []), state.fade), [level, nodes, depth, state.fade]);
   const rows = useListRows(tree, level, open);
+  const containers = useMemo(() => containerKeys(nodes), [nodes]);
   return (
     <section className="stack list" aria-label="List" data-testid="list">
       <ViewBar subject={routeSubject(nodes)} screen="list" badges={badges} />
@@ -87,7 +89,7 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
               data-testid="route-row"
               data-node={node.key}
               data-kind={node.kind}
-              data-container={childrenOf(tree, node.key).length > 0}
+              data-container={containers.has(node.key)}
               data-faded={faded(node.key) ? true : undefined}
               data-navigable={onOpen === undefined ? undefined : true}
               aria-current={node.key === selected ? "true" : undefined}

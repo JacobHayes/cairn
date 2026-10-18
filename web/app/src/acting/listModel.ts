@@ -60,8 +60,10 @@ export interface Line {
   /** How far in the tree it sits; every flat line is 0. */
   depth: number;
   row: NodeRow | undefined;
-  /** It holds lines of its own, shown or folded. */
+  /** It is a container of the graph (`containerKeys`), whether or not any of what it holds is drawn. */
   container: boolean;
+  /** It has drawn lines beneath it, shown or folded: the fold button's. */
+  foldable: boolean;
   open: boolean;
   /**
    * The tree's guide lines, one per level: at `depth - 1` (the last) the row's own `├` or `└`,
@@ -76,7 +78,7 @@ export interface Line {
  * folded as `open` says. A drawn node with no row (read at another revision for a moment) is left
  * out, its children kept under the nearest drawn node above it that has one.
  */
-export function treeLines(drawn: readonly { key: string; parent?: string | null }[], rows: ReadonlyMap<string, NodeRow>, open: (container: string) => boolean, order: ReadonlyMap<string, number>): Line[] {
+export function treeLines(drawn: readonly { key: string; parent?: string | null }[], rows: ReadonlyMap<string, NodeRow>, open: (container: string) => boolean, order: ReadonlyMap<string, number>, containers: ReadonlySet<string>): Line[] {
   const parents = new Map(drawn.map((node) => [node.key, node.parent ?? undefined]));
   const shownAbove = (key: string): string | undefined => {
     let at = parents.get(key);
@@ -100,7 +102,7 @@ export function treeLines(drawn: readonly { key: string; parent?: string | null 
   const visit = (key: string, depth: number, guides: boolean[]) => {
     const held = children.get(key) ?? [];
     const isOpen = held.length > 0 && open(key);
-    lines.push({ key, depth, row: rows.get(key), container: held.length > 0, open: isOpen, guides });
+    lines.push({ key, depth, row: rows.get(key), container: containers.has(key), foldable: held.length > 0, open: isOpen, guides });
     if (isOpen) {
       held.forEach((child, at) => { visit(child, depth + 1, [...guides, at < held.length - 1]); });
     }
@@ -117,7 +119,7 @@ export function flatLines(view: Ready, rows: readonly NodeRow[], sort: SortBy | 
   const order = new Map(planOrder(view).map((key, at) => [key, at]));
   const ordered = sort === undefined ? [...rows].sort((left, right) => (order.get(left.key) ?? 0) - (order.get(right.key) ?? 0)) : rows;
   const over = (row: NodeRow) => (sort === "due" || sort === "slack") && ["done", "skipped", "not_relevant"].includes(row.display_state);
-  return [...ordered.filter((row) => !over(row)), ...ordered.filter(over)].map((row) => ({ key: row.key, depth: 0, row, container: false, open: false, guides: [] }));
+  return [...ordered.filter((row) => !over(row)), ...ordered.filter(over)].map((row) => ({ key: row.key, depth: 0, row, container: false, foldable: false, open: false, guides: [] }));
 }
 
 /**

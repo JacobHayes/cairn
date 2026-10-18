@@ -21,7 +21,7 @@ import type { Ready } from "../detail/model.ts";
 import { useMineOf } from "../journeys/mine.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides, tableQueryOf } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
-import { planOrder } from "../plan/tree.ts";
+import { containerKeys, planOrder } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { journeySubject, ResetView, ViewBar } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
@@ -225,6 +225,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const decisions = useMemo(() => new Map((projected === undefined ? [] : decisionRows(view, projected)).map((decision) => [decision.key, decision])), [view, projected]);
   const ranks = useMemo(() => rankPositions(view, state.frontier), [view, state.frontier]);
   const order = useMemo(() => new Map(planOrder(view).map((key, at) => [key, at])), [view]);
+  const containers = useMemo(() => containerKeys(nodes), [nodes]);
   const tree = list.sort === undefined;
   const addresses = useNodeAddresses();
   const navigate = useNavigate();
@@ -232,8 +233,8 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   const folds = useFolds(nodes, current, state.depth, shown, picks, selected, (key) => void navigate(addresses.open(key)));
   const kept = useMemo(() => (rows === undefined || drawn === undefined ? undefined : rows.filter((row) => drawn.has(row.key))), [rows, drawn]);
   const lines = useMemo(
-    () => (kept === undefined || level === undefined ? [] : tree ? treeLines(level.nodes, new Map(kept.map((row) => [row.key, row])), folds.open, order) : flatLines(view, kept, list.sort)),
-    [view, kept, level, tree, list.sort, folds.open, order],
+    () => (kept === undefined || level === undefined ? [] : tree ? treeLines(level.nodes, new Map(kept.map((row) => [row.key, row])), folds.open, order, containers) : flatLines(view, kept, list.sort)),
+    [view, kept, level, tree, list.sort, folds.open, order, containers],
   );
   const base = useMemo(() => litOf("list", state, view), [state, view]);
   const lit = useMemo(() => (base === undefined ? undefined : lightsUp(nodes, base)), [nodes, base]);

@@ -91,7 +91,7 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
       {tree ? (
         <>
           <TreeGuides depth={line.depth} guides={line.guides} open={line.open} />
-          <TreeFold container={line.container} open={line.open} label={nodeOf(view, line.key)?.title ?? line.key} testId="list-fold" onFold={() => { context.onFold(line.key); }} />
+          <TreeFold container={line.foldable} open={line.open} label={nodeOf(view, line.key)?.title ?? line.key} testId="list-fold" onFold={() => { context.onFold(line.key); }} />
         </>
       ) : null}
       <div className="list-node">

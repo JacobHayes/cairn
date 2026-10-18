@@ -173,7 +173,7 @@ function Foot({ card, owner = true }: { card: Card; owner?: boolean }) {
   if (journey === undefined && card.route?.foot !== undefined) {
     return (
       <div className="node-foot">
-        <span className="node-date" data-testid="card-foot">
+        <span className="node-date" data-testid="card-foot" title={card.route.foot}>
           {card.route.foot}
         </span>
       </div>
@@ -185,7 +185,7 @@ function Foot({ card, owner = true }: { card: Card; owner?: boolean }) {
   return (
     <div className="node-foot">
       {journey.foot === undefined ? null : (
-        <span className={journey.foot.tone === "plain" ? "node-date" : `node-date ${journey.foot.tone}`} data-testid="card-foot" data-status={journey.foot.tone}>
+        <span className={journey.foot.tone === "plain" ? "node-date" : `node-date ${journey.foot.tone}`} data-testid="card-foot" data-status={journey.foot.tone} title={journey.foot.words}>
           {journey.foot.words}
         </span>
       )}
