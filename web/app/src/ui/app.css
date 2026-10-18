@@ -975,22 +975,30 @@ table.data {
     grid-template-columns: minmax(0, 1fr);
   }
 }
-.version-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
+/* An entity's row in its Panel: paper, a hairline under each, as the node rows. */
+.entity-row {
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--color-edge);
+  background: var(--color-surface);
 }
-.version-list > li {
-  border-top: 1px solid var(--color-border);
-  padding: var(--space-3) 0;
+.node-rows > .entity-row:last-child {
+  border-bottom: 0;
 }
 /* Multi-value input (DESIGN): an input's box holding a chip per value and the input that takes the next. */
 .chips-field {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
-  flex: 1 1 18rem;
+  gap: 3px;
+  flex: 2 1 18rem;
   min-width: 0;
+}
+.chips-field > .label {
+  font-size: 11px;
+  line-height: 1.2;
+}
+.entity-key {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .chips-input {
   display: flex;
@@ -1033,9 +1041,15 @@ table.data {
   background: transparent;
   font: 500 13px / 1.6 var(--font-mono);
 }
-/* Beside a growing field, the form's controls hold the top edge. */
+/* Beside a growing field, the form's controls hold the top edge, and the name takes a share of the row. */
 .row:has(> .chips-field) {
   align-items: flex-start;
+}
+.row:has(> .chips-field) > .field {
+  flex: 1 1 12rem;
+}
+.row:has(> .chips-field) > .field > input {
+  width: 100%;
 }
 .chip-value {
   display: inline-flex;
@@ -1047,20 +1061,33 @@ table.data {
   font: 500 13px / 1.6 var(--font-mono);
   padding-left: var(--space-2);
 }
+.chips-static {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
 .chip-value > span {
   overflow-wrap: anywhere;
 }
+/* A chip with nothing after it is as padded after as before. */
+.chip-value > span:last-child {
+  padding-right: var(--space-2);
+}
 /* The remove button is a full touch target on a phone, a quiet cross beside the value elsewhere. */
-.chip-value > button {
+.chip-value > :is(button, a) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   min-width: 24px;
   min-height: 24px;
   padding: 0 var(--space-1);
   border: 0;
   background: transparent;
   color: var(--color-secondary);
+  text-decoration: none;
   line-height: 1;
 }
-.chip-value > button:hover {
+.chip-value > :is(button, a):hover {
   color: var(--color-text);
 }
 .chips-reason {
@@ -1074,14 +1101,14 @@ table.data {
   text-transform: uppercase;
 }
 @media (max-width: 719px) {
-  .chip-value > button {
+  .chip-value > :is(button, a) {
     min-width: 44px;
     min-height: 32px;
   }
   .chips-input > input {
     font-size: 16px;
   }
-  .row:has(> .chips-field) > input {
+  .row:has(> .chips-field) > .field {
     flex: 1 1 100%;
   }
 }

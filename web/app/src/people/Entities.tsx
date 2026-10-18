@@ -3,6 +3,7 @@
 // and merged, the merged key kept as an alias so journeys and their history resolve to the
 // survivor unchanged. Which entities are the caller's is marked. Kept current (H6). An edit
 // is drafted against the deployment revision its author saw, and forms survive a reload.
+import { useState } from "react";
 import { useLocation } from "react-router";
 
 import type { Deployment } from "../data/host.ts";
@@ -16,6 +17,8 @@ import type { Rejection } from "../data/writes.ts";
 import { Refused } from "../screens/Refused.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "../screens/write.ts";
+import { NodePanel } from "../acting/NodeItem.tsx";
+import { Chip, Chips } from "../ui/Chip.tsx";
 import { ChipsInput } from "../ui/ChipsInput.tsx";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { MergeEntities } from "./MergeEntities.tsx";
@@ -52,11 +55,15 @@ function EntityEditor({ entity, deployment, draft, setDraft, write }: { entity: 
   };
   return (
     <>
-      <form className="row" onSubmit={(event) => { event.preventDefault(); void save(); }}>
-        <Field aria-label="Name" value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); }} />
-        <ChipsInput label="Emails" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={draft.emails} text={draft.emailText} onChange={(emails, emailText) => { setDraft({ ...draft, emails, emailText }); }} />
-        <Button primary type="submit" disabled={write.disabled || draft.name.trim() === "" || draft.emailText.trim() !== ""}>Save</Button>
-        <Button onClick={() => { setDraft(undefined); write.dismiss(); }}>Cancel</Button>
+      <form className="stack" onSubmit={(event) => { event.preventDefault(); void save(); }}>
+        <span className="row">
+          <Field label="Name" value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); }} />
+          <ChipsInput label="Emails" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={draft.emails} text={draft.emailText} onChange={(emails, emailText) => { setDraft({ ...draft, emails, emailText }); }} />
+        </span>
+        <span className="row">
+          <Button primary type="submit" disabled={write.disabled || draft.name.trim() === "" || draft.emailText.trim() !== ""}>Save</Button>
+          <Button onClick={() => { setDraft(undefined); write.dismiss(); }}>Cancel</Button>
+        </span>
       </form>
       <WriteStatus view={write.status} />
       {write.rejected === undefined ? null : (
@@ -77,10 +84,10 @@ function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: 
   const write = useScreenWrite(`entity:${entity.key}`, entity.name);
   const aliases = aliasesOf(deployment, entity.key);
   return (
-    <li className="stack" data-testid="entity" data-entity={entity.key}>
+    <li className="stack entity-row" data-testid="entity" data-entity={entity.key}>
       <span className="row">
         <strong data-testid="entity-name">{entity.name}</strong>
-        <span className="muted mono">{entity.key}</span>
+        <span className="muted mono entity-key">{entity.key}</span>
         {yours ? <Badge tone="good" data-testid="yours">You</Badge> : null}
         {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">also {aliases.join(", ")}</span>}
         <span className="spacer" />
@@ -88,7 +95,11 @@ function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: 
           <Button disabled={write.disabled} onClick={() => { setDraft({ name: entity.name, emails: [...(entity.emails ?? [])], emailText: "", base: deployment.revision }); }}>Edit</Button>
         ) : null}
       </span>
-      {draft === undefined ? <span className="muted small" data-testid="entity-emails">{(entity.emails ?? []).join(", ") || "No emails"}</span> : null}
+      {draft !== undefined ? null : (
+        <span data-testid="entity-emails">
+          {(entity.emails ?? []).length === 0 ? <span className="muted small">No emails</span> : <Chips>{(entity.emails ?? []).map((email) => <Chip key={email}>{email}</Chip>)}</Chips>}
+        </span>
+      )}
       {draft === undefined ? null : <EntityEditor entity={entity} deployment={deployment} draft={draft} setDraft={setDraft} write={write} />}
     </li>
   );
@@ -105,11 +116,15 @@ function CreateEntity({ deployment }: { deployment: Deployment }) {
     }
   };
   return (
-    <form className="row" data-testid="create-entity" onSubmit={(event) => { event.preventDefault(); void create(); }}>
-      <Field aria-label="New entity's name" placeholder="Name" value={name} onChange={(event) => { setDraft({ name: event.target.value, emails, emailText }); }} />
-      <ChipsInput label="New entity's emails" placeholder="Add an email (optional)" inputMode="email" rules={EMAIL_RULES} values={emails} text={emailText} onChange={(next, nextText) => { setDraft({ name, emails: next, emailText: nextText }); }} />
-      <Button primary type="submit" disabled={write.disabled || name.trim() === "" || emailText.trim() !== ""}>Add an entity</Button>
-      {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+    <form className="stack" data-testid="create-entity" onSubmit={(event) => { event.preventDefault(); void create(); }}>
+      <span className="row">
+        <Field label="Name" value={name} onChange={(event) => { setDraft({ name: event.target.value, emails, emailText }); }} />
+        <ChipsInput label="Emails (optional)" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={emails} text={emailText} onChange={(next, nextText) => { setDraft({ name, emails: next, emailText: nextText }); }} />
+      </span>
+      <span className="row">
+        <Button primary type="submit" disabled={write.disabled || name.trim() === "" || emailText.trim() !== ""}>Add an entity</Button>
+        {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
+      </span>
     </form>
   );
 }
@@ -131,6 +146,19 @@ function DeploymentProposals() {
   return found.items.length === 0 ? null : <RowsPanel title="Open proposals" testId="deployment-proposals" rows={proposalRows(found.items)} />;
 }
 
+/** Merging is folded away until asked for, or until a link (the sign-in page's offer) names the two to merge. */
+function MergeFold({ deployment, entities, asked }: { deployment: Deployment; entities: readonly Entity[]; asked: string[] }) {
+  const [open, setOpen] = useState(asked.length > 0);
+  return (
+    <>
+      <span className="row">
+        <Button aria-expanded={open} aria-controls="merge-entities" onClick={() => { setOpen(!open); }}>{open ? "Close merge" : "Merge entities"}</Button>
+      </span>
+      {open ? <MergeEntities deployment={deployment} entities={entities} asked={asked} /> : null}
+    </>
+  );
+}
+
 export function Entities() {
   const deployment = useDeployment();
   const { viewer } = useViewer();
@@ -147,13 +175,16 @@ export function Entities() {
       <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an entity holding your verified email is you.</span>
       <DeploymentProposals />
       <CreateEntity deployment={deployment} />
-      <MergeEntities key={asked.join(",")} deployment={deployment} entities={entities} asked={asked} />
-      {entities.length === 0 ? <p className="muted small" data-testid="entities-empty">No entities yet.</p> : null}
-      <ul className="version-list">
-        {entities.map((entity) => (
-          <EntityRow key={entity.key} entity={entity} deployment={deployment} yours={yours.has(entity.key)} />
-        ))}
-      </ul>
+      <MergeFold key={asked.join(",")} deployment={deployment} entities={entities} asked={asked} />
+      {entities.length === 0 ? (
+        <p className="muted small" data-testid="entities-empty">No entities yet.</p>
+      ) : (
+        <NodePanel title="Entities" count={entities.length} testId="entity-list">
+          {entities.map((entity) => (
+            <EntityRow key={entity.key} entity={entity} deployment={deployment} yours={yours.has(entity.key)} />
+          ))}
+        </NodePanel>
+      )}
     </section>
   );
 }

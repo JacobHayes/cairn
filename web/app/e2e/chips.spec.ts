@@ -6,7 +6,7 @@ import type { Page } from "@playwright/test";
 import { open } from "./shell.ts";
 import { expect, test } from "./test.ts";
 
-const field = (page: Page) => page.getByTestId("create-entity").getByLabel("New entity's emails");
+const field = (page: Page) => page.getByTestId("create-entity").getByLabel("Emails");
 const chips = (page: Page) => page.getByTestId("create-entity").getByTestId("chip-value");
 
 for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["phone", { width: 390, height: 844 }]] as const) {
@@ -17,7 +17,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
     await field(page).press("Enter");
     await field(page).pressSequentially("bob@example.org,");
     await field(page).fill("cy@example.org");
-    await page.getByTestId("create-entity").getByLabel("New entity's name").focus();
+    await page.getByTestId("create-entity").getByLabel("Name").focus();
     await expect(chips(page)).toHaveText(["ann@example.org", "bob@example.org", "cy@example.org"]);
 
     await field(page).fill("not-an-email");
@@ -37,7 +37,7 @@ for (const [name, viewport] of [["desktop", { width: 1280, height: 800 }], ["pho
     await page.getByRole("button", { name: "Remove ann@example.org" }).click();
     await expect(chips(page)).toHaveText(["bob@example.org"]);
 
-    await page.getByTestId("create-entity").getByLabel("New entity's name").fill("Chip person");
+    await page.getByTestId("create-entity").getByLabel("Name").fill("Chip person");
     await page.getByRole("button", { name: "Add an entity" }).click();
     const row = page.getByTestId("entity").filter({ hasText: "Chip person" });
     await expect(row.getByTestId("entity-emails")).toHaveText("bob@example.org");
@@ -77,4 +77,16 @@ test("H3: a refused value is selected so a paste replaces it, and Tab still leav
   await field(page).press("Tab");
   await expect(field(page)).not.toBeFocused();
   await expect(page.getByTestId("chips-reason")).toBeVisible();
+});
+
+test("the merge is folded until asked for, and open when a link names the two to merge", async ({ page }) => {
+  await open(page, "browser", "/entities");
+  await expect(page.getByTestId("merge-entities")).toHaveCount(0);
+  await page.getByRole("button", { name: "Merge entities" }).click();
+  await expect(page.getByTestId("merge-entities")).toBeVisible();
+  await page.getByRole("button", { name: "Close merge" }).click();
+  await expect(page.getByTestId("merge-entities")).toHaveCount(0);
+  await open(page, "browser", "/entities?merge=e_lead,e_owner");
+  await expect(page.getByTestId("merge-entities")).toBeVisible();
+  await expect(page.getByTestId("merge-entities").getByLabel("Keep")).toHaveValue("e_lead");
 });

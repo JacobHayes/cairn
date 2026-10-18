@@ -5,6 +5,7 @@
 // a value is (chips.ts).
 import { useId, useRef, useState, type ChangeEvent, type ClipboardEvent, type KeyboardEvent, type RefObject } from "react";
 
+import { Chip, Cross } from "./Chip.tsx";
 import { hasSeparator, takeChips, type ChipRules } from "./chips.ts";
 
 interface Chips {
@@ -65,12 +66,15 @@ function useTaking({ values, text, onChange, rules }: Chips, input: RefObject<HT
 
 function RemovableChip({ value, onRemove }: { value: string; onRemove: () => void }) {
   return (
-    <span className="chip-value">
-      <span data-testid="chip-value">{value}</span>
-      <button type="button" aria-label={`Remove ${value}`} onClick={onRemove}>
-        <span aria-hidden="true">×</span>
-      </button>
-    </span>
+    <Chip
+      remove={
+        <button type="button" aria-label={`Remove ${value}`} onClick={onRemove}>
+          <Cross />
+        </button>
+      }
+    >
+      {value}
+    </Chip>
   );
 }
 
@@ -80,7 +84,7 @@ export function ChipsInput({
   inputMode = "text",
   ...chips
 }: Chips & {
-  /** The input's accessible name. */
+  /** The field's name, shown above it and naming the input. */
   label: string;
   placeholder?: string;
   /** The keyboard a phone offers. */
@@ -89,9 +93,13 @@ export function ChipsInput({
   const { values, text, onChange } = chips;
   const input = useRef<HTMLInputElement>(null);
   const reasonId = useId();
+  const inputId = useId();
   const { problem, setProblem, handlers } = useTaking(chips, input);
   return (
     <div className="chips-field">
+      <label className="label" htmlFor={inputId}>
+        {label}
+      </label>
       <div
         className="chips-input"
         data-invalid={problem === undefined ? undefined : "true"}
@@ -120,7 +128,7 @@ export function ChipsInput({
           autoComplete="off"
           spellCheck={false}
           enterKeyHint="done"
-          aria-label={label}
+          id={inputId}
           aria-invalid={problem !== undefined}
           aria-describedby={problem === undefined ? undefined : reasonId}
           placeholder={placeholder}

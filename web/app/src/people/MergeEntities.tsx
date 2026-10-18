@@ -61,7 +61,7 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
   });
   const ready = survivor !== "" && merged !== "" && survivor !== merged;
   return (
-    <section className="stack panel" aria-label="Merge two entities" data-testid="merge-entities">
+    <section id="merge-entities" className="stack panel" aria-label="Merge two entities" data-testid="merge-entities">
       <strong>Merge two entities</strong>
       <span className="muted small">The second becomes an alias of the first: journeys and their history keep referring to it and now read the first.</span>
       <span className="row">

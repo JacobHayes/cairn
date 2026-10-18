@@ -105,17 +105,20 @@ export async function savedText(page: Page, click: () => Promise<void>): Promise
 /** Merges `merged` into `survivor` on the entities screen and waits for the alias to show. */
 export async function mergeEntities(page: Page, survivor: string, merged: string): Promise<void> {
   const form = page.getByTestId("merge-entities");
+  if ((await form.count()) === 0) {
+    await page.getByRole("button", { name: "Merge entities" }).click();
+  }
   await form.getByLabel("Keep").selectOption(survivor);
   await form.getByLabel("Merge into it").selectOption(merged);
-  await form.getByRole("button", { name: "Merge" }).click();
+  await form.getByRole("button", { name: "Merge", exact: true }).click();
   await expect(page.locator(`[data-testid="entity"][data-entity="${survivor}"]`).getByTestId("aliases")).toContainText(merged);
 }
 
 /** Adds an entity on the entities screen; its key, once listed. */
 export async function addEntity(page: Page, name: string, emails: readonly string[] = []): Promise<string> {
   const form = page.getByTestId("create-entity");
-  await form.getByLabel("New entity's name").fill(name);
-  const field = form.getByLabel("New entity's emails");
+  await form.getByLabel("Name").fill(name);
+  const field = form.getByLabel("Emails");
   for (const email of emails) {
     await field.fill(email);
     await field.press("Enter");
