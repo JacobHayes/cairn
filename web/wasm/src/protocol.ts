@@ -9,7 +9,7 @@ import type { ApplyRequest, DerivationHandle, DraftRequest, HostError, PreviewRe
 
 /** What the page asks the worker. */
 export type WorkerRequest =
-  | { op: "init"; wasm: string }
+  | { op: "init"; wasm: WebAssembly.Module }
   | { op: "load"; document: string }
   | { op: "derived"; journey: string }
   | { op: "project"; journey: string; request: ProjectionRequest }

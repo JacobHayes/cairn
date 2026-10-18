@@ -6,15 +6,11 @@
 // its own would.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { pathToFileURL } from "node:url";
 
 const bindgen = join(import.meta.dirname, "..", "dist", "bindgen", "cairn_wasm_bg.wasm");
 
-/** The module's bytes, for the calls that run on this thread. */
-export const wasmBytes = readFileSync(bindgen);
-
-/** The module's address, for the derive worker, which loads it by a fetch as the browser's does. */
-const wasmUrl = pathToFileURL(bindgen).href;
+/** The module, compiled once from the bytes the build wrote, for the page's calls and the derive worker's, as a boot shares it. */
+export const wasmModule = await WebAssembly.compile(readFileSync(bindgen));
 
 /** The part of a `Worker` the derive worker's page side uses. */
 interface FakeWorker {
@@ -41,8 +37,6 @@ function workerOver(post: (message: unknown, reply: (message: unknown) => void) 
 
 /** The browser host's modules, loaded now, with a derive worker running the worker's own script. */
 export async function inProcess() {
-  // The worker loads the module by the address the page gives it; Node's fetch does not read files.
-  globalThis.fetch = () => Promise.resolve(new Response(wasmBytes, { headers: { "content-type": "application/wasm" } }));
   const host = await import("./index.ts");
   const globals = globalThis as unknown as { onmessage?: (event: { data: unknown }) => void; postMessage?: (message: unknown) => void };
   let deliver: (message: unknown) => void = () => undefined;
@@ -54,7 +48,7 @@ export async function inProcess() {
     deliver = reply;
     globals.onmessage?.({ data: message });
   });
-  return { host, worker: () => host.DeriveWorker.start(wasmUrl, worker as unknown as Worker) };
+  return { host, worker: () => host.DeriveWorker.start(wasmModule, worker as unknown as Worker) };
 }
 
 /** A `Worker` that fails the moment it is asked anything, as one whose script throws does. */

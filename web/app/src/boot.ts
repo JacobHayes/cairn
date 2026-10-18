@@ -1,8 +1,9 @@
-// Starting a tab: start the host the build was made for (vite.config.ts), load the engine
-// (the page's own instance for touched sets or the in-browser root, and the derive worker's),
-// and start the session over them. The server host also takes the build the page was loaded
+// Starting a tab: start the host the build was made for (vite.config.ts), compile the engine
+// once and instantiate it (the page's own instance for touched sets or the in-browser root,
+// and the derive worker's, which is posted the compiled module), and start the session over
+// them. The server host also takes the build the page was loaded
 // from, which the server's documents must carry (version skew).
-import { DeriveWorker, InBrowserHost, loadEngine } from "@cairn/wasm";
+import { DeriveWorker, InBrowserHost, compileEngine, loadEngine, type WasmModule } from "@cairn/wasm";
 
 import wasmUrl from "../../wasm/dist/bindgen/cairn_wasm_bg.wasm?url";
 
@@ -22,16 +23,17 @@ function build(): string | undefined {
   return document.querySelector<HTMLMetaElement>('meta[name="cairn-build"]')?.content;
 }
 
-async function startHost(kind: HostKind): Promise<Host> {
+async function startHost(kind: HostKind, compiled: Promise<WasmModule>): Promise<Host> {
   if (kind === "server") {
-    return serverHost(location.origin, await loadEngine(wasm), build());
+    return serverHost(location.origin, await loadEngine(await compiled), build());
   }
-  return browserHost(await InBrowserHost.start(wasm));
+  return browserHost(await InBrowserHost.start(await compiled));
 }
 
 /** The tab's session over the build's host. */
 export async function boot(): Promise<Session> {
-  const [host, deriver] = await Promise.all([startHost(__CAIRN_HOST__), DeriveWorker.start(wasm)]);
+  const module = compileEngine(wasm);
+  const [host, deriver] = await Promise.all([startHost(__CAIRN_HOST__, module), DeriveWorker.start(module)]);
   // Before the session restores the tab's edit records: a tab open across a deploy holds the old drafts.
   migrateTabDrafts(tabStorage(), tabEditStore());
   forgetEarlierKeptTurns(tabStorage());

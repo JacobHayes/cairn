@@ -38,19 +38,25 @@ import {
   type RouteNoticesRequest,
 } from "./types.ts";
 
-/** Where the module's `.wasm` is, or its bytes. */
-export type WasmSource = URL | string | BufferSource;
+/** The compiled module: compiled once per page, then instantiated by the page and posted to the derive worker. */
+export type WasmModule = WebAssembly.Module;
 
 /** The module's linear memory, for its size: it only grows, so it is the peak so far. */
 let memory: WebAssembly.Memory | undefined;
 
 /**
- * Instantiates the module in this realm (a page or a worker), once. `wasm` is where the build
- * put `cairn_wasm_bg.wasm`; the generated bindings never guess it.
+ * Compiles the module at `wasm` (where the build put `cairn_wasm_bg.wasm`; the generated
+ * bindings never guess it), or from its bytes. The one compile of a boot: every realm that
+ * needs an instance takes this module (`loadEngine`).
  */
-export async function loadEngine(wasm: WasmSource): Promise<Engine> {
+export function compileEngine(wasm: URL | string | BufferSource): Promise<WasmModule> {
+  return wasm instanceof URL || typeof wasm === "string" ? WebAssembly.compileStreaming(fetch(wasm)) : WebAssembly.compile(wasm);
+}
+
+/** Instantiates the compiled `module` in this realm (a page or a worker), once. */
+export async function loadEngine(module: WasmModule): Promise<Engine> {
   if (memory === undefined) {
-    const output = await init({ module_or_path: wasm });
+    const output = await init({ module_or_path: module });
     memory = output.memory;
   }
   return new Engine();

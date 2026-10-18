@@ -6,7 +6,7 @@
 import { readFileSync } from "node:fs";
 
 import type { Schema } from "@cairn/client";
-import { HostFailure, InBrowserHost, type Engine } from "@cairn/wasm";
+import { HostFailure, InBrowserHost, compileEngine, type Engine } from "@cairn/wasm";
 
 import type { Graph, Mutation } from "./graph.ts";
 
@@ -14,7 +14,7 @@ let started: Promise<InBrowserHost> | undefined;
 
 /** The seeded in-browser host, started once per test file. */
 export function seeded(): Promise<InBrowserHost> {
-  started ??= InBrowserHost.start(readFileSync(new URL("../../../wasm/dist/bindgen/cairn_wasm_bg.wasm", import.meta.url)), () => "2026-10-06T12:00:00Z");
+  started ??= compileEngine(readFileSync(new URL("../../../wasm/dist/bindgen/cairn_wasm_bg.wasm", import.meta.url))).then((module) => InBrowserHost.start(module, () => "2026-10-06T12:00:00Z"));
   return started;
 }
 

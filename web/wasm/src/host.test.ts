@@ -10,7 +10,7 @@ import type { Schema } from "@cairn/client";
 
 import type { Group, IndexEntry } from "./cases.ts";
 import { NOW } from "./cases.ts";
-import { brokenWorker, inProcess, wasmBytes } from "./in-process.ts";
+import { brokenWorker, inProcess, wasmModule } from "./in-process.ts";
 import type { HostError, PatchRequest } from "./index.ts";
 
 const cases = join(import.meta.dirname, "..", "dist", "cases");
@@ -61,7 +61,7 @@ const settle = (milliseconds: number): Promise<void> => new Promise((resolve) =>
 
 it("the in-browser root loads each fixture, applies a patch, refuses stale ones, and notifies", async () => {
   const started = await fresh();
-  const host = await started.host.InBrowserHost.start(wasmBytes, () => NOW);
+  const host = await started.host.InBrowserHost.start(wasmModule, () => NOW);
   const worker = await started.worker();
   const loaded: { journey: string; derivedBytes: number }[] = [];
   for (const summary of host.journeys().items) {
@@ -96,7 +96,7 @@ it("the in-browser root loads each fixture, applies a patch, refuses stale ones,
 
 it("a trap stops the page's module for every caller", async () => {
   const started = await fresh();
-  const host = await started.host.InBrowserHost.start(wasmBytes, () => NOW);
+  const host = await started.host.InBrowserHost.start(wasmModule, () => NOW);
   expect(host.capabilities().auth.length).toBeGreaterThan(0);
   // A trap reaches JavaScript as a RuntimeError thrown out of a call into the module.
   const trap = await reasonOf(started, () =>
@@ -113,7 +113,7 @@ it("a trap stops the page's module for every caller", async () => {
 
 it("the worker keeps a journey's newest document and refuses an older one", async () => {
   const started = await fresh();
-  const host = await started.host.InBrowserHost.start(wasmBytes, () => NOW);
+  const host = await started.host.InBrowserHost.start(wasmModule, () => NOW);
   const worker = await started.worker();
   const earlier = host.documentText("j_vendor_eval");
   const base = (await worker.load(earlier)).key.revision;
@@ -125,7 +125,7 @@ it("the worker keeps a journey's newest document and refuses an older one", asyn
 
 it("a derivation is freed only by the load that made it", async () => {
   const started = await fresh();
-  const host = await started.host.InBrowserHost.start(wasmBytes, () => NOW);
+  const host = await started.host.InBrowserHost.start(wasmModule, () => NOW);
   const worker = await started.worker();
   const document = host.documentText("j_vendor_eval");
   const first = await worker.load(document);
@@ -142,5 +142,5 @@ it("a derivation is freed only by the load that made it", async () => {
 
 it("a derive worker that fails rejects what was asked of it", async () => {
   const started = await fresh();
-  expect(await reasonOf(started, () => started.host.DeriveWorker.start("module.wasm", brokenWorker()))).toMatchObject({ error: "aborted" });
+  expect(await reasonOf(started, () => started.host.DeriveWorker.start(wasmModule, brokenWorker()))).toMatchObject({ error: "aborted" });
 });

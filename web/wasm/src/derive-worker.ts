@@ -62,15 +62,21 @@ export class DeriveWorker {
   }
 
   /**
-   * Starts a worker and loads the module at `wasm` into it. `worker` is this package's
-   * worker script unless a bundler hands over its own instance of it.
+   * Starts a worker and instantiates the compiled `wasm` module in it (the module is posted,
+   * not compiled again; the worker's script loads while it is still compiling). `worker` is
+   * this package's worker script unless a bundler hands over its own instance of it.
    */
   static async start(
-    wasm: URL | string,
+    wasm: WebAssembly.Module | Promise<WebAssembly.Module>,
     worker: Worker = new Worker(new URL("./worker.ts", import.meta.url), { type: "module" }),
   ): Promise<DeriveWorker> {
     const started = new DeriveWorker(worker);
-    await started.#ask({ op: "init", wasm: String(wasm) });
+    try {
+      await started.#ask({ op: "init", wasm: await wasm });
+    } catch (thrown) {
+      worker.terminate();
+      throw thrown;
+    }
     return started;
   }
 

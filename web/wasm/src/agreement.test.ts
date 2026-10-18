@@ -11,7 +11,7 @@ import { expect, it, vi } from "vitest";
 
 import { type Case, type Group, type IndexEntry } from "./cases.ts";
 import type { DeriveWorker, Engine } from "./index.ts";
-import { inProcess, wasmBytes } from "./in-process.ts";
+import { inProcess, wasmModule } from "./in-process.ts";
 
 const cases = join(import.meta.dirname, "..", "dist", "cases");
 
@@ -46,7 +46,7 @@ it.each(index)("the browser host agrees with the server: $label", async (entry) 
   const group = JSON.parse(readFileSync(join(cases, entry.file), "utf8")) as Group;
   const started = await fresh();
   const worker = await started.worker();
-  const engine = await started.host.loadEngine(wasmBytes);
+  const engine = await started.host.loadEngine(wasmModule);
   const journey = group.document === undefined ? "" : (await worker.load(group.document)).key.journey;
   const differing: string[] = [];
   for (const found of group.cases) {

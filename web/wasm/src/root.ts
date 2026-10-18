@@ -6,7 +6,7 @@ import type { Schema } from "@cairn/client";
 
 import { BrowserRoot, type RootSubscription } from "../generated/cairn_wasm.js";
 
-import { loadEngine, type Engine, type WasmSource } from "./engine.ts";
+import { loadEngine, type Engine, type WasmModule } from "./engine.ts";
 import { hosted, parsed, stoppedBy, type HistoryPage, type JourneyIndexQuery, type PatchRequest, type Taken } from "./types.ts";
 
 /** Hears a subscription's ticks: the first time, the current revisions (`first`). */
@@ -37,10 +37,11 @@ export class InBrowserHost {
     this.#clock = clock;
   }
 
-  /** Loads the module at `wasm` in this page and seeds a root (fixtures, on every load). */
-  static async start(wasm: WasmSource, clock: Clock = () => new Date().toISOString()): Promise<InBrowserHost> {
+  /** Instantiates the compiled `wasm` module in this page and seeds a root (fixtures, on every load). */
+  static async start(wasm: WasmModule, clock: Clock = () => new Date().toISOString()): Promise<InBrowserHost> {
     const engine = await loadEngine(wasm);
-    return new InBrowserHost(engine, hosted(() => new BrowserRoot()), clock);
+    const root = hosted(() => new BrowserRoot());
+    return new InBrowserHost(engine, root, clock);
   }
 
   /** The capabilities document. */
