@@ -2855,7 +2855,7 @@
           },
           {
             "const": "active",
-            "description": "Started: stored `active`, or a container whose children are the only thing it waits\non and some work beneath it has started.",
+            "description": "Started: stored `active`, or a container whose children are the only thing it waits\non and work beneath it has started (a deliverable or action under it is active or done).",
             "type": "string"
           },
           {
@@ -4425,7 +4425,7 @@
           },
           {
             "const": "active",
-            "description": "Work beneath it has started.",
+            "description": "Work beneath it has started: a deliverable or action under it is active or done.",
             "type": "string"
           },
           {

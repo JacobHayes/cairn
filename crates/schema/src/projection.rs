@@ -120,7 +120,7 @@ pub enum GroupState {
     Done,
     /// Its own or an inherited requirement, opening, or condition is not yet satisfied.
     Waiting,
-    /// Work beneath it has started.
+    /// Work beneath it has started: a deliverable or action under it is active or done.
     Active,
     /// Open to start, nothing beneath it started.
     NotStarted,

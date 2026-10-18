@@ -70,7 +70,7 @@ pub enum DisplayState {
     /// only on its own children with nothing started, or one ready to finish.
     Ready,
     /// Started: stored `active`, or a container whose children are the only thing it waits
-    /// on and some work beneath it has started.
+    /// on and work beneath it has started (a deliverable or action under it is active or done).
     Active,
     /// In scope and unfinished, and its own or an inherited gate is unsatisfied. A container
     /// is never blocked by its own children.

@@ -11,8 +11,8 @@
 //!    dependencies.
 //! 4. `snoozed`: a snooze holds.
 //! 5. `active`: stored `active`, or a container whose only unsatisfied waits are its own
-//!    children and some descendant has started (when it waits on nothing, it is `ready` to
-//!    finish).
+//!    children and work beneath it has started (`work_has_started`; when it waits on
+//!    nothing, it is `ready` to finish).
 //! 6. `conditional`: relevance `undecided`; or `not_relevant` but pending on an undecided
 //!    decision (`pending_on`), which relevance itself leaves unchanged.
 //! 7. `blocked`: in scope, unfinished, and its own or an inherited gate is unsatisfied; for a
@@ -66,8 +66,10 @@ impl Derived {
         }
         let container = graph.tree().is_container(key);
         // A container that waits on nothing is ready to finish, not active.
-        let working =
-            container && self.entered(key) && !blocking.deps_done(key) && Self::started(graph, key);
+        let working = container
+            && self.entered(key)
+            && !blocking.deps_done(key)
+            && Self::work_has_started(graph, key);
         let started = stored == State::Active || working;
         if started {
             return DisplayState::Active;
@@ -127,7 +129,7 @@ impl Derived {
         if !self.entered(key) {
             return GroupState::Waiting;
         }
-        if Self::started(graph, key) {
+        if Self::work_has_started(graph, key) {
             GroupState::Active
         } else {
             GroupState::NotStarted
@@ -150,15 +152,16 @@ impl Derived {
         })
     }
 
-    /// Some node beneath it has started or finished.
-    fn started(graph: &Graph, key: &NodeKey) -> bool {
+    /// D8: work has started beneath a container: some deliverable or action under it is
+    /// stored `active` or `done`. A decision answered or a milestone reached is not work
+    /// started (it opens or closes a gate), and a skipped node did none. Derived on read, so
+    /// stopping the only started node takes the container back to what its waits say.
+    fn work_has_started(graph: &Graph, key: &NodeKey) -> bool {
         let document = graph.document();
         graph.tree().descendants(key).iter().any(|below| {
             graph.node(below).is_some_and(|node| {
-                matches!(
-                    stored_state(document, node),
-                    State::Active | State::Done | State::Decided | State::Reached
-                )
+                matches!(node.kind(), NodeKind::Deliverable | NodeKind::Action)
+                    && matches!(stored_state(document, node), State::Active | State::Done)
             })
         })
     }

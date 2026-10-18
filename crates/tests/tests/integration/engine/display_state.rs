@@ -101,6 +101,16 @@ const WALL_KID: &str =
     "{key: n_wall_kid, id: wall-kid, parent: n_walled, kind: action, title: Wall kid}";
 const BOX: &str = "{key: n_box, id: box, kind: group, title: Box}";
 const BOX_KID: &str = "{key: n_box_kid, id: box-kid, parent: n_box, kind: action, title: Box kid}";
+const MIX: &str = "{key: n_mix, id: mix, kind: group, title: Mix}";
+const MIX_ASK: &str = "{key: n_mix_ask, id: mix-ask, parent: n_mix, kind: decision, title: Mix ask, prompt: Mix?, answer_type: boolean}";
+const MIX_GATE: &str =
+    "{key: n_mix_gate, id: mix-gate, parent: n_mix, kind: milestone, title: Mix gate}";
+const MIX_DO: &str = "{key: n_mix_do, id: mix-do, parent: n_mix, kind: action, title: Mix do}";
+const DEEP: &str = "{key: n_deep, id: deep, kind: group, title: Deep}";
+const DEEP_MID: &str =
+    "{key: n_deep_mid, id: deep-mid, parent: n_deep, kind: deliverable, title: Deep mid}";
+const DEEP_LEAF: &str =
+    "{key: n_deep_leaf, id: deep-leaf, parent: n_deep_mid, kind: action, title: Deep leaf}";
 const NAP: &str = "{key: n_nap, id: nap, kind: action, title: Nap}";
 const DROP: &str = "{key: n_drop, id: drop, kind: action, title: Drop}";
 const FINISH: &str = "{key: n_finish, id: finish, kind: action, title: Finish}";
@@ -113,7 +123,8 @@ const READER: &str = "{key: n_reader, id: reader, kind: action, title: Reader, r
 fn board() -> Records {
     support::journey(&add(&[
         ASK, BRANCH, INNER, PLAIN, FIRST, SECOND, GATE, STAGE, STEP_A, STEP_B, WALLED, WALL_KID,
-        BOX, BOX_KID, NAP, DROP, FINISH, BEGUN, LATE, GATED, THIRD, READER,
+        BOX, BOX_KID, MIX, MIX_ASK, MIX_GATE, MIX_DO, DEEP, DEEP_MID, DEEP_LEAF, NAP, DROP, FINISH,
+        BEGUN, LATE, GATED, THIRD, READER,
     ]))
 }
 
@@ -122,7 +133,7 @@ fn board() -> Records {
 fn step(text: &str) -> String {
     match text.split(' ').collect::<Vec<_>>().as_slice() {
         ["done", node] => transition(node, "complete"),
-        [verb @ ("start" | "reach" | "reopen"), node] => transition(node, verb),
+        [verb @ ("start" | "stop" | "reach" | "reopen"), node] => transition(node, verb),
         ["skip", node] => skip(node),
         ["yes", decision] => answer(decision, "{boolean: true}"),
         ["no", decision] => answer(decision, "{boolean: false}"),
@@ -142,7 +153,7 @@ fn step(text: &str) -> String {
 fn precedence_rows() {
     const DAY: &str = "2026-10-06";
     #[rustfmt::skip]
-    let rows: [(&[&str], &str, &str, DisplayState); 36] = [
+    let rows: &[(&[&str], &str, &str, DisplayState)] = &[
         (&[], DAY, "n_plain", Ready),
         (&[], DAY, "n_stage", Ready),
         (&[], DAY, "n_box", Ready),
@@ -151,6 +162,18 @@ fn precedence_rows() {
         (&["start n_step_a"], DAY, "n_stage", Active),
         (&["start n_step_a", "done n_step_a"], DAY, "n_stage", Active),
         (&["start n_box_kid"], DAY, "n_box", Active),
+        (&["start n_box_kid", "stop n_box_kid"], DAY, "n_box", Ready),
+        (&["start n_step_a", "start n_step_b", "stop n_step_a"], DAY, "n_stage", Active),
+        (&["start n_step_a", "done n_step_a", "start n_step_b", "stop n_step_b"], DAY, "n_stage", Active),
+        (&["start n_step_a", "skip n_step_a"], DAY, "n_stage", Ready),
+        (&["start n_step_a", "done n_step_a", "reopen n_step_a"], DAY, "n_stage", Ready),
+        (&["start n_deep_leaf"], DAY, "n_deep", Active),
+        (&["start n_deep_leaf"], DAY, "n_deep_mid", Active),
+        (&["start n_deep_leaf", "stop n_deep_leaf"], DAY, "n_deep", Ready),
+        (&["start n_deep_leaf", "stop n_deep_leaf"], DAY, "n_deep_mid", Ready),
+        (&["yes n_mix_ask"], DAY, "n_mix", Ready),
+        (&["reach n_mix_gate"], DAY, "n_mix", Ready),
+        (&["yes n_mix_ask", "reach n_mix_gate", "start n_mix_do", "stop n_mix_do"], DAY, "n_mix", Ready),
         (&[], DAY, "n_second", Blocked),
         (&[], DAY, "n_wall_kid", Blocked),
         (&["done n_first"], DAY, "n_walled", Ready),
@@ -183,7 +206,7 @@ fn precedence_rows() {
         // the third's answer may yet change.
         (&["no n_ask", "yes n_third", "reopen n_ask"], DAY, "n_reader", Conditional),
     ];
-    for (words, today, node, expected) in rows {
+    for &(words, today, node, expected) in rows {
         let steps: Vec<String> = words.iter().map(|text| step(text)).collect();
         let seen = Seen::of(&then(&board(), &steps), support::JOURNEY, today);
         assert_eq!(

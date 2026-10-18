@@ -543,7 +543,7 @@ Numbered so feature briefs can reference them. Everything here is in scope; defe
   | `skipped` | stored `skipped`, or effectively skipped (D1a) |
   | `done` | stored `done`, `decided`, or `reached`; auto-reached (F1); or a group that satisfies dependencies |
   | `snoozed` | a snooze holds over it, its own or a container's (B6) |
-  | `active` | stored `active` (started early included), or a container whose only unsatisfied waits are its own children and beneath which work has started |
+  | `active` | stored `active` (started early included), or a container whose only unsatisfied waits are its own children and beneath which work has started (a deliverable or action under it is `active` or `done`; an answered decision or a reached milestone is a gate, not work) |
   | `conditional` | unfinished, and undecided or pending |
   | `blocked` | in scope, unfinished, and its own or an inherited gate is unsatisfied; for a container only its own gates count, never its children |
   | `scheduled` | an `auto_reach` milestone, not blocked, whose effective date is ahead |
