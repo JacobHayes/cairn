@@ -79,43 +79,45 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
     <section className="stack list" aria-label="List" data-testid="list">
       <ViewBar subject={routeSubject(nodes)} screen="list" badges={badges} />
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
-      <ul className="route-list route-tree" data-testid="route-list">
-        {(rows ?? []).map(({ node, depth: indent, holds, guides }) => {
-          const foot = ruleFoot(node, tree);
-          return (
-            <li
-              key={node.key}
-              className="route-list-row"
-              data-testid="route-row"
-              data-node={node.key}
-              data-kind={node.kind}
-              data-container={containers.has(node.key)}
-              data-faded={faded(node.key) ? true : undefined}
-              data-navigable={onOpen === undefined ? undefined : true}
-              aria-current={node.key === selected ? "true" : undefined}
-              style={{ paddingInlineStart: `calc(var(--space-2) + var(--space-5) * ${String(indent)})` }}
-            >
-              <TreeGuides depth={indent} guides={guides} open={holds && open(node.key)} />
-              <TreeFold container={holds} open={open(node.key)} label={node.title} testId="row-fold" onFold={() => { fold(node.key); }} />
-              {onOpen === undefined ? (
-                <span className="route-list-title">{node.title}</span>
-              ) : (
-                <button type="button" className="link route-list-title" data-testid="row-open" onClick={() => { onOpen(node.key); }}>
-                  {node.title}
-                </button>
-              )}
-              {foot === undefined ? null : <span className="muted small">{foot}</span>}
-              {unanchored.has(node.key) ? <span className="node-notice">No path to final</span> : null}
-              <span className="node-kind">{node.kind}</span>
-            </li>
-          );
-        })}
-      </ul>
-      {rows !== undefined && rows.length === 0 ? (
-        <p className="muted row" data-testid="list-empty">
-          <NothingMatches />
-        </p>
-      ) : null}
+      <div className="node-panel list-panel" data-testid="list-panel">
+        <ul className="route-list route-tree" data-testid="route-list">
+          {(rows ?? []).map(({ node, depth: indent, holds, guides }) => {
+            const foot = ruleFoot(node, tree);
+            return (
+              <li
+                key={node.key}
+                className="route-list-row"
+                data-testid="route-row"
+                data-node={node.key}
+                data-kind={node.kind}
+                data-container={containers.has(node.key)}
+                data-faded={faded(node.key) ? true : undefined}
+                data-navigable={onOpen === undefined ? undefined : true}
+                aria-current={node.key === selected ? "true" : undefined}
+                style={{ paddingInlineStart: `calc(var(--space-2) + var(--space-5) * ${String(indent)})` }}
+              >
+                <TreeGuides depth={indent} guides={guides} open={holds && open(node.key)} />
+                <TreeFold container={holds} open={open(node.key)} label={node.title} testId="row-fold" onFold={() => { fold(node.key); }} />
+                {onOpen === undefined ? (
+                  <span className="route-list-title">{node.title}</span>
+                ) : (
+                  <button type="button" className="link route-list-title" data-testid="row-open" onClick={() => { onOpen(node.key); }}>
+                    {node.title}
+                  </button>
+                )}
+                {foot === undefined ? null : <span className="muted small">{foot}</span>}
+                {unanchored.has(node.key) ? <span className="node-notice">No path to final</span> : null}
+                <span className="node-kind">{node.kind}</span>
+              </li>
+            );
+          })}
+        </ul>
+        {rows !== undefined && rows.length === 0 ? (
+          <div className="empty-row" data-testid="list-empty">
+            <NothingMatches />
+          </div>
+        ) : null}
+      </div>
     </section>
   );
 }

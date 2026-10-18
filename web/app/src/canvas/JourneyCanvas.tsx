@@ -15,7 +15,7 @@ import { contextMenuOf } from "../detail/offers.ts";
 import { screenSwitched } from "../journeys/address.ts";
 import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { badgesOf, currentStagesOf, depthFaded, journeyLayoutView, levelRequestOf, litOf, stepHides, type LevelRequest } from "../journeys/requests.ts";
-import { journeySubject, NothingMatches, ResetView, ViewControls } from "../screens/ViewControls.tsx";
+import { EmptyPanel, journeySubject, NothingMatches, ResetView, ViewControls } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { typing } from "../ui/typing.ts";
 import { RevealBox, SignalMenu } from "./Chrome.tsx";
@@ -332,9 +332,9 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
           <>
             <ViewControls subject={journeySubject(ready)} screen="graph" badges={graph.badges} />
             {laidOut.model.cards.length > 0 ? null : (
-              <p className="callout row" role="status" data-testid="nothing-matches">
+              <EmptyPanel testId="nothing-matches">
                 <NothingMatches />
-              </p>
+              </EmptyPanel>
             )}
           </>
         }

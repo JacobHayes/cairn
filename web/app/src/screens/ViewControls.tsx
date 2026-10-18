@@ -297,6 +297,15 @@ export function NothingMatches() {
   );
 }
 
+/** The empty view's own paper panel (DESIGN, Panel): the sentence and its way back where the rows or canvas would have been, bordered and ticked like them. */
+export function EmptyPanel({ testId, children }: { testId: string; children: ReactNode }) {
+  return (
+    <div className="node-panel empty-row" role="status" data-testid={testId}>
+      {children}
+    </div>
+  );
+}
+
 /** Reset the view: the way back from an empty view, offered only off the stock view. Frontier and Fade stay (they hide nothing). */
 export function ResetView() {
   const { state, onState } = useViewState();

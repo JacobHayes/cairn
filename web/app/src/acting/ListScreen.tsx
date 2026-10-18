@@ -143,7 +143,7 @@ function Table({ list, lines, columns, context, selection, selected, everyLine, 
       <thead>
         <tr>
           <th scope="col" className="list-check list-pinned">
-            <input type="checkbox" className="list-checkbox" aria-label="Select every row shown" checked={all} onChange={() => { selection.set(all ? [] : everyLine); }} />
+            <input type="checkbox" className="list-checkbox" disabled={everyLine.length === 0} aria-label="Select every row shown" checked={all} onChange={() => { selection.set(all ? [] : everyLine); }} />
           </th>
           {columns.map((column) => (
             <Head key={column} column={column} columns={columns} list={list} onSort={(sort) => void navigate(`${pathname}${withListSettings(search, { ...list, sort })}`)} />
@@ -252,12 +252,14 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
     <section className="stack list" aria-label="List" data-testid="list">
       <ViewBar subject={journeySubject(view)} screen="list" badges={badges} end={<RowEnd list={list} decisionColumns={decisionColumns} total={kept?.length} />} />
       {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
-      <Table list={list} lines={lines} columns={columns} context={context} selection={selection} selected={selected} everyLine={everyLine} outOfFocus={dimmed} />
-      {kept !== undefined && level !== undefined && lines.length === 0 ? (
-        <p className="muted row" data-testid="list-empty">
-          <NothingMatches />
-        </p>
-      ) : null}
+      <div className="node-panel list-panel" data-empty={lines.length === 0 ? true : undefined} data-testid="list-panel">
+        <Table list={list} lines={lines} columns={columns} context={context} selection={selection} selected={selected} everyLine={everyLine} outOfFocus={dimmed} />
+        {kept !== undefined && level !== undefined && lines.length === 0 ? (
+          <div className="empty-row" data-testid="list-empty">
+            <NothingMatches />
+          </div>
+        ) : null}
+      </div>
       {state.frontier ? <FrontierPanels view={view} drawn={drawn} /> : null}
     </section>
   );

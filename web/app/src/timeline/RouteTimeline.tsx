@@ -19,7 +19,7 @@ import { badgesOf, depthFaded, levelRequestOf, outOfFocus, stepHides } from "../
 import type { ViewState } from "../journeys/view.ts";
 import { useRouteLevel, useRouteSchedule } from "../screens/route-views.ts";
 import { nodesOf, type Shown } from "../screens/route-reads.ts";
-import { ResetView, routeSubject, ViewBar } from "../screens/ViewControls.tsx";
+import { NothingMatches, routeSubject, ViewBar } from "../screens/ViewControls.tsx";
 import { routeSpec } from "./model.ts";
 import { routeChartOf } from "./rows.ts";
 import { TimelineChart } from "./TimelineView.tsx";
@@ -78,7 +78,7 @@ export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTi
               ? "No final milestone has a day, so the timeline ends after its latest day."
               : `Ends at ${titleOf(end)} on day ${String(spec.anchor.day)}${schedule.final_conditional === true ? " at the earliest, if the branch is taken" : ""}.`
           }
-          empty={{ filtered: <>Nothing is drawn at this depth, filter and search. <ResetView /></>, none: "Nothing in this route has an earliest day yet." }}
+          empty={{ filtered: <NothingMatches />, none: "Nothing in this route has an earliest day yet." }}
           undated="No day yet"
           anyScheduled={schedule.entries.length > 0}
         />

@@ -20,7 +20,7 @@ import { NodeLink } from "../detail/parts.tsx";
 import { useNodeAddresses, withParam } from "../journeys/address.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
-import { journeySubject, NothingMatches, ViewBar } from "../screens/ViewControls.tsx";
+import { EmptyPanel, journeySubject, NothingMatches, ViewBar } from "../screens/ViewControls.tsx";
 import { Button, Segmented } from "../ui/kit.tsx";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import { axisOf, calendarSpec, dateOf, dateWords, dayWords, positionOf, rangeWindow, RANGES, type Axis, type AxisSpec, type Range, type Window } from "./model.ts";
@@ -398,9 +398,7 @@ export function TimelineChart({ chart, spec, viewKey, range, onFold, selected, t
         {anchorNote}
       </span>
       {chart.rows.length === 0 ? (
-        <p className="muted row" data-testid="timeline-empty">
-          {anyScheduled ? empty.filtered : empty.none}
-        </p>
+        <EmptyPanel testId="timeline-empty">{anyScheduled ? empty.filtered : empty.none}</EmptyPanel>
       ) : (
         <div className="timeline-chart" ref={chartRef}>
           <div className="timeline-axis">
