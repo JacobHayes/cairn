@@ -138,6 +138,18 @@ function checkBoxes(tolerance: number): string[] {
 
 /** Text cut without a sign: an element holding text that is wider than it, with no ellipsis, no clamp and no scroll. */
 function checkCuts(): string[] {
+  /** The right edge of the text nodes `el` holds itself, whatever else it holds. */
+  function ownTextRight(el: HTMLElement): number {
+    const range = document.createRange();
+    let right = 0;
+    for (const node of el.childNodes) {
+      if (node.nodeType === Node.TEXT_NODE) {
+        range.selectNodeContents(node);
+        right = Math.max(right, range.getBoundingClientRect().right);
+      }
+    }
+    return right;
+  }
   const kit = (window as unknown as Record<string, Kit | undefined>)["__containmentKit"];
   const found: string[] = [];
   for (const el of kit?.seen ?? []) {
@@ -146,9 +158,11 @@ function checkCuts(): string[] {
     const marked = style.textOverflow.includes("ellipsis") || (style.getPropertyValue("-webkit-line-clamp") !== "none" && style.getPropertyValue("-webkit-line-clamp") !== "");
     const inline = style.display.startsWith("inline") && !style.display.startsWith("inline-");
     const ownText = [...el.childNodes].some((node) => node.nodeType === Node.TEXT_NODE && (node.textContent ?? "").trim() !== "") || (/hidden|clip/.test(style.overflowX) && el.textContent.trim() !== "");
-    // scrollWidth counts what an overhang adds, so an element holding one is left to the box check.
-    const skipped = !ownText || el.querySelector("[data-overhang]") !== null || el.matches("input, textarea, select, option, canvas, img, video, [class*='react-flow']") || scrolls || inline || style.display === "contents";
-    if (!skipped && !marked && el.scrollWidth > el.clientWidth + 1 && el.clientWidth > 0) {
+    // scrollWidth counts what an overhang adds, so an element holding one is held to its own text's width instead.
+    const holdsOverhang = el.querySelector("[data-overhang]") !== null;
+    const skipped = !ownText || el.matches("input, textarea, select, option, canvas, img, video, [class*='react-flow']") || scrolls || inline || style.display === "contents";
+    const wide = holdsOverhang ? ownTextRight(el) > el.getBoundingClientRect().right + 1 : el.scrollWidth > el.clientWidth + 1;
+    if (!skipped && !marked && wide && el.clientWidth > 0) {
       found.push(`${kit?.name(el) ?? ""} is cut: content ${String(el.scrollWidth)}px in ${String(el.clientWidth)}px with no ellipsis`);
     }
   }

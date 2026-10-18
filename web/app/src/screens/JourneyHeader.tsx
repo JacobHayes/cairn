@@ -162,11 +162,17 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
   const target = useJourneyTarget();
   const { search } = useLocation();
   const [panel, setPanel] = useState<Panel | undefined>(undefined);
+  const [nameOpen, setNameOpen] = useState(false);
   return (
     <section className="stack journey-header" aria-label={header.name} data-testid="journey-header">
       <div className="row">
         <div className="journey-header-title">
-          <h1 data-testid="journey-name" title={header.name}>{header.name}</h1>
+          <h1 data-testid="journey-name" data-expanded={nameOpen} title={header.name}>
+            {/* A long name is clamped to two lines; a tap or click reads it whole, where a tooltip cannot be reached. */}
+            <button type="button" className="journey-name-toggle" aria-expanded={nameOpen} onClick={() => { setNameOpen(!nameOpen); }}>
+              {header.name}
+            </button>
+          </h1>
           <JourneyStatusChip status={header.status} />
         </div>
         <AssistantDock target={{ journey: header.id }} titleOf={journeyTitles(ready)} />

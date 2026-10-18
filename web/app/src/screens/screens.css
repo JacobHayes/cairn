@@ -64,15 +64,35 @@
   white-space: nowrap;
 }
 
-/* A name as long as one may be takes two lines and ends in an ellipsis; the title holds it whole. */
-.journey-header h1 {
+/* A name as long as one may be takes two lines and ends in an ellipsis; a tap opens it whole (JourneyHeader). */
+.journey-name-toggle {
   display: -webkit-box;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
-  min-width: 0;
   overflow: hidden;
+  width: 100%;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  letter-spacing: inherit;
+  text-align: left;
+  text-transform: inherit;
+  cursor: pointer;
+}
+
+.journey-header h1[data-expanded="true"] .journey-name-toggle {
+  display: block;
+  -webkit-line-clamp: unset;
+}
+
+.journey-header h1 {
+  min-width: 0;
   overflow-wrap: anywhere;
 }
+
 
 /* On a phone the title takes its own line; the picker and the menu drop under it, at the right, and the head's rule closes the header (the flowing page has none of its own). */
 @media (max-width: 719px) {
