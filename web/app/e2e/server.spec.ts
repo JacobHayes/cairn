@@ -138,7 +138,7 @@ test("a deployment tick refetches the deployment context and re-derives: a merge
 test("an identity signed in with the stub issuer links to the user, and its verified email names their entity", { tag: "@server" }, async ({ page }) => {
   const email = `${fresh("linked").replace(/\W/g, "-")}@example.org`;
   await open(page, "server", "/entities");
-  const entity = await addEntity(page, fresh("Linked person"), email);
+  const entity = await addEntity(page, fresh("Linked person"), [email]);
   await open(page, "server", "/me");
   await expect(page.getByTestId("identity")).toHaveCount(1);
   await expect(page.locator(`[data-testid="your-entity"][data-entity="${entity}"]`)).toHaveCount(0);

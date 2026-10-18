@@ -52,3 +52,8 @@ export function outOfRange(value: number, max: number, what: string): string | u
 export function urlProblem(text: string): string | undefined {
   return /^[A-Za-z][A-Za-z0-9+.-]*:\S+$/.test(text) ? overBytes(text, LINK_BYTES_MAX, "The address") : "An address is a URL: a scheme, a colon, and no spaces (https://...).";
 }
+
+/** Emails per entity. */
+export const EMAIL_COUNT_PER_ENTITY_MAX = 16;
+/** An email address, in bytes. */
+export const EMAIL_BYTES_MAX = 254;

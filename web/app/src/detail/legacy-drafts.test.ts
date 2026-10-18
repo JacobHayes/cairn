@@ -112,6 +112,20 @@ describe("an old per-form draft that is not simply converted", () => {
   });
 });
 
+describe("an old entity form draft", () => {
+  it("keeps its name, base and the emails that hold as chips, leaving the rest in the input, under the new keys", () => {
+    const storage = memoryStorage();
+    drafts(storage, {
+      "entity:e_ann": { name: "Ann", emails: "Ann@Example.org, nope, bob@example.org", base: 5 },
+      "entity:new": { name: "Cy", emails: "" },
+    });
+    migrate(storage);
+    expect(read(storage, "entity-edit:e_ann")).toEqual({ name: "Ann", emails: ["ann@example.org", "bob@example.org"], emailText: "nope", base: 5 });
+    expect(read(storage, "entity-new")).toEqual({ name: "Cy", emails: [], emailText: "" });
+    expect(keysOf(storage)).toEqual([`${P}entity-edit:e_ann`, `${P}entity-new`]);
+  });
+});
+
 describe("an old rejected draft", () => {
   const rejection = { rejection: "invalid", violations: [{ at: {}, code: "limit_exceeded", message: "Too long (F5)" }] };
   const attempt = (mutations: unknown[]) => ({ attempt: { mutations, base: 3, deployment: 1 }, rejection, address: "/journeys/j_one/n_a" });

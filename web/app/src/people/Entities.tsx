@@ -16,14 +16,17 @@ import type { Rejection } from "../data/writes.ts";
 import { Refused } from "../screens/Refused.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite, type ScreenWrite } from "../screens/write.ts";
+import { ChipsInput } from "../ui/ChipsInput.tsx";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { MergeEntities } from "./MergeEntities.tsx";
-import { aliasesOf, byName, entityOf, mergeAsked, newEntityKey, type Entity } from "./model.ts";
+import { aliasesOf, byName, EMAIL_RULES, entityOf, mergeAsked, newEntityKey, type Entity } from "./model.ts";
 
 /** An entity's edit as typed, and the deployment revision its author saw when they opened it (H5). */
 interface EntityDraft {
   name: string;
-  emails: string;
+  emails: string[];
+  /** The email typed and not yet taken as a chip. */
+  emailText: string;
   base: number;
 }
 
@@ -51,8 +54,8 @@ function EntityEditor({ entity, deployment, draft, setDraft, write }: { entity: 
     <>
       <form className="row" onSubmit={(event) => { event.preventDefault(); void save(); }}>
         <Field aria-label="Name" value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); }} />
-        <Field aria-label="Emails" placeholder="Emails, separated by commas" value={draft.emails} onChange={(event) => { setDraft({ ...draft, emails: event.target.value }); }} />
-        <Button primary type="submit" disabled={write.disabled || draft.name.trim() === ""}>Save</Button>
+        <ChipsInput label="Emails" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={draft.emails} text={draft.emailText} onChange={(emails, emailText) => { setDraft({ ...draft, emails, emailText }); }} />
+        <Button primary type="submit" disabled={write.disabled || draft.name.trim() === "" || draft.emailText.trim() !== ""}>Save</Button>
         <Button onClick={() => { setDraft(undefined); write.dismiss(); }}>Cancel</Button>
       </form>
       <WriteStatus view={write.status} />
@@ -68,7 +71,7 @@ function EntityEditor({ entity, deployment, draft, setDraft, write }: { entity: 
 }
 
 function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: Deployment; yours: boolean }) {
-  const [draft, setDraft] = useDraft<EntityDraft>(`entity:${entity.key}`);
+  const [draft, setDraft] = useDraft<EntityDraft>(`entity-edit:${entity.key}`);
   // The row holds the write, so a save in flight keeps Edit closed until it settles: its
   // landing closes the draft it sent, never one opened after it.
   const write = useScreenWrite(`entity:${entity.key}`, entity.name);
@@ -82,10 +85,10 @@ function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: 
         {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">also {aliases.join(", ")}</span>}
         <span className="spacer" />
         {draft === undefined ? (
-          <Button disabled={write.disabled} onClick={() => { setDraft({ name: entity.name, emails: (entity.emails ?? []).join(", "), base: deployment.revision }); }}>Edit</Button>
+          <Button disabled={write.disabled} onClick={() => { setDraft({ name: entity.name, emails: [...(entity.emails ?? [])], emailText: "", base: deployment.revision }); }}>Edit</Button>
         ) : null}
       </span>
-      <span className="muted small" data-testid="entity-emails">{(entity.emails ?? []).join(", ") || "No emails"}</span>
+      {draft === undefined ? <span className="muted small" data-testid="entity-emails">{(entity.emails ?? []).join(", ") || "No emails"}</span> : null}
       {draft === undefined ? null : <EntityEditor entity={entity} deployment={deployment} draft={draft} setDraft={setDraft} write={write} />}
     </li>
   );
@@ -93,8 +96,8 @@ function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: 
 
 function CreateEntity({ deployment }: { deployment: Deployment }) {
   const write = useScreenWrite("new-entity");
-  const [draft, setDraft] = useDraft<{ name: string; emails: string }>("entity:new");
-  const { name, emails } = draft ?? { name: "", emails: "" };
+  const [draft, setDraft] = useDraft<{ name: string; emails: string[]; emailText: string }>("entity-new");
+  const { name, emails, emailText } = draft ?? { name: "", emails: [], emailText: "" };
   const create = async () => {
     const mutation = { op: "create_entity" as const, entity: entityOf(newEntityKey(name), name, emails) };
     if (await write.run({ target: "deployment", baseRevision: deployment.revision, mutations: [mutation] })) {
@@ -103,9 +106,9 @@ function CreateEntity({ deployment }: { deployment: Deployment }) {
   };
   return (
     <form className="row" data-testid="create-entity" onSubmit={(event) => { event.preventDefault(); void create(); }}>
-      <Field aria-label="New entity's name" placeholder="Name" value={name} onChange={(event) => { setDraft({ name: event.target.value, emails }); }} />
-      <Field aria-label="New entity's emails" placeholder="Emails (optional)" value={emails} onChange={(event) => { setDraft({ name, emails: event.target.value }); }} />
-      <Button primary type="submit" disabled={write.disabled || name.trim() === ""}>Add an entity</Button>
+      <Field aria-label="New entity's name" placeholder="Name" value={name} onChange={(event) => { setDraft({ name: event.target.value, emails, emailText }); }} />
+      <ChipsInput label="New entity's emails" placeholder="Add an email (optional)" inputMode="email" rules={EMAIL_RULES} values={emails} text={emailText} onChange={(next, nextText) => { setDraft({ name, emails: next, emailText: nextText }); }} />
+      <Button primary type="submit" disabled={write.disabled || name.trim() === "" || emailText.trim() !== ""}>Add an entity</Button>
       {write.rejected === undefined ? <WriteStatus view={write.status} /> : <Refused rejection={write.rejected} onDismiss={write.dismiss} />}
     </form>
   );

@@ -5,7 +5,9 @@
 import type { Schema } from "@cairn/client";
 
 import { pathTo } from "../address.ts";
+import { EMAIL_BYTES_MAX, EMAIL_COUNT_PER_ENTITY_MAX, overBytes } from "../authoring/limits.ts";
 import type { Mutation } from "../data/writes.ts";
+import type { ChipRules } from "../ui/chips.ts";
 
 export type Entity = Schema<"Entity">;
 export type Deployment = Schema<"Deployment">;
@@ -23,19 +25,24 @@ export function newEntityKey(name: string, random: () => string = () => crypto.r
   return `e_${slug === "" ? "entity" : slug}_${random()}`;
 }
 
-/** H3: the emails typed into a field, one per comma, space, or line, trimmed, lower-cased, each once. */
-export function emailsFrom(text: string): string[] {
-  const emails = text
-    .split(/[\s,;]+/)
-    .map((email) => email.trim().toLowerCase())
-    .filter((email) => email !== "");
-  return [...new Set(emails)];
+/** H3: the rules for an email chip: trimmed and lower-cased as the store holds it, shaped local@domain, at most 16 to an entity. */
+export const EMAIL_RULES: ChipRules = {
+  normalize: (email) => email.trim().toLowerCase(),
+  problem: emailProblem,
+  max: EMAIL_COUNT_PER_ENTITY_MAX,
+  maxProblem: `An entity holds at most ${String(EMAIL_COUNT_PER_ENTITY_MAX)} emails.`,
+};
+
+/** H3: why `email` (normalized) is not an email address as the schema takes one (local@domain, no spaces), or undefined. */
+export function emailProblem(email: string): string | undefined {
+  const [local, domain, ...more] = email.split("@");
+  const shaped = local !== undefined && local !== "" && domain !== undefined && domain !== "" && more.length === 0 && !/\s/.test(email);
+  return shaped ? overBytes(email, EMAIL_BYTES_MAX, "The email") : `${email} is not an email address: write it as name@example.org.`;
 }
 
-/** E6: an entity as it should be, its name trimmed and its emails read from `emails`. */
-export function entityOf(key: string, name: string, emails: string): Entity {
-  const listed = emailsFrom(emails);
-  return { key, name: name.trim(), ...(listed.length === 0 ? {} : { emails: listed }) };
+/** E6: an entity as it should be, its name trimmed and its emails (already normalized chips) as the list it holds. */
+export function entityOf(key: string, name: string, emails: readonly string[]): Entity {
+  return { key, name: name.trim(), ...(emails.length === 0 ? {} : { emails: [...emails] }) };
 }
 
 /** E6: the merge of `merged` into `survivor`, naming each journey referring to either at the revision seen. */

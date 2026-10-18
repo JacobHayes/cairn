@@ -984,6 +984,107 @@ table.data {
   border-top: 1px solid var(--color-border);
   padding: var(--space-3) 0;
 }
+/* Multi-value input (DESIGN): an input's box holding a chip per value and the input that takes the next. */
+.chips-field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+  flex: 1 1 18rem;
+  min-width: 0;
+}
+.chips-input {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-1);
+  min-height: var(--control-h);
+  padding: 2px var(--space-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+  cursor: text;
+}
+.chips-input:hover {
+  border-color: var(--color-secondary);
+}
+/* The box wears the focus ring, not the input inside it. */
+.chips-input:has(> input:focus-visible) {
+  border-color: var(--color-accent);
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+}
+.chips-input[data-invalid]:has(> input:focus-visible) {
+  border-color: var(--color-error);
+  outline-color: var(--color-error);
+}
+.chips-input > input:focus-visible {
+  outline: none;
+}
+.chips-input[data-invalid] {
+  border-color: var(--color-error);
+}
+.chips-input > input {
+  flex: 1 1 6rem;
+  min-width: 0;
+  min-height: 0;
+  height: calc(var(--control-h) - 6px);
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  font: 500 13px / 1.6 var(--font-mono);
+}
+/* Beside a growing field, the form's controls hold the top edge. */
+.row:has(> .chips-field) {
+  align-items: flex-start;
+}
+.chip-value {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-sm);
+  background: var(--color-band);
+  font: 500 13px / 1.6 var(--font-mono);
+  padding-left: var(--space-2);
+}
+.chip-value > span {
+  overflow-wrap: anywhere;
+}
+/* The remove button is a full touch target on a phone, a quiet cross beside the value elsewhere. */
+.chip-value > button {
+  min-width: 24px;
+  min-height: 24px;
+  padding: 0 var(--space-1);
+  border: 0;
+  background: transparent;
+  color: var(--color-secondary);
+  line-height: 1;
+}
+.chip-value > button:hover {
+  color: var(--color-text);
+}
+.chips-reason {
+  font-size: 14px;
+  color: var(--color-error);
+}
+.chips-reason::before {
+  content: "Not added ";
+  font: 500 11.5px / 1.6 var(--font-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+@media (max-width: 719px) {
+  .chip-value > button {
+    min-width: 44px;
+    min-height: 32px;
+  }
+  .chips-input > input {
+    font-size: 16px;
+  }
+  .row:has(> .chips-field) > input {
+    flex: 1 1 100%;
+  }
+}
 /* A control in a narrow column wraps rather than pushing it wider. */
 :is(.author-panel, .author-bar, .detail-panel) :is(input, select, textarea) {
   max-width: 100%;

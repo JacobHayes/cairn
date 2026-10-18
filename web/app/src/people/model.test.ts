@@ -5,7 +5,7 @@ import type { Schema } from "@cairn/client";
 import { describe, expect, it } from "vitest";
 
 import { linkable } from "./Identity.tsx";
-import { aliasesOf, emailsFrom, entityOf, mergeMutation, newEntityKey, offeredMerge } from "./model.ts";
+import { aliasesOf, emailProblem, entityOf, mergeMutation, newEntityKey, offeredMerge } from "./model.ts";
 
 describe("entities as sent (E6, H3)", () => {
   it.each(["Ann Example", "", "Équipe d'achats", "y".repeat(300)])("mints a key the host accepts from %j", (name) => {
@@ -14,9 +14,22 @@ describe("entities as sent (E6, H3)", () => {
     expect(key.length).toBeLessThanOrEqual(64);
   });
 
-  it("reads emails trimmed, lower-cased, each once, by comma, space, or line", () => {
-    expect(emailsFrom(" Ann@Example.org, ann@example.org\nbob@example.org;  ")).toEqual(["ann@example.org", "bob@example.org"]);
-    expect(entityOf("e_a", " Ann ", "")).toEqual({ key: "e_a", name: "Ann" });
+  it("holds the emails it is given, none when none", () => {
+    expect(entityOf("e_a", " Ann ", [])).toEqual({ key: "e_a", name: "Ann" });
+    expect(entityOf("e_a", "Ann", ["ann@example.org"])).toEqual({ key: "e_a", name: "Ann", emails: ["ann@example.org"] });
+  });
+
+  it.each([
+    ["ann@example.org", false],
+    ["a@b", false],
+    ["ann", true],
+    ["@example.org", true],
+    ["ann@", true],
+    ["a@b@c.org", true],
+    ["a b@c.org", true],
+    [`${"x".repeat(250)}@e.org`, true],
+  ])("judges %j a bad email: %s", (email, bad) => {
+    expect(emailProblem(email) !== undefined).toBe(bad);
   });
 });
 

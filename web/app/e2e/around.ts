@@ -112,10 +112,14 @@ export async function mergeEntities(page: Page, survivor: string, merged: string
 }
 
 /** Adds an entity on the entities screen; its key, once listed. */
-export async function addEntity(page: Page, name: string, emails = ""): Promise<string> {
+export async function addEntity(page: Page, name: string, emails: readonly string[] = []): Promise<string> {
   const form = page.getByTestId("create-entity");
   await form.getByLabel("New entity's name").fill(name);
-  await form.getByLabel("New entity's emails").fill(emails);
+  const field = form.getByLabel("New entity's emails");
+  for (const email of emails) {
+    await field.fill(email);
+    await field.press("Enter");
+  }
   await form.getByRole("button", { name: "Add an entity" }).click();
   const row = page.getByTestId("entity").filter({ has: page.getByTestId("entity-name").getByText(name, { exact: true }) });
   await expect(row).toHaveCount(1);

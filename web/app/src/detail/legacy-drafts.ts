@@ -10,6 +10,8 @@ import { EDIT_RECORD_VERSION, readRecord } from "../data/edit-record.ts";
 import { DRAFT_PREFIX } from "../data/drafts.ts";
 import { JOURNEY_ID } from "../data/journeys.ts";
 import { newPatchId, patchOf } from "../data/writes.ts";
+import { EMAIL_RULES } from "../people/model.ts";
+import { takeChips } from "../ui/chips.ts";
 import { actionsDraftKey, readOpened, type FormCase, type Opened } from "./actions-form.ts";
 import { nodeEdit, writesEntities } from "./write.ts";
 
@@ -149,6 +151,28 @@ function convertForms(drafts: Drafts, keys: string[]): void {
   }
 }
 
+/** An entity form's old draft (its emails one comma-separated text) as the chips it is now: the emails that hold as chips, the rest left in the input. */
+function chipsOf(value: unknown): Plain | undefined {
+  if (!isPlain(value) || typeof value.emails !== "string") {
+    return undefined;
+  }
+  const { values, text } = takeChips([], value.emails, EMAIL_RULES);
+  return { ...value, emails: values, emailText: text };
+}
+
+/** Each old `entity:` form draft becomes an `entity-new` or `entity-edit:` one; the old key goes once it was stored. */
+function convertEntities(drafts: Drafts, keys: string[]): void {
+  for (const key of keys.filter((each) => each.startsWith("entity:"))) {
+    const name = key.slice("entity:".length);
+    const target = name === "new" ? "entity-new" : `entity-edit:${name}`;
+    const chips = chipsOf(drafts.read(key));
+    // A draft the new build already made wins: the old one is a leftover.
+    if (drafts.has(target) || chips === undefined || drafts.put(target, chips)) {
+      drafts.remove(key);
+    }
+  }
+}
+
 /** Each old `rejected:` draft becomes a rejected record in `store`; the draft goes once it was kept. */
 function convertRejections(drafts: Drafts, keys: string[], store: EditStore): void {
   for (const key of keys.filter((each) => each.startsWith("rejected:"))) {
@@ -163,7 +187,8 @@ function convertRejections(drafts: Drafts, keys: string[], store: EditStore): vo
 /**
  * Converts the old drafts of `storage` (a tab's session storage; none where it is unavailable):
  * the per-form Actions drafts into one `actions:` draft per node, a reason typed under a
- * rejection to its own key, and each `rejected:` draft into a rejected record kept in `store`.
+ * rejection to its own key, each `rejected:` draft into a rejected record kept in `store`, and
+ * an entity form's emails text into chips.
  */
 export function migrateTabDrafts(storage: Storage | undefined, store: EditStore): void {
   if (storage === undefined) {
@@ -180,6 +205,7 @@ export function migrateTabDrafts(storage: Storage | undefined, store: EditStore)
     const drafts = draftsOf(storage);
     convertForms(drafts, keys);
     convertRejections(drafts, keys, store);
+    convertEntities(drafts, keys);
   } catch {
     // Storage refused mid-way: what was not converted is still where it was.
   }
