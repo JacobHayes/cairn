@@ -315,9 +315,11 @@ impl Client {
                             Err(WriteError::Rejected(rejection)) => {
                                 Err(Refused::Rejected(rejection))
                             }
-                            Err(WriteError::Failed(error)) => {
-                                Err(Refused::Failed(server_error(&error.to_string())))
-                            }
+                            // A domain patch is never answered "no such proposal": the
+                            // service answered wrongly, which only-conflicts-refused reports.
+                            Err(
+                                error @ (WriteError::Failed(_) | WriteError::ProposalMissing(_)),
+                            ) => Err(Refused::Failed(server_error(&error.to_string()))),
                         },
                     };
                     in_flight.send_modify(|count| *count -= 1);

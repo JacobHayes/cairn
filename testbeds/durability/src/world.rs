@@ -172,10 +172,10 @@ impl World {
                     }
                     return Ok(written);
                 }
-                Err(WriteError::Rejected(rejection)) => {
+                Err(refused @ (WriteError::Rejected(_) | WriteError::ProposalMissing(_))) => {
                     // The plan is valid by construction (its tests), so the service or the
                     // store answered wrongly.
-                    let detail = format!("step {index} was rejected: {rejection:?}");
+                    let detail = format!("step {index} was refused: {refused:?}");
                     report_violation("durability-planned-patch-accepted", &detail);
                     return Err(Stop::Violated);
                 }

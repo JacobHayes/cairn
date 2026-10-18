@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Step lint of `mise run check` and `check:fast`: format, lint, typecheck (rustfmt, clippy,
-# workspace lints, patina site labels, the wasm32 build of the runtime-free crates, the
+# workspace lints, the same over each testbed, patina site labels, the wasm32 build of the runtime-free crates, the
 # TypeScript typecheck, eslint, the CSS lint).
 # PRACTICES, The validation ladder; Code conventions. This step runs tools, not tests: it
 # fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
@@ -147,6 +147,12 @@ if [ "$fixing" -eq 1 ]; then
     cargo clippy --fix --allow-dirty --allow-staged --locked --workspace --no-deps --all-targets \
       --all-features -- "${raised[@]}" >"$typescript/clippy-fix.out" 2>&1 || true
     cargo fmt --all >/dev/null 2>&1 || true
+    for manifest in testbeds/*/Cargo.toml; do
+      cargo fmt --manifest-path "$manifest" >/dev/null 2>&1 || true
+      cargo clippy --fix --allow-dirty --allow-staged --locked --all-targets --manifest-path "$manifest" \
+        -- -D warnings >>"$typescript/clippy-fix.out" 2>&1 || true
+      cargo fmt --manifest-path "$manifest" >/dev/null 2>&1 || true
+    done
   fi
   wait "$eslint_job" || true
   fixed=$(ladder_changed_files "$sums_before" "$(ladder_source_sums)")
@@ -225,18 +231,26 @@ if [ "$rust" = 1 ]; then
   fi
   ladder_suite clippy "$checked" crates
 
-  # Each testbed is a workspace of its own with its own lock file, which nothing above reads;
-  # `mise run sim` builds them with --locked nightly. A lock that no longer matches the crates
-  # it depends on (a version or dependency change in the main workspace) fails here, on push.
-  testbed_locks=0
+  # Each testbed is a workspace of its own with its own lock file and target directory, which
+  # nothing above reads. Formatting and clippy over them (--locked also fails a lock file that
+  # no longer matches the crates it depends on) is what keeps a service API change from
+  # breaking them unseen until the nightly `mise run sim`
+  # (decisions/2026-10-18-the-ladder-lints-the-testbeds.md).
+  testbeds=0
   for manifest in testbeds/*/Cargo.toml; do
-    cargo metadata --locked --format-version 1 --manifest-path "$manifest" >/dev/null 2>"$typescript/testbed-lock.err" || {
-      ladder_show <"$typescript/testbed-lock.err"
-      ladder_fail "$(dirname "$manifest")/Cargo.lock is out of date (run: cargo metadata --format-version 1 --manifest-path $manifest >/dev/null)"
+    testbed=$(dirname "$manifest")
+    cargo fmt --check --manifest-path "$manifest" >"$typescript/testbed-fmt.out" 2>&1 || {
+      ladder_show <"$typescript/testbed-fmt.out"
+      ladder_fail "rustfmt: $testbed is not formatted (run: cargo fmt --manifest-path $manifest)"
     }
-    testbed_locks=$((testbed_locks + 1))
+    cargo clippy --locked --all-targets --manifest-path "$manifest" -- -D warnings \
+      >"$typescript/testbed-clippy.out" 2>&1 || {
+      ladder_show <"$typescript/testbed-clippy.out"
+      ladder_fail "clippy reported errors or warnings in $testbed"
+    }
+    testbeds=$((testbeds + 1))
   done
-  ladder_suite "testbed lock files" "$testbed_locks" testbeds
+  ladder_suite "testbed rustfmt and clippy" "$testbeds" testbeds
 
   # PRACTICES, Simulation with patina: every `sometimes!`, `reachable!`, `always!`, and
   # `buggify!` site carries a literal kebab-case label. A campaign reads the labels declared

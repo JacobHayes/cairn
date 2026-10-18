@@ -2,7 +2,7 @@
 # The durability testbed's legs of `mise run sim` (brief 6.2; PRACTICES, Simulation with
 # patina). Not part of `mise run check`. Each leg fails loudly; none skips.
 #
-#   1. code: rustfmt, clippy with warnings denied, the unit tests;
+#   1. code: the unit tests (rustfmt and clippy are the check ladder's lint step);
 #   2. build shim-linked, and `cargo patina audit`: the only unsupported symbols are the
 #      ones Turso links and Cairn never reaches (README, Audit), allowed by name;
 #   3. determinism: a crash-restart run recorded twice is byte-identical, and its replay
@@ -31,9 +31,8 @@ fail() {
 }
 command -v cargo-patina >/dev/null || fail "cargo-patina is missing: run mise install"
 
-# Builds the artifact first, so `target` (a managed symlink on some hosts) exists.
-cargo fmt --check || fail "rustfmt: run cargo fmt in testbeds/durability"
-cargo clippy --locked --all-targets -- -D warnings || fail "clippy reported errors"
+# Builds the artifact first, so `target` (a managed symlink on some hosts) exists. rustfmt and
+# clippy are the check ladder's lint step (PRACTICES, The validation ladder), not repeated here.
 cargo test --locked || fail "unit tests failed"
 say "leg 1 passed: code"
 

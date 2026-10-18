@@ -15,7 +15,7 @@
 #
 # With --fast, steps are left out when the current change touches none of their inputs
 # (scripts/changed): the Rust steps (unit, property) and the Rust half of lint (rustfmt,
-# clippy, the wasm32 build, patina labels) when no Rust input changed, and the web steps
+# clippy, also over the testbeds, the wasm32 build, patina labels) when no Rust input changed, and the web steps
 # (web-unit, browser) when neither side changed (the web unit tests compare the browser host's
 # module with the server's answers). The browser step runs only against the in-browser host,
 # with no web build embedded and no binary built or tested, unless the change touches the

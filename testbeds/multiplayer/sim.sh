@@ -2,7 +2,7 @@
 # The multiplayer testbed's legs of `mise run sim` (brief 6.1; PRACTICES, Simulation with
 # patina). Not part of `mise run check`. Each leg fails loudly; none skips.
 #
-#   1. code: rustfmt, clippy with warnings denied, the unit tests;
+#   1. code: the unit tests (rustfmt and clippy are the check ladder's lint step);
 #   2. build shim-linked; `cargo patina audit` finds exactly the unsupported symbols Turso
 #      links (README, gap 4), which every run is then allowed by name;
 #   3. determinism: one seed recorded twice is byte-identical, and its replay reports the
@@ -67,9 +67,8 @@ out_of_reach=(
   assistant-turn-overflow-proposed
 )
 
-# Builds the artifact first, so `target` (a managed symlink on some hosts) exists.
-cargo fmt --check || fail "rustfmt: run cargo fmt in testbeds/multiplayer"
-cargo clippy --locked --all-targets -- -D warnings || fail "clippy reported errors"
+# Builds the artifact first, so `target` (a managed symlink on some hosts) exists. rustfmt and
+# clippy are the check ladder's lint step (PRACTICES, The validation ladder), not repeated here.
 cargo test --locked || fail "unit tests failed"
 say "leg 1 passed: code"
 

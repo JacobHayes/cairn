@@ -1,8 +1,8 @@
 # Brief 6.2, the durability testbed: the service on the real Turso store under the patina
 # native shim's filesystem faults and crash-restart (PRACTICES, Simulation with patina:
 # Testbeds, `durability`). Its own Cargo workspace (the empty [workspace] table), so
-# `cargo patina build` resolves only this tree and the check ladder, which covers the root
-# workspace's `crates/*`, never builds it.
+# `cargo patina build` resolves only this tree. The check ladder formats and lints it as a
+# separate workspace (lint step) and never runs it; only `mise run sim` does.
 [workspace]
 
 [package]
