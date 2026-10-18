@@ -11,7 +11,7 @@ rust = { version = "1.99.0", profile = "minimal", components = "clippy,rustfmt",
 # The simulation track's runner (PRACTICES, Simulation with patina: Tooling), built from
 # source once at the same revision as the SDK git dependencies in Cargo.toml. Only
 # `mise run sim` uses it; the check ladder never does.
-"cargo:https://github.com/JacobHayes/patina" = { version = "rev:6a2977e7bce794d15eabaa18258a5542115bd872", crate = "cargo-patina", locked = true }
+"cargo:https://github.com/JacobHayes/patina" = { version = "rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8", crate = "cargo-patina", locked = true }
 
 [env]
 # A fixed build time for every build, local and CI. turso_core's build script embeds the wall

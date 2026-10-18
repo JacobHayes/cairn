@@ -33,8 +33,8 @@ axum = { version = "0.8.9", default-features = false, features = ["http1", "toki
 jiff = { version = "0.2.37", default-features = false, features = ["std"] }
 url = "2.5.8"
 # The SDK at the revision the root Cargo.toml and mise.toml pin.
-patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "6a2977e7bce794d15eabaa18258a5542115bd872" }
-tokio = { version = "1.53.2", features = ["macros", "net", "rt", "sync", "time"] }
+patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "1dee57b448d57c390af26a9d5af5f2d3a8820cc8" }
+tokio = { version = "1.53.2", features = ["macros", "net", "rt", "rt-multi-thread", "sync", "time"] }
 
 # The crate-wide lints of the root workspace (Cargo.toml [workspace.lints]); this
 # workspace cannot inherit them. `mise run sim` runs clippy with warnings denied.

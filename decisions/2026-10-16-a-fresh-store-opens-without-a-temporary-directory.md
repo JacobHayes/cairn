@@ -44,3 +44,5 @@ Alternatives:
 
 What would change it: a patina that crashes after a directory removal (drop the pragma, its
 test, and the README finding); a Turso that does not use a directory for `DROP TABLE`.
+
+Superseded by decisions/2026-10-18-patina-main-retires-four-testbed-workarounds.md.

@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Step lint of `mise run check` and `check:fast`: format, lint, typecheck (rustfmt, clippy,
-# workspace lints, the same over each testbed, patina site labels, the wasm32 build of the runtime-free crates, the
-# TypeScript typecheck, eslint, the CSS lint).
+# workspace lints, the same over each testbed, patina site labels, the wasm32 build of the
+# runtime-free crates, the TypeScript typecheck, eslint, the CSS lint).
 # PRACTICES, The validation ladder; Code conventions. This step runs tools, not tests: it
 # fails if a tool is missing or reports nothing checked. The TypeScript typecheck and
 # eslint joined with the first TypeScript package, web/client
@@ -253,9 +253,10 @@ if [ "$rust" = 1 ]; then
   ladder_suite "testbed rustfmt and clippy" "$testbeds" testbeds
 
   # PRACTICES, Simulation with patina: every `sometimes!`, `reachable!`, `always!`, and
-  # `buggify!` site carries a literal kebab-case label. A campaign reads the labels declared
-  # anywhere in a binary, and one holding a space breaks every campaign over it (patina gap 5,
-  # decisions/2026-10-06-patina-a-site-label-holding-a-space-breaks-every-campaign.md). The
+  # `buggify!` site carries a literal kebab-case label. A campaign gates the literal labels
+  # declared at link time, so a label built at run time is not seen; and the testbeds' sim.sh
+  # scripts word-split and grep labels, so a spaced label would break them
+  # (decisions/2026-10-18-patina-main-retires-four-testbed-workarounds.md). The
   # exception: the durability testbed's crash oracles, whose kebab-case labels are constants
   # so a campaign, which draws no crash, does not declare them (decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md).
   label_exceptions=(

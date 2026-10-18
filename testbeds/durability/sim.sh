@@ -3,8 +3,7 @@
 # patina). Not part of `mise run check`. Each leg fails loudly; none skips.
 #
 #   1. code: the unit tests (rustfmt and clippy are the check ladder's lint step);
-#   2. build shim-linked, and `cargo patina audit`: the only unsupported symbols are the
-#      ones Turso links and Cairn never reaches (README, Audit), allowed by name;
+#   2. build shim-linked, and `cargo patina audit` finds no unsupported symbol;
 #   3. determinism: a crash-restart run recorded twice is byte-identical, and its replay
 #      reports the same verdict;
 #   4. smoke campaign: buggify, dampened fs errors and short I/O, and swarm over 128
@@ -43,25 +42,14 @@ cargo patina build . --output "$bed" >"$out/build.log" 2>&1 || {
   cat "$out/build.log" >&2
   fail "cargo patina build"
 }
-# The audit exits nonzero while anything is unsupported; what it lists is checked below.
-cargo patina audit "$bed" >"$out/audit.log" 2>&1 || true
-# Every unsupported finding is extension loading (dlopen, dlclose) or one of simsimd's
-# AVX-512 FP16 kernels, which Turso links and Cairn never calls, or rustix's raw syscall,
-# which a run traps through syscall-user dispatch and needs no allowance.
-unsupported=$(sed -n '/^unsupported native imports:/,/^[^ ]/p' "$out/audit.log" | grep -E '^    ' || true)
-unexpected=$(grep -Ev '^    (dlopen|dlclose) |symbol=simsimd_[a-z0-9_]+_sapphire |\(direct-syscall\) .*rustix' \
-  <<<"$unsupported" || true)
-[ -z "$unexpected" ] || {
-  printf '%s\n' "$unexpected" >&2
-  fail "cargo patina audit found unsupported symbols beyond Turso's known ones"
+cargo patina audit "$bed" >"$out/audit.log" 2>&1 || {
+  cat "$out/audit.log" >&2
+  fail "cargo patina audit"
 }
-allow=$(grep -oE '^    (dlopen|dlclose)|symbol=simsimd_[a-z0-9_]+_sapphire' <<<"$unsupported" |
-  sed 's/^ *//; s/^symbol=//' | sort -u | paste -sd, -)
-[ -n "$allow" ] || fail "the audit listed none of Turso's known symbols: update this leg and the README"
-say "leg 2 passed: built and audited, allowing $(tr ',' '\n' <<<"$allow" | wc -l) symbols Turso links"
+say "leg 2 passed: built and audited, no unsupported symbol"
 
-# run ARGS...: one run of the testbed under patina, with the allowance.
-run() { cargo patina run "$bed" --allow-unsupported-symbols "$allow" "$@"; }
+# run ARGS...: one run of the testbed under patina.
+run() { cargo patina run "$bed" "$@"; }
 verdict_of() { grep '^PATINA_VERDICT ' "$1" || true; }
 
 for repeat in a b; do
@@ -71,7 +59,7 @@ for repeat in a b; do
 done
 cmp -s "$out/crash-a.patina" "$out/crash-b.patina" ||
   fail "a crash-restart run recorded twice gave different traces"
-cargo patina replay "$bed" "$out/crash-a.patina" --allow-unsupported-symbols "$allow" \
+cargo patina replay "$bed" "$out/crash-a.patina" \
   >/dev/null 2>"$out/crash-replay.err" || fail "replay failed: $out/crash-replay.err"
 [ "$(verdict_of "$out/crash-a.err")" = "$(verdict_of "$out/crash-replay.err")" ] ||
   fail "the replay reported a different verdict"
@@ -106,7 +94,7 @@ out_of_reach=(
 gens=128
 rm -rf "$out/campaign"
 cargo patina campaign "$bed" --gens "$gens" --buggify --faults --fault-scale-permille 100 --swarm \
-  --allow-unmet-sometimes --allow-unsupported-symbols "$allow" --out-dir "$out/campaign" \
+  --allow-unmet-sometimes --out-dir "$out/campaign" \
   --progress-every 0 >"$out/campaign.log" 2>&1 || {
   sed -n '/campaign summary/,$p' "$out/campaign.log" >&2
   fail "smoke campaign"
@@ -139,7 +127,7 @@ sweep() {
   shift
   rm -f "$out/$name".*.err
   extra="$*"
-  export bed allow out name extra
+  export bed out name extra
   for seed in 1 2; do
     for granularity in block byte; do
       for kind in write sync; do
@@ -152,7 +140,7 @@ sweep() {
     seed=$1 granularity=$2 kind=$3 at=$4
     err="$out/$name.$seed.$granularity.$kind.$at.err"
     status=0
-    cargo patina run "$bed" --allow-unsupported-symbols "$allow" --seed "$seed" \
+    cargo patina run "$bed" --seed "$seed" \
       --fs-crash-at "$kind:$at" --fs-torn-granularity "$granularity" $extra >/dev/null 2>"$err" ||
       status=$?
     echo "$status $err"

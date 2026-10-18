@@ -11,8 +11,9 @@ Proof: `briefs/proof/6.1/README.md`.
 `src/main.rs` assembles a composition root as the binary's will (`src/world.rs`): the Turso
 store on a file in the run's virtual filesystem, the in-process notifier, the dev sign-in
 provider (no token: every request is the dev user), and 4.2's `cairn_api::router`, served by
-axum on `127.0.0.1:7878`. Everything runs as tasks on one current-thread tokio runtime with a
-1 ms ticker (the configuration the simulation spike, 1.3, found the shim carries; DECISIONS.md, 1.3).
+axum on `127.0.0.1:7878`. Everything runs as tasks on a multi-thread tokio runtime with four workers, so requests
+run on several threads and PCT reorders them
+(`decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md`).
 
 Setup creates journey `j_shared` with three nodes and one pair of entities. Then:
 
@@ -37,8 +38,9 @@ Setup creates journey `j_shared` with three nodes and one pair of entities. Then
 - **Fault sites** (`src/faults.rs`), on the store's commit points, all `buggify!` and so
   inert without `--buggify`, none during setup: a commit waits before it begins (short, or a
   few times per run past the attempt timeout) or holds its transaction open just before it
-  commits (short, or once per run past the attempt timeout). Without them no two commits
-  ever overlap: one thread runs each request to its end, and a commit takes no virtual time.
+  commits (short, or once per run past the attempt timeout). Without them a run
+  reaches two overlapping commits too rarely: a commit holds nothing long enough for another
+  request, or a resubmission, to get ahead.
   Plus the client's `client-loses-response`: a first answer dropped on its way back.
 
 When every client is done, the run waits for the views, reads the store's truth through the
@@ -73,7 +75,7 @@ proposal and route-import paths (the testbed drafts no proposal and imports no r
 the assistant's tool loop, turn limits, and write wrapper (the testbed never drives the
 assistant).
 
-Arguments: `--clients N`, `--actions N`, `--tick-ms N` (default 1; 0 for no ticker). Exit
+Arguments: `--clients N`, `--actions N`. Exit
 codes: 0 pass, 1 violation, 3 abort (runtime, store, or listener), 4 liveness (a client gave
 up after 64 attempts, or the server would not stop), 64 bad arguments; never 2.
 
@@ -85,15 +87,14 @@ and only `mise run sim` does; its
 
 ```
 cargo patina build . --output target/patina/cairn-multiplayer
-cargo patina run target/patina/cairn-multiplayer --seed 1 \
-  --allow-unsupported-symbols "$(paste -sd, unsupported-symbols.txt)" [FAULT FLAGS]
+cargo patina run target/patina/cairn-multiplayer --seed 1 [FAULT FLAGS]
 mise run sim          # every leg of sim.sh, from the repository root
 ```
 
-`sim.sh` (about 3 minutes): code (fmt, clippy, unit tests); build, and an audit whose
-unsupported symbols must be exactly `unsupported-symbols.txt` (gap 4); determinism (a seed
+`sim.sh` (about 3 minutes): code (fmt, clippy, unit tests); build, and a clean audit; determinism (a seed
 recorded twice is byte-identical, its replay reports the same verdict); the smoke campaign
-(16 generations, `--buggify --sched-pct`, every oracle in reach fired, no failure); the
+(16 generations, `--buggify --sched-pct`, every oracle in reach fired, every generation
+passing); the
 faulted sweep (8 seeds of dropped, delayed, refused, and reset
 connections, every run passing and resending, some patch answered from its receipt, no inert
 knob). The patina gaps below are not checked: they exercise the pinned patina, not Cairn
@@ -115,58 +116,33 @@ for it and then meets its receipt or what it really touched; and the client neve
 patch backward. `crates/tests/tests/integration/service/in_flight.rs` holds both cases over both stores, and
 the campaign tolerates no finding.
 
-## Patina gap report
+When a smoke generation fails, read its observed verdict and replay the saved trace before
+blaming determinism: Patina currently classes a finding found under PCT whose run hit a
+change point as `NONDETERMINISM`, because a replay always reports a bug depth of 0 (a Patina
+bug, reported).
 
-Three gaps beyond the three the spike found (gaps 1 to 3, tracked as patina issues), each
-with a `DECISIONS.md` entry tagged patina. They are history: no leg checks that they still
-reproduce, and whoever bumps patina reads them.
+## Patina gap history
 
-### Gap 4: Turso links symbols the shim refuses to run beside
+The gaps this testbed found in Patina, each with a `DECISIONS.md` entry tagged patina. Gaps
+1 to 3 are the spike's. Gaps 4, 5 and 6 are fixed at the pinned revision, and no leg checks
+them:
 
-```
-$ cargo patina run target/patina/cairn-multiplayer --seed 1
-cargo-patina: refusing to run .../cairn-multiplayer: 19 symbol(s) on the blocking/time/scheduling/effect
-surface are neither interposed by the deterministic runtime nor known-safe (default-deny). ...
-  dlclose (dynamic-loading)
-  dlopen (dynamic-loading)
-  instruction@.text+0x20d56a9 (undecodable-instruction) [symbol=simsimd_dot_f16_sapphire ...]
-  ... (17 such, all simsimd_*_sapphire)
-```
+- Gap 4, Turso links symbols the shim refuses to run beside (`dlopen`, `dlclose` and
+  simsimd's AVX-512 FP16 kernels): the audit decodes those instructions and traps `dlopen`
+  (`6bca33af`), so the audit is clean and no run names an allowance.
+- Gap 5, a site label holding a space breaks a campaign: labels are escaped in the report
+  (the label rule in `scripts/steps/lint` stays for the reasons in
+  `decisions/2026-10-18-patina-main-retires-four-testbed-workarounds.md`).
+- Gap 6, an `always!` violation leaves no trace to replay: the trace is finalized and
+  replays (`2d1c8d3f`). The invariants stay `violation` verdicts for another reason
+  (`decisions/2026-10-18-testbed-invariants-stay-verdicts.md`).
 
-`turso_core` links `libloading` unconditionally (extension loading, never called by Cairn)
-and its default `simd` feature, which the `turso` and `turso_sdk_kit` crates turn on with no
-way to turn it off downstream, links simsimd's AVX-512 FP16 kernels, whose instructions
-patina's decoder cannot read. Neither is called on Cairn's paths. Every run passes
-`--allow-unsupported-symbols` naming exactly these 19, never `all`; leg 2 fails if the audit finds any other.
+Also fixed, and removed from the testbed: a delayed TCP segment waking no reactor (the 1 ms
+ticker; `0115ebf0`) and tokio TCP I/O on a multi-thread runtime aborting the shim (the
+single-thread runtime; `0115ebf0`).
 
-### Gap 5: a site label holding a space breaks a campaign
-
-```
-$ cargo patina campaign target/patina/spaced_label --gens 1
-cargo-patina: generation 0 has malformed PATINA_SDK_REPORT: malformed SDK declared-site token
-"a": expected <label>|<kind>|@<file:line>
-```
-
-`PATINA_SDK_REPORT` writes `declared_site=` and `site=` rows space-separated without
-escaping, though verdict labels are escaped; nothing documents labels as space-free. Every
-literal-label site is declared at link time, so one such label anywhere in the binary fails
-every campaign over it, whether or not it runs. Cairn's own oracle labels (4.1's and 4.2's)
-were sentences; they are kebab-case now (DECISIONS.md, 6.1).
-
-### Gap 6: an `always!` violation leaves no trace to replay
-
-```
-$ cargo patina run target/patina/always_abort --seed 1 --record abort.patina
-PATINA_VERDICT seq=0 kind=violation label=never-holds detail=src/bin/always_abort.rs:6
-PATINA_INFRA native_run signal=6 trace=incomplete trace_path="abort.patina" reason="incomplete trace
-.../.abort.patina.tmp...: empty trace file; record finalization did not complete"
-```
-
-`always!` aborts the process before the native recorder finalizes, so a failing seed found
-by `always!` cannot be replayed, and `cargo patina minimize --generation N` fails even with
-`--no-trace-phase` (`failed to load the trace recorded from the reduced knobs`). The testbed
-therefore reports each invariant through `verdict` and exits 1 rather than
-with `always!` as the brief asked.
+Still open and worked around: `campaign --faults` draws every plane with no way to leave
+one out, so the network sweep is explicit (`decisions/2026-10-18-patina-campaign-faults-still-cannot-sweep-the-multiplayer-testbed.md`).
 
 ## Limits and choices
 

@@ -3,13 +3,12 @@
 # patina). Not part of `mise run check`. Each leg fails loudly; none skips.
 #
 #   1. code: the unit tests (rustfmt and clippy are the check ladder's lint step);
-#   2. build shim-linked; `cargo patina audit` finds exactly the unsupported symbols Turso
-#      links (README, gap 4), which every run is then allowed by name;
+#   2. build shim-linked; `cargo patina audit` finds no unsupported symbol;
 #   3. determinism: one seed recorded twice is byte-identical, and its replay reports the
 #      same verdict;
 #   4. smoke campaign: buggify and PCT schedules over 16 generations, every `sometimes!`
-#      and `reachable!` site fired but those out of reach below, and no failure but the
-#      known product findings below;
+#      and `reachable!` site fired but those out of reach below, and every generation
+#      passes;
 #   5. faulted sweep: 8 seeds with dropped, refused, reset, and delayed connections; every
 #      run passes, every run resent a request, some patch was answered from its receipt,
 #      and no fault knob was inert;
@@ -18,8 +17,7 @@
 # pinned patina, not Cairn, and are recorded in decisions/
 # (decisions/2026-10-17-simulation-runs-no-known-gap-checks.md).
 #
-# One current-thread runtime with the 1 ms ticker (the testbed's default) is the
-# configuration the simulation spike (1.3) found the shim carries.
+# The testbed serves on a multi-thread runtime (decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md).
 set -euo pipefail
 cd "$(dirname "$0")"
 
@@ -29,12 +27,6 @@ fail() {
   exit 1
 }
 command -v cargo-patina >/dev/null || fail "cargo-patina is missing: run mise install"
-
-# Product bugs this testbed found and DECISIONS.md records, by the label of the invariant a
-# run breaks first. Until each is fixed, a campaign generation failing on one of these is
-# reported, not fatal; any other failure is. When a fix lands, its label comes out of
-# this list and its ignored test in crates/tests/tests/integration/service/in_flight.rs is un-ignored.
-known_findings=()
 
 # Coverage oracles in the binary that this testbed cannot reach, by label (DECISIONS.md,
 # 6.1 integration). The campaign's own gate is waived for these alone: any other oracle that
@@ -79,19 +71,11 @@ cargo patina build . --output "$testbed" >"$out/build.log" 2>&1 || {
   cat "$out/build.log" >&2
   fail "cargo patina build"
 }
-# The audit exits nonzero on unsupported symbols; the leg checks they are exactly the
-# recorded ones (gap 4) rather than none.
-cargo patina audit "$testbed" >"$out/audit.log" 2>&1 || true
-found=$(grep -oE '^    (instruction@[^ ]+ \(undecodable-instruction\) \[symbol=[a-z0-9_]+|(dlopen|dlclose) \(dynamic-loading\))' "$out/audit.log" |
-  sed -E 's/.*\[symbol=//; s/^ *([a-z]+) \(dynamic-loading\)/\1/' | sort -u)
-expected=$(sort -u unsupported-symbols.txt)
-[ "$found" = "$expected" ] || {
-  diff <(printf '%s\n' "$expected") <(printf '%s\n' "$found") >&2 || true
-  fail "the audit's unsupported symbols changed: update unsupported-symbols.txt, README.md gap 4, and DECISIONS.md"
+cargo patina audit "$testbed" >"$out/audit.log" 2>&1 || {
+  cat "$out/audit.log" >&2
+  fail "cargo patina audit"
 }
-grep -q 'unsupported native imports' "$out/audit.log" || fail "the audit reports no unsupported symbols: gap 4 is fixed"
-allow=$(paste -sd, unsupported-symbols.txt)
-say "leg 2 passed: built; the audit finds exactly the $(wc -l <unsupported-symbols.txt) recorded unsupported symbols"
+say "leg 2 passed: built; the audit finds no unsupported symbol"
 
 # The verdict line a run reported, from its stderr file.
 verdict_of() { grep '^PATINA_VERDICT ' "$1" || true; }
@@ -99,12 +83,12 @@ verdict_of() { grep '^PATINA_VERDICT ' "$1" || true; }
 for seed in 1 2; do
   for repeat in a b; do
     cargo patina run "$testbed" --seed "$seed" --record "$out/seed-$seed-$repeat.patina" \
-      --allow-unsupported-symbols "$allow" >/dev/null 2>"$out/seed-$seed-$repeat.err" ||
+      >/dev/null 2>"$out/seed-$seed-$repeat.err" ||
       fail "seed $seed did not pass: $out/seed-$seed-$repeat.err"
   done
   cmp -s "$out/seed-$seed-a.patina" "$out/seed-$seed-b.patina" ||
     fail "seed $seed recorded twice gave different traces"
-  cargo patina replay "$testbed" "$out/seed-$seed-a.patina" --allow-unsupported-symbols "$allow" \
+  cargo patina replay "$testbed" "$out/seed-$seed-a.patina" \
     >/dev/null 2>"$out/seed-$seed-replay.err" || fail "seed $seed replay failed: $out/seed-$seed-replay.err"
   [ "$(verdict_of "$out/seed-$seed-a.err")" = "$(verdict_of "$out/seed-$seed-replay.err")" ] ||
     fail "seed $seed replay reported a different verdict"
@@ -114,7 +98,7 @@ say "leg 3 passed: repeats byte-identical, replays reproduce the verdict"
 rm -rf "$out/campaign"
 status=0
 cargo patina campaign "$testbed" --gens 16 --buggify --sched-pct --out-dir "$out/campaign" \
-  --progress-every 0 --allow-unmet-sometimes --allow-unsupported-symbols "$allow" \
+  --progress-every 0 --allow-unmet-sometimes \
   >"$out/campaign.log" 2>&1 || status=$?
 summary=$(sed -n '/campaign summary/,$p' "$out/campaign.log")
 [ -n "$summary" ] || {
@@ -130,26 +114,18 @@ done
 for label in "${out_of_reach[@]}"; do
   grep -qx -- "$label" <<<"$unmet" || say "note: $label fired: take it out of out_of_reach"
 done
-known=0
-while read -r class count; do
-  [ "$class" = OK ] && continue
-  [ "$class" = VIOLATION ] || fail "smoke campaign: $count generation(s) classed $class"
-  known=$count
-done < <(grep -E '^  class ' <<<"$summary" | awk '{ print $2, $3 }')
-while read -r signature; do
-  label=${signature##*label=}
-  label=${label%%|*}
-  printf '%s\n' "${known_findings[@]}" | grep -qx -- "$label" ||
-    fail "smoke campaign: a new violation, $signature (see $out/campaign/failures)"
-done < <(grep -oE 'signature: VIOLATION\|verdict kind=violation label=[a-z-]+\|' <<<"$summary" || true)
+grep -q '^generations=16 failures=0 ' "$out/campaign.log" || {
+  grep -E '^  (class|signature)' <<<"$summary" >&2
+  fail "smoke campaign: a generation failed (see $out/campaign/failures)"
+}
 grep 'PATINA_CAMPAIGN_COVERAGE' <<<"$summary"
-say "leg 4 passed: smoke campaign, every oracle in reach fired; $known generation(s) hit a known product finding"
+say "leg 4 passed: smoke campaign, every oracle in reach fired, every generation passed"
 
 seeds=8
 cargo patina explore run "$testbed" --seeds "$seeds" \
   --net-drop-permille 100 --net-latency-nanos 1000000 --net-jitter-nanos 0..2000000 \
   --net-connect-refuse-permille 100 --net-reset-permille 100 \
-  --allow-unsupported-symbols "$allow" >"$out/sweep.log" 2>&1 || {
+  >"$out/sweep.log" 2>&1 || {
   grep -E '^(PATINA_EXPLORE|MULTIPLAYER_)' "$out/sweep.log" >&2 || true
   fail "faulted sweep"
 }

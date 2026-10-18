@@ -44,7 +44,7 @@ be restarted).
 
 ```
 cargo patina build . --output target/patina/cairn-durability
-cargo patina run target/patina/cairn-durability --allow-unsupported-symbols <list> \
+cargo patina run target/patina/cairn-durability \
   --seed 1 --fs-crash-at sync:40 --fs-torn-granularity byte
 mise run sim     # every leg of sim.sh, from the repository root
 ```
@@ -52,9 +52,7 @@ mise run sim     # every leg of sim.sh, from the repository root
 ## sim.sh
 
 1. rustfmt, clippy, unit tests.
-2. Build and audit. The only unsupported symbols are `dlopen`, `dlclose`, and simsimd's
-   AVX-512 FP16 kernels, which Turso links and Cairn never reaches (6.1's patina entry),
-   allowed by name; rustix's raw syscall runs through syscall-user dispatch.
+2. Build and audit: the audit finds no unsupported symbol, so no run names an allowance.
 3. A crash-restart run recorded twice is byte-identical and replays its verdict.
 4. Smoke campaign: 128 generations of buggify, fs errors and short I/O (bands at 100 per
    mille of their default), and swarm. Every generation passes, and every oracle fires but
@@ -93,15 +91,12 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
   [`decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md`](../../decisions/2026-10-09-a-commit-the-store-cannot-settle-fails-it-closed.md),
   which replaced the barrier of
   [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
-- **Patina: a removed directory stops crash points.** Once the guest removes a directory
-  (Turso's temporary directory, when a connection that wrote is dropped), no later
-  `--fs-crash-at` point fires and the run ends uncrashed (or the injected crash reaches
-  the guest as `EIO`). An in-process reopen drops the pool, so a run that reopens is not
-  crashed after it. Turso creates and removes a temporary directory for each `DROP TABLE`,
-  and a fresh store runs two (the segments and barrier migrations), so the migrations run
-  with `temp_store = MEMORY`; a later statement that removes a directory would again end the
-  sweep early, which leg 5 catches. Recorded in
-  [`decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md`](../../decisions/2026-10-07-the-log-sync-fix-nothing-is-answered-from-a-write-until.md).
+- **Patina: a removed directory stopped crash points (fixed at the pin).** Once the guest
+  removed a directory (Turso's temporary directory, for each `DROP TABLE`), no later
+  `--fs-crash-at` point fired. Patina now crashes after a removal (`f0d1fc31`), so the
+  store's migrations no longer set `temp_store = MEMORY` and leg 5 reaches every crash point
+  on a fresh store. Recorded in
+  [`decisions/2026-10-16-a-fresh-store-opens-without-a-temporary-directory.md`](../../decisions/2026-10-16-a-fresh-store-opens-without-a-temporary-directory.md).
 - **Turso: opens under injected faults.** A log size error at open panics; a short read of
   the log header fails the open (both were cases of the store's tests, removed as they only
   re-proved the pinned Turso's gaps); an open retried in-process
@@ -113,5 +108,7 @@ Each finding is recorded in `decisions/`, linked at the end of its item.
   gates them. Byte tearing tears the ledger's appends but never leaves part of a Turso log
   frame, so the torn-tail oracle has not fired. Recorded in
   [`decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md`](../../decisions/2026-10-07-patina-a-campaign-draws-no-crash-and-no-crash-leaves-part.md).
-- Reused from 6.1: whitespace-free site labels, verdicts rather than `always!`, the
-  symbol allowance.
+- Reused from 6.1: kebab-case literal site labels (the label rule's reasons are in
+  [`decisions/2026-10-18-patina-main-retires-four-testbed-workarounds.md`](../../decisions/2026-10-18-patina-main-retires-four-testbed-workarounds.md))
+  and verdicts rather than `always!`
+  ([`decisions/2026-10-18-testbed-invariants-stay-verdicts.md`](../../decisions/2026-10-18-testbed-invariants-stay-verdicts.md)).

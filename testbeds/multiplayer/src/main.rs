@@ -1,8 +1,8 @@
 //! Brief 6.1, the multiplayer testbed (PRACTICES, Simulation with patina: Testbeds).
 //!
 //! One process runs Cairn's real HTTP server (4.2's router over a service on the Turso
-//! store) and N virtual clients, all as tasks on one current-thread tokio runtime (the
-//! configuration the spike, 1.3, found the patina shim carries). Each client patches one
+//! store) and N virtual clients, all as tasks on a multi-thread tokio runtime
+//! (`WORKER_THREADS` workers; decisions/2026-10-18-the-multiplayer-testbed-runs-a-multi-thread-runtime.md). Each client patches one
 //! shared journey through the real Rust client: H5's safe retry resubmits a stale patch
 //! when what intervened cannot overlap it and surfaces it when it can, and a transport
 //! retry resends a patch whose answer was lost, which the server answers from its receipt.
@@ -32,12 +32,16 @@ mod view;
 mod world;
 
 use std::process::ExitCode;
-use std::time::Duration;
 
 use tokio::task::JoinSet;
 
 use crate::client::{Client, GaveUp};
 use crate::outcome::{Outcome, Truth};
+
+/// Worker threads of the runtime. Cairn's binary serves on one worker per CPU, but patina
+/// presents one CPU, so the default would start a single worker and requests would never run
+/// beside each other; four lets PCT reorder them, as on a four-core host.
+const WORKER_THREADS: usize = 4;
 
 /// What a run is told on its command line.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -46,8 +50,6 @@ struct Options {
     clients: u32,
     /// Patches each client drafts.
     actions: u32,
-    /// The period of the ticker task, if any (`--tick-ms`, 0 for none).
-    tick: Option<Duration>,
 }
 
 impl Default for Options {
@@ -55,7 +57,6 @@ impl Default for Options {
         Self {
             clients: 4,
             actions: 8,
-            tick: Some(Duration::from_millis(1)),
         }
     }
 }
@@ -67,10 +68,6 @@ fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, Stri
         match flag.as_str() {
             "--clients" => options.clients = parse_count(&flag, &value)?,
             "--actions" => options.actions = parse_count(&flag, &value)?,
-            "--tick-ms" if value == "0" => options.tick = None,
-            "--tick-ms" => {
-                options.tick = Some(Duration::from_millis(parse_count(&flag, &value)?.into()));
-            }
             _ => return Err(format!("unknown argument {flag} {value}")),
         }
     }
@@ -99,20 +96,9 @@ impl From<GaveUp> for Stop {
     }
 }
 
-/// Wakes the runtime every `period` and does nothing else: under the shim a TCP segment
-/// delayed by a network fault is delivered only when some timer wakes the runtime
-/// (decisions/2026-10-06-patina-a-delayed-tcp-segment-does-not-wake-epoll-wait.md).
-async fn tick(period: Duration) {
-    let mut interval = tokio::time::interval(period);
-    loop {
-        interval.tick().await;
-    }
-}
-
 /// Starts the server, sets up the shared journey, runs every client and view, waits for
 /// the views to catch up, reads what the store holds, and stops the server.
 async fn run(options: &Options) -> Result<Outcome, Stop> {
-    let ticker = options.tick.map(|period| tokio::spawn(tick(period)));
     let server = world::Server::start().await?;
     let setup = world::set_up(&Client::new(world::SERVER, u32::MAX)).await?;
     server.arm();
@@ -149,9 +135,6 @@ async fn run(options: &Options) -> Result<Outcome, Stop> {
     }
     let outcome = Outcome::new(&setup, reports, truth, caught_up, writes_stopped);
     server.stop().await?;
-    if let Some(ticker) = ticker {
-        ticker.abort();
-    }
     Ok(outcome)
 }
 
@@ -163,7 +146,8 @@ fn main() -> ExitCode {
             return ExitCode::from(64);
         }
     };
-    let runtime = match tokio::runtime::Builder::new_current_thread()
+    let runtime = match tokio::runtime::Builder::new_multi_thread()
+        .worker_threads(WORKER_THREADS)
         .enable_all()
         .build()
     {
@@ -199,13 +183,12 @@ mod tests {
     #[test]
     fn options_parse_and_refuse_what_they_should() {
         assert_eq!(parse(&[]), Ok(Options::default()));
-        let parsed = parse(&["--clients", "6", "--actions", "3", "--tick-ms", "0"]).unwrap();
+        let parsed = parse(&["--clients", "6", "--actions", "3"]).unwrap();
         assert_eq!(
             parsed,
             Options {
                 clients: 6,
-                actions: 3,
-                tick: None
+                actions: 3
             }
         );
         for bad in [

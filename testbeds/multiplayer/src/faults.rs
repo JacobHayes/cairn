@@ -1,7 +1,7 @@
 //! The testbed's fault sites inside the server, for what the network cannot do: make two
-//! commits to one domain overlap. One server task on one thread runs each request to its
-//! end unless something waits, and a commit takes no virtual time, so without these no two
-//! commits ever meet. They hang on the store's own commit points (`cairn_store::Faults`).
+//! commits to one domain overlap. A request runs to its end unless something waits, and
+//! a commit takes little virtual time, so a run reaches two overlapping commits too rarely
+//! without these. They hang on the store's own commit points (`cairn_store::Faults`).
 //! Every site is a `buggify!`, inert without `--buggify`, and none fires during setup.
 //!
 //! - `store-commit-waits` (short) and `store-commit-waits-past-timeout` (a few per run): a

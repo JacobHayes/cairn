@@ -43,40 +43,6 @@ mod open {
         std::fs::remove_dir_all(&root).unwrap();
     }
 
-    const NO_TEMP_DIR: &str = "CAIRN_STORE_NO_TEMP_DIR";
-
-    /// A fresh store opens without the operating system's temporary directory: the
-    /// migrations keep their temporary structures in memory, so the store touches no disk
-    /// but its own directory (a disk simulation stops injecting crashes once a directory
-    /// is removed, which a temporary file's directory would be). The child opens the store
-    /// with `TMPDIR` naming a directory that does not exist.
-    #[test]
-    fn a_fresh_store_opens_without_a_temporary_directory() {
-        let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR"))
-            .join(format!("no-temp-dir-{}", std::process::id()));
-        if let Ok(path) = std::env::var(NO_TEMP_DIR) {
-            run(async { TursoStore::open(std::path::Path::new(&path)).await.unwrap() });
-            return;
-        }
-        std::fs::create_dir_all(&root).unwrap();
-        let output = std::process::Command::new(std::env::current_exe().unwrap())
-            .args([
-                "--exact",
-                "store_turso::open::open::a_fresh_store_opens_without_a_temporary_directory",
-                "--test-threads=1",
-            ])
-            .env(NO_TEMP_DIR, root.join("store.db"))
-            .env("TMPDIR", root.join("absent"))
-            .output()
-            .unwrap();
-        assert!(
-            output.status.success(),
-            "the store did not open: {}",
-            String::from_utf8_lossy(&output.stdout)
-        );
-        std::fs::remove_dir_all(&root).unwrap();
-    }
-
     /// A patch revising the journey's one decision, with `rationale` when given.
     fn revise(patch: &str, base: u32, yes: bool, rationale: Option<&str>) -> cairn_store::Commit {
         use cairn_schema::{AnswerValue, EventType, GraphRecord, Subject};

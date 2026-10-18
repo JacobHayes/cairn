@@ -3,9 +3,9 @@
 lockfile_version = 3
 
 [[tools."cargo:https://github.com/JacobHayes/patina"]]
-version = "rev:6a2977e7bce794d15eabaa18258a5542115bd872"
+version = "rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8"
 backend = "cargo:https://github.com/JacobHayes/patina"
-specifiers = ["rev:6a2977e7bce794d15eabaa18258a5542115bd872"]
+specifiers = ["rev:1dee57b448d57c390af26a9d5af5f2d3a8820cc8"]
 
 [tools."cargo:https://github.com/JacobHayes/patina".options]
 crate = "cargo-patina"

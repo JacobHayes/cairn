@@ -26,7 +26,7 @@ cairn-store-turso = { path = "../../crates/store-turso" }
 # The deployment's time zone the service takes, at the root workspace's version.
 jiff = { version = "0.2.37", default-features = false, features = ["std"] }
 # The SDK at the revision Cargo.toml's [workspace.dependencies] and mise.toml pin.
-patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "6a2977e7bce794d15eabaa18258a5542115bd872" }
+patina-dst = { git = "https://github.com/JacobHayes/patina", rev = "1dee57b448d57c390af26a9d5af5f2d3a8820cc8" }
 # The Turso backend's runtime: one current-thread runtime with its timer (the working shape
 # under the shim).
 tokio = { version = "1.53.2", default-features = false, features = ["rt", "time"] }

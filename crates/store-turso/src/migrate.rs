@@ -24,11 +24,6 @@ pub(crate) const MIGRATIONS: [(u32, &str); 10] = [
 
 /// Puts the database in MVCC mode and applies the migrations it lacks.
 pub(crate) async fn run(connection: &Connection) -> Result<(), StoreError> {
-    // Turso makes and removes a temporary directory for each `DROP TABLE`, and a fresh store
-    // runs two. The migrations keep their temporary structures in memory so they touch no
-    // directory but the store's own: a disk simulation stops injecting crashes once the guest
-    // removes a directory (testbeds/durability/README.md).
-    execute(connection, "PRAGMA temp_store = MEMORY", Vec::new()).await?;
     rows(connection, "PRAGMA journal_mode = mvcc", Vec::new()).await?;
     execute(
         connection,
