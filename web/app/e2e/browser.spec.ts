@@ -184,17 +184,25 @@ test("a toast stays while the pointer is on it, the next one replaces it, and it
   const toast = page.getByTestId("toast");
   await savedText(page, () => exportDraft.click());
   await expect(toast).toHaveText("Route file exported");
+  // Whether the pointer is on the toast, as the browser has it: the time a pointer move has been taken in, since the toast's hold follows the browser's enter and leave.
+  const pointerOn = (on: boolean) => expect.poll(() => toast.evaluate((element) => element.matches(":hover"))).toBe(on);
   await toast.hover();
+  await pointerOn(true);
   // Past the toast's time, the pointer holds it.
   await page.clock.runFor(TOAST_MS.confirm + 1000);
   await expect(toast).toBeVisible();
-  // The next toast, raised from the keyboard with the pointer still on the toast, replaces it and is held too.
+  // The next toast, raised from the keyboard with the pointer still on the toast, replaces it (a new element) and is held too.
+  const first = await toast.elementHandle();
   await exportDraft.focus();
   await savedText(page, () => page.keyboard.press("Enter"));
+  await expect.poll(() => first.evaluate((element) => element.isConnected)).toBe(false);
   await expect(toast).toHaveCount(1);
+  await pointerOn(true);
   await page.clock.runFor(TOAST_MS.confirm + 1000);
   await expect(toast).toBeVisible();
+  // Once the pointer has left, the toast goes after its full time.
   await page.mouse.move(5, 5);
+  await pointerOn(false);
   await page.clock.runFor(TOAST_MS.confirm + 1000);
   await expect(toast).toHaveCount(0);
 });
