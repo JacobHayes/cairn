@@ -23,7 +23,7 @@ import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf,
 import type { ViewState } from "../journeys/view.ts";
 import { containerKeys, planOrder } from "../plan/tree.ts";
 import { Menu } from "../screens/Menu.tsx";
-import { journeySubject, ResetView, ViewBar } from "../screens/ViewControls.tsx";
+import { journeySubject, NothingMatches, ViewBar } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
 import { useNodeAddresses } from "../journeys/address.ts";
 import { withListSettings, type ListSettings } from "./address.ts";
@@ -255,7 +255,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
       <Table list={list} lines={lines} columns={columns} context={context} selection={selection} selected={selected} everyLine={everyLine} outOfFocus={dimmed} />
       {kept !== undefined && level !== undefined && lines.length === 0 ? (
         <p className="muted row" data-testid="list-empty">
-          Nothing matches at this depth, filter and search. <ResetView />
+          <NothingMatches />
         </p>
       ) : null}
       {state.frontier ? <FrontierPanels view={view} drawn={drawn} /> : null}

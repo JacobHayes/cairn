@@ -391,6 +391,22 @@ table.data.list-table tbody td {
   line-height: 1.5;
 }
 
+/* Dates in a column are mono with tabular figures (DESIGN, Dates). */
+.list-table td[data-column="due"],
+.list-table td[data-column="start_by"] {
+  font: 13px / 1.5 var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+/* The owner and due columns keep their width whether rows fill the table or a search leaves none, so the header does not move; the title takes the rest. */
+.list-table th[data-column="owner"] {
+  width: 200px;
+}
+
+.list-table th[data-column="due"] {
+  width: 168px;
+}
+
 .list-table th,
 .list-table td[data-column="due"],
 .list-table td[data-column="affects"],

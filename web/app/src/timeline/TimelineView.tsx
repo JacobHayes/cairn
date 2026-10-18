@@ -20,7 +20,7 @@ import { NodeLink } from "../detail/parts.tsx";
 import { useNodeAddresses, withParam } from "../journeys/address.ts";
 import { badgesOf, currentStagesOf, depthFaded, levelRequestOf, lightsUp, litOf, outOfFocus, stepHides } from "../journeys/requests.ts";
 import type { ViewState } from "../journeys/view.ts";
-import { journeySubject, ResetView, ViewBar } from "../screens/ViewControls.tsx";
+import { journeySubject, NothingMatches, ViewBar } from "../screens/ViewControls.tsx";
 import { Button, Segmented } from "../ui/kit.tsx";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import { axisOf, calendarSpec, dateOf, dateWords, dayWords, positionOf, rangeWindow, RANGES, type Axis, type AxisSpec, type Range, type Window } from "./model.ts";
@@ -398,7 +398,7 @@ export function TimelineChart({ chart, spec, viewKey, range, onFold, selected, t
         {anchorNote}
       </span>
       {chart.rows.length === 0 ? (
-        <p className="muted" data-testid="timeline-empty">
+        <p className="muted row" data-testid="timeline-empty">
           {anyScheduled ? empty.filtered : empty.none}
         </p>
       ) : (
@@ -486,7 +486,7 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
               </>
             )
           }
-          empty={{ filtered: <>Nothing dated is drawn at this depth, filter and search. <ResetView /></>, none: "Nothing in scope has a date yet: no milestone date, pin, or due date." }}
+          empty={{ filtered: <NothingMatches />, none: "Nothing in scope has a date yet: no milestone date, pin, or due date." }}
           undated="No date yet"
           anyScheduled={timeline.entries.length > 0}
         />

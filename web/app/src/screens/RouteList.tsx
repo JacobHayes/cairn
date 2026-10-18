@@ -18,7 +18,7 @@ import { containerKeys } from "../plan/tree.ts";
 import { nodesOf, type Shown } from "./route-reads.ts";
 import { useRouteLevel } from "./route-views.ts";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
-import { ResetView, routeSubject, ViewBar } from "./ViewControls.tsx";
+import { NothingMatches, routeSubject, ViewBar } from "./ViewControls.tsx";
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -113,7 +113,7 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
       </ul>
       {rows !== undefined && rows.length === 0 ? (
         <p className="muted row" data-testid="list-empty">
-          Nothing matches at this depth, filter and search. <ResetView />
+          <NothingMatches />
         </p>
       ) : null}
     </section>

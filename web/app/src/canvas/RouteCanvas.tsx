@@ -15,7 +15,7 @@ import { errorWords, valueOf } from "../data/keyed-read.ts";
 import { routePath } from "../routes/address.ts";
 import { useRouteLevel } from "../screens/route-views.ts";
 import { nodesOf, type Shown } from "../screens/route-reads.ts";
-import { ResetView, routeSubject, ViewControls } from "../screens/ViewControls.tsx";
+import { NothingMatches, ResetView, routeSubject, ViewControls } from "../screens/ViewControls.tsx";
 import { useNodeAddresses } from "../journeys/address.ts";
 import { GraphCanvas } from "./GraphCanvas.tsx";
 import { useLaidOut } from "./hooks.ts";
@@ -135,7 +135,7 @@ export function RouteCanvas({ shown, view, selected, unanchored, editable, onPic
           {controls}
           {laidOut.model.cards.length > 0 ? null : (
             <p className="callout row" role="status" data-testid="nothing-matches">
-              Nothing matches the depth, filter and search. <ResetView />
+              <NothingMatches />
             </p>
           )}
         </>

@@ -288,6 +288,15 @@ function FrontierChip({ ready, screen }: { ready: Ready; screen: Screen }) {
   );
 }
 
+/** What every view says when the depth, filter and search leave nothing to draw, with the way back: the one wording. */
+export function NothingMatches() {
+  return (
+    <>
+      Nothing matches the depth, filter and search. <ResetView />
+    </>
+  );
+}
+
 /** Reset the view: the way back from an empty view, offered only off the stock view. Frontier and Fade stay (they hide nothing). */
 export function ResetView() {
   const { state, onState } = useViewState();
