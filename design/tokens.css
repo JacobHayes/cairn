@@ -49,6 +49,7 @@
   --shadow-md: 0 12px 30px rgba(20, 24, 30, 0.1);
   --shadow-lg: 0 24px 60px rgba(20, 24, 30, 0.14);
   --control-h: 32px; /* inputs, selects and buttons share one height */
+  --opacity-snoozed: 0.7; /* the content of a snoozed node on every view: not now, lighter than resting, lighter still when done (0.5) */
   --motion-duration: 180ms;
   --motion-easing: cubic-bezier(0.2, 0.7, 0, 1);
   --font-heading: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;

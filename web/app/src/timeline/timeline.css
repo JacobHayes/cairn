@@ -119,6 +119,11 @@
   opacity: 0.5;
 }
 
+/* Snoozed work is not now: its title at --opacity-snoozed, as on a card and a List row (the chip stays), never under the out-of-focus fade. */
+.timeline-label[data-state="snoozed"]:not([data-faded="true"]) .timeline-text > :not(.timeline-words) {
+  opacity: var(--opacity-snoozed);
+}
+
 .timeline-label[data-faded="true"],
 .timeline-row[data-faded="true"] {
   opacity: 0.3;

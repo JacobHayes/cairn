@@ -114,10 +114,14 @@ export function treeLines(drawn: readonly { key: string; parent?: string | null 
 /**
  * C9: `rows` flat: in the order the engine sorted them by `sort`, or in plan order when none is.
  * Sorted by a date, the rows that are over come after the open ones: their date cells are blank.
+ * Sorted by any signal, the snoozed rows come after the unsnoozed ones, in their own order: they
+ * are not now (the shared rank itself is unchanged; this is display order).
  */
 export function flatLines(view: Ready, rows: readonly NodeRow[], sort: SortBy | undefined): Line[] {
   const order = new Map(planOrder(view).map((key, at) => [key, at]));
-  const ordered = sort === undefined ? [...rows].sort((left, right) => (order.get(left.key) ?? 0) - (order.get(right.key) ?? 0)) : rows;
+  const snoozed = (row: NodeRow) => sort !== undefined && row.display_state === "snoozed";
+  const planned = sort === undefined ? [...rows].sort((left, right) => (order.get(left.key) ?? 0) - (order.get(right.key) ?? 0)) : rows;
+  const ordered = [...planned.filter((row) => !snoozed(row)), ...planned.filter(snoozed)];
   const over = (row: NodeRow) => (sort === "due" || sort === "slack") && ["done", "skipped", "not_relevant"].includes(row.display_state);
   return [...ordered.filter((row) => !over(row)), ...ordered.filter(over)].map((row) => ({ key: row.key, depth: 0, row, container: false, foldable: false, open: false, guides: [] }));
 }

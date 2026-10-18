@@ -4,11 +4,12 @@
 // completed from the pass, C11), over a journey started from a route's form (B1). Every test
 // runs on the in-browser host, whose fixtures are fresh on every load. The rules behind both
 // (ranking, filters, guards, the pass's order) are the engine's and vitest's.
-import { expect, test } from "@playwright/test";
+import { expect, test, type Locator } from "@playwright/test";
 
 import { answerCard, card, frontierItem, openActing, passOrder, publishFollowUpRoute, revisionAfter, select } from "./acting.ts";
 import { journeyName, startJourney } from "./around.ts";
-import { derivedRevision, goTo, nodePanel, setDepth } from "./shell.ts";
+import { expectRowsInsideCards } from "./canvas.ts";
+import { derivedRevision, goTo, nodeCard, nodePanel, setDepth } from "./shell.ts";
 
 test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an unsnooze returns them", async ({ page }) => {
   await openActing(page, "browser", "j_launch", "list?frontier=1");
@@ -33,6 +34,35 @@ test("C9, B6: a bulk snooze is one patch; the snoozed leave the frontier and an 
   await expect(fold).toHaveAttribute("data-count", "2");
   await fold.locator("summary").click();
   await expect(fold.getByTestId("snooze-group")).toHaveCount(1);
+  // Snoozed is dimmed the same way on the graph, the list and the timeline (not now: lighter than resting, lighter still when done), its chip and date left clear, and what is not snoozed is not dimmed.
+  // Frontier, on from the list, fades every card off the frontier, so it is off while the states themselves are read.
+  await goTo(page, "graph");
+  await page.keyboard.press("Shift+F");
+  const opacityOf = (target: Locator) => target.evaluate((element) => Number(getComputedStyle(element).opacity));
+  const snoozed = nodeCard(page, "n_docs");
+  const onCard = await opacityOf(snoozed.locator(".node-title"));
+  expect(onCard).toBeLessThan(1);
+  expect(onCard).toBeGreaterThan(0.5);
+  expect(await opacityOf(snoozed.getByTestId("card-state"))).toBe(1);
+  expect(await opacityOf(snoozed.getByTestId("card-foot"))).toBe(1);
+  await expect(snoozed.getByTestId("card-foot")).toHaveText(/^Until /);
+  expect(await opacityOf(nodeCard(page, "n_beta_end").locator(".node-title"))).toBe(1);
+  await expectRowsInsideCards(page);
+  await goTo(page, "list");
+  const row = page.locator('[data-testid="list-row"][data-node="n_docs"]');
+  expect(await opacityOf(row.locator('[data-column="title"] .list-content'))).toBe(onCard);
+  expect(await opacityOf(row.locator('[data-column="status"] .list-content'))).toBe(1);
+  expect(await opacityOf(page.locator('[data-testid="list-row"][data-node="n_beta_end"] [data-column="title"] .list-content'))).toBe(1);
+  await goTo(page, "timeline");
+  const label = page.locator('[data-testid="timeline-entry"][data-node="n_docs"] .timeline-text');
+  expect(await opacityOf(label.locator("> :not(.timeline-words)"))).toBe(onCard);
+  expect(await opacityOf(label.getByTestId("timeline-words"))).toBe(1);
+  await goTo(page, "list");
+  await page.keyboard.press("Shift+F");
+  await expect(fold).toHaveAttribute("data-count", "2");
+  if ((await fold.getAttribute("open")) === null) {
+    await fold.locator("summary").click();
+  }
   await fold.locator('[data-testid="fold-item"][data-node="n_docs"]').getByRole("button", { name: "Unsnooze" }).click();
   await expect(frontierItem(page, "n_docs")).toBeVisible();
 });

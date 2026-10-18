@@ -661,6 +661,11 @@
   color: var(--color-success);
 }
 
+/* Snoozed is "not now": the node is off the acting frontier but still blocks, so it stays, its title and owner (not the kind label, the chip or the foot date, which stay at the contrast floor) at --opacity-snoozed, as on a List row and a Timeline label. The content only, and not under an out-of-focus fade, so the lowest opacity wins and none multiplies. */
+.node-snoozed:not(.node-faded) :is(.node-title, .node-owner) {
+  opacity: var(--opacity-snoozed);
+}
+
 .node-faded {
   opacity: 0.3;
 }

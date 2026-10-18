@@ -62,6 +62,8 @@ export function nodeClasses(card: Card, options: { overlay?: CanvasOverlay | und
     classes.push("node-done");
   } else if (journey?.state === "skipped") {
     classes.push("node-skipped");
+  } else if (journey?.state === "snoozed") {
+    classes.push("node-snoozed");
   }
   if (journey !== undefined && (journey.here.frontier || journey.here.active)) {
     classes.push("node-here");
