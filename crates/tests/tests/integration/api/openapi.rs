@@ -92,7 +92,7 @@ mod in_process {
     /// their proposals by (the API addresses one under its destination).
     const NOT_OPERATIONS: [&str; 3] = ["new", "settings", "proposal"];
 
-    /// The public methods of every `impl<S: Store> Service<S>` block in the service's
+    /// The public methods of every `impl Service` block in the service's
     /// sources.
     fn service_methods() -> BTreeSet<String> {
         let sources = Path::new(env!("CARGO_MANIFEST_DIR")).join("../service/src");
@@ -101,7 +101,7 @@ mod in_process {
             let text = std::fs::read_to_string(entry.unwrap().path()).unwrap();
             let mut inside = false;
             for line in text.lines() {
-                if line.starts_with("impl<S: Store> Service<S>") {
+                if line.starts_with("impl Service") {
                     inside = true;
                 } else if line == "}" {
                     inside = false;

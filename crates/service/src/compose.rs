@@ -9,14 +9,14 @@ use std::sync::Arc;
 use cairn_schema::{
     Date, Deployment, DeriveInputs, EntityKey, RankConstants, Slug, TimeZoneName, Timestamp,
 };
-use cairn_store::Notifier;
+use cairn_store::{Notifier, Store};
 use jiff::tz::TimeZone;
 use serde::{Deserialize, Serialize};
 
 /// What a composition root assembles a service from.
-pub struct Parts<S> {
+pub struct Parts {
     /// The store, shared with the auth layer.
-    pub store: Arc<S>,
+    pub store: Arc<dyn Store>,
     /// The notifier every commit is announced through.
     pub notifier: Arc<dyn Notifier>,
     /// The deployment's time zone and rank constants.

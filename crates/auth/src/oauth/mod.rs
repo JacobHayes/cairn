@@ -24,7 +24,6 @@ use std::sync::Arc;
 use axum::Router;
 use axum::routing::{get, post};
 use cairn_schema::Slug;
-use cairn_store::AuthStore;
 use url::Url;
 
 use crate::accounts::Accounts;
@@ -45,20 +44,20 @@ pub struct OAuthConfig {
 }
 
 /// The built-in OAuth provider.
-pub struct OAuthServer<S> {
-    inner: Arc<Server<S>>,
+pub struct OAuthServer {
+    inner: Arc<Server>,
 }
 
-struct Server<S> {
+struct Server {
     config: OAuthConfig,
-    accounts: Accounts<S>,
+    accounts: Accounts,
     metadata: Arc<Metadata>,
 }
 
-impl<S: AuthStore> OAuthServer<S> {
+impl OAuthServer {
     /// The provider for a deployment at the public `base` URL.
     #[must_use]
-    pub fn new(config: OAuthConfig, accounts: Accounts<S>, base: &Url) -> Self {
+    pub fn new(config: OAuthConfig, accounts: Accounts, base: &Url) -> Self {
         let inner = Server {
             config,
             accounts,
@@ -70,7 +69,7 @@ impl<S: AuthStore> OAuthServer<S> {
     }
 }
 
-impl<S: AuthStore> Server<S> {
+impl Server {
     /// H2: a bearer token Cairn issued names its agent and user, or is refused.
     async fn verdict(&self, request: Presented<'_>) -> Verdict {
         let claimed = request
@@ -87,7 +86,7 @@ impl<S: AuthStore> Server<S> {
     }
 }
 
-impl<S: AuthStore + 'static> AuthProvider for OAuthServer<S> {
+impl AuthProvider for OAuthServer {
     fn name(&self) -> &Slug {
         &self.inner.config.name
     }
@@ -116,9 +115,9 @@ impl<S: AuthStore + 'static> AuthProvider for OAuthServer<S> {
             .route(metadata::REGISTER, post(flow::register))
             .route(
                 metadata::AUTHORIZE,
-                get(flow::authorize::<S>).post(flow::consent::<S>),
+                get(flow::authorize).post(flow::consent),
             )
-            .route(metadata::TOKEN, post(flow::token::<S>))
+            .route(metadata::TOKEN, post(flow::token))
             .with_state(Arc::new(state));
         Some(router.merge(self.inner.metadata.router()))
     }

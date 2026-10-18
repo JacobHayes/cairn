@@ -12,7 +12,6 @@ use axum::extract::ConnectInfo;
 use axum::http::header::{ACCEPT, AUTHORIZATION, CONTENT_TYPE, HOST, WWW_AUTHENTICATE};
 use axum::http::{HeaderName, HeaderValue, Method, Request, StatusCode};
 use cairn_mcp::ToolSet;
-use cairn_store::MemoryStore;
 use http_body_util::BodyExt;
 use rmcp::ServiceExt;
 use rmcp::model::{
@@ -179,7 +178,7 @@ impl Agent {
         }
         let transport = StreamableHttpClientTransport::with_client(client, config);
         let client = ().serve(transport).await.map_err(|error| error.to_string())?;
-        let definitions = ToolSet::<MemoryStore>::definitions().into_iter();
+        let definitions = ToolSet::definitions().into_iter();
         let outputs = definitions.map(|tool| {
             let schema = Value::Object(tool.output_schema);
             (tool.name.to_owned(), schema)

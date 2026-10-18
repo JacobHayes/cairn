@@ -4,7 +4,7 @@
 use std::collections::BTreeSet;
 
 use cairn_schema::{Deployment, Email, EntityKey, UserId};
-use cairn_store::{IdentityRecord, Store};
+use cairn_store::IdentityRecord;
 
 use crate::{Call, Service, ServiceError};
 
@@ -30,7 +30,7 @@ impl Viewer {
     }
 }
 
-impl<S: Store> Service<S> {
+impl Service {
     /// H3: the caller's entities, from the verified emails of every identity they signed in
     /// with, matched against entity emails in the current deployment. Emails are stored
     /// trimmed and lower-cased, so the match is case-insensitive; an email the provider did

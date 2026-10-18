@@ -23,7 +23,7 @@ use std::task::{Context, Poll};
 use axum::extract::{RawQuery, State};
 use axum::response::sse::Event;
 use axum::response::{IntoResponse, Response, Sse};
-use cairn_store::{Store, Subscription, Take};
+use cairn_store::{Subscription, Take};
 use tokio::sync::mpsc;
 use tokio::time::Instant;
 
@@ -63,8 +63,8 @@ impl Frame {
 /// # Errors
 ///
 /// A bad request for what it watches; 503 when the process is at its subscriber limit.
-pub(crate) async fn stream<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub(crate) async fn stream(
+    State(api): State<Api>,
     RawQuery(raw): RawQuery,
 ) -> Result<Response, ApiError> {
     let params = Params::parse(raw.as_deref(), query::STREAM_PARAMS)?;

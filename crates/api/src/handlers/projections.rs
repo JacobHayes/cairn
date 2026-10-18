@@ -10,7 +10,6 @@ use cairn_schema::{
     Actor, DecisionView, Derived, ExplainedField, ExplanationPage, JourneyId, Level, ListPage,
     Next, NodeKey, Snapshot, StatusSummary, Timeline, Trace,
 };
-use cairn_store::Store;
 
 use super::Answer;
 use crate::Api;
@@ -19,22 +18,22 @@ use crate::query::{self, Params};
 use crate::wire::{History, Mine, NodeDetail, Projected};
 
 /// The derived reads' endpoints and handlers.
-pub fn served<S: Store + 'static>() -> crate::Served<S> {
+pub fn served() -> crate::Served {
     use crate::endpoints as at;
     vec![
-        (&at::SNAPSHOT, get(snapshot::<S>)),
-        (&at::LEVEL, get(level::<S>)),
-        (&at::TRACE, get(trace::<S>)),
-        (&at::DERIVED, get(derived::<S>)),
-        (&at::DECISIONS, get(decisions::<S>)),
-        (&at::TIMELINE, get(timeline::<S>)),
-        (&at::SUMMARY, get(summary::<S>)),
-        (&at::NEXT, get(next::<S>)),
-        (&at::NODES, get(nodes::<S>)),
-        (&at::MINE, get(mine::<S>)),
-        (&at::NODE, get(node_detail::<S>)),
-        (&at::EXPLANATIONS, get(explanations::<S>)),
-        (&at::HISTORY, get(history::<S>)),
+        (&at::SNAPSHOT, get(snapshot)),
+        (&at::LEVEL, get(level)),
+        (&at::TRACE, get(trace)),
+        (&at::DERIVED, get(derived)),
+        (&at::DECISIONS, get(decisions)),
+        (&at::TIMELINE, get(timeline)),
+        (&at::SUMMARY, get(summary)),
+        (&at::NEXT, get(next)),
+        (&at::NODES, get(nodes)),
+        (&at::MINE, get(mine)),
+        (&at::NODE, get(node_detail)),
+        (&at::EXPLANATIONS, get(explanations)),
+        (&at::HISTORY, get(history)),
     ]
 }
 
@@ -50,8 +49,8 @@ fn node(key: &str) -> Result<NodeKey, crate::error::ApiError> {
 }
 
 /// `GET /api/journeys/{id}/snapshot` (I3).
-pub async fn snapshot<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn snapshot(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     RawQuery(raw): RawQuery,
@@ -65,8 +64,8 @@ pub async fn snapshot<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/level` (C2).
-pub async fn level<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn level(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     RawQuery(raw): RawQuery,
@@ -80,8 +79,8 @@ pub async fn level<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/trace/{key}` (C7).
-pub async fn trace<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn trace(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path((id, key)): Path<(String, String)>,
 ) -> Projection<Trace> {
@@ -92,8 +91,8 @@ pub async fn trace<S: Store + 'static>(
 
 /// `GET /api/journeys/{id}/derived` (D3): the whole derive, which the browser computes itself from
 /// the domain document; for a client without the wasm engine.
-pub async fn derived<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn derived(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
 ) -> Projection<Derived> {
@@ -103,8 +102,8 @@ pub async fn derived<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/decisions` (C12).
-pub async fn decisions<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn decisions(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
 ) -> Projection<DecisionView> {
@@ -114,8 +113,8 @@ pub async fn decisions<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/timeline` (C13).
-pub async fn timeline<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn timeline(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
 ) -> Projection<Timeline> {
@@ -125,8 +124,8 @@ pub async fn timeline<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/summary` (C18).
-pub async fn summary<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn summary(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
 ) -> Projection<StatusSummary> {
@@ -136,8 +135,8 @@ pub async fn summary<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/next` (C10).
-pub async fn next<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn next(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     RawQuery(raw): RawQuery,
@@ -150,8 +149,8 @@ pub async fn next<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/nodes` (C9).
-pub async fn nodes<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn nodes(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     RawQuery(raw): RawQuery,
@@ -165,8 +164,8 @@ pub async fn nodes<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/mine` (E4).
-pub async fn mine<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn mine(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     RawQuery(raw): RawQuery,
@@ -179,8 +178,8 @@ pub async fn mine<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/nodes/{key}` (C8): explanation lists capped with their totals.
-pub async fn node_detail<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn node_detail(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path((id, key)): Path<(String, String)>,
 ) -> Projection<NodeDetail> {
@@ -191,8 +190,8 @@ pub async fn node_detail<S: Store + 'static>(
 
 /// `GET /api/journeys/{id}/nodes/{key}/explanations/{field}`: a page of one explanation list,
 /// largest first; the first page is what node detail carries.
-pub async fn explanations<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn explanations(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path((id, key, field)): Path<(String, String, String)>,
     RawQuery(raw): RawQuery,
@@ -211,8 +210,8 @@ pub async fn explanations<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/history` (J4).
-pub async fn history<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn history(
+    State(api): State<Api>,
     Path(id): Path<String>,
     RawQuery(raw): RawQuery,
 ) -> Answer<History> {

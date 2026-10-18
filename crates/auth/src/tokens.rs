@@ -4,7 +4,7 @@
 //! revoking are auth operations, written to the auth log.
 
 use cairn_schema::{Actor, AgentId, Timestamp, Title, UserId};
-use cairn_store::{AgentTokenRecord, AuthEvent, AuthStore};
+use cairn_store::{AgentTokenRecord, AuthEvent};
 
 use crate::accounts::Accounts;
 use crate::error::AuthError;
@@ -32,7 +32,7 @@ pub struct AgentToken {
     pub revoked_at: Option<Timestamp>,
 }
 
-impl<S: AuthStore> Accounts<S> {
+impl Accounts {
     /// H2: mints a token for a new agent acting for `actor`'s user, named `name`. Only a
     /// user mints tokens: an agent cannot create other agents.
     ///

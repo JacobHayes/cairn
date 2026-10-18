@@ -93,7 +93,7 @@ impl Loaded {
 /// published route versions it (or a proposal it applies) copies or moves from and to, and
 /// for an entity merge every journey referencing either entity as well as every journey it
 /// names, so the engine sees any difference between the two (E6).
-pub(crate) async fn records<S: Store>(store: &S, patch: &Patch) -> Result<Loaded, StoreError> {
+pub(crate) async fn records(store: &dyn Store, patch: &Patch) -> Result<Loaded, StoreError> {
     let mut records = Records::default();
     match store.load(&LoadTarget::Deployment).await? {
         Some(Document::Deployment(deployment)) => records.deployment = deployment,
@@ -193,8 +193,8 @@ fn effective_mutations<'a>(records: &'a Records, patch: &'a Patch) -> Vec<&'a Mu
 /// B7, B8, B9: what drafting an upgrade, a save as route, or a re-link reads: the deployment,
 /// the journey, the route it saves to (with its latest version, which a draft opened on it
 /// reads), and the versions `versions` names from what was loaded.
-pub(crate) async fn drafting<S: Store>(
-    store: &S,
+pub(crate) async fn drafting(
+    store: &dyn Store,
     id: &JourneyId,
     route: Option<&cairn_schema::RouteId>,
     versions: impl FnOnce(Option<&cairn_schema::Journey>) -> Vec<Lineage>,
@@ -230,8 +230,8 @@ pub(crate) async fn drafting<S: Store>(
     Ok(records)
 }
 
-async fn journey<S: Store>(
-    store: &S,
+async fn journey(
+    store: &dyn Store,
     id: &JourneyId,
 ) -> Result<Option<cairn_schema::Journey>, StoreError> {
     Ok(match store.load(&LoadTarget::Journey(id.clone())).await? {

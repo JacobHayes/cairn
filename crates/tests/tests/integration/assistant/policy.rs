@@ -10,7 +10,6 @@ use std::collections::BTreeSet;
 
 use cairn_assistant::wrapper::{self, Action, Because, Decision, Ledger, Outcome, Policy};
 use cairn_mcp::{ToolError, ToolSet};
-use cairn_store::MemoryStore;
 use serde_json::{Value, json};
 
 use support::{World, assisting, user};
@@ -245,7 +244,7 @@ async fn every_write_tool_is_decided_by_mutation_kind_and_destination() {
     let draft = world.open_vendor_draft(&ann).await;
     let cases = cases(draft);
     let covered: BTreeSet<&str> = cases.iter().map(|(name, _, _)| *name).collect();
-    let writes: BTreeSet<&str> = ToolSet::<MemoryStore>::definitions()
+    let writes: BTreeSet<&str> = ToolSet::definitions()
         .into_iter()
         .filter(|definition| definition.writes)
         .map(|definition| definition.name)
@@ -259,7 +258,7 @@ async fn every_write_tool_is_decided_by_mutation_kind_and_destination() {
             "{name}: {policy:?}, expected {expected:?}"
         );
     }
-    for read in ToolSet::<MemoryStore>::definitions()
+    for read in ToolSet::definitions()
         .into_iter()
         .filter(|definition| !definition.writes)
     {

@@ -43,11 +43,10 @@ mod mcp_in_process {
             .iter()
             .map(|t| t.name.to_string())
             .collect();
-        let expected: BTreeSet<String> =
-            cairn_mcp::ToolSet::<cairn_store::MemoryStore>::definitions()
-                .iter()
-                .map(|tool| tool.name.to_owned())
-                .collect();
+        let expected: BTreeSet<String> = cairn_mcp::ToolSet::definitions()
+            .iter()
+            .map(|tool| tool.name.to_owned())
+            .collect();
         assert_eq!(listed, expected, "the endpoint lists the tool set");
         assert_eq!(agent.called(), listed, "every listed tool was called");
     }

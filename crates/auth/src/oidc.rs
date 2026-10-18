@@ -18,7 +18,7 @@ use axum::http::{Extensions, HeaderMap, HeaderValue, StatusCode};
 use axum::response::{IntoResponse, Response};
 use axum::routing::get;
 use cairn_schema::{Actor, Email, Identity, Slug, Title, UserId};
-use cairn_store::{AuthStore, OAuthStateKind, OAuthStateRecord};
+use cairn_store::{OAuthStateKind, OAuthStateRecord};
 use openidconnect::core::{
     CoreAuthenticationFlow, CoreClient, CoreClientAuthMethod, CoreIdTokenClaims,
     CoreProviderMetadata,
@@ -55,13 +55,13 @@ pub struct OidcConfig {
 }
 
 /// The OIDC provider.
-pub struct OidcProvider<S> {
-    inner: Arc<Inner<S>>,
+pub struct OidcProvider {
+    inner: Arc<Inner>,
 }
 
-struct Inner<S> {
+struct Inner {
     config: OidcConfig,
-    accounts: Accounts<S>,
+    accounts: Accounts,
     http: Outbound,
     redirect: RedirectUrl,
     login_cookie: String,
@@ -80,13 +80,13 @@ struct Pending {
     initiator: Option<UserId>,
 }
 
-impl<S: AuthStore + 'static> OidcProvider<S> {
+impl OidcProvider {
     /// The provider for a deployment at the public `base` URL.
     ///
     /// # Errors
     ///
     /// The issuer is neither https nor http on loopback, or the HTTP client cannot start.
-    pub fn new(config: OidcConfig, accounts: Accounts<S>, base: &Url) -> Result<Self, ConfigError> {
+    pub fn new(config: OidcConfig, accounts: Accounts, base: &Url) -> Result<Self, ConfigError> {
         let refuse = |reason: String| ConfigError {
             provider: config.name.to_string(),
             reason,
@@ -116,7 +116,7 @@ impl<S: AuthStore + 'static> OidcProvider<S> {
     }
 }
 
-impl<S: AuthStore + 'static> Inner<S> {
+impl Inner {
     /// One discovery per sign-in step, so a rotated signing key needs nothing. Discovery,
     /// the key set, and the code exchange all go through `Outbound`, so an endpoint the
     /// issuer advertises over plain http is never called.
@@ -429,12 +429,12 @@ struct Callback {
 }
 
 /// The routes' state: the provider, and how they learn who a browser already is.
-struct Routes<S> {
-    inner: Arc<Inner<S>>,
+struct Routes {
+    inner: Arc<Inner>,
     authenticator: Arc<dyn Authenticate>,
 }
 
-impl<S> Routes<S> {
+impl Routes {
     /// The user the browser is signed in as, by its session or by a provider that signs
     /// each request in (Tailscale, the dev user), past a lapsed session cookie: the user a
     /// new identity links to. An agent is no one's browser, and a refused credential is
@@ -454,8 +454,8 @@ impl<S> Routes<S> {
     }
 }
 
-async fn start<S: AuthStore + 'static>(
-    State(routes): State<Arc<Routes<S>>>,
+async fn start(
+    State(routes): State<Arc<Routes>>,
     headers: HeaderMap,
     extensions: Extensions,
     Query(query): Query<SignIn>,
@@ -470,8 +470,8 @@ async fn start<S: AuthStore + 'static>(
 
 /// The callback: the identity links to the browser's user, who must be the one who
 /// started the sign-in.
-async fn finish<S: AuthStore + 'static>(
-    State(routes): State<Arc<Routes<S>>>,
+async fn finish(
+    State(routes): State<Arc<Routes>>,
     headers: HeaderMap,
     extensions: Extensions,
     Query(query): Query<Callback>,
@@ -483,7 +483,7 @@ async fn finish<S: AuthStore + 'static>(
     finished.unwrap_or_else(IntoResponse::into_response)
 }
 
-impl<S: AuthStore + 'static> AuthProvider for OidcProvider<S> {
+impl AuthProvider for OidcProvider {
     fn name(&self) -> &Slug {
         &self.inner.config.name
     }
@@ -507,8 +507,8 @@ impl<S: AuthStore + 'static> AuthProvider for OidcProvider<S> {
         };
         let name = &self.inner.config.name;
         let router = Router::new()
-            .route(&format!("/api/auth/{name}/sign-in"), get(start::<S>))
-            .route(&format!("/api/auth/{name}/callback"), get(finish::<S>))
+            .route(&format!("/api/auth/{name}/sign-in"), get(start))
+            .route(&format!("/api/auth/{name}/callback"), get(finish))
             .with_state(Arc::new(state));
         Some(router)
     }

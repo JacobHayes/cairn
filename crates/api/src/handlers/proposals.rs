@@ -8,7 +8,7 @@ use axum::extract::{Extension, RawPathParams, RawQuery, State};
 use axum::routing::{get, patch, post};
 use cairn_schema::{Actor, Domain, JourneyId, PatchId, Proposal, ProposalId, RouteId};
 use cairn_service::{ProposalWritten, ProposeError, WriteError};
-use cairn_store::{ProposalScope, Store};
+use cairn_store::ProposalScope;
 
 use super::{Answer, committed, refusal_outcome, written_outcome};
 use crate::Api;
@@ -34,13 +34,13 @@ pub enum Under {
 }
 
 /// The proposals' endpoints and handlers.
-pub fn served<S: Store + 'static>() -> crate::Served<S> {
+pub fn served() -> crate::Served {
     use crate::endpoints as at;
-    let mut served: crate::Served<S> = vec![
-        (&at::PROPOSE_JOURNEY, post(propose_journey::<S>)),
-        (&at::PROPOSE_ROUTE, post(propose_route::<S>)),
-        (&at::PROPOSE_DEPLOYMENT, post(propose_deployment::<S>)),
-        (&at::PROPOSALS, get(listing::<S>)),
+    let mut served: crate::Served = vec![
+        (&at::PROPOSE_JOURNEY, post(propose_journey)),
+        (&at::PROPOSE_ROUTE, post(propose_route)),
+        (&at::PROPOSE_DEPLOYMENT, post(propose_deployment)),
+        (&at::PROPOSALS, get(listing)),
     ];
     for (under, set) in [
         (Under::Journey, &at::JOURNEY_PROPOSALS),
@@ -48,13 +48,13 @@ pub fn served<S: Store + 'static>() -> crate::Served<S> {
         (Under::Deployment, &at::DEPLOYMENT_PROPOSALS),
     ] {
         served.extend([
-            (&set.list, get(list::<S>).layer(Extension(under))),
-            (&set.get, get(proposal::<S>).layer(Extension(under))),
-            (&set.edit, patch(edit::<S>).layer(Extension(under))),
-            (&set.preview, post(preview::<S>).layer(Extension(under))),
-            (&set.apply, post(apply::<S>).layer(Extension(under))),
-            (&set.discard, post(discard::<S>).layer(Extension(under))),
-            (&set.refresh, post(refresh::<S>).layer(Extension(under))),
+            (&set.list, get(list).layer(Extension(under))),
+            (&set.get, get(proposal).layer(Extension(under))),
+            (&set.edit, patch(edit).layer(Extension(under))),
+            (&set.preview, post(preview).layer(Extension(under))),
+            (&set.apply, post(apply).layer(Extension(under))),
+            (&set.discard, post(discard).layer(Extension(under))),
+            (&set.refresh, post(refresh).layer(Extension(under))),
         ]);
     }
     served
@@ -97,8 +97,8 @@ fn addressed_proposal(
 }
 
 /// `GET /api/{destination}/proposals` (C14): the destination's open proposals, newest first.
-pub async fn list<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn list(
+    State(api): State<Api>,
     Extension(under): Extension<Under>,
     params: RawPathParams,
     RawQuery(raw): RawQuery,
@@ -113,8 +113,8 @@ pub async fn list<S: Store + 'static>(
 }
 
 /// `GET /api/proposals?scope=` (C14, C16): the open proposals no one destination holds.
-pub async fn listing<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn listing(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     RawQuery(raw): RawQuery,
 ) -> Answer<ProposalList> {
@@ -142,8 +142,8 @@ pub async fn listing<S: Store + 'static>(
 }
 
 /// `POST /api/journeys/{id}/proposals`.
-pub async fn propose_journey<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn propose_journey(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<ProposalCreate>,
@@ -153,8 +153,8 @@ pub async fn propose_journey<S: Store + 'static>(
 }
 
 /// `POST /api/routes/{id}/proposals`.
-pub async fn propose_route<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn propose_route(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<ProposalCreate>,
@@ -164,8 +164,8 @@ pub async fn propose_route<S: Store + 'static>(
 }
 
 /// `POST /api/deployment/proposals`.
-pub async fn propose_deployment<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn propose_deployment(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     JsonBody(request): JsonBody<ProposalCreate>,
 ) -> Answer<ProposalAnswer> {
@@ -173,8 +173,8 @@ pub async fn propose_deployment<S: Store + 'static>(
 }
 
 /// I6: creates a proposal for `destination`; a create resubmitted by proposal id answers it.
-async fn create<S: Store + 'static>(
-    api: &Api<S>,
+async fn create(
+    api: &Api,
     actor: Actor,
     destination: Domain,
     request: ProposalCreate,
@@ -196,8 +196,8 @@ async fn create<S: Store + 'static>(
 }
 
 /// `GET /api/{destination}/proposals/{proposal}` (I6).
-pub async fn proposal<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn proposal(
+    State(api): State<Api>,
     Extension(under): Extension<Under>,
     params: RawPathParams,
 ) -> Answer<Proposal> {
@@ -206,8 +206,8 @@ pub async fn proposal<S: Store + 'static>(
 }
 
 /// `PATCH /api/{destination}/proposals/{proposal}` (I6, H5).
-pub async fn edit<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn edit(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Extension(under): Extension<Under>,
     params: RawPathParams,
@@ -231,8 +231,8 @@ pub async fn edit<S: Store + 'static>(
 }
 
 /// `POST /api/{destination}/proposals/{proposal}/discard` (I6).
-pub async fn discard<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn discard(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Extension(under): Extension<Under>,
     params: RawPathParams,
@@ -256,8 +256,8 @@ pub async fn discard<S: Store + 'static>(
 
 /// `POST /api/{destination}/proposals/{proposal}/refresh` (I6): drafted again on its destination as it stands, the
 /// reviewer's choices carried over; it must be reviewed again before it applies.
-pub async fn refresh<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn refresh(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Extension(under): Extension<Under>,
     params: RawPathParams,
@@ -280,8 +280,8 @@ pub async fn refresh<S: Store + 'static>(
 }
 
 /// `POST /api/{destination}/proposals/{proposal}/preview` (C14, D7, I6).
-pub async fn preview<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn preview(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Extension(under): Extension<Under>,
     params: RawPathParams,
@@ -295,8 +295,8 @@ pub async fn preview<S: Store + 'static>(
 }
 
 /// `POST /api/{destination}/proposals/{proposal}/apply` (I6, H2): the caller confirms it.
-pub async fn apply<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn apply(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Extension(under): Extension<Under>,
     params: RawPathParams,
@@ -328,11 +328,7 @@ fn proposal_id(id: &str) -> Result<ProposalId, ApiError> {
 
 /// The proposal with this id under `destination`, or not found: a proposal under another
 /// destination is not found here.
-async fn held<S: Store + 'static>(
-    api: &Api<S>,
-    destination: &Domain,
-    id: &ProposalId,
-) -> Result<Proposal, ApiError> {
+async fn held(api: &Api, destination: &Domain, id: &ProposalId) -> Result<Proposal, ApiError> {
     api.service
         .proposal_at(destination, id)
         .await?

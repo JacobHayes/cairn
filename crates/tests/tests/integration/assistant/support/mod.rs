@@ -23,10 +23,10 @@ use serde_json::{Value, json};
 
 /// The assistant over a fresh memory store, its provider's script, and what is beneath it.
 pub struct World {
-    pub assistant: Assistant<MemoryStore>,
+    pub assistant: Assistant,
     pub provider: Arc<ScriptedProvider>,
-    pub tools: ToolSet<MemoryStore>,
-    pub service: Service<MemoryStore>,
+    pub tools: ToolSet,
+    pub service: Service,
     pub store: Arc<MemoryStore>,
     now: Arc<AtomicI64>,
 }
@@ -44,7 +44,7 @@ impl World {
             DeploymentSettings::new("Etc/GMT+5".parse().unwrap(), zone, RankConstants::default());
         let store = Arc::new(MemoryStore::with_faults(faults));
         let service = Service::new(Parts {
-            store: Arc::clone(&store),
+            store: Arc::<MemoryStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
             capabilities: Capabilities::server(Vec::new(), true),
@@ -56,7 +56,7 @@ impl World {
         let provider = Arc::new(ScriptedProvider::default());
         let assistant = Assistant::new(
             service.clone(),
-            Arc::clone(&store),
+            Arc::<MemoryStore>::clone(&store),
             clock.clone(),
             Arc::clone(&provider) as Arc<dyn cairn_assistant::Provider>,
         );

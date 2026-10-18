@@ -16,7 +16,6 @@ use axum::Router;
 use axum::http::request::Parts;
 use cairn_schema::limits::REQUEST_BYTES_MAX;
 use cairn_schema::{Actor, Rejection};
-use cairn_store::Store;
 use rmcp::model::{
     CallToolRequestParams, CallToolResponse, CallToolResult, ContentBlock, GetPromptRequestParams,
     GetPromptResponse, GetPromptResult, Implementation, ListPromptsResult, ListToolsResult,
@@ -37,7 +36,7 @@ pub const MCP_PATH: &str = "/api/mcp";
 /// The MCP endpoint over `tools` at [`MCP_PATH`], for a router whose auth layer puts an
 /// [`Actor`] in every request's extensions. `version` is what `serverInfo` reports: the host's
 /// build.
-pub fn router<S: Store + 'static>(tools: ToolSet<S>, version: &'static str) -> Router {
+pub fn router(tools: ToolSet, version: &'static str) -> Router {
     // Host and Origin checks guard a server nothing else authenticates; this one sits
     // behind the auth layer, and its public host is the deployment's, which the listener
     // owns
@@ -58,21 +57,13 @@ pub fn router<S: Store + 'static>(tools: ToolSet<S>, version: &'static str) -> R
 }
 
 /// The rmcp handler: one per request, sharing the tool set.
-struct Server<S> {
-    tools: ToolSet<S>,
+#[derive(Clone)]
+struct Server {
+    tools: ToolSet,
     version: &'static str,
 }
 
-impl<S> Clone for Server<S> {
-    fn clone(&self) -> Self {
-        Self {
-            tools: self.tools.clone(),
-            version: self.version,
-        }
-    }
-}
-
-impl<S: Store + 'static> ServerHandler for Server<S> {
+impl ServerHandler for Server {
     fn get_info(&self) -> ServerConfig {
         let capabilities = ServerCapabilities::builder()
             .enable_tools()
@@ -88,7 +79,7 @@ impl<S: Store + 'static> ServerHandler for Server<S> {
         _request: Option<PaginatedRequestParams>,
         _context: RequestContext<RoleServer>,
     ) -> impl Future<Output = Result<ListToolsResult, ErrorData>> + Send + '_ {
-        let tools = ToolSet::<S>::definitions().into_iter().map(|definition| {
+        let tools = ToolSet::definitions().into_iter().map(|definition| {
             let destructive = tools::spec(definition.name).is_some_and(|spec| spec.destructive);
             let mut annotations = ToolAnnotations::new()
                 .read_only(!definition.writes)
@@ -175,8 +166,8 @@ pub const UNKNOWN_TOOL: &str = "unknown";
 /// commit and its announcement (H6), and a resubmission by patch id finds what it did (H5);
 /// a read runs in the request and stops with it. A name no tool has is counted under one
 /// label, so callers cannot mint metric series.
-async fn observed<S: Store + 'static>(
-    tools: ToolSet<S>,
+async fn observed(
+    tools: ToolSet,
     actor: Actor,
     name: String,
     arguments: Value,

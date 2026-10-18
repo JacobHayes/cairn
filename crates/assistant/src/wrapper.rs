@@ -163,13 +163,13 @@ pub struct Outcome {
 /// # Errors
 ///
 /// What working the patch out answers: arguments that do not match, or a failed read.
-pub async fn decide<S: Store + 'static>(
-    tools: &ToolSet<S>,
-    store: &S,
+pub async fn decide(
+    tools: &ToolSet,
+    store: &dyn Store,
     name: &str,
     arguments: &Value,
 ) -> Result<Decision, ToolError> {
-    let writes = ToolSet::<S>::definitions()
+    let writes = ToolSet::definitions()
         .into_iter()
         .find(|definition| definition.name == name)
         .is_some_and(|definition| definition.writes);
@@ -213,8 +213,8 @@ pub(crate) fn within_limit(count: usize) -> bool {
 
 /// The journey `patch` targets, as stored, with its revision; `None` for another domain or
 /// a journey that does not exist yet.
-async fn stored_journey<S: Store>(
-    store: &S,
+async fn stored_journey(
+    store: &dyn Store,
     patch: &Patch,
 ) -> Result<Option<(Graph, Revision)>, ToolError> {
     let PatchTarget::Journey(journey) = &patch.target else {
@@ -268,9 +268,9 @@ impl Decision {
 
 /// Runs the tool call `name` with `arguments` for `actor` (the assistant acting for its
 /// user, H2) through the policy, keeping the turn's direct writes in `ledger`.
-pub async fn run<S: Store + 'static>(
-    tools: &ToolSet<S>,
-    store: &S,
+pub async fn run(
+    tools: &ToolSet,
+    store: &dyn Store,
     actor: &Actor,
     (name, arguments): (&str, Value),
     ledger: &mut Ledger,
@@ -346,8 +346,8 @@ pub async fn run<S: Store + 'static>(
 /// Drafts `drafted`, what the tool `name` would have written, as one proposal against the
 /// same destination and revision, under an id derived from its patch id, so the same write
 /// asked again is answered with the same proposal (H5, I6).
-async fn propose<S: Store + 'static>(
-    tools: &ToolSet<S>,
+async fn propose(
+    tools: &ToolSet,
     actor: &Actor,
     name: &str,
     arguments: &Value,

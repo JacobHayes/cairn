@@ -31,29 +31,19 @@ use cairn_assistant::Assistant;
 use cairn_auth::Auth;
 use cairn_schema::Actor;
 use cairn_service::{Call, Service};
-use cairn_store::Store;
 
 use crate::endpoints::Endpoint;
 
 /// What every handler holds: the service, auth for its accounts and clock, and the
 /// assistant when the host assembled one.
-pub(crate) struct Api<S> {
-    service: Service<S>,
-    auth: Auth<S>,
-    assistant: Option<Assistant<S>>,
+#[derive(Clone)]
+pub(crate) struct Api {
+    service: Service,
+    auth: Auth,
+    assistant: Option<Assistant>,
 }
 
-impl<S> Clone for Api<S> {
-    fn clone(&self) -> Self {
-        Self {
-            service: self.service.clone(),
-            auth: self.auth.clone(),
-            assistant: self.assistant.clone(),
-        }
-    }
-}
-
-impl<S: Store + 'static> Api<S> {
+impl Api {
     /// The call a request makes: its actor, at the deployment clock's now, read once.
     fn call(&self, actor: Actor) -> Call {
         Call {
@@ -64,48 +54,48 @@ impl<S: Store + 'static> Api<S> {
 }
 
 /// Endpoints and the handlers that serve them.
-type Served<S> = Vec<(&'static Endpoint, MethodRouter<Api<S>>)>;
+type Served = Vec<(&'static Endpoint, MethodRouter<Api>)>;
 
 /// The API: every endpoint but the health check behind `auth`'s layer, with the MCP
 /// endpoint at `/api/mcp` when the service's capabilities offer it (I2), auth's own routes
 /// beside them, the request limits, and observability, over `service`. `auth` must share
 /// the service's store. No assistant: see [`router_with_assistant`].
-pub fn router<S: Store + 'static>(service: Service<S>, auth: &Auth<S>) -> Router {
+pub fn router(service: Service, auth: &Auth) -> Router {
     router_with_assistant(service, auth, None)
 }
 
 /// The endpoints held to the request duration, with their handlers: the assistant's
 /// conversation reads among them when `assistant` is mounted.
-fn served<S: Store + 'static>(assistant: bool) -> Served<S> {
+fn served(assistant: bool) -> Served {
     use crate::endpoints as at;
     use crate::handlers as handle;
-    let mut served: Served<S> = vec![
-        (&at::CAPABILITIES, get(handle::capabilities::<S>)),
-        (&at::PATCH_JOURNEY, post(handle::patch_journey::<S>)),
-        (&at::PATCH_ROUTE, post(handle::patch_route::<S>)),
-        (&at::PATCH_DEPLOYMENT, post(handle::patch_deployment::<S>)),
-        (&at::JOURNEYS, get(handle::reads::journeys::<S>)),
-        (&at::JOURNEY, get(handle::reads::journey::<S>)),
-        (&at::DOCUMENT, get(handle::reads::document::<S>)),
-        (&at::ROUTES, get(handle::reads::routes::<S>)),
-        (&at::ROUTE, get(handle::reads::route::<S>)),
-        (&at::ROUTE_VERSIONS, get(handle::reads::route_versions::<S>)),
-        (&at::ROUTE_VERSION, get(handle::reads::route_version::<S>)),
-        (&at::DEPLOYMENT, get(handle::reads::deployment::<S>)),
-        (&at::SEARCH, get(handle::reads::search::<S>)),
-        (&at::EVENTS, get(handle::reads::events::<S>)),
-        (&at::STREAM, get(stream::stream::<S>)),
-        (&at::VIEWER, get(handle::users::viewer::<S>)),
-        (&at::TOKENS, get(handle::users::tokens::<S>)),
-        (&at::MINT_TOKEN, post(handle::users::mint_token::<S>)),
-        (&at::REVOKE_TOKEN, delete(handle::users::revoke_token::<S>)),
+    let mut served: Served = vec![
+        (&at::CAPABILITIES, get(handle::capabilities)),
+        (&at::PATCH_JOURNEY, post(handle::patch_journey)),
+        (&at::PATCH_ROUTE, post(handle::patch_route)),
+        (&at::PATCH_DEPLOYMENT, post(handle::patch_deployment)),
+        (&at::JOURNEYS, get(handle::reads::journeys)),
+        (&at::JOURNEY, get(handle::reads::journey)),
+        (&at::DOCUMENT, get(handle::reads::document)),
+        (&at::ROUTES, get(handle::reads::routes)),
+        (&at::ROUTE, get(handle::reads::route)),
+        (&at::ROUTE_VERSIONS, get(handle::reads::route_versions)),
+        (&at::ROUTE_VERSION, get(handle::reads::route_version)),
+        (&at::DEPLOYMENT, get(handle::reads::deployment)),
+        (&at::SEARCH, get(handle::reads::search)),
+        (&at::EVENTS, get(handle::reads::events)),
+        (&at::STREAM, get(stream::stream)),
+        (&at::VIEWER, get(handle::users::viewer)),
+        (&at::TOKENS, get(handle::users::tokens)),
+        (&at::MINT_TOKEN, post(handle::users::mint_token)),
+        (&at::REVOKE_TOKEN, delete(handle::users::revoke_token)),
     ];
-    served.extend(handle::projections::served::<S>());
-    served.extend(handle::proposals::served::<S>());
-    served.extend(handle::bulk::served::<S>());
+    served.extend(handle::projections::served());
+    served.extend(handle::proposals::served());
+    served.extend(handle::bulk::served());
     if assistant {
         // I5: reading a conversation back is an ordinary read, under the request duration.
-        served.extend(handle::assistant::reads::<S>());
+        served.extend(handle::assistant::reads());
     }
     served
 }
@@ -119,10 +109,10 @@ fn served<S: Store + 'static>(assistant: bool) -> Served<S> {
 ///
 /// When the service's capabilities say otherwise than `assistant` about the assistant: the
 /// capabilities document must say what is served.
-pub fn router_with_assistant<S: Store + 'static>(
-    service: Service<S>,
-    auth: &Auth<S>,
-    assistant: Option<Assistant<S>>,
+pub fn router_with_assistant(
+    service: Service,
+    auth: &Auth,
+    assistant: Option<Assistant>,
 ) -> Router {
     router_beside(service, auth, assistant, Router::new(), None, UNRELEASED)
 }
@@ -142,10 +132,10 @@ const UNRELEASED: &str = "dev";
 /// # Panics
 ///
 /// As [`router_with_assistant`], or when `beside` or `app` claims a path the API does.
-pub fn router_beside<S: Store + 'static>(
-    service: Service<S>,
-    auth: &Auth<S>,
-    assistant: Option<Assistant<S>>,
+pub fn router_beside(
+    service: Service,
+    auth: &Auth,
+    assistant: Option<Assistant>,
     beside: Router,
     app: Option<Router>,
     version: &'static str,
@@ -161,14 +151,14 @@ pub fn router_beside<S: Store + 'static>(
         auth: auth.clone(),
         assistant,
     };
-    let served = served::<S>(api.assistant.is_some());
+    let served = served(api.assistant.is_some());
     let mut routes = Router::new();
     for (endpoint, method_router) in served {
         routes = routes.route(endpoint.path, method_router);
     }
     let conversing = api.assistant.is_some().then(|| {
         let mut routes = Router::new();
-        for (endpoint, method_router) in handle::assistant::served::<S>() {
+        for (endpoint, method_router) in handle::assistant::served() {
             routes = routes.route(endpoint.path, method_router);
         }
         routes.with_state(api.clone())
@@ -180,7 +170,7 @@ pub fn router_beside<S: Store + 'static>(
     // The health check sits outside the auth layer, so a proxy's anonymous probe reaches
     // it, but inside the request limits and observation like everything else.
     let health = Router::new()
-        .route(endpoints::HEALTH.path, get(handle::health::<S>))
+        .route(endpoints::HEALTH.path, get(handle::health))
         .method_not_allowed_fallback(handle::method_not_allowed)
         .with_state(api.clone());
     let routes = routes

@@ -35,7 +35,8 @@ use cairn_store::{
     ConversationRecord, ConversationStore, ConversationSummary, Document, EventQuery, Faults,
     IdentityRecord, JourneyMatches, JourneyQuery, JourneySummary, LoadTarget, LoggedAuthEntry,
     LoggedEvent, OAuthStateRecord, Page, PageSize, ProposalPage, ProposalQuery, Revisions,
-    RouteDetail, SearchQuery, SecretHash, SessionRecord, Store, StoreError, UserRecord,
+    RouteDetail, SearchQuery, SecretHash, SessionRecord, Store, StoreError, StoreFuture,
+    UserRecord,
 };
 
 #[cfg(feature = "io-seam")]
@@ -239,207 +240,299 @@ impl TursoStore {
 }
 
 impl Store for TursoStore {
-    async fn load(&self, target: &LoadTarget) -> Result<Option<Document>, StoreError> {
-        read!(self, connection => load::document(connection, target))
+    fn load<'a>(
+        &'a self,
+        target: &'a LoadTarget,
+    ) -> StoreFuture<'a, Result<Option<Document>, StoreError>> {
+        Box::pin(async move { read!(self, connection => load::document(connection, target)) })
     }
 
-    async fn proposal(&self, id: &ProposalId) -> Result<Option<Proposal>, StoreError> {
-        read!(self, connection => load::proposal(connection, id))
+    fn proposal<'a>(
+        &'a self,
+        id: &'a ProposalId,
+    ) -> StoreFuture<'a, Result<Option<Proposal>, StoreError>> {
+        Box::pin(async move { read!(self, connection => load::proposal(connection, id)) })
     }
 
-    async fn proposals(&self, query: &ProposalQuery) -> Result<ProposalPage, StoreError> {
-        read!(self, connection => queries::proposals(connection, query))
+    fn proposals<'a>(
+        &'a self,
+        query: &'a ProposalQuery,
+    ) -> StoreFuture<'a, Result<ProposalPage, StoreError>> {
+        Box::pin(async move { read!(self, connection => queries::proposals(connection, query)) })
     }
 
     fn health(&self) -> Result<(), StoreError> {
         self.durability.still_open()
     }
 
-    async fn receipt(&self, patch: &PatchId) -> Result<Option<PatchReceipt>, StoreError> {
-        let stored = read!(self, connection => load::receipt(connection, patch))?;
-        Ok(stored.map(|stored| stored.receipt))
+    fn receipt<'a>(
+        &'a self,
+        patch: &'a PatchId,
+    ) -> StoreFuture<'a, Result<Option<PatchReceipt>, StoreError>> {
+        Box::pin(async move {
+            let stored = read!(self, connection => load::receipt(connection, patch))?;
+            Ok(stored.map(|stored| stored.receipt))
+        })
     }
 
-    async fn commit(&self, commit: Commit) -> Result<Committed, CommitError> {
-        let started = std::time::Instant::now();
-        // Boxed, as the commit itself is: the wrapper stays small to hold.
-        let result = Box::pin(self.commit_timed(commit)).await;
-        let outcome = if result.is_ok() {
-            "committed"
-        } else {
-            "refused"
-        };
-        metrics::histogram!(COMMIT_DURATION, "outcome" => outcome)
-            .record(started.elapsed().as_secs_f64());
-        result
+    fn commit(&self, commit: Commit) -> StoreFuture<'_, Result<Committed, CommitError>> {
+        Box::pin(async move {
+            let started = std::time::Instant::now();
+            let result = self.commit_timed(commit).await;
+            let outcome = if result.is_ok() {
+                "committed"
+            } else {
+                "refused"
+            };
+            metrics::histogram!(COMMIT_DURATION, "outcome" => outcome)
+                .record(started.elapsed().as_secs_f64());
+            result
+        })
     }
 
-    async fn revisions(&self) -> Result<Revisions, StoreError> {
-        read!(self, connection => load::revisions(connection))
+    fn revisions(&self) -> StoreFuture<'_, Result<Revisions, StoreError>> {
+        Box::pin(async move { read!(self, connection => load::revisions(connection)) })
     }
 
-    async fn intervening(&self, conflicts: &[RevisionConflict]) -> Result<TouchedSet, StoreError> {
-        read!(self, connection => commit::intervening(connection, conflicts))
+    fn intervening<'a>(
+        &'a self,
+        conflicts: &'a [RevisionConflict],
+    ) -> StoreFuture<'a, Result<TouchedSet, StoreError>> {
+        Box::pin(
+            async move { read!(self, connection => commit::intervening(connection, conflicts)) },
+        )
     }
 
-    async fn journeys(
-        &self,
-        query: &JourneyQuery,
-    ) -> Result<Page<JourneySummary, JourneyId>, StoreError> {
-        read!(self, connection => queries::journeys(connection, query))
+    fn journeys<'a>(
+        &'a self,
+        query: &'a JourneyQuery,
+    ) -> StoreFuture<'a, Result<Page<JourneySummary, JourneyId>, StoreError>> {
+        Box::pin(async move { read!(self, connection => queries::journeys(connection, query)) })
     }
 
-    async fn route_detail(&self, route: &RouteId) -> Result<Option<RouteDetail>, StoreError> {
-        read!(self, connection => queries::route_detail(connection, route))
+    fn route_detail<'a>(
+        &'a self,
+        route: &'a RouteId,
+    ) -> StoreFuture<'a, Result<Option<RouteDetail>, StoreError>> {
+        Box::pin(async move { read!(self, connection => queries::route_detail(connection, route)) })
     }
 
-    async fn journeys_referencing(
-        &self,
-        entities: &BTreeSet<EntityKey>,
-    ) -> Result<BTreeMap<JourneyId, Revision>, StoreError> {
-        read!(self, connection => queries::referencing(connection, entities))
+    fn journeys_referencing<'a>(
+        &'a self,
+        entities: &'a BTreeSet<EntityKey>,
+    ) -> StoreFuture<'a, Result<BTreeMap<JourneyId, Revision>, StoreError>> {
+        Box::pin(
+            async move { read!(self, connection => queries::referencing(connection, entities)) },
+        )
     }
 
-    async fn resolve_entity(&self, key: &EntityKey) -> Result<Option<Entity>, StoreError> {
-        read!(self, connection => queries::resolve_entity(connection, key))
+    fn resolve_entity<'a>(
+        &'a self,
+        key: &'a EntityKey,
+    ) -> StoreFuture<'a, Result<Option<Entity>, StoreError>> {
+        Box::pin(async move { read!(self, connection => queries::resolve_entity(connection, key)) })
     }
 
-    async fn events(&self, query: &EventQuery) -> Result<Page<LoggedEvent, u64>, StoreError> {
-        let horizon = self.events.horizon();
-        read!(self, connection => queries::events(connection, query, horizon))
+    fn events<'a>(
+        &'a self,
+        query: &'a EventQuery,
+    ) -> StoreFuture<'a, Result<Page<LoggedEvent, u64>, StoreError>> {
+        Box::pin(async move {
+            let horizon = self.events.horizon();
+            read!(self, connection => queries::events(connection, query, horizon))
+        })
     }
 
-    async fn search(
-        &self,
-        query: &SearchQuery,
-    ) -> Result<Page<JourneyMatches, JourneyId>, StoreError> {
-        read!(self, connection => queries::search(connection, query))
+    fn search<'a>(
+        &'a self,
+        query: &'a SearchQuery,
+    ) -> StoreFuture<'a, Result<Page<JourneyMatches, JourneyId>, StoreError>> {
+        Box::pin(async move { read!(self, connection => queries::search(connection, query)) })
     }
 }
 
 impl AuthStore for TursoStore {
-    async fn put_user(&self, user: UserRecord) -> Result<(), StoreError> {
-        in_transaction!(self, connection => records::put_user(connection, &user))
+    fn put_user(&self, user: UserRecord) -> StoreFuture<'_, Result<(), StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::put_user(connection, &user))
+        })
     }
 
-    async fn user(&self, id: &UserId) -> Result<Option<UserRecord>, StoreError> {
-        read!(self, connection => records::user(connection, id))
+    fn user<'a>(
+        &'a self,
+        id: &'a UserId,
+    ) -> StoreFuture<'a, Result<Option<UserRecord>, StoreError>> {
+        Box::pin(async move { read!(self, connection => records::user(connection, id)) })
     }
 
-    async fn put_identity(&self, identity: IdentityRecord) -> Result<(), StoreError> {
-        in_transaction!(self, connection => records::put_identity(connection, &identity))
+    fn put_identity(&self, identity: IdentityRecord) -> StoreFuture<'_, Result<(), StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::put_identity(connection, &identity))
+        })
     }
 
-    async fn identity(
-        &self,
-        provider: &Slug,
-        subject: &Title,
-    ) -> Result<Option<IdentityRecord>, StoreError> {
-        read!(self, connection => records::identity(connection, provider, subject))
+    fn identity<'a>(
+        &'a self,
+        provider: &'a Slug,
+        subject: &'a Title,
+    ) -> StoreFuture<'a, Result<Option<IdentityRecord>, StoreError>> {
+        Box::pin(async move {
+            read!(self, connection => records::identity(connection, provider, subject))
+        })
     }
 
-    async fn identities_of(&self, user: &UserId) -> Result<Vec<IdentityRecord>, StoreError> {
-        read!(self, connection => records::identities_of(connection, user))
+    fn identities_of<'a>(
+        &'a self,
+        user: &'a UserId,
+    ) -> StoreFuture<'a, Result<Vec<IdentityRecord>, StoreError>> {
+        Box::pin(async move { read!(self, connection => records::identities_of(connection, user)) })
     }
 
-    async fn identities_with_email(
-        &self,
-        email: &Email,
-    ) -> Result<Vec<IdentityRecord>, StoreError> {
-        read!(self, connection => records::identities_with_email(connection, email))
+    fn identities_with_email<'a>(
+        &'a self,
+        email: &'a Email,
+    ) -> StoreFuture<'a, Result<Vec<IdentityRecord>, StoreError>> {
+        Box::pin(async move {
+            read!(self, connection => records::identities_with_email(connection, email))
+        })
     }
 
-    async fn remove_identity(&self, provider: &Slug, subject: &Title) -> Result<bool, StoreError> {
-        in_transaction!(self, connection => records::remove_identity(connection, provider, subject))
+    fn remove_identity<'a>(
+        &'a self,
+        provider: &'a Slug,
+        subject: &'a Title,
+    ) -> StoreFuture<'a, Result<bool, StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::remove_identity(connection, provider, subject))
+        })
     }
 
-    async fn put_session(&self, session: SessionRecord) -> Result<(), StoreError> {
-        in_transaction!(self, connection => records::put_session(connection, &session))
+    fn put_session(&self, session: SessionRecord) -> StoreFuture<'_, Result<(), StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::put_session(connection, &session))
+        })
     }
 
-    async fn session(
-        &self,
-        token_hash: &SecretHash,
+    fn session<'a>(
+        &'a self,
+        token_hash: &'a SecretHash,
         now: Timestamp,
-    ) -> Result<Option<SessionRecord>, StoreError> {
-        read!(self, connection => records::session(connection, token_hash, now))
+    ) -> StoreFuture<'a, Result<Option<SessionRecord>, StoreError>> {
+        Box::pin(
+            async move { read!(self, connection => records::session(connection, token_hash, now)) },
+        )
     }
 
-    async fn remove_session(&self, token_hash: &SecretHash) -> Result<bool, StoreError> {
-        in_transaction!(self, connection => records::remove_session(connection, token_hash))
+    fn remove_session<'a>(
+        &'a self,
+        token_hash: &'a SecretHash,
+    ) -> StoreFuture<'a, Result<bool, StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::remove_session(connection, token_hash))
+        })
     }
 
-    async fn put_oauth_state(&self, state: OAuthStateRecord) -> Result<(), StoreError> {
-        in_transaction!(self, connection => records::put_oauth_state(connection, &state))
+    fn put_oauth_state(&self, state: OAuthStateRecord) -> StoreFuture<'_, Result<(), StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::put_oauth_state(connection, &state))
+        })
     }
 
-    async fn take_oauth_state(
-        &self,
-        key_hash: &SecretHash,
+    fn take_oauth_state<'a>(
+        &'a self,
+        key_hash: &'a SecretHash,
         now: Timestamp,
-    ) -> Result<Option<OAuthStateRecord>, StoreError> {
-        in_transaction!(self, connection => records::take_oauth_state(connection, key_hash, now))
+    ) -> StoreFuture<'a, Result<Option<OAuthStateRecord>, StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::take_oauth_state(connection, key_hash, now))
+        })
     }
 
-    async fn remove_expired(&self, now: Timestamp) -> Result<u64, StoreError> {
-        in_transaction!(self, connection => records::remove_expired(connection, now))
+    fn remove_expired(&self, now: Timestamp) -> StoreFuture<'_, Result<u64, StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::remove_expired(connection, now))
+        })
     }
 
-    async fn put_agent_token(&self, token: AgentTokenRecord) -> Result<(), StoreError> {
-        in_transaction!(self, connection => records::put_agent_token(connection, &token))
+    fn put_agent_token(&self, token: AgentTokenRecord) -> StoreFuture<'_, Result<(), StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::put_agent_token(connection, &token))
+        })
     }
 
-    async fn agent_token(
-        &self,
-        token_hash: &SecretHash,
-    ) -> Result<Option<AgentTokenRecord>, StoreError> {
-        read!(self, connection => records::agent_token_by_hash(connection, token_hash))
+    fn agent_token<'a>(
+        &'a self,
+        token_hash: &'a SecretHash,
+    ) -> StoreFuture<'a, Result<Option<AgentTokenRecord>, StoreError>> {
+        Box::pin(async move {
+            read!(self, connection => records::agent_token_by_hash(connection, token_hash))
+        })
     }
 
-    async fn agent_tokens_of(&self, user: &UserId) -> Result<Vec<AgentTokenRecord>, StoreError> {
-        read!(self, connection => records::agent_tokens_of(connection, user))
+    fn agent_tokens_of<'a>(
+        &'a self,
+        user: &'a UserId,
+    ) -> StoreFuture<'a, Result<Vec<AgentTokenRecord>, StoreError>> {
+        Box::pin(
+            async move { read!(self, connection => records::agent_tokens_of(connection, user)) },
+        )
     }
 
-    async fn append_auth_log(&self, entry: AuthLogEntry) -> Result<u64, StoreError> {
-        let position = self.auth_log.reserve(1);
-        let seq = position.first();
-        let appended =
-            in_transaction!(self, connection => records::append_auth_log(connection, &entry, seq));
-        drop(position);
-        appended
+    fn append_auth_log(&self, entry: AuthLogEntry) -> StoreFuture<'_, Result<u64, StoreError>> {
+        Box::pin(async move {
+            let position = self.auth_log.reserve(1);
+            let seq = position.first();
+            let appended = in_transaction!(self, connection => records::append_auth_log(connection, &entry, seq));
+            drop(position);
+            appended
+        })
     }
 
-    async fn auth_log(
-        &self,
-        query: &AuthLogQuery,
-    ) -> Result<Page<LoggedAuthEntry, u64>, StoreError> {
-        let horizon = self.auth_log.horizon();
-        read!(self, connection => records::auth_log(connection, query, horizon))
+    fn auth_log<'a>(
+        &'a self,
+        query: &'a AuthLogQuery,
+    ) -> StoreFuture<'a, Result<Page<LoggedAuthEntry, u64>, StoreError>> {
+        Box::pin(async move {
+            let horizon = self.auth_log.horizon();
+            read!(self, connection => records::auth_log(connection, query, horizon))
+        })
     }
 }
 
 impl ConversationStore for TursoStore {
-    async fn put_conversation(&self, conversation: ConversationRecord) -> Result<(), StoreError> {
-        in_transaction!(self, connection => records::put_conversation(connection, &conversation))
+    fn put_conversation(
+        &self,
+        conversation: ConversationRecord,
+    ) -> StoreFuture<'_, Result<(), StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::put_conversation(connection, &conversation))
+        })
     }
 
-    async fn conversation(
-        &self,
-        id: &ConversationId,
-    ) -> Result<Option<ConversationRecord>, StoreError> {
-        read!(self, connection => records::conversation(connection, id))
+    fn conversation<'a>(
+        &'a self,
+        id: &'a ConversationId,
+    ) -> StoreFuture<'a, Result<Option<ConversationRecord>, StoreError>> {
+        Box::pin(async move { read!(self, connection => records::conversation(connection, id)) })
     }
 
-    async fn conversations_of(
-        &self,
-        user: &UserId,
-        after: Option<&ConversationId>,
+    fn conversations_of<'a>(
+        &'a self,
+        user: &'a UserId,
+        after: Option<&'a ConversationId>,
         size: PageSize,
-    ) -> Result<Page<ConversationSummary, ConversationId>, StoreError> {
-        read!(self, connection => records::conversations_of(connection, user, after, size))
+    ) -> StoreFuture<'a, Result<Page<ConversationSummary, ConversationId>, StoreError>> {
+        Box::pin(async move {
+            read!(self, connection => records::conversations_of(connection, user, after, size))
+        })
     }
 
-    async fn remove_conversation(&self, id: &ConversationId) -> Result<bool, StoreError> {
-        in_transaction!(self, connection => records::remove_conversation(connection, id))
+    fn remove_conversation<'a>(
+        &'a self,
+        id: &'a ConversationId,
+    ) -> StoreFuture<'a, Result<bool, StoreError>> {
+        Box::pin(async move {
+            in_transaction!(self, connection => records::remove_conversation(connection, id))
+        })
     }
 }

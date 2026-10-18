@@ -3,7 +3,6 @@
 
 use cairn_schema::{Markdown, Patch};
 use cairn_service::{Call, DomainPatch, Service, ServiceError, WriteError};
-use cairn_store::Store;
 
 use super::retry::{self, Landed, Refused};
 
@@ -22,8 +21,8 @@ pub enum InProcessError {
 /// # Errors
 ///
 /// Its rejection (a stale one when retrying was not safe), or the service's failure.
-pub async fn patch<S: Store>(
-    service: &Service<S>,
+pub async fn patch(
+    service: &Service,
     call: &Call,
     patch: Patch,
     note: Option<Markdown>,

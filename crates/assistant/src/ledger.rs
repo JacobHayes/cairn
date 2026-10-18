@@ -11,7 +11,6 @@ use std::collections::{BTreeMap, BTreeSet};
 use cairn_mcp::{ToolError, ToolSet};
 use cairn_schema::{Actor, Domain, Mutation, NodeKey, ProposalId, Revision};
 use cairn_service::DomainPatch;
-use cairn_store::Store;
 use serde_json::{Value, json};
 
 use crate::wrapper::{Action, Because, Outcome, proposal_id_of, title};
@@ -73,9 +72,9 @@ impl Ledger {
     /// limit, into its destination's overflow proposal: created against the destination's
     /// `current` revision on the first, replaced with every overflowing mutation so far on
     /// each after it.
-    pub(crate) async fn overflow<S: Store + 'static>(
+    pub(crate) async fn overflow(
         &mut self,
-        tools: &ToolSet<S>,
+        tools: &ToolSet,
         actor: &Actor,
         (tool, note): (&str, Option<&str>),
         drafted: &DomainPatch,
@@ -147,9 +146,9 @@ impl Overflow {
     }
 
     /// Creates it, under the overflowing patch's id.
-    async fn create<S: Store + 'static>(
+    async fn create(
         &mut self,
-        tools: &ToolSet<S>,
+        tools: &ToolSet,
         actor: &Actor,
         destination: &Domain,
         (tool, note): (&str, Option<&str>),
@@ -167,9 +166,9 @@ impl Overflow {
     }
 
     /// Replaces its content with every overflowing mutation so far.
-    async fn edit<S: Store + 'static>(
+    async fn edit(
         &mut self,
-        tools: &ToolSet<S>,
+        tools: &ToolSet,
         actor: &Actor,
         tool: &str,
         note: Option<&str>,

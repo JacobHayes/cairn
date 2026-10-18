@@ -27,7 +27,7 @@ pub fn settings() -> DeploymentSettings {
 }
 
 /// A service over `store`, with its notifier.
-pub fn service_over<S: Store>(store: Arc<S>) -> (Service<S>, Arc<InProcessNotifier>) {
+pub fn service_over(store: Arc<dyn Store>) -> (Service, Arc<InProcessNotifier>) {
     let notifier = Arc::new(InProcessNotifier::new());
     let service = Service::new(Parts {
         store,
@@ -39,7 +39,7 @@ pub fn service_over<S: Store>(store: Arc<S>) -> (Service<S>, Arc<InProcessNotifi
 }
 
 /// A service over a fresh memory store.
-pub fn memory() -> (Service<MemoryStore>, Arc<InProcessNotifier>) {
+pub fn memory() -> (Service, Arc<InProcessNotifier>) {
     service_over(Arc::new(MemoryStore::new()))
 }
 
@@ -57,7 +57,7 @@ pub fn turso_path(root: &Path) -> PathBuf {
 }
 
 /// A service over a fresh Turso store under `root`.
-pub async fn turso(root: &Path) -> (Service<TursoStore>, Arc<InProcessNotifier>) {
+pub async fn turso(root: &Path) -> (Service, Arc<InProcessNotifier>) {
     let store = TursoStore::open(&turso_path(root)).await.unwrap();
     service_over(Arc::new(store))
 }
@@ -211,7 +211,7 @@ pub fn rejected(written: Result<Written, WriteError>) -> cairn_schema::Rejection
 }
 
 /// Seeds the vendor evaluation's route and runs its scenario's first `steps` steps.
-pub async fn vendor_after<S: Store>(service: &Service<S>, steps: usize) {
+pub async fn vendor_after(service: &Service, steps: usize) {
     let seed = publish_fixture_route("vendor-evaluation");
     applied(
         service

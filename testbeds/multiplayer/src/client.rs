@@ -27,7 +27,6 @@ use cairn_schema::{
     Timestamp, TouchedSet, UserId,
 };
 use cairn_service::{Call, DomainPatch, Service, WriteError};
-use cairn_store_turso::TursoStore;
 
 use crate::Stop;
 use crate::patches::Draft;
@@ -128,7 +127,7 @@ enum Channel {
     /// original in flight. The API runs each patch on a task of its own too (4.2), so an
     /// HTTP resubmission can meet its original once the original reached the service.
     InProcess {
-        service: Service<TursoStore>,
+        service: Service,
         /// Attempts still running, which the agent waits out before it reports.
         in_flight: watch::Sender<usize>,
     },
@@ -151,7 +150,7 @@ impl Client {
     }
 
     /// Client `index` calling `service` in process, as an agent host would.
-    pub fn in_process(service: Service<TursoStore>, index: u32) -> Self {
+    pub fn in_process(service: Service, index: u32) -> Self {
         Self {
             channel: Channel::InProcess {
                 service,

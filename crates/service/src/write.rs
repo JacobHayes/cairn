@@ -13,7 +13,7 @@ use cairn_schema::{
     PatchReceipt, PatchTarget, ProposalId, Record, Rejection, Revision, RevisionOf, Subject,
     Violation, ViolationCode, Violations, Write,
 };
-use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize, Store};
+use cairn_store::{Commit, CommitError, Committed, EventQuery, PageSize};
 
 use crate::{Call, Service, ServiceError, consequence, load, notices};
 
@@ -128,7 +128,7 @@ impl fmt::Display for WriteError {
 
 impl std::error::Error for WriteError {}
 
-impl<S: Store> Service<S> {
+impl Service {
     /// A17: applies a domain patch as `call`'s actor (H2), at `call`'s today in the
     /// deployment's zone, and commits it. In order: a patch id already committed is answered
     /// from its receipt before anything is loaded (H5); an upgrade or re-link, which changes

@@ -18,7 +18,6 @@ use axum::middleware::{self, Next};
 use axum::response::{IntoResponse, Response};
 use axum::routing::post;
 use cairn_schema::Actor;
-use cairn_store::AuthStore;
 use url::Url;
 
 use crate::accounts::Accounts;
@@ -72,31 +71,24 @@ pub(crate) async fn browser(
 }
 
 /// The deployment's auth: accounts and the configured providers.
-pub struct Auth<S> {
-    inner: Arc<Inner<S>>,
+#[derive(Clone)]
+pub struct Auth {
+    inner: Arc<Inner>,
 }
 
-struct Inner<S> {
-    accounts: Accounts<S>,
+struct Inner {
+    accounts: Accounts,
     providers: Vec<Arc<dyn AuthProvider>>,
     listener: Listener,
     secure: bool,
 }
 
-impl<S> Clone for Auth<S> {
-    fn clone(&self) -> Self {
-        Self {
-            inner: Arc::clone(&self.inner),
-        }
-    }
-}
-
-impl<S: AuthStore + 'static> Auth<S> {
+impl Auth {
     /// Auth for a server on `listener` at the public `base` URL, asking `providers` in
     /// this order.
     #[must_use]
     pub fn new(
-        accounts: Accounts<S>,
+        accounts: Accounts,
         listener: Listener,
         base: &Url,
         providers: Vec<Arc<dyn AuthProvider>>,
@@ -114,7 +106,7 @@ impl<S: AuthStore + 'static> Auth<S> {
 
     /// The accounts.
     #[must_use]
-    pub fn accounts(&self) -> &Accounts<S> {
+    pub fn accounts(&self) -> &Accounts {
         &self.inner.accounts
     }
 
@@ -123,17 +115,14 @@ impl<S: AuthStore + 'static> Auth<S> {
     /// (axum's `into_make_service_with_connect_info::<SocketAddr>`): a request with no
     /// recorded peer is never local, so the local-only providers refuse it.
     pub fn protect(&self, router: Router) -> Router {
-        router.layer(middleware::from_fn_with_state(
-            self.clone(),
-            require_actor::<S>,
-        ))
+        router.layer(middleware::from_fn_with_state(self.clone(), require_actor))
     }
 
     /// The routes auth serves outside the layer: every provider's own, and sign-out.
     pub fn router(&self) -> Router {
         let authenticator: Arc<dyn Authenticate> = Arc::new(self.clone());
         let sign_out = Router::new()
-            .route("/api/auth/sign-out", post(sign_out::<S>))
+            .route("/api/auth/sign-out", post(sign_out))
             .with_state(self.clone());
         let routers = self.inner.providers.iter();
         routers
@@ -239,7 +228,7 @@ impl<S: AuthStore + 'static> Auth<S> {
     }
 }
 
-impl<S: AuthStore + 'static> Authenticate for Auth<S> {
+impl Authenticate for Auth {
     fn authenticate<'a>(
         &'a self,
         headers: &'a HeaderMap,
@@ -253,11 +242,7 @@ impl<S: AuthStore + 'static> Authenticate for Auth<S> {
     }
 }
 
-async fn require_actor<S: AuthStore + 'static>(
-    State(auth): State<Auth<S>>,
-    mut request: Request,
-    next: Next,
-) -> Response {
+async fn require_actor(State(auth): State<Auth>, mut request: Request, next: Next) -> Response {
     let presented = Presented {
         headers: request.headers(),
         peer: auth.peer(request.extensions()),
@@ -281,10 +266,7 @@ async fn require_actor<S: AuthStore + 'static>(
 }
 
 /// Ends the browser's session and clears its cookie.
-async fn sign_out<S: AuthStore + 'static>(
-    State(auth): State<Auth<S>>,
-    headers: HeaderMap,
-) -> Response {
+async fn sign_out(State(auth): State<Auth>, headers: HeaderMap) -> Response {
     if let Some(token) = cookies::read(&headers, SESSION_COOKIE)
         && let Err(error) = auth.inner.accounts.end_session(&token).await
     {

@@ -15,7 +15,7 @@ use cairn_schema::{
     VersionNumber, from_yaml, to_yaml,
 };
 use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, Written};
-use cairn_store::{InProcessNotifier, MemoryStore};
+use cairn_store::{InProcessNotifier, MemoryStore, Store};
 use jiff::tz::TimeZone;
 
 use super::{Case, CaseCall, Group};
@@ -61,9 +61,9 @@ fn reader() -> Call {
 /// The server: the service over the memory store, in UTC like the in-browser root, seeded
 /// with every fixture, with the root's local identity signed in, so every read here is
 /// derived with that identity's entities (one lead per fixture) as the viewer (H3).
-fn server() -> Service<MemoryStore> {
+fn server() -> Service {
     let settings = DeploymentSettings::new(parsed("UTC"), TimeZone::UTC, RankConstants::default());
-    let store = Arc::new(MemoryStore::new());
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
     let service = Service::new(Parts {
         store: Arc::clone(&store),
         notifier: Arc::new(InProcessNotifier::new()),
@@ -77,17 +77,13 @@ fn server() -> Service<MemoryStore> {
 }
 
 /// The server's domain document of `id`.
-fn document(service: &Service<MemoryStore>, id: &JourneyId) -> DomainDocument {
+fn document(service: &Service, id: &JourneyId) -> DomainDocument {
     served(now_or_never(service.document(&reader(), id)), "document")
         .unwrap_or_else(|| panic!("the server holds {id}"))
 }
 
 /// The server's answer to `request`, as the API's JSON.
-fn server_projection(
-    service: &Service<MemoryStore>,
-    id: &JourneyId,
-    request: &Projection,
-) -> String {
+fn server_projection(service: &Service, id: &JourneyId, request: &Projection) -> String {
     let call = reader();
     let read = |what: &str| format!("{what} of {id}");
     match request {
@@ -338,12 +334,7 @@ fn causes_consequences(document: &DomainDocument, mutations: &str) -> bool {
 /// # Panics
 ///
 /// When no pin before today causes a consequence: the walk would check nothing of D7.
-fn mutations(
-    service: &Service<MemoryStore>,
-    id: &JourneyId,
-    document: &DomainDocument,
-    note: &str,
-) -> String {
+fn mutations(service: &Service, id: &JourneyId, document: &DomainDocument, note: &str) -> String {
     let nodes = document.journey.graph.nodes.as_map();
     let first = served(nodes.keys().next().ok_or("no node"), "first node");
     let next = served(
@@ -374,11 +365,7 @@ fn mutations(
 
 /// C14: two proposals created on the server against the journey, each previewed there and
 /// asked of the browser host with the proposal as the server answers it.
-fn previews(
-    service: &Service<MemoryStore>,
-    id: &JourneyId,
-    document: &DomainDocument,
-) -> Vec<Case> {
+fn previews(service: &Service, id: &JourneyId, document: &DomainDocument) -> Vec<Case> {
     let first = served(
         document
             .journey
@@ -449,7 +436,7 @@ fn previews(
 
 /// Everything read over one journey's document: its derive, every projection, and two
 /// previews.
-fn journey_group(service: &Service<MemoryStore>, label: &str, id: &JourneyId) -> Group {
+fn journey_group(service: &Service, label: &str, id: &JourneyId) -> Group {
     let document = document(service, id);
     let derived = served(now_or_never(service.derived(&reader(), id)), "derive");
     let mut cases = vec![Case {
@@ -475,7 +462,7 @@ fn journey_group(service: &Service<MemoryStore>, label: &str, id: &JourneyId) ->
 /// A17, D7: the walk's patch, applied locally against the document and committed on the
 /// server: the journey after and its consequences agree. Also its touched set (H5). Then the
 /// journey after, derived and projected.
-fn apply_and_after(service: &Service<MemoryStore>, group: &mut Group, id: &JourneyId) -> Group {
+fn apply_and_after(service: &Service, group: &mut Group, id: &JourneyId) -> Group {
     let before = document(service, id);
     let patch: Patch = parsed(&format!(
         "id: p_wasm_apply_{}\ntarget:\n  journey: {id}\nbase_revision: {}\nmutations:\n{}",
@@ -525,12 +512,7 @@ fn apply_and_after(service: &Service<MemoryStore>, group: &mut Group, id: &Journ
 
 /// The journey's derive and its main projections, over the server's document `after` a
 /// change.
-fn after_group(
-    service: &Service<MemoryStore>,
-    label: &str,
-    id: &JourneyId,
-    after: &DomainDocument,
-) -> Group {
+fn after_group(service: &Service, label: &str, id: &JourneyId, after: &DomainDocument) -> Group {
     let derived = served(now_or_never(service.derived(&reader(), id)), "derive");
     let requests = [
         Projection::level(NodeKind::ALL.into_iter().collect(), None),
@@ -567,7 +549,7 @@ fn after_group(
 
 /// A13: each fixture's route exported at version 1, that file imported back as a new draft,
 /// and the draft exported, against the server's export and the draft its import opened.
-fn route_group(service: &Service<MemoryStore>) -> Group {
+fn route_group(service: &Service) -> Group {
     let mut cases = Vec::new();
     for fixture in &FIXTURES {
         let Some(file) = fixture.route else { continue };
@@ -641,7 +623,7 @@ fn route_group(service: &Service<MemoryStore>) -> Group {
 /// E6: one of the vendor evaluation's stakeholders merged into a new entity, then the journey
 /// derived again over the new deployment. The merge moves neither a journey revision nor the
 /// viewer (the lead), so only the deployment revision tells a cached derive apart.
-fn merge_group(service: &Service<MemoryStore>) -> Group {
+fn merge_group(service: &Service) -> Group {
     let id: JourneyId = parsed("j_vendor_eval");
     let deployment = served(now_or_never(service.deployment()), "deployment").revision;
     let journey = document(service, &id).journey.revision;

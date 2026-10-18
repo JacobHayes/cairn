@@ -13,7 +13,7 @@ use cairn_schema::{
     from_yaml,
 };
 use cairn_service::{Call, DomainPatch};
-use cairn_store::{JourneyQuery, PageSize, Store};
+use cairn_store::{JourneyQuery, PageSize};
 
 use schemars::JsonSchema;
 use serde::Deserialize;
@@ -170,7 +170,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
 ];
 
-impl<S: Store + 'static> ToolSet<S> {
+impl ToolSet {
     /// Runs the direct-write tool `name`.
     pub(crate) async fn write(
         &self,

@@ -15,7 +15,6 @@ use axum::http::StatusCode;
 use axum::response::{IntoResponse, Response};
 use cairn_schema::{Actor, Domain, JourneyId, PatchTarget, Rejection, RouteId};
 use cairn_service::{DomainPatch, WriteError, Written};
-use cairn_store::Store;
 
 use crate::Api;
 use crate::error::ApiError;
@@ -28,7 +27,7 @@ pub type Answer<T> = Result<Json<T>, ApiError>;
 
 /// `GET /healthz`, outside the auth layer: 200 while the store answers, 503 once it has
 /// failed closed. Cheap: it reads the store's state, never its storage.
-pub async fn health<S: Store + 'static>(State(api): State<Api<S>>) -> Response {
+pub async fn health(State(api): State<Api>) -> Response {
     match api.service.health() {
         Ok(()) => (
             StatusCode::OK,
@@ -51,13 +50,13 @@ pub async fn health<S: Store + 'static>(State(api): State<Api<S>>) -> Response {
 }
 
 /// `GET /api/capabilities`.
-pub async fn capabilities<S: Store + 'static>(State(api): State<Api<S>>) -> Json<Capabilities> {
+pub async fn capabilities(State(api): State<Api>) -> Json<Capabilities> {
     Json(Capabilities::from(api.service.capabilities()))
 }
 
 /// `POST /api/journeys/{id}/patches`.
-pub async fn patch_journey<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn patch_journey(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<PatchRequest>,
@@ -67,8 +66,8 @@ pub async fn patch_journey<S: Store + 'static>(
 }
 
 /// `POST /api/routes/{id}/patches`.
-pub async fn patch_route<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn patch_route(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<PatchRequest>,
@@ -78,8 +77,8 @@ pub async fn patch_route<S: Store + 'static>(
 }
 
 /// `POST /api/deployment/patches`.
-pub async fn patch_deployment<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn patch_deployment(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     JsonBody(request): JsonBody<PatchRequest>,
 ) -> Answer<PatchAnswer> {
@@ -88,8 +87,8 @@ pub async fn patch_deployment<S: Store + 'static>(
 
 /// A17: one domain patch as `actor`, whose target must be `domain`. A proposal is edited
 /// through its own endpoints (4.9), never as a domain.
-async fn submit<S: Store + 'static>(
-    api: &Api<S>,
+async fn submit(
+    api: &Api,
     actor: Actor,
     domain: &Domain,
     request: PatchRequest,

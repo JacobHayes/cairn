@@ -69,7 +69,7 @@ fn key(text: &str) -> NodeKey {
 
 /// The journey `j_wide`: a root action and a chain of `count` actions after it, each
 /// requiring the one before, so everything is downstream of the root.
-async fn wide<S: Store>(service: &Service<S>, count: usize) {
+async fn wide(service: &Service, count: usize) {
     let mut mutations = String::from(
         "- op: create_journey\n  name: Wide\n- op: add_node\n  node: {key: n_root, id: root, kind: action, title: Root}\n",
     );
@@ -87,8 +87,8 @@ async fn wide<S: Store>(service: &Service<S>, count: usize) {
 }
 
 /// The engine's own derive of a stored journey for no viewer at `call`'s today.
-async fn reference<S: Store>(
-    service: &Service<S>,
+async fn reference(
+    service: &Service,
     id: &JourneyId,
     call: &Call,
 ) -> (Graph, cairn_engine::Derived) {
@@ -103,7 +103,7 @@ async fn reference<S: Store>(
 /// C10, I3, I1: the vendor evaluation after kickoff, read through the service, ranks its next
 /// list as the engine alone does (fixtures/README.md: `n_access`, `n_decision_meeting`,
 /// `n_workload`), and the snapshot's acting frontier is that list.
-async fn a_journey_reads_as_the_engine_alone_projects_it<S: Store>(store: Arc<S>) {
+async fn a_journey_reads_as_the_engine_alone_projects_it(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     vendor_after(&service, 3).await;
     let reader = call("u_lead", AT);
@@ -153,7 +153,7 @@ async fn a_journey_reads_as_the_engine_alone_projects_it<S: Store>(store: Arc<S>
 
 /// I3: a subtree scopes the node list to that node and what is beneath it, and the node
 /// list pages at `page_item_count_max`, its pages together listing each node once.
-async fn a_snapshot_scopes_to_a_subtree_and_pages_its_nodes<S: Store>(store: Arc<S>) {
+async fn a_snapshot_scopes_to_a_subtree_and_pages_its_nodes(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     vendor_after(&service, 3).await;
     let reader = call("u_lead", AT);
@@ -197,7 +197,7 @@ async fn a_snapshot_scopes_to_a_subtree_and_pages_its_nodes<S: Store>(store: Arc
 
 /// C8; ARCHITECTURE, Read path: node detail carries a value's largest explanation entries up
 /// to the response limit with the total, and the explanation pages list every entry once.
-async fn node_detail_caps_its_explanations_and_the_rest_page<S: Store>(store: Arc<S>) {
+async fn node_detail_caps_its_explanations_and_the_rest_page(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     let count = usize::try_from(EXPLANATION_ENTRY_COUNT_MAX).unwrap() * 2 + 3;
     wide(&service, count).await;
@@ -249,7 +249,7 @@ async fn node_detail_caps_its_explanations_and_the_rest_page<S: Store>(store: Ar
 /// D6, E6, H3: a user whose verified email names a duplicate entity sees nothing as theirs;
 /// once the lead is merged into that entity, their reads are the lead's, and a service that
 /// has read before the merge answers exactly what a fresh one does.
-async fn cached_and_uncached_reads_agree_across_an_entity_merge<S: Store>(store: Arc<S>) {
+async fn cached_and_uncached_reads_agree_across_an_entity_merge(store: Arc<dyn Store>) {
     let (cached, _) = service_over(Arc::clone(&store));
     vendor_after(&cached, 3).await;
     let entity = patch(
@@ -319,7 +319,7 @@ async fn cached_and_uncached_reads_agree_across_an_entity_merge<S: Store>(store:
 /// D6, A9: a read just before midnight in the deployment's zone and one just after differ in
 /// their today, and the service that read before midnight answers after it exactly what a
 /// fresh one does.
-async fn cached_and_uncached_reads_agree_across_midnight<S: Store>(store: Arc<S>) {
+async fn cached_and_uncached_reads_agree_across_midnight(store: Arc<dyn Store>) {
     let (cached, _) = service_over(Arc::clone(&store));
     vendor_after(&cached, 3).await;
     // The deployment is five hours behind UTC: its midnight is 05:00 UTC.
@@ -344,7 +344,7 @@ async fn cached_and_uncached_reads_agree_across_midnight<S: Store>(store: Arc<S>
 
 /// J4: a journey's history pages its events grouped by patch, and a node's lists only the
 /// events naming it; a journey that does not exist has no history.
-async fn history_pages_a_journeys_events_grouped_by_patch<S: Store>(store: Arc<S>) {
+async fn history_pages_a_journeys_events_grouped_by_patch(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     vendor_after(&service, 3).await;
     let history = service.history(&vendor(), None, None).await.unwrap();
@@ -371,11 +371,11 @@ async fn history_pages_a_journeys_events_grouped_by_patch<S: Store>(store: Arc<S
 }
 
 /// The derived reads' futures are `Send` over either store, as the write path's are
-/// (decisions/2026-10-06-the-store-trait-is-generic-with-send-futures-not-object-safe.md).
+/// (2026-10-18-the-store-trait-returns-boxed-futures-and-the-stack-holds-a-trait-object.md).
 #[test]
 fn every_derived_read_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}
-    fn reads<S: Store>(service: &Service<S>) {
+    fn reads(service: &Service) {
         let reader = call("u_lead", AT);
         let id = vendor();
         send(&service.snapshot(&reader, &id, &SnapshotScope::default()));

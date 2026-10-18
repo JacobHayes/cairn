@@ -178,11 +178,7 @@ async fn demo(listen: SocketAddr) -> Result<(), String> {
     run(&config, store, routes).await
 }
 
-async fn run<S: Store + 'static>(
-    config: &Config,
-    store: Arc<S>,
-    beside: Router,
-) -> Result<(), String> {
+async fn run(config: &Config, store: Arc<dyn Store>, beside: Router) -> Result<(), String> {
     telemetry::install_panic_policy();
     let metrics = telemetry::install_metrics().map_err(|error| error.to_string())?;
     root::serve(config, store, beside, metrics, stopped())

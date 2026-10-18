@@ -24,7 +24,7 @@ use cairn_auth::{
     TailscaleProvider,
 };
 use cairn_service::{AuthKind, AuthMethod, Capabilities, Parts, Service};
-use cairn_store::{AuthStore, InProcessNotifier, Notifier, Store, StoreError};
+use cairn_store::{InProcessNotifier, Notifier, Store, StoreError};
 use metrics_exporter_prometheus::PrometheusHandle;
 use tokio::net::TcpListener;
 
@@ -35,9 +35,9 @@ use crate::{listener, telemetry};
 
 /// What the root assembles a server from besides its configuration: the parts a test
 /// replaces (the store, the notifier, the web build, the metrics recorder, the clock).
-pub struct Assembly<S> {
+pub struct Assembly {
     /// The store, shared by the service, auth, and the assistant.
-    pub store: Arc<S>,
+    pub store: Arc<dyn Store>,
     /// The notifier every commit is announced through.
     pub notifier: Arc<dyn Notifier>,
     /// The web build.
@@ -128,9 +128,9 @@ pub fn capabilities(config: &Config) -> Capabilities {
 /// Every provider that refuses its configuration (the dev provider off loopback without its
 /// override, Tailscale's proxy mode on a listener others reach, an OIDC issuer over plain
 /// http, an IAP audience that is not an IAP resource).
-pub fn providers<S: AuthStore + 'static>(
+pub fn providers(
     config: &Config,
-    accounts: &Accounts<S>,
+    accounts: &Accounts,
 ) -> Result<Vec<Arc<dyn AuthProvider>>, Vec<Problem>> {
     let listener = config.listener();
     let base = &config.public_url;
@@ -176,10 +176,7 @@ pub fn providers<S: AuthStore + 'static>(
 /// # Errors
 ///
 /// A provider refusing its configuration, or a web build with no page.
-pub fn app<S: Store + 'static>(
-    config: &Config,
-    parts: Assembly<S>,
-) -> Result<Router, StartupError> {
+pub fn app(config: &Config, parts: Assembly) -> Result<Router, StartupError> {
     let service = Service::new(Parts {
         store: Arc::clone(&parts.store),
         notifier: parts.notifier,
@@ -221,9 +218,9 @@ pub fn app<S: Store + 'static>(
 /// # Errors
 ///
 /// Any [`StartupError`].
-pub async fn serve<S: Store + 'static>(
+pub async fn serve(
     config: &Config,
-    store: Arc<S>,
+    store: Arc<dyn Store>,
     beside: Router,
     metrics: PrometheusHandle,
     shutdown: impl Future<Output = ()> + Send + 'static,
@@ -276,7 +273,7 @@ pub async fn serve<S: Store + 'static>(
 
 /// Resolves once `store` has failed closed. A health check reads the store's own state, so
 /// looking once a second costs nothing.
-async fn failed_closed<S: Store>(store: &S) {
+async fn failed_closed(store: &dyn Store) {
     while store.health().is_ok() {
         tokio::time::sleep(Duration::from_secs(1)).await;
     }

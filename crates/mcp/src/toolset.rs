@@ -7,7 +7,6 @@
 use cairn_auth::Clock;
 use cairn_schema::Actor;
 use cairn_service::{Call, DomainPatch, Service};
-use cairn_store::Store;
 use schemars::JsonSchema;
 use schemars::generate::SchemaSettings;
 use serde::Serialize;
@@ -137,25 +136,17 @@ fn prune_definitions(schema: &mut Map<String, Value>) {
 }
 
 /// The tool set over one service: what the MCP endpoint serves and the assistant calls.
-pub struct ToolSet<S> {
-    pub(crate) service: Service<S>,
+#[derive(Clone)]
+pub struct ToolSet {
+    pub(crate) service: Service,
     clock: Clock,
 }
 
-impl<S> Clone for ToolSet<S> {
-    fn clone(&self) -> Self {
-        Self {
-            service: self.service.clone(),
-            clock: self.clock.clone(),
-        }
-    }
-}
-
-impl<S: Store + 'static> ToolSet<S> {
+impl ToolSet {
     /// The tools over `service`, each call made at `clock`'s now (the deployment clock the
     /// API's calls read).
     #[must_use]
-    pub fn new(service: Service<S>, clock: Clock) -> Self {
+    pub fn new(service: Service, clock: Clock) -> Self {
         Self { service, clock }
     }
 

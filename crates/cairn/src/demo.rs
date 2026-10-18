@@ -37,7 +37,7 @@ use serde_json::{Value, json};
 use url::Url;
 
 use cairn_service::{Parts, Service};
-use cairn_store::{InProcessNotifier, MemoryStore};
+use cairn_store::{InProcessNotifier, MemoryStore, Store};
 
 use crate::config::{self, Config, Environment};
 use crate::host::AllowedHosts;
@@ -96,8 +96,8 @@ fn issuer_url(listen: SocketAddr) -> String {
 /// # Errors
 ///
 /// A fixture that did not seed, or a signing key that did not build.
-pub async fn parts(config: &Config) -> Result<(Arc<MemoryStore>, Router), String> {
-    let store = Arc::new(MemoryStore::new());
+pub async fn parts(config: &Config) -> Result<(Arc<dyn Store>, Router), String> {
+    let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
     let service = Service::new(Parts {
         store: Arc::clone(&store),
         notifier: Arc::new(InProcessNotifier::new()),

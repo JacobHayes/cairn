@@ -95,7 +95,7 @@ fn codes(rejection: &Rejection) -> Vec<ViolationCode> {
 }
 
 /// A11: publishes `route`'s open draft.
-async fn publish<S: Store>(service: &Service<S>, route: &RouteId, patch_id: &str) {
+async fn publish(service: &Service, route: &RouteId, patch_id: &str) {
     let held = service.route(route).await.unwrap().unwrap();
     let publish = patch(
         patch_id,
@@ -108,7 +108,7 @@ async fn publish<S: Store>(service: &Service<S>, route: &RouteId, patch_id: &str
 
 /// The vendor evaluation finished, its access deliverable retitled and its findings
 /// re-estimated by the journey, and version 2 imported from its file and published.
-async fn finished_and_edited_with_version_two<S: Store>(service: &Service<S>) {
+async fn finished_and_edited_with_version_two(service: &Service) {
     vendor_after(service, usize::MAX).await;
     let journey = service.journey(&vendor()).await.unwrap().unwrap();
     let edits = patch(
@@ -148,7 +148,7 @@ fn take_the_route(item: &mut ReviewItem) {
 /// and imported back through the service opens a new draft that extends version 1 and holds
 /// the same graph, every node matched by path; exported again it is the same file. A
 /// resubmitted import is answered from its receipt.
-async fn an_export_imported_back_is_a_new_draft_matching_by_path<S: Store>(store: Arc<S>) {
+async fn an_export_imported_back_is_a_new_draft_matching_by_path(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     let seed = publish_fixture_route("vendor-evaluation");
     applied(service.patch(&call("u_author", AT), &domain(seed)).await);
@@ -274,7 +274,7 @@ fn a_proposal_review_and_a_publish_list_notices_and_a_draft_edit_lists_none() {
 }
 
 /// The upgrade proposal `pr_upgrade` to version 2 drafted by `author`, unchanged.
-async fn propose<S: Store>(service: &Service<S>, author: &Call) -> Proposal {
+async fn propose(service: &Service, author: &Call) -> Proposal {
     saved(
         service
             .propose_upgrade(author, id("p_propose"), &upgrade(), &vendor(), version(2))
@@ -284,7 +284,7 @@ async fn propose<S: Store>(service: &Service<S>, author: &Call) -> Proposal {
 }
 
 /// `drafted` edited by `author` to take the route's side of every conflict, at revision 2.
-async fn resolve<S: Store>(service: &Service<S>, author: &Call, drafted: &Proposal) {
+async fn resolve(service: &Service, author: &Call, drafted: &Proposal) {
     let resolved = chosen(drafted, take_the_route);
     let edited = saved(
         service
@@ -307,8 +307,8 @@ fn upgrade() -> ProposalId {
 }
 
 /// Applies `proposal` to `destination` as `caller`, reviewed at `reviewed`.
-async fn apply<S: Store>(
-    service: &Service<S>,
+async fn apply(
+    service: &Service,
     caller: &Call,
     patch_id: &str,
     destination: &Domain,
@@ -331,8 +331,8 @@ async fn apply<S: Store>(
 /// title conflict blocks apply, by an agent as by anyone, until a choice is made; applied by
 /// the agent, the journey follows version 2 with the route's title, the new sign-off, the
 /// kept estimate, and the removed workload orphaned, and its user is the confirming user.
-async fn an_upgrade_is_applied_once_its_conflict_is_resolved_and_an_agent_confirms_it<S: Store>(
-    store: Arc<S>,
+async fn an_upgrade_is_applied_once_its_conflict_is_resolved_and_an_agent_confirms_it(
+    store: Arc<dyn Store>,
 ) {
     let (service, _) = service_over(store);
     finished_and_edited_with_version_two(&service).await;
@@ -394,7 +394,7 @@ async fn an_upgrade_is_applied_once_its_conflict_is_resolved_and_an_agent_confir
 /// I6, H5: an upgrade whose journey moved after review is stale with what intervened;
 /// refreshed, it is drafted again on the new base with the reviewer's choice carried by node
 /// and field, under a new revision, so the old review no longer applies and the new one does.
-async fn a_stale_upgrade_is_refreshed_with_its_choices_and_reviewed_again<S: Store>(store: Arc<S>) {
+async fn a_stale_upgrade_is_refreshed_with_its_choices_and_reviewed_again(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     finished_and_edited_with_version_two(&service).await;
     let lead = call("u_lead", AT);
@@ -454,7 +454,7 @@ async fn a_stale_upgrade_is_refreshed_with_its_choices_and_reviewed_again<S: Sto
 /// B8: the finished journey, with a stakeholder named as the findings' reviewer, saved as a
 /// new route: the stakeholder is a participation item, mapped to the findings reviewer role;
 /// applied and published, the route's findings take their reviewer from that role.
-async fn saved_and_published<S: Store>(service: &Service<S>, lead: &Call) -> RouteId {
+async fn saved_and_published(service: &Service, lead: &Call) -> RouteId {
     let journey = service.journey(&vendor()).await.unwrap().unwrap();
     let named = patch(
         "p_named",
@@ -520,7 +520,7 @@ async fn saved_and_published<S: Store>(service: &Service<S>, lead: &Call) -> Rou
 
 /// B8, B9: the journey saved as a route and published is re-linked to it, its old lineage
 /// held until the re-link is applied.
-async fn a_journey_saved_as_a_route_is_published_and_relinked_to_it<S: Store>(store: Arc<S>) {
+async fn a_journey_saved_as_a_route_is_published_and_relinked_to_it(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     vendor_after(&service, usize::MAX).await;
     let lead = call("u_lead", AT);
@@ -552,7 +552,7 @@ async fn a_journey_saved_as_a_route_is_published_and_relinked_to_it<S: Store>(st
 #[test]
 fn every_route_operation_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}
-    fn operations<S: Store>(service: &Service<S>, file: &RouteFile, lead: &Call) {
+    fn operations(service: &Service, file: &RouteFile, lead: &Call) {
         let proposal: ProposalId = id("pr_one");
         send(&service.export_route(&vendor_route(), None));
         send(&service.import_route(lead, id("p_one"), file, None));
@@ -591,7 +591,7 @@ fn every_route_operation_can_be_awaited_on_another_thread() {
 }
 
 /// The journey moved by a note, as a second person would.
-async fn move_journey<S: Store>(service: &Service<S>, patch_id: &str) {
+async fn move_journey(service: &Service, patch_id: &str) {
     let at = service.journey(&vendor()).await.unwrap().unwrap().revision;
     let note = patch(
         patch_id,
@@ -608,8 +608,8 @@ async fn move_journey<S: Store>(service: &Service<S>, patch_id: &str) {
 /// the journey moved (so drafting again would give other content) are answered from their
 /// receipts; the upgrade resubmitted under a new patch id is the proposal already held; a
 /// patch id used for one is refused for the other.
-async fn a_resubmitted_draft_after_the_journey_moved_is_answered_from_its_receipt<S: Store>(
-    store: Arc<S>,
+async fn a_resubmitted_draft_after_the_journey_moved_is_answered_from_its_receipt(
+    store: Arc<dyn Store>,
 ) {
     let (service, _) = service_over(store);
     finished_and_edited_with_version_two(&service).await;
@@ -663,7 +663,7 @@ async fn a_resubmitted_draft_after_the_journey_moved_is_answered_from_its_receip
 /// an export of an older version, its keys stripped, is matched against the latest: a node
 /// the latest removed (and retired) is new, never its old key back. Resubmitted after the
 /// draft is published, the import is answered from its receipt.
-async fn an_older_export_is_matched_against_the_latest_version<S: Store>(store: Arc<S>) {
+async fn an_older_export_is_matched_against_the_latest_version(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     let author = call("u_author", AT);
     let first = patch(
@@ -737,7 +737,7 @@ async fn an_older_export_is_matched_against_the_latest_version<S: Store>(store: 
 /// another version, a re-link, a refresh, another author's draft, or (once applied) a refresh
 /// under the apply's patch id; and a proposal id held for one upgrade does not answer a
 /// request for another.
-async fn a_patch_id_reused_for_another_drafted_request_is_refused<S: Store>(store: Arc<S>) {
+async fn a_patch_id_reused_for_another_drafted_request_is_refused(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     finished_and_edited_with_version_two(&service).await;
     let lead = call("u_lead", AT);

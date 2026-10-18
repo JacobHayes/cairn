@@ -10,7 +10,7 @@ mod domains;
 mod queries;
 mod records;
 
-use std::future::{Future, ready};
+use std::future::ready;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use std::collections::{BTreeMap, BTreeSet};
@@ -32,7 +32,7 @@ use crate::records::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
     IdentityRecord, LoggedAuthEntry, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
 };
-use crate::store::{AuthStore, ConversationStore, Store};
+use crate::store::{AuthStore, ConversationStore, Store, StoreFuture};
 use crate::target::{Document, LoadTarget};
 
 use domains::Domains;
@@ -317,19 +317,24 @@ fn missing_header(domain: &Domain) -> Result<(), StoreError> {
     )))
 }
 
+/// A call that has already completed: the memory backend answers at once.
+fn done<'a, T: Send + 'a>(value: T) -> StoreFuture<'a, T> {
+    Box::pin(ready(value))
+}
+
 impl Store for MemoryStore {
-    fn load(
-        &self,
-        target: &LoadTarget,
-    ) -> impl Future<Output = Result<Option<Document>, StoreError>> + Send {
-        ready(Ok(self.load_now(target)))
+    fn load<'a>(
+        &'a self,
+        target: &'a LoadTarget,
+    ) -> StoreFuture<'a, Result<Option<Document>, StoreError>> {
+        done(Ok(self.load_now(target)))
     }
 
-    fn proposal(
-        &self,
-        id: &ProposalId,
-    ) -> impl Future<Output = Result<Option<Proposal>, StoreError>> + Send {
-        ready(Ok(self.state().domains.proposals.get(id).cloned()))
+    fn proposal<'a>(
+        &'a self,
+        id: &'a ProposalId,
+    ) -> StoreFuture<'a, Result<Option<Proposal>, StoreError>> {
+        done(Ok(self.state().domains.proposals.get(id).cloned()))
     }
 
     fn health(&self) -> Result<(), StoreError> {
@@ -341,220 +346,199 @@ impl Store for MemoryStore {
         Ok(())
     }
 
-    fn receipt(
-        &self,
-        patch: &PatchId,
-    ) -> impl Future<Output = Result<Option<PatchReceipt>, StoreError>> + Send {
+    fn receipt<'a>(
+        &'a self,
+        patch: &'a PatchId,
+    ) -> StoreFuture<'a, Result<Option<PatchReceipt>, StoreError>> {
         let receipt = self
             .state()
             .receipts
             .get(patch)
             .map(|stored| stored.receipt.clone());
-        ready(Ok(receipt))
+        done(Ok(receipt))
     }
 
-    fn commit(
-        &self,
-        commit: Commit,
-    ) -> impl Future<Output = Result<Committed, CommitError>> + Send {
+    fn commit(&self, commit: Commit) -> StoreFuture<'_, Result<Committed, CommitError>> {
         let wait = self.faults.pause_at(CommitPoint::BeforeBegin);
-        async move {
+        Box::pin(async move {
             if let Some(wait) = wait {
                 wait.await;
             }
             self.commit_now(&commit)
-        }
+        })
     }
 
-    fn revisions(&self) -> impl Future<Output = Result<Revisions, StoreError>> + Send {
-        ready(Ok(self.revisions_now()))
+    fn revisions(&self) -> StoreFuture<'_, Result<Revisions, StoreError>> {
+        done(Ok(self.revisions_now()))
     }
 
-    fn intervening(
-        &self,
-        conflicts: &[RevisionConflict],
-    ) -> impl Future<Output = Result<TouchedSet, StoreError>> + Send {
-        ready(Ok(self.state().intervening(conflicts)))
+    fn intervening<'a>(
+        &'a self,
+        conflicts: &'a [RevisionConflict],
+    ) -> StoreFuture<'a, Result<TouchedSet, StoreError>> {
+        done(Ok(self.state().intervening(conflicts)))
     }
 
-    fn journeys(
-        &self,
-        query: &JourneyQuery,
-    ) -> impl Future<Output = Result<Page<JourneySummary, JourneyId>, StoreError>> + Send {
-        ready(Ok(self.state().journeys(query)))
+    fn journeys<'a>(
+        &'a self,
+        query: &'a JourneyQuery,
+    ) -> StoreFuture<'a, Result<Page<JourneySummary, JourneyId>, StoreError>> {
+        done(Ok(self.state().journeys(query)))
     }
 
-    fn proposals(
-        &self,
-        query: &crate::query::ProposalQuery,
-    ) -> impl Future<Output = Result<crate::query::ProposalPage, StoreError>> + Send {
-        ready(Ok(self.state().proposals(query)))
+    fn proposals<'a>(
+        &'a self,
+        query: &'a crate::query::ProposalQuery,
+    ) -> StoreFuture<'a, Result<crate::query::ProposalPage, StoreError>> {
+        done(Ok(self.state().proposals(query)))
     }
 
-    fn route_detail(
-        &self,
-        route: &cairn_schema::RouteId,
-    ) -> impl Future<Output = Result<Option<RouteDetail>, StoreError>> + Send {
-        ready(Ok(self.state().route_detail(route)))
+    fn route_detail<'a>(
+        &'a self,
+        route: &'a cairn_schema::RouteId,
+    ) -> StoreFuture<'a, Result<Option<RouteDetail>, StoreError>> {
+        done(Ok(self.state().route_detail(route)))
     }
 
-    fn journeys_referencing(
-        &self,
-        entities: &BTreeSet<EntityKey>,
-    ) -> impl Future<Output = Result<BTreeMap<JourneyId, Revision>, StoreError>> + Send {
-        ready(Ok(queries::referencing(&self.state(), entities)))
+    fn journeys_referencing<'a>(
+        &'a self,
+        entities: &'a BTreeSet<EntityKey>,
+    ) -> StoreFuture<'a, Result<BTreeMap<JourneyId, Revision>, StoreError>> {
+        done(Ok(queries::referencing(&self.state(), entities)))
     }
 
-    fn resolve_entity(
-        &self,
-        key: &EntityKey,
-    ) -> impl Future<Output = Result<Option<Entity>, StoreError>> + Send {
-        ready(Ok(self.state().resolve_entity(key)))
+    fn resolve_entity<'a>(
+        &'a self,
+        key: &'a EntityKey,
+    ) -> StoreFuture<'a, Result<Option<Entity>, StoreError>> {
+        done(Ok(self.state().resolve_entity(key)))
     }
 
-    fn events(
-        &self,
-        query: &EventQuery,
-    ) -> impl Future<Output = Result<Page<LoggedEvent, u64>, StoreError>> + Send {
-        ready(Ok(self.state().events(query)))
+    fn events<'a>(
+        &'a self,
+        query: &'a EventQuery,
+    ) -> StoreFuture<'a, Result<Page<LoggedEvent, u64>, StoreError>> {
+        done(Ok(self.state().events(query)))
     }
 
-    fn search(
-        &self,
-        query: &SearchQuery,
-    ) -> impl Future<Output = Result<Page<JourneyMatches, JourneyId>, StoreError>> + Send {
-        ready(Ok(self.state().search(query)))
+    fn search<'a>(
+        &'a self,
+        query: &'a SearchQuery,
+    ) -> StoreFuture<'a, Result<Page<JourneyMatches, JourneyId>, StoreError>> {
+        done(Ok(self.state().search(query)))
     }
 }
 
 impl AuthStore for MemoryStore {
-    fn put_user(&self, user: UserRecord) -> impl Future<Output = Result<(), StoreError>> + Send {
+    fn put_user(&self, user: UserRecord) -> StoreFuture<'_, Result<(), StoreError>> {
         self.state().outside.put_user(user);
-        ready(Ok(()))
+        done(Ok(()))
     }
 
-    fn user(
-        &self,
-        id: &UserId,
-    ) -> impl Future<Output = Result<Option<UserRecord>, StoreError>> + Send {
-        ready(Ok(self.state().outside.user(id)))
+    fn user<'a>(
+        &'a self,
+        id: &'a UserId,
+    ) -> StoreFuture<'a, Result<Option<UserRecord>, StoreError>> {
+        done(Ok(self.state().outside.user(id)))
     }
 
-    fn put_identity(
-        &self,
-        identity: IdentityRecord,
-    ) -> impl Future<Output = Result<(), StoreError>> + Send {
-        ready(self.state().outside.put_identity(identity))
+    fn put_identity(&self, identity: IdentityRecord) -> StoreFuture<'_, Result<(), StoreError>> {
+        done(self.state().outside.put_identity(identity))
     }
 
-    fn identity(
-        &self,
-        provider: &Slug,
-        subject: &Title,
-    ) -> impl Future<Output = Result<Option<IdentityRecord>, StoreError>> + Send {
-        ready(Ok(self.state().outside.identity(provider, subject)))
+    fn identity<'a>(
+        &'a self,
+        provider: &'a Slug,
+        subject: &'a Title,
+    ) -> StoreFuture<'a, Result<Option<IdentityRecord>, StoreError>> {
+        done(Ok(self.state().outside.identity(provider, subject)))
     }
 
-    fn identities_of(
-        &self,
-        user: &UserId,
-    ) -> impl Future<Output = Result<Vec<IdentityRecord>, StoreError>> + Send {
-        ready(Ok(self.state().outside.identities_of(user)))
+    fn identities_of<'a>(
+        &'a self,
+        user: &'a UserId,
+    ) -> StoreFuture<'a, Result<Vec<IdentityRecord>, StoreError>> {
+        done(Ok(self.state().outside.identities_of(user)))
     }
 
-    fn identities_with_email(
-        &self,
-        email: &Email,
-    ) -> impl Future<Output = Result<Vec<IdentityRecord>, StoreError>> + Send {
-        ready(Ok(self.state().outside.identities_with_email(email)))
+    fn identities_with_email<'a>(
+        &'a self,
+        email: &'a Email,
+    ) -> StoreFuture<'a, Result<Vec<IdentityRecord>, StoreError>> {
+        done(Ok(self.state().outside.identities_with_email(email)))
     }
 
-    fn remove_identity(
-        &self,
-        provider: &Slug,
-        subject: &Title,
-    ) -> impl Future<Output = Result<bool, StoreError>> + Send {
-        ready(Ok(self.state().outside.remove_identity(provider, subject)))
+    fn remove_identity<'a>(
+        &'a self,
+        provider: &'a Slug,
+        subject: &'a Title,
+    ) -> StoreFuture<'a, Result<bool, StoreError>> {
+        done(Ok(self.state().outside.remove_identity(provider, subject)))
     }
 
-    fn put_session(
-        &self,
-        session: SessionRecord,
-    ) -> impl Future<Output = Result<(), StoreError>> + Send {
-        ready(self.state().outside.put_session(session))
+    fn put_session(&self, session: SessionRecord) -> StoreFuture<'_, Result<(), StoreError>> {
+        done(self.state().outside.put_session(session))
     }
 
-    fn session(
-        &self,
-        token_hash: &SecretHash,
+    fn session<'a>(
+        &'a self,
+        token_hash: &'a SecretHash,
         now: Timestamp,
-    ) -> impl Future<Output = Result<Option<SessionRecord>, StoreError>> + Send {
-        ready(Ok(self.state().outside.session(token_hash, now)))
+    ) -> StoreFuture<'a, Result<Option<SessionRecord>, StoreError>> {
+        done(Ok(self.state().outside.session(token_hash, now)))
     }
 
-    fn remove_session(
-        &self,
-        token_hash: &SecretHash,
-    ) -> impl Future<Output = Result<bool, StoreError>> + Send {
-        ready(Ok(self.state().outside.remove_session(token_hash)))
+    fn remove_session<'a>(
+        &'a self,
+        token_hash: &'a SecretHash,
+    ) -> StoreFuture<'a, Result<bool, StoreError>> {
+        done(Ok(self.state().outside.remove_session(token_hash)))
     }
 
-    fn put_oauth_state(
-        &self,
-        state: OAuthStateRecord,
-    ) -> impl Future<Output = Result<(), StoreError>> + Send {
+    fn put_oauth_state(&self, state: OAuthStateRecord) -> StoreFuture<'_, Result<(), StoreError>> {
         self.state().outside.put_oauth_state(state);
-        ready(Ok(()))
+        done(Ok(()))
     }
 
-    fn take_oauth_state(
-        &self,
-        key_hash: &SecretHash,
+    fn take_oauth_state<'a>(
+        &'a self,
+        key_hash: &'a SecretHash,
         now: Timestamp,
-    ) -> impl Future<Output = Result<Option<OAuthStateRecord>, StoreError>> + Send {
-        ready(Ok(self.state().outside.take_oauth_state(key_hash, now)))
+    ) -> StoreFuture<'a, Result<Option<OAuthStateRecord>, StoreError>> {
+        done(Ok(self.state().outside.take_oauth_state(key_hash, now)))
     }
 
-    fn remove_expired(
-        &self,
-        now: Timestamp,
-    ) -> impl Future<Output = Result<u64, StoreError>> + Send {
-        ready(Ok(self.state().outside.remove_expired(now)))
+    fn remove_expired(&self, now: Timestamp) -> StoreFuture<'_, Result<u64, StoreError>> {
+        done(Ok(self.state().outside.remove_expired(now)))
     }
 
-    fn put_agent_token(
-        &self,
-        token: AgentTokenRecord,
-    ) -> impl Future<Output = Result<(), StoreError>> + Send {
-        ready(self.state().outside.put_agent_token(token))
+    fn put_agent_token(&self, token: AgentTokenRecord) -> StoreFuture<'_, Result<(), StoreError>> {
+        done(self.state().outside.put_agent_token(token))
     }
 
-    fn agent_token(
-        &self,
-        token_hash: &SecretHash,
-    ) -> impl Future<Output = Result<Option<AgentTokenRecord>, StoreError>> + Send {
-        ready(Ok(self.state().outside.agent_token(token_hash)))
+    fn agent_token<'a>(
+        &'a self,
+        token_hash: &'a SecretHash,
+    ) -> StoreFuture<'a, Result<Option<AgentTokenRecord>, StoreError>> {
+        done(Ok(self.state().outside.agent_token(token_hash)))
     }
 
-    fn agent_tokens_of(
-        &self,
-        user: &UserId,
-    ) -> impl Future<Output = Result<Vec<AgentTokenRecord>, StoreError>> + Send {
-        ready(Ok(self.state().outside.agent_tokens_of(user)))
+    fn agent_tokens_of<'a>(
+        &'a self,
+        user: &'a UserId,
+    ) -> StoreFuture<'a, Result<Vec<AgentTokenRecord>, StoreError>> {
+        done(Ok(self.state().outside.agent_tokens_of(user)))
     }
 
-    fn append_auth_log(
-        &self,
-        entry: AuthLogEntry,
-    ) -> impl Future<Output = Result<u64, StoreError>> + Send {
-        ready(Ok(self.state().outside.append_auth_log(entry)))
+    fn append_auth_log(&self, entry: AuthLogEntry) -> StoreFuture<'_, Result<u64, StoreError>> {
+        done(Ok(self.state().outside.append_auth_log(entry)))
     }
 
-    fn auth_log(
-        &self,
-        query: &AuthLogQuery,
-    ) -> impl Future<Output = Result<Page<LoggedAuthEntry, u64>, StoreError>> + Send {
-        ready(Ok(self.state().outside.auth_log(query)))
+    fn auth_log<'a>(
+        &'a self,
+        query: &'a AuthLogQuery,
+    ) -> StoreFuture<'a, Result<Page<LoggedAuthEntry, u64>, StoreError>> {
+        done(Ok(self.state().outside.auth_log(query)))
     }
 }
 
@@ -562,31 +546,30 @@ impl ConversationStore for MemoryStore {
     fn put_conversation(
         &self,
         conversation: ConversationRecord,
-    ) -> impl Future<Output = Result<(), StoreError>> + Send {
-        ready(self.state().outside.put_conversation(conversation))
+    ) -> StoreFuture<'_, Result<(), StoreError>> {
+        done(self.state().outside.put_conversation(conversation))
     }
 
-    fn conversation(
-        &self,
-        id: &ConversationId,
-    ) -> impl Future<Output = Result<Option<ConversationRecord>, StoreError>> + Send {
-        ready(Ok(self.state().outside.conversation(id)))
+    fn conversation<'a>(
+        &'a self,
+        id: &'a ConversationId,
+    ) -> StoreFuture<'a, Result<Option<ConversationRecord>, StoreError>> {
+        done(Ok(self.state().outside.conversation(id)))
     }
 
-    fn conversations_of(
-        &self,
-        user: &UserId,
-        after: Option<&ConversationId>,
+    fn conversations_of<'a>(
+        &'a self,
+        user: &'a UserId,
+        after: Option<&'a ConversationId>,
         size: PageSize,
-    ) -> impl Future<Output = Result<Page<ConversationSummary, ConversationId>, StoreError>> + Send
-    {
-        ready(Ok(self.state().outside.conversations_of(user, after, size)))
+    ) -> StoreFuture<'a, Result<Page<ConversationSummary, ConversationId>, StoreError>> {
+        done(Ok(self.state().outside.conversations_of(user, after, size)))
     }
 
-    fn remove_conversation(
-        &self,
-        id: &ConversationId,
-    ) -> impl Future<Output = Result<bool, StoreError>> + Send {
-        ready(Ok(self.state().outside.remove_conversation(id)))
+    fn remove_conversation<'a>(
+        &'a self,
+        id: &'a ConversationId,
+    ) -> StoreFuture<'a, Result<bool, StoreError>> {
+        done(Ok(self.state().outside.remove_conversation(id)))
     }
 }

@@ -164,7 +164,7 @@ fn author_call() -> Call {
 /// # Errors
 ///
 /// When a fixture does not parse or the service does not commit a step.
-pub async fn seed<S: Store>(service: &Service<S>) -> Result<(), SeedError> {
+pub async fn seed(service: &Service) -> Result<(), SeedError> {
     for fixture in &FIXTURES {
         let start = service
             .deployment()
@@ -183,8 +183,8 @@ pub async fn seed<S: Store>(service: &Service<S>) -> Result<(), SeedError> {
 
 /// One scenario step, its deployment revision counted from `start`: a proposal's create or
 /// apply through the proposal lifecycle (I6), anything else as a domain patch.
-async fn seed_step<S: Store>(
-    service: &Service<S>,
+async fn seed_step(
+    service: &Service,
     step: &ScenarioStep,
     start: Revision,
 ) -> Result<(), SeedError> {
@@ -233,8 +233,8 @@ async fn seed_step<S: Store>(
 }
 
 /// Submits a domain patch, which must commit.
-async fn submit<S: Store>(
-    service: &Service<S>,
+async fn submit(
+    service: &Service,
     call: &Call,
     patch: Patch,
     note: Option<cairn_schema::Markdown>,
@@ -265,7 +265,7 @@ pub const LOCAL_EMAILS: [&str; 4] = [
 /// # Errors
 ///
 /// When the store fails.
-pub async fn sign_in_local<S: Store>(store: &S, at: Timestamp) -> Result<Actor, SeedError> {
+pub async fn sign_in_local(store: &dyn Store, at: Timestamp) -> Result<Actor, SeedError> {
     fn parse<T: std::str::FromStr<Err: std::fmt::Debug>>(text: &str) -> Result<T, SeedError> {
         text.parse()
             .map_err(|error| SeedError(format!("{text}: {error:?}")))

@@ -17,7 +17,7 @@ use axum::extract::{Form, Query, State};
 use axum::http::{Extensions, HeaderMap, StatusCode, Uri};
 use axum::response::{Html, IntoResponse, Json, Response};
 use cairn_schema::{Actor, Title, UserId};
-use cairn_store::{AuthStore, OAuthStateKind, OAuthStateRecord};
+use cairn_store::{OAuthStateKind, OAuthStateRecord};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use url::Url;
@@ -34,8 +34,8 @@ use crate::lifetimes::{AUTHORIZATION_CODE_LIFETIME, BROWSER_STEP_LIFETIME};
 use crate::secret::{Secret, SecretKind, digest};
 
 /// What the endpoints share.
-pub(super) struct Flow<S> {
-    pub server: Arc<Server<S>>,
+pub(super) struct Flow {
+    pub server: Arc<Server>,
     pub authenticator: Arc<dyn Authenticate>,
 }
 
@@ -75,8 +75,8 @@ pub(super) struct AuthorizeQuery {
 
 /// RFC 6749 section 4.1.1: checks the request, then shows a signed-in user the consent
 /// page, or sends the browser to sign in first.
-pub(super) async fn authorize<S: AuthStore>(
-    State(flow): State<Arc<Flow<S>>>,
+pub(super) async fn authorize(
+    State(flow): State<Arc<Flow>>,
     headers: HeaderMap,
     extensions: Extensions,
     uri: Uri,
@@ -130,8 +130,8 @@ pub(super) struct ConsentForm {
 }
 
 /// The consent page's answer: the step must be the one this browser's user was shown.
-pub(super) async fn consent<S: AuthStore>(
-    State(flow): State<Arc<Flow<S>>>,
+pub(super) async fn consent(
+    State(flow): State<Arc<Flow>>,
     headers: HeaderMap,
     extensions: Extensions,
     Form(form): Form<ConsentForm>,
@@ -172,8 +172,8 @@ pub(super) struct TokenRequest {
 
 /// RFC 6749 section 4.1.3 and RFC 7636: exchanges a code, once, for an agent token acting
 /// for the user who allowed the client (H2).
-pub(super) async fn token<S: AuthStore>(
-    State(flow): State<Arc<Flow<S>>>,
+pub(super) async fn token(
+    State(flow): State<Arc<Flow>>,
     Form(request): Form<TokenRequest>,
 ) -> Response {
     if request.grant_type.as_deref() != Some("authorization_code") {
@@ -207,7 +207,7 @@ pub(super) async fn token<S: AuthStore>(
     }
 }
 
-impl<S: AuthStore> Flow<S> {
+impl Flow {
     /// The browser's user, past a lapsed session cookie (which the answer must clear);
     /// none when it is not signed in. An agent, or any other refused credential, is
     /// answered at once.

@@ -11,7 +11,6 @@ use cairn_mcp::limits::PAGE_ITEM_COUNT_MAX;
 use cairn_mcp::{ToolError, ToolSet};
 use cairn_schema::{Mutation, Mutations, NextQuery, Patch, PatchTarget, Revision, from_yaml};
 use cairn_service::Call;
-use cairn_store::MemoryStore;
 use serde_json::{Value, json};
 
 use support::{World, user};
@@ -20,7 +19,7 @@ use support::{World, user};
 /// arguments and its output.
 #[test]
 fn every_tool_has_a_name_a_description_and_object_schemas() {
-    let definitions = ToolSet::<MemoryStore>::definitions();
+    let definitions = ToolSet::definitions();
     let names: BTreeSet<&str> = definitions.iter().map(|tool| tool.name).collect();
     assert_eq!(names.len(), definitions.len(), "names are unique");
     for tool in &definitions {
@@ -39,7 +38,7 @@ fn every_tool_has_a_name_a_description_and_object_schemas() {
 /// tool that takes mutations cites it, so the tool list carries it once.
 #[test]
 fn the_mutation_vocabulary_is_spelled_out_once() {
-    let definitions = ToolSet::<MemoryStore>::definitions();
+    let definitions = ToolSet::definitions();
     let mut spelled = Vec::new();
     let mut cited = Vec::new();
     for tool in &definitions {

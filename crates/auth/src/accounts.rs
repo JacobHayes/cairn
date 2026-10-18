@@ -7,8 +7,8 @@ use std::sync::Arc;
 
 use cairn_schema::{Identity, Title, UserId};
 use cairn_store::{
-    AuthEvent, AuthLogEntry, AuthLogQuery, AuthStore, IdentityRecord, LoggedAuthEntry, Page,
-    SessionRecord, UserRecord,
+    AuthEvent, AuthLogEntry, AuthLogQuery, IdentityRecord, LoggedAuthEntry, Page, SessionRecord,
+    Store, UserRecord,
 };
 use tokio::sync::Mutex;
 
@@ -18,8 +18,9 @@ use crate::lifetimes::SESSION_LIFETIME;
 use crate::secret::{Secret, SecretKind, digest, mint_id};
 
 /// Users, identities, and sessions over one store.
-pub struct Accounts<S> {
-    store: Arc<S>,
+#[derive(Clone)]
+pub struct Accounts {
+    store: Arc<dyn Store>,
     clock: Clock,
     /// Resolution is a read then writes; one at a time, so two first sign-ins of one
     /// identity cannot both create a user. One process serves a deployment (ARCHITECTURE,
@@ -27,20 +28,10 @@ pub struct Accounts<S> {
     resolving: Arc<Mutex<()>>,
 }
 
-impl<S> Clone for Accounts<S> {
-    fn clone(&self) -> Self {
-        Self {
-            store: Arc::clone(&self.store),
-            clock: self.clock.clone(),
-            resolving: Arc::clone(&self.resolving),
-        }
-    }
-}
-
-impl<S: AuthStore> Accounts<S> {
+impl Accounts {
     /// Accounts over `store`, reading `clock`.
     #[must_use]
-    pub fn new(store: Arc<S>, clock: Clock) -> Self {
+    pub fn new(store: Arc<dyn Store>, clock: Clock) -> Self {
         Self {
             store,
             clock,
@@ -50,8 +41,8 @@ impl<S: AuthStore> Accounts<S> {
 
     /// The store.
     #[must_use]
-    pub fn store(&self) -> &S {
-        &self.store
+    pub fn store(&self) -> &dyn Store {
+        self.store.as_ref()
     }
 
     /// The clock.

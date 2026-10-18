@@ -20,7 +20,7 @@ use cairn_schema::{
 };
 use cairn_store::{
     Document, EventQuery, LoadTarget, PageSize, ProposalCursor, ProposalPage, ProposalQuery,
-    ProposalScope, Store,
+    ProposalScope,
 };
 
 use crate::write::engine;
@@ -78,7 +78,7 @@ pub struct StaleBase {
     pub intervening: TouchedSet,
 }
 
-impl<S: Store> Service<S> {
+impl Service {
     /// I6: creates proposal `id` for `destination` (which may not exist yet: a proposal can
     /// create a journey or route at revision 0) as `call`'s actor, who is its author; an agent
     /// is recorded as the proposing agent. Drafting never moves the destination's revision

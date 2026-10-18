@@ -19,7 +19,7 @@ use cairn_schema::{
     Timestamp, Title, VersionNumber,
 };
 use cairn_service::{Call, Capabilities, DeploymentSettings, DomainPatch, Parts, Service, Written};
-use cairn_store::{InProcessNotifier, MemoryStore, Subscription, Take, Watch};
+use cairn_store::{InProcessNotifier, MemoryStore, Store, Subscription, Take, Watch};
 use jiff::tz::TimeZone;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::wasm_bindgen;
@@ -217,7 +217,7 @@ fn position(after: f64) -> Result<Option<u64>, HostError> {
 #[wasm_bindgen]
 #[derive(Debug)]
 pub struct BrowserRoot {
-    service: Service<MemoryStore>,
+    service: Service,
     local: Actor,
 }
 
@@ -230,7 +230,7 @@ impl BrowserRoot {
     ///
     /// When seeding fails, which is a bug in the fixtures or the service.
     pub fn seeded() -> Result<Self, HostError> {
-        let store = Arc::new(MemoryStore::new());
+        let store: Arc<dyn Store> = Arc::new(MemoryStore::new());
         let settings = DeploymentSettings::new(
             "UTC"
                 .parse()
@@ -254,7 +254,7 @@ impl BrowserRoot {
 
     /// The service, for a native host or test that drives it directly.
     #[must_use]
-    pub fn service(&self) -> &Service<MemoryStore> {
+    pub fn service(&self) -> &Service {
         &self.service
     }
 

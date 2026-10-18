@@ -19,7 +19,7 @@ use cairn_schema::{
     NodeDerived, NodeKey, NodeKind, NodeState, Overrides, PatchEvents, Path, ProposalId, Revision,
     Snapshot, SnapshotScope, State, StatusSummary, StillWaiting, Timeline, Title, Trace,
 };
-use cairn_store::{EventQuery, PageSize, Store};
+use cairn_store::{EventQuery, PageSize};
 
 use crate::derived::{Derivation, MemoKey};
 use crate::write::engine;
@@ -141,7 +141,7 @@ pub struct History {
     pub next: Option<u64>,
 }
 
-impl<S: Store> Service<S> {
+impl Service {
     /// I3: the bounded agent snapshot, scoped to a subtree and depth, its node list paged.
     ///
     /// # Errors

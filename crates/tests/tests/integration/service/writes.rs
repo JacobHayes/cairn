@@ -9,7 +9,7 @@ use std::collections::BTreeSet;
 use cairn_engine::Records;
 use cairn_schema::{Domain, EventType, JourneyId, Rejection, RevisionOf, Subject, ViolationCode};
 use cairn_service::{DomainPatch, Service, Written};
-use cairn_store::{EventQuery, InProcessNotifier, Store, Take, Tick, Watch};
+use cairn_store::{EventQuery, InProcessNotifier, Take, Tick, Watch};
 
 use support::{
     applied, call, domain, engine_step, patch, publish_fixture_route, rejected, scenario,
@@ -73,7 +73,7 @@ fn journey_id(id: &str) -> JourneyId {
 }
 
 /// Creates an empty journey `id` with the nodes given (as YAML flow mappings), at revision 1.
-async fn create<S: Store>(service: &Service<S>, id: &str, nodes: &[&str]) {
+async fn create(service: &Service, id: &str, nodes: &[&str]) {
     let mut mutations = String::from("- op: create_journey\n  name: Test\n");
     for node in nodes {
         mutations += "- op: add_node\n  node: ";
@@ -99,8 +99,8 @@ fn codes(rejection: &Rejection) -> Vec<ViolationCode> {
 /// A17, B1, H2: the vendor evaluation's route published and its whole scenario submitted
 /// through the service leave the store holding exactly what the engine alone produces, with
 /// every event stamped with its step's actor.
-async fn a_fixture_scenario_lands_as_the_engine_alone_would<S: Store>(
-    service: &Service<S>,
+async fn a_fixture_scenario_lands_as_the_engine_alone_would(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     let seed = publish_fixture_route("vendor-evaluation");
@@ -138,8 +138,8 @@ async fn a_fixture_scenario_lands_as_the_engine_alone_would<S: Store>(
 
 /// H5: a lost response resubmitted by patch id, after another patch advanced the journey,
 /// is answered from its receipt and never re-applied; the id with other content is refused.
-async fn a_resubmission_after_another_patch_is_answered_from_its_receipt<S: Store>(
-    service: &Service<S>,
+async fn a_resubmission_after_another_patch_is_answered_from_its_receipt(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     create(service, "j_h5", &[]).await;
@@ -193,8 +193,8 @@ const REMOVAL: &str = "- op: remove_node\n  removal: {node: n_g, descendants: [n
 /// H5: a subtree removal drafted at revision 1 is stale once an edit inside the subtree
 /// lands; the rejection carries what the edit touched, which overlaps the removal, so the
 /// client may not retry it on its own.
-async fn a_subtree_removal_conflicts_with_an_edit_inside_it<S: Store>(
-    service: &Service<S>,
+async fn a_subtree_removal_conflicts_with_an_edit_inside_it(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     create(service, "j_tree", &[GROUP, CHILD]).await;
@@ -236,8 +236,8 @@ async fn a_subtree_removal_conflicts_with_an_edit_inside_it<S: Store>(
 /// H5, A18: when what intervened is an insertion beneath the subtree, the touched sets do
 /// not overlap and the client retries at the new revision; the retry names only what its
 /// author saw, so it is rejected rather than widened to the new node.
-async fn a_removal_retried_after_an_insertion_beneath_it_is_not_widened<S: Store>(
-    service: &Service<S>,
+async fn a_removal_retried_after_an_insertion_beneath_it_is_not_widened(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     create(service, "j_tree", &[GROUP, CHILD]).await;
@@ -273,8 +273,8 @@ async fn a_removal_retried_after_an_insertion_beneath_it_is_not_widened<S: Store
 
 /// E6: a merge whose aliases make a contradictory chain apply in a referencing journey is
 /// rejected, naming the journey.
-async fn a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it<S: Store>(
-    service: &Service<S>,
+async fn a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     vendor_after(service, 2).await;
@@ -326,8 +326,8 @@ async fn a_merge_that_breaks_a_referencing_journey_is_rejected_naming_it<S: Stor
 
 /// H3, E6: a merge moves the merged entity's emails to the survivor and leaves its key as an
 /// alias; an email already on another entity cannot be given to a second one.
-async fn a_merge_moves_emails_and_an_email_stays_on_one_entity<S: Store>(
-    service: &Service<S>,
+async fn a_merge_moves_emails_and_an_email_stays_on_one_entity(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     vendor_after(service, 2).await;
@@ -367,8 +367,8 @@ async fn a_merge_moves_emails_and_an_email_stays_on_one_entity<S: Store>(
 
 /// E6, H5: a merge names the journeys it was checked against at their revisions; one of them
 /// edited since, or a journey newly referring to either entity, makes it stale.
-async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers<S: Store>(
-    service: &Service<S>,
+async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     vendor_after(service, 2).await;
@@ -431,10 +431,7 @@ async fn a_merge_is_stale_once_a_journey_it_checked_moves_or_a_new_one_refers<S:
 
 /// A11, Journey durability: a second draft is refused while one is open, and publishing a
 /// new version leaves a journey on the old one exactly as it was.
-async fn publishing_a_route_never_touches_its_journeys<S: Store>(
-    service: &Service<S>,
-    _: &InProcessNotifier,
-) {
+async fn publishing_a_route_never_touches_its_journeys(service: &Service, _: &InProcessNotifier) {
     vendor_after(service, 1).await;
     let id = journey_id("j_vendor_eval");
     let before = service.journey(&id).await.unwrap();
@@ -482,10 +479,8 @@ async fn publishing_a_route_never_touches_its_journeys<S: Store>(
 
 /// B11, A19: an archived journey takes only un-archiving or a hard delete; the delete removes
 /// it, the deployment log keeps who deleted it, and its id is never reused.
-async fn an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never_returns<
-    S: Store,
->(
-    service: &Service<S>,
+async fn an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never_returns(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     create(
@@ -556,8 +551,8 @@ async fn an_archived_journey_takes_only_unarchiving_or_deletion_and_its_id_never
 
 /// A12, H2: the same mutations from a user and from their agent produce the same journey;
 /// only the events' stamp differs.
-async fn a_users_patch_and_their_agents_land_alike_but_for_the_stamp<S: Store>(
-    service: &Service<S>,
+async fn a_users_patch_and_their_agents_land_alike_but_for_the_stamp(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     let mutations = "\
@@ -600,8 +595,8 @@ async fn a_users_patch_and_their_agents_land_alike_but_for_the_stamp<S: Store>(
 
 /// H6: every commit is announced: the journey a patch moved, and the deployment when an
 /// entity create riding in it moved that too; a subscriber hears only what it watches.
-async fn every_commit_is_announced_with_each_revision_it_moved<S: Store>(
-    service: &Service<S>,
+async fn every_commit_is_announced_with_each_revision_it_moved(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     let watching: BTreeSet<Watch> = [
@@ -646,8 +641,8 @@ async fn every_commit_is_announced_with_each_revision_it_moved<S: Store>(
 /// D7: an accepted patch reports what it newly caused (a completion it made stale), and both
 /// sides are derived at the request's today, so work that became overdue at midnight is not
 /// blamed on a patch made the next day, while work the patch adds already overdue is.
-async fn consequences_report_what_the_patch_caused_and_not_what_midnight_did<S: Store>(
-    service: &Service<S>,
+async fn consequences_report_what_the_patch_caused_and_not_what_midnight_did(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     let id = journey_id("j_d7");
@@ -727,7 +722,7 @@ fn a_patch_to_a_proposal_is_not_a_domain_patch() {
 }
 
 /// The futures a multi-threaded host awaits are `Send` over either store
-/// (decisions/2026-10-06-the-store-trait-is-generic-with-send-futures-not-object-safe.md).
+/// (2026-10-18-the-store-trait-returns-boxed-futures-and-the-stack-holds-a-trait-object.md).
 #[test]
 fn every_operation_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}
@@ -752,8 +747,8 @@ fn every_operation_can_be_awaited_on_another_thread() {
 
 /// H6: a hard delete moves no deployment revision in the store, so none is announced; the
 /// entity create that later moves it to 1 is heard.
-async fn a_hard_delete_announces_no_deployment_revision_it_did_not_commit<S: Store>(
-    service: &Service<S>,
+async fn a_hard_delete_announces_no_deployment_revision_it_did_not_commit(
+    service: &Service,
     _: &InProcessNotifier,
 ) {
     create(service, "j_gone", &[]).await;

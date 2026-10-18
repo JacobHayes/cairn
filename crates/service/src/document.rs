@@ -3,11 +3,10 @@
 
 use cairn_engine::project;
 use cairn_schema::{DomainDocument, JourneyId};
-use cairn_store::Store;
 
 use crate::{Call, Service, ServiceError};
 
-impl<S: Store> Service<S> {
+impl Service {
     /// A journey's domain document for `call`'s user, or none: its graph and state, the
     /// derive inputs at `call`'s today in the deployment's zone (A9) with the user's
     /// entities as the viewer (H3) and the current deployment context (E4, E6). Nothing

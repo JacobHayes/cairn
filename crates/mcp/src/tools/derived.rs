@@ -13,7 +13,6 @@ use cairn_schema::{
     StillWaiting,
 };
 use cairn_service::{Call, ChildEntry, NodeDetail};
-use cairn_store::Store;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -389,7 +388,7 @@ pub(crate) struct FrontierOutput {
     stalled: Option<Stalled>,
 }
 
-impl<S: Store + 'static> ToolSet<S> {
+impl ToolSet {
     /// Runs the derived read tool `name`.
     pub(crate) async fn derive(
         &self,

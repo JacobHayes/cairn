@@ -38,7 +38,7 @@ pub const MERGE_COUNT: u32 = 1;
 /// The server, serving until stopped.
 pub struct Server {
     sites: Arc<Sites>,
-    service: Service<TursoStore>,
+    service: Service,
     stop: oneshot::Sender<()>,
     task: JoinHandle<std::io::Result<()>>,
 }
@@ -78,7 +78,7 @@ impl Server {
             kind: AuthKind::Dev,
         }];
         let service = Service::new(Parts {
-            store: Arc::clone(&store),
+            store: Arc::<TursoStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
             capabilities: Capabilities::server(methods, false),
@@ -108,7 +108,7 @@ impl Server {
     }
 
     /// The service behind it, which the judge reads the store's truth through.
-    pub fn service(&self) -> &Service<TursoStore> {
+    pub fn service(&self) -> &Service {
         &self.service
     }
 
@@ -130,7 +130,7 @@ impl Server {
 
 /// Auth as the binary's root assembles it for local development: the dev sign-in provider
 /// on a loopback listener, with no token, so every request is the dev user (H1).
-fn auth(store: &Arc<TursoStore>) -> Result<Auth<TursoStore>, Stop> {
+fn auth(store: &Arc<TursoStore>) -> Result<Auth, Stop> {
     let invalid = |label: &'static str| {
         move |error: &dyn std::fmt::Debug| Stop::Abort {
             label,
@@ -152,7 +152,7 @@ fn auth(store: &Arc<TursoStore>) -> Result<Auth<TursoStore>, Stop> {
     let provider = DevProvider::new(dev, Listener::Tcp(SERVER))
         .map_err(|error| invalid("dev-provider")(&error))?;
     let providers: Vec<Arc<dyn AuthProvider>> = vec![Arc::new(provider)];
-    let accounts = Accounts::new(Arc::clone(store), Clock::system());
+    let accounts = Accounts::new(Arc::<TursoStore>::clone(store), Clock::system());
     Ok(Auth::new(accounts, Listener::Tcp(SERVER), &base, providers))
 }
 

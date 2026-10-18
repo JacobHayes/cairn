@@ -7,7 +7,6 @@ use std::collections::BTreeSet;
 
 use cairn_mcp::ToolSet;
 use cairn_mcp::instructions::{self, SKILL};
-use cairn_store::MemoryStore;
 use serde_json::Value;
 
 /// I4: the instructions name only tools that exist. An identifier written as code (`name`)
@@ -15,7 +14,7 @@ use serde_json::Value;
 /// renamed or removed tool or field fails here rather than misleading an agent.
 #[test]
 fn the_instructions_name_only_tools_and_fields_that_exist() {
-    let definitions = ToolSet::<MemoryStore>::definitions();
+    let definitions = ToolSet::definitions();
     let mut known: BTreeSet<String> = definitions.iter().map(|t| t.name.to_owned()).collect();
     for tool in &definitions {
         vocabulary(&Value::Object(tool.input_schema.clone()), &mut known);
@@ -106,10 +105,7 @@ fn every_i2_capability_has_a_tool() {
         ("upgrade", &["upgrade"]),
         ("search", &["search"]),
     ];
-    let tools: BTreeSet<&str> = ToolSet::<MemoryStore>::definitions()
-        .iter()
-        .map(|t| t.name)
-        .collect();
+    let tools: BTreeSet<&str> = ToolSet::definitions().iter().map(|t| t.name).collect();
     for (capability, covered_by) in coverage {
         assert!(!covered_by.is_empty(), "{capability}");
         for tool in *covered_by {

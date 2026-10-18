@@ -22,7 +22,6 @@ use cairn_schema::{
     NodeField, NodeKey, PatchId, ProposalDraft, ProposalId, ReviewItem, Revision, RoleKey, RouteId,
     Title, VersionNumber,
 };
-use cairn_store::Store;
 
 use crate::write::engine;
 use crate::{Call, ProposalWritten, Service, ServiceError, WriteError, load};
@@ -80,7 +79,7 @@ enum Drafted {
     Other,
 }
 
-impl<S: Store> Service<S> {
+impl Service {
     /// B7: proposes upgrading `journey` to version `to` of the route it follows, as proposal
     /// `id`: the merge's clean outcomes ride in its upgrade mutation, and its conflicts, kept
     /// edits, orphans, and the violations a trial apply finds are its review items. Nothing

@@ -55,7 +55,7 @@ pub fn base() -> Url {
 pub struct World {
     pub store: Arc<MemoryStore>,
     pub clock: TestClock,
-    pub accounts: Accounts<MemoryStore>,
+    pub accounts: Accounts,
 }
 
 impl World {
@@ -63,7 +63,7 @@ impl World {
         let store = Arc::new(MemoryStore::new());
         let clock = TestClock::default();
         clock.advance(1_800_000_000);
-        let accounts = Accounts::new(Arc::clone(&store), clock.clock());
+        let accounts = Accounts::new(Arc::<MemoryStore>::clone(&store), clock.clock());
         Self {
             store,
             clock,
@@ -71,11 +71,7 @@ impl World {
         }
     }
 
-    pub fn auth(
-        &self,
-        listener: Listener,
-        providers: Vec<Arc<dyn AuthProvider>>,
-    ) -> Auth<MemoryStore> {
+    pub fn auth(&self, listener: Listener, providers: Vec<Arc<dyn AuthProvider>>) -> Auth {
         Auth::new(self.accounts.clone(), listener, &base(), providers)
     }
 
@@ -94,7 +90,7 @@ impl World {
 }
 
 /// A bare router behind the layer with one route answering the actor, plus auth's own.
-pub fn app(auth: &Auth<MemoryStore>) -> Router {
+pub fn app(auth: &Auth) -> Router {
     let whoami = Router::new().route(
         "/whoami",
         get(|Extension(actor): Extension<Actor>| async move { Json(actor) }),

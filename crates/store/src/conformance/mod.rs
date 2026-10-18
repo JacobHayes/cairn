@@ -150,7 +150,7 @@ pub async fn open<B: Backend>(backend: &B) -> B::Store {
 }
 
 /// Commits, expecting it to apply.
-pub async fn applied<S: Store>(store: &S, commit: Commit) -> PatchReceipt {
+pub async fn applied(store: &dyn Store, commit: Commit) -> PatchReceipt {
     match store.commit(commit).await {
         Ok(Committed::Applied(receipt)) => receipt,
         other => panic!("expected the commit to apply, got {other:?}"),
@@ -158,7 +158,7 @@ pub async fn applied<S: Store>(store: &S, commit: Commit) -> PatchReceipt {
 }
 
 /// Commits, expecting it to fail.
-pub async fn failed<S: Store>(store: &S, commit: Commit) -> CommitError {
+pub async fn failed(store: &dyn Store, commit: Commit) -> CommitError {
     match store.commit(commit).await {
         Err(error) => error,
         Ok(committed) => panic!("expected the commit to fail, got {committed:?}"),
@@ -166,7 +166,7 @@ pub async fn failed<S: Store>(store: &S, commit: Commit) -> CommitError {
 }
 
 /// A journey as loaded.
-pub async fn journey<S: Store>(store: &S, id: &str) -> Option<Journey> {
+pub async fn journey(store: &dyn Store, id: &str) -> Option<Journey> {
     match store
         .load(&LoadTarget::Journey(crate::build::id(id)))
         .await
@@ -179,7 +179,7 @@ pub async fn journey<S: Store>(store: &S, id: &str) -> Option<Journey> {
 }
 
 /// A route as loaded.
-pub async fn route<S: Store>(store: &S, id: &str) -> Option<Route> {
+pub async fn route(store: &dyn Store, id: &str) -> Option<Route> {
     match store
         .load(&LoadTarget::Route(crate::build::id(id)))
         .await
@@ -192,7 +192,7 @@ pub async fn route<S: Store>(store: &S, id: &str) -> Option<Route> {
 }
 
 /// The deployment as loaded.
-pub async fn deployment<S: Store>(store: &S) -> Deployment {
+pub async fn deployment(store: &dyn Store) -> Deployment {
     match store.load(&LoadTarget::Deployment).await.unwrap() {
         Some(Document::Deployment(deployment)) => deployment,
         other => panic!("the deployment load returned {other:?}"),
@@ -200,7 +200,7 @@ pub async fn deployment<S: Store>(store: &S) -> Deployment {
 }
 
 /// Every event in the log, in order.
-pub async fn all_events<S: Store>(store: &S) -> Vec<LoggedEvent> {
+pub async fn all_events(store: &dyn Store) -> Vec<LoggedEvent> {
     let mut events = Vec::new();
     let mut after = None;
     loop {
@@ -236,7 +236,7 @@ pub struct Snapshot {
 }
 
 /// Takes a snapshot of everything a commit could change.
-pub async fn snapshot<S: Store>(store: &S) -> Snapshot {
+pub async fn snapshot(store: &dyn Store) -> Snapshot {
     let revisions = store.revisions().await.unwrap();
     let mut journeys = BTreeMap::new();
     for id in revisions.journeys.keys() {

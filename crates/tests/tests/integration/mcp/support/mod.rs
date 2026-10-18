@@ -22,8 +22,8 @@ use serde_json::Value;
 /// The tool set over a fresh memory store, the service beneath it, and the clock its calls
 /// read.
 pub struct World {
-    pub tools: ToolSet<MemoryStore>,
-    pub service: Service<MemoryStore>,
+    pub tools: ToolSet,
+    pub service: Service,
     now: Arc<AtomicI64>,
 }
 

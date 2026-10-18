@@ -10,7 +10,6 @@ use axum::extract::{Extension, State};
 use axum::routing::{get, post};
 use cairn_assistant::{Assistant, Target, TurnError};
 use cairn_schema::{Actor, JourneyId, RouteId};
-use cairn_store::Store;
 
 use super::Answer;
 use crate::Api;
@@ -19,32 +18,32 @@ use crate::extract::{JsonBody, Path, segment};
 use crate::wire::{AssistantRequest, Conversation, ProblemCode, TurnReply};
 
 /// The conversation reads and their handlers, held to the request duration.
-pub fn reads<S: Store + 'static>() -> crate::Served<S> {
+pub fn reads() -> crate::Served {
     use crate::endpoints as at;
     vec![
         (
             &at::ASSISTANT_JOURNEY_CONVERSATION,
-            get(journey_conversation::<S>),
+            get(journey_conversation),
         ),
         (
             &at::ASSISTANT_ROUTE_DRAFT_CONVERSATION,
-            get(route_draft_conversation::<S>),
+            get(route_draft_conversation),
         ),
     ]
 }
 
 /// The turn endpoints and their handlers, outside the request duration.
-pub fn served<S: Store + 'static>() -> crate::Served<S> {
+pub fn served() -> crate::Served {
     use crate::endpoints as at;
     vec![
-        (&at::ASSISTANT_JOURNEY, post(journey::<S>)),
-        (&at::ASSISTANT_ROUTE_DRAFT, post(route_draft::<S>)),
+        (&at::ASSISTANT_JOURNEY, post(journey)),
+        (&at::ASSISTANT_ROUTE_DRAFT, post(route_draft)),
     ]
 }
 
 /// `POST /api/journeys/{id}/assistant`.
-pub async fn journey<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn journey(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<AssistantRequest>,
@@ -54,8 +53,8 @@ pub async fn journey<S: Store + 'static>(
 }
 
 /// `POST /api/routes/{id}/draft/assistant`.
-pub async fn route_draft<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn route_draft(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<AssistantRequest>,
@@ -65,8 +64,8 @@ pub async fn route_draft<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/assistant`.
-pub async fn journey_conversation<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn journey_conversation(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
 ) -> Answer<Conversation> {
@@ -75,8 +74,8 @@ pub async fn journey_conversation<S: Store + 'static>(
 }
 
 /// `GET /api/routes/{id}/draft/assistant`.
-pub async fn route_draft_conversation<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn route_draft_conversation(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
 ) -> Answer<Conversation> {
@@ -85,11 +84,7 @@ pub async fn route_draft_conversation<S: Store + 'static>(
 }
 
 /// The conversation `actor`'s user holds about `target`, as kept; none started yet is empty.
-async fn kept<S: Store + 'static>(
-    api: &Api<S>,
-    actor: &Actor,
-    target: &Target,
-) -> Answer<Conversation> {
+async fn kept(api: &Api, actor: &Actor, target: &Target) -> Answer<Conversation> {
     let assistant = mounted(api)?;
     if actor.agent.is_some() {
         return Err(ApiError::problem(
@@ -110,7 +105,7 @@ async fn kept<S: Store + 'static>(
 }
 
 /// The assistant, which these endpoints are mounted only beside.
-fn mounted<S: Store + 'static>(api: &Api<S>) -> Result<&Assistant<S>, ApiError> {
+fn mounted(api: &Api) -> Result<&Assistant, ApiError> {
     api.assistant.as_ref().ok_or_else(|| {
         // Mounted only beside an assistant: a request here is a programmer error.
         ApiError::problem(ProblemCode::NoSuchEndpoint, "no assistant")
@@ -118,8 +113,8 @@ fn mounted<S: Store + 'static>(api: &Api<S>) -> Result<&Assistant<S>, ApiError> 
 }
 
 /// One turn as `actor`.
-async fn converse<S: Store + 'static>(
-    api: &Api<S>,
+async fn converse(
+    api: &Api,
     actor: &Actor,
     target: Target,
     request: AssistantRequest,

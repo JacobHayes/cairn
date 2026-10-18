@@ -108,7 +108,7 @@ pub fn settings() -> DeploymentSettings {
 
 /// A server on loopback and what it stands on.
 pub struct World {
-    pub service: Service<MemoryStore>,
+    pub service: Service,
     pub store: Arc<MemoryStore>,
     /// The store's faults, for a test that fails the store closed.
     pub faults: Faults,
@@ -173,11 +173,11 @@ impl World {
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let base = format!("http://{address}").parse().unwrap();
-        let accounts = Accounts::new(Arc::clone(&store), clock.clock());
+        let accounts = Accounts::new(Arc::<MemoryStore>::clone(&store), clock.clock());
         let (providers, methods) = front.providers(&accounts, &base, clock.clock());
         let auth = Auth::new(accounts, Listener::Tcp(address), &base, providers);
         let service = Service::new(Parts {
-            store: Arc::clone(&store),
+            store: Arc::<MemoryStore>::clone(&store),
             notifier: notifier.clone(),
             settings: settings(),
             capabilities: Capabilities {
@@ -186,7 +186,7 @@ impl World {
             },
         });
         let assistant = assistant.map(|provider| {
-            let store = Arc::clone(&store);
+            let store = Arc::<MemoryStore>::clone(&store);
             cairn_assistant::Assistant::new(service.clone(), store, clock.clock(), provider)
         });
         let app = front.in_front_of(cairn_api::router_with_assistant(
@@ -286,7 +286,7 @@ enum Front {
 impl Front {
     fn providers(
         &self,
-        accounts: &Accounts<MemoryStore>,
+        accounts: &Accounts,
         base: &Url,
         clock: Clock,
     ) -> (Vec<Arc<dyn AuthProvider>>, Vec<AuthMethod>) {

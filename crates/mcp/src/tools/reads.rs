@@ -10,9 +10,7 @@ use cairn_schema::{
     Timestamp, Title, TouchedSet, UnresolvedItem, UserId, VersionNumber, Violation, to_yaml,
 };
 use cairn_service::{Call, ProposalReview, StaleBase};
-use cairn_store::{
-    JourneyQuery, PageSize, ProposalCursor, ProposalScope, SearchHit, SearchQuery, Store,
-};
+use cairn_store::{JourneyQuery, PageSize, ProposalCursor, ProposalScope, SearchHit, SearchQuery};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -108,7 +106,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
 ];
 
-impl<S: Store + 'static> ToolSet<S> {
+impl ToolSet {
     /// Runs the store-backed read tool `name`.
     pub(crate) async fn read(
         &self,
@@ -526,7 +524,7 @@ struct HistoryOutput {
     next: Option<u64>,
 }
 
-impl<S: Store + 'static> ToolSet<S> {
+impl ToolSet {
     async fn list_routes(&self, arguments: ListRoutes) -> Result<RoutesOutput, ToolError> {
         let page = self
             .service

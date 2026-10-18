@@ -122,9 +122,10 @@ impl std::error::Error for TurnError {}
 
 /// The assistant (I5): the tool set over the service, the deployment's provider, and the
 /// store its conversations live in. Optional: a host without one has none at its root.
-pub struct Assistant<S> {
-    tools: ToolSet<S>,
-    store: Arc<S>,
+#[derive(Clone)]
+pub struct Assistant {
+    tools: ToolSet,
+    store: Arc<dyn Store>,
     provider: Arc<dyn Provider>,
     clock: Clock,
     in_flight: Arc<Semaphore>,
@@ -133,26 +134,13 @@ pub struct Assistant<S> {
     busy: Arc<Mutex<BTreeSet<ConversationId>>>,
 }
 
-impl<S> Clone for Assistant<S> {
-    fn clone(&self) -> Self {
-        Self {
-            tools: self.tools.clone(),
-            store: Arc::clone(&self.store),
-            provider: Arc::clone(&self.provider),
-            clock: self.clock.clone(),
-            in_flight: Arc::clone(&self.in_flight),
-            busy: Arc::clone(&self.busy),
-        }
-    }
-}
-
-impl<S: Store + 'static> Assistant<S> {
+impl Assistant {
     /// The assistant over `service` and `store` (the service's own), at `clock`'s now (the
     /// deployment clock the API reads), asking `provider`.
     #[must_use]
     pub fn new(
-        service: Service<S>,
-        store: Arc<S>,
+        service: Service,
+        store: Arc<dyn Store>,
         clock: Clock,
         provider: Arc<dyn Provider>,
     ) -> Self {
@@ -255,7 +243,7 @@ impl<S: Store + 'static> Assistant<S> {
         let exchange = Exchange {
             system: system(user, target, &context),
             messages,
-            tools: tool_specs::<S>(),
+            tools: tool_specs(),
         };
         let acting = Actor {
             user: user.user.clone(),
@@ -455,8 +443,8 @@ impl<S: Store + 'static> Assistant<S> {
 }
 
 /// The tools the model is offered: every tool but those the wrapper always refuses.
-fn tool_specs<S: Store + 'static>() -> Vec<ToolSpec> {
-    ToolSet::<S>::definitions()
+fn tool_specs() -> Vec<ToolSpec> {
+    ToolSet::definitions()
         .into_iter()
         .filter(|definition| {
             !REFUSED_TOOLS

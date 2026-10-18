@@ -176,7 +176,7 @@ pub async fn current_revisions_list_every_domain_and_proposal<B: Backend>(backen
 /// Routes `vendor` (versions 1 and 2) and `hiring` (version 1), and four journeys:
 /// `j_a` on vendor 1 (active), `j_b` on vendor 2 (completed), `j_c` on hiring 1 (archived),
 /// and `j_d` with no route (active), which refers to `e_x`.
-async fn index_fixture<S: Store>(store: &S) {
+async fn index_fixture(store: &dyn Store) {
     applied(store, create_route("p_vendor", "vendor").commit()).await;
     applied(
         store,
@@ -679,8 +679,8 @@ pub async fn text_search_hits_names_nodes_notes_and_resources<B: Backend>(backen
 
 /// Commits proposal `key` for `destination`, made at `minute` by `user` (and `agent`), in
 /// `status`.
-async fn drafted<S: Store>(
-    store: &S,
+async fn drafted(
+    store: &dyn Store,
     key: &str,
     destination: &Domain,
     (user, agent): (&str, Option<&str>),
@@ -700,11 +700,7 @@ async fn drafted<S: Store>(
 }
 
 /// Every page of a listing, concatenated, with each page's count.
-async fn listed<S: Store>(
-    store: &S,
-    scope: ProposalScope,
-    size: u32,
-) -> (Vec<String>, ProposalPage) {
+async fn listed(store: &dyn Store, scope: ProposalScope, size: u32) -> (Vec<String>, ProposalPage) {
     let mut ids = Vec::new();
     let mut after = None;
     let first = loop {

@@ -15,12 +15,12 @@ use cairn_schema::{
     PatchId, PatchTarget, Record, Rejection, Revision, RouteFile, RouteId, VersionNumber,
     ViolationCode, Violations, Write,
 };
-use cairn_store::{EventQuery, PageSize, Store};
+use cairn_store::{EventQuery, PageSize};
 
 use crate::write::{engine, violation};
 use crate::{Call, DomainPatch, Service, ServiceError, WriteError, Written};
 
-impl<S: Store> Service<S> {
+impl Service {
     /// A13: version `version` of `route` as a file (the draft when none is given), every key
     /// kept and everything in one sorted order, naming the version it extends: the version
     /// itself, or the one the draft extends. None when the route, version, or draft does not

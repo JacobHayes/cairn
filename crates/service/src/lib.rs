@@ -44,12 +44,13 @@ use std::sync::Arc;
 
 use cairn_store::{Notifier, Store, StoreError};
 
-/// The service over one store (ARCHITECTURE, Service layer and composition). Generic over the
-/// store, whose trait is not object-safe
-/// (decisions/2026-10-06-the-store-trait-is-generic-with-send-futures-not-object-safe.md);
-/// the notifier is a trait object. Cloning shares the store and notifier.
-pub struct Service<S> {
-    store: Arc<S>,
+/// The service over one store (ARCHITECTURE, Service layer and composition). The store and
+/// the notifier are trait objects, so the service and every layer above it are compiled once
+/// whatever backend a host picks
+/// (decisions/2026-10-18-the-store-trait-returns-boxed-futures-and-the-stack-holds-a-trait-object.md). Cloning shares the store and notifier.
+#[derive(Clone)]
+pub struct Service {
+    store: Arc<dyn Store>,
     notifier: Arc<dyn Notifier>,
     settings: DeploymentSettings,
     capabilities: Capabilities,
@@ -57,19 +58,7 @@ pub struct Service<S> {
     memo: Arc<derived::Memo>,
 }
 
-impl<S> Clone for Service<S> {
-    fn clone(&self) -> Self {
-        Self {
-            store: Arc::clone(&self.store),
-            notifier: Arc::clone(&self.notifier),
-            settings: self.settings.clone(),
-            capabilities: self.capabilities.clone(),
-            memo: Arc::clone(&self.memo),
-        }
-    }
-}
-
-impl<S> std::fmt::Debug for Service<S> {
+impl std::fmt::Debug for Service {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Service")
@@ -79,10 +68,10 @@ impl<S> std::fmt::Debug for Service<S> {
     }
 }
 
-impl<S: Store> Service<S> {
+impl Service {
     /// Assembles the service from what the composition root picked.
     #[must_use]
-    pub fn new(parts: Parts<S>) -> Self {
+    pub fn new(parts: Parts) -> Self {
         Self {
             store: parts.store,
             notifier: parts.notifier,

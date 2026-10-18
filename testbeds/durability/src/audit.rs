@@ -120,7 +120,7 @@ async fn all_events(store: &TursoStore) -> Result<Vec<(u64, Event)>, StoreError>
 /// Audits the store against `plan` and the ledger's `entries`.
 pub async fn audit(
     store: &TursoStore,
-    service: &Service<TursoStore>,
+    service: &Service,
     plan: &Plan,
     entries: &[Entry],
 ) -> Result<Audit, Unreadable> {
@@ -283,7 +283,7 @@ async fn receipts(
 /// deployment, and digests the loaded state.
 async fn compare(
     audit: &mut Audit,
-    service: &Service<TursoStore>,
+    service: &Service,
     replayed: &Records,
 ) -> Result<(), ServiceError> {
     let mut digest = String::new();

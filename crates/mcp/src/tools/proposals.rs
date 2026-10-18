@@ -9,7 +9,6 @@ use cairn_schema::{
     ProposalId, Revision, RouteId, Title, VersionNumber,
 };
 use cairn_service::{Call, ProposalWritten};
-use cairn_store::Store;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -90,7 +89,7 @@ pub(crate) const SPECS: &[Spec] = &[
     },
 ];
 
-impl<S: Store + 'static> ToolSet<S> {
+impl ToolSet {
     /// Runs the proposal tool `name`.
     pub(crate) async fn propose(
         &self,

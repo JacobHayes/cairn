@@ -81,7 +81,7 @@ fn revision(at: u32) -> Revision {
 }
 
 /// The journey `j_p` at revision 2: one action, done.
-async fn journey<S: Store>(service: &Service<S>) {
+async fn journey(service: &Service) {
     let created = patch(
         "p_create",
         "{journey: j_p}",
@@ -125,7 +125,7 @@ fn codes(rejection: &Rejection) -> Vec<ViolationCode> {
 /// from the receipt, and by proposal id it is fetched, never duplicated, while another user
 /// cannot take the id; an edit moves its own revision and never the journey's, and an edit
 /// against a revision it moved past is stale.
-async fn a_proposal_is_created_once_and_edited_against_its_own_revision<S: Store>(store: Arc<S>) {
+async fn a_proposal_is_created_once_and_edited_against_its_own_revision(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     let (target, proposal) = (destination(), pr_one());
     journey(&service).await;
@@ -189,7 +189,7 @@ async fn a_proposal_is_created_once_and_edited_against_its_own_revision<S: Store
 /// an apply against the older reviewed revision is stale; applied by a reviewer, its events
 /// are the author's and agent's with the reviewer as confirming user, and it reports what it
 /// caused as previewed; it cannot be applied twice.
-async fn a_proposal_is_previewed_and_applied_with_its_confirming_user<S: Store>(store: Arc<S>) {
+async fn a_proposal_is_previewed_and_applied_with_its_confirming_user(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     let (target, proposal) = (destination(), pr_one());
     journey(&service).await;
@@ -240,7 +240,7 @@ async fn a_proposal_is_previewed_and_applied_with_its_confirming_user<S: Store>(
 }
 
 /// `pr_one` drafted by `author` against `j_p` and edited once, at revision 2.
-async fn drafted_and_edited<S: Store>(service: &Service<S>, author: &cairn_service::Call) {
+async fn drafted_and_edited(service: &Service, author: &cairn_service::Call) {
     let (target, proposal) = (destination(), pr_one());
     saved(
         service
@@ -272,8 +272,8 @@ async fn drafted_and_edited<S: Store>(service: &Service<S>, author: &cairn_servi
 
 /// H2: every event of patch `id` is attributed to `author` (a user, or an agent for one)
 /// with `confirming`'s user as the confirming user.
-async fn assert_confirmed_by<S: Store>(
-    service: &Service<S>,
+async fn assert_confirmed_by(
+    service: &Service,
     id: &str,
     author: &cairn_service::Call,
     confirming: &cairn_service::Call,
@@ -307,9 +307,7 @@ fn refused(written: Result<ProposalWritten, cairn_service::WriteError>) -> Rejec
 
 /// I6, H5: once the journey moves past the revision a proposal was drafted against, its
 /// preview says what moved, and its apply is stale with the intervening touched set.
-async fn applying_after_the_destination_moved_is_stale_with_what_intervened<S: Store>(
-    store: Arc<S>,
-) {
+async fn applying_after_the_destination_moved_is_stale_with_what_intervened(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     journey(&service).await;
     let lead = call("u_lead", AT);
@@ -366,7 +364,7 @@ async fn applying_after_the_destination_moved_is_stale_with_what_intervened<S: S
 
 /// I6, A17: a proposal can create a journey that does not exist yet, at revision 0; its
 /// preview shows the graph it would create, and applying it creates the journey at 1.
-async fn a_proposal_creates_its_destination_at_revision_zero<S: Store>(store: Arc<S>) {
+async fn a_proposal_creates_its_destination_at_revision_zero(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     let fresh = Domain::Journey("j_fresh".parse().unwrap());
     let draft: ProposalDraft = from_yaml(
@@ -408,7 +406,7 @@ async fn a_proposal_creates_its_destination_at_revision_zero<S: Store>(store: Ar
 }
 
 /// I6: a discarded proposal stays discarded: applying it is refused.
-async fn a_discarded_proposal_is_never_applied<S: Store>(store: Arc<S>) {
+async fn a_discarded_proposal_is_never_applied(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     journey(&service).await;
     let lead = call("u_lead", AT);
@@ -458,7 +456,7 @@ async fn a_discarded_proposal_is_never_applied<S: Store>(store: Arc<S>) {
 
 /// H5, I6: an apply whose response was lost, resubmitted under its patch id once the
 /// proposal is applied, is answered from its receipt; another apply under that id is refused.
-async fn a_resubmitted_apply_is_answered_from_its_receipt<S: Store>(store: Arc<S>) {
+async fn a_resubmitted_apply_is_answered_from_its_receipt(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     journey(&service).await;
     let lead = call("u_lead", AT);
@@ -501,7 +499,7 @@ async fn a_resubmitted_apply_is_answered_from_its_receipt<S: Store>(store: Arc<S
 
 /// H6, I6: a proposal's writes tick the proposal and never its destination; applying it ticks
 /// both.
-async fn a_proposal_write_ticks_the_proposal_and_its_apply_ticks_both<S: Store>(store: Arc<S>) {
+async fn a_proposal_write_ticks_the_proposal_and_its_apply_ticks_both(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     journey(&service).await;
     let watching: BTreeSet<Watch> = [Watch::Journeys, Watch::Proposals].into_iter().collect();
@@ -561,7 +559,7 @@ async fn a_proposal_write_ticks_the_proposal_and_its_apply_ticks_both<S: Store>(
 
 /// B7, B9, I7: an upgrade or a re-link changes a journey only once confirmed through its
 /// proposal, so submitted directly each is refused, whoever submits it.
-async fn an_upgrade_or_relink_submitted_directly_is_refused<S: Store>(store: Arc<S>) {
+async fn an_upgrade_or_relink_submitted_directly_is_refused(store: Arc<dyn Store>) {
     let (service, _) = service_over(store);
     journey(&service).await;
     for (id, mutation) in [
@@ -585,7 +583,7 @@ async fn an_upgrade_or_relink_submitted_directly_is_refused<S: Store>(store: Arc
 
 /// I6: a proposal is addressed under its destination, so under another one it is missing
 /// to every read and write, before its receipt is consulted, and nothing is written.
-async fn another_destinations_proposal_is_missing_never_rejected<S: Store>(store: Arc<S>) {
+async fn another_destinations_proposal_is_missing_never_rejected(store: Arc<dyn Store>) {
     use cairn_service::ReadError;
     let (service, _) = service_over(store);
     journey(&service).await;
@@ -620,8 +618,8 @@ async fn another_destinations_proposal_is_missing_never_rejected<S: Store>(store
 
 /// Each write to `pr_one` under `elsewhere`, and what it answered. The discard reuses the
 /// create's patch id, so a receipt consulted before the address would answer it.
-async fn writes_under<S: Store>(
-    service: &Service<S>,
+async fn writes_under(
+    service: &Service,
     caller: &cairn_service::Call,
     elsewhere: &Domain,
 ) -> [(&'static str, Result<(), cairn_service::WriteError>); 4] {
@@ -653,11 +651,11 @@ async fn writes_under<S: Store>(
 }
 
 /// The proposal operations' futures are `Send` over either store
-/// (decisions/2026-10-06-the-store-trait-is-generic-with-send-futures-not-object-safe.md).
+/// (2026-10-18-the-store-trait-returns-boxed-futures-and-the-stack-holds-a-trait-object.md).
 #[test]
 fn every_proposal_operation_can_be_awaited_on_another_thread() {
     fn send<T: Send>(_: &T) {}
-    fn operations<S: Store>(service: &Service<S>) {
+    fn operations(service: &Service) {
         let lead = call("u_lead", AT);
         let (id, target) = (pr_one(), destination());
         send(&service.create_proposal(&lead, patch_id("p_one"), &target, &id, draft("A", 1)));

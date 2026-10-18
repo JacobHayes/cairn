@@ -7,7 +7,6 @@ use axum::Json;
 use axum::extract::{Extension, RawQuery, State};
 use axum::routing::{get, post};
 use cairn_schema::{Actor, JourneyId, RouteFile, RouteId};
-use cairn_store::Store;
 
 use super::proposals::drafted_written;
 use super::{Answer, committed, written_outcome};
@@ -22,20 +21,20 @@ use crate::wire::{
 };
 
 /// The bulk endpoints and their handlers.
-pub fn served<S: Store + 'static>() -> crate::Served<S> {
+pub fn served() -> crate::Served {
     use crate::endpoints as at;
     vec![
-        (&at::UPGRADE, post(upgrade::<S>)),
-        (&at::SAVE_AS_ROUTE, post(save_as_route::<S>)),
-        (&at::RELINK, post(relink::<S>)),
-        (&at::IMPORT_ROUTE, post(import::<S>)),
-        (&at::EXPORT_ROUTE, get(export::<S>)),
+        (&at::UPGRADE, post(upgrade)),
+        (&at::SAVE_AS_ROUTE, post(save_as_route)),
+        (&at::RELINK, post(relink)),
+        (&at::IMPORT_ROUTE, post(import)),
+        (&at::EXPORT_ROUTE, get(export)),
     ]
 }
 
 /// `POST /api/journeys/{id}/upgrade` (B7).
-pub async fn upgrade<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn upgrade(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<UpgradeRequest>,
@@ -58,8 +57,8 @@ pub async fn upgrade<S: Store + 'static>(
 }
 
 /// `POST /api/journeys/{id}/save-as-route` (B8).
-pub async fn save_as_route<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn save_as_route(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<SaveAsRouteRequest>,
@@ -83,8 +82,8 @@ pub async fn save_as_route<S: Store + 'static>(
 }
 
 /// `POST /api/journeys/{id}/relink` (B9).
-pub async fn relink<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn relink(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<RelinkRequest>,
@@ -107,8 +106,8 @@ pub async fn relink<S: Store + 'static>(
 }
 
 /// `POST /api/routes/{id}/import` (A13): one route patch opening a new route or a new draft.
-pub async fn import<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn import(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
     JsonBody(request): JsonBody<RouteImport>,
@@ -134,8 +133,8 @@ pub async fn import<S: Store + 'static>(
 }
 
 /// `GET /api/routes/{id}/export` (A13): a version, or the draft when none is asked for.
-pub async fn export<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn export(
+    State(api): State<Api>,
     Path(id): Path<String>,
     RawQuery(raw): RawQuery,
 ) -> Answer<RouteFile> {

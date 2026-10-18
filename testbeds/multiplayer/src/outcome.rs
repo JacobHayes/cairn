@@ -10,7 +10,7 @@ use std::time::Duration;
 use cairn_engine::Records;
 use cairn_schema::{Deployment, Domain, Event, Journey, PatchId, Revision, RevisionOf, TouchedSet};
 use cairn_service::Service;
-use cairn_store::{EventQuery, PageSize, Store};
+use cairn_store::{EventQuery, PageSize};
 use patina_dst::VerdictKind;
 
 use crate::Stop;
@@ -46,7 +46,7 @@ impl Truth {
     /// # Errors
     ///
     /// A liveness miss when the store cannot be read.
-    pub async fn read<S: Store>(service: &Service<S>, setup: &Setup) -> Result<Self, Stop> {
+    pub async fn read(service: &Service, setup: &Setup) -> Result<Self, Stop> {
         let failed = |error: cairn_service::ServiceError| {
             Stop::Liveness(format!("reading the store: {error}"))
         };

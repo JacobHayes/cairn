@@ -14,7 +14,7 @@ use std::time::Duration;
 
 use cairn_schema::{Patch, Rejection};
 use cairn_service::{Service, WriteError, Written};
-use cairn_store::{CommitPoint, Faults, MemoryStore, PauseHook, Store};
+use cairn_store::{CommitPoint, Faults, MemoryStore, PauseHook};
 use cairn_store_turso::TursoStore;
 use tokio::sync::Notify;
 use tokio::task::JoinHandle;
@@ -64,7 +64,7 @@ impl Gate {
 
 /// A service over a fresh Turso store holding journey `j_race`, and a gate armed at
 /// `point` on its next commit.
-async fn turso(point: CommitPoint) -> (Service<TursoStore>, Arc<Gate>) {
+async fn turso(point: CommitPoint) -> (Service, Arc<Gate>) {
     let faults = Faults::default();
     let path = support::turso_path(TMP.as_ref());
     let store = TursoStore::open_with_faults(&path, faults.clone())
@@ -76,7 +76,7 @@ async fn turso(point: CommitPoint) -> (Service<TursoStore>, Arc<Gate>) {
 }
 
 /// The same over a fresh memory store.
-async fn memory(point: CommitPoint) -> (Service<MemoryStore>, Arc<Gate>) {
+async fn memory(point: CommitPoint) -> (Service, Arc<Gate>) {
     let faults = Faults::default();
     let (service, _) = support::service_over(Arc::new(MemoryStore::with_faults(faults.clone())));
     created(&service).await;
@@ -84,7 +84,7 @@ async fn memory(point: CommitPoint) -> (Service<MemoryStore>, Arc<Gate>) {
 }
 
 /// Creates journey `j_race` at revision 1, with one node `n_a`.
-async fn created<S: Store>(service: &Service<S>) {
+async fn created(service: &Service) {
     let created = patch(
         "p_create",
         "{journey: j_race}",
@@ -101,17 +101,14 @@ fn rename(id: &str, base: u32, title: &str) -> Patch {
 }
 
 /// Submits `patch` on a task of its own.
-fn submit<S: Store + 'static>(
-    service: &Service<S>,
-    patch: Patch,
-) -> JoinHandle<Result<Written, WriteError>> {
+fn submit(service: &Service, patch: Patch) -> JoinHandle<Result<Written, WriteError>> {
     let service = service.clone();
     tokio::spawn(async move { service.patch(&call("u_lead", AT), &domain(patch)).await })
 }
 
 /// Holds `held` at the gate, runs `beside` meanwhile, then releases the gate; answers both.
-async fn beside_held<S: Store + 'static>(
-    service: &Service<S>,
+async fn beside_held(
+    service: &Service,
     gate: &Gate,
     held: Patch,
     beside: Patch,
@@ -128,8 +125,8 @@ async fn beside_held<S: Store + 'static>(
 /// second waits before its commit begins while the first lands, so only the commit's own
 /// revision check stands between it and a lost update. It is rejected stale, carrying the
 /// first's rename, which overlaps it; the journey holds the first's title at revision 2.
-async fn a_patch_that_loses_the_race_to_commit_is_rejected_stale<S: Store + 'static>(
-    service: Service<S>,
+async fn a_patch_that_loses_the_race_to_commit_is_rejected_stale(
+    service: Service,
     gate: Arc<Gate>,
 ) {
     let second = rename("p_second", 1, "Second");
@@ -194,10 +191,8 @@ fn split_applied(
 /// submission is answered from its receipt. On Turso the original is held inside its
 /// transaction and the resubmission waits its turn; on the memory store, which commits
 /// whole, the original is held before it begins and the resubmission lands first.
-async fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt<
-    S: Store + 'static,
->(
-    service: Service<S>,
+async fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt(
+    service: Service,
     gate: Arc<Gate>,
 ) {
     let original = rename("p_rename", 1, "Renamed");
@@ -231,8 +226,8 @@ fn a_resubmission_while_its_original_commits_is_answered_from_its_receipt_on_tur
 /// 1, one held in flight: the other is answered stale carrying the held one's rename,
 /// never naming the revision in flight with nothing intervening, which the client would
 /// take as safe to rebase onto.
-async fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches<S: Store + 'static>(
-    service: Service<S>,
+async fn a_stale_answer_beside_a_commit_in_flight_carries_what_it_touches(
+    service: Service,
     gate: Arc<Gate>,
 ) {
     let second = rename("p_second", 1, "Second");

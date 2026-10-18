@@ -7,7 +7,6 @@ use cairn_schema::{
     Actor, Deployment, DomainDocument, Journey, JourneyId, Route, RouteId, RouteVersion,
     VersionNumber,
 };
-use cairn_store::Store;
 
 use super::Answer;
 use crate::Api;
@@ -17,10 +16,7 @@ use crate::query::{self, Params};
 use crate::wire::{EventPage, JourneyPage, RouteDetail, RoutePage, SearchPage};
 
 /// `GET /api/journeys` (C16).
-pub async fn journeys<S: Store + 'static>(
-    State(api): State<Api<S>>,
-    RawQuery(raw): RawQuery,
-) -> Answer<JourneyPage> {
+pub async fn journeys(State(api): State<Api>, RawQuery(raw): RawQuery) -> Answer<JourneyPage> {
     let params = Params::parse(raw.as_deref(), query::JOURNEY_PARAMS)?;
     let page = api.service.journeys(&query::journeys(&params)?).await?;
     Ok(Json(JourneyPage {
@@ -30,10 +26,7 @@ pub async fn journeys<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}`.
-pub async fn journey<S: Store + 'static>(
-    State(api): State<Api<S>>,
-    Path(id): Path<String>,
-) -> Answer<Journey> {
+pub async fn journey(State(api): State<Api>, Path(id): Path<String>) -> Answer<Journey> {
     let id: JourneyId = segment(&id, "journey")?;
     let journey = api.service.journey(&id).await?;
     journey
@@ -42,8 +35,8 @@ pub async fn journey<S: Store + 'static>(
 }
 
 /// `GET /api/journeys/{id}/document`: at the caller's today, with their entities as the viewer.
-pub async fn document<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn document(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(id): Path<String>,
 ) -> Answer<DomainDocument> {
@@ -55,10 +48,7 @@ pub async fn document<S: Store + 'static>(
 }
 
 /// `GET /api/routes` (I2).
-pub async fn routes<S: Store + 'static>(
-    State(api): State<Api<S>>,
-    RawQuery(raw): RawQuery,
-) -> Answer<RoutePage> {
+pub async fn routes(State(api): State<Api>, RawQuery(raw): RawQuery) -> Answer<RoutePage> {
     let params = Params::parse(raw.as_deref(), query::ROUTE_PARAMS)?;
     let (kind, after, size) = query::routes(&params)?;
     let page = api.service.routes(kind, after.as_ref(), size).await?;
@@ -69,10 +59,7 @@ pub async fn routes<S: Store + 'static>(
 }
 
 /// `GET /api/routes/{id}`.
-pub async fn route<S: Store + 'static>(
-    State(api): State<Api<S>>,
-    Path(id): Path<String>,
-) -> Answer<Route> {
+pub async fn route(State(api): State<Api>, Path(id): Path<String>) -> Answer<Route> {
     let id: RouteId = segment(&id, "route")?;
     let route = api.service.route(&id).await?;
     route
@@ -81,10 +68,7 @@ pub async fn route<S: Store + 'static>(
 }
 
 /// `GET /api/routes/{id}/versions` (C17).
-pub async fn route_versions<S: Store + 'static>(
-    State(api): State<Api<S>>,
-    Path(id): Path<String>,
-) -> Answer<RouteDetail> {
+pub async fn route_versions(State(api): State<Api>, Path(id): Path<String>) -> Answer<RouteDetail> {
     let id: RouteId = segment(&id, "route")?;
     let detail = api.service.route_detail(&id).await?;
     detail
@@ -93,8 +77,8 @@ pub async fn route_versions<S: Store + 'static>(
 }
 
 /// `GET /api/routes/{id}/versions/{version}`.
-pub async fn route_version<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn route_version(
+    State(api): State<Api>,
     Path((id, version)): Path<(String, String)>,
 ) -> Answer<RouteVersion> {
     let id: RouteId = segment(&id, "route")?;
@@ -106,25 +90,19 @@ pub async fn route_version<S: Store + 'static>(
 }
 
 /// `GET /api/deployment`.
-pub async fn deployment<S: Store + 'static>(State(api): State<Api<S>>) -> Answer<Deployment> {
+pub async fn deployment(State(api): State<Api>) -> Answer<Deployment> {
     Ok(Json(api.service.deployment().await?))
 }
 
 /// `GET /api/search`.
-pub async fn search<S: Store + 'static>(
-    State(api): State<Api<S>>,
-    RawQuery(raw): RawQuery,
-) -> Answer<SearchPage> {
+pub async fn search(State(api): State<Api>, RawQuery(raw): RawQuery) -> Answer<SearchPage> {
     let params = Params::parse(raw.as_deref(), query::SEARCH_PARAMS)?;
     let page = api.service.search(&query::search(&params)?).await?;
     Ok(Json(page.into()))
 }
 
 /// `GET /api/events` (J5).
-pub async fn events<S: Store + 'static>(
-    State(api): State<Api<S>>,
-    RawQuery(raw): RawQuery,
-) -> Answer<EventPage> {
+pub async fn events(State(api): State<Api>, RawQuery(raw): RawQuery) -> Answer<EventPage> {
     let params = Params::parse(raw.as_deref(), query::EVENT_PARAMS)?;
     let page = api.service.events(&query::events(&params)?).await?;
     Ok(Json(page.into()))

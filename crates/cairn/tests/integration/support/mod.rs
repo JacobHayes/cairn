@@ -65,7 +65,7 @@ pub fn assets() -> Vec<Asset> {
 }
 
 /// The parts of a server over a memory store and `notifier`.
-pub fn assembly(notifier: Arc<InProcessNotifier>) -> Assembly<MemoryStore> {
+pub fn assembly(notifier: Arc<InProcessNotifier>) -> Assembly {
     Assembly {
         store: Arc::new(MemoryStore::new()),
         notifier,

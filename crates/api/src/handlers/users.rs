@@ -4,7 +4,6 @@ use axum::Json;
 use axum::extract::{Extension, State};
 use axum::http::StatusCode;
 use cairn_schema::{Actor, AgentId};
-use cairn_store::Store;
 
 use super::Answer;
 use crate::Api;
@@ -13,10 +12,7 @@ use crate::extract::{JsonBody, Path, segment};
 use crate::wire::{AgentToken, MintedToken, TokenRequest, Viewer};
 
 /// `GET /api/users/me` (H2, H3).
-pub async fn viewer<S: Store + 'static>(
-    State(api): State<Api<S>>,
-    Extension(actor): Extension<Actor>,
-) -> Answer<Viewer> {
+pub async fn viewer(State(api): State<Api>, Extension(actor): Extension<Actor>) -> Answer<Viewer> {
     let agent = actor.agent.clone();
     let viewer = api.service.viewer(&api.call(actor)).await?;
     let merge_offer = viewer.merge_offer().cloned();
@@ -30,8 +26,8 @@ pub async fn viewer<S: Store + 'static>(
 }
 
 /// `GET /api/users/me/tokens`.
-pub async fn tokens<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn tokens(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
 ) -> Answer<Vec<AgentToken>> {
     let tokens = api.auth.accounts().tokens_of(&actor.user).await?;
@@ -39,8 +35,8 @@ pub async fn tokens<S: Store + 'static>(
 }
 
 /// `POST /api/users/me/tokens` (H2): only a user mints one.
-pub async fn mint_token<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn mint_token(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     JsonBody(request): JsonBody<TokenRequest>,
 ) -> Result<(StatusCode, Json<MintedToken>), ApiError> {
@@ -53,8 +49,8 @@ pub async fn mint_token<S: Store + 'static>(
 }
 
 /// `DELETE /api/users/me/tokens/{agent}`: only a user revokes one, and only their own.
-pub async fn revoke_token<S: Store + 'static>(
-    State(api): State<Api<S>>,
+pub async fn revoke_token(
+    State(api): State<Api>,
     Extension(actor): Extension<Actor>,
     Path(agent): Path<String>,
 ) -> Result<StatusCode, ApiError> {

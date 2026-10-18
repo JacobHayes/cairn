@@ -69,7 +69,7 @@ mod property {
             .commit()
     }
 
-    async fn loaded<S: Store>(store: &S, journey_id: &str, graph: &Graph) -> Graph {
+    async fn loaded(store: &dyn Store, journey_id: &str, graph: &Graph) -> Graph {
         store.commit(create(journey_id, graph)).await.unwrap();
         journey(store, journey_id).await.unwrap().graph
     }

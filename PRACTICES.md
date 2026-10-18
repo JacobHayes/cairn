@@ -81,7 +81,7 @@ Rules from Tiger Style and the Power of Ten that Cairn does not follow, and why.
 - **Zero-copy data plane.** There is no data plane. A journey is a few megabytes handled a few times per second.
 - **Line length 100.** rustfmt's default.
 - **No `else if` chains, split compound conditions.** Rust's `match` covers most of the motivation; a rule on `if` shape is noise.
-- **No dynamic dispatch.** The store, notifier, and auth provider are trait objects by design; the cost is irrelevant at this scale and the seams are the point.
+- **No dynamic dispatch.** The store, notifier, and auth provider are trait objects by design; the cost is irrelevant at this scale and the seams are the point. The store's calls return boxed futures for this reason, and holding it as `Arc<dyn Store>` keeps the server stack compiled once instead of once per backend.
 
 ## Errors, panics, and rejections
 

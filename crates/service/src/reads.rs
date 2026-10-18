@@ -12,7 +12,7 @@ use cairn_schema::{
 };
 use cairn_store::{
     Document, EventQuery, JourneyMatches, JourneyQuery, JourneySummary, LoadTarget, LoggedEvent,
-    Page, PageSize, RouteDetail, SearchQuery, Store, Subscription, Watch,
+    Page, PageSize, RouteDetail, SearchQuery, Subscription, Watch,
 };
 
 use crate::{Service, ServiceError};
@@ -31,7 +31,7 @@ pub struct RouteSummary {
     pub draft_open: bool,
 }
 
-impl<S: Store> Service<S> {
+impl Service {
     /// I2: the route index, in id order, paged: the routes of `kind` (every kind when none)
     /// after `after`, at most `size`. Cost: the store's revisions of every domain (a row each),
     /// then one route load per route passed over or on the page.

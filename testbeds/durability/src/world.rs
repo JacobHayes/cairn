@@ -103,7 +103,7 @@ impl World {
     }
 
     /// The service over the store.
-    pub fn service(&self) -> &Service<TursoStore> {
+    pub fn service(&self) -> &Service {
         &self.opened().service
     }
 
@@ -204,7 +204,7 @@ impl World {
 /// The store and the service over it, as a composition root assembles them.
 struct Open {
     store: Arc<TursoStore>,
-    service: Service<TursoStore>,
+    service: Service,
 }
 
 impl Open {
@@ -213,7 +213,7 @@ impl Open {
         let zone = TimeZone::fixed(Offset::constant(-5));
         let settings = DeploymentSettings::new(parse("Etc/GMT+5"), zone, RankConstants::default());
         let service = Service::new(Parts {
-            store: Arc::clone(&store),
+            store: Arc::<TursoStore>::clone(&store),
             notifier: Arc::new(InProcessNotifier::new()),
             settings,
             capabilities: Capabilities::server(Vec::new(), false),
