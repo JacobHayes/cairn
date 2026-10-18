@@ -39,6 +39,7 @@ export type RouteDetail = Schema<"RouteDetail">;
 export type RouteFile = Schema<"RouteFile">;
 export type RouteImport = Schema<"RouteImport">;
 export type Viewer = Schema<"Viewer">;
+export type UserName = Schema<"UserName">;
 export type { JourneyIndexQuery };
 
 export type HostKind = "server" | "browser";
@@ -91,6 +92,8 @@ export interface Host {
   importRoute(request: RouteImport): Promise<Answered<HttpFailure>>;
   /** The caller, their identities, and the entities their verified emails name (H3). */
   viewer(): Promise<Viewer>;
+  /** H3: the names of `users` (at most a page of them); one that does not exist is left out. */
+  userNames(users: readonly string[]): Promise<UserName[]>;
   /** A13: route files as the page's engine reads and writes them (YAML on disk, JSON on the wire). */
   readonly files: RouteFiles;
   /** A journey's domain document as the host wrote it; `Missing` when there is none, `Skewed` when another engine wrote it. */

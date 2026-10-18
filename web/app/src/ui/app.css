@@ -1021,10 +1021,6 @@ table.data {
   font-size: 11px;
   line-height: 1.2;
 }
-.entity-key {
-  min-width: 0;
-  overflow-wrap: anywhere;
-}
 .chips-input {
   display: flex;
   flex-wrap: wrap;

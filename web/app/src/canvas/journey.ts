@@ -10,6 +10,7 @@ import type { DisplayState } from "../status/words.ts";
 import { currentStages, isStage } from "./ladder.ts";
 import type { CardBadge, CardBody, CardState, JourneyExtras, LevelNode, Looks, Signals } from "./model.ts";
 import { dependsWords, firstParagraph, footWords, snoozeWords } from "./words.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 /** A node's display state (D8): the engine's one state, which the canvas shows as it is. */
 export function stateOf(view: Ready, node: GraphNode): DisplayState {
@@ -67,8 +68,8 @@ function dependsBody(context: Context, node: GraphNode, derived: NodeDerived): C
   const { view } = context;
   const nodes = view.journey.graph.nodes ?? [];
   const source = derived.relevance.condition_on == null ? node : (nodeOf(view, derived.relevance.condition_on) ?? node);
-  const pending = (derived.relevance.pending_on ?? []).map((key) => nodeOf(view, key)?.title ?? key);
-  const reads = (derived.relevance.decisions ?? []).map((key) => nodeOf(view, key)?.title ?? key);
+  const pending = (derived.relevance.pending_on ?? []).map((key) => nodeOf(view, key)?.title ?? NODE_GONE);
+  const reads = (derived.relevance.decisions ?? []).map((key) => nodeOf(view, key)?.title ?? NODE_GONE);
   const words = dependsWords(nodes, source) ?? (reads.length === 0 ? undefined : reads.join(" and "));
   if (words === undefined) {
     return undefined;

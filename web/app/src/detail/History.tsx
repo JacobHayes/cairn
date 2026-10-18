@@ -7,13 +7,12 @@ import type { HistoryPage } from "@cairn/wasm";
 import { useEffect, useRef, useState } from "react";
 
 import type { Host } from "../data/host.ts";
-import { useSession } from "../data/react.ts";
+import { useSession, useUserName, useUserWords } from "../data/react.ts";
 import { Button } from "../ui/kit.tsx";
 import { dateWords } from "../timeline/model.ts";
 import { Markdown } from "../ui/markdown.tsx";
-import { foldKey, useFold } from "./folds.ts";
-import type { AnswerValue, GraphNode, NodeDetail, Ready } from "./model.ts";
-import { Section } from "./parts.tsx";
+import { type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
+import { listed, recount, wordsOf, type Happened, type Words } from "./happened.ts";
 import { answerText } from "./sections.tsx";
 
 type PatchEvents = Schema<"PatchEvents">;
@@ -93,21 +92,40 @@ function readPage(
   );
 }
 
-function PatchItem({ view, decision, patch }: { view: Ready; decision: GraphNode; patch: PatchEvents }) {
+/** Each patch with its events in words, the earlier events telling the later ones what they changed from. */
+function withTold(patches: PatchEvents[], words: Words): { patch: PatchEvents; told: Happened[] }[] {
+  const told = recount(
+    patches.flatMap((patch) => patch.events),
+    words,
+  );
+  let at = 0;
+  return patches.map((patch) => {
+    const mine = told.slice(at, at + patch.events.length);
+    at += patch.events.length;
+    return { patch, told: mine };
+  });
+}
+
+const capitalized = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1);
+
+/** One patch: the date, then who did what in a sentence, the reason it was given with, and any answer it wrote. */
+function PatchItem({ view, decision, patch, told, name }: { view: Ready; decision: GraphNode; patch: PatchEvents; told: Happened[]; name: (user: string) => string }) {
   const [first] = patch.events;
-  if (first === undefined) {
+  const [lead] = told;
+  if (first === undefined || lead === undefined) {
     return null;
   }
   const answers = answersWritten(patch, decision.key);
   const note = patch.events.find((event) => event.note != null)?.note;
+  const what = listed([...new Set(told.map((each) => each.what))]);
   return (
-    <li data-testid="history-patch">
-      <span className="muted small">
-        {dateWords(first.at.slice(0, 10), view.derived.today)} by {first.actor.user}
-        {first.actor.agent == null ? "" : ` (agent ${first.actor.agent})`}
-      </span>{" "}
-      {[...new Set(patch.events.map((event) => event.event_type.replaceAll("_", " ")))].join(", ")}
-      {note == null ? null : <span className="muted small"> — {note}</span>}
+    <li data-testid="history-patch" data-actor={lead.actor}>
+      <span className="muted small">{dateWords(first.at.slice(0, 10), view.derived.today)}</span>{" "}
+      <span data-testid="history-sentence">
+        {name(lead.actor)} {what}
+        {told.some((each) => each.byAgent) ? " (through an agent)" : ""}
+      </span>
+      {note == null ? null : <div className="muted small" data-testid="history-note">{note}</div>}
       {answers.map((answer, index) => (
         <div key={index} className="stack" data-testid="history-answer">
           <span>
@@ -120,15 +138,17 @@ function PatchItem({ view, decision, patch }: { view: Ready; decision: GraphNode
   );
 }
 
-export function NodeHistory({ view, detail }: { view: Ready; detail: NodeDetail }) {
+/** J4: the node's history as sentences, read from the host while `open` and kept current as the journey moves. */
+export function NodeHistory({ view, detail, open }: { view: Ready; detail: NodeDetail; open: boolean }) {
   const { host } = useSession();
   const journey = view.journey.header.id;
   const node = detail.node.key;
   const revision = view.journey.revision;
-  const fold = foldKey(detail.node.kind, "history");
-  const open = useFold(fold, false);
   const [loaded, setLoaded] = useState<Loaded | { failed: string } | undefined>();
   const reads = useRef(new Reads()).current;
+  const name = useUserName();
+  const words = wordsOf(view, node, name);
+  const who = useUserWords();
   const load = (after: number | undefined, shown: PatchEvents[]) => {
     readPage(host, reads, { journey, node, after, shown }, setLoaded);
   };
@@ -139,19 +159,20 @@ export function NodeHistory({ view, detail }: { view: Ready; detail: NodeDetail 
     }
   }, [host, reads, open, journey, node, revision]);
   return (
-    <Section title="History" fold={fold} testId="history">
+    <div className="stack" data-testid="history">
+      <strong className="detail-subhead">History</strong>
       {loaded === undefined ? <span className="muted small">Reading...</span> : null}
       {loaded !== undefined && "failed" in loaded ? <span className="callout callout-bad">The history could not be read: {loaded.failed}</span> : null}
       {loaded !== undefined && "patches" in loaded ? (
         <>
-          <ol className="detail-list">
-            {loaded.patches.map((patch) => (
-              <PatchItem key={patch.patch_id} view={view} decision={detail.node} patch={patch} />
+          <ul className="detail-list">
+            {withTold(loaded.patches, words).map(({ patch, told }) => (
+              <PatchItem key={patch.patch_id} view={view} decision={detail.node} patch={patch} told={told} name={(user) => capitalized(who(user))} />
             ))}
-          </ol>
+          </ul>
           {loaded.next === undefined ? null : <Button onClick={() => { load(loaded.next, loaded.patches); }}>More</Button>}
         </>
       ) : null}
-    </Section>
+    </div>
   );
 }

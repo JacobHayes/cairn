@@ -158,12 +158,11 @@ export function syncWords(shown: SyncCase): SyncSummary {
     case "reconnecting":
       return { state: "reconnecting", label: "RECONNECTING", tone: "wait", sentence: "Live updates paused. Your edits still save.", announce: "polite" };
     case "behind": {
-      const newer = shown.announced > shown.shown;
       return {
         state: "behind",
-        label: newer ? `BEHIND · REV ${String(shown.announced)}` : "BEHIND",
+        label: "BEHIND",
         tone: "wait",
-        sentence: `${newer ? `Showing revision ${String(shown.shown)}; ${String(shown.announced)} exists.` : "Showing older data than exists."} Retrying. Your edits still save and re-base. Click to retry now.`,
+        sentence: "Showing older data than exists. Retrying. Your edits still save and re-base. Click to retry now.",
         announce: "polite",
       };
     }
@@ -174,7 +173,7 @@ export function syncWords(shown: SyncCase): SyncSummary {
         state: "updating",
         label: "UPDATING",
         tone: "working",
-        sentence: shown.announced > shown.shown ? `Loading revision ${String(shown.announced)}` : "Loading the latest changes",
+        sentence: "Loading the latest changes",
         announce: undefined,
       };
     case "saved":
@@ -186,7 +185,7 @@ export function syncWords(shown: SyncCase): SyncSummary {
         state: "in-sync",
         label: "IN SYNC",
         tone: "good",
-        sentence: `In sync${shown.live ? " · live" : ""}${shown.revision === undefined ? "" : ` · revision ${String(shown.revision)}`}`,
+        sentence: `In sync${shown.live ? " · live" : ""}`,
         announce: undefined,
       };
   }

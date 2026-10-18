@@ -9,7 +9,7 @@ mod in_process {
     use cairn_api::error::status_of;
     use cairn_api::wire::{
         AgentToken, Capabilities, EventPage, JourneyPage, MintedToken, Problem, ProblemCode,
-        RouteDetail, RoutePage, SearchHit, SearchPage, Viewer,
+        RouteDetail, RoutePage, SearchHit, SearchPage, UserName, Viewer,
     };
     use cairn_engine::{Graph, derive};
     use cairn_schema::{Deployment, DomainDocument, Journey, Route, RouteVersion};
@@ -153,6 +153,46 @@ mod in_process {
         let capabilities: Capabilities = get(&ann, "/api/capabilities").await;
         assert_eq!(capabilities, Capabilities::from(service.capabilities()));
         assert!(capabilities.sse && capabilities.mcp && !capabilities.assistant);
+    }
+
+    /// H3: a user goes by the entity their verified email names, else by the name their
+    /// sign-in gave; a user that does not exist is left out, and a request for more users
+    /// than a page holds is refused.
+    #[tokio::test]
+    async fn a_user_goes_by_their_entity_else_their_sign_in_name() {
+        let world = World::start().await;
+        let ann = world.vendor_after(3).await;
+        let bob = world.signed_in("bob");
+        let ann_user = get::<Viewer>(&ann, "/api/users/me").await.user;
+        let bob_user = get::<Viewer>(&bob, "/api/users/me").await.user;
+
+        let ask = format!("/api/users?id={ann_user}&id=u_nobody&id={bob_user}");
+        let named: Vec<UserName> = get(&ann, &ask).await;
+        let name_of = |user: &cairn_schema::UserId| {
+            named
+                .iter()
+                .find(|each| &each.user == user)
+                .map(|each| each.name.to_string())
+        };
+        let deployment: Deployment = get(&ann, "/api/deployment").await;
+        let lead = deployment
+            .entities
+            .values()
+            .find(|entity| entity.key.as_str() == "e_lead")
+            .unwrap();
+        assert_eq!(name_of(&ann_user), Some(lead.name.to_string()));
+        assert_eq!(name_of(&bob_user), Some("bob".to_owned()));
+        assert_eq!(named.len(), 2, "u_nobody has no name to give");
+
+        let many = (0..201)
+            .map(|each| format!("id=u_user{each}"))
+            .collect::<Vec<_>>()
+            .join("&");
+        let refused = ann
+            .send(Method::GET, &format!("/api/users?{many}"), None)
+            .await
+            .unwrap();
+        assert_eq!(refused.status, StatusCode::BAD_REQUEST);
     }
 
     /// The domain document carries the stored journey and the caller's derive inputs and

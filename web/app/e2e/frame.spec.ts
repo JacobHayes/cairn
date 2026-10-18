@@ -1,4 +1,4 @@
-// The app frame: one scroller per region, so a node's History is reachable in the
+// The app frame: one scroller per region, so a node's Details (its History) are reachable in the
 // inspector (or the tablet's sheet) at each width, the page itself never scrolls from it; a
 // phone's map is a preview that leaves swipes to the page and opens full screen, where they
 // pan. On the in-browser host.
@@ -8,10 +8,10 @@ import { expect, test } from "./test.ts";
 
 import { expectAddress, nodeCard, nodePanel, openAt, openJourney } from "./shell.ts";
 
-/** Opens History in `node`'s inspector and scrolls it to its end the way a person does: the wheel over it. */
+/** Opens Details (with the History in it) in `node`'s inspector and scrolls it to its end the way a person does: the wheel over it. */
 async function reachHistory(page: Page, node: string, height: number): Promise<void> {
   const panel = nodePanel(page, node);
-  const history = panel.getByTestId("history");
+  const history = panel.getByTestId("details");
   await history.locator("summary").click();
   await expect(history.getByText("Reading...")).toHaveCount(0);
   const body = page.locator('.inspector-body[data-pane="inspector"]');
@@ -31,7 +31,7 @@ async function reachHistory(page: Page, node: string, height: number): Promise<v
 // The inspector is one component and the CSS lint holds each region to one scroller, so one
 // screen per width guards it: a canvas at the desktop, the summary on a tablet, and (below)
 // the sheet over a phone's map.
-test("the inspector scrolls to the end of History at 1440 and 1024px, a node opens at its top, and the page behind never scrolls", async ({ page }) => {
+test("the inspector scrolls to the end of Details at 1440 and 1024px, a node opens at its top, and the page behind never scrolls", async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 768 });
   await openAt(page, "browser", "j_vendor_eval", "graph?depth=actions", { node: "n_plan" });
   await reachHistory(page, "n_plan", 768);

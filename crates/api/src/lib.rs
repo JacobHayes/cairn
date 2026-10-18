@@ -86,6 +86,7 @@ fn served(assistant: bool) -> Served {
         (&at::EVENTS, get(handle::reads::events)),
         (&at::STREAM, get(stream::stream)),
         (&at::VIEWER, get(handle::users::viewer)),
+        (&at::USER_NAMES, get(handle::users::user_names)),
         (&at::TOKENS, get(handle::users::tokens)),
         (&at::MINT_TOKEN, post(handle::users::mint_token)),
         (&at::REVOKE_TOKEN, delete(handle::users::revoke_token)),

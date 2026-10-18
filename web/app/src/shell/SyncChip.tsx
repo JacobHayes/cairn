@@ -123,7 +123,7 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
         </p>
         {derivation === undefined ? null : (
           <p className="mono small muted">
-            Revision {derivation.revision} · Today {dateWords(derivation.today, derivation.today)}
+            Today {dateWords(derivation.today, derivation.today)}
           </p>
         )}
         {skew && (

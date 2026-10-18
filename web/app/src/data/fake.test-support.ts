@@ -123,6 +123,16 @@ export class FakeHost implements Host {
     return Promise.resolve(this.viewerHeld);
   }
 
+  /** The names `userNames` gives, by user. */
+  readonly names = new Map<string, string>();
+  /** The users asked for, one entry per read. */
+  readonly namesAsked: string[][] = [];
+
+  userNames(users: readonly string[]): Promise<{ user: string; name: string }[]> {
+    this.namesAsked.push([...users]);
+    return Promise.resolve(users.flatMap((user) => (this.names.has(user) ? [{ user, name: this.names.get(user) ?? "" }] : [])));
+  }
+
   readonly files = {
     read: (text: string): RouteFile => JSON.parse(text) as RouteFile,
     text: (file: RouteFile): string => JSON.stringify(file),

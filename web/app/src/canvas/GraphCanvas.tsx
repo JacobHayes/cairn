@@ -29,6 +29,7 @@ import { STEPS, type CanvasModel, type Line, type Lens, type Step } from "./mode
 import { CardActionsContext, NodeCard, type CardActions, type CardNode } from "./NodeCard.tsx";
 import type { CanvasOverlay } from "./overlay.ts";
 import { firstFitCards } from "./refit.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 const nodeTypes = { card: NodeCard };
 const edgeTypes = { line: EdgeLine };
@@ -158,11 +159,14 @@ function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {
 }
 
 function edgesOf({ model, layout, overlay, faded, selectedEdge }: FlowProps): LineEdge[] {
+  const titles = new Map(model.cards.map((card) => [card.key, card.title]));
   return model.lines.map((line) => ({
     id: line.id,
     source: line.from,
     target: line.to,
     type: "line",
+    // The flow's own label names the keys of its two ends; the cards' titles say it to a reader.
+    ariaLabel: `Edge from ${titles.get(line.from) ?? NODE_GONE} to ${titles.get(line.to) ?? NODE_GONE}`,
     data: {
       line,
       route: layout.routes[line.id],

@@ -3,7 +3,7 @@
 
 use std::collections::BTreeSet;
 
-use cairn_schema::{Deployment, Email, EntityKey, UserId};
+use cairn_schema::{Deployment, Email, EntityKey, Title, UserId};
 use cairn_store::IdentityRecord;
 
 use crate::{Call, Service, ServiceError};
@@ -20,6 +20,15 @@ pub struct Viewer {
     /// with the verified emails it carried at its last sign-in, in provider and subject
     /// order.
     pub identities: Vec<IdentityRecord>,
+}
+
+/// A user and the name people see for them (H3).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct UserName {
+    /// The user.
+    pub user: UserId,
+    /// Their name: the entity their verified emails name, else the name their sign-in gave.
+    pub name: Title,
 }
 
 impl Viewer {
@@ -49,6 +58,40 @@ impl Service {
             user,
             identities,
         })
+    }
+
+    /// H3: the names of `users`, in the order asked, leaving out users that do not exist. A
+    /// user whose verified emails name an entity goes by that entity's name (the person as
+    /// the deployment curates them; the first by key when the emails name several, which
+    /// are duplicates of one person), else by the name their sign-in gave. Nothing here
+    /// ever answers an id as a name.
+    ///
+    /// # Errors
+    ///
+    /// When the store fails.
+    pub async fn user_names(&self, users: &[UserId]) -> Result<Vec<UserName>, ServiceError> {
+        let deployment = self.deployment().await?;
+        let mut names = Vec::with_capacity(users.len());
+        for user in users {
+            let Some(record) = self.store.user(user).await? else {
+                continue;
+            };
+            let identities = self.store.identities_of(user).await?;
+            let entity = entities_of(&identities, &deployment)
+                .into_iter()
+                .find_map(|key| {
+                    deployment
+                        .entities
+                        .values()
+                        .find(|entity| entity.key == key)
+                        .map(|entity| entity.name.clone())
+                });
+            names.push(UserName {
+                user: user.clone(),
+                name: entity.unwrap_or(record.name),
+            });
+        }
+        Ok(names)
     }
 }
 

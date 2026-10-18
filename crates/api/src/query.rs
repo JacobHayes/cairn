@@ -181,6 +181,15 @@ pub const EVENT_PARAMS: &[ParamSpec] = &[
     SIZE,
 ];
 
+/// `GET /api/users` (H3).
+pub const USER_NAME_PARAMS: &[ParamSpec] = &[ParamSpec {
+    required: true,
+    ..ParamSpec::many::<UserId>(
+        "id",
+        "The users to name, at most the page limit (200); one that does not exist is left out.",
+    )
+}];
+
 /// `GET /api/events/stream` (H6).
 pub const STREAM_PARAMS: &[ParamSpec] = &[ParamSpec {
     required: true,

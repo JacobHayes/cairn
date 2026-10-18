@@ -49,7 +49,7 @@ test("edits to different nodes both land, and edits to one field surface a confl
   await startRename(two, "n_onsite", mine);
   await rename(one, "n_onsite", theirs);
   await save(two, "n_onsite");
-  await expect(two.getByTestId("conflict")).toContainText("n_onsite");
+  await expect(two.getByTestId("conflict")).toContainText(theirs);
   await expect(syncChip(two)).toHaveAttribute("aria-label", /^CONFLICT · 1\./);
   await expect(renameOf(two, "n_onsite").getByRole("textbox")).toHaveValue(mine);
   await expect(title(one, "n_onsite")).toHaveText(theirs);

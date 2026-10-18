@@ -176,6 +176,16 @@ pub struct Viewer {
     pub identities: Vec<LinkedIdentity>,
 }
 
+/// A user and the name people see for them (H3), as the API's `UserName`.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct UserName {
+    /// The user.
+    pub user: UserId,
+    /// Their name.
+    pub name: Title,
+}
+
 impl BrowserRoot {
     /// C16: the journey index `query` asks for, as `GET /api/journeys` answers it.
     ///
@@ -291,6 +301,22 @@ impl BrowserRoot {
         })
     }
 
+    /// H3: the names of `users`; one that does not exist is left out.
+    ///
+    /// # Errors
+    ///
+    /// When the store fails.
+    pub fn user_names_now(&self, users: &[UserId]) -> Result<Vec<UserName>, HostError> {
+        let names = now_or_never(self.service().user_names(users)).map_err(failed)?;
+        Ok(names
+            .into_iter()
+            .map(|found| UserName {
+                user: found.user,
+                name: found.name,
+            })
+            .collect())
+    }
+
     /// A13: `request`'s file imported as the local user at `now`.
     ///
     /// # Errors
@@ -401,5 +427,17 @@ impl BrowserRoot {
     /// The JSON of a [`HostError`].
     pub fn viewer(&self, now: &str) -> Result<String, String> {
         Ok(json(&self.viewer_now(now)?))
+    }
+
+    /// The names of the users in `users`, a JSON array of ids, as `GET /api/users` answers it
+    /// (H3).
+    ///
+    /// # Errors
+    ///
+    /// The JSON of a [`HostError`].
+    #[wasm_bindgen(js_name = userNames)]
+    pub fn user_names_json(&self, users: &str) -> Result<String, String> {
+        let users: Vec<UserId> = read("users", users)?;
+        Ok(json(&self.user_names_now(&users)?))
     }
 }

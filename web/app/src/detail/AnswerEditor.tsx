@@ -25,6 +25,7 @@ import { bypassReady, Rejected } from "./Rejected.tsx";
 import { answerText, resolveEntity, roleTitle } from "./sections.tsx";
 import { effectWords, savingWords } from "./words.ts";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 type Choice = Schema<"Choice">;
 type ChoiceEffect = Schema<"ChoiceEffect">;
@@ -418,7 +419,7 @@ function useAnswerForm(view: Ready, detail: NodeDetail, anyway: Anyway | undefin
     close,
     open,
     meanwhile,
-    preview: form.draft === undefined || !newAnswer ? undefined : savingWords(effectOf(effects, form.draft.value), caused, (key) => nodeOf(view, key)?.title ?? key),
+    preview: form.draft === undefined || !newAnswer ? undefined : savingWords(effectOf(effects, form.draft.value), caused, (key) => nodeOf(view, key)?.title ?? NODE_GONE),
     pick: (value: AnswerValue) => {
       if (form.draft === undefined) {
         form.open(value, write.seen);

@@ -4,6 +4,7 @@ import { childrenOfClause, decisionOf, operatorOf, valuesOf, type Clause } from 
 import { ruleWords } from "../authoring/dates.ts";
 import type { Graph, Mutation } from "../authoring/graph.ts";
 import { removedChoices, type Conflict, type ResolutionKind, type ReviewItem } from "./model.ts";
+import { ENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
 
 /** Names by key over the graphs a review shows (before and after), falling back to the key. */
 export interface Names {
@@ -31,10 +32,10 @@ export function namesOf(graphs: (Graph | null | undefined)[], entities: readonly
   }
   const people = new Map(entities.map((entity) => [entity.key, entity.name]));
   return {
-    node: (key) => nodes.get(key) ?? key,
-    role: (key) => roles.get(key) ?? key,
-    kind: (key) => kinds.get(key) ?? key,
-    entity: (key) => people.get(key) ?? key,
+    node: (key) => nodes.get(key) ?? NODE_GONE,
+    role: (key) => roles.get(key) ?? ROLE_GONE,
+    kind: (key) => kinds.get(key) ?? KIND_GONE,
+    entity: (key) => people.get(key) ?? ENTITY_GONE,
   };
 }
 

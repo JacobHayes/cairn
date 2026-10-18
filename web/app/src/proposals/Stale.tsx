@@ -8,8 +8,9 @@ import type { Host } from "../data/host.ts";
 import { HOST_READ, type ReadSource } from "../data/keyed-read.ts";
 import { allPages } from "../data/live.ts";
 import type { ProposalReview } from "../data/proposals.ts";
-import { useKeyedRead, useSession } from "../data/react.ts";
-import { describeRecord } from "../screens/RejectionView.tsx";
+import { useJourney, useKeyedRead, useSession, useUserWords } from "../data/react.ts";
+import { listed, recount, wordsOf } from "../detail/happened.ts";
+import { useRecordWords } from "../screens/RejectionView.tsx";
 import { Button } from "../ui/kit.tsx";
 import { intervening } from "./model.ts";
 
@@ -58,19 +59,29 @@ function joined(patches: PatchEvents[]): PatchEvents[] {
   return whole;
 }
 
-function PatchLine({ patch }: { patch: PatchEvents }) {
-  const [first] = patch.events;
-  if (first === undefined) {
-    return null;
-  }
-  const kinds = [...new Set(patch.events.map((event) => event.event_type.replaceAll("_", " ")))];
+/** The patches that came between, each as who did what, in order. */
+function InterveningPatches({ journey, patches }: { journey: string; patches: PatchEvents[] }) {
+  const view = useJourney(journey);
+  const name = useUserWords();
+  const told = recount(
+    patches.flatMap((patch) => patch.events),
+    wordsOf(view.status === "ready" ? view : undefined, "", name),
+  );
+  let at = 0;
   return (
-    <li data-testid="intervening-patch">
-      <span className="muted small">
-        {first.at} by {first.actor.user}
-      </span>{" "}
-      {kinds.join(", ")}
-    </li>
+    <ol className="detail-list" data-testid="intervening">
+      {patches.map((patch) => {
+        const mine = told.slice(at, at + patch.events.length);
+        at += patch.events.length;
+        const [first] = patch.events;
+        const [lead] = mine;
+        return first === undefined || lead === undefined ? null : (
+          <li key={patch.patch_id} data-testid="intervening-patch">
+            <span className="muted small">{first.at.slice(0, 10)}</span> {name(lead.actor)} {listed([...new Set(mine.map((each) => each.what))])}
+          </li>
+        );
+      })}
+    </ol>
   );
 }
 
@@ -82,6 +93,7 @@ export interface StaleProps {
 
 /** I6: what moved since the proposal was drafted, and its refresh. */
 export function StalePanel({ review, disabled, onRefresh }: StaleProps) {
+  const words = useRecordWords();
   const stale = review.stale;
   const destination = review.proposal.destination;
   const journey = destination !== "deployment" && "journey" in destination ? destination.journey : undefined;
@@ -92,11 +104,11 @@ export function StalePanel({ review, disabled, onRefresh }: StaleProps) {
   return (
     <section className="callout stack" role="alert" data-testid="stale" data-expected={stale.conflict.expected} data-current={stale.conflict.current}>
       <strong>
-        This proposal was drafted at revision {stale.conflict.expected}; its {journey === undefined ? "destination" : "journey"} is at {stale.conflict.current} now. Refresh it, then review it again before applying.
+        This proposal was drafted before its {journey === undefined ? "destination" : "journey"} last changed. Refresh it, then review it again before applying.
       </strong>
       {journey === undefined ? (
         <ul className="detail-list" data-testid="intervening">
-          {[...new Set(stale.intervening.map(describeRecord))].map((record) => (
+          {[...new Set(stale.intervening.map(words))].map((record) => (
             <li key={record} data-testid="intervening-record">
               {record}
             </li>
@@ -107,11 +119,7 @@ export function StalePanel({ review, disabled, onRefresh }: StaleProps) {
       ) : "failed" in patches ? (
         <span className="author-problem">What changed could not be read: {patches.failed}</span>
       ) : (
-        <ol className="detail-list" data-testid="intervening">
-          {patches.map((patch) => (
-            <PatchLine key={patch.patch_id} patch={patch} />
-          ))}
-        </ol>
+        <InterveningPatches journey={journey} patches={patches} />
       )}
       <span className="row">
         <Button primary disabled={disabled} onClick={onRefresh} data-testid="refresh">

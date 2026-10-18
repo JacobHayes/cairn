@@ -6,7 +6,7 @@
 // inspector's sections, forms and offers are vitest's.
 import { expect, test } from "./test.ts";
 
-import { openNode, pin } from "./detail.ts";
+import { openNode, pin, section } from "./detail.ts";
 import { fresh, goWithin, menuItem, nodeCard, nodePanel, syncChip } from "./shell.ts";
 
 test("a later pin is rejected with its chain, kept across a reload and counted away from it, and resolved with a listed move (F5)", async ({ page }) => {
@@ -105,4 +105,21 @@ test("Discard on the chip clears a section's rejection on its screen, and it doe
   await expect(page.getByTestId("node-detail")).toBeVisible();
   await expect(page.getByTestId("date-conflict")).toHaveCount(0);
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
+});
+
+test("C8, J4: Details is last and folded, and its history says who did what: others by name, the viewer as You, never an id", async ({ page }) => {
+  const panel = await openNode(page, "browser", "j_launch", "n_announcement");
+  const details = panel.getByTestId("details");
+  await expect(details).not.toHaveAttribute("open", "");
+  expect(await panel.locator(".detail-folds > details").last().getAttribute("data-testid")).toBe("details");
+  // A fixture author's patches read by their name, the oldest first.
+  const history = (await section(panel, "details")).getByTestId("history-patch");
+  await expect(history.first().getByTestId("history-sentence")).not.toBeEmpty();
+  await expect(history.first()).toHaveAttribute("data-actor", /^u_/);
+  await expect(history.first().getByTestId("history-sentence")).not.toContainText("u_");
+  // The viewer's own change is theirs: "You", at the end of the history.
+  const before = await history.count();
+  await panel.getByRole("button", { name: "Start" }).click();
+  await expect(history).toHaveCount(before + 1);
+  await expect(history.last().getByTestId("history-sentence")).toHaveText(/^You /);
 });

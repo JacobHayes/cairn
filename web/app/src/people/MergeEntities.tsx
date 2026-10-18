@@ -25,7 +25,8 @@ function EntitySelect({ label, value, entities, onChange }: { label: string; val
         <option value="">Choose an entity</option>
         {entities.map((entity) => (
           <option key={entity.key} value={entity.key}>
-            {entity.name} ({entity.key})
+            {entity.name}
+            {(entity.emails ?? []).length === 0 ? "" : ` (${(entity.emails ?? []).join(", ")})`}
           </option>
         ))}
       </select>

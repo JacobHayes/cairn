@@ -40,10 +40,10 @@ test("C19, C14: a segment inserted from a container, reviewed, applied, and show
   await expect(page.getByTestId("diff-edge")).toContainText("now requires Environment access");
   await apply(page);
 
-  // A member's Origin names the segment and version.
+  // A member's Details name the segment and version.
   await openJourney(page, "browser", JOURNEY);
   await page.getByTestId("node-card").filter({ hasText: "Threat model" }).first().getByTestId("card-open").click();
-  await page.getByTestId("origin").locator("summary").click();
+  await page.getByTestId("details").locator("summary").click();
   await expect(page.getByTestId("segment-origin").first()).toHaveText("From segment Security review, version 1.");
   // Show insertion selects the insertion's root.
   await menuItem(page.getByTestId("node-detail"), "show-insertion");

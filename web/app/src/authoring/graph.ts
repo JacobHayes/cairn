@@ -5,6 +5,7 @@
 //
 // Cost: an index is one pass over the nodes; every walk is bounded by the graph's size.
 import type { Schema } from "@cairn/client";
+import { NODE_GONE } from "../ui/gone.ts";
 
 export type Graph = Schema<"Graph">;
 export type GraphNode = Schema<"Node">;
@@ -101,7 +102,7 @@ export function pathOf(tree: Tree, key: string): string {
 
 /** A node's title, or its key when the graph does not hold it. */
 export function titleIn(tree: Tree, key: string): string {
-  return tree.byKey.get(key)?.title ?? key;
+  return tree.byKey.get(key)?.title ?? NODE_GONE;
 }
 
 /** Nodes of `kind` (every kind when none), in path order, for a picker. */

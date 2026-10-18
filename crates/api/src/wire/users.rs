@@ -51,6 +51,25 @@ impl From<cairn_store::IdentityRecord> for LinkedIdentity {
     }
 }
 
+/// A user and the name people see for them (H3).
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UserName {
+    /// The user.
+    pub user: UserId,
+    /// Their name: the entity their verified emails name, else the name their sign-in gave.
+    pub name: Title,
+}
+
+impl From<cairn_service::UserName> for UserName {
+    fn from(name: cairn_service::UserName) -> Self {
+        Self {
+            user: name.user,
+            name: name.name,
+        }
+    }
+}
+
 /// `POST /api/users/me/tokens`: what to call the new agent token.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

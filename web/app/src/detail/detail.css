@@ -272,3 +272,10 @@ dl.kv dd {
   color: var(--color-warning);
   font-weight: 600;
 }
+
+/* A heading inside a section (Details holds the origin and the history): the section's own weight, one step quieter. */
+.detail-subhead {
+  font-weight: 600;
+  font-size: 0.9375rem;
+  margin-top: var(--space-3);
+}

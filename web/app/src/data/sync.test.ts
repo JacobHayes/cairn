@@ -133,11 +133,6 @@ describe("syncWords", () => {
     expect(syncWords({ state: "in-sync", live: true, revision: 1 }).announce).toBeUndefined();
   });
 
-  it("names the revision a view is behind, and says nothing of one when only its deployment is behind", () => {
-    expect(syncWords({ state: "behind", shown: 42, announced: 43 }).label).toBe("BEHIND · REV 43");
-    expect(syncWords({ state: "behind", shown: 43, announced: 43 }).label).toBe("BEHIND");
-  });
-
   it("counts the refused writes, and names the first one's subject", () => {
     const shown = syncWords(summarize({ ...quiet, problems: [problem("rejected", "Draft test plan"), problem("failed", "Other")] }));
     expect(shown.label).toBe("NOT SAVED · 2");

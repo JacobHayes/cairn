@@ -7,6 +7,7 @@ import type { Schema } from "@cairn/client";
 
 import type { JourneyView } from "../data/journeys.ts";
 import type { DisplayState } from "../status/words.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 export type Ready = Extract<JourneyView, { status: "ready" }>;
 export type GraphNode = Schema<"Node">;
@@ -82,9 +83,9 @@ export function nodeOf(view: Ready, key: string): GraphNode | undefined {
   return index.get(key);
 }
 
-/** A node's title, or its key when the journey does not hold it. */
+/** A node's title, or words for a node the journey does not hold. */
 export function titleOf(view: Ready, key: string): string {
-  return nodeOf(view, key)?.title ?? key;
+  return nodeOf(view, key)?.title ?? NODE_GONE;
 }
 
 /** A node's stored state, or its kind's initial state. */

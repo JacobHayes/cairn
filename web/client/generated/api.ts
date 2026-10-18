@@ -930,6 +930,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The names people see for the users asked for: the entity their verified emails name, else the name their sign-in gave (H3). */
+        get: operations["listUserNames"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users/me": {
         parameters: {
             query?: never;
@@ -5101,6 +5118,13 @@ export interface components {
         Url: string;
         /** @description Starts with "u_"; at most id_bytes_max (64) bytes. */
         UserId: string;
+        /** @description A user and the name people see for them (H3). */
+        UserName: {
+            /** @description Their name: the entity their verified emails name, else the name their sign-in gave. */
+            name: components["schemas"]["Title"];
+            /** @description The user. */
+            user: components["schemas"]["UserId"];
+        };
         /** @description One published version and the journeys on it. */
         VersionJourneys: {
             /** @description Where this version of a segment is inserted (C19). */
@@ -10994,6 +11018,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["SearchPage"];
+                };
+            };
+            /** @description The request is malformed. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description No credential, or one that is refused (the auth layer, in text). */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/plain": string;
+                };
+            };
+            /** @description The server failed; the request id names it in the logs. */
+            500: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                };
+            };
+            /** @description A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`). */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Problem"];
+                    "text/plain": string;
+                };
+            };
+        };
+    };
+    listUserNames: {
+        parameters: {
+            query: {
+                /** @description The users to name, at most the page limit (200); one that does not exist is left out. */
+                id: components["schemas"]["UserId"][];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Answered. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserName"][];
                 };
             };
             /** @description The request is malformed. */

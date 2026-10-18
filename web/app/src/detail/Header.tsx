@@ -42,7 +42,7 @@ function RenameForm({ view, title, rename }: { view: Ready; title: string; renam
         </Button>
         {busy ? null : <Button onClick={rename.cancel}>Cancel</Button>}
       </span>
-      {base !== undefined && base < view.journey.revision ? <span className="muted small">Editing as of revision {base}; now {view.journey.revision}.</span> : null}
+      {base !== undefined && base < view.journey.revision ? <span className="muted small">The journey has changed since you started this edit.</span> : null}
       {write?.state === "rejected" ? (
         <RejectionView rejection={write.rejection} onRebase={() => { rename.keep(rebasedOnto(write.rejection, view.journey.header.id, view.journey.revision)); }} />
       ) : write === undefined ? null : (

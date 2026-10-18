@@ -259,6 +259,35 @@ pub const LOCAL_EMAILS: [&str; 4] = [
     "lead@example.org",
 ];
 
+/// The users the fixtures' events name (the routes' publisher and the scenarios' actors), as
+/// users with a name, so a history says who rather than an id. Their names stand for the
+/// roles the fixtures give them.
+///
+/// # Errors
+///
+/// When the store fails.
+pub async fn put_fixture_users(store: &dyn Store, at: Timestamp) -> Result<(), SeedError> {
+    const USERS: [(&str, &str); 5] = [
+        ("u_author", "Route author"),
+        ("u_lead", "Lead"),
+        ("u_manager", "Manager"),
+        ("u_launch_lead", "Launch lead"),
+        ("u_owner", "Owner"),
+    ];
+    for (id, name) in USERS {
+        let parse_failed = |what: &str| SeedError(format!("{what}: not a valid user"));
+        store
+            .put_user(UserRecord {
+                id: id.parse().map_err(|_| parse_failed(id))?,
+                name: name.parse().map_err(|_| parse_failed(name))?,
+                created_at: at,
+            })
+            .await
+            .map_err(|error| SeedError(error.to_string()))?;
+    }
+    Ok(())
+}
+
 /// Signs in the browser host's one local identity on `store`: user `u_local` through the
 /// `local` method, verified for [`LOCAL_EMAILS`]. Who everything in the root is done as.
 ///
@@ -272,6 +301,7 @@ pub async fn sign_in_local(store: &dyn Store, at: Timestamp) -> Result<Actor, Se
     }
     let user: cairn_schema::UserId = parse("u_local")?;
     let failed = |error: cairn_store::StoreError| SeedError(error.to_string());
+    put_fixture_users(store, at).await?;
     store
         .put_user(UserRecord {
             id: user.clone(),

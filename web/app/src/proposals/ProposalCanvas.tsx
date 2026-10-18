@@ -18,6 +18,7 @@ import type { Deployment, Deriver } from "../data/host.ts";
 import { errorWords, PROJECTION, valueOf, type ReadSource } from "../data/keyed-read.ts";
 import { useKeyedRead, useSession } from "../data/react.ts";
 import type { DiffMark, GraphDiff } from "./model.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 /** What a proposal canvas's level is derived from. */
 interface LevelArgs {
@@ -89,7 +90,7 @@ export function ProposalCanvas({ domain, graphs, marks, edges, dim, deployment, 
       open: onPick,
       expand: undefined,
       trace: undefined,
-      title: (key) => (graph?.nodes ?? []).find((node) => node.key === key)?.title ?? key,
+      title: (key) => (graph?.nodes ?? []).find((node) => node.key === key)?.title ?? NODE_GONE,
       menu: undefined,
     }),
     [onPick, graph],

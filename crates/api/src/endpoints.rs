@@ -308,6 +308,8 @@ pub static EVENTS: Endpoint = endpoint(Method::GET, "/api/events", "listEvents")
 pub static STREAM: Endpoint = endpoint(Method::GET, "/api/events/stream", "streamRevisions");
 /// `GET /api/users/me`: the caller and their entities (H3).
 pub static VIEWER: Endpoint = endpoint(Method::GET, "/api/users/me", "getViewer");
+/// `GET /api/users`: the names of the users asked for (H3).
+pub static USER_NAMES: Endpoint = endpoint(Method::GET, "/api/users", "listUserNames");
 /// `GET /api/users/me/tokens`: the caller's agent tokens.
 pub static TOKENS: Endpoint = endpoint(Method::GET, "/api/users/me/tokens", "listAgentTokens");
 /// `POST /api/users/me/tokens`: mints an agent token (H2).
@@ -349,7 +351,7 @@ pub static ASSISTANT_ROUTE_DRAFT_CONVERSATION: Endpoint = endpoint(
 );
 
 /// Every endpoint, in the order the OpenAPI document lists them.
-pub static ALL: [&Endpoint; 67] = [
+pub static ALL: [&Endpoint; 68] = [
     &HEALTH,
     &CAPABILITIES,
     &PATCH_JOURNEY,
@@ -410,6 +412,7 @@ pub static ALL: [&Endpoint; 67] = [
     &EVENTS,
     &STREAM,
     &VIEWER,
+    &USER_NAMES,
     &TOKENS,
     &MINT_TOKEN,
     &REVOKE_TOKEN,

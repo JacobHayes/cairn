@@ -5,6 +5,7 @@
 import type { Schema } from "@cairn/client";
 
 import { feedingDecision, nodeOf, titleOf, type Mutation, type Ready } from "./model.ts";
+import { ROLE_GONE } from "../ui/gone.ts";
 
 export type Bound = Schema<"Bound">;
 export type Chain = Schema<"Chain">;
@@ -190,7 +191,7 @@ export function originText(origin: Schema<"ParticipationOrigin">, view: Ready): 
   if (origin === "explicit") {
     return "set on this node";
   }
-  const roleTitle = (role: string) => (view.journey.graph.roles ?? []).find((each) => each.key === role)?.title ?? role;
+  const roleTitle = (role: string) => (view.journey.graph.roles ?? []).find((each) => each.key === role)?.title ?? ROLE_GONE;
   if ("role" in origin) {
     return `the role ${roleTitle(origin.role)}`;
   }

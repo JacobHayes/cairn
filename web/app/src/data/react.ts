@@ -64,10 +64,19 @@ export function useViewer(): { viewer: Viewer | undefined; failed: string | unde
   return useSelector(useSession().viewer, viewerReading, (left, right) => left.viewer === right.viewer && left.failed === right.failed);
 }
 
-/** A user id as people read it: "you" for the viewer, else "someone else" (the host holds no names for users). */
+/** H3: a user as people read them: their name (the entity their verified emails name, else the name they signed in with), never their id. */
+export function useUserName(): (user: string) => string {
+  const people = useSession().people;
+  useSyncExternalStore(people.subscribe, people.version);
+  const revision = useDeployment()?.revision;
+  return (user) => people.name(user, revision);
+}
+
+/** A user in a sentence: "you" for the viewer, else their name. */
 export function useUserWords(): (user: string) => string {
   const { viewer } = useViewer();
-  return (user) => (user === viewer?.user ? "you" : "someone else");
+  const name = useUserName();
+  return (user) => (user === viewer?.user ? "you" : name(user));
 }
 
 /** The deployment context (E6), once fetched. */

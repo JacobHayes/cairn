@@ -7,7 +7,7 @@ import { Link } from "react-router";
 
 import { pathTo } from "../address.ts";
 import type { Capabilities, Viewer } from "../data/host.ts";
-import { useCapabilities, useDeployment, useSession, useViewer } from "../data/react.ts";
+import { useCapabilities, useDeployment, useSession, useUserName, useViewer } from "../data/react.ts";
 import { Segmented } from "../ui/kit.tsx";
 import { THEME_CHOICES, useThemeChoice, type ThemeChoice } from "../ui/theme.ts";
 import { byName, mergePath, offeredMerge } from "./model.ts";
@@ -111,6 +111,7 @@ export function Identity() {
   const { viewer, failed } = useViewer();
   const { host } = useSession();
   const capabilities = useCapabilities();
+  const userName = useUserName();
   if (viewer === undefined) {
     return <p className={failed === undefined ? "muted small" : "callout callout-bad"}>{failed === undefined ? "Reading who you are..." : `Who you are could not be read: ${failed}`}</p>;
   }
@@ -119,7 +120,7 @@ export function Identity() {
     <section className="stack" aria-label="You" data-testid="identity-screen">
       <span className="row">
         <h1>You</h1>
-        <code className="mono small" data-testid="user">{viewer.user}</code>
+        <span className="muted small" data-testid="user">{userName(viewer.user)}</span>
         {host.kind === "browser" ? <span className="muted small">The demo's one local identity.</span> : null}
       </span>
       <Identities viewer={viewer} />

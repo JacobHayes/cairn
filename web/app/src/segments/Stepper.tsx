@@ -21,6 +21,7 @@ import { heldOf, insertion, stepOf } from "./insertion.ts";
 import { insertionMembers, planInsertion, sizeWords, type Choices, type Mapping, type PeopleRow, type Plan } from "./model.ts";
 import { useCandidate, type Candidate } from "./preview.ts";
 import { useSegmentNames, useSegmentOffers, useSegmentVersion, type SegmentOffer, type SegmentVersion } from "./read.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 /** What the canvas draws while a segment is being placed: the graph before and after, and how its new insertion is named. */
 export interface InsertPreview {
@@ -84,8 +85,8 @@ function NodePicks({ label, authored, chosen, onChange }: { label: string; autho
       <span className="author-label">{label}</span>
       {chosen.map((key) => (
         <span key={key} className="row" data-testid="pick" data-node={key}>
-          <span>{authored.tree.byKey.get(key)?.title ?? key}</span>
-          <Button ghost aria-label={`Remove ${authored.tree.byKey.get(key)?.title ?? key} from ${label}`} title="Remove" onClick={() => { onChange(chosen.filter((each) => each !== key)); }}>
+          <span>{authored.tree.byKey.get(key)?.title ?? NODE_GONE}</span>
+          <Button ghost aria-label={`Remove ${authored.tree.byKey.get(key)?.title ?? NODE_GONE} from ${label}`} title="Remove" onClick={() => { onChange(chosen.filter((each) => each !== key)); }}>
             Remove
           </Button>
         </span>

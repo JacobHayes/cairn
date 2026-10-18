@@ -82,7 +82,7 @@ export function ProposalOrigin({ proposal, name }: { proposal: Proposal; name: s
   return (
     <p className="muted small">
       For <DestinationLink proposal={proposal} name={name} />, proposed by {userWords(proposal.created_by)}
-      {proposal.proposing_agent == null ? "" : ` with the agent ${proposal.proposing_agent}`}.
+      {proposal.proposing_agent == null ? "" : " with an agent"}.
     </p>
   );
 }

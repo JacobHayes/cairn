@@ -23,6 +23,7 @@ import { NothingMatches, routeSubject, ViewBar } from "../screens/ViewControls.t
 import { routeSpec } from "./model.ts";
 import { routeChartOf } from "./rows.ts";
 import { TimelineChart } from "./TimelineView.tsx";
+import { NODE_GONE } from "../ui/gone.ts";
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -53,7 +54,7 @@ export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTi
   const error = levelError ?? errorWords(scheduleRead);
   const spec = useMemo(() => (schedule === undefined ? undefined : routeSpec(schedule)), [schedule]);
   const chart = useMemo(() => (schedule === undefined || level === undefined ? undefined : routeChartOf(tree, schedule, { drawn: level.nodes, open, selected, faded })), [tree, schedule, level, open, selected, faded]);
-  const titleOf = (key: string) => tree.byKey.get(key)?.title ?? key;
+  const titleOf = (key: string) => tree.byKey.get(key)?.title ?? NODE_GONE;
   const end = schedule?.end;
   return (
     <>

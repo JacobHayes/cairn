@@ -90,6 +90,11 @@ export class InBrowserHost {
     return parsed<Schema<"Viewer">>(hosted(() => this.#root.viewer(this.#clock())));
   }
 
+  /** H3: the names of `users`, as `GET /api/users` answers it; a user that does not exist is left out. */
+  userNames(users: readonly string[]): Schema<"UserName">[] {
+    return parsed<Schema<"UserName">[]>(hosted(() => this.#root.userNames(JSON.stringify(users))));
+  }
+
   /** A journey's domain document now, as the server answers it: the text to derive. */
   documentText(journey: string): string {
     return hosted(() => this.#root.document(journey, this.#clock()));

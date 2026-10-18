@@ -3,15 +3,16 @@
 // read it. The sections themselves are one file each (Connections, Affects, WhyRank, Facts).
 import { answerWords } from "./explain.ts";
 import type { NodeDetail, Ready } from "./model.ts";
+import { ENTITY_GONE, KIND_GONE, ROLE_GONE } from "../ui/gone.ts";
 
 /** A role by its title, or its key when it has none. */
 export function roleTitle(view: Ready, role: string): string {
-  return (view.journey.graph.roles ?? []).find((each) => each.key === role)?.title ?? role;
+  return (view.journey.graph.roles ?? []).find((each) => each.key === role)?.title ?? ROLE_GONE;
 }
 
 /** A participation kind by its title (the built-in owner kind has none in the graph), or its key when it has none. */
 export function kindTitle(view: Ready, kind: string): string {
-  return kind === "k_owner" ? "Owner" : ((view.journey.graph.participation_kinds ?? []).find((each) => each.key === kind)?.title ?? kind);
+  return kind === "k_owner" ? "Owner" : ((view.journey.graph.participation_kinds ?? []).find((each) => each.key === kind)?.title ?? KIND_GONE);
 }
 
 /** E6: the entity a key names now, following the aliases a merge left behind. */
@@ -29,7 +30,7 @@ export function resolveEntity(view: Ready, key: string): string {
 /** An entity's name from the deployment (E6), through any merge, or its key. */
 export function entityName(view: Ready, key: string): string {
   const resolved = resolveEntity(view, key);
-  return (view.inputs.deployment.entities ?? []).find((entity) => entity.key === resolved)?.name ?? key;
+  return (view.inputs.deployment.entities ?? []).find((entity) => entity.key === resolved)?.name ?? ENTITY_GONE;
 }
 
 /** An answer as people read it: choices by their labels, entities by name. */

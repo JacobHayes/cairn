@@ -14148,6 +14148,25 @@
         "pattern": "^u_[a-z0-9][a-z0-9_-]*$",
         "type": "string"
       },
+      "UserName": {
+        "additionalProperties": false,
+        "description": "A user and the name people see for them (H3).",
+        "properties": {
+          "name": {
+            "$ref": "#/components/schemas/Title",
+            "description": "Their name: the entity their verified emails name, else the name their sign-in gave."
+          },
+          "user": {
+            "$ref": "#/components/schemas/UserId",
+            "description": "The user."
+          }
+        },
+        "required": [
+          "user",
+          "name"
+        ],
+        "type": "object"
+      },
       "VersionJourneys": {
         "additionalProperties": false,
         "description": "One published version and the journeys on it.",
@@ -22323,6 +22342,98 @@
           }
         },
         "summary": "Text search across journeys, paged."
+      }
+    },
+    "/api/users": {
+      "get": {
+        "operationId": "listUserNames",
+        "parameters": [
+          {
+            "description": "The users to name, at most the page limit (200); one that does not exist is left out.",
+            "explode": true,
+            "in": "query",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "items": {
+                "$ref": "#/components/schemas/UserId"
+              },
+              "type": "array"
+            },
+            "style": "form"
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/UserName"
+                  },
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Answered."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The request is malformed."
+          },
+          "401": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "No credential, or one that is refused (the auth layer, in text)."
+          },
+          "403": {
+            "content": {
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "The auth layer refused the peer: a local-only provider and a remote peer, or identity headers from a peer no proxy-mode provider trusts (in text)."
+          },
+          "500": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            },
+            "description": "The server failed; the request id names it in the logs."
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              },
+              "text/plain": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "A limit was reached or the request timed out; retry after `Retry-After`. Or: The auth layer could not ask an identity provider (in text, without `Retry-After`)."
+          }
+        },
+        "summary": "The names people see for the users asked for: the entity their verified emails name, else the name their sign-in gave (H3)."
       }
     },
     "/api/users/me": {

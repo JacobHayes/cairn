@@ -11,6 +11,7 @@ import type { Schema } from "@cairn/client";
 import type { GraphNode, NodeKind } from "../detail/model.ts";
 import type { DisplayState } from "../status/words.ts";
 import { dependsWords } from "./words.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 export type Level = Schema<"Level">;
 export type LevelNode = Schema<"LevelNode">;
@@ -189,7 +190,7 @@ function nodesOf(graph: GraphNode[]): Nodes {
 
 /** C1: what one edge says, in words: why the dependent waits on the requirement. */
 function sentenceOf(edge: Schema<"UnderlyingEdge">, nodes: Nodes, graph: GraphNode[]): string {
-  const title = (key: string) => nodes.get(key)?.title ?? key;
+  const title = (key: string) => nodes.get(key)?.title ?? NODE_GONE;
   if (!edge.gates) {
     return `Dated from ${title(edge.requirement)}; does not block`;
   }

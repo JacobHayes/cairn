@@ -38,7 +38,7 @@ export function JourneyCell({ summary, routes }: { summary: JourneySummary; rout
   return (
     <td data-column="journey">
       <span className="cell-first">
-        <Link to={journeyPath({ journey: summary.id })} title={summary.id}>
+        <Link to={journeyPath({ journey: summary.id })}>
           {summary.name}
         </Link>
         {summary.status === "active" ? null : <Badge>{summary.status}</Badge>}

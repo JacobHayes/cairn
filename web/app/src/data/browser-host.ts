@@ -82,6 +82,7 @@ export function browserHost(root: InBrowserHost): Host {
       read(version === undefined ? `${route}'s draft` : `${route} version ${String(version)}`, () => root.exportFile(route, version)),
     importRoute: (request) => importInto(root, request),
     viewer: () => read("the viewer", () => root.viewer()),
+    userNames: (users) => read("the users", () => root.userNames(users)),
     files: filesOf(engine),
     deployment: () => read("the deployment", () => root.deployment()),
     documentText: (journey) => read(journey, () => root.documentText(journey)),

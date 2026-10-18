@@ -398,7 +398,7 @@ function Confirm({ proposal, reviewing }: { proposal: Proposal; reviewing: Revie
     <section className="stack panel-actions" aria-label="Apply" data-testid="proposal-footer">
       <label className="row">
         <input type="checkbox" disabled={reviewing.kept !== undefined} checked={reviewing.reviewed === proposal.revision} onChange={(event) => { reviewing.mark(event.target.checked); }} data-testid="reviewed" />
-        I have reviewed this proposal as it stands (revision {proposal.revision})
+        I have reviewed this proposal as it stands
       </label>
       {reviewing.blockers.length === 0 ? null : (
         <ul className="detail-list muted small" data-testid="blockers">

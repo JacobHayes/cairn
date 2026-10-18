@@ -106,6 +106,7 @@ export function serverHost(origin: string, engine: Engine, build: string | undef
       ),
     importRoute: (request) => importOver(client, request),
     viewer: () => answered("the viewer", () => client.GET("/api/users/me")),
+    userNames: (users) => answered("the users", () => client.GET("/api/users", { params: { query: { id: [...users] } } })),
     files: filesOf(engine),
     deployment: () => answered("the deployment", () => client.GET("/api/deployment")),
     documentText: async (journey) => {

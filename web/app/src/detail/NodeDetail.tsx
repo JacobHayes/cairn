@@ -17,10 +17,10 @@ import { Checklist } from "./Checklist.tsx";
 import { Connections } from "./Connections.tsx";
 import { DatesSection } from "./DatesSection.tsx";
 import { PinEditor } from "./editors.tsx";
-import { Origin, People } from "./Facts.tsx";
+import { Details } from "./Details.tsx";
+import { People } from "./Facts.tsx";
 import { foldKey } from "./folds.ts";
 import { Header } from "./Header.tsx";
-import { NodeHistory } from "./History.tsx";
 import { nodeDetail, type NodeDetail, type Ready } from "./model.ts";
 import { FoldedSections } from "./parts.tsx";
 import { Pieces } from "./Pieces.tsx";
@@ -81,7 +81,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
   if (detail === undefined) {
     return (
       <aside className="detail-panel panel" data-testid="node-detail-missing">
-        <p className="callout">This journey has no node {nodeKey}.</p>
+        <p className="callout">This item is not in the journey any more.</p>
         <Link to={close}>Close</Link>
       </aside>
     );
@@ -106,8 +106,7 @@ export function NodeDetailPanel({ view, nodeKey, extra, folded = false }: { view
           <Dates view={view} detail={detail} />
           <WhyRank view={view} detail={detail} position={position} row={row} />
           <People view={view} detail={detail} />
-          <Origin view={view} detail={detail} />
-          <NodeHistory view={view} detail={detail} />
+          <Details view={view} detail={detail} />
         </div>
       </aside>
     </FoldedSections>

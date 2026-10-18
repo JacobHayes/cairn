@@ -20,6 +20,7 @@ import { hereWords, nodeClasses } from "./look.ts";
 import { RANK_TAG_COUNT, type Card, type CardBody } from "./model.ts";
 import type { CanvasOverlay } from "./overlay.ts";
 import { progressWords } from "./words.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 /** What a card can ask of its canvas. */
 export interface CardActions {
@@ -216,7 +217,7 @@ function Marker({ card }: { card: Card }) {
   if (count === 0) {
     return null;
   }
-  const names = card.hiddenPrerequisites.map((key) => actions?.title(key) ?? key).join(", ");
+  const names = card.hiddenPrerequisites.map((key) => actions?.title(key) ?? NODE_GONE).join(", ");
   const words = `Waits on ${String(count)} hidden ${count === 1 ? "prerequisite" : "prerequisites"}`;
   const trace = actions?.trace;
   const marker = { "data-testid": "hidden-prerequisites", "data-nodes": card.hiddenPrerequisites.join(" "), title: `Waits on ${names}` };

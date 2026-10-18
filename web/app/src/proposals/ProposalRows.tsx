@@ -18,7 +18,7 @@ export function needsRefresh(item: ProposalSummary): boolean {
 export function ProposalRow({ item, context }: { item: ProposalSummary; context?: ReactNode }) {
   const userWords = useUserWords();
   const stale = needsRefresh(item);
-  const who = `Proposed by ${userWords(item.created_by)}${item.proposing_agent == null ? "" : ` with the agent ${item.proposing_agent}`}`;
+  const who = `Proposed by ${userWords(item.created_by)}${item.proposing_agent == null ? "" : " with an agent"}`;
   return (
     <li className="node-row proposal-row" data-row data-testid="proposal-row" data-proposal={item.id} data-stale={stale}>
       <div className="node-row-main">

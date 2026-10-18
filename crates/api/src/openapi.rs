@@ -17,7 +17,7 @@ use crate::wire::{
     JourneyPage, Mine, MintedToken, NodeDetail, PatchAnswer, PatchRequest, Problem, Projected,
     ProposalAnswer, ProposalApply, ProposalCreate, ProposalEdit, ProposalList, ProposalReview,
     ProposalStep, RelinkRequest, RouteDetail, RouteImport, RoutePage, SaveAsRouteRequest,
-    SearchPage, Tick, TokenRequest, TurnReply, UpgradeRequest, Viewer,
+    SearchPage, Tick, TokenRequest, TurnReply, UpgradeRequest, UserName, Viewer,
 };
 use cairn_schema::{
     AgentId, DecisionView, Deployment, Derived, DomainDocument, ExplainedField, ExplanationPage,
@@ -501,6 +501,14 @@ fn users() -> Vec<Operation> {
             )
         },
         read::<Viewer>(&at::VIEWER, "The caller and their entities (H2, H3)."),
+        Operation {
+            query: query::USER_NAME_PARAMS,
+            ..read::<Vec<UserName>>(
+                &at::USER_NAMES,
+                "The names people see for the users asked for: the entity their verified emails \
+                 name, else the name their sign-in gave (H3).",
+            )
+        },
         read::<Vec<AgentToken>>(&at::TOKENS, "The caller's agent tokens."),
         Operation {
             body: Some(schema_of::<TokenRequest>),

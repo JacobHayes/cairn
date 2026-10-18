@@ -4,6 +4,7 @@
 import { nodeOf, type GraphNode, type NodeDerived, type NodeKind, type Ready } from "../detail/model.ts";
 import type { DisplayState } from "../status/words.ts";
 import type { Tone } from "./model.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 /** A date in days from `today` (negative in the past). Both are ISO dates. */
 export function daysFrom(today: string, date: string): number {
@@ -148,7 +149,7 @@ function valueWords(nodes: readonly GraphNode[], decision: string, value: boolea
  */
 export function dependsWords(nodes: readonly GraphNode[], node: GraphNode): string | undefined {
   const condition = node.relevant_when;
-  const title = (key: string) => nodes.find((each) => each.key === key)?.title ?? key;
+  const title = (key: string) => nodes.find((each) => each.key === key)?.title ?? NODE_GONE;
   if (condition == null) {
     return undefined;
   }

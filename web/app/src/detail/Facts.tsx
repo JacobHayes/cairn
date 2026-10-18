@@ -1,6 +1,6 @@
-// C8, E2, B4 (design 6.9): who takes part in the node and where it came from, both folded: they
-// explain rather than ask for anything. The origin says whether the node is the route's, edited
-// here, or the journey's own, and offers the choice an orphaned node needs.
+// C8, E2, B4 (design 6.9): who takes part in the node, and where it came from (held by the
+// Details section): they explain rather than ask for anything. The origin says whether the
+// node is the route's, edited here, or the journey's own.
 import { memberOrigin, originLines } from "../segments/model.ts";
 import { useLatestVersions, useSegmentNames } from "../segments/read.ts";
 import { originText } from "./explain.ts";
@@ -57,18 +57,14 @@ function SegmentOrigin({ view, node }: { view: Ready; node: string }) {
 export function Origin({ view, detail }: { view: Ready; detail: NodeDetail }) {
   const { record, localEdits } = detail;
   const edits = localEdits.map((edit) => (typeof edit === "string" ? edit : Object.values(edit)[0])).join(", ");
-  return (
-    <Section title="Origin" fold={foldKey(detail.node.kind, "origin")} testId="origin">
-      {record.provenance === "from_segment" ? (
-        <span className="stack" data-testid="provenance" data-status={record.provenance}>
-          <SegmentOrigin view={view} node={detail.node.key} />
-        </span>
-      ) : (
-        <span data-testid="provenance" data-status={record.provenance}>
-          {record.provenance === "from_route" ? "From the route" : record.provenance === "orphaned" ? "Orphaned: its route version no longer has it" : "Local to this journey"}
-          {edits === "" ? "." : `, edited here: ${edits}.`}
-        </span>
-      )}
-    </Section>
+  return record.provenance === "from_segment" ? (
+    <span className="stack" data-testid="provenance" data-status={record.provenance}>
+      <SegmentOrigin view={view} node={detail.node.key} />
+    </span>
+  ) : (
+    <span data-testid="provenance" data-status={record.provenance}>
+      {record.provenance === "from_route" ? "From the route" : record.provenance === "orphaned" ? "Orphaned: its route version no longer has it" : "Local to this journey"}
+      {edits === "" ? "." : `, edited here: ${edits}.`}
+    </span>
   );
 }

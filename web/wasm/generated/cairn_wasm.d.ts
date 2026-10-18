@@ -230,6 +230,15 @@ export class BrowserRoot {
      */
     subscribe(watching: string): RootSubscription;
     /**
+     * The names of the users in `users`, a JSON array of ids, as `GET /api/users` answers it
+     * (H3).
+     *
+     * # Errors
+     *
+     * The JSON of a [`HostError`].
+     */
+    userNames(users: string): string;
+    /**
      * The caller at `now`, as `GET /api/users/me` answers it (H3).
      *
      * # Errors
@@ -463,6 +472,7 @@ export interface InitOutput {
     readonly browserroot_routeVersion: (a: number, b: number, c: number, d: number, e: number, f: number) => void;
     readonly browserroot_routes: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_subscribe: (a: number, b: number, c: number, d: number) => void;
+    readonly browserroot_userNames: (a: number, b: number, c: number, d: number) => void;
     readonly browserroot_viewer: (a: number, b: number, c: number, d: number) => void;
     readonly derivation_derived: (a: number, b: number) => void;
     readonly derivation_key: (a: number, b: number) => void;

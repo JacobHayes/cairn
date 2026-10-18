@@ -11,6 +11,7 @@ import type { TitleOf } from "./activity.ts";
 import type { EditsRef } from "./edit-manager.ts";
 import { tabEditStore, type EditStore } from "./edit-record.ts";
 import type { Capabilities, Deriver, Host } from "./host.ts";
+import { People } from "./people.ts";
 import { journeyView, lagOf, type JourneysRef } from "./journeys.ts";
 import { readLag, settledRead, worstLag, type ReadEnv, type ReadRef } from "./keyed-read.ts";
 import {
@@ -31,6 +32,7 @@ import {
   type ToastsRef,
 } from "./session-root.ts";
 import { saveEventOf, saveOf } from "./writes.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 /** The clock the session root's delays run on. */
 type Clock = NonNullable<ActorOptions<typeof sessionRoot>["clock"]>;
@@ -73,6 +75,8 @@ export class Session {
   readonly deployment: ReadRef;
   /** The caller, read again for each newer deployment held. */
   readonly viewer: ReadRef;
+  /** The names of the users the screens show. */
+  readonly people: People;
   /** What every read is given of the session. */
   readonly readEnv: ReadEnv;
   /** The sync scheduler, the root's child: the facts that carry a deadline. */
@@ -101,6 +105,7 @@ export class Session {
     this.journeys = journeysOf(this.root);
     this.deployment = deploymentOf(this.root);
     this.viewer = viewerOf(this.root);
+    this.people = new People(parts.host);
     this.readEnv = readEnvOf(this.root, this.#monotonic);
     this.sync = syncOf(this.root);
     this.toasts = toastsOf(this.root);
@@ -129,7 +134,7 @@ export class Session {
   /** A node's title in a journey this tab holds, or its key. */
   readonly titleOf: TitleOf = (journey, node) => {
     const view = journeyView(this.journeys.getSnapshot(), journey);
-    return (view.status === "ready" ? view.journey.graph.nodes?.find((each) => each.key === node)?.title : undefined) ?? node;
+    return (view.status === "ready" ? view.journey.graph.nodes?.find((each) => each.key === node)?.title : undefined) ?? NODE_GONE;
   };
 
   /** Whether the tab is in version skew, which never lifts until a reload. */

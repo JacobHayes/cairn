@@ -25,6 +25,7 @@ import { cardsOf, linesOf, type CanvasModel } from "./model.ts";
 import type { CardActions } from "./NodeCard.tsx";
 import { refitKey } from "./refit.ts";
 import { graphSearch, type GraphView } from "./settings.ts";
+import { NODE_GONE } from "../ui/gone.ts";
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -92,7 +93,7 @@ function useActions(shown: Shown, view: GraphView, selected: string | undefined,
         void navigate(routePath(id, { version, node, screen: "graph" }, graphSearch(withExpanded(view, key, expanded), search)), { state: { reveal: { key, how: expanded ? "expanded" : "collapsed" } } });
       },
       trace: undefined,
-      title: (key) => tree.byKey.get(key)?.title ?? key,
+      title: (key) => tree.byKey.get(key)?.title ?? NODE_GONE,
       menu: undefined,
     }),
     [navigate, addresses, id, version, view, search, selected, nodes, tree, editable, onPick],

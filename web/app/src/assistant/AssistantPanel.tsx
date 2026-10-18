@@ -24,6 +24,7 @@ import { Badge, Button } from "../ui/kit.tsx";
 import { aboutWords, assistantOffered, becauseWords, endedWords, shown, toolWords, type Entry } from "./model.ts";
 import { conversationView, sendTurn, type ConversationRef } from "./conversation.ts";
 import "./assistant.css";
+import { NODE_GONE } from "../ui/gone.ts";
 
 /** A node's title, when the screen knows it. */
 export type TitleOf = (key: string) => string | undefined;
@@ -37,7 +38,7 @@ export function journeyTitles(ready: Ready): TitleOf {
 function NodeLink({ journey, node, titleOf }: { journey: string; node: string; titleOf: TitleOf | undefined }) {
   return (
     <Link to={journeyPath({ journey, node }, "graph")} data-testid="assistant-node" data-node={node}>
-      {titleOf?.(node) ?? node}
+      {titleOf?.(node) ?? NODE_GONE}
     </Link>
   );
 }
@@ -53,7 +54,7 @@ function Applied({ action, titleOf }: { action: Extract<AssistantAction, { outco
       <span className="row">
         <Badge tone="good">Changed</Badge>
         <span>
-          {toolWords(action.tool)}, now at revision {action.receipt.revision}
+          {toolWords(action.tool)}
         </span>
       </span>
       {journey === undefined || nodes.length === 0 ? null : (
@@ -78,7 +79,7 @@ function Applied({ action, titleOf }: { action: Extract<AssistantAction, { outco
               `The journey is now stalled`
             ) : (
               <>
-                {line.kind === "undecided" ? mayNotApply(line.unanswered ?? [], (key) => titleOf?.(key) ?? key) : `Newly ${line.kind}`}:{" "}
+                {line.kind === "undecided" ? mayNotApply(line.unanswered ?? [], (key) => titleOf?.(key) ?? NODE_GONE) : `Newly ${line.kind}`}:{" "}
                 {line.nodes.map((node, index) => (
                   <span key={node}>
                     {index === 0 ? null : ", "}
