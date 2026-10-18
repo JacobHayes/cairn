@@ -40,6 +40,17 @@ test("C2 to C7: the graph opens fitted at every depth, expands in place, traces 
   const at = await pointOn(edge);
   await page.mouse.move(at.x, at.y);
   await expect(page.getByTestId("edge-hover")).toContainText("Test plan needs Environment access");
+  // The styled hover is the only one: the element under the pointer and its ancestors carry no native title (the browser's tooltip would cover it).
+  const native = await page.evaluate(({ x, y }) => {
+    const found: string[] = [];
+    for (let each = document.elementFromPoint(x, y); each !== null; each = each.parentElement) {
+      if (each.hasAttribute("title") || each.querySelector(":scope > title") !== null) {
+        found.push(each.outerHTML.slice(0, 120));
+      }
+    }
+    return found;
+  }, at);
+  expect(native).toEqual([]);
   await page.mouse.click(at.x, at.y);
   await expect(page.getByTestId("edge-card")).toBeVisible();
   await page.getByRole("link", { name: "Go to Environment access" }).click();

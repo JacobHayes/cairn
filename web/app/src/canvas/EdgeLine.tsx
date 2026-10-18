@@ -112,8 +112,9 @@ export function EdgeLine({ id, data, selected }: EdgeProps<LineEdge>) {
       data-dash={look.dash ?? "solid"}
       data-marker={look.marker}
       className={classes}
+      role="img"
+      aria-label={line.sentence}
     >
-      <title>{line.sentence}</title>
       <BaseEdge id={id} path={polyline(trimmed(route, reach(look.marker, scale)))} />
       {look.marker === "none" || end === undefined || before === undefined ? null : (
         <path className="line-marker" d={markerPath(look.marker, end, direction(before, end), scale)} />
