@@ -44,5 +44,5 @@ pub use records::{
     ConversationRecord, ConversationSummary, IdentityRecord, LoggedAuthEntry, MessageAuthor,
     OAuthStateKind, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
 };
-pub use store::{AuthStore, ConversationStore, Store, StoreFuture};
+pub use store::{AuthStore, ConversationStore, Store};
 pub use target::{Document, LoadTarget};

@@ -10,11 +10,11 @@ mod domains;
 mod queries;
 mod records;
 
-use std::future::ready;
 use std::sync::{Mutex, MutexGuard, PoisonError};
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use async_trait::async_trait;
 use cairn_schema::{
     ConversationId, Domain, Email, Entity, EntityKey, JourneyId, PatchId, PatchReceipt, Proposal,
     ProposalId, Revision, RevisionConflict, RevisionOf, Slug, Timestamp, Title, TouchedSet, UserId,
@@ -32,7 +32,7 @@ use crate::records::{
     AgentTokenRecord, AuthLogEntry, AuthLogQuery, ConversationRecord, ConversationSummary,
     IdentityRecord, LoggedAuthEntry, OAuthStateRecord, SecretHash, SessionRecord, UserRecord,
 };
-use crate::store::{AuthStore, ConversationStore, Store, StoreFuture};
+use crate::store::{AuthStore, ConversationStore, Store};
 use crate::target::{Document, LoadTarget};
 
 use domains::Domains;
@@ -317,24 +317,14 @@ fn missing_header(domain: &Domain) -> Result<(), StoreError> {
     )))
 }
 
-/// A call that has already completed: the memory backend answers at once.
-fn done<'a, T: Send + 'a>(value: T) -> StoreFuture<'a, T> {
-    Box::pin(ready(value))
-}
-
+#[async_trait]
 impl Store for MemoryStore {
-    fn load<'a>(
-        &'a self,
-        target: &'a LoadTarget,
-    ) -> StoreFuture<'a, Result<Option<Document>, StoreError>> {
-        done(Ok(self.load_now(target)))
+    async fn load(&self, target: &LoadTarget) -> Result<Option<Document>, StoreError> {
+        Ok(self.load_now(target))
     }
 
-    fn proposal<'a>(
-        &'a self,
-        id: &'a ProposalId,
-    ) -> StoreFuture<'a, Result<Option<Proposal>, StoreError>> {
-        done(Ok(self.state().domains.proposals.get(id).cloned()))
+    async fn proposal(&self, id: &ProposalId) -> Result<Option<Proposal>, StoreError> {
+        Ok(self.state().domains.proposals.get(id).cloned())
     }
 
     fn health(&self) -> Result<(), StoreError> {
@@ -346,230 +336,196 @@ impl Store for MemoryStore {
         Ok(())
     }
 
-    fn receipt<'a>(
-        &'a self,
-        patch: &'a PatchId,
-    ) -> StoreFuture<'a, Result<Option<PatchReceipt>, StoreError>> {
+    async fn receipt(&self, patch: &PatchId) -> Result<Option<PatchReceipt>, StoreError> {
         let receipt = self
             .state()
             .receipts
             .get(patch)
             .map(|stored| stored.receipt.clone());
-        done(Ok(receipt))
+        Ok(receipt)
     }
 
-    fn commit(&self, commit: Commit) -> StoreFuture<'_, Result<Committed, CommitError>> {
+    async fn commit(&self, commit: Commit) -> Result<Committed, CommitError> {
         let wait = self.faults.pause_at(CommitPoint::BeforeBegin);
-        Box::pin(async move {
-            if let Some(wait) = wait {
-                wait.await;
-            }
-            self.commit_now(&commit)
-        })
+        if let Some(wait) = wait {
+            wait.await;
+        }
+        self.commit_now(&commit)
     }
 
-    fn revisions(&self) -> StoreFuture<'_, Result<Revisions, StoreError>> {
-        done(Ok(self.revisions_now()))
+    async fn revisions(&self) -> Result<Revisions, StoreError> {
+        Ok(self.revisions_now())
     }
 
-    fn intervening<'a>(
-        &'a self,
-        conflicts: &'a [RevisionConflict],
-    ) -> StoreFuture<'a, Result<TouchedSet, StoreError>> {
-        done(Ok(self.state().intervening(conflicts)))
+    async fn intervening(&self, conflicts: &[RevisionConflict]) -> Result<TouchedSet, StoreError> {
+        Ok(self.state().intervening(conflicts))
     }
 
-    fn journeys<'a>(
-        &'a self,
-        query: &'a JourneyQuery,
-    ) -> StoreFuture<'a, Result<Page<JourneySummary, JourneyId>, StoreError>> {
-        done(Ok(self.state().journeys(query)))
-    }
-
-    fn proposals<'a>(
-        &'a self,
-        query: &'a crate::query::ProposalQuery,
-    ) -> StoreFuture<'a, Result<crate::query::ProposalPage, StoreError>> {
-        done(Ok(self.state().proposals(query)))
-    }
-
-    fn route_detail<'a>(
-        &'a self,
-        route: &'a cairn_schema::RouteId,
-    ) -> StoreFuture<'a, Result<Option<RouteDetail>, StoreError>> {
-        done(Ok(self.state().route_detail(route)))
-    }
-
-    fn journeys_referencing<'a>(
-        &'a self,
-        entities: &'a BTreeSet<EntityKey>,
-    ) -> StoreFuture<'a, Result<BTreeMap<JourneyId, Revision>, StoreError>> {
-        done(Ok(queries::referencing(&self.state(), entities)))
-    }
-
-    fn resolve_entity<'a>(
-        &'a self,
-        key: &'a EntityKey,
-    ) -> StoreFuture<'a, Result<Option<Entity>, StoreError>> {
-        done(Ok(self.state().resolve_entity(key)))
-    }
-
-    fn events<'a>(
-        &'a self,
-        query: &'a EventQuery,
-    ) -> StoreFuture<'a, Result<Page<LoggedEvent, u64>, StoreError>> {
-        done(Ok(self.state().events(query)))
-    }
-
-    fn search<'a>(
-        &'a self,
-        query: &'a SearchQuery,
-    ) -> StoreFuture<'a, Result<Page<JourneyMatches, JourneyId>, StoreError>> {
-        done(Ok(self.state().search(query)))
-    }
-}
-
-impl AuthStore for MemoryStore {
-    fn put_user(&self, user: UserRecord) -> StoreFuture<'_, Result<(), StoreError>> {
-        self.state().outside.put_user(user);
-        done(Ok(()))
-    }
-
-    fn user<'a>(
-        &'a self,
-        id: &'a UserId,
-    ) -> StoreFuture<'a, Result<Option<UserRecord>, StoreError>> {
-        done(Ok(self.state().outside.user(id)))
-    }
-
-    fn put_identity(&self, identity: IdentityRecord) -> StoreFuture<'_, Result<(), StoreError>> {
-        done(self.state().outside.put_identity(identity))
-    }
-
-    fn identity<'a>(
-        &'a self,
-        provider: &'a Slug,
-        subject: &'a Title,
-    ) -> StoreFuture<'a, Result<Option<IdentityRecord>, StoreError>> {
-        done(Ok(self.state().outside.identity(provider, subject)))
-    }
-
-    fn identities_of<'a>(
-        &'a self,
-        user: &'a UserId,
-    ) -> StoreFuture<'a, Result<Vec<IdentityRecord>, StoreError>> {
-        done(Ok(self.state().outside.identities_of(user)))
-    }
-
-    fn identities_with_email<'a>(
-        &'a self,
-        email: &'a Email,
-    ) -> StoreFuture<'a, Result<Vec<IdentityRecord>, StoreError>> {
-        done(Ok(self.state().outside.identities_with_email(email)))
-    }
-
-    fn remove_identity<'a>(
-        &'a self,
-        provider: &'a Slug,
-        subject: &'a Title,
-    ) -> StoreFuture<'a, Result<bool, StoreError>> {
-        done(Ok(self.state().outside.remove_identity(provider, subject)))
-    }
-
-    fn put_session(&self, session: SessionRecord) -> StoreFuture<'_, Result<(), StoreError>> {
-        done(self.state().outside.put_session(session))
-    }
-
-    fn session<'a>(
-        &'a self,
-        token_hash: &'a SecretHash,
-        now: Timestamp,
-    ) -> StoreFuture<'a, Result<Option<SessionRecord>, StoreError>> {
-        done(Ok(self.state().outside.session(token_hash, now)))
-    }
-
-    fn remove_session<'a>(
-        &'a self,
-        token_hash: &'a SecretHash,
-    ) -> StoreFuture<'a, Result<bool, StoreError>> {
-        done(Ok(self.state().outside.remove_session(token_hash)))
-    }
-
-    fn put_oauth_state(&self, state: OAuthStateRecord) -> StoreFuture<'_, Result<(), StoreError>> {
-        self.state().outside.put_oauth_state(state);
-        done(Ok(()))
-    }
-
-    fn take_oauth_state<'a>(
-        &'a self,
-        key_hash: &'a SecretHash,
-        now: Timestamp,
-    ) -> StoreFuture<'a, Result<Option<OAuthStateRecord>, StoreError>> {
-        done(Ok(self.state().outside.take_oauth_state(key_hash, now)))
-    }
-
-    fn remove_expired(&self, now: Timestamp) -> StoreFuture<'_, Result<u64, StoreError>> {
-        done(Ok(self.state().outside.remove_expired(now)))
-    }
-
-    fn put_agent_token(&self, token: AgentTokenRecord) -> StoreFuture<'_, Result<(), StoreError>> {
-        done(self.state().outside.put_agent_token(token))
-    }
-
-    fn agent_token<'a>(
-        &'a self,
-        token_hash: &'a SecretHash,
-    ) -> StoreFuture<'a, Result<Option<AgentTokenRecord>, StoreError>> {
-        done(Ok(self.state().outside.agent_token(token_hash)))
-    }
-
-    fn agent_tokens_of<'a>(
-        &'a self,
-        user: &'a UserId,
-    ) -> StoreFuture<'a, Result<Vec<AgentTokenRecord>, StoreError>> {
-        done(Ok(self.state().outside.agent_tokens_of(user)))
-    }
-
-    fn append_auth_log(&self, entry: AuthLogEntry) -> StoreFuture<'_, Result<u64, StoreError>> {
-        done(Ok(self.state().outside.append_auth_log(entry)))
-    }
-
-    fn auth_log<'a>(
-        &'a self,
-        query: &'a AuthLogQuery,
-    ) -> StoreFuture<'a, Result<Page<LoggedAuthEntry, u64>, StoreError>> {
-        done(Ok(self.state().outside.auth_log(query)))
-    }
-}
-
-impl ConversationStore for MemoryStore {
-    fn put_conversation(
+    async fn journeys(
         &self,
-        conversation: ConversationRecord,
-    ) -> StoreFuture<'_, Result<(), StoreError>> {
-        done(self.state().outside.put_conversation(conversation))
+        query: &JourneyQuery,
+    ) -> Result<Page<JourneySummary, JourneyId>, StoreError> {
+        Ok(self.state().journeys(query))
     }
 
-    fn conversation<'a>(
-        &'a self,
-        id: &'a ConversationId,
-    ) -> StoreFuture<'a, Result<Option<ConversationRecord>, StoreError>> {
-        done(Ok(self.state().outside.conversation(id)))
+    async fn proposals(
+        &self,
+        query: &crate::query::ProposalQuery,
+    ) -> Result<crate::query::ProposalPage, StoreError> {
+        Ok(self.state().proposals(query))
     }
 
-    fn conversations_of<'a>(
-        &'a self,
-        user: &'a UserId,
-        after: Option<&'a ConversationId>,
+    async fn route_detail(
+        &self,
+        route: &cairn_schema::RouteId,
+    ) -> Result<Option<RouteDetail>, StoreError> {
+        Ok(self.state().route_detail(route))
+    }
+
+    async fn journeys_referencing(
+        &self,
+        entities: &BTreeSet<EntityKey>,
+    ) -> Result<BTreeMap<JourneyId, Revision>, StoreError> {
+        Ok(queries::referencing(&self.state(), entities))
+    }
+
+    async fn resolve_entity(&self, key: &EntityKey) -> Result<Option<Entity>, StoreError> {
+        Ok(self.state().resolve_entity(key))
+    }
+
+    async fn events(&self, query: &EventQuery) -> Result<Page<LoggedEvent, u64>, StoreError> {
+        Ok(self.state().events(query))
+    }
+
+    async fn search(
+        &self,
+        query: &SearchQuery,
+    ) -> Result<Page<JourneyMatches, JourneyId>, StoreError> {
+        Ok(self.state().search(query))
+    }
+}
+
+#[async_trait]
+impl AuthStore for MemoryStore {
+    async fn put_user(&self, user: UserRecord) -> Result<(), StoreError> {
+        self.state().outside.put_user(user);
+        Ok(())
+    }
+
+    async fn user(&self, id: &UserId) -> Result<Option<UserRecord>, StoreError> {
+        Ok(self.state().outside.user(id))
+    }
+
+    async fn put_identity(&self, identity: IdentityRecord) -> Result<(), StoreError> {
+        self.state().outside.put_identity(identity)
+    }
+
+    async fn identity(
+        &self,
+        provider: &Slug,
+        subject: &Title,
+    ) -> Result<Option<IdentityRecord>, StoreError> {
+        Ok(self.state().outside.identity(provider, subject))
+    }
+
+    async fn identities_of(&self, user: &UserId) -> Result<Vec<IdentityRecord>, StoreError> {
+        Ok(self.state().outside.identities_of(user))
+    }
+
+    async fn identities_with_email(
+        &self,
+        email: &Email,
+    ) -> Result<Vec<IdentityRecord>, StoreError> {
+        Ok(self.state().outside.identities_with_email(email))
+    }
+
+    async fn remove_identity(&self, provider: &Slug, subject: &Title) -> Result<bool, StoreError> {
+        Ok(self.state().outside.remove_identity(provider, subject))
+    }
+
+    async fn put_session(&self, session: SessionRecord) -> Result<(), StoreError> {
+        self.state().outside.put_session(session)
+    }
+
+    async fn session(
+        &self,
+        token_hash: &SecretHash,
+        now: Timestamp,
+    ) -> Result<Option<SessionRecord>, StoreError> {
+        Ok(self.state().outside.session(token_hash, now))
+    }
+
+    async fn remove_session(&self, token_hash: &SecretHash) -> Result<bool, StoreError> {
+        Ok(self.state().outside.remove_session(token_hash))
+    }
+
+    async fn put_oauth_state(&self, state: OAuthStateRecord) -> Result<(), StoreError> {
+        self.state().outside.put_oauth_state(state);
+        Ok(())
+    }
+
+    async fn take_oauth_state(
+        &self,
+        key_hash: &SecretHash,
+        now: Timestamp,
+    ) -> Result<Option<OAuthStateRecord>, StoreError> {
+        Ok(self.state().outside.take_oauth_state(key_hash, now))
+    }
+
+    async fn remove_expired(&self, now: Timestamp) -> Result<u64, StoreError> {
+        Ok(self.state().outside.remove_expired(now))
+    }
+
+    async fn put_agent_token(&self, token: AgentTokenRecord) -> Result<(), StoreError> {
+        self.state().outside.put_agent_token(token)
+    }
+
+    async fn agent_token(
+        &self,
+        token_hash: &SecretHash,
+    ) -> Result<Option<AgentTokenRecord>, StoreError> {
+        Ok(self.state().outside.agent_token(token_hash))
+    }
+
+    async fn agent_tokens_of(&self, user: &UserId) -> Result<Vec<AgentTokenRecord>, StoreError> {
+        Ok(self.state().outside.agent_tokens_of(user))
+    }
+
+    async fn append_auth_log(&self, entry: AuthLogEntry) -> Result<u64, StoreError> {
+        Ok(self.state().outside.append_auth_log(entry))
+    }
+
+    async fn auth_log(
+        &self,
+        query: &AuthLogQuery,
+    ) -> Result<Page<LoggedAuthEntry, u64>, StoreError> {
+        Ok(self.state().outside.auth_log(query))
+    }
+}
+
+#[async_trait]
+impl ConversationStore for MemoryStore {
+    async fn put_conversation(&self, conversation: ConversationRecord) -> Result<(), StoreError> {
+        self.state().outside.put_conversation(conversation)
+    }
+
+    async fn conversation(
+        &self,
+        id: &ConversationId,
+    ) -> Result<Option<ConversationRecord>, StoreError> {
+        Ok(self.state().outside.conversation(id))
+    }
+
+    async fn conversations_of(
+        &self,
+        user: &UserId,
+        after: Option<&ConversationId>,
         size: PageSize,
-    ) -> StoreFuture<'a, Result<Page<ConversationSummary, ConversationId>, StoreError>> {
-        done(Ok(self.state().outside.conversations_of(user, after, size)))
+    ) -> Result<Page<ConversationSummary, ConversationId>, StoreError> {
+        Ok(self.state().outside.conversations_of(user, after, size))
     }
 
-    fn remove_conversation<'a>(
-        &'a self,
-        id: &'a ConversationId,
-    ) -> StoreFuture<'a, Result<bool, StoreError>> {
-        done(Ok(self.state().outside.remove_conversation(id)))
+    async fn remove_conversation(&self, id: &ConversationId) -> Result<bool, StoreError> {
+        Ok(self.state().outside.remove_conversation(id))
     }
 }

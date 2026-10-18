@@ -16,6 +16,7 @@ publish.workspace = true
 io-seam = []
 
 [dependencies]
+async-trait.workspace = true
 cairn-schema.workspace = true
 cairn-store.workspace = true
 metrics.workspace = true

@@ -34,6 +34,9 @@ cairn-wasm = { path = "crates/wasm" }
 # http-body-util for the one GET to tailscaled's whois over its unix socket (already in the
 # tree under axum and reqwest); ipnet for the networks Tailscale's proxy mode trusts (already
 # in the tree under reqwest); tower only to drive a router in tests.
+# The store traits (ARCHITECTURE, Store trait): plain `async fn` in a trait that stays object-safe
+# and `Send`; already compiled in the tree through rmcp.
+async-trait = "0.1.92"
 base64 = "0.22.1"
 axum = { version = "0.8.9", default-features = false, features = ["form", "http1", "json", "query", "tokio"] }
 chrono = { version = "0.4.45", default-features = false }
