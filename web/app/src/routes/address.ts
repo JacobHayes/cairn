@@ -83,15 +83,11 @@ export function routePath(route: string, spot: RouteSpot = {}, search = ""): str
 }
 
 /**
- * View `to` from the route page at `search`: the whole query but `map` (the phone's full-screen
- * map is a moment of the graph), so every view's own settings stay for the way back, and the
- * version and the node stay.
+ * View `to` from the route page at `search`: the whole query, so every view's own settings stay
+ * for the way back, and the version and the node stay.
  */
 export function routeSwitched(route: string, search: string, to: Screen, node: string | undefined): string {
   const params = new URLSearchParams(search);
-  const { version, screen } = spotOf(params);
-  if (screen !== to) {
-    params.delete("map");
-  }
+  const { version } = spotOf(params);
   return routePath(route, { version, node, screen: to }, params.toString());
 }

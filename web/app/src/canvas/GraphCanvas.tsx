@@ -24,7 +24,6 @@ import { NEAR_ZOOM, fitZoom, listenPinch, minZoomOf } from "./gestures.ts";
 import { lensChips, lensTiers } from "./lens.ts";
 import type { Layout } from "./layout.ts";
 import { fadedCards } from "./look.ts";
-import { MapFrame } from "./MapFrame.tsx";
 import { STEPS, type CanvasModel, type Line, type Lens, type Step } from "./model.ts";
 import { CardActionsContext, NodeCard, type CardActions, type CardNode } from "./NodeCard.tsx";
 import type { CanvasOverlay } from "./overlay.ts";
@@ -68,10 +67,6 @@ export interface GraphCanvasProps {
   viewKey: string;
   /** The accessible name of the canvas. */
   label: string;
-  /** What the map is of, as its full-screen bar shows it (the journey's name, not the label). */
-  title: string;
-  /** The canvas sits inside a page that scrolls: the wheel scrolls the page, and drag and pinch still pan and zoom. */
-  inScroller?: boolean;
   /** An edge was clicked, or reached with the keyboard and chosen. */
   onEdge?: ((line: Line) => void) | undefined;
   /** The empty canvas was clicked (a pan or a lasso is not a click). */
@@ -94,23 +89,18 @@ export interface GraphCanvasProps {
   held?: ReactNode;
 }
 
-/** `inert`: the phone's preview, which takes no gesture and opens nothing (MapFrame). */
-interface FlowProps extends GraphCanvasProps {
-  inert: boolean;
-}
-
 /** Whether a card is a container drawn open, with children to collapse. */
 function openContainers(model: CanvasModel): Set<string> {
   return new Set(model.cards.flatMap((card) => (card.parent === undefined ? [] : [card.parent])));
 }
 
 /** `props` with `faded` holding every card out of focus for Depth's Fade or for Frontier (`fadedCards`). */
-function withEmphasis(props: FlowProps): FlowProps {
+function withEmphasis(props: GraphCanvasProps): GraphCanvasProps {
   const { emphasis, faded, model } = props;
   return emphasis === null || emphasis === undefined ? props : { ...props, faded: fadedCards(model.cards, faded, emphasis) };
 }
 
-function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {
+function nodesOf(props: GraphCanvasProps, edgeEnds: ReadonlySet<string>): CardNode[] {
   const { model, layout, overlay, lens, faded, selected, selection } = props;
   const containers = openContainers(model);
   const chips = lens === undefined ? undefined : lensChips(model.cards, lens);
@@ -158,7 +148,7 @@ function nodesOf(props: FlowProps, edgeEnds: ReadonlySet<string>): CardNode[] {
   });
 }
 
-function edgesOf({ model, layout, overlay, faded, selectedEdge }: FlowProps): LineEdge[] {
+function edgesOf({ model, layout, overlay, faded, selectedEdge }: GraphCanvasProps): LineEdge[] {
   const titles = new Map(model.cards.map((card) => [card.key, card.title]));
   return model.lines.map((line) => ({
     id: line.id,
@@ -192,7 +182,7 @@ function boundsOf(model: CanvasModel, layout: Layout): { width: number; height: 
   return { width, height };
 }
 
-/** Whether the inspector is a sheet fixed over the workspace (a tablet's, or a phone map's), not a column beside it or stacked under the page. */
+/** Whether the inspector is a sheet fixed over the workspace (a tablet's), not a column beside it or stacked under the page. */
 function isSheet(column: HTMLElement | null | undefined): column is HTMLElement {
   return column !== null && column !== undefined && getComputedStyle(column).position === "fixed";
 }
@@ -209,19 +199,19 @@ function useFitPadding(): () => typeof FIT_PADDING {
 }
 
 /**
- * On a tablet, and in a phone's full-screen map, the inspector is a sheet over the canvas's lower
+ * On a tablet the inspector is a sheet over the canvas's lower
  * part: a node picked is centred in the band the sheet leaves, less the zones the floating controls
  * keep (PAD), so the selection is never under the sheet and its neighbours clear the controls.
  */
-function useCenterAboveSheet(selected: string | undefined, live: boolean): void {
+function useCenterAboveSheet(selected: string | undefined): void {
   const flow = useReactFlow();
   const store = useStoreApi();
   const sheet = useFrameState()?.inspector?.parentElement;
   useEffect(() => {
-    if (!live || selected === undefined || sheet === null || sheet === undefined) {
+    if (selected === undefined || sheet === null || sheet === undefined) {
       return undefined;
     }
-    // After the commit that shows the sheet, so it is one (a phone's column becomes the map's sheet only once the node is in it) and its height is there to read.
+    // After the commit that shows the sheet, so its height is there to read.
     const frame = requestAnimationFrame(() => {
       if (!isSheet(sheet)) {
         return;
@@ -246,12 +236,12 @@ function useCenterAboveSheet(selected: string | undefined, live: boolean): void 
 }
 
 /** A find centres its result, and an expand or collapse fits the container (5.1): once the card is drawn as asked. */
-function useReveal(reveal: Reveal | undefined, model: CanvasModel, live: boolean): void {
+function useReveal(reveal: Reveal | undefined, model: CanvasModel): void {
   const flow = useReactFlow();
   const padding = useFitPadding();
   const done = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (!live || reveal === undefined || done.current === reveal.id) {
+    if (reveal === undefined || done.current === reveal.id) {
       return undefined;
     }
     const container = model.cards.some((card) => card.parent === reveal.key);
@@ -274,18 +264,15 @@ function useReveal(reveal: Reveal | undefined, model: CanvasModel, live: boolean
     return () => {
       cancelAnimationFrame(frame);
     };
-  }, [reveal, model, live, flow, padding]);
+  }, [reveal, model, flow, padding]);
 }
 
 /** Keys on the canvas: 1 to 4 pick a step, `f` fits the selection, or the whole graph with none. */
-function useCanvasKeys(props: FlowProps, live: boolean): void {
+function useCanvasKeys(props: GraphCanvasProps): void {
   const flow = useReactFlow();
   const padding = useFitPadding();
   const { steps, onStep, selected } = props;
   useEffect(() => {
-    if (!live) {
-      return undefined;
-    }
     const onKey = (event: KeyboardEvent) => {
       // Not behind the key sheet (a modal dialog), where only its own keys act.
       if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target) || (event.target instanceof Element && event.target.closest("dialog[open]") !== null)) {
@@ -304,7 +291,7 @@ function useCanvasKeys(props: FlowProps, live: boolean): void {
     return () => {
       document.removeEventListener("keydown", onKey);
     };
-  }, [flow, steps, onStep, selected, live, padding]);
+  }, [flow, steps, onStep, selected, padding]);
 }
 
 /** The line under the pointer, and the chip that says what it is: where the pointer is only moves the chip, it never re-renders the cards. */
@@ -340,7 +327,7 @@ function useEdgeHover(root: RefObject<HTMLDivElement | null>) {
  * How far the canvas zooms out, computed from the graph (5.6) so fit-all always fits, and the
  * pinch Safari may send instead of a ctrl-key wheel (5.10).
  */
-function useZoomRange(props: FlowProps, live: boolean, root: RefObject<HTMLDivElement | null>): { minZoom: number; fit: number } {
+function useZoomRange(props: GraphCanvasProps, root: RefObject<HTMLDivElement | null>): { minZoom: number; fit: number } {
   const flow = useReactFlow();
   const [width, height] = [useStore((state) => state.width), useStore((state) => state.height)];
   // The room a fit has is what a sheet over the canvas's lower part leaves.
@@ -352,7 +339,7 @@ function useZoomRange(props: FlowProps, live: boolean, root: RefObject<HTMLDivEl
   minZoomNow.current = minZoom;
   useEffect(() => {
     const element = root.current;
-    if (!live || element === null) {
+    if (element === null) {
       return undefined;
     }
     return listenPinch(element, {
@@ -361,12 +348,12 @@ function useZoomRange(props: FlowProps, live: boolean, root: RefObject<HTMLDivEl
       minZoom: () => minZoomNow.current,
       maxZoom: () => ZOOM_MAX,
     });
-  }, [flow, live, root]);
+  }, [flow, root]);
   return { minZoom, fit };
 }
 
 /** The first fit, once the canvas has a size and its cards are in: the `firstFit` nodes when any is drawn, else the whole drawn graph. */
-function useFirstFit(props: FlowProps, fit: number): void {
+function useFirstFit(props: GraphCanvasProps, fit: number): void {
   const flow = useReactFlow();
   const [initialized, sized] = [useNodesInitialized(), useStore((state) => state.width > 0 && state.height > 0)];
   const sheet = useFrameState()?.inspector?.parentElement;
@@ -401,16 +388,14 @@ function useZoomVariable(root: RefObject<HTMLDivElement | null>): void {
 }
 
 /** What xyflow tells us was picked: the lasso's cards, added to the selection as the box moves, or the edge chosen by click or key. */
-function useChanges({ selection, model, selectedEdge, onEdge, onBackground }: FlowProps, live: boolean) {
+function useChanges({ selection, model, selectedEdge, onEdge, onBackground }: GraphCanvasProps) {
   // A box adds to what was selected when it began; the cards it passes over come and go.
   const lassoing = useRef(false);
   const before = useRef<readonly string[]>([]);
   const boxed = useRef(new Set<string>());
   return {
     onPaneClick: () => {
-      if (live) {
-        onBackground?.();
-      }
+      onBackground?.();
     },
     onSelectionStart: () => {
       lassoing.current = true;
@@ -450,10 +435,7 @@ function useChanges({ selection, model, selectedEdge, onEdge, onBackground }: Fl
 }
 
 /** A click on a card: Shift, Cmd or Ctrl adds it to the selection or takes it out; a plain click selects it alone. */
-function clicked({ selection, actions }: FlowProps, live: boolean, event: ReactMouseEvent, key: string): void {
-  if (!live) {
-    return;
-  }
+function clicked({ selection, actions }: GraphCanvasProps, event: ReactMouseEvent, key: string): void {
   if (selection !== undefined && (event.shiftKey || event.metaKey || event.ctrlKey)) {
     selection.toggle(key);
   } else {
@@ -462,10 +444,10 @@ function clicked({ selection, actions }: FlowProps, live: boolean, event: ReactM
 }
 
 /** Expand a collapsed container, or collapse an open one: a double-click, or Enter on the focused card (5.1). True when it did. */
-function toggleOf({ model, actions }: FlowProps, live: boolean): (key: string) => boolean {
+function toggleOf({ model, actions }: GraphCanvasProps): (key: string) => boolean {
   return (key) => {
     const found = model.cards.find((each) => each.key === key);
-    if (live && actions.expand !== undefined && found !== undefined && (found.collapsed || model.cards.some((each) => each.parent === found.key))) {
+    if (actions.expand !== undefined && found !== undefined && (found.collapsed || model.cards.some((each) => each.parent === found.key))) {
       actions.expand(found.key, found.collapsed);
       return true;
     }
@@ -473,26 +455,19 @@ function toggleOf({ model, actions }: FlowProps, live: boolean): (key: string) =
   };
 }
 
-/**
- * Input (5.10): two-finger scroll pans; pinch (and ctrl+wheel) zooms; the wheel alone never does.
- * The preview does none of it, so a swipe over it scrolls the page; nor does a canvas inside a
- * scrolling page take its wheel.
- */
-function inputOf(live: boolean, inScroller: boolean) {
-  const wheel = live && !inScroller;
-  return {
-    panOnDrag: live,
-    panOnScroll: wheel,
-    zoomOnScroll: false,
-    zoomOnPinch: live,
-    zoomOnDoubleClick: false,
-    preventScrolling: wheel,
-    nodesFocusable: live,
-    // Needed for an edge's click and for the lasso; which nodes are selected stays ours.
-    elementsSelectable: live,
-    edgesFocusable: live,
-  };
-}
+/** Input (5.10): two-finger scroll pans; pinch (and ctrl+wheel) zooms; the wheel alone never does. */
+const INPUT = {
+  panOnDrag: true,
+  panOnScroll: true,
+  zoomOnScroll: false,
+  zoomOnPinch: true,
+  zoomOnDoubleClick: false,
+  preventScrolling: true,
+  nodesFocusable: true,
+  // Needed for an edge's click and for the lasso; which nodes are selected stays ours.
+  elementsSelectable: true,
+  edgesFocusable: true,
+} as const;
 
 /** What hovering a line says (5.7): its sentence, and whether it still waits. */
 function EdgeChip({ chip, line }: { chip: RefObject<HTMLDivElement | null>; line: Line }) {
@@ -505,11 +480,11 @@ function EdgeChip({ chip, line }: { chip: RefObject<HTMLDivElement | null>; line
 }
 
 /** The node menu: open on a card at a point, offered only where the cards have actions. */
-function useNodeMenu(props: FlowProps, live: boolean) {
+function useNodeMenu(props: GraphCanvasProps) {
   const [menu, setMenu] = useState<{ key: string; at: { x: number; y: number } } | undefined>(undefined);
   const closeMenu = useCallback(() => { setMenu(undefined); }, []);
   const openMenu = (key: string, at: { x: number; y: number }) => { setMenu({ key, at }); };
-  return { menu, menus: live ? props.actions.menu : undefined, openMenu, closeMenu };
+  return { menu, menus: props.actions.menu, openMenu, closeMenu };
 }
 
 /**
@@ -547,31 +522,30 @@ function FitControls() {
   );
 }
 
-function Flow(props: FlowProps) {
+function Flow(props: GraphCanvasProps) {
   const theme = useResolvedTheme();
-  const live = !props.inert;
   const root = useRef<HTMLDivElement>(null);
   const { chip, hover, move, enter, leave } = useEdgeHover(root);
   const edgeEnds = useMemo(() => new Set(hover === undefined ? [] : [hover.from, hover.to]), [hover]);
   const nodes = useMemo(() => nodesOf(withEmphasis(props), edgeEnds), [props, edgeEnds]);
   const edges = useMemo(() => edgesOf(withEmphasis(props)), [props]);
-  const { menu, menus, openMenu, closeMenu } = useNodeMenu(props, live);
+  const { menu, menus, openMenu, closeMenu } = useNodeMenu(props);
   const near = useStore((state) => state.transform[2] >= NEAR_ZOOM);
-  const { minZoom, fit } = useZoomRange(props, live, root);
+  const { minZoom, fit } = useZoomRange(props, root);
   useFirstFit(props, fit);
   useZoomVariable(root);
-  useCenterAboveSheet(props.selected, live);
-  useReveal(props.reveal, props.model, live);
-  useCanvasKeys(props, live);
-  const changes = useChanges(props, live);
-  const toggle = toggleOf(props, live);
+  useCenterAboveSheet(props.selected);
+  useReveal(props.reveal, props.model);
+  useCanvasKeys(props);
+  const changes = useChanges(props);
+  const toggle = toggleOf(props);
   const selection = props.selection;
   return (
     <CardActionsContext value={props.actions}>
       <div
         ref={root}
         className="canvas-root"
-        onKeyDown={cardKeys(toggle, live ? selection?.toggle : undefined, menus === undefined ? undefined : openMenu)}
+        onKeyDown={cardKeys(toggle, selection?.toggle, menus === undefined ? undefined : openMenu)}
       >
         <ReactFlow
           nodes={nodes}
@@ -580,11 +554,11 @@ function Flow(props: FlowProps) {
           edgeTypes={edgeTypes}
           nodesDraggable={false}
           nodesConnectable={false}
-          {...inputOf(live, props.inScroller === true)}
+          {...INPUT}
           selectionKeyCode={selection === undefined ? null : "Shift"}
           multiSelectionKeyCode={null}
           {...changes}
-          onNodeClick={(event, node) => { clicked(props, live, event, node.id); }}
+          onNodeClick={(event, node) => { clicked(props, event, node.id); }}
           onNodeDoubleClick={(_, node) => { toggle(node.id); }}
           onNodeContextMenu={(event, node) => {
             if (menus !== undefined) {
@@ -603,8 +577,8 @@ function Flow(props: FlowProps) {
           aria-label={props.label}
           data-lod={near ? "near" : "out"}
         >
-          {live ? <FitControls /> : null}
-          {live ? props.children : null}
+          <FitControls />
+          {props.children}
         </ReactFlow>
         {hover === undefined ? null : <EdgeChip chip={chip} line={hover} />}
         {menu === undefined || menus === undefined ? null : <ContextMenu at={menu.at} groups={menus.groups(menu.key)} label={`Actions for ${props.actions.title(menu.key)}`} onChoose={(id) => { menus.choose(menu.key, id); }} onClose={closeMenu} />}
@@ -613,19 +587,15 @@ function Flow(props: FlowProps) {
   );
 }
 
-/** A graph's canvas: laid-out cards and lines, with pan and zoom (a preview on a phone, MapFrame). */
+/** A graph's canvas: laid-out cards and lines, with pan and zoom. */
 export function GraphCanvas(props: GraphCanvasProps) {
   return (
-    <MapFrame title={props.title}>
-      {(inert) => (
-        <div className="canvas" data-testid="canvas" data-view={props.viewKey}>
-          {/* A new view mounts a new flow, which fits the whole graph (C3); a revision keeps the viewport. */}
-          <ReactFlowProvider key={props.viewKey}>
-            <Flow {...props} inert={inert} />
-          </ReactFlowProvider>
-          {inert || props.held === undefined ? null : <div className="canvas-panel canvas-top canvas-held">{props.held}</div>}
-        </div>
-      )}
-    </MapFrame>
+    <div className="canvas" data-testid="canvas" data-view={props.viewKey}>
+      {/* A new view mounts a new flow, which fits the whole graph (C3); a revision keeps the viewport. */}
+      <ReactFlowProvider key={props.viewKey}>
+        <Flow {...props} />
+      </ReactFlowProvider>
+      {props.held === undefined ? null : <div className="canvas-panel canvas-top canvas-held">{props.held}</div>}
+    </div>
   );
 }

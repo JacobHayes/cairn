@@ -3,8 +3,8 @@
 // has no state, owner or relevance to decide, so it offers Depth (with Fade), the Filter's
 // conditional class and Search; the rest is left out, not disabled (it is not a setting a
 // sibling view of the same subject honours). On the graph the
-// row floats at the canvas's top left (on a phone, folded into one Controls menu); on the list, the
-// timeline and the walk it sits at the top of the pane. Every control reads and writes the
+// row floats at the canvas's top left; on the list, the
+// timeline and the walk it sits at the top of the pane; on a phone it is one Controls menu in every view. Every control reads and writes the
 // journey's one view state (journeys/view.ts), so it means the same on every view: Depth, Filter
 // and search choose what is drawn, through the engine's level; Frontier only lights what is
 // there, and so does Depth's Fade, which draws every kind and dims those below the depth instead
@@ -325,8 +325,8 @@ export interface ViewControlsProps {
   end?: ReactNode;
 }
 
-/** The graph's controls on a phone, where the canvas has room for one button: the same controls in a Controls menu, with the depth and filter badges on it. */
-function PhoneControls({ subject, screen, badges }: { subject: ViewSubject; screen: Screen; badges: Badges | undefined }) {
+/** The controls on a phone, where a view has room for one button: the same controls in a Controls menu, with the depth and filter badges on it, and what the screen puts at the row's end beside it. */
+function PhoneControls({ subject, screen, badges, end }: { subject: ViewSubject; screen: Screen; badges: Badges | undefined; end: ReactNode }) {
   const shown = [badges?.depth, badges?.filter].flatMap((badge) => (badge === undefined || badge.count === 0 ? [] : [badge]));
   const total = { count: shown.reduce((sum, badge) => sum + badge.count, 0), words: shown.map((badge) => badge.words).join(". ") };
   return (
@@ -358,15 +358,16 @@ function PhoneControls({ subject, screen, badges }: { subject: ViewSubject; scre
           </div>
         )}
       </Menu>
+      {end === undefined ? null : <div className="view-controls-end">{end}</div>}
     </div>
   );
 }
 
 export function ViewControls({ subject, screen, badges, end }: ViewControlsProps) {
-  // The graph's controls float over the canvas, where a phone has room for one: they fold into a Controls menu.
+  // A phone has room for one button on every view: the controls fold into a Controls menu.
   const phone = useMedia(PHONE_WIDTH);
-  if (screen === "graph" && phone) {
-    return <PhoneControls subject={subject} screen={screen} badges={badges} />;
+  if (phone) {
+    return <PhoneControls subject={subject} screen={screen} badges={badges} end={end} />;
   }
   return (
     <div className="view-controls row" role="toolbar" aria-label="View controls" data-testid="view-controls">

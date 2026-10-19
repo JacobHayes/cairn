@@ -47,9 +47,9 @@ describe("a route's address", () => {
 });
 
 describe("switching a route's view", () => {
-  const search = "?version=2&view=list&depth=decisions&fade=1&q=ship&open=n_a&shut=n_b&map=1";
+  const search = "?version=2&view=list&depth=decisions&fade=1&q=ship&open=n_a&shut=n_b";
 
-  it("keeps the version, the view state and the graph's settings, and the Graph's phone map only on the Graph", () => {
+  it("keeps the version, the view state and the graph's settings", () => {
     const to = query(routeSwitched("r", search, "timeline", undefined));
     expect(Object.fromEntries(to)).toEqual({ version: "2", view: "timeline", depth: "decisions", fade: "1", q: "ship", open: "n_a", shut: "n_b" });
     const back = query(routeSwitched("r", `?${to.toString()}`, "graph", undefined));

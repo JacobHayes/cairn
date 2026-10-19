@@ -105,6 +105,6 @@ export function ProposalCanvas({ domain, graphs, marks, edges, dim, deployment, 
     return <p className="muted small">Laying out the diff...</p>;
   }
   return (
-    <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={overlay} lens={undefined} selected={selected} actions={actions} firstFit={changed} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" title="The proposal's diff" />
+    <GraphCanvas model={laidOut.model} layout={laidOut.layout} overlay={overlay} lens={undefined} selected={selected} actions={actions} firstFit={changed} viewKey={`${laidOut.view}:${String(laidOut.model.cards.length)}`} label="The proposal's diff" />
   );
 }

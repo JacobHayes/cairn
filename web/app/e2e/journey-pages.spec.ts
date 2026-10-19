@@ -13,7 +13,7 @@ import { expect, test } from "./test.ts";
 
 import { journeyName, setStatus, startJourney } from "./around.ts";
 import { viewportOf, viewportSettled } from "./canvas.ts";
-import { daysAfter, frontierKeys, listKeys, passOrder, select, setFrontier } from "./acting.ts";
+import { daysAfter, frontierKeys, listKeys, passOrder, select, setFrontier, withFrontier } from "./acting.ts";
 import { expectAddress, fresh, goTo, nodeCard, nodePanel, openAt, openFilter, openJourney, setDepth, setFade } from "./shell.ts";
 import { closePopover, filterOf, ownAndPin, search, setCheck, setViewState, VIEWER } from "./view-state.ts";
 import { FIXED_TODAY } from "./views.ts";
@@ -186,7 +186,7 @@ test("C10: Frontier highlights the list: every row stays, the frontier's rows ca
   await setFrontier(page, true);
   await expectAddress(page, `${journeyBase(page)}?view=list&frontier=1`);
   expect(await listKeys(page)).toEqual(everything);
-  const counted = /(\d+) can move now/.exec((await page.getByTestId("chip-frontier").getAttribute("title")) ?? "")?.[1];
+  const counted = /(\d+) can move now/.exec((await withFrontier(page, (chip) => chip.getAttribute("title"))) ?? "")?.[1];
   const frontier = await frontierKeys(page);
   expect(String(frontier.length)).toBe(counted);
   // A frontier row says what to do under its title, at a phone's width too.

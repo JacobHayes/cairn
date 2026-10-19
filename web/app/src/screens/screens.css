@@ -64,13 +64,14 @@
   white-space: nowrap;
 }
 
-/* A name as long as one may be takes two lines and ends in an ellipsis; a tap opens it whole (JourneyHeader). */
+/* A name as long as one may be takes two lines (three on a phone) and ends in an ellipsis; a tap opens it whole (JourneyHeader). */
 .journey-name-toggle {
   display: -webkit-box;
   -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: var(--name-lines, 2);
   overflow: hidden;
-  width: 100%;
+  flex: 0 1 auto;
+  min-width: 0;
   min-height: 0;
   padding: 0;
   border: 0;
@@ -89,19 +90,35 @@
 }
 
 .journey-header h1 {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
   min-width: 0;
   overflow-wrap: anywhere;
 }
 
+/* The mark that the name is cut and a tap reads it whole. */
+.journey-name-cue {
+  flex: none;
+  padding-top: 0.25em;
+  font-size: 0.7em;
+  color: var(--color-secondary);
+}
 
-/* On a phone the title takes its own line; the picker and the menu drop under it, at the right, and the head's rule closes the header (the flowing page has none of its own). */
+
+/* On a phone the title and the picker with the menu share one row (the picker says only the view, "Graph", the title takes what is left), and the head's rule closes the header (the flowing page has none of its own). */
 @media (max-width: 719px) {
   .journey-header > .row {
-    flex-wrap: wrap;
+    align-items: flex-start;
   }
 
-  .journey-header-title {
-    flex-basis: 100%;
+  .journey-header h1 {
+    --name-lines: 3;
+  }
+
+  /* Words a phone can do without: "View:" before the view's name, "to edit" after Open a draft. */
+  .phone-hidden {
+    display: none;
   }
 
   .journey-frame > .journey-head {
@@ -316,6 +333,10 @@
 @media (max-width: 719px) {
   .route-header > .row {
     flex-wrap: wrap;
+  }
+
+  .route-header > .row > h1 {
+    flex-basis: 100%;
   }
 
   .route-header h1 {

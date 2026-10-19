@@ -108,24 +108,6 @@ export function forYouWords(forYou: ForYou): string {
   }
 }
 
-/**
- * The one attention fact a phone row leads with: an error-toned trouble, else what is ready for
- * the viewer, else a warning-toned trouble, else that they are waiting; otherwise nothing. The
- * row shows only that cell, so nothing is said twice.
- */
-export function leadFact(troubles: readonly Trouble[], forYou: ForYou): "trouble" | "for-you" | undefined {
-  if (troubles.some((each) => each.tone === "bad")) {
-    return "trouble";
-  }
-  if (forYou.kind === "ready") {
-    return "for-you";
-  }
-  if (troubles.some((each) => each.tone === "warn")) {
-    return "trouble";
-  }
-  return forYou.kind === "waiting" ? "for-you" : undefined;
-}
-
 /** The next milestone as the table says it: its title, its date in words (when it is due, or how late), and the ink for a soon or late date. */
 export function milestoneOf(model: SummaryModel, today: string): { title: string; when: string; tone: FactTone | undefined } | undefined {
   const next = model.upcoming[0];

@@ -100,9 +100,9 @@
 }
 
 /* On a phone the column stacks under the page, which is the one scroller: the panel is as tall as
-   its conversation, the composer after it. Over the full-screen map the column is a sheet again. */
+   its conversation, the composer after it. */
 @media (max-width: 719px) {
-  .frame:not([data-map="open"]) :is(.assistant-panel, .assistant-panel > .assistant-scroll) {
+  .frame :is(.assistant-panel, .assistant-panel > .assistant-scroll) {
     flex: none;
   }
 }

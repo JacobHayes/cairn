@@ -129,7 +129,6 @@ export function RouteCanvas({ shown, view, selected, unanchored, editable, onPic
       actions={actions}
       viewKey={refitKey(laidOut, editable)}
       label={`${shown.route.header.name}: canvas`}
-      title={shown.route.header.name}
       reveal={reveal}
       held={
         <>

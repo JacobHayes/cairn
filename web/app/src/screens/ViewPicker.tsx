@@ -20,7 +20,7 @@ export interface ViewPickerProps {
 
 export function ViewPicker({ screen, screens, to, title }: ViewPickerProps) {
   return (
-    <Menu label={`View: ${SCREEN_WORDS[screen]}`} title={title} testId="view-picker" align="end" className="no-print view-picker" trigger={<>View: {SCREEN_WORDS[screen]} ▾</>}>
+    <Menu label={`View: ${SCREEN_WORDS[screen]}`} title={title} testId="view-picker" align="end" className="no-print view-picker" trigger={<><span className="phone-hidden">View: </span>{SCREEN_WORDS[screen]} ▾</>}>
       {(close) =>
         screens.map((each) => (
           <Link key={each} role="menuitem" className="menu-item" aria-current={each === screen ? "page" : undefined} data-testid={`view-${each}`} to={to(each)} onClick={close}>

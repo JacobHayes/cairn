@@ -6,6 +6,7 @@ import { expect, test } from "./test.ts";
 import { frontierKeys, openActing } from "./acting.ts";
 import { section } from "./authoring.ts";
 import { derived, nodeCard, open } from "./shell.ts";
+import { publishStressJourney } from "./stress.ts";
 
 test.use({ viewport: { width: 390, height: 844 } });
 
@@ -13,7 +14,7 @@ test("C10: the list with Frontier on fits a narrow window, the journey's menus o
   await openActing(page, "browser", "j_launch", "list?frontier=1");
   await frontierKeys(page);
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-  for (const trigger of ["journey-menu", "view-picker", "depth-button", "filter-button"]) {
+  for (const trigger of ["journey-menu", "view-picker", "controls-button"]) {
     await page.getByTestId(trigger).click();
     const box = await page.getByTestId(`${trigger}-menu`).boundingBox();
     expect(box?.x, trigger).toBeGreaterThanOrEqual(0);
@@ -22,14 +23,16 @@ test("C10: the list with Frontier on fits a narrow window, the journey's menus o
   }
 });
 
-test("the View picker and the menu share a row under the title, and the header is as tall on every view", async ({ page }) => {
+test("the View picker and the menu share the title's row, and the header is as tall on every view", async ({ page }) => {
   const heights: number[] = [];
   for (const view of ["list", "walk"]) {
     await openActing(page, "browser", "j_launch", view);
     const title = await page.getByTestId("journey-name").boundingBox();
     const picker = await page.getByTestId("view-picker").boundingBox();
     const menu = await page.getByTestId("journey-menu").boundingBox();
-    expect(picker?.y, view).toBeGreaterThanOrEqual((title?.y ?? 0) + (title?.height ?? 0));
+    // Beside the title, not under it: the picker starts inside the title's own rows.
+    expect(picker?.y, view).toBeLessThan((title?.y ?? 0) + (title?.height ?? 0));
+    expect(picker?.x, view).toBeGreaterThanOrEqual((title?.x ?? 0) + (title?.width ?? 0) - 1);
     expect(Math.abs((picker?.y ?? 0) - (menu?.y ?? 99)), view).toBeLessThan(4);
     expect(picker?.x, view).toBeGreaterThanOrEqual(0);
     expect((menu?.x ?? 0) + (menu?.width ?? 0), view).toBeLessThanOrEqual(390);
@@ -40,7 +43,6 @@ test("the View picker and the menu share a row under the title, and the header i
 
 test("the graph's controls fold into one Controls menu that holds them all", async ({ page }) => {
   await openActing(page, "browser", "j_launch", "graph");
-  await page.getByRole("button", { name: "Open map" }).click();
   const bar = page.getByTestId("view-controls");
   await expect(bar.getByTestId("controls-button")).toBeVisible();
   await expect(bar.getByTestId("filter-button")).toHaveCount(0);
@@ -59,16 +61,38 @@ test("the graph's controls fold into one Controls menu that holds them all", asy
   await expect(page).toHaveURL(/frontier=1/);
 });
 
-test("A3: on a phone the drawing's banner is the open map's, one banner, and Escape stops the drawing and leaves the map open", async ({ page }) => {
+test("A3: on a phone the drawing's banner is one banner above the graph, and Escape stops the drawing", async ({ page }) => {
   await open(page, "browser", "/journeys/j_vendor_eval?view=graph&edit=on&depth=actions");
   await derived(page);
-  await page.getByTestId("map-open").click();
   await nodeCard(page, "n_access").getByTestId("card-open").click();
   await (await section(page, "author-edges")).getByRole("button", { name: "Draw it on the canvas" }).click();
   const banner = page.getByTestId("drawing-edge");
   await expect(banner).toHaveCount(1);
-  await expect(page.getByTestId("map-full").getByTestId("drawing-edge")).toBeVisible();
+  await expect(banner).toBeVisible();
   await page.keyboard.press("Escape");
   await expect(banner).toHaveCount(0);
-  await expect(page.getByTestId("map-full")).toBeVisible();
+});
+
+test("the top bar is one short row of the four screens and the sync dot, and You is one tap from the dot", async ({ page }) => {
+  await open(page, "browser", "/journeys");
+  const nav = page.getByRole("navigation", { name: "Screens", exact: true });
+  await expect(nav.getByRole("link")).toHaveText(["Home", "Journeys", "Routes", "Entities"]);
+  const bar = await page.locator(".rail").boundingBox();
+  expect(bar?.height).toBeLessThanOrEqual(48);
+  await expect(page.getByRole("button", { name: "Keyboard shortcuts" })).toBeHidden();
+  await page.getByTestId("sync").click();
+  await page.getByTestId("sync-popover").getByRole("link", { name: /You/ }).click();
+  await expect(page).toHaveURL(/\/me$/);
+});
+
+test("a journey name cut by its clamp wears a mark that a tap opens it, and a whole name wears none", async ({ page }) => {
+  await open(page, "browser", "/");
+  const journey = await publishStressJourney(page);
+  await open(page, "browser", `/journeys/${journey}?view=list`);
+  const cue = page.getByTestId("journey-name-cue");
+  await expect(cue).toBeVisible();
+  await page.getByTestId("journey-name").getByRole("button").click();
+  await expect(cue).toBeVisible();
+  await openActing(page, "browser", "j_launch", "list");
+  await expect(cue).toHaveCount(0);
 });

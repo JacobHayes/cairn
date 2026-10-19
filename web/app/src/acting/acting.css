@@ -499,6 +499,27 @@ table.data.list-table .badge {
 /* Under the Frontier lens the Rank column comes first and is held with them. */
 .list-table {
   --rank-width: 0px;
+  --status-width: 112px;
+}
+
+/* A phone gives the status chip a narrower column: the chip is tightened and wraps a two-word state onto two lines, so the longest single word ("conditional", 95px) sets the width, and the title's pin follows it. */
+@media (max-width: 719px) {
+  .list-table {
+    --status-width: 104px;
+  }
+
+  table.data.list-table td[data-column="status"] {
+    padding-inline: var(--space-1);
+  }
+
+  table.data.list-table .badge {
+    max-width: 100%;
+    gap: 2px;
+    padding: 0 3px;
+    letter-spacing: 0;
+    line-height: 1.3;
+    white-space: normal;
+  }
 }
 
 .list-table[data-ranked="true"] {
@@ -516,7 +537,7 @@ table.data.list-table .badge {
 }
 
 .list-table [data-column="title"].list-pinned {
-  left: calc(var(--space-6) + var(--rank-width) + 112px);
+  left: calc(var(--space-6) + var(--rank-width) + var(--status-width));
 }
 
 /* The owner and the primary action of a frontier row sit in its owner column. */
@@ -535,8 +556,8 @@ table.data.list-table .badge {
 
 .list-table td[data-column="status"],
 .list-table th[data-column="status"] {
-  width: 112px;
-  min-width: 112px;
+  width: var(--status-width);
+  min-width: var(--status-width);
 }
 
 /* A word with no break in it (an identifier, a long path) breaks at the cell's edge instead of widening the table past its panel. */

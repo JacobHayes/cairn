@@ -56,11 +56,10 @@ export function Shell() {
   // The screen the router shows, for the browser tests to wait on after an in-page navigation.
   const { pathname, search } = useLocation();
   const frame = useFrame();
-  const mapOpen = new URLSearchParams(search).get("map") === "1";
   return (
     <FrameActionsContext value={frame.actions}>
       <FrameStateContext value={frame.state}>
-        <div className="frame" data-inspector={frame.folded ? "folded" : frame.open ? "on" : "off"} data-map={mapOpen ? "open" : "closed"}>
+        <div className="frame" data-inspector={frame.folded ? "folded" : frame.open ? "on" : "off"}>
           <Rail pathname={pathname} />
           <main className="workspace" data-screen={`${pathname}${search}`}>
             <div className="ws-body">

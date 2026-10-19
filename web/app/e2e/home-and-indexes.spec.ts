@@ -18,7 +18,7 @@ test("C16: a Home row opens its node's address, and Done on a row acts in place"
   await expect(page).toHaveURL(/\/journeys\/[^/]+\/nodes\//);
 });
 
-test("C16, C17: the Journeys index at 390px shows each row's lead fact and nothing wider than the window", async ({ page }) => {
+test("C16, C17: the Journeys index at 390px shows both of each row's facts and nothing wider than the window", async ({ page }) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await open(page, "browser", "/journeys");
   const rows = page.getByTestId("journey-row");
@@ -29,15 +29,21 @@ test("C16, C17: the Journeys index at 390px shows each row's lead fact and nothi
   for (const right of widths) {
     expect(right).toBeLessThanOrEqual(390);
   }
-  // Each row that leads with a fact shows it in the cell that leads, and only that one.
-  const led = page.locator("[data-testid=journey-row][data-lead=trouble], [data-testid=journey-row][data-lead=for-you]");
-  expect(await led.count()).toBeGreaterThan(0);
-  for (const row of await led.all()) {
-    const lead = (await row.getAttribute("data-lead")) === "trouble" ? "trouble" : "for-you";
-    const other = lead === "trouble" ? "for-you" : "trouble";
-    await expect(row.locator(`td[data-column="${lead}"]`)).toBeVisible();
-    await expect(row.locator(`td[data-column="${other}"]`)).toBeHidden();
+  // Both independent facts show on a row that has them (what needs a look, what is yours), and an upgrade notice is never hidden.
+  let shown = 0;
+  for (const row of await rows.all()) {
+    for (const [column, attribute, none] of [["trouble", "data-kind", "none"], ["for-you", "data-for-you", "nothing"]] as const) {
+      const cell = row.locator(`td[data-column="${column}"]`);
+      if ((await cell.getAttribute(attribute)) !== none) {
+        await expect(cell, `${column} on a row that has one`).toBeVisible();
+        shown += 1;
+      }
+    }
+    for (const notice of await row.getByTestId("upgrade").all()) {
+      await expect(notice).toBeVisible();
+    }
   }
+  expect(shown).toBeGreaterThan(0);
 });
 
 test("C17: the Routes type control writes ?type= and keeps only that type's rows", async ({ page }) => {

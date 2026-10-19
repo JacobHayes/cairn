@@ -92,6 +92,25 @@ async function widths({ page, look, check }: Walk): Promise<void> {
     await name.getByRole("button").click();
     await expect(name.getByRole("button")).toHaveAttribute("aria-expanded", "true");
     await look(`the journey name opened at ${String(width)}px`);
+    // A phone's chrome: the Controls menu on every view, the sync popover with its You link, the inspector hidden to its bar, and the stress route's own pages.
+    if (width === 390) {
+      for (const address of ["graph", "list", "timeline", "walk"]) {
+        await check(address);
+        await page.getByTestId("controls-button").click();
+        await look(`the Controls menu on ${address} at 390px`);
+        await page.keyboard.press("Escape");
+      }
+      await check("list", "n_a1");
+      await page.getByRole("button", { name: "Hide inspector" }).click();
+      await look("the inspector folded at 390px");
+      await page.getByTestId("sync").click();
+      await look("the sync popover at 390px");
+      await page.keyboard.press("Escape");
+      for (const view of ["graph", "list", "timeline"]) {
+        await open(page, "browser", `/routes/${STRESS.route}?view=${view}`);
+        await look(`the route's ${view} at 390px`);
+      }
+    }
     for (const path of ["/", "/journeys", "/routes", "/entities", "/me"]) {
       await open(page, "browser", path);
       await look(`${path} at ${String(width)}px`);

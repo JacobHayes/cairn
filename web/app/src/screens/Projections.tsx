@@ -39,10 +39,10 @@ export interface ProjectionProps {
 }
 
 /** The canvas's own bars, which stay with the head: the structure's tools (edit mode) and the stalled surface. */
-export function CanvasBars({ ready, view, authored, drawing, banner }: Pick<ProjectionProps, "ready" | "view" | "authored" | "drawing"> & { banner: boolean }) {
+export function CanvasBars({ ready, view, authored, drawing }: Pick<ProjectionProps, "ready" | "view" | "authored" | "drawing">) {
   return (
     <>
-      {authored === undefined ? null : <JourneyAuthoringBar ready={ready} authored={authored} view={view} drawing={drawing} banner={banner} />}
+      {authored === undefined ? null : <JourneyAuthoringBar ready={ready} authored={authored} view={view} drawing={drawing} />}
       <StalledSurface ready={ready} view={view} />
     </>
   );

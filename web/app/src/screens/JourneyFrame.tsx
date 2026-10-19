@@ -10,11 +10,10 @@
 import { lazy, Suspense, useMemo, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 
-import { ConnectContext, DrawingBanner, useEdgeDrawing } from "../authoring/connect.tsx";
+import { ConnectContext, useEdgeDrawing } from "../authoring/connect.tsx";
 import { AuthoringPanel } from "../authoring/AuthoringPanel.tsx";
 import { domainOf, journeyAuthored } from "../authoring/target.ts";
 import { stepsFor } from "../canvas/ladder.ts";
-import { MapBand, useMapOpen } from "../canvas/MapFrame.tsx";
 import { useSelection, type Selection } from "../canvas/selection.ts";
 import { graphViewFrom, type GraphView } from "../canvas/settings.ts";
 import { useJourney } from "../data/react.ts";
@@ -196,11 +195,8 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   const structure = authored === undefined || node === undefined ? undefined : <AuthoringPanel authored={authored} node={node} onRemoved={() => void navigate(addresses.close())} />;
   // The graph is a gesture surface that fills the workspace under the head; the rest scroll.
   const fills = planned || inserting.preview !== undefined;
-  // A phone's open map covers the head, so the drawing's banner is the map's, not the head's.
-  const onMap = useMapOpen() && fills;
   // The journey card is the inspector's empty state where the inspector has a column of its own,
-  // and on a phone, whose column stacks right under the projection, so its tabs follow the map
-  // (over the full-screen map it stays in the page behind, useFrame). On a tablet it follows the
+  // and on a phone, whose column stacks right under the projection, so its tabs follow the graph. On a tablet it follows the
   // projection, and a graph that fills the page has no room for it: a sheet would cover the canvas unasked.
   const wide = useMedia(COLUMN);
   const phone = useMedia(PHONE_WIDTH);
@@ -208,12 +204,11 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
   return (
     <ViewStateContext value={viewState}>
     <ConnectContext value={authored === undefined ? undefined : drawing}>
-    <MapBand value={authored === undefined ? null : <DrawingBanner drawing={drawing} />}>
       <InsertEntryContext value={inserting.start}>
       <div className="ws-fill journey-frame" data-testid="journey-frame" data-screen={screen}>
         <div className="ws-head stack journey-head">
           <JourneyHeader ready={ready} view={planned ? view : { ...view, edit: false }} screen={screen} selected={selected} />
-          {planned ? <CanvasBars ready={ready} view={view} authored={authored} drawing={drawing} banner={!onMap} /> : null}
+          {planned ? <CanvasBars ready={ready} view={view} authored={authored} drawing={drawing} /> : null}
         </div>
         <div className={fills ? "ws-canvas journey-body" : "journey-body journey-scroll stack"}>
           <Workspace ready={ready} view={view} screen={screen} selected={selected} edge={edge} authored={authored} drawing={drawing} selection={selection} preview={inserting.preview} onCard={setWalkCard} />
@@ -224,7 +219,6 @@ function ReadyFrame({ ready, screen, selected, edge }: { ready: Ready } & Omit<F
       {/* After the head: a node opened from the assistant brings its detail forward last. */}
       <InspectorSlot ready={ready} screen={screen} selected={selected} edge={edge} structure={structure} card={card === "column"} inserting={inserting} selection={selection} authored={authored} walkCard={walkCard} />
       </InsertEntryContext>
-    </MapBand>
     </ConnectContext>
     </ViewStateContext>
   );

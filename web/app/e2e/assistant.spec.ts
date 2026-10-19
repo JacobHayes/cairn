@@ -83,7 +83,7 @@ test("only a person brings the assistant forward: a reload or a phone's width ke
   await expect(page.getByTestId("assistant-panel")).toHaveCount(1);
   await expect(inspector).toHaveAttribute("aria-selected", "true");
   await page.setViewportSize({ width: 390, height: 844 });
-  await expect(page.getByTestId("map-preview")).toBeVisible();
+  await expect(page.getByTestId("canvas")).toBeVisible();
   await expect(inspector).toHaveAttribute("aria-selected", "true");
   await expect(page.getByTestId("journey-card")).toBeVisible();
 });

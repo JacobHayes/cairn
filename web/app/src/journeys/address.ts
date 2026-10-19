@@ -279,18 +279,14 @@ export function useNodeAddresses(): NodeAddresses {
 }
 
 /**
- * View `to` from the journey page at `target` + `search`: the whole query but `map` (the phone's
- * full-screen map is a moment of the graph), so the other views' own settings stay for the way
- * back. The node stays (or becomes `node` when given: Show in list, Show in graph, the Affects
+ * View `to` from the journey page at `target` + `search`: the whole query, so the other views' own
+ * settings stay for the way back. The node stays (or becomes `node` when given: Show in list, Show in graph, the Affects
  * link), except into the Walkthrough from another view: there a node's address means "opened from
  * a card", and a node opened elsewhere is no card of this pass. An edge stays only in the graph.
  */
 export function screenSwitched(target: JourneyTarget, search: string, to: Screen, node?: string): string {
   const from = screenOf(target, new URLSearchParams(search));
   const params = new URLSearchParams(search);
-  if (from !== to) {
-    params.delete("map");
-  }
   const keeps = node ?? (to === "walk" && from !== "walk" ? undefined : target.node);
   const edge = to === "graph" && node === undefined && keeps === undefined ? target.edge : undefined;
   return journeyPath({ journey: target.journey, node: keeps, edge }, to, params.toString());

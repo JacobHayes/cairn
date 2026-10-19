@@ -22,7 +22,6 @@ import { blockedWords, DraftCard, ResultBand, RouteHeader, useDraftViolations } 
 import { useRouteNotices } from "../authoring/RouteNotices.tsx";
 import { StructureTools } from "../authoring/StructureTools.tsx";
 import { domainOf, routeAuthored, type Authored } from "../authoring/target.ts";
-import { MapBand, useMapOpen } from "../canvas/MapFrame.tsx";
 import { RouteCanvas } from "../canvas/RouteCanvas.tsx";
 import { stepsFor } from "../canvas/ladder.ts";
 import { graphViewFrom } from "../canvas/settings.ts";
@@ -197,8 +196,6 @@ function DraftFrame({ shown, authored, selected, write, result, setResult, impor
   const close = here(undefined);
   useEscapeTo(selected === undefined ? undefined : close);
   const fills = screen === "graph" || inserting.preview !== undefined;
-  // A phone's open map covers the head, so the drawing's banner is the map's, not the head's. `map=1` can outlive the canvas (the List keeps it).
-  const onMap = useMapOpen() && fills;
   const columned = wide || phone;
   const head = (
     <>
@@ -208,7 +205,7 @@ function DraftFrame({ shown, authored, selected, write, result, setResult, impor
       <div className="row route-tools">
         <StructureTools authored={authored} container={undefined} onAdded={(node) => void navigate(here(node.key))} onInsert={() => { inserting.start(undefined); }} />
       </div>
-      {onMap ? null : <DrawingBanner drawing={drawing} />}
+      <DrawingBanner drawing={drawing} />
     </>
   );
   const body = (
@@ -223,9 +220,7 @@ function DraftFrame({ shown, authored, selected, write, result, setResult, impor
   );
   return (
     <ConnectContext value={drawing}>
-      <MapBand value={<DrawingBanner drawing={drawing} />}>
-        <Workspace head={head} body={body} fills={fills} inspector={<DraftInspector authored={authored} selected={selected} card={columned ? card : undefined} close={close} inserting={inserting} />} />
-      </MapBand>
+      <Workspace head={head} body={body} fills={fills} inspector={<DraftInspector authored={authored} selected={selected} card={columned ? card : undefined} close={close} inserting={inserting} />} />
     </ConnectContext>
   );
 }
@@ -260,9 +255,7 @@ function VersionFrame({ shown, write, result, setResult, imports }: FrameProps) 
       </Inspector>
     ) : null;
   return (
-    <MapBand value={null}>
-      <Workspace head={head} body={body} fills={fills} inspector={inspector} />
-    </MapBand>
+    <Workspace head={head} body={body} fills={fills} inspector={inspector} />
   );
 }
 

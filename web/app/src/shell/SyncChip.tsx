@@ -6,8 +6,9 @@
 // region announce the changes that matter.
 import { useActorRef, useSelector } from "@xstate/react";
 import { useEffect, useId, useRef } from "react";
-import { useNavigate } from "react-router";
+import { Link, useNavigate } from "react-router";
 
+import { pathTo } from "../address.ts";
 import type { SaveEvent } from "../data/activity.ts";
 import { useDerivation, useProblems, useSaves, useSavedAnnouncement, useSession, useSkew, useStreamStatus, useSync } from "../data/react.ts";
 import { dateWords } from "../timeline/model.ts";
@@ -126,6 +127,10 @@ function Popover({ summary, anchor, onClose }: { summary: SyncSummary; anchor: A
             Today {dateWords(derivation.today, derivation.today)}
           </p>
         )}
+        {/* On a phone the top bar has no You tab: who you are is one tap from here. */}
+        <Link to={pathTo("me")} className="sync-you" onClick={onClose}>
+          You: who you are here &rsaquo;
+        </Link>
         {skew && (
           <p className="stack" data-testid="sync-skew">
             <span>Cairn was updated. Reload to keep saving; your unsent edits are kept.</span>

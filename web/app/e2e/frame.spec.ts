@@ -1,7 +1,6 @@
 // The app frame: one scroller per region, so a node's Details (its History) are reachable in the
 // inspector (or the tablet's sheet) at each width, the page itself never scrolls from it; a
-// phone's map is a preview that leaves swipes to the page and opens full screen, where they
-// pan. On the in-browser host.
+// phone's graph is in the page, with the inspector stacked under it. On the in-browser host.
 import type { Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
@@ -127,64 +126,46 @@ async function swipe(page: Page, at: { x: number; y: number }, by: { dx: number;
   await touch("touchEnd", steps, steps / 60 + 0.2);
 }
 
-test.describe("a phone's map", () => {
+test.describe("a phone's graph", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
   /** The canvas's pan and zoom, as React Flow writes it. */
-  const transform = (page: Page, within: string) => page.locator(`${within} .react-flow__viewport`).evaluate((element) => (element as HTMLElement).style.transform);
+  const transform = (page: Page) => page.locator('[data-testid="canvas"] .react-flow__viewport').evaluate((element) => (element as HTMLElement).style.transform);
   const scrolled = (page: Page) => page.evaluate(() => document.scrollingElement?.scrollTop ?? 0);
 
-  test("is a preview a swipe scrolls past, and opens full screen where a swipe pans", async ({ page }) => {
+  test("is in the page, where a swipe on it pans and a swipe on the head scrolls the page", async ({ page }) => {
     await openJourney(page, "browser", "j_vendor_eval");
-    const preview = page.getByTestId("map-preview");
-    const box = await preview.boundingBox();
+    const canvas = page.getByTestId("canvas");
+    const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
-    const at = { x: 195, y: ((box?.y ?? 0) + Math.min((box?.y ?? 0) + (box?.height ?? 0), 844)) / 2 };
-    const before = await transform(page, '[data-testid="map-preview"]');
+    // The graph has the room the bars leave, with the inspector's head peeking under it.
+    expect(box?.height).toBeGreaterThan(400);
+    expect((box?.y ?? 0) + (box?.height ?? 0)).toBeLessThan(844);
     expect(await scrolled(page)).toBe(0);
-
-    // The page is only a little taller than the window here, so each gesture is small and the next one reaches further.
-    await page.mouse.move(at.x, at.y);
-    await page.mouse.wheel(0, 20);
-    await expect.poll(() => scrolled(page)).toBeGreaterThan(0);
-    const wheeled = await scrolled(page);
-    await swipe(page, at, { dx: 0, dy: -200 });
-    await expect.poll(() => scrolled(page)).toBeGreaterThan(wheeled);
-    expect(await transform(page, '[data-testid="map-preview"]')).toBe(before);
-
-    const resting = await scrolled(page);
-    await page.getByTestId("map-open").click();
-    await expect(page).toHaveURL(/map=1/);
-    await expect(page.getByTestId("map-full")).toBeVisible();
-    const opened = await transform(page, '[data-testid="map-full"]');
+    const before = await transform(page);
     // From empty pane: a finger that lands on a routed edge selects it and does not pan.
-    await swipe(page, { x: 195, y: 200 }, { dx: -80, dy: -120 });
-    await expect.poll(() => transform(page, '[data-testid="map-full"]')).not.toBe(opened);
-    expect(await scrolled(page)).toBe(resting);
-
-    await page.goBack();
-    await expect(page.getByTestId("map-full")).toHaveCount(0);
-    expect(await scrolled(page)).toBe(resting);
+    await swipe(page, { x: 195, y: (box?.y ?? 0) + 40 }, { dx: -80, dy: -120 });
+    await expect.poll(() => transform(page)).not.toBe(before);
+    expect(await scrolled(page)).toBe(0);
+    // The head is the page's: a wheel over it scrolls.
+    await page.mouse.move(195, 40);
+    await page.mouse.wheel(0, 200);
+    await expect.poll(() => scrolled(page)).toBeGreaterThan(0);
   });
 
-  test("opens a tapped decision as a sheet over the map, with nothing off the side", async ({ page }) => {
-    await openAt(page, "browser", "j_hiring", "graph?depth=decisions&map=1");
+  test("opens a tapped decision in the inspector under it, which can be hidden and shown", async ({ page }) => {
+    await openAt(page, "browser", "j_hiring", "graph?depth=decisions");
     await page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").click();
     const panel = nodePanel(page, "n_make_offer");
     await expect(panel).toBeVisible();
-    await expectAddress(page, "/journeys/j_hiring/nodes/n_make_offer?depth=decisions&map=1");
-    await expect(page.getByTestId("map-full")).toBeVisible();
-    const sheet = (await page.locator(".inspector").boundingBox())?.y ?? 0;
-    expect(sheet).toBeGreaterThan(300);
-    // The tapped card is brought above the sheet it opened.
-    const tapped = page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]');
-    await expect.poll(async () => (await tapped.evaluate((element) => element.getBoundingClientRect().bottom)) <= sheet).toBe(true);
-    // The sheet is bounded and its body scrolls, so the end of the node's detail is reachable.
-    await reachHistory(page, "n_make_offer", 844);
+    await expectAddress(page, "/journeys/j_hiring/nodes/n_make_offer?depth=decisions");
+    // The page brings the column into view and has no sideways scroll.
+    await expect.poll(async () => (await page.locator(".inspector").boundingBox())?.y ?? 9999).toBeLessThan(400);
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
-    // Hiding the sheet gives the whole map back, and a bar along the bottom opens it again.
+    // Hiding it folds the column to a slim bar in the page, and the bar opens it again.
     await page.getByRole("button", { name: "Hide inspector" }).click();
     await expect(panel).toBeHidden();
+    expect((await page.getByRole("button", { name: "Show inspector" }).boundingBox())?.height).toBeGreaterThanOrEqual(24);
     await page.getByRole("button", { name: "Show inspector" }).click();
     await expect(panel).toBeVisible();
   });
@@ -193,20 +174,15 @@ test.describe("a phone's map", () => {
 test.describe("a phone's inspector", () => {
   test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
 
-  test("stacks the journey card in the inspector right under the map, whose fit is not padded for the column below it", async ({ page }) => {
+  test("stacks the journey card in the inspector right under the graph", async ({ page }) => {
     await openJourney(page, "browser", "j_vendor_eval");
     const column = page.locator(".inspector");
-    await expect(column.getByTestId("journey-card")).toBeVisible();
-    const preview = page.getByTestId("map-preview");
-    const map = await preview.boundingBox();
+    await expect(column.getByTestId("journey-card")).toBeAttached();
+    const graph = await page.getByTestId("canvas").boundingBox();
     const under = await column.boundingBox();
-    expect(map).not.toBeNull();
+    expect(graph).not.toBeNull();
     expect(under).not.toBeNull();
-    // Only the workspace's own padding lies between the map and the column's head.
-    expect((under?.y ?? 0) - ((map?.y ?? 0) + (map?.height ?? 0))).toBeLessThan(64);
-    // The fit `openJourney` asked for draws the graph across the preview, not shrunk to clear the column under it.
-    const cards = await preview.getByTestId("node-card").evaluateAll((elements) => elements.map((element) => element.getBoundingClientRect()).map(({ top, bottom }) => ({ top, bottom })));
-    const drawn = Math.max(...cards.map((card) => card.bottom)) - Math.min(...cards.map((card) => card.top));
-    expect(drawn).toBeGreaterThan((map?.height ?? 0) / 4);
+    // Only the workspace's own padding lies between the graph and the column's head.
+    expect((under?.y ?? 0) - ((graph?.y ?? 0) + (graph?.height ?? 0))).toBeLessThan(64);
   });
 });

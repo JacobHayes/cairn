@@ -2,8 +2,7 @@
 // follows the back button. A graph, a journey's or a route's, reads the page's view state
 // (journeys/view.ts: the depth, the Filter and the search, shared with every view) and its own
 // settings: the containers the viewer expanded and collapsed since picking the depth (`open=`,
-// `shut=`, C4), the Signals lens (`lens=`, C6), whether its structure is being edited (5.6), and
-// on a phone whether the full-screen map is open. Every setting at its default leaves the
+// `shut=`, C4), the Signals lens (`lens=`, C6) and whether its structure is being edited (5.6). Every setting at its default leaves the
 // address bare.
 import { LENSES, type Lens } from "./model.ts";
 import { journeyPath } from "../journeys/address.ts";
@@ -14,8 +13,6 @@ const OPEN = "open";
 const SHUT = "shut";
 const LENS = "lens";
 const EDIT = "edit";
-/** The full-screen map's address parameter (MapFrame), so Back closes it. */
-export const MAP = "map";
 
 /** The values of `name`, split on commas, empty when the parameter is there but holds none. */
 function listOf(params: URLSearchParams, name: string): string[] | undefined {
@@ -29,13 +26,12 @@ function lensFrom(params: URLSearchParams): Lens | undefined {
   return LENSES.find((each) => each === lens);
 }
 
-/** A graph's own settings: the viewer's expands and collapses, the lens, edit mode and the phone's map. */
+/** A graph's own settings: the viewer's expands and collapses, the lens and edit mode. */
 export interface GraphSettings {
   open: string[];
   shut: string[];
   lens: Lens | undefined;
   edit: boolean;
-  map: boolean;
 }
 
 /** What a journey's graph shows: the journey's view state and its own settings. */
@@ -50,7 +46,6 @@ export function graphSettingsFrom(params: URLSearchParams): GraphSettings {
     shut: listOf(params, SHUT) ?? [],
     lens: lensFrom(params),
     edit: params.get(EDIT) === "on",
-    map: params.get(MAP) === "1",
   };
 }
 
@@ -60,7 +55,7 @@ export function graphViewFrom(params: URLSearchParams, offers: ViewOffers = JOUR
 }
 
 /** The view a journey's graph opens with: the stock view state, nothing expanded, no lens. */
-export const DEFAULT_GRAPH_VIEW: GraphView = { state: DEFAULT_VIEW_STATE, open: [], shut: [], lens: undefined, edit: false, map: false };
+export const DEFAULT_GRAPH_VIEW: GraphView = { state: DEFAULT_VIEW_STATE, open: [], shut: [], lens: undefined, edit: false };
 
 /** `view` as an address's query: the view state, then the graph's own settings, leaving out what is at its default. */
 function graphParamsOf(view: GraphView): URLSearchParams {
@@ -77,9 +72,6 @@ function graphParamsOf(view: GraphView): URLSearchParams {
   if (view.edit) {
     params.set(EDIT, "on");
   }
-  if (view.map) {
-    params.set(MAP, "1");
-  }
   return params;
 }
 
@@ -89,7 +81,7 @@ function graphParamsOf(view: GraphView): URLSearchParams {
  */
 export function graphSearch(view: GraphView, search: string): string {
   const rest = new URLSearchParams(search);
-  for (const name of [...VIEW_PARAMS, OPEN, SHUT, LENS, EDIT, MAP]) {
+  for (const name of [...VIEW_PARAMS, OPEN, SHUT, LENS, EDIT]) {
     rest.delete(name);
   }
   const params = graphParamsOf(view);

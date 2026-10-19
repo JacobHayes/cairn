@@ -20,6 +20,15 @@
   border-width: 1px 0 0;
 }
 
+/* A phone's graph is in the page, not a preview: the window less the bars above it and a peek of the inspector below it, which is the page's to scroll (a swipe on the canvas pans it). */
+@media (max-width: 719px) {
+  .ws-canvas > .canvas {
+    flex: none;
+    height: calc(100dvh - 280px);
+    min-height: 360px;
+  }
+}
+
 .canvas-root {
   position: relative;
   width: 100%;
@@ -137,7 +146,7 @@
   box-shadow: var(--shadow-sm);
 }
 
-/* Where the inspector is a sheet over the canvas's lower part (a tablet, or the phone's full-screen map) the bottom controls ride above it (`--lift`). */
+/* Where the inspector is a sheet over the canvas's lower part (a tablet) the bottom controls ride above it (`--lift`). */
 .canvas .react-flow__panel:is(.react-flow__controls, .canvas-reveal) {
   margin-bottom: calc(var(--lift, 0px) + var(--space-3));
 }
@@ -152,20 +161,6 @@
   }
 
   .frame[data-inspector="on"]:has(.inspector[data-snap="full"]) .canvas {
-    --lift: var(--sheet-h, var(--sheet-full));
-  }
-}
-
-@media (max-width: 719px) {
-  .frame[data-map="open"][data-inspector="folded"] .canvas {
-    --lift: 24px;
-  }
-
-  .frame[data-map="open"][data-inspector="on"] .canvas {
-    --lift: var(--sheet-h, var(--sheet-half));
-  }
-
-  .frame[data-map="open"][data-inspector="on"]:has(.inspector[data-snap="full"]) .canvas {
     --lift: var(--sheet-h, var(--sheet-full));
   }
 }

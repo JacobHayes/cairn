@@ -23,14 +23,11 @@ export function JourneyAuthoringBar({
   authored,
   view,
   drawing,
-  banner,
 }: {
   ready: Ready;
   authored: Authored;
   view: GraphView;
   drawing: EdgeDrawing;
-  /** Whether the drawing's banner is shown here: not while a full-screen map carries it. */
-  banner: boolean;
 }) {
   const navigate = useNavigate();
   const { search } = useLocation();
@@ -56,7 +53,7 @@ export function JourneyAuthoringBar({
       </div>
       <HeaderEditor ready={ready} />
       <Tombstones authored={authored} />
-      {banner ? <DrawingBanner drawing={drawing} /> : null}
+      <DrawingBanner drawing={drawing} />
     </section>
   );
 }

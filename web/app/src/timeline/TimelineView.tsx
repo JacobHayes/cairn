@@ -53,6 +53,30 @@ const SPAN_DAYS_MAX = 3650;
 /** Past this fraction of the width, a label on the axis reads leftward, so it stays on it. */
 const LABEL_FLIP_AT = 0.75;
 
+/** What a character of the axis's 11px mono labels takes (px), and the gap two labels keep between them. */
+const LABEL_CHAR_PX = 6.6;
+const LABEL_GAP_PX = 8;
+
+/** The stretch (px) a label of `words` takes along the axis from `x`, reading toward `anchor`'s side. */
+function spanOf(words: string, x: number, anchor: "start" | "end"): [number, number] {
+  const length = words.length * LABEL_CHAR_PX;
+  return anchor === "end" ? [x - length, x] : [x, x + length];
+}
+
+/**
+ * The end anchor's label on an axis `width` px wide: `full`, or, where it would run over the Today
+ * (or Start) label, just "Ends", the sentence under the bar already names the milestone.
+ * `now` is where that label sits (none when it is off the axis).
+ */
+export function endLabelWords(full: string, end: { at: number; anchor: "start" | "end" }, now: { at: number; anchor: "start" | "end"; words: string } | undefined, width: number): string {
+  if (now === undefined || width === 0) {
+    return full;
+  }
+  const [nowFrom, nowTo] = spanOf(now.words, now.at * width + (now.anchor === "end" ? -4 : 4), now.anchor);
+  const [from, to] = spanOf(full, end.at * width + (end.anchor === "end" ? -4 : 4), end.anchor);
+  return from < nowTo + LABEL_GAP_PX && nowFrom < to + LABEL_GAP_PX ? "Ends" : full;
+}
+
 const RANGE_WORDS: Record<Range, string> = { fit: "Fit", month: "Month", quarter: "Quarter" };
 
 /** The timeline's own settings, in the address: the range. */
@@ -119,6 +143,8 @@ function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => 
   const every = apart > 0 ? Math.ceil(TICK_LABEL_PX / apart) : Math.ceil(axis.ticks.length / TICK_LABEL_COUNT_MAX);
   const clear = (tick: { at: number }) => width === 0 || (tick.at * width < width - TICK_LABEL_EDGE_PX && (anchorAt === undefined || tick.at >= anchorAt || (anchorAt - tick.at) * width >= TICK_LABEL_EDGE_PX));
   const named = (tick: { at: number }, at: number) => at % every === 0 && clear(tick);
+  const nowWords = axis.mode === "calendar" ? "Today" : "Start";
+  const nowShown = axis.now >= 0 && axis.now <= 1;
   return (
     <svg ref={svg} className="timeline-axis-svg" width="100%" height={AXIS_PX} aria-hidden="true" data-testid="timeline-axis" data-unit={axis.unit}>
       <Backdrop axis={axis} height={AXIS_PX} />
@@ -128,19 +154,23 @@ function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => 
           {named(tick, at) ? tick.label : ""}
         </text>
       ))}
-      {axis.now < 0 || axis.now > 1 ? null : (
+      {nowShown ? (
         <text className="timeline-today-label" x={percent(axis.now)} y={32} dx={dx(axis.now)} textAnchor={textAnchor(axis.now)} data-testid="timeline-now">
-          {axis.mode === "calendar" ? "Today" : "Start"}
+          {nowWords}
         </text>
-      )}
+      ) : null}
       {end === undefined || anchorAt === undefined ? (
         <text className="timeline-end-label" x="100%" y={32} dx={-4} textAnchor="end" data-testid="timeline-no-end">
           No final milestone
         </text>
       ) : (
         <text className="timeline-end-label" x={percent(anchorAt)} y={32} dx={dx(anchorAt)} textAnchor={textAnchor(anchorAt)}>
-          Ends: {endTitle(end.node)}
-          {axis.mode === "relative" ? ` · ${dayWords(end.day)}` : ""}
+          {endLabelWords(
+            `Ends: ${endTitle(end.node)}${axis.mode === "relative" ? ` · ${dayWords(end.day)}` : ""}`,
+            { at: anchorAt, anchor: textAnchor(anchorAt) },
+            nowShown ? { at: axis.now, anchor: textAnchor(axis.now), words: nowWords } : undefined,
+            width,
+          )}
         </text>
       )}
     </svg>

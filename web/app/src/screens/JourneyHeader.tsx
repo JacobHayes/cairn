@@ -3,7 +3,7 @@
 // route, re-link it, copy its link, and its Status: the moves the status allows, B11, and
 // deletion once archived, A19). What the journey is (progress, next milestone, route) is on the
 // journey card in the inspector. When completion is suggested, a band under the header offers it.
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { Link, useLocation } from "react-router";
 
 import { AssistantDock, journeyTitles } from "../assistant/AssistantPanel.tsx";
@@ -154,6 +154,28 @@ function JourneyMenu({ ready, view, screen, selected, write, onPanel }: { ready:
   );
 }
 
+/** Whether `name`, in the button `ref`, is cut by its line clamp now (or was, while it is open): what the cue is for. */
+function useClamped(ref: React.RefObject<HTMLElement | null>, name: string, open: boolean): boolean {
+  const [clamped, setClamped] = useState(false);
+  useLayoutEffect(() => {
+    const element = ref.current;
+    if (element === null) {
+      return undefined;
+    }
+    const measure = () => {
+      // Open, the name is whole: it was cut if it runs past the clamp's lines.
+      const style = getComputedStyle(element);
+      const lines = Number(style.getPropertyValue("--name-lines")) || 2;
+      setClamped(open ? element.scrollHeight > lines * Number.parseFloat(style.lineHeight) + 1 : element.scrollHeight > element.clientHeight + 1);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+    return () => { observer.disconnect(); };
+  }, [ref, name, open]);
+  return clamped;
+}
+
 /** `view` is the canvas as the page shows it, or the canvas's defaults off the graph: Edit structure keeps it. */
 export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready; view: GraphView; screen: Screen; selected: string | undefined }) {
   const { header, revision } = ready.journey;
@@ -163,15 +185,18 @@ export function JourneyHeader({ ready, view, screen, selected }: { ready: Ready;
   const { search } = useLocation();
   const [panel, setPanel] = useState<Panel | undefined>(undefined);
   const [nameOpen, setNameOpen] = useState(false);
+  const nameButton = useRef<HTMLButtonElement>(null);
+  const clamped = useClamped(nameButton, header.name, nameOpen);
   return (
     <section className="stack journey-header" aria-label={header.name} data-testid="journey-header">
       <div className="row">
         <div className="journey-header-title">
           <h1 data-testid="journey-name" data-expanded={nameOpen} title={header.name}>
             {/* A long name is clamped to two lines; a tap or click reads it whole, where a tooltip cannot be reached. */}
-            <button type="button" className="journey-name-toggle" aria-expanded={nameOpen} onClick={() => { setNameOpen(!nameOpen); }}>
+            <button ref={nameButton} type="button" className="journey-name-toggle" aria-expanded={nameOpen} onClick={() => { setNameOpen(!nameOpen); }}>
               {header.name}
             </button>
+            {clamped ? <span className="journey-name-cue" aria-hidden="true" data-testid="journey-name-cue">{nameOpen ? "\u25b4" : "\u25be"}</span> : null}
           </h1>
           <JourneyStatusChip status={header.status} />
         </div>

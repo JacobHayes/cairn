@@ -57,12 +57,8 @@ export interface AssistantDock {
 
 /** What a screen tells the shell. Stable for the shell's life, so effects keyed on it run once. */
 export interface FrameActions {
-  /**
-   * Something is in `slot`'s pane until the returned function is called. `asked` is false for
-   * what is there without being asked for (the journey card): over a phone's full-screen map
-   * that stays in the page behind it rather than becoming a sheet.
-   */
-  mount: (slot: InspectorTab, asked?: boolean) => () => void;
+  /** Something is in `slot`'s pane until the returned function is called. */
+  mount: (slot: InspectorTab) => () => void;
   /** Brings `tab` into view whatever the viewer left in its way: the other tab, a hidden column. */
   show: (tab: InspectorTab) => void;
   /** The assistant can be opened (its tab is offered) until the returned function is called. */
@@ -100,7 +96,7 @@ function useScrollToColumn(column: HTMLElement | null | undefined, focus: string
     return () => {
       cancelAnimationFrame(frame);
     };
-    // Picking another node brings it into view; the map opening or closing does not.
+    // Picking another node brings it into view.
   }, [focus, column, reveal]);
 }
 
@@ -114,12 +110,11 @@ function useScrollToColumn(column: HTMLElement | null | undefined, focus: string
 export function Inspector({ focus, reveal = true, children }: { focus: string; reveal?: boolean; children: ReactNode }) {
   const actions = useFrameActions();
   const state = useFrameState();
-  const { search } = useLocation();
   const addresses = useNodeAddresses();
   const close = addresses.close();
   // Layout effects, so the column appears in the same commit as the screen that fills it: a second
   // render after paint could land in a ResizeObserver delivery and make the canvas resize twice.
-  useLayoutEffect(() => actions?.mount("inspector", reveal), [actions, reveal]);
+  useLayoutEffect(() => actions?.mount("inspector"), [actions]);
   useLayoutEffect(() => {
     if (reveal) {
       actions?.show("inspector");
@@ -133,8 +128,7 @@ export function Inspector({ focus, reveal = true, children }: { focus: string; r
     }
   }, [body, focus]);
   // On a phone the inspector stacks under the whole page: bring it into view, or opening a node looks like nothing happened.
-  const mapOpen = new URLSearchParams(search).get("map") === "1";
-  useScrollToColumn(state?.inspector?.parentElement, focus, reveal && !mapOpen);
+  useScrollToColumn(state?.inspector?.parentElement, focus, reveal);
   useEffect(() => {
     actions?.closeTo(close);
     return () => {

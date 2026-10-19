@@ -20,13 +20,29 @@ export async function keysOf(page: Page, testId: string): Promise<string[]> {
   return page.getByTestId(testId).evaluateAll((rows) => rows.map((row) => row.getAttribute("data-node") ?? ""));
 }
 
+/** Runs `read` with the Frontier chip in reach: on a phone it lives in the Controls menu, opened for the read and closed after. */
+export async function withFrontier<T>(page: Page, read: (chip: Locator) => Promise<T>): Promise<T> {
+  const chip = page.getByTestId("chip-frontier");
+  const controls = page.getByTestId("controls-button");
+  const folded = (await controls.count()) > 0;
+  if (folded) {
+    await controls.click();
+  }
+  const result = await read(chip);
+  if (folded) {
+    await page.keyboard.press("Escape");
+  }
+  return result;
+}
+
 /** Turns the Frontier chip on or off, on the list or any other view that has it. */
 export async function setFrontier(page: Page, on: boolean): Promise<void> {
-  const chip = page.getByTestId("chip-frontier");
-  if ((await chip.getAttribute("aria-pressed")) !== String(on)) {
-    await chip.click();
-  }
-  await expect(chip).toHaveAttribute("aria-pressed", String(on));
+  await withFrontier(page, async (chip) => {
+    if ((await chip.getAttribute("aria-pressed")) !== String(on)) {
+      await chip.click();
+    }
+    await expect(chip).toHaveAttribute("aria-pressed", String(on));
+  });
 }
 
 /** The list's rows on the acting frontier (Frontier on), in order. */

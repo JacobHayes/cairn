@@ -159,10 +159,10 @@ describe("opening and closing a node keeps the view", () => {
 });
 
 describe("switching views", () => {
-  const search = `?${new URLSearchParams({ depth: "decisions", frontier: "1", sort: "due", cols: "rank", range: "3m", open: "n_a", map: "1" }).toString()}`;
+  const search = `?${new URLSearchParams({ depth: "decisions", frontier: "1", sort: "due", cols: "rank", range: "3m", open: "n_a" }).toString()}`;
   const paramsOf = (path: string) => new URLSearchParams(path.split("?")[1] ?? "");
 
-  it("keeps the whole query but the full-screen map, so switching back restores the other views' settings", () => {
+  it("keeps the whole query, so switching back restores the other views' settings", () => {
     const to = paramsOf(screenSwitched(JOURNEY, `${search}&view=graph`, "list"));
     expect(Object.fromEntries(to)).toEqual({ view: "list", depth: "decisions", frontier: "1", sort: "due", cols: "rank", range: "3m", open: "n_a" });
     const back = paramsOf(screenSwitched(JOURNEY, `?${to.toString()}`, "graph"));

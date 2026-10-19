@@ -6,7 +6,7 @@ import { describe, expect, it } from "vitest";
 import { testView } from "../detail/view.test-support.ts";
 import { summaryModel } from "../summary/model.ts";
 import type { StatusSummary } from "../summary/model.ts";
-import { forYouOf, forYouWords, leadFact, milestoneOf, troubleOf, troubleWords, yoursOf, type ForYou, type Trouble } from "./figures-model.ts";
+import { forYouOf, forYouWords, milestoneOf, troubleOf, troubleWords, yoursOf, type Trouble } from "./figures-model.ts";
 
 const entries = (...nodes: string[]) => nodes.map((node) => ({ node, kinds: ["k_owner"] }));
 
@@ -69,25 +69,6 @@ describe("the viewer's part in a journey", () => {
   it("holds no current work in a journey that is not active", () => {
     expect(forYouOf(view, "completed", mineOpen, 2)).toEqual({ kind: "inactive" });
     expect(forYouWords({ kind: "inactive" })).not.toBe(forYouWords({ kind: "nothing" }));
-  });
-});
-
-describe("the one fact a phone row leads with", () => {
-  const bad: Trouble = { kind: "overdue", count: 1, tone: "bad" };
-  const warn: Trouble = { kind: "stale", count: 1, tone: "warn" };
-  const calm: Trouble = { kind: "stalled", count: 1, tone: undefined };
-  const ready: ForYou = { kind: "ready", count: 2 };
-  const waiting: ForYou = { kind: "waiting" };
-  const cases: [string, Trouble[], ForYou, ReturnType<typeof leadFact>][] = [
-    ["an error beats what is ready", [bad], ready, "trouble"],
-    ["what is ready beats a warning", [warn], ready, "for-you"],
-    ["a warning beats waiting", [warn], waiting, "trouble"],
-    ["waiting beats an untoned wait", [calm], waiting, "for-you"],
-    ["an untoned wait alone leads with nothing", [calm], { kind: "nothing" }, undefined],
-    ["nothing at all leads with nothing", [], { kind: "nothing-open" }, undefined],
-  ];
-  it.each(cases)("%s", (_name, troubles, forYou, expected) => {
-    expect(leadFact(troubles, forYou)).toBe(expected);
   });
 });
 

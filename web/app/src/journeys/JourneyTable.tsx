@@ -11,7 +11,7 @@ import { useRetryJourney } from "../data/react.ts";
 import type { JourneySummary, RouteSummary } from "../data/reads.ts";
 import { Badge, Meter } from "../ui/kit.tsx";
 import { routePath } from "../routes/address.ts";
-import { forYouOf, forYouWords, leadFact, milestoneOf, progressOf, troubleOf, troubleWords, upgradeWords, type ForYou, type Trouble } from "./figures-model.ts";
+import { forYouOf, forYouWords, milestoneOf, progressOf, troubleOf, troubleWords, upgradeWords, type ForYou, type Trouble } from "./figures-model.ts";
 import { journeyPath } from "./address.ts";
 import { useMineCounts, useReportMine } from "./mine.ts";
 import { useJourneyReading, type JourneyReading } from "./reading.ts";
@@ -43,11 +43,13 @@ export function JourneyCell({ summary, routes }: { summary: JourneySummary; rout
         </Link>
         {summary.status === "active" ? null : <Badge>{summary.status}</Badge>}
       </span>
-      <span className="cell-second cell-lineage">
-        <Lineage summary={summary} routes={routes} />
+      <span className="cell-second">
+        <span className="cell-lineage">
+          <Lineage summary={summary} routes={routes} />
+        </span>
         {upgrade === undefined ? null : (
           <>
-            {" · "}
+            <span className="cell-lineage">{" · "}</span>
             <span className="flag-warn" data-testid="upgrade" data-status="available">
               {upgrade}
             </span>
@@ -63,7 +65,7 @@ function TroubleCell({ journey, troubles }: { journey: string; troubles: Trouble
   const [first, ...rest] = troubles;
   if (first === undefined) {
     return (
-      <td data-column="trouble" data-testid="row-trouble">
+      <td data-column="trouble" data-testid="row-trouble" data-kind="none">
         <span className="muted">None</span>
       </td>
     );
@@ -177,7 +179,7 @@ function ReadRow({ summary, routes, mine, report, rowRef }: RowProps) {
   const troubles = model === undefined ? [] : troubleOf(model, reading.view.derived.stalled != null);
   const forYou = forYouOf(reading.view, summary.status, reading.mine, reading.ready.length);
   return (
-    <tr ref={rowRef} {...attrsOf(summary)} data-lead={leadFact(troubles, forYou) ?? "none"}>
+    <tr ref={rowRef} {...attrsOf(summary)}>
       <JourneyCell summary={summary} routes={routes} />
       <TroubleCell journey={summary.id} troubles={troubles} />
       <ForYouCell journey={summary.id} forYou={forYou} />

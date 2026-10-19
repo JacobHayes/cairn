@@ -317,7 +317,6 @@ export function JourneyCanvas({ ready, view, selected, edge, onPick, selection }
         actions={actions}
         viewKey={refitKey(laidOut, view.edit)}
         label={`${ready.journey.header.name}: canvas`}
-        title={ready.journey.header.name}
         onEdge={(line) => void navigate(graphPath(journey, view, { edge: `${line.from}~${line.to}` }, location.search))}
         onBackground={() => {
           if (selection.members.length > 0) {

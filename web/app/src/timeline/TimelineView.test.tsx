@@ -8,7 +8,7 @@ import { testView } from "../detail/view.test-support.ts";
 import { treeOf, type Graph } from "../authoring/graph.ts";
 import { calendarSpec, dayOf, routeSpec, type Timeline } from "./model.ts";
 import { chartOf, routeChartOf, type ChartOptions } from "./rows.ts";
-import { TimelineChart, type TimelineChartProps } from "./TimelineView.tsx";
+import { endLabelWords, TimelineChart, type TimelineChartProps } from "./TimelineView.tsx";
 
 const view = testView();
 
@@ -104,5 +104,20 @@ describe("TimelineChart on a route's relative axis (C13)", () => {
     expect(markup).toContain('data-testid="timeline-now"');
     expect(drawn(timeline)).toContain("timeline-range");
     expect(markup).not.toContain("timeline-range");
+  });
+});
+
+describe("the end anchor's label (C13)", () => {
+  const full = "Ends: Decision meeting";
+  const now = { at: 0.2, anchor: "start" as const, words: "Today" };
+
+  it("keeps its milestone's name where it clears Today, and gives it up where it would run over Today", () => {
+    expect(endLabelWords(full, { at: 1, anchor: "end" }, now, 900)).toBe(full);
+    expect(endLabelWords(full, { at: 1, anchor: "end" }, now, 230)).toBe("Ends");
+  });
+
+  it("has nothing to clear when Today is off the axis or the axis is not measured yet", () => {
+    expect(endLabelWords(full, { at: 1, anchor: "end" }, undefined, 230)).toBe(full);
+    expect(endLabelWords(full, { at: 1, anchor: "end" }, now, 0)).toBe(full);
   });
 });

@@ -13,7 +13,7 @@
   /* The sheet's two heights. The tall one leaves room above it for a notice: a window's worth, less a notice. */
   --sheet-half: 40dvh;
   --sheet-full: min(85dvh, calc(100dvh - 160px));
-  /* DESIGN's four corner ticks (L-shaped, 8px, inset 3px) as background layers, for the ruled canvases: the graph, the timeline and the phone map. */
+  /* DESIGN's four corner ticks (L-shaped, 8px, inset 3px) as background layers, for the ruled canvases: the graph and the timeline. */
   --corner-ticks:
     linear-gradient(var(--color-tick), var(--color-tick)) left 3px top 3px / 8px 1px no-repeat,
     linear-gradient(var(--color-tick), var(--color-tick)) left 3px top 3px / 1px 8px no-repeat,
@@ -253,6 +253,12 @@ body {
     width: min(360px, calc(100vw - 2 * var(--space-3)));
   }
 }
+/* The top bar of a phone has no You tab; the link is for that width only. */
+@media (min-width: 720px) {
+  .sync-you {
+    display: none;
+  }
+}
 
 /* ---- the inspector column --------------------------------------------------------------------- */
 .frame > .inspector {
@@ -379,15 +385,15 @@ body {
   outline: 2px solid var(--chrome-muted);
   outline-offset: 2px;
 }
-/* The phone's stack is under the page and cannot be hidden. */
 .inspector-head .hide {
-  display: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
-@media (min-width: 720px) {
-  .inspector-head .hide {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
+/* Stacked under the page the column folds upward to its bar, so the chevron points up. */
+@media (max-width: 719px) {
+  .inspector-head .hide .fold-icon {
+    transform: rotate(-90deg);
   }
 }
 /* The sheet's grip sits in the middle of the head, behind its controls. */
@@ -433,72 +439,7 @@ body {
   padding: var(--inspector-pad);
 }
 
-/* ---- the map on a phone, and the sheet on a tablet ---------------------------------------------- */
-/* The canvas is transparent, so the preview and the map carry the ruling themselves. */
-.map-preview,
-.map-full {
-  background: var(--corner-ticks), var(--ruling), var(--color-ground);
-}
-.map-preview {
-  position: relative;
-  height: 40dvh;
-  border: 1px solid var(--color-border);
-}
-.map-inert {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-}
-.map-inert .canvas {
-  flex: 1 1 0;
-  min-height: 0;
-  border: 0;
-}
-.map-inert * {
-  pointer-events: none !important;
-}
-.map-open {
-  position: absolute;
-  right: var(--space-2);
-  bottom: var(--space-2);
-  z-index: 3;
-}
-.map-full {
-  position: fixed;
-  inset: 0;
-  z-index: 50;
-  height: 100dvh;
-  display: flex;
-  flex-direction: column;
-}
-.map-bar {
-  flex: none;
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-2);
-  border-bottom: 1px solid var(--color-border);
-}
-.map-title {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font: 400 15px / 1.4 var(--font-body);
-}
-.map-canvas {
-  flex: 1 1 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.map-canvas .canvas {
-  flex: 1 1 0;
-  min-height: 0;
-  border: 0;
-}
-
+/* ---- the sheet on a tablet ---------------------------------------------------------------------- */
 /* 720 to 1099px: the inspector is a bottom sheet over the workspace instead of a column, so the
    canvas keeps its own region and nothing falls below it into the page. */
 @media (min-width: 720px) and (max-width: 1099px) {
@@ -547,7 +488,7 @@ body {
 }
 
 /* Below 720px: one column the document scrolls. The rail is a top bar, the inspector stacks under the
-   workspace, and the map is a preview that opens full screen. */
+   workspace. */
 @media (max-width: 719px) {
   html,
   body,
@@ -556,9 +497,6 @@ body {
   }
   body {
     overflow: visible;
-  }
-  html:has(.frame[data-map="open"]) {
-    overflow: hidden;
   }
   .frame,
   .frame[data-inspector="off"] {
@@ -609,37 +547,13 @@ body {
   .inspector-body {
     overflow: visible;
   }
-  /* Over the full-screen map the column is a sheet, unless it is off (it holds only the journey card) and stays in the page behind. */
-  .frame[data-map="open"]:not([data-inspector="off"]) > .inspector {
-    display: flex;
-    position: fixed;
-    z-index: 60;
-    top: auto;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    height: var(--sheet-h, var(--sheet-half));
-    box-shadow: var(--shadow-lg);
-  }
-  .frame[data-map="open"]:not([data-inspector="off"]) > .inspector[data-snap="full"] {
-    height: var(--sheet-h, var(--sheet-full));
-  }
-  .frame[data-map="open"] .inspector-head .sheet-handle {
-    display: block;
-  }
-  .frame[data-map="open"] .inspector-head .hide {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-  }
-  /* Hidden over the map, the sheet is the same slim bar as a tablet's. */
-  .frame[data-map="open"] > .inspector[data-folded="true"] {
+  /* Hidden, the stacked column is a slim bar in the page that opens it. */
+  .frame > .inspector[data-folded="true"] {
     width: auto;
-    height: 24px;
-    box-shadow: none;
+    height: 32px;
   }
-  .frame[data-map="open"] .inspector-body {
-    overflow-y: auto;
+  .frame > .inspector[data-folded="true"] .inspector-rail {
+    height: 100%;
   }
 }
 
@@ -656,7 +570,7 @@ body {
   max-width: min(420px, calc(100% - 24px));
   pointer-events: none;
 }
-/* Above an open sheet (either height), and above the full-screen map. */
+/* Above an open sheet (either height). */
 @media (min-width: 720px) and (max-width: 1099px) {
   .frame[data-inspector="on"] .toasts {
     bottom: calc(var(--sheet-half) + var(--space-3));
@@ -665,16 +579,11 @@ body {
     bottom: calc(var(--sheet-full) + var(--space-3));
   }
 }
+/* A phone's page is one tall column: the toast stays on the window, not at the page's foot. */
 @media (max-width: 719px) {
-  .frame[data-map="open"] .toasts {
+  .toasts {
     position: fixed;
     z-index: 70;
-  }
-  .frame[data-map="open"][data-inspector="on"] .toasts {
-    bottom: calc(var(--sheet-half) + var(--space-3));
-  }
-  .frame[data-map="open"][data-inspector="on"]:has(.inspector[data-snap="full"]) .toasts {
-    bottom: calc(var(--sheet-full) + var(--space-3));
   }
 }
 /* The design's toast is fixed to the window; here the container places it, and the pointer pauses it. */
@@ -891,9 +800,11 @@ table.data {
 }
 
 /* On a phone each row is a block with an edge hairline, no inner cell borders. The header row stays
-   in the document for screen readers. Line 1 is the name; then the context, a wrapping steel line
-   (progress and next milestone, or type and version) whose pieces flow as one; then one attention
-   block in its own ink: the cell that leads (`data-lead`), the other left out, so nothing is said twice. */
+   in the document for screen readers. Line 1 is the name; then the upgrade notice when there is one
+   (the route and version it came from are for wider screens); then the context, a wrapping steel
+   line (progress and next milestone, or type and version) whose pieces flow as one; then one
+   attention line, each fact in its own ink: what needs a look and what is yours, both, since they
+   are independent. A fact that says nothing ("None", "Nothing yours") is left out. */
 @media (max-width: 719px) {
   .index-table table.data,
   .index-table tbody {
@@ -936,30 +847,41 @@ table.data {
   .index-table table.data td:is([data-column="progress"], [data-column="milestone"]) > * {
     order: 1;
   }
-  .index-table table.data td[data-column="milestone"] > .cell-first::before,
   .index-table table.data td[data-column="latest"]::before {
     content: "\00b7";
     margin-right: var(--space-2);
   }
+  .index-table table.data td[data-column="milestone"] > .cell-first {
+    margin-left: var(--space-2);
+  }
   .index-table table.data td[data-column="milestone"] > .cell-second {
     flex: 1 1 100%;
   }
-  .index-table table.data td:is([data-column="trouble"], [data-column="for-you"], [data-column="use"], [data-column="act"], [data-column="reading"]) {
+  .index-table table.data td:is([data-column="use"], [data-column="act"], [data-column="reading"]) {
     flex: 1 1 100%;
     order: 0;
+  }
+  .index-table table.data td:is([data-column="trouble"], [data-column="for-you"]) {
+    order: 0;
+    margin-right: var(--space-3);
+  }
+  /* The attention line ends here: what follows (the context) starts a line of its own. */
+  .index-table tr::after {
+    content: "";
+    flex: 1 1 100%;
+    height: 0;
   }
   .index-table table.data td.num .cell-first {
     justify-content: flex-start;
   }
   .index-table .cell-lineage,
-  .index-table td[data-column="trouble"] .cell-second,
   .index-table td.num .meter,
   .index-table table.data td[data-column="act"]:empty {
     display: none;
   }
-  .index-table tr[data-lead="trouble"] td[data-column="for-you"],
-  .index-table tr[data-lead="for-you"] td[data-column="trouble"],
-  .index-table tr[data-lead="none"] :is(td[data-column="trouble"], td[data-column="for-you"]) {
+  .index-table td[data-column="journey"] > .cell-second:not(:has(> [data-testid="upgrade"])),
+  .index-table td[data-column="trouble"][data-kind="none"],
+  .index-table td[data-for-you="nothing"] {
     display: none;
   }
 }
