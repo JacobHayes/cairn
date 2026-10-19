@@ -100,10 +100,8 @@ describe("TimelineChart on a route's relative axis (C13)", () => {
     expect(markup).toContain('data-end="n_ship" data-end-date="" data-end-day="12"');
   });
 
-  it("marks the start where a journey's timeline marks today, and offers no calendar presets", () => {
+  it("marks the start where a journey's timeline marks today", () => {
     expect(markup).toContain('data-testid="timeline-now"');
-    expect(drawn(timeline)).toContain("timeline-range");
-    expect(markup).not.toContain("timeline-range");
   });
 });
 

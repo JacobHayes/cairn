@@ -169,6 +169,8 @@ function useClamped(ref: React.RefObject<HTMLElement | null>, name: string, open
       setClamped(open ? element.scrollHeight > lines * Number.parseFloat(style.lineHeight) + 1 : element.scrollHeight > element.clientHeight + 1);
     };
     measure();
+    // The face arriving re-flows the name without resizing its box.
+    void document.fonts.ready.then(measure);
     const observer = new ResizeObserver(measure);
     observer.observe(element);
     return () => { observer.disconnect(); };

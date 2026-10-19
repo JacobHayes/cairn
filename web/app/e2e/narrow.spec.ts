@@ -96,3 +96,14 @@ test("a journey name cut by its clamp wears a mark that a tap opens it, and a wh
   await openActing(page, "browser", "j_launch", "list");
   await expect(cue).toHaveCount(0);
 });
+
+test("the timeline's Controls and range switch share one row, and a nested title keeps room", async ({ page }) => {
+  await openActing(page, "browser", "j_launch", "timeline");
+  const controls = await page.getByTestId("controls-button").boundingBox();
+  const range = await page.getByTestId("timeline-range").boundingBox();
+  expect(Math.abs((controls?.y ?? 0) - (range?.y ?? 99))).toBeLessThan(12);
+  expect((range?.x ?? 0) + (range?.width ?? 0)).toBeLessThanOrEqual(390);
+  // Rows below the cap sit at the same indent, so the titles of the deepest rows are as wide as the third level's.
+  const widths = await page.locator('[data-testid="timeline-entry"] .timeline-text').evaluateAll((all) => all.map((each) => each.getBoundingClientRect().width));
+  expect(Math.min(...widths)).toBeGreaterThan(60);
+});

@@ -7,7 +7,7 @@
 }
 
 /* Sentence case in the body face, like the switcher beside them: these are toolbar text, not labels. */
-.timeline-controls .segmented label {
+.view-controls-end .segmented label {
   font: 500 14px / 1.4 var(--font-body);
   letter-spacing: 0;
   text-transform: none;
@@ -77,6 +77,7 @@
 }
 
 .timeline-title {
+  padding-inline-start: calc(min(var(--depth), var(--tree-cap, 99)) * var(--space-5));
   display: flex;
   align-items: center;
   gap: var(--space-1);
@@ -300,7 +301,12 @@
 @media (max-width: 640px) {
   .timeline-axis,
   .timeline-body {
-    grid-template-columns: minmax(120px, 40%) minmax(0, 1fr);
+    grid-template-columns: minmax(120px, 52%) minmax(0, 1fr);
+  }
+
+  /* Nesting stops indenting after two levels, so a deep title keeps its room (it ends in an ellipsis, and a tap opens the node). */
+  .timeline-labels {
+    --tree-cap: 2;
   }
 
   .timeline-label {

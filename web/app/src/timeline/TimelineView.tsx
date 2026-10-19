@@ -10,7 +10,7 @@
 // a folded list. A row's title opens the node's detail (5.1) beside the timeline, which
 // explains its dates (F7).
 import { errorWords, valueOf } from "../data/keyed-read.ts";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { useLocation, useNavigate } from "react-router";
 
 import { useFolds, useLevel, useProjected } from "../canvas/hooks.ts";
@@ -258,7 +258,7 @@ function Label({ axis, row, selected, onFold, title }: { axis: Axis; row: ChartR
       data-container={row.shape === "span"}
       style={{ height: ROW_PX }}
     >
-      <div className="timeline-title" style={{ paddingInlineStart: `calc(${String(row.depth)} * var(--space-5))` }}>
+      <div className="timeline-title" style={{ "--depth": row.depth } as CSSProperties}>
         <TreeGuides depth={row.depth} guides={row.guides} open={row.open} />
         <TreeFold container={row.foldable} open={row.open} label={row.title} testId="timeline-fold" onFold={() => { onFold(row.key); }} />
         <div className="timeline-text" title={row.title}>
@@ -350,30 +350,44 @@ function Tracks({ chart, axis, selected, activate }: { chart: Chart; axis: Axis;
   );
 }
 
-/** The range (a journey's: its calendar presets), and the way back from a pan or a pinch: Fit, the whole span, which a route has with no presets. */
-function Controls({ range, panned, onChoose, onReset }: { range: Range | undefined; panned: boolean; onChoose: (value: string) => void; onReset: () => void }) {
-  if (range === undefined && !panned) {
+/** The way back from a pan or a pinch: the range's window again, or Fit, the whole span, which a route has with no presets. */
+function ResetPan({ range, panned, onReset }: { range: Range | undefined; panned: boolean; onReset: () => void }) {
+  if (!panned) {
     return null;
   }
   return (
     <div className="row timeline-controls">
-      {range === undefined ? null : <Segmented label="Range" value={range} options={RANGES.map((each) => ({ value: each, label: RANGE_WORDS[each] }))} onChange={onChoose} data-testid="timeline-range" />}
-      {panned ? (
-        <Button ghost data-testid="timeline-reset" onClick={onReset}>
-          {range === undefined ? "Fit" : `Back to ${RANGE_WORDS[range].toLowerCase()}`}
-        </Button>
-      ) : null}
+      <Button ghost data-testid="timeline-reset" onClick={onReset}>
+        {range === undefined ? "Fit" : `Back to ${RANGE_WORDS[range].toLowerCase()}`}
+      </Button>
     </div>
+  );
+}
+
+/** A journey's range presets, one switch at the end of the view controls' row (a new range starts the pan afresh, so choosing is only navigation). */
+function RangeSwitch({ range }: { range: Range }) {
+  const { pathname, search } = useLocation();
+  const navigate = useNavigate();
+  return (
+    <Segmented
+      label="Range"
+      value={range}
+      options={RANGES.map((each) => ({ value: each, label: RANGE_WORDS[each] }))}
+      onChange={(value) => { void navigate(`${pathname}${withParam(search, "range", value === "fit" ? undefined : value)}`); }}
+      data-testid="timeline-range"
+    />
   );
 }
 
 /** C13: the axis the rows lie on: the range's window, or the one a pan or a pinch moved to, which holds until the range or the step is chosen again. */
 function useAxis(spec: AxisSpec, days: readonly number[], key: string, preset: Window | undefined) {
-  const [dragged, setDragged] = useState<{ for: string; window: Window } | undefined>(undefined);
+  const [dragged, setDragged] = useState<Window | undefined>(undefined);
+  // A new range or step starts afresh, and coming back to an old one does not bring its pan back.
+  useEffect(() => { setDragged(undefined); }, [key]);
   const base = useMemo(() => axisOf(spec, days, preset), [spec, days, preset?.first, preset?.last]);
-  const held = dragged?.for === key ? dragged.window : undefined;
+  const held = dragged;
   const axis = useMemo(() => (held === undefined ? base : axisOf(spec, [], { first: Math.round(held.first), last: Math.round(held.last) })), [base, held, spec]);
-  return { axis, panned: held !== undefined, window: held ?? { first: base.start, last: base.end }, move: (window: Window) => { setDragged({ for: key, window }); }, reset: () => { setDragged(undefined); } };
+  return { axis, panned: held !== undefined, window: held ?? { first: base.start, last: base.end }, move: (window: Window) => { setDragged(window); }, reset: () => { setDragged(undefined); } };
 }
 
 export interface TimelineChartProps {
@@ -404,17 +418,11 @@ export interface TimelineChartProps {
 
 /** C13: a timeline: the rows of `chart` on one axis, with the controls, the end anchor's note and the folded list of what has no day. */
 export function TimelineChart({ chart, spec, viewKey, range, onFold, selected, title, endTitle, activate, anchorNote, empty, undated, anyScheduled }: TimelineChartProps) {
-  const { pathname, search } = useLocation();
-  const navigate = useNavigate();
   const preset = range === undefined ? undefined : rangeWindow(range, dateOf(spec.now));
   const { axis, panned, window, move, reset } = useAxis(spec, chart.days, viewKey, preset);
   const chartRef = useRef<HTMLDivElement>(null);
   useGestures(chartRef, window, move);
   useReveal(chartRef, selected);
-  const choose = (value: string) => {
-    reset();
-    void navigate(`${pathname}${withParam(search, "range", value === "fit" ? undefined : value)}`);
-  };
   return (
     <section
       className="stack timeline"
@@ -424,7 +432,7 @@ export function TimelineChart({ chart, spec, viewKey, range, onFold, selected, t
       data-end-date={axis.anchor === undefined || axis.mode !== "calendar" ? "" : dateOf(axis.anchor.day)}
       data-end-day={axis.anchor === undefined ? "" : axis.anchor.day}
     >
-      <Controls range={range} panned={panned} onChoose={choose} onReset={reset} />
+      <ResetPan range={range} panned={panned} onReset={reset} />
       <span className="muted small" data-testid="timeline-anchor">
         {anchorNote}
       </span>
@@ -490,7 +498,7 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
   const chart = useMemo(() => (timeline === undefined || level === undefined ? undefined : chartOf(ready, timeline, { drawn: level.nodes, open, selected, faded })), [ready, timeline, level, open, selected, faded]);
   return (
     <>
-      <ViewBar subject={journeySubject(ready)} screen="timeline" badges={badges} />
+      <ViewBar subject={journeySubject(ready)} screen="timeline" badges={badges} end={<RangeSwitch range={range} />} />
       {error !== undefined ? (
         <p className="callout callout-bad"><ReadFailed what="The timeline" error={error} /></p>
       ) : timeline === undefined || level === undefined || spec === undefined || chart === undefined ? (

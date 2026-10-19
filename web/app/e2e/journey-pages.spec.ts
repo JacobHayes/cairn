@@ -594,3 +594,13 @@ test("B11, A19, C16: the status moves from the menu's Status, and the header say
   await page.getByTestId("status-delete").click();
   await expect(page.getByTestId("delete-journey")).toBeVisible();
 });
+
+test("C13: a pan does not come back when the range is chosen away and back", async ({ page }) => {
+  await openAt(page, "browser", "j_vendor_eval", "timeline");
+  await page.getByTestId("timeline").hover();
+  await page.mouse.wheel(300, 0);
+  await expect(page.getByTestId("timeline-reset")).toBeVisible();
+  await page.getByTestId("timeline-range").getByText("Month", { exact: true }).click();
+  await page.getByTestId("timeline-range").getByText("Fit", { exact: true }).click();
+  await expect(page.getByTestId("timeline-reset")).toHaveCount(0);
+});
