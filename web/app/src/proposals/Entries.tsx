@@ -10,11 +10,10 @@ import { useNavigate } from "react-router";
 
 import { proposalAddress } from "../address.ts";
 import { destinationOf } from "../data/edit-record.ts";
-import { breakdownMutations } from "../authoring/StructureEditors.tsx";
+import { breakdownMutations, PieceRows, type Piece } from "../authoring/StructureEditors.tsx";
 import { slugOf } from "../authoring/keys.ts";
 import { Picker } from "../authoring/parts.tsx";
 import { journeyAuthored } from "../authoring/target.ts";
-import type { NodeKind } from "../authoring/graph.ts";
 import { isSegment, routeIndex } from "../data/reads.ts";
 import { isPatchAnswer } from "../data/writes.ts";
 import { newProposalId, proposalOf } from "../data/proposals.ts";
@@ -24,7 +23,6 @@ import type { Ready } from "../detail/model.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button, Field, Panel } from "../ui/kit.tsx";
-import { PIECE_KINDS } from "./model.ts";
 import { useProposalWrite, type ProposalAsk, type ProposalWrite } from "./write.ts";
 
 type ProposalAnswer = Schema<"ProposalAnswer">;
@@ -149,19 +147,11 @@ export function JourneyFlow({ ready, flow, onClose }: { ready: Ready; flow: Jour
   );
 }
 
-interface Piece {
-  kind: NodeKind;
-  title: string;
-}
-
 /** B10: break `node` down: the pieces typed here open a proposal adding them beneath it. Shown while its owner has it open. */
 export function BreakDown({ ready, node, onCancel }: { ready: Ready; node: { key: string; title: string }; onCancel: () => void }) {
   const { write, start } = useDraftAndOpen(`breakdown:${ready.journey.header.id}:${node.key}`, node.title);
   const [pieces, setPieces] = useState<Piece[]>([{ kind: "action", title: "" }]);
   const filled = pieces.filter((piece) => piece.title.trim() !== "");
-  const set = (at: number, piece: Partial<Piece>) => {
-    setPieces(pieces.map((each, index) => (index === at ? { ...each, ...piece } : each)));
-  };
   const propose = () => {
     // The pieces' keys are minted once, with the ask: the write keeps the draft, so a resend sends the same one.
     const draft = { title: `Break down ${node.title}`, destination_revision: ready.journey.revision, mutations: breakdownMutations(journeyAuthored(ready), node.key, filled) };
@@ -169,12 +159,7 @@ export function BreakDown({ ready, node, onCancel }: { ready: Ready; node: { key
   };
   return (
     <div className="stack" data-testid="break-down-form" data-node={node.key}>
-      {pieces.map((piece, at) => (
-        <span key={at} className="row" data-testid="piece">
-          <Picker aria-label="Kind of piece" value={piece.kind} options={PIECE_KINDS.map((kind) => ({ value: kind, label: kind }))} onChange={(event) => { set(at, { kind: event.target.value as NodeKind }); }} />
-          <Field aria-label="Piece title" placeholder="What it is" value={piece.title} onChange={(event) => { set(at, { title: event.target.value }); }} />
-        </span>
-      ))}
+      <PieceRows pieces={pieces} onChange={setPieces} />
       <span className="row">
         <Button onClick={() => { setPieces([...pieces, { kind: "action", title: "" }]); }}>Another piece</Button>
         <Button primary disabled={write.disabled || filled.length === 0} onClick={propose} data-testid="propose-breakdown">

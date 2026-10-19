@@ -4,10 +4,10 @@
 // without a page.
 import { missingEvidence } from "../acting/acts.ts";
 import { breakable } from "../proposals/model.ts";
-import { answerable, isBlocked, isTerminal, movesFrom, type NodeDetail, type Ready } from "./model.ts";
+import { isBlocked, isTerminal, movesFrom, nodeOf, recordOf, storedSnooze, titleOf, type NodeDetail, type Ready } from "./model.ts";
 
-/** The action in the row beside the form: what a person does to the node in one move. */
-export type Act = "done" | "done-with-evidence" | "start" | "reach" | "reach-now" | "break-down" | "mark-atomic" | "unsnooze";
+/** The action beside a node, on any surface: what a person does to it in one move. */
+export type Act = "decide" | "done" | "done-with-evidence" | "start" | "reach" | "reach-now" | "break-down" | "mark-atomic" | "unsnooze";
 
 export interface Offered {
   /** The one primary, none when the node is finished, does not apply, or is a stage. */
@@ -17,12 +17,25 @@ export interface Offered {
   waiting: boolean;
 }
 
-/** The primary and secondary actions of a node that is not a decision awaiting its answer. */
-export function offered(view: Ready, detail: NodeDetail): Offered {
-  const { node, derived, record } = detail;
+/**
+ * B6: the node whose snooze Unsnooze lifts for `key`: its own snooze, else the container's
+ * holding it (a node cannot be unsnoozed through a snooze it does not have; a container with a
+ * snooze of its own and another above it lifts its own first). None when nothing holds it.
+ */
+export function unsnoozeOf(view: Ready, key: string): string | undefined {
+  return storedSnooze(view, key) ? key : (view.derived.nodes[key]?.snoozed_via ?? undefined);
+}
+
+/** The one place that decides which actions a node offers, for every surface that shows them: rows, the inspector, the graph's menu, the folds. A decision awaiting its answer offers Decide. */
+export function offered(view: Ready, key: string): Offered {
+  const node = nodeOf(view, key);
+  const derived = view.derived.nodes[key];
+  if (node === undefined || derived === undefined) {
+    return { primary: undefined, secondary: [], waiting: false };
+  }
+  const record = recordOf(view, node);
   const shown = derived.display_state;
-  const stored = view.journey.graph.state?.snoozes?.[node.key] !== undefined;
-  const snooze: Act[] = stored ? ["unsnooze"] : [];
+  const snooze: Act[] = unsnoozeOf(view, key) === undefined ? [] : ["unsnooze"];
   if (shown === "done" || shown === "skipped" || shown === "not_relevant" || isTerminal(record.state)) {
     return { primary: undefined, secondary: [], waiting: false };
   }
@@ -38,7 +51,7 @@ export function offered(view: Ready, detail: NodeDetail): Offered {
     case "milestone":
       return { primary: shown === "scheduled" ? "reach-now" : "reach", secondary: snooze, waiting };
     case "decision":
-      return { primary: undefined, secondary: snooze, waiting };
+      return { primary: record.state === "open" ? "decide" : undefined, secondary: snooze, waiting: false };
     default: {
       if (!moves.includes("complete")) {
         return { primary: undefined, secondary: snooze, waiting: false };
@@ -157,32 +170,38 @@ export function menuOf(view: Ready, detail: NodeDetail): MenuItem[][] {
 }
 
 /** What a node's context menu on the graph can ask for: the row's actions, the `⋯` entries, and where else to see the node. */
-export type ContextId = MenuId | Act | "decide" | "show-in-list" | "toggle-selection";
+export type ContextId = MenuId | Act | "show-in-list" | "toggle-selection";
 
-const ACT_LABELS: Record<Act, string> = {
+/** What each action says, wherever it is shown. */
+export const ACT_LABELS: Record<Act, string> = {
+  decide: "Decide",
   done: "Mark done",
   "done-with-evidence": "Mark done…",
   start: "Start",
-  reach: "Mark reached…",
+  reach: "Mark reached",
   "reach-now": "Confirm reached now",
-  "break-down": "Break down…",
+  "break-down": "Break down",
   "mark-atomic": "Mark atomic",
   unsnooze: "Unsnooze",
 };
 
+/** What `act` says for `key`: Unsnooze names the container when its snooze is the one holding the node. */
+export function actLabel(view: Ready, key: string, act: Act): string {
+  const holder = act === "unsnooze" ? unsnoozeOf(view, key) : undefined;
+  return holder === undefined || holder === key ? ACT_LABELS[act] : `${ACT_LABELS[act]} ${titleOf(view, holder)}`;
+}
+
 /**
- * The context menu's groups: the row's actions (a decision awaiting its answer says Decide…),
+ * The context menu's groups: the row's actions (a decision awaiting its answer says Decide),
  * then the `⋯` menu's groups as they are, with where to find the node being the graph's
  * counterpart: the list. On the canvas, where cards are selected, the last group adds the node
  * to the selection or takes it out (`member`: it is in it), which is how touch selects several.
  */
 export function contextMenuOf(view: Ready, detail: NodeDetail, member?: boolean): MenuItem<ContextId>[][] {
-  const offers = offered(view, detail);
+  const key = detail.node.key;
+  const offers = offered(view, key);
   const acts: Act[] = [...(offers.primary === undefined || offers.waiting ? [] : [offers.primary]), ...offers.secondary];
-  const row: MenuItem<ContextId>[] = [
-    ...(detail.record.state === "open" && answerable(detail.node.kind, detail.record.state) ? [{ id: "decide" as const, label: "Decide…" }] : []),
-    ...acts.map((id) => ({ id, label: ACT_LABELS[id] })),
-  ];
+  const row: MenuItem<ContextId>[] = acts.map((id) => ({ id, label: actLabel(view, key, id) }));
   const rest = menuOf(view, detail).map((group) => group.flatMap((item): MenuItem<ContextId>[] => (item.id === "show-in-graph" ? [{ id: "show-in-list", label: "Show in list" }] : [item])));
   const select: MenuItem<ContextId>[] = member === undefined ? [] : [{ id: "toggle-selection", label: member ? "Remove from selection" : "Add to selection" }];
   return [row, ...rest, select].filter((group) => group.length > 0);

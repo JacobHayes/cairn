@@ -6,6 +6,7 @@
 // Cost: an index is one pass over the nodes; every walk is bounded by the graph's size.
 import type { Schema } from "@cairn/client";
 import { NODE_GONE } from "../ui/gone.ts";
+import { mintKey, slugOf, uniqueId } from "./keys.ts";
 
 export type Graph = Schema<"Graph">;
 export type GraphNode = Schema<"Node">;
@@ -133,4 +134,15 @@ export function edgeRefusal(tree: Tree, node: string, requires: string): string 
 export function moveTargets(tree: Tree, key: string): GraphNode[] {
   const below = new Set(descendantsOf(tree, key).map((node) => node.key));
   return nodesByPath(tree).filter((node) => canHoldChildren(node.kind) && node.key !== key && !below.has(node.key));
+}
+
+/**
+ * A new node of `kind` titled `title` under `parent`, with a fresh key and an id unique among its
+ * siblings (those in `tree` and any `pending` additions). A decision asks its title as a yes-or-no question.
+ */
+export function newNode(tree: Tree, kind: NodeKind, title: string, parent: string | undefined, pending: readonly GraphNode[] = []): GraphNode {
+  const taken = new Set([...childrenOf(tree, parent).map((child) => child.id), ...pending.filter((node) => (node.parent ?? undefined) === parent).map((node) => node.id)]);
+  const node: GraphNode = { key: mintKey("n_"), id: uniqueId(slugOf(title), taken), kind, title: title.trim() };
+  const placed = parent === undefined ? node : { ...node, parent };
+  return kind === "decision" ? { ...placed, prompt: title.trim(), answer_type: "boolean" } : placed;
 }

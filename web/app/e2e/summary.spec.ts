@@ -39,7 +39,7 @@ test("C10, E1: Done on a row of Waiting on you acts in place, and the lead moves
   const doneBefore = Number(await page.locator('[data-testid="summary-states"] [data-state="done"]').getAttribute("data-count"));
   const row = yours.locator('[data-testid="summary-item"][data-node="n_announcement"]');
   await row.hover();
-  await row.getByRole("button", { name: "Done", exact: true }).click();
+  await row.getByRole("button", { name: "Mark done", exact: true }).click();
   await expect(row).toHaveCount(0);
   // What is left is what the derivation now says (finishing a node can finish what it alone held up), so it is less, not "one less".
   await expect.poll(async () => Number(await left.getAttribute("data-remaining"))).toBeLessThan(before);

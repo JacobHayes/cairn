@@ -6,21 +6,12 @@
 import { useDraft } from "../data/drafts.ts";
 import { wrapRoots } from "../segments/model.ts";
 import { Button, Field } from "../ui/kit.tsx";
-import { KINDS, canHoldChildren, kindOption, childrenOf, nodesByPath, pathOf, type GraphNode, type NodeKind } from "./graph.ts";
-import { mintKey, slugOf, uniqueId } from "./keys.ts";
+import { KINDS, canHoldChildren, childrenOf, kindOption, newNode, nodesByPath, pathOf, type GraphNode, type NodeKind } from "./graph.ts";
 import { NODE_COUNT_MAX, TITLE_BYTES_MAX, overBytes } from "./limits.ts";
 import { Picker } from "./parts.tsx";
 import { Refusal } from "./StructureEditors.tsx";
 import { domainOf, type Authored } from "./target.ts";
 import { useAuthorWrite } from "./write.ts";
-
-/** A new node of `kind` titled `title` under `parent`, with a fresh key and a sibling-unique id. */
-export function newNode(authored: Authored, kind: NodeKind, title: string, parent: string | undefined): GraphNode {
-  const taken = new Set(childrenOf(authored.tree, parent).map((child) => child.id));
-  const node: GraphNode = { key: mintKey("n_"), id: uniqueId(slugOf(title), taken), kind, title: title.trim() };
-  const placed = parent === undefined ? node : { ...node, parent };
-  return kind === "decision" ? { ...placed, prompt: title.trim(), answer_type: "boolean" } : placed;
-}
 
 export interface AddNodeProps {
   authored: Authored;
@@ -77,15 +68,15 @@ export function AddNode({ authored, container, onAdded }: AddNodeProps) {
     if (second) {
       return;
     }
-    const node = newNode(authored, kind, title, parent === "" ? undefined : parent);
+    const node = newNode(authored.tree, kind, title, parent === "" ? undefined : parent);
     void write.run([{ op: "add_node", node }]).then(added(node));
   };
   const addUnder = (under: GraphNode) => {
-    const node = newNode(authored, kind, title, under.key);
+    const node = newNode(authored.tree, kind, title, under.key);
     void write.run([{ op: "add_node", node }]).then(added(node));
   };
   const wrap = (rest: GraphNode) => {
-    const node = newNode(authored, kind, title, undefined);
+    const node = newNode(authored.tree, kind, title, undefined);
     void write.run(wrapRoots([rest], authored.route?.header.name ?? "", [node])).then(added(node));
   };
   return (

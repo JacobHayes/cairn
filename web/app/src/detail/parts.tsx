@@ -9,6 +9,7 @@ import { useNodeAddresses } from "../journeys/address.ts";
 import { Markdown } from "../ui/markdown.tsx";
 import { setFold, useFold } from "./folds.ts";
 import { titleOf, type Ready } from "./model.ts";
+import { entityName } from "./sections.tsx";
 
 /** B2: an answer's rationale as the journey records it, rendered as markdown. */
 export function Rationale({ text }: { text: string | undefined }) {
@@ -103,4 +104,13 @@ export function Contributions({
       ))}
     </ul>
   );
+}
+
+/** E6: the people the deployment lists, as a select's options, each by its name through any merge. */
+export function EntityOptions({ view }: { view: Ready }) {
+  return (view.inputs.deployment.entities ?? []).map((each) => (
+    <option key={each.key} value={each.key}>
+      {entityName(view, each.key)}
+    </option>
+  ));
 }

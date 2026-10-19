@@ -3,7 +3,8 @@
 import { describe, expect, it } from "vitest";
 
 import { nodeDetail, type NodeDerived, type Ready } from "./model.ts";
-import { contextMenuOf, menuOf, offered } from "./offers.ts";
+import { actMutation } from "./ActButton.tsx";
+import { actLabel, contextMenuOf, menuOf, offered, unsnoozeOf } from "./offers.ts";
 import { plainSentence, sentenceOf } from "./sentence.ts";
 import { setAsideOptions } from "./snooze.ts";
 import { testView } from "./view.test-support.ts";
@@ -31,7 +32,7 @@ describe("the inspector's offers", () => {
     const view = made("n_when", { display_state: "done" });
     view.journey.graph.state = { ...view.journey.graph.state, nodes: { ...view.journey.graph.state?.nodes, n_when: { state: "decided", provenance: "local" } } };
     expect(menuOf(view, detailOf(view, "n_when")).map((group) => group.map((item) => item.id))).toEqual([["reopen"], ["rename", "assign", "weight"], ["show-in-graph", "edit-node", "copy-link"]]);
-    expect(offered(view, detailOf(view, "n_when")).primary).toBeUndefined();
+    expect(offered(view, "n_when").primary).toBeUndefined();
   });
 
   it("opens the graph's context menu with the row's actions, then the menu's groups, finding the node in the list not the graph it is on", () => {
@@ -49,12 +50,37 @@ describe("the inspector's offers", () => {
 
   it("offers a placeholder to break down Break down, with Mark atomic beside it and no Mark done (B10)", () => {
     const view = made("n_findings", { needs_breakdown: true });
-    expect(offered(view, detailOf(view, "n_findings"))).toEqual({ primary: "break-down", secondary: ["mark-atomic"], waiting: false });
+    expect(offered(view, "n_findings")).toEqual({ primary: "break-down", secondary: ["mark-atomic"], waiting: false });
+  });
+
+  it("offers a decision awaiting its answer Decide, and nothing once it is decided", () => {
+    expect(offered(testView(), "n_when").primary).toBe("decide");
+    const decided = made("n_when", { display_state: "done" });
+    expect(offered(decided, "n_when").primary).toBeUndefined();
+  });
+
+  it("offers Unsnooze of the container holding a node that has no snooze of its own (B6), and says whose", () => {
+    const view = made("n_findings", { display_state: "snoozed", snoozed_via: "n_stage" });
+    expect(offered(view, "n_findings").secondary).toEqual(["start", "unsnooze"]);
+    expect(unsnoozeOf(view, "n_findings")).toBe("n_stage");
+    expect(actMutation(view, "unsnooze", "n_findings")).toEqual({ op: "unsnooze", node: "n_stage" });
+    expect(actLabel(view, "n_findings", "unsnooze")).toContain("Stage");
+    expect(unsnoozeOf(testView(), "n_findings")).toBeUndefined();
+    // A container with a snooze of its own lifts that before the one above it.
+    view.journey.graph.state = { ...view.journey.graph.state, snoozes: { n_findings: { date: "2026-12-01" } } };
+    expect(unsnoozeOf(view, "n_findings")).toBe("n_findings");
+  });
+
+  it("names a scheduled milestone's reach the same on the row and in the graph's menu", () => {
+    const view = made("n_meeting", { display_state: "scheduled" });
+    const menu = contextMenuOf(view, detailOf(view, "n_meeting"))[0] ?? [];
+    expect(offered(view, "n_meeting").primary).toBe("reach-now");
+    expect(menu.map((item) => item.label)).toContain(actLabel(view, "n_meeting", "reach-now"));
   });
 
   it("offers Mark done with Start beside it, which waits when something it requires is not done", () => {
-    expect(offered(testView(), detailOf(testView(), "n_findings"))).toEqual({ primary: "done", secondary: ["start"], waiting: false });
-    expect(offered(testView(), detailOf(testView(), "n_report")).waiting).toBe(true);
+    expect(offered(testView(), "n_findings")).toEqual({ primary: "done", secondary: ["start"], waiting: false });
+    expect(offered(testView(), "n_report").waiting).toBe(true);
   });
 
   it("offers a snooze the node, then each container above it with its open count", () => {

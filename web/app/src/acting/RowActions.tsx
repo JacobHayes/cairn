@@ -1,6 +1,6 @@
-// C10, C11, E1: what a row offers at its right end: its primary action (Done, or Done... when
-// a note or link is needed first; Start for work not begun; Mark reached; Decide, which opens
-// the inspector's form), and who owns it (You, or an inline Assign when nobody does). Each is
+// C10, C11, E1: what a row offers at its right end: the actions the node offers everywhere
+// (detail/offers.ts: Mark done, or Mark done... when a note or link is needed first; Start; Mark
+// reached; Decide, Break down and Mark atomic, which open or finish in the inspector), and who owns it (You, or an inline Assign when nobody does). Each is
 // one patch through the shell's write path, its rejection shown under the row (A15, D4).
 // Anything more is one click away in the inspector. The write's feedback is the shell's
 // notices; this is the one place a row sends from.
@@ -8,13 +8,15 @@ import type { ReactNode } from "react";
 import { useNavigate } from "react-router";
 
 import { useViewer } from "../data/react.ts";
-import { DoneButton, EvidenceForm, type Needs } from "../detail/DoneEvidence.tsx";
-import { transition, type Ready } from "../detail/model.ts";
+import { ActButton, type Opens } from "../detail/ActButton.tsx";
+import { EvidenceForm, type Needs } from "../detail/DoneEvidence.tsx";
+import type { Ready } from "../detail/model.ts";
+import { offered } from "../detail/offers.ts";
+import { EntityOptions } from "../detail/parts.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
 import { entityName } from "../detail/sections.tsx";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "../detail/write.ts";
-import { Button } from "../ui/kit.tsx";
-import { actsFor, assignOwner, doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
+import { assignOwner, doneMutations, evidenceDraft, factsOf, missingEvidence, type EvidenceDraft } from "./acts.ts";
 import type { NodeRow } from "./why.ts";
 import { ownedBy } from "./yours.ts";
 
@@ -28,11 +30,7 @@ function AssignInline({ view, write, node }: { view: Ready; write: NodeWrite; no
       <span className="row-owner row-unassigned">Unassigned</span>
       <select className="row-assign row-owner-other" aria-label="Assign owner" data-testid="assign" disabled={write.disabled} value="" onChange={(event) => { void write.run([assignOwner(node, event.target.value)]); }}>
         <option value="">Assign</option>
-        {(view.inputs.deployment.entities ?? []).map((each) => (
-          <option key={each.key} value={each.key}>
-            {entityName(view, each.key)}
-          </option>
-        ))}
+        <EntityOptions view={view} />
       </select>
     </span>
   );
@@ -69,9 +67,10 @@ function RowEvidence({ write, node, needs, form }: { write: NodeWrite; node: str
 /**
  * The row's owner slot and primary action, and under the row the form and rejection they open.
  * With `owner` off (Mine, where every row is the viewer's) the slot says nothing unless the row
- * is unowned.
+ * is unowned. With `column` the screen has an Owner column that already says who (the inspector
+ * assigns), so the row says nothing of the owner.
  */
-export function RowActions({ view, row, to, owner = true }: { view: Ready; row: NodeRow; to: string; owner?: boolean }): ReactNode {
+export function RowActions({ view, row, to, owner = true, column = false }: { view: Ready; row: NodeRow; to: string; owner?: boolean; column?: boolean }): ReactNode {
   const navigate = useNavigate();
   const { viewer } = useViewer();
   const write = useNodeWrite(view, `acts:${row.key}`, row.key);
@@ -80,14 +79,24 @@ export function RowActions({ view, row, to, owner = true }: { view: Ready; row: 
   if (facts === undefined) {
     return null;
   }
-  const acts = actsFor(facts);
+  const offers = offered(view, row.key);
+  const acts = [...(offers.primary === undefined ? [] : [offers.primary]), ...offers.secondary];
   const needs = missingEvidence(view, facts.node);
-  const run = (mutations: Parameters<NodeWrite["run"]>[0]) => () => void write.run(mutations);
+  // C11: the inspector opens the form or the answer for a choice that arrives with the navigation (detail/Actions.tsx).
+  const open = (what: Opens) => {
+    if (what === "evidence") {
+      if (evidence.draft === undefined) {
+        evidence.open({ artifact: "", note: "" }, write.seen);
+      }
+    } else {
+      void navigate(to, { state: { choice: { node: row.key, id: what } } });
+    }
+  };
   const owners = (row.owners ?? []).map((key) => entityName(view, key)).join(", ");
   return (
     <>
       <div className="row-side">
-        {row.unassigned === true ? (
+        {column ? null : row.unassigned === true ? (
           <AssignInline view={view} write={write} node={row.key} />
         ) : !owner ? null : ownedBy(view, row.owners, viewer?.entities ?? []) ? (
           <span className="row-owner">You</span>
@@ -97,32 +106,9 @@ export function RowActions({ view, row, to, owner = true }: { view: Ready; row: 
           </span>
         )}
         <span className="row-act">
-          {acts.includes("start") ? <Button disabled={write.disabled} onClick={run([transition(row.key, "start")])}>Start</Button> : null}
-          {acts.includes("done") ? (
-            needs.artifact || needs.note ? (
-              <DoneButton
-                disabled={write.disabled}
-                onOpen={() => {
-                  if (evidence.draft === undefined) {
-                    evidence.open({ artifact: "", note: "" }, write.seen);
-                  }
-                }}
-              />
-            ) : (
-              <Button primary disabled={write.disabled} onClick={run(doneMutations(row.key))}>Done</Button>
-            )
-          ) : null}
-          {acts.includes("reach") ? <Button primary disabled={write.disabled} onClick={run([transition(row.key, "reach")])}>Mark reached</Button> : null}
-          {acts.includes("answer") ? (
-            <Button
-              primary
-              // C11: the node's detail opens its answer form and focuses it when it arrives with this choice (detail/Actions.tsx).
-              onClick={() => void navigate(to, { state: { choice: { node: row.key, id: "decide" } } })}
-            >
-              Decide
-            </Button>
-          ) : null}
-          {acts.includes("atomic") ? <Button disabled={write.disabled} onClick={run([{ op: "set_atomic", node: row.key, atomic: true }])}>Mark atomic</Button> : null}
+          {acts.map((act) => (
+            <ActButton key={act} act={act} view={view} node={row.key} write={write} waiting={offers.waiting} open={open} />
+          ))}
         </span>
       </div>
       <RowEvidence write={write} node={row.key} needs={needs} form={evidence} />

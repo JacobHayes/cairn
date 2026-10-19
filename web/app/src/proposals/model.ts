@@ -351,9 +351,6 @@ export function intervening<P>(patches: readonly P[], expected: number, current:
   return count === 0 ? [] : patches.slice(-count);
 }
 
-/** The kinds of node a breakdown adds (B10: deliverables and actions). */
-export const PIECE_KINDS = ["action", "deliverable"] as const;
-
 /** B10: whether a node can be broken down: a non-group node that is not a leaf-only kind. */
 export function breakable(node: Pick<GraphNode, "kind">): boolean {
   return node.kind === "deliverable" || node.kind === "action";

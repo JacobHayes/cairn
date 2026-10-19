@@ -1,4 +1,4 @@
-// C11, G2, G4: finishing work that requires a note or a link and has none. Done... opens the
+// C11, G2, G4: finishing work that requires a note or a link and has none. Mark done... opens the
 // fields it needs; sending adds them and completes in one patch, so the guards see them. The
 // inspector's Actions and the next list's rows both offer it, so a Complete that the engine
 // would reject is never the primary action.
@@ -19,15 +19,6 @@ function sendLabel({ artifact, note }: Needs): string {
     return "Add and mark done";
   }
   return artifact ? "Link and mark done" : "Add note and mark done";
-}
-
-/** The Done... button: opens the form; the owner of the form keeps it once open, with what was typed. */
-export function DoneButton({ disabled, onOpen }: { disabled: boolean; onOpen: () => void }) {
-  return (
-    <Button primary disabled={disabled} onClick={onOpen}>
-      Done...
-    </Button>
-  );
 }
 
 /** What sending `draft` adds before completing: each field the node needs, trimmed, with its new key. */

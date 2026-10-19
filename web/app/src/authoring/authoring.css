@@ -61,3 +61,16 @@
 [data-testid="add-node"] > :is(select, input) {
   width: 100%;
 }
+
+/* A field with its label above it, in the Label style (DESIGN, Label). */
+.field {
+  display: grid;
+  gap: var(--space-1);
+}
+
+.field > .label {
+  font: 500 12px / 1.4 var(--font-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-secondary);
+}

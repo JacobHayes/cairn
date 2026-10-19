@@ -91,7 +91,7 @@ function Acting({ line, context }: { line: Line; context: CellContext }) {
   return line.row === undefined ? null : (
     <span className="list-acting stack" data-testid="list-acting">
       <Fact line={line} context={context} />
-      <RowActions view={context.view} row={line.row} to={addresses.open(line.key)} owner={false} />
+      <RowActions view={context.view} row={line.row} to={addresses.open(line.key)} owner={false} column />
     </span>
   );
 }

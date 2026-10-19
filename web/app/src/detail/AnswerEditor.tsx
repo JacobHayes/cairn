@@ -18,11 +18,11 @@ import { newEntityKey } from "../people/model.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { Markdown } from "../ui/markdown.tsx";
 import { effectOf, effectOfOption, outgoing, sameAnswer } from "./answer.ts";
-import { answerable, isBlocked, nodeOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
-import { NodeLink, Rationale } from "./parts.tsx";
+import { answerable, guardBypass, isBlocked, nodeOf, type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
+import { EntityOptions, NodeLink, Rationale } from "./parts.tsx";
 import { useSavePreview } from "./preview.ts";
 import { bypassReady, Rejected } from "./Rejected.tsx";
-import { answerText, resolveEntity, roleTitle } from "./sections.tsx";
+import { answerText, entityName, resolveEntity, roleTitle } from "./sections.tsx";
 import { effectWords, savingWords } from "./words.ts";
 import { useFormDraft, useNodeWrite, type NodeWrite } from "./write.ts";
 import { NODE_GONE } from "../ui/gone.ts";
@@ -70,7 +70,7 @@ function Checks({ options, chosen, onChange }: { options: [string, string][]; ch
 /** An answer of the decision's type, as typed (the proposal editor's input, 5.7; the inspector draws its own). */
 export function Input({ view, node, value, onChange }: { view: Ready; node: GraphNode; value: AnswerValue; onChange: (value: AnswerValue) => void }) {
   const choices: [string, string][] = (node.choices ?? []).map((choice) => [choiceId(choice), choiceTitle(choice)]);
-  const entities: [string, string][] = (view.inputs.deployment.entities ?? []).map((entity) => [entity.key, entity.name]);
+  const entities: [string, string][] = (view.inputs.deployment.entities ?? []).map((entity) => [entity.key, entityName(view, entity.key)]);
   const select = (options: [string, string][], chosen: string, wrap: (id: string) => AnswerValue) => (
     <select aria-label="Answer" value={chosen} onChange={(event) => { onChange(wrap(event.target.value)); }}>
       <option value="">Choose</option>
@@ -225,11 +225,7 @@ function EntityInput({ view, value, pick, named, onNamed }: InputProps) {
         }}
       >
         <option value="">Choose</option>
-        {(view.inputs.deployment.entities ?? []).map((entity) => (
-          <option key={entity.key} value={entity.key}>
-            {entity.name}
-          </option>
-        ))}
+        <EntityOptions view={view} />
         <option value={NEW_PERSON}>New person</option>
       </select>
       {naming ? <Field aria-label="New person's name" placeholder="Their name" value={named} onChange={(event) => { onNamed(event.target.value); }} /> : null}
@@ -243,7 +239,7 @@ function EntityListInput({ view, value, pick, named, onNamed }: InputProps) {
     <div className="stack" data-testid="answer">
       <div className="opts" role="group" aria-label="Answer">
         {(view.inputs.deployment.entities ?? []).map((entity) => (
-          <Choose key={entity.key} type="checkbox" title={entity.name} checked={picked.includes(entity.key)} effect={undefined} onPick={() => { pick({ entity_list: toggled(picked, entity.key) }); }} />
+          <Choose key={entity.key} type="checkbox" title={entityName(view, entity.key)} checked={picked.includes(entity.key)} effect={undefined} onPick={() => { pick({ entity_list: toggled(picked, entity.key) }); }} />
         ))}
       </div>
       <Field
@@ -373,7 +369,7 @@ function useChoiceEffects(view: Ready, node: string, open: boolean) {
 
 /** D4: answering past the guard that blocks the decision records why. */
 function bypassOverride(node: string, reason: string | undefined): Mutation[] {
-  return reason === undefined ? [] : [{ op: "apply_override", node, override: { guard_bypass: { guards: ["deps_done"], reason: reason.trim() } } }];
+  return reason === undefined ? [] : [guardBypass(node, ["deps_done"], reason)];
 }
 
 /** What the form holds, and what it would do: the drafts, what Save would send, and Save itself. */

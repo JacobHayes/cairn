@@ -1,7 +1,7 @@
 // C8, D8: the one plain sentence the inspector says under its header, built in the tab from the
 // node's display state and what its derive already holds: what its state means for this node
 // and, where it helps, what to do about it. Pure, so the unit tests check the wording without a
-// page; the pieces carry links and the Unsnooze action, which the component draws.
+// page; the pieces carry links, which the component draws.
 import type { Schema } from "@cairn/client";
 
 import { rankParts, type NodeRow } from "../acting/why.ts";
@@ -13,7 +13,7 @@ import { answerText, entityName } from "./sections.tsx";
 import { conditionPhrase, daysFrom, plural, relativeDays } from "./words.ts";
 
 /** A part of the sentence: text, a link to a node, or the Unsnooze action for the container whose snooze holds over the node. */
-export type Piece = string | { node: string } | { unsnooze: string };
+export type Piece = string | { node: string };
 
 /** What the inspector knows of the node's rank: its place on the acting frontier and its terms, once read. */
 export interface RankFacts {
@@ -234,7 +234,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
       const via = derived.snoozed_via ?? undefined;
       const target = derived.snoozed;
       const until = target == null ? [] : "date" in target ? [` until ${on(target.date)}`] : [" until ", { node: target.node }, " is done"];
-      return via !== undefined && stored === undefined ? ["Snoozed", ...until, ", through ", { node: via }, ". ", { unsnooze: via }] : ["Snoozed", ...until, "."];
+      return via !== undefined && stored === undefined ? ["Snoozed", ...until, ", through ", { node: via }, "."] : ["Snoozed", ...until, "."];
     }
     case "done": {
       const verb = node.kind === "decision" ? `Decided${detail.answer === undefined ? "" : ` ${answerText(view, detail.answer, node)}`}` : node.kind === "milestone" ? "Reached" : "Done";
@@ -262,5 +262,5 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
 
 /** The sentence as plain text, nodes by title: what tests and the accessible label read. */
 export function plainSentence(view: Ready, pieces: Piece[]): string {
-  return pieces.map((piece) => (typeof piece === "string" ? piece : "node" in piece ? titleOf(view, piece.node) : `[Unsnooze ${titleOf(view, piece.unsnooze)}]`)).join("");
+  return pieces.map((piece) => (typeof piece === "string" ? piece : titleOf(view, piece.node))).join("");
 }

@@ -66,9 +66,21 @@ test("a node's actions hold one open form, and a reload brings back that one (D1
   await expect(panel.getByRole("button", { name: "Mark done" })).toBeVisible();
 });
 
+test("a node held by its container's snooze offers Unsnooze of the container, which lifts it (B6)", async ({ page }) => {
+  const panel = await openNode(page, "browser", "j_launch", "n_announcement");
+  await menuItem(panel, "snooze");
+  await panel.getByRole("radio", { name: /^All of / }).first().check();
+  await panel.getByTestId("snooze").getByRole("button", { name: "Snooze", exact: true }).click();
+  const unsnooze = panel.getByTestId("actions").getByRole("button", { name: /^Unsnooze / });
+  await expect(unsnooze).toBeVisible();
+  await unsnooze.click();
+  await expect(unsnooze).toHaveCount(0);
+  await expect(panel.getByRole("button", { name: "Mark done" })).toBeVisible();
+});
+
 test("choosing Mark done again from the graph's menu keeps what was typed in its form (D4)", async ({ page }) => {
   const panel = await openNode(page, "browser", "j_launch", "n_docs");
-  await panel.getByRole("button", { name: "Done..." }).click();
+  await panel.getByRole("button", { name: "Mark done…" }).click();
   const typed = fresh("https://example.test/notes");
   await panel.getByLabel("Artifact address").fill(typed);
   await nodeCard(page, "n_docs").click({ button: "right" });

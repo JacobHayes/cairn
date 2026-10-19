@@ -140,6 +140,22 @@ function SetAside({ options, group, aside, onChange }: { options: ReturnType<typ
   );
 }
 
+/** B6: the node a snooze waits on: any but `exclude`, the work being set aside, which the engine would refuse. */
+export function UntilNode({ view, label, exclude, value, onChange }: { view: Ready; label: string; exclude: ReadonlySet<string>; value: string; onChange: (node: string) => void }) {
+  return (
+    <select aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }}>
+      <option value="">Choose</option>
+      {(view.journey.graph.nodes ?? [])
+        .filter((node) => !exclude.has(node.key))
+        .map((node) => (
+          <option key={node.key} value={node.key}>
+            {node.title}
+          </option>
+        ))}
+    </select>
+  );
+}
+
 /** B6: until when: a quick date, a date, or another node being done. */
 function UntilFields({ view, group, value, onChange }: { view: Ready; group: string; value: SnoozeDraft; onChange: (patch: Partial<SnoozeDraft>) => void }) {
   const { aside, until, date, target } = value;
@@ -158,18 +174,7 @@ function UntilFields({ view, group, value, onChange }: { view: Ready; group: str
         </div>
       </fieldset>
       {until === "date" ? <Field type="date" aria-label="Snooze until" value={date} onChange={(event) => { onChange({ date: event.target.value }); }} /> : null}
-      {until === "node" ? (
-        <select aria-label="Snooze until node" value={target} onChange={(event) => { onChange({ target: event.target.value }); }}>
-          <option value="">Choose</option>
-          {(view.journey.graph.nodes ?? [])
-            .filter((node) => !scope.has(node.key))
-            .map((node) => (
-              <option key={node.key} value={node.key}>
-                {node.title}
-              </option>
-            ))}
-        </select>
-      ) : null}
+      {until === "node" ? <UntilNode view={view} label="Snooze until node" exclude={scope} value={target} onChange={(next) => { onChange({ target: next }); }} /> : null}
     </>
   );
 }

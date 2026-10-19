@@ -10,8 +10,7 @@ import { ConditionEditor } from "../authoring/ConditionEditor.tsx";
 import { planRemoval, removalMutations } from "../authoring/cascade.ts";
 import { DateRuleEditor } from "../authoring/DateRuleEditor.tsx";
 import { draftOf, draftProblems, nodeFrom, valueOf, type FormField, type NodeDraft } from "../authoring/fields.ts";
-import { KINDS, canHoldChildren, kindOption, childrenOf, edgeRefusal, moveTargets, nodesByPath, pathOf, type GraphNode, type Mutation, type NodeField, type NodeKind, type Role, type Tree } from "../authoring/graph.ts";
-import { mintKey, slugOf, uniqueId } from "../authoring/keys.ts";
+import { KINDS, canHoldChildren, kindOption, edgeRefusal, moveTargets, newNode, nodesByPath, pathOf, type GraphNode, type Mutation, type NodeField, type NodeKind, type Role, type Tree } from "../authoring/graph.ts";
 import { BasicsFields, ChoicesEditor, CompletionFields, DecisionFields, StageFields, WeightFields, has } from "../authoring/NodeFields.tsx";
 import { problemsOf } from "../authoring/NodeForm.tsx";
 import { FieldBox, Picker } from "../authoring/parts.tsx";
@@ -253,11 +252,7 @@ function AddNode({ context }: { context: ChangesContext }) {
   const [parent, setParent] = useState(context.defaultParent ?? lastParent ?? "");
   const containers = nodesByPath(context.tree).filter((node) => canHoldChildren(node.kind));
   const add = () => {
-    const under = parent === "" ? undefined : parent;
-    const taken = new Set([...childrenOf(context.tree, under).map((child) => child.id), ...pending.filter((node) => (node.parent ?? undefined) === under).map((node) => node.id)]);
-    const base: GraphNode = { key: mintKey("n_"), id: uniqueId(slugOf(title), taken), kind, title: title.trim() };
-    const placed = under === undefined ? base : { ...base, parent: under };
-    const node = kind === "decision" ? { ...placed, prompt: title.trim(), answer_type: "boolean" as const } : placed;
+    const node = newNode(context.tree, kind, title, parent === "" ? undefined : parent, pending);
     context.edit(withMutationsAdded(context.draft, [{ op: "add_node", node }]));
     setTitle("");
   };

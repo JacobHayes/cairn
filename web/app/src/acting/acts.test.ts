@@ -1,11 +1,10 @@
-// C11's per-kind actions (a placeholder offers no done until it is broken down or atomic, B10),
 // C11 done with its inline artifact (G2), D2's inline assign, and C9's bulk actions: one patch,
 // one mutation per node, nothing sent when a selected node cannot take the action.
 import { describe, expect, it } from "vitest";
 
 import type { Mutation } from "../detail/model.ts";
 import { actingView } from "./acting.test-support.ts";
-import { actsFor, assignOwner, bulkPlan, doneMutations, evidenceComplete, factsOf, hasArtifact, hasNote, missingEvidence, reasonFor, runBulk, selectionOf, type Act, type BulkAction, type Facts } from "./acts.ts";
+import { assignOwner, bulkPlan, doneMutations, evidenceComplete, factsOf, hasArtifact, hasNote, missingEvidence, reasonFor, runBulk, selectionOf, type BulkAction, type Facts } from "./acts.ts";
 
 const view = actingView();
 
@@ -16,25 +15,6 @@ function facts(key: string, change: Partial<Facts> = {}): Facts {
   }
   return { ...found, ...change };
 }
-
-describe("C11: each kind's actions", () => {
-  const derivedOf = (key: string) => facts(key).derived;
-  const cases: [string, Facts, Act[]][] = [
-    ["a decision", facts("n_pick"), ["answer", "skip", "snooze"]],
-    ["a deliverable to do", facts("n_work"), ["start", "done", "snooze", "skip", "canvas"]],
-    ["a deliverable under way", facts("n_work", { state: "active" }), ["done", "snooze", "skip", "canvas"]],
-    ["a milestone", facts("n_meet"), ["reach", "skip", "snooze", "canvas"]],
-    ["a placeholder to break down", facts("n_hold"), ["breakdown", "atomic", "snooze"]],
-    ["a placeholder marked atomic", facts("n_hold", { derived: { ...derivedOf("n_hold"), needs_breakdown: false } }), ["start", "done", "snooze", "skip", "canvas"]],
-  ];
-  it.each(cases)("%s", (_, given, expected) => {
-    expect(actsFor(given)).toEqual(expected);
-  });
-
-  it("a placeholder still to break down has no done (B10)", () => {
-    expect(actsFor(facts("n_hold"))).not.toContain("done");
-  });
-});
 
 describe("C11 done with its artifact (G2) or note (G4)", () => {
   it("links the artifact before completing, in one patch, so the guard sees it", () => {

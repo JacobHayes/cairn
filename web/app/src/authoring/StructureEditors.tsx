@@ -153,7 +153,7 @@ export function ParticipationWiring({ authored, node }: NodeEditorProps) {
 }
 
 /** One child a breakdown adds: a kind and a title. */
-interface Piece {
+export interface Piece {
   kind: NodeKind;
   title: string;
 }
@@ -166,6 +166,23 @@ export function breakdownMutations(authored: Authored, parent: string, pieces: r
     taken.add(id);
     return { op: "add_node", node: { key: mintKey("n_"), id, kind: piece.kind, title: piece.title.trim(), parent } };
   });
+}
+
+/** B10: the pieces of a breakdown, each a kind (action or deliverable) and a title, edited in place. */
+export function PieceRows({ pieces, onChange }: { pieces: Piece[]; onChange: (next: Piece[]) => void }) {
+  const set = (at: number, piece: Partial<Piece>) => { onChange(pieces.map((each, index) => (index === at ? { ...each, ...piece } : each))); };
+  return pieces.map((piece, at) => (
+    <span key={at} className="row" data-testid="piece">
+      <label className="field">
+        <span className="label">Kind</span>
+        <Picker aria-label="Kind of piece" value={piece.kind} options={(["action", "deliverable"] as const).map(kindOption)} onChange={(event) => { set(at, { kind: event.target.value as NodeKind }); }} />
+      </label>
+      <label className="field">
+        <span className="label">Title</span>
+        <Field aria-label="Piece title" placeholder="What it is" value={piece.title} onChange={(event) => { set(at, { title: event.target.value }); }} />
+      </label>
+    </span>
+  ));
 }
 
 /** B10: breaking the node down by hand into children, and a journey's placeholder marked atomic. */
@@ -183,12 +200,7 @@ export function Breakdown({ authored, node }: NodeEditorProps) {
   return (
     <div className="stack" data-testid="breakdown">
       <span className="muted small">{children === 0 ? "Nothing beneath it yet." : `${String(children)} beneath it.`}</span>
-      {pieces.map((piece, at) => (
-        <span key={at} className="row" data-testid="piece">
-          <Picker aria-label="Kind of piece" value={piece.kind} options={(["action", "deliverable"] as const).map(kindOption)} onChange={(event) => { setPieces(pieces.map((each, index) => (index === at ? { ...each, kind: event.target.value as NodeKind } : each))); }} />
-          <Field aria-label="Piece title" placeholder="What it is" value={piece.title} onChange={(event) => { setPieces(pieces.map((each, index) => (index === at ? { ...each, title: event.target.value } : each))); }} />
-        </span>
-      ))}
+      <PieceRows pieces={pieces} onChange={setPieces} />
       <span className="row">
         <Button onClick={() => { setPieces([...pieces, { kind: "action", title: "" }]); }}>Another piece</Button>
         <Button

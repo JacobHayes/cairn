@@ -164,7 +164,7 @@ test("Done... sends the note it was given and keeps what was added meanwhile, an
   await openJourney(page, "server", "j_launch");
   const { release, sent } = await holding(page);
   const panel = await openFromCanvas(page, "n_docs");
-  await panel.getByRole("button", { name: "Done..." }).click();
+  await panel.getByRole("button", { name: "Mark done…" }).click();
   const evidence = panel.getByTestId("done-evidence");
   const link = `https://example.test/${fresh("docs").replace(" ", "-")}`;
   await evidence.getByLabel("Artifact address").fill(link);

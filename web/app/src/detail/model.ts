@@ -93,6 +93,11 @@ export function recordOf(view: Ready, node: GraphNode): NodeState {
   return view.journey.graph.state?.nodes?.[node.key] ?? { state: INITIAL_STATE[node.kind], provenance: "local" };
 }
 
+/** B6: whether `key` holds a snooze of its own, whether or not it holds (a container's snooze holds its nodes through it). */
+export function storedSnooze(view: Ready, key: string): boolean {
+  return view.journey.graph.state?.snoozes?.[key] !== undefined;
+}
+
 /** E3: the decision whose answer pins `milestone`, if one feeds it. */
 export function feedingDecision(view: Ready, milestone: string): GraphNode | undefined {
   return (view.journey.graph.nodes ?? []).find((node) => node.feeds_milestone === milestone);
@@ -145,6 +150,11 @@ export function nodeDetail(view: Ready, key: string): NodeDetail | undefined {
     derived,
     fedBy: node.kind === "milestone" ? feedingDecision(view, key) : undefined,
   };
+}
+
+/** D4: the override that lets a move past the `guards` it would fail, with the reason it was given; the one place it is built. */
+export function guardBypass(node: string, guards: Schema<"Guard">[], reason: string): Mutation {
+  return { op: "apply_override", node, override: { guard_bypass: { guards, reason: reason.trim() } } };
 }
 
 /** A transition by name (D1); answering a decision is its own mutation. */

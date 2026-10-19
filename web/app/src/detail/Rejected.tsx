@@ -11,7 +11,7 @@ import { RejectionView } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
-import { titleOf, type Mutation, type Ready } from "./model.ts";
+import { guardBypass, titleOf, type Mutation, type Ready } from "./model.ts";
 import { ShortfallView } from "./ShortfallView.tsx";
 import { guardWords } from "./words.ts";
 import { rebasedOnto, type Attempt, type Failed, type NodeWrite, type Seen } from "./write.ts";
@@ -111,7 +111,7 @@ function Bypass({ write, node, guards, onResolved, onResent }: Omit<Resolving, "
   if (failed === undefined) {
     return null;
   }
-  const override: Mutation = { op: "apply_override", node, override: { guard_bypass: { guards, reason } } };
+  const override = guardBypass(node, guards, reason);
   return (
     <div className="row" data-testid="bypass">
       <span>Do it anyway, without {guards.map(guardWords).join(" and ")}:</span>

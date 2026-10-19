@@ -9,10 +9,10 @@ test("C16: a Home row opens its node's address, and Done on a row acts in place"
   await open(page, "browser", "/");
   const group = page.getByTestId("home-journey").first();
   await expect(group).toBeVisible();
-  const row = page.getByTestId("home-item").filter({ has: page.getByRole("button", { name: "Done", exact: true }) }).first();
+  const row = page.getByTestId("home-item").filter({ has: page.getByRole("button", { name: "Mark done", exact: true }) }).first();
   const node = (await row.getAttribute("data-node")) ?? "";
   await row.hover();
-  await row.getByRole("button", { name: "Done", exact: true }).click();
+  await row.getByRole("button", { name: "Mark done", exact: true }).click();
   await expect(page.locator(`[data-testid="home-item"][data-node="${node}"]`)).toHaveCount(0);
   await page.getByTestId("home-item").first().locator("a.node-title").click();
   await expect(page).toHaveURL(/\/journeys\/[^/]+\/nodes\//);

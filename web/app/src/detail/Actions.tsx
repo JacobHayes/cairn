@@ -27,13 +27,14 @@ import { insertionRoot, memberOrigin } from "../segments/model.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { actionsDraftKey, actionsForm, changing, formView, opening, takeOpened, type Drafted, type FormCase, type FormValues, type FormView, type Opened, type PanelCase } from "./actions-form.ts";
 import { AnswerEditor, type Anyway } from "./AnswerEditor.tsx";
-import { DoneButton, EvidenceForm } from "./DoneEvidence.tsx";
+import { ActButton, actMutation, type Opens } from "./ActButton.tsx";
+import { EvidenceForm } from "./DoneEvidence.tsx";
 import { SnoozePanel, snoozeWords, WeightEditor } from "./editors.tsx";
 import { foldKey, setFold } from "./folds.ts";
-import { answerable, isBlocked, movesFrom, titleOf, transition, unansweredOf, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
+import { answerable, guardBypass, isBlocked, movesFrom, storedSnooze, titleOf, transition, unansweredOf, type GraphNode, type Mutation, type NodeDetail, type Ready } from "./model.ts";
 import { menuOf, offered, type Act, type ContextId, type MenuId, type MenuItem } from "./offers.ts";
+import { EntityOptions } from "./parts.tsx";
 import { Rejected } from "./Rejected.tsx";
-import { entityName } from "./sections.tsx";
 import { snoozeStart } from "./snooze.ts";
 import { Saving, type Sending } from "../ui/Receipt.tsx";
 import { guardWords, keptWords } from "./words.ts";
@@ -89,7 +90,7 @@ function ReasonForm({ value, label, confirm, testId, sending, disabled, onChange
 /** B6: a transition on a container holding its own snooze clears it, and with it the hold on everything beneath. */
 function LiftsSnooze({ view, node, moving }: { view: Ready; node: string; moving: string }) {
   const held = Object.values(view.derived.nodes).filter((derived) => derived.snoozed_via === node).length;
-  if (held === 0 || view.journey.graph.state?.snoozes?.[node] === undefined) {
+  if (held === 0 || !storedSnooze(view, node)) {
     return null;
   }
   return (
@@ -112,23 +113,6 @@ function guardsOf(view: Ready, detail: NodeDetail): { guards: Guard[]; words: st
   ];
   const found = missing.filter(([lacks]) => lacks).map(([, guard]) => guard);
   return { guards: found, words: found.map(guardWords).join(" and ") };
-}
-
-/** F1, D1: Mark reached with the date it was reached on, today unless changed. */
-function Reach({ write, node, today, disabled }: { write: NodeWrite; node: string; today: string; disabled: boolean }) {
-  const [date, setDate] = useState(today);
-  return (
-    <span className="row">
-      <Button
-        primary
-        disabled={disabled || write.disabled || date === ""}
-        onClick={() => void write.run([transition(node, "reach"), ...(date === today ? [] : [{ op: "set_recorded_date" as const, node, end: "finish" as const, date }])])}
-      >
-        Mark reached
-      </Button>
-      <Field type="date" aria-label="Reached on" value={date} onChange={(event) => { setDate(event.target.value); }} />
-    </span>
-  );
 }
 
 /** F2: a reached milestone's actual date, edited. */
@@ -154,11 +138,7 @@ function AssignOwner({ view, write, node }: { view: Ready; write: NodeWrite; nod
     <span className="row" data-testid="assign">
       <select aria-label="Assign owner" value={entity} onChange={(event) => { setEntity(event.target.value); }}>
         <option value="">Assign owner</option>
-        {(view.inputs.deployment.entities ?? []).map((each) => (
-          <option key={each.key} value={each.key}>
-            {entityName(view, each.key)}
-          </option>
-        ))}
+        <EntityOptions view={view} />
       </select>
       <Button disabled={write.disabled || entity === ""} onClick={() => void write.run([assignOwner(node, entity)])}>
         Assign
@@ -300,75 +280,6 @@ function Overflow({ groups, runners }: { groups: MenuItem[][]; runners: Record<M
   );
 }
 
-/** What a row action sends as its one move, if it is one (the others open a form). */
-function actMutation(act: Act, key: string): Mutation | undefined {
-  switch (act) {
-    case "done":
-      return transition(key, "complete");
-    case "start":
-      return transition(key, "start");
-    case "reach-now":
-      return transition(key, "reach");
-    case "mark-atomic":
-      return { op: "set_atomic", node: key, atomic: true };
-    case "unsnooze":
-      return { op: "unsnooze", node: key };
-    case "done-with-evidence":
-    case "reach":
-    case "break-down":
-      return undefined;
-  }
-}
-
-/** One of the row's buttons. */
-function ActButton({ act, view, detail, write, form, waiting }: { act: Act; view: Ready; detail: NodeDetail; write: NodeWrite; form: ActionsForm; waiting: boolean }) {
-  const key = detail.node.key;
-  const mutation = actMutation(act, key);
-  const run = () => void write.run(mutation === undefined ? [] : [mutation]);
-  switch (act) {
-    case "done":
-      return (
-        <Button primary disabled={write.disabled || waiting} onClick={run}>
-          Mark done
-        </Button>
-      );
-    case "done-with-evidence":
-      return <DoneButton disabled={write.disabled} onOpen={() => { form.openForm("evidence", { artifact: "", note: "" }); }} />;
-    case "start":
-      return (
-        <Button disabled={write.disabled} onClick={run}>
-          Start
-        </Button>
-      );
-    case "reach":
-      return <Reach write={write} node={key} today={view.derived.today} disabled={waiting} />;
-    case "reach-now":
-      return (
-        <Button primary disabled={write.disabled} onClick={run}>
-          Confirm reached now
-        </Button>
-      );
-    case "break-down":
-      return (
-        <Button onClick={() => { form.openPanel("break-down"); }} data-testid="break-down">
-          Break down
-        </Button>
-      );
-    case "mark-atomic":
-      return (
-        <Button disabled={write.disabled} onClick={run}>
-          Mark atomic
-        </Button>
-      );
-    case "unsnooze":
-      return (
-        <Button disabled={write.disabled} onClick={run}>
-          Unsnooze
-        </Button>
-      );
-  }
-}
-
 /**
  * An earlier version of the form landed; this is what was typed after it, which was not sent.
  * The action already happened, so nothing here would do it again: the text can be read and
@@ -426,7 +337,7 @@ function reasonMutations(kind: ReasonKind, node: GraphNode, guards: Guard[], rea
     case "include":
       return [{ op: "apply_override", node: node.key, override: { force_include: { reason } } }];
     case "bypass":
-      return [{ op: "apply_override", node: node.key, override: { guard_bypass: { guards, reason } } }, transition(node.key, node.kind === "milestone" ? "reach" : "complete")];
+      return [guardBypass(node.key, guards, reason), transition(node.key, node.kind === "milestone" ? "reach" : "complete")];
   }
 }
 
@@ -557,7 +468,7 @@ function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runn
     } else {
       // What the row itself shows (its buttons and the answer form) is in place of any form the menu opened.
       form.close();
-      const mutation = actMutation(id as Act, detail.node.key);
+      const mutation = actMutation(view, id as Act, detail.node.key);
       // As the row's buttons are, not offered again while a write is in flight.
       if (mutation !== undefined && !write.disabled) {
         void write.run([mutation]);
@@ -565,6 +476,17 @@ function useMenu(menus: Omit<Menus, "insertHere">): { groups: MenuItem[][]; runn
     }
   });
   return { groups, runners, focusAnswer: focusAsked ? () => { setFocusAsked(false); } : undefined };
+}
+
+/** What the form's buttons open here: the done form and the break-down panel (the answer form is drawn in place of Decide). */
+function opensIn(form: ActionsForm): (what: Opens) => void {
+  return (what) => {
+    if (what === "evidence") {
+      form.openForm("evidence", { artifact: "", note: "" });
+    } else if (what === "break-down") {
+      form.openPanel("break-down");
+    }
+  };
 }
 
 export function Actions({ view, detail, onRename }: { view: Ready; detail: NodeDetail; onRename: () => void }) {
@@ -577,7 +499,7 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
   const { node, record } = detail;
   const [copied, setCopied] = useState(false);
   const form = useActionsForm(write.journey, node.key, write.seen, () => { setCopied(false); });
-  const offers = offered(view, detail);
+  const offers = offered(view, node.key);
   const deciding = answerable(node.kind, record.state);
   const { open } = form;
   const kept = form.view.state === "kept" ? form.view.opened : undefined;
@@ -607,7 +529,9 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
       : undefined;
   const { groups, runners, focusAnswer } = useMenu({ view, detail, write, form, onRename, onCopied: () => { setCopied(true); } });
   const menu = <Overflow groups={groups} runners={runners} />;
-  const acts = [...(offers.primary === undefined ? [] : [offers.primary]), ...offers.secondary];
+  // A decision awaiting its answer has the answer form in the place of Decide.
+  const acts = [...(offers.primary === undefined || offers.primary === "decide" ? [] : [offers.primary]), ...offers.secondary];
+  const opens = opensIn(form);
   const moving = movesFrom(node.kind, record.state).includes("start") ? "Starting" : "Finishing";
   const rejected = <Rejected view={view} write={write} onResent={form.resent} />;
   const inDialog = open?.case === "snooze";
@@ -618,7 +542,7 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
       {showsAnswer ? <AnswerEditor view={view} detail={detail} menu={menu} anyway={anyway} focus={focusAnswer} /> : null}
       {showsAnswer && offers.secondary.includes("unsnooze") ? (
         <span>
-          <ActButton act="unsnooze" view={view} detail={detail} write={write} form={form} waiting={false} />
+          <ActButton act="unsnooze" view={view} node={node.key} write={write} waiting={false} open={opens} />
         </span>
       ) : null}
       {showsRow && (acts.length > 0 || groups.length > 0) ? (
@@ -626,7 +550,7 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
           {offers.primary === undefined ? null : <LiftsSnooze view={view} node={node.key} moving={moving} />}
           <span className="row actions-row">
             {acts.map((act) => (
-              <ActButton key={act} act={act} view={view} detail={detail} write={write} form={form} waiting={offers.waiting} />
+              <ActButton key={act} act={act} view={view} node={node.key} write={write} waiting={offers.waiting} open={opens} dated />
             ))}
             <span className="spacer" />
             {menu}

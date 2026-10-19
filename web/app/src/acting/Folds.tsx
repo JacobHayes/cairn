@@ -9,6 +9,7 @@ import type { ListQuery } from "@cairn/wasm";
 import { useMemo, type ReactNode } from "react";
 import { Link } from "react-router";
 
+import { ActButton } from "../detail/ActButton.tsx";
 import { newAttachmentKey } from "../detail/Attachments.tsx";
 import { namer } from "../detail/explain.ts";
 import { titleOf, type Ready, type Mutation } from "../detail/model.ts";
@@ -129,17 +130,15 @@ function looksOf(view: Ready, stale: NodeRow[], short: NodeRow[], lapsed: NodeRo
   return [...found.values()];
 }
 
+/** The folds open no form: they offer only Unsnooze, which is one move. */
+function noForm(): void {}
+
 function LookRow({ view, write, look, to }: { view: Ready; write: NodeWrite; look: Look; to: string }) {
-  const holder = look.row.snoozed_via ?? look.row.key;
   return (
     <NodeItem view={view} node={look.row.key} to={to} fact={look.reason} testId="fold-item">
       <span className="row-side">
         {look.fix === "note" ? <AddNote write={write} node={look.row.key} /> : null}
-        {look.fix === "unsnooze" ? (
-          <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: holder }])}>
-            {holder === look.row.key ? "Unsnooze" : `Unsnooze ${titleOf(view, holder)}`}
-          </Button>
-        ) : null}
+        {look.fix === "unsnooze" ? <ActButton act="unsnooze" view={view} node={look.row.key} write={write} waiting={false} open={noForm} /> : null}
         {look.fix === "open" ? <Link className="button" to={to}>{look.reason.endsWith("plan") ? "Open dates" : "Open"}</Link> : null}
       </span>
     </NodeItem>
@@ -175,9 +174,7 @@ function SnoozedGroup({ view, write, held, toOf }: { view: Ready; write: NodeWri
       <span className="row fold-group-head">
         <strong>{held.container === undefined ? `Snoozed ${until}` : `${titleOf(view, held.container)} is snoozed ${until}`}</strong>
         {held.container === undefined ? null : (
-          <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: held.container ?? "" }])}>
-            Unsnooze
-          </Button>
+          <ActButton act="unsnooze" view={view} node={held.container} write={write} waiting={false} open={noForm} />
         )}
       </span>
       <ul className="plain-list node-rows">
@@ -185,9 +182,7 @@ function SnoozedGroup({ view, write, held, toOf }: { view: Ready; write: NodeWri
           <NodeItem key={row.key} view={view} node={row.key} to={toOf(row.key)} testId="fold-item">
             {held.container === undefined ? (
               <span className="row-side">
-                <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node: row.key }])}>
-                  Unsnooze
-                </Button>
+                <ActButton act="unsnooze" view={view} node={row.key} write={write} waiting={false} open={noForm} />
               </span>
             ) : null}
           </NodeItem>

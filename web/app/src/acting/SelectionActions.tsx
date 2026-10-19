@@ -7,10 +7,13 @@
 // certain to be refused.
 import { useEffect, useRef, useState, type ReactNode } from "react";
 
+import { UntilNode } from "../detail/editors.tsx";
 import { titleOf, type Ready } from "../detail/model.ts";
+import { ACT_LABELS } from "../detail/offers.ts";
+import { withinScope } from "../detail/snooze.ts";
 import { Menu } from "../screens/Menu.tsx";
 import { Rejected } from "../detail/Rejected.tsx";
-import { entityName } from "../detail/sections.tsx";
+import { EntityOptions } from "../detail/parts.tsx";
 import { useFormDraft, useNodeWrite, type Seen } from "../detail/write.ts";
 import { Button, Field } from "../ui/kit.tsx";
 import { reasonFor, runBulk, type BulkAction, type Facts } from "./acts.ts";
@@ -47,38 +50,33 @@ interface Offer {
 
 const form = (kind: Form): Offer => ({ words: FORM_WORDS[kind], asks: actionOf(kind, ""), form: kind });
 
-const STATUS: Offer[] = [{ words: "Start", asks: { act: "start" } }, { words: "Mark done", asks: { act: "done" } }, form("skip")];
+const STATUS: Offer[] = [{ words: ACT_LABELS.start, asks: { act: "start" } }, { words: ACT_LABELS.done, asks: { act: "done" } }, form("skip")];
 const ASSIGN = form("assign");
-const SNOOZE: Offer[] = [form("snooze-date"), form("snooze-node"), { words: "Unsnooze", asks: { act: "unsnooze" } }];
+const SNOOZE: Offer[] = [form("snooze-date"), form("snooze-node"), { words: ACT_LABELS.unsnooze, asks: { act: "unsnooze" } }];
 
-function FormInput({ view, form, value, onChange }: { view: Ready; form: Form; value: string; onChange: (value: string) => void }) {
+function FormInput({ view, form, within, value, onChange }: { view: Ready; form: Form; within: ReadonlySet<string>; value: string; onChange: (value: string) => void }) {
   if (form === "skip") {
     return <Field aria-label="Why skip them" placeholder="Why" value={value} onChange={(event) => { onChange(event.target.value); }} />;
   }
   if (form === "snooze-date") {
     return <Field type="date" aria-label="Snooze them until" value={value} onChange={(event) => { onChange(event.target.value); }} />;
   }
-  const options =
-    form === "assign"
-      ? (view.inputs.deployment.entities ?? []).map((entity) => ({ key: entity.key, text: entityName(view, entity.key) }))
-      : (view.journey.graph.nodes ?? []).map((node) => ({ key: node.key, text: node.title }));
-  return (
-    <select aria-label={form === "assign" ? "Owner for them" : "Snooze them until node"} value={value} onChange={(event) => { onChange(event.target.value); }}>
-      <option value="">Choose</option>
-      {options.map((option) => (
-        <option key={option.key} value={option.key}>
-          {option.text}
-        </option>
-      ))}
-    </select>
-  );
+  if (form === "assign") {
+    return (
+      <select aria-label="Owner for them" value={value} onChange={(event) => { onChange(event.target.value); }}>
+        <option value="">Choose</option>
+        <EntityOptions view={view} />
+      </select>
+    );
+  }
+  return <UntilNode view={view} label="Snooze them until node" exclude={within} value={value} onChange={onChange} />;
 }
 
 /** The form an action opened: its field, Apply to every member, Cancel. */
-function FormRow({ view, open, count, disabled, onChange, onApply, onCancel }: { view: Ready; open: { form: Form; value: string }; count: number; disabled: boolean; onChange: (value: string) => void; onApply: () => void; onCancel: () => void }) {
+function FormRow({ view, within, open, count, disabled, onChange, onApply, onCancel }: { view: Ready; within: ReadonlySet<string>; open: { form: Form; value: string }; count: number; disabled: boolean; onChange: (value: string) => void; onApply: () => void; onCancel: () => void }) {
   return (
     <div className="row" data-testid="bulk-form" data-form={open.form}>
-      <FormInput view={view} form={open.form} value={open.value} onChange={onChange} />
+      <FormInput view={view} form={open.form} within={within} value={open.value} onChange={onChange} />
       <Button primary disabled={disabled || open.value.trim() === ""} onClick={onApply}>
         Apply to {count}
       </Button>
@@ -145,7 +143,7 @@ export function SelectionActions({ view, selected, onLanded, structure }: { view
         )}
       </div>
       {open === undefined ? null : (
-        <FormRow view={view} open={open.value} count={selected.length} disabled={write.disabled} onChange={(value) => { draft.change({ ...open.value, value }); }} onApply={() => void act(actionOf(open.value.form, open.value.value.trim()), open)} onCancel={draft.close} />
+        <FormRow view={view} within={new Set(selected.flatMap((facts) => [...withinScope(view, facts.node.key)]))} open={open.value} count={selected.length} disabled={write.disabled} onChange={(value) => { draft.change({ ...open.value, value }); }} onApply={() => void act(actionOf(open.value.form, open.value.value.trim()), open)} onCancel={draft.close} />
       )}
       {unable.length === 0 ? null : (
         <p className="callout" role="alert" data-testid="bulk-unable">

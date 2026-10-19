@@ -1,13 +1,10 @@
-// C11's per-kind actions, shared by the triage card and the next list's rows (C10 offers the
-// same actions inline), and C9's bulk actions over a selection. Each is one patch: a bulk
+// C11's done with its inline evidence, D2's assign, and C9's bulk actions over a selection.
+// (Which actions a node offers is detail/offers.ts's, for every surface.) Each is one patch: a bulk
 // action is one patch with one mutation, so one event, per node (C9), and a guard failure on
 // any node rejects it whole and names which (A15, D4).
 import type { Schema } from "@cairn/client";
 
-import { movesFrom, nodeOf, recordOf, transition, type GraphNode, type Mutation, type NodeDerived, type Ready, type State } from "../detail/model.ts";
-
-/** One action a card or row offers. */
-export type Act = "answer" | "start" | "done" | "reach" | "skip" | "snooze" | "breakdown" | "atomic" | "canvas";
+import { movesFrom, nodeOf, recordOf, storedSnooze, transition, type GraphNode, type Mutation, type NodeDerived, type Ready, type State } from "../detail/model.ts";
 
 /** What the acting surfaces read about one node. */
 export interface Facts {
@@ -25,8 +22,7 @@ export function factsOf(view: Ready, key: string): Facts | undefined {
   if (node === undefined || derived === undefined) {
     return undefined;
   }
-  const snoozed = view.journey.graph.state?.snoozes?.[key] !== undefined;
-  return { node, state: recordOf(view, node).state, derived, snoozed };
+  return { node, state: recordOf(view, node).state, derived, snoozed: storedSnooze(view, key) };
 }
 
 /** C9: the facts of every selected node the journey still holds, in the order selected, whatever page each is on. */
@@ -35,30 +31,6 @@ export function selectionOf(view: Ready, keys: Iterable<string>): Facts[] {
     const facts = factsOf(view, key);
     return facts === undefined ? [] : [facts];
   });
-}
-
-/**
- * C11: the actions a card offers for its node's kind, in the order offered. A placeholder that
- * needs breaking down offers break down (which opens a proposal), mark atomic, and snooze, and
- * no done (B10); once it has children or is atomic it reverts to its kind's actions.
- * Pass and assign owner (D2) are every card's, not the kind's.
- */
-export function actsFor({ node, state, derived }: Facts): Act[] {
-  if (derived.needs_breakdown === true) {
-    return ["breakdown", "atomic", "snooze"];
-  }
-  const moves = movesFrom(node.kind, state);
-  switch (node.kind) {
-    case "decision":
-      return ["answer", "skip", "snooze"];
-    case "deliverable":
-    case "action":
-      return [...(moves.includes("start") ? (["start"] as const) : []), "done", "snooze", "skip", "canvas"];
-    case "milestone":
-      return ["reach", "skip", "snooze", "canvas"];
-    case "group":
-      return [];
-  }
 }
 
 /** G2: whether a node has a link designated as its artifact. */

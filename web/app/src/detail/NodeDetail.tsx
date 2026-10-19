@@ -52,16 +52,12 @@ function Dates({ view, detail }: { view: Ready; detail: NodeDetail }) {
   );
 }
 
-/** The one plain sentence: what the node's state means, with links, and Unsnooze for the container holding it. */
+/** The one plain sentence: what the node's state means, with links. */
 function Sentence({ view, detail, rank }: { view: Ready; detail: NodeDetail; rank: RankFacts }) {
-  const write = useNodeWrite(view, `sentence:${detail.node.key}`);
   return (
-    <div className="stack">
-      <p className="sentence" data-testid="detail-sentence">
-        <Pieces view={view} pieces={sentenceOf(view, detail, rank)} disabled={write.disabled} onUnsnooze={(container) => void write.run([{ op: "unsnooze", node: container }])} />
-      </p>
-      <Rejected view={view} write={write} />
-    </div>
+    <p className="sentence" data-testid="detail-sentence">
+      <Pieces view={view} pieces={sentenceOf(view, detail, rank)} />
+    </p>
   );
 }
 

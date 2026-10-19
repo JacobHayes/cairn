@@ -4,6 +4,7 @@
 import { Link } from "react-router";
 
 import { titleOf, transition, type Ready } from "../detail/model.ts";
+import { ACT_LABELS } from "../detail/offers.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useNodeWrite, type NodeWrite } from "../detail/write.ts";
 import { isSoon } from "../status/when.ts";
@@ -47,7 +48,7 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
         </span>
         {reach.readOnly ? null : (
           <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node }])}>
-            Unsnooze
+            {ACT_LABELS.unsnooze}
           </Button>
         )}
       </li>
@@ -59,7 +60,7 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
       <span>{title(node)} <span className="muted">· {away(date)}</span></span>
       {reach.readOnly ? null : (
         <Button disabled={write.disabled} onClick={() => void write.run([transition(node, "reach")])}>
-          Confirm reached now
+          {ACT_LABELS["reach-now"]}
         </Button>
       )}
     </li>
