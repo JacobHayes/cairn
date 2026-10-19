@@ -38,11 +38,11 @@ export type TickUnit = (typeof UNITS)[number]["unit"];
 
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
-/** A calendar date in words: `Oct 6`, with the year (`Oct 6, 2027`) when it is not in `today`'s. */
-export function dateWords(date: string, today: string): string {
+/** A calendar date in words: `Oct 6`, with the year (`Oct 6, 2027`) when it is not in `today`'s, or always when there is no `today` to compare with. */
+export function dateWords(date: string, today?: string): string {
   const parsed = new Date(`${date}T00:00:00Z`);
   const words = `${MONTHS[parsed.getUTCMonth()] ?? ""} ${String(parsed.getUTCDate())}`;
-  return date.slice(0, 4) === today.slice(0, 4) ? words : `${words}, ${String(parsed.getUTCFullYear())}`;
+  return today !== undefined && date.slice(0, 4) === today.slice(0, 4) ? words : `${words}, ${String(parsed.getUTCFullYear())}`;
 }
 
 /** A date in words with how far off it is from `today`: `Oct 30, in 24 days`, `Oct 2, 4 days late`, `Oct 6, today`. */

@@ -50,7 +50,7 @@ describe("explanation words", () => {
     const shift = moveText({ op: "shift_pin", node: "n_report", offset_days: -5 }, name);
     expect(shift).toContain("Report");
     expect(shift).toContain("5");
-    expect(moveText({ op: "answer", decision: "n_when", value: { date: "2026-11-25" } }, name)).toContain("2026-11-25");
+    expect(moveText({ op: "answer", decision: "n_when", value: { date: "2026-11-25" } }, name)).toContain("Nov 25");
     expect(guardFailureText({ open_dependency: "n_findings" }, name)).toContain("Findings");
   });
 });

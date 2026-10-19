@@ -4,6 +4,7 @@ import { childrenOfClause, decisionOf, operatorOf, valuesOf, type Clause } from 
 import { ruleWords } from "../authoring/dates.ts";
 import type { Graph, Mutation } from "../authoring/graph.ts";
 import { removedChoices, type Conflict, type ResolutionKind, type ReviewItem } from "./model.ts";
+import { dateWords } from "../timeline/model.ts";
 import { ENTITY_GONE, KIND_GONE, NODE_GONE, ROLE_GONE } from "../ui/gone.ts";
 
 /** Names by key over the graphs a review shows (before and after), falling back to the key. */
@@ -55,6 +56,12 @@ function valueWords(value: unknown): string {
     return String(value);
   }
   return JSON.stringify(value);
+}
+
+/** An answer's value as people read it: a date in words, anything else as it is. */
+function answerValueWords(value: Record<string, unknown>): string {
+  const [kind, answer] = Object.entries(value)[0] ?? ["", undefined];
+  return kind === "date" && typeof answer === "string" ? dateWords(answer) : valueWords(answer);
 }
 
 /** A5: a condition as people read it. */
@@ -118,9 +125,9 @@ export function mutationWords(mutation: Mutation, names: Names): string {
     case "remove_edge":
       return `${node(mutation.edge.node)} no longer requires ${node(mutation.edge.requires)}`;
     case "answer":
-      return `Answer ${node(mutation.decision)}: ${valueWords(Object.values(mutation.value)[0])}${mutation.rationale == null ? "" : `, because ${quoted(briefly(mutation.rationale))}`}`;
+      return `Answer ${node(mutation.decision)}: ${answerValueWords(mutation.value)}${mutation.rationale == null ? "" : `, because ${quoted(briefly(mutation.rationale))}`}`;
     case "set_pin":
-      return `Pin ${node(mutation.node)} to ${mutation.date}`;
+      return `Pin ${node(mutation.node)} to ${dateWords(mutation.date)}`;
     case "shift_pin":
       return `Shift the pin of ${node(mutation.node)} by ${String(mutation.offset_days)} days`;
     case "clear_pin":

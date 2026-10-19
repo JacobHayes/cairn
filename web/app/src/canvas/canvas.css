@@ -905,7 +905,3 @@
 .line-faded {
   opacity: 0.5;
 }
-
-.stalled {
-  border-color: var(--color-warning);
-}

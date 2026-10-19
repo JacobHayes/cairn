@@ -228,7 +228,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
     }
     case "scheduled": {
       const date = derived.dates.effective_date?.date ?? derived.dates.due?.date;
-      return [date === undefined ? "Reaches itself when its date comes (auto-reach)." : `Reaches itself on ${on(date)} (auto-reach).`];
+      return [date === undefined ? "Waiting for its date (auto-reach)." : `Scheduled for ${on(date)} (auto-reach).`];
     }
     case "snoozed": {
       const via = derived.snoozed_via ?? undefined;

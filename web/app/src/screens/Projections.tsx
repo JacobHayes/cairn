@@ -5,14 +5,14 @@
 import { lazy, Suspense, useMemo } from "react";
 import { useLocation } from "react-router";
 
+import { StalledPanel } from "../acting/Stalled.tsx";
 import { listSettingsFrom } from "../acting/address.ts";
 import { ListBody } from "../acting/ListScreen.tsx";
 import { TriageBody } from "../acting/TriageScreen.tsx";
 import { JourneyAuthoringBar } from "../authoring/JourneyAuthoring.tsx";
 import type { EdgeDrawing } from "../authoring/connect.tsx";
 import type { Authored } from "../authoring/target.ts";
-import type { GraphView } from "../canvas/settings.ts";
-import { StalledSurface } from "../canvas/Surfaces.tsx";
+import { graphPath, type GraphView } from "../canvas/settings.ts";
 import type { Selection } from "../canvas/selection.ts";
 import type { Ready } from "../detail/model.ts";
 import type { Screen } from "../journeys/address.ts";
@@ -40,10 +40,11 @@ export interface ProjectionProps {
 
 /** The canvas's own bars, which stay with the head: the structure's tools (edit mode) and the stalled surface. */
 export function CanvasBars({ ready, view, authored, drawing }: Pick<ProjectionProps, "ready" | "view" | "authored" | "drawing">) {
+  const { search } = useLocation();
   return (
     <>
       {authored === undefined ? null : <JourneyAuthoringBar ready={ready} authored={authored} view={view} drawing={drawing} />}
-      <StalledSurface ready={ready} view={view} />
+      <StalledPanel view={ready} nodeTo={(node) => graphPath(ready.journey.header.id, view, { node }, search)} readOnly={ready.journey.header.status === "archived"} />
     </>
   );
 }

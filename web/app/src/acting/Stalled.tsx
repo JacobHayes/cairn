@@ -6,7 +6,8 @@ import { Link } from "react-router";
 import { titleOf, transition, type Ready } from "../detail/model.ts";
 import { Rejected } from "../detail/Rejected.tsx";
 import { useNodeWrite, type NodeWrite } from "../detail/write.ts";
-import { dateWords } from "../timeline/model.ts";
+import { isSoon } from "../status/when.ts";
+import { dateAway, dateWords } from "../timeline/model.ts";
 import { Button } from "../ui/kit.tsx";
 import { DetailLink } from "./Parts.tsx";
 
@@ -22,21 +23,27 @@ function NodeTitle({ view, node, reach }: { view: Ready; node: string; reach: Re
 
 type Cause = NonNullable<Ready["derived"]["stalled"]>["waiting_on"][number];
 
+/** One cause as a row: the node's title, then what it waits on in plain words (a date the way the app says dates, not a verb that suits only some titles), then its action at the row's end. */
 function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrite; cause: Cause; reach: Reach }) {
+  const { today } = view.derived;
+  const title = (node: string) => <NodeTitle view={view} node={node} reach={reach} />;
+  const away = (date: string) => <span className={date < today ? "stall-late" : isSoon(date, today) ? "stall-soon" : undefined}>{dateAway(date, today)}</span>;
   if ("gate" in cause) {
     return (
-      <li data-testid="stall-cause" data-status="gate">
-        <NodeTitle view={view} node={cause.gate} reach={reach} /> must be finished first
+      <li className="stall-cause" data-testid="stall-cause" data-status="gate" data-node={cause.gate}>
+        <span>{title(cause.gate)} <span className="muted">· must be finished first</span></span>
       </li>
     );
   }
   if ("snooze" in cause) {
     const { node, until } = cause.snooze;
     return (
-      <li className="row" data-testid="stall-cause" data-status="snooze" data-node={node}>
+      <li className="stall-cause" data-testid="stall-cause" data-status="snooze" data-node={node}>
         <span>
-          <NodeTitle view={view} node={node} reach={reach} /> is snoozed until{" "}
-          {"date" in until ? dateWords(until.date, view.derived.today) : <><NodeTitle view={view} node={until.node} reach={reach} /> is finished</>}
+          <span className="stall-snoozed">{title(node)}</span>{" "}
+          <span className="muted">
+            · snoozed until {"date" in until ? away(until.date) : <>{title(until.node)} is finished</>}
+          </span>
         </span>
         {reach.readOnly ? null : (
           <Button disabled={write.disabled} onClick={() => void write.run([{ op: "unsnooze", node }])}>
@@ -48,10 +55,8 @@ function CauseLine({ view, write, cause, reach }: { view: Ready; write: NodeWrit
   }
   const { node, date } = cause.auto_reach;
   return (
-    <li className="row" data-testid="stall-cause" data-status="auto_reach" data-node={node}>
-      <span>
-        <NodeTitle view={view} node={node} reach={reach} /> is reached on {date}
-      </span>
+    <li className="stall-cause" data-testid="stall-cause" data-status="auto_reach" data-node={node}>
+      <span>{title(node)} <span className="muted">· {away(date)}</span></span>
       {reach.readOnly ? null : (
         <Button disabled={write.disabled} onClick={() => void write.run([transition(node, "reach")])}>
           Confirm reached now
@@ -80,11 +85,12 @@ export function StalledPanel({ view, nodeTo, readOnly = false, endDate }: { view
   }
   return (
     <section className="callout stalled stack" role="status" data-testid="stalled">
-      <strong>Nothing can be acted on right now.</strong>
+      <p className="stall-head">
+        <strong>Nothing can be acted on right now.</strong> <span>Waiting on:</span>
+      </p>
       {stalled.all_blocked === true ? <span>Every remaining node is blocked.</span> : null}
       {pastEnd(stalled.waiting_on, endDate) ? <span>Every snooze runs past the final milestone ({dateWords(endDate ?? "", view.derived.today)}), so the journey cannot reach it as things stand.</span> : null}
-      <span>The journey is waiting on:</span>
-      <ul className="detail-list stack">
+      <ul className="stall-causes">
         {stalled.waiting_on.map((cause) => (
           <CauseLine key={JSON.stringify(cause)} view={view} write={write} cause={cause} reach={{ nodeTo, readOnly }} />
         ))}

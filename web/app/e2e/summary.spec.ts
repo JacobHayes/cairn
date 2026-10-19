@@ -148,6 +148,21 @@ test("C18, A19: a stalled archived journey lists what it waits on without the ac
   await expect(page.getByRole("button", { name: "Unsnooze" })).toHaveCount(0);
 });
 
+test("D5: the graph's stalled panel offers the same actions, and an unsnooze acts in place", async ({ page }) => {
+  await stall(page, "j_bakeoff", ["n_trial_a", "n_trial_b", "n_wrap_up"]);
+  await goTo(page, "graph");
+  const causes = page.getByTestId("stall-cause");
+  await expect(causes.first()).toBeVisible();
+  // Each cause is one row: its action sits beside the title, not under it.
+  const [title, action] = await Promise.all([causes.first().locator("a").first().boundingBox(), causes.first().getByRole("button").boundingBox()]);
+  expect(action?.y ?? 0).toBeLessThan((title?.y ?? 0) + (title?.height ?? 0));
+  const before = await causes.count();
+  await page.getByRole("button", { name: "Unsnooze" }).first().click();
+  // The unsnoozed node can be acted on again, so nothing is stalled.
+  await expect(page.getByTestId("stalled")).toHaveCount(0);
+  expect(before).toBeGreaterThan(0);
+});
+
 test("C18: a journey with no node invites planning and offers no completion", async ({ page }) => {
   await startOnSummary(page, undefined);
   await expect(page.getByTestId("summary-empty")).toBeVisible();

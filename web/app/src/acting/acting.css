@@ -921,3 +921,40 @@ button.list-sort {
   overflow: hidden;
   overflow-wrap: anywhere;
 }
+
+/* The stalled diagnostic (D5): the panel frame with an amber edge. Its head and each cause are one row, wrapping only when the width runs out; a cause's title stays close to its action, and the causes are set apart by hairlines. */
+.stalled {
+  border-color: var(--color-warning);
+  background: var(--corner-ticks), var(--color-surface);
+  box-shadow: var(--shadow-sm);
+}
+.stall-head {
+  margin: 0;
+}
+.stall-causes {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.stall-cause {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-1) var(--space-2);
+  padding-block: var(--space-2);
+}
+.stall-cause + .stall-cause {
+  border-top: 1px solid var(--color-border);
+}
+.stall-snoozed {
+  opacity: var(--opacity-snoozed);
+}
+.stall-soon {
+  color: var(--color-warning);
+}
+.stall-late {
+  color: var(--color-error);
+}

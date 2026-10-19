@@ -5,6 +5,7 @@
 import type { Schema } from "@cairn/client";
 
 import { feedingDecision, nodeOf, titleOf, type Mutation, type Ready } from "./model.ts";
+import { dateWords } from "../timeline/model.ts";
 import { ROLE_GONE } from "../ui/gone.ts";
 
 export type Bound = Schema<"Bound">;
@@ -88,7 +89,7 @@ export function constraintText(constraint: Constraint, name: Namer): string {
 /** What fixes a date on a chain, in words. */
 export function fixedText(fixed: FixedDate, name: Namer): string {
   const by = { pin: "pinned", actual: "actual", answer: "answered", today: "today" }[fixed.fixed_by];
-  return `${instantText(fixed.instant, name)}: ${fixed.date} (${by})`;
+  return `${instantText(fixed.instant, name)}: ${dateWords(fixed.date)} (${by})`;
 }
 
 /** F7: a pin or rule whose edit changes a bound. Actuals and today are facts, not edits. */
@@ -209,7 +210,7 @@ export function moveText(move: Mutation, name: Namer): string {
       return `Move the pin on ${name(move.node)} ${String(Math.abs(days))} days ${days < 0 ? "earlier" : "later"}`;
     }
     case "set_pin":
-      return `Pin ${name(move.node)} to ${move.date}`;
+      return `Pin ${name(move.node)} to ${dateWords(move.date)}`;
     case "clear_pin":
       return `Unpin ${name(move.node)}`;
     case "answer":
@@ -228,6 +229,9 @@ export function answerWords(value: Schema<"AnswerValue">): string {
   const [kind, answer] = (Object.entries(value) as [string, unknown][])[0] ?? ["", undefined];
   if (Array.isArray(answer)) {
     return answer.length === 0 ? "none" : answer.join(", ");
+  }
+  if (kind === "date" && typeof answer === "string") {
+    return dateWords(answer);
   }
   return kind === "boolean" ? (answer === true ? "yes" : "no") : typeof answer === "string" ? answer : JSON.stringify(answer);
 }

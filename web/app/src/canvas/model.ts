@@ -19,7 +19,6 @@ export type LevelEdge = Schema<"LevelEdge">;
 export type Relevance = Schema<"Relevance">;
 export type LevelDisplay = Schema<"LevelDisplay">;
 export type Trace = Schema<"Trace">;
-export type Stalled = Schema<"Stalled">;
 
 /** C2: every kind, in the order the toggles list them; all shown by default. */
 export const KINDS: NodeKind[] = ["group", "decision", "deliverable", "action", "milestone"];
