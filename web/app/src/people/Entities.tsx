@@ -84,13 +84,14 @@ function EntityRow({ entity, deployment, yours }: { entity: Entity; deployment: 
   const write = useScreenWrite(`entity:${entity.key}`, entity.name);
   const aliases = aliasesOf(deployment, entity.key);
   return (
-    <li className="stack entity-row" data-testid="entity" data-entity={entity.key}>
-      <span className="row">
-        <strong data-testid="entity-name">{entity.name}</strong>
-        <span className="muted mono entity-key">{entity.key}</span>
-        {yours ? <Badge tone="good" data-testid="yours">You</Badge> : null}
-        {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">also {aliases.join(", ")}</span>}
-        <span className="spacer" />
+    <li className="entity-row" data-testid="entity" data-entity={entity.key}>
+      <span className="entity-head">
+        <span className="row entity-title">
+          <strong data-testid="entity-name">{entity.name}</strong>
+          <span className="muted mono entity-key">{entity.key}</span>
+          {yours ? <Badge tone="good" data-testid="yours">You</Badge> : null}
+          {aliases.length === 0 ? null : <span className="muted small" data-testid="aliases">also {aliases.join(", ")}</span>}
+        </span>
         {draft === undefined ? (
           <Button disabled={write.disabled} onClick={() => { setDraft({ name: entity.name, emails: [...(entity.emails ?? [])], emailText: "", base: deployment.revision }); }}>Edit</Button>
         ) : null}
@@ -170,7 +171,7 @@ export function Entities() {
   const yours = new Set(viewer?.entities ?? []);
   const entities = byName(deployment.entities ?? []);
   return (
-    <section className="stack" aria-label="Entities" data-testid="entities" data-revision={deployment.revision} data-rows-page tabIndex={-1}>
+    <section className="stack entities-page" aria-label="Entities" data-testid="entities" data-revision={deployment.revision} data-rows-page tabIndex={-1}>
       <h1>Entities</h1>
       <span className="muted small">People and teams journeys refer to, across every journey. They need not be users; an entity holding your verified email is you.</span>
       <DeploymentProposals />

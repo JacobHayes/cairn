@@ -976,10 +976,35 @@ table.data {
   }
 }
 /* An entity's row in its Panel: paper, a hairline under each, as the node rows. */
+.entities-page {
+  gap: var(--space-5);
+}
+/* DESIGN's Table: a row 8px high-padded, its two lines close, in two columns: the name block and its emails, and Edit, which keeps its column at every width. The head's left inset is the Panel head's, so both share an edge. */
 .entity-row {
-  padding: var(--space-3) var(--space-4);
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: start;
+  gap: var(--space-1) var(--space-2);
+  padding: var(--space-2) var(--space-4);
   border-bottom: 1px solid var(--color-edge);
   background: var(--color-surface);
+}
+.entity-head {
+  display: contents;
+}
+.entity-head > button {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+.entity-row > :not(.entity-head, [data-testid="entity-emails"]) {
+  grid-column: 1 / -1;
+}
+.entity-title {
+  min-width: 0;
+}
+.entity-title > strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 .node-rows > .entity-row:last-child {
   border-bottom: 0;
