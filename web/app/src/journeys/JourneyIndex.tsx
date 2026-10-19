@@ -15,6 +15,7 @@ import { DEFAULT_FILTERS, filtersFrom, indexPath, newJourneyPath, queryOf, type 
 import { IndexFilterBar } from "./IndexFilterBar.tsx";
 import { JourneyTable } from "./JourneyTable.tsx";
 import "./journeys.css";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 /** Whether `filters` are the index's stock ones, which show the active journeys. */
 function isStock(filters: IndexFilters): boolean {
@@ -76,7 +77,7 @@ export function JourneyIndex() {
       </div>
       <NewDestinations scope="new_journeys" />
       <IndexFilterBar filters={filters} routes={known.filter((route) => !isSegment(route))} onChange={(next) => void navigate(indexPath(next))} />
-      {unknownViewer ? <IndexState kind="failed">Who you are could not be read, so neither can what is yours: {failed}</IndexState> : null}
+      {unknownViewer ? <IndexState kind="failed"><ReadFailed what="Who you are" error={failed} /></IndexState> : null}
       {!unknownViewer && (waiting || view.status === "loading" || view.status === "idle") ? <IndexState kind="loading">Reading the journeys...</IndexState> : null}
       {view.status === "failed" ? (
         <IndexState
@@ -87,7 +88,7 @@ export function JourneyIndex() {
             </button>
           }
         >
-          The journeys could not be read: {view.error.message}
+          <ReadFailed what="The journeys" error={view.error} />
         </IndexState>
       ) : null}
       {found !== undefined && !waiting ? <JourneyTable items={found} routes={known} mine={filters.mine} none={<Nothing filters={filters} />} /> : null}

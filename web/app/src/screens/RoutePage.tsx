@@ -51,6 +51,7 @@ import { useViewStateValue } from "./useViewStateValue.ts";
 import { withViewState } from "../journeys/view.ts";
 import { useScreenWrite, type ScreenWrite } from "./write.ts";
 import { NODE_GONE } from "../ui/gone.ts";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 /** What an import or a publish left, shown under the header until dismissed. */
 interface Result {
@@ -389,7 +390,7 @@ function RouteContent({ result: kept, setResult }: { result: Result | undefined;
     if (read.status === "gone") {
       body = <p className="callout">This route does not exist. <Link to={ROUTES_PATH}>All routes</Link></p>;
     } else {
-      body = read.status === "failed" ? <p className="callout callout-bad">The route could not be read: {read.error.message}</p> : <p className="muted small">Reading the route...</p>;
+      body = read.status === "failed" ? <p className="callout callout-bad"><ReadFailed what="The route" error={read.error} /></p> : <p className="muted small">Reading the route...</p>;
     }
   } else if ("empty" in found) {
     body = <EmptyRoute route={found.empty} write={write} imports={imports} />;

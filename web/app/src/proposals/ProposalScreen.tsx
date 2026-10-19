@@ -62,6 +62,7 @@ import { StalePanel } from "./Stale.tsx";
 import { itemHeading, mutationNode, namesOf, type Names } from "./words.ts";
 import { useProposalWrite, type ProposalWrite } from "./write.ts";
 import "./proposals.css";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 /** The reviewer's edits not yet saved, and the proposal revision they started from (H5). */
 interface Kept {
@@ -593,7 +594,7 @@ function JourneyReview({ journey, ...props }: Omit<BodyProps, "ready" | "before"
     return <ReviewBody {...props} ready={undefined} before={undefined} name={undefined} />;
   }
   if (view.status === "failed") {
-    return <p className="callout callout-bad">The journey could not be read: {view.message}</p>;
+    return <p className="callout callout-bad"><ReadFailed what="The journey" error={view.message} /></p>;
   }
   if (view.status === "skew") {
     return <p className="callout">This journey comes from a newer Cairn; reload to review the proposal.</p>;
@@ -623,7 +624,7 @@ function RouteReview({ route, ...props }: Omit<BodyProps, "ready" | "before" | "
   // A route that is not there yet is reviewed against nothing; one that cannot be read is not reviewed at all.
   const before = valueOf(view) ?? (view.status === "gone" ? { graph: undefined, name: undefined } : undefined);
   if (view.status === "failed") {
-    return <p className="callout callout-bad" role="alert">The route could not be read: {view.error.message}</p>;
+    return <p className="callout callout-bad" role="alert"><ReadFailed what="The route" error={view.error} /></p>;
   }
   if (before === undefined) {
     return <p className="muted small">Reading the route...</p>;
@@ -664,7 +665,7 @@ export function ProposalScreen() {
     if (view.status === "gone") {
       return <NoSuchProposal destination={destination} />;
     }
-    return view.status === "failed" ? <p className="callout callout-bad">The proposal could not be read: {view.error.message}</p> : <p className="muted small">Reading the proposal...</p>;
+    return view.status === "failed" ? <p className="callout callout-bad"><ReadFailed what="The proposal" error={view.error} /></p> : <p className="muted small">Reading the proposal...</p>;
   }
   if (deployment === undefined) {
     return <p className="muted small">Reading the deployment...</p>;

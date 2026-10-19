@@ -13,6 +13,7 @@ import { Refused } from "../screens/Refused.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { useScreenWrite } from "../screens/write.ts";
 import { Button, Field, Panel } from "../ui/kit.tsx";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 import { walkthroughPath } from "./address.ts";
 import { createMutation, newJourneyId, startableRoutes, type RouteSummary } from "./lifecycle.ts";
 
@@ -105,7 +106,7 @@ export function NewJourney() {
   const { view } = useLive("routes", routeIndex);
   const index = valueOf(view);
   if (index === undefined) {
-    return <p className="muted small">{view.status === "failed" ? `The routes could not be read: ${view.error.message}` : "Loading the routes..."}</p>;
+    return <p className="muted small">{view.status === "failed" ? <ReadFailed what="The routes" error={view.error} /> : "Loading the routes..."}</p>;
   }
   const routes = startableRoutes(index);
   const asked = params.get("route") ?? "";

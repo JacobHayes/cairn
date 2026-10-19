@@ -26,6 +26,7 @@ import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import { axisOf, calendarSpec, dateOf, dateWords, dayWords, positionOf, rangeWindow, RANGES, type Axis, type AxisSpec, type Range, type Window } from "./model.ts";
 import { chartOf, type Chart, type ChartRow, type Dependency } from "./rows.ts";
 import "./timeline.css";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 /** The height of one row's track, and of the axis above the rows (px). */
 const ROW_PX = 56;
@@ -461,7 +462,7 @@ export function ProjectedTimeline({ ready, state, picks, selected }: { ready: Re
     <>
       <ViewBar subject={journeySubject(ready)} screen="timeline" badges={badges} />
       {error !== undefined ? (
-        <p className="callout callout-bad">The timeline could not be read: {error}</p>
+        <p className="callout callout-bad"><ReadFailed what="The timeline" error={error} /></p>
       ) : timeline === undefined || level === undefined || spec === undefined || chart === undefined ? (
         <p className="muted small">Placing the dates...</p>
       ) : (

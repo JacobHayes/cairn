@@ -16,6 +16,7 @@ import { ProposalsSlot, useFrameState } from "../shell/frame.tsx";
 import { Button } from "../ui/kit.tsx";
 import { proposalRows } from "./ProposalRows.tsx";
 import { listKey, proposalsUnder } from "./read.ts";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 /** Whether the page is at its destination's `/proposals` address. */
 function useAtProposals(): boolean {
@@ -45,7 +46,7 @@ export function DestinationProposals({ destination }: { destination: Domain }) {
           )
         ) : view.status === "failed" ? (
           <p className="callout callout-bad" role="alert">
-            The open proposals could not be read: {view.error.message}{" "}
+            <ReadFailed what="The open proposals" error={view.error} />{" "}
             <Button onClick={refresh}>Try again</Button>
           </p>
         ) : view.status === "gone" ? (

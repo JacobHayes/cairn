@@ -17,6 +17,7 @@ import { Badge, IndexState, Segmented } from "../ui/kit.tsx";
 import { newRoutePath, routePath } from "./address.ts";
 import { activeJourneyCounts, inUseWords, ofType, startableVersion, typeOf, type InUse, type RouteType } from "./model.ts";
 import "../journeys/journeys.css";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 const TYPES = [
   { value: "all", label: "All" },
@@ -164,7 +165,7 @@ export function RouteIndex() {
             </button>
           }
         >
-          The routes could not be read: {view.error.message}
+          <ReadFailed what="The routes" error={view.error} />
         </IndexState>
       ) : null}
       {routes !== undefined && shown.length === 0 ? (

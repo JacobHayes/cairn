@@ -46,6 +46,7 @@
 }
 
 .meta {
+  font-family: var(--font-mono);
   font-size: 13px;
 }
 
@@ -95,6 +96,28 @@ textarea.grow {
   min-height: var(--control-h);
   width: 100%;
   resize: vertical;
+}
+
+/* The sentence, the description and the actions are one block; when the actions are only the overflow
+   menu it sits at the sentence's right edge, so no row is spent on it alone. */
+.detail-lead {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-3);
+  align-items: start;
+}
+
+.detail-lead > * {
+  grid-column: 1 / -1;
+}
+
+.detail-lead > .actions-menu-only {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.detail-lead:has(> .actions-menu-only) > :first-child {
+  grid-column: 1;
 }
 
 .actions-row {
@@ -238,10 +261,21 @@ dl.kv dd {
 
 /* Contents: one row height, and a leading cell on every row so the titles line up with or without a box. */
 .contents li {
-  display: flex;
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto auto;
   align-items: center;
   gap: var(--space-2);
   min-height: 44px;
+}
+
+/* The status chips line up in a column of their own, whatever the titles' widths. */
+.contents li > :nth-child(2) {
+  justify-self: start;
+}
+
+/* A done child fades its content, not its checkbox: the status language (DESIGN, One status language). */
+.contents li[data-status="done"] > :not(.checklist-mark) {
+  opacity: 0.5;
 }
 
 .checklist-mark {

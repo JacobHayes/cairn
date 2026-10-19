@@ -7,6 +7,7 @@ import { useLive } from "../data/react.ts";
 import { Button } from "../ui/kit.tsx";
 import { destinationWords, proposalRows } from "./ProposalRows.tsx";
 import { listKey, proposalsListed } from "./read.ts";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 /** The open proposals that would create a journey (`new_journeys`) or a route (`new_routes`). */
 export function NewDestinations({ scope, segments }: { scope: "new_journeys" | "new_routes"; segments?: boolean | undefined }) {
@@ -15,7 +16,7 @@ export function NewDestinations({ scope, segments }: { scope: "new_journeys" | "
   if (view.status === "failed") {
     return (
       <p className="callout callout-bad" role="alert" data-testid="proposed-failed">
-        The proposals that would create one could not be read: {view.error.message} <Button onClick={refresh}>Try again</Button>
+        <ReadFailed what="The proposals that would create one" error={view.error} /> <Button onClick={refresh}>Try again</Button>
       </p>
     );
   }

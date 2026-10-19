@@ -19,6 +19,7 @@ import { nodesOf, type Shown } from "./route-reads.ts";
 import { useRouteLevel } from "./route-views.ts";
 import { TreeFold, TreeGuides } from "../ui/Tree.tsx";
 import { NothingMatches, routeSubject, ViewBar } from "./ViewControls.tsx";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -78,7 +79,7 @@ export function RouteList({ shown, state, picks, selected, unanchored, onOpen }:
   return (
     <section className="stack list" aria-label="List" data-testid="list">
       <ViewBar subject={routeSubject(nodes)} screen="list" badges={badges} />
-      {error === undefined ? null : <p className="callout callout-bad">The list could not be read: {error}</p>}
+      {error === undefined ? null : <p className="callout callout-bad"><ReadFailed what="The list" error={error} /></p>}
       <div className="node-panel list-panel" data-testid="list-panel">
         <ul className="route-list route-tree" data-testid="route-list">
           {(rows ?? []).map(({ node, depth: indent, holds, guides }) => {

@@ -10,6 +10,7 @@ import type { Capabilities, Viewer } from "../data/host.ts";
 import { useCapabilities, useDeployment, useSession, useUserName, useViewer } from "../data/react.ts";
 import { Segmented } from "../ui/kit.tsx";
 import { THEME_CHOICES, useThemeChoice, type ThemeChoice } from "../ui/theme.ts";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 import { byName, mergePath, offeredMerge } from "./model.ts";
 
 /** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
@@ -39,7 +40,7 @@ function Identities({ viewer }: { viewer: Viewer }) {
             <tr key={`${identity.provider}:${identity.subject}`} data-testid="identity" data-provider={identity.provider}>
               <td>{identity.provider}</td>
               <td className="mono">{identity.subject}</td>
-              <td data-testid="identity-emails">{identity.verified_emails.join(", ") || <span className="muted small">None</span>}</td>
+              <td className="mono" data-testid="identity-emails">{identity.verified_emails.join(", ") || <span className="muted small">None</span>}</td>
               <td className="muted small">{identity.linked_at}</td>
             </tr>
           ))}
@@ -113,7 +114,7 @@ export function Identity() {
   const capabilities = useCapabilities();
   const userName = useUserName();
   if (viewer === undefined) {
-    return <p className={failed === undefined ? "muted small" : "callout callout-bad"}>{failed === undefined ? "Reading who you are..." : `Who you are could not be read: ${failed}`}</p>;
+    return <p className={failed === undefined ? "muted small" : "callout callout-bad"}>{failed === undefined ? "Reading who you are..." : <ReadFailed what="Who you are" error={failed} />}</p>;
   }
   const providers = linkable(capabilities);
   return (

@@ -24,6 +24,7 @@ import { routeSpec } from "./model.ts";
 import { routeChartOf } from "./rows.ts";
 import { TimelineChart } from "./TimelineView.tsx";
 import { NODE_GONE } from "../ui/gone.ts";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -60,7 +61,7 @@ export function RouteTimeline({ shown, state, picks, selected, onOpen }: RouteTi
     <>
       <ViewBar subject={routeSubject(nodes)} screen="timeline" badges={badges} />
       {error !== undefined ? (
-        <p className="callout callout-bad">The timeline could not be read: {error}</p>
+        <p className="callout callout-bad"><ReadFailed what="The timeline" error={error} /></p>
       ) : schedule === undefined || level === undefined || spec === undefined || chart === undefined ? (
         <p className="muted small">Placing the days...</p>
       ) : (

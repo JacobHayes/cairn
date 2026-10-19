@@ -611,15 +611,17 @@ function NodeActions({ view, detail, onRename }: { view: Ready; detail: NodeDeta
   const moving = movesFrom(node.kind, record.state).includes("start") ? "Starting" : "Finishing";
   const rejected = <Rejected view={view} write={write} onResent={form.resent} />;
   const inDialog = open?.case === "snooze";
+  // With nothing to do but the overflow menu, it sits beside the sentence above it instead of on a row of its own.
+  const menuOnly = showsRow && acts.length === 0 && groups.length > 0 && !showsAnswer && !copied;
   return (
-    <div className="stack" data-testid="actions">
+    <div className={menuOnly ? "stack actions-menu-only" : "stack"} data-testid="actions">
       {showsAnswer ? <AnswerEditor view={view} detail={detail} menu={menu} anyway={anyway} focus={focusAnswer} /> : null}
       {showsAnswer && offers.secondary.includes("unsnooze") ? (
         <span>
           <ActButton act="unsnooze" view={view} detail={detail} write={write} form={form} waiting={false} />
         </span>
       ) : null}
-      {showsRow ? (
+      {showsRow && (acts.length > 0 || groups.length > 0) ? (
         <>
           {offers.primary === undefined ? null : <LiftsSnooze view={view} node={node.key} moving={moving} />}
           <span className="row actions-row">

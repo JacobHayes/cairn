@@ -17,6 +17,11 @@ import { Receipt, useReceipt } from "../ui/Receipt.tsx";
 import { mergeFlow } from "./merge.ts";
 import type { Entity } from "./model.ts";
 
+/** An entity's name by key. */
+function nameOf(entities: readonly Entity[], key: string): string {
+  return entities.find((entity) => entity.key === key)?.name ?? "";
+}
+
 function EntitySelect({ label, value, entities, onChange }: { label: string; value: string; entities: readonly Entity[]; onChange: (key: string) => void }) {
   return (
     <label className="row">
@@ -64,10 +69,11 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
   return (
     <section id="merge-entities" className="stack panel" aria-label="Merge two entities" data-testid="merge-entities">
       <strong>Merge two entities</strong>
-      <span className="muted small">The second becomes an alias of the first: journeys and their history keep referring to it and now read the first.</span>
+      <span className="muted small">Journeys and their history will show the entity you keep.</span>
+      {ready ? <span data-testid="merge-sentence">{nameOf(entities, merged)} will be merged into {nameOf(entities, survivor)}. {nameOf(entities, survivor)} will remain.</span> : null}
       <span className="row">
-        <EntitySelect label="Keep" value={survivor} entities={entities} onChange={setSurvivor} />
-        <EntitySelect label="Merge into it" value={merged} entities={entities} onChange={setMerged} />
+        <EntitySelect label="Keep this entity" value={survivor} entities={entities} onChange={setSurvivor} />
+        <EntitySelect label="Merge this entity into it" value={merged} entities={entities} onChange={setMerged} />
         <Button
           primary
           disabled={!ready || working || write.busy || skew}

@@ -28,6 +28,7 @@ import { JourneyTable } from "./JourneyTable.tsx";
 import { useJourneyReading, type JourneyReading } from "./reading.ts";
 import { listPath } from "./view.ts";
 import "./journeys.css";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 type Ready = Extract<JourneyReading, { status: "ready" }>;
 
@@ -228,10 +229,10 @@ export function Home() {
         </p>
       )}
       <ProposalsToReview reading={proposals} />
-      {failed === undefined ? null : <p className="callout callout-bad">Who you are could not be read: {failed}</p>}
+      {failed === undefined ? null : <p className="callout callout-bad"><ReadFailed what="Who you are" error={failed} /></p>}
       {view.status === "failed" ? (
         <p className="callout callout-bad">
-          The journeys could not be read: {view.error.message}{" "}
+          <ReadFailed what="The journeys" error={view.error} />{" "}
           <button type="button" className="ghost" onClick={refresh}>
             Try again
           </button>

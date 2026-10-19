@@ -34,6 +34,7 @@ import { useRows } from "./useRows.ts";
 import type { NodeRow } from "./why.ts";
 import { actingDecisions } from "./waiting.ts";
 import "./acting.css";
+import { ReadFailed } from "../ui/ReadFailed.tsx";
 
 /** What reached the acting frontier since the pass began, other than what the pass's own actions unlocked and its filters still show (the card's band and the rail name those). */
 function Surfaced({ view, keys }: { view: Ready; keys: string[] }) {
@@ -212,7 +213,7 @@ export function TriageBody({ view, state, selected, onCard }: { view: Ready; sta
           Start with the decisions that shape this journey. {open} open now; each answer can open more.
         </p>
       ) : null}
-      {error === undefined ? null : <p className="callout callout-bad">The frontier could not be read: {error}</p>}
+      {error === undefined ? null : <p className="callout callout-bad"><ReadFailed what="The frontier" error={error} /></p>}
       <Surfaced view={view} keys={surfaced(view.derived.acting_frontier, pass).filter((key) => unlockedBy(pass, key) === undefined || !order.includes(key))} />
       {read ? null : <p className="muted small">Reading the frontier...</p>}
       {read && rows.length === 0 ? <Empty view={view} decisions={decisions} stalled={view.derived.stalled != null} onContinue={() => { onState({ ...state, depth: undefined }, true); }} /> : null}

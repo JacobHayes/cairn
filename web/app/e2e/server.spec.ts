@@ -177,6 +177,21 @@ test("a route's canvas keeps its graph while its reads fail, says BEHIND, and ca
   await expect(syncChip(two)).not.toHaveAttribute("data-state", "behind");
 });
 
+test("a failed read says what happened in a sentence, and keeps the server's message, ids and all, behind Details", { tag: "@server" }, async ({ page }) => {
+  const raw = "read of j_hiring at revision 4 failed in e_lead";
+  await page.route((url) => url.pathname === "/api/journeys", (route) => route.fulfill({ status: 500, body: raw }));
+  await open(page, "server", "/journeys");
+  const failed = page.getByText("The journeys could not be read.");
+  await expect(failed).toBeVisible();
+  await expect(page.getByText("j_hiring")).toBeHidden();
+  const details = page.getByRole("button", { name: "Details" });
+  await details.click();
+  await expect(page.getByTestId("read-failed-message")).toContainText("j_hiring");
+  // Closed again: the page a person reads shows no key, which every test ends by checking.
+  await details.click();
+  await expect(page.getByTestId("read-failed-message")).toBeHidden();
+});
+
 test("C14: a proposal drafted in another page appears in a journey's Proposals tab with no reload", { tag: "@server" }, async ({ context }) => {
   const [one, two] = [await context.newPage(), await context.newPage()];
   await open(one, "server", "/entities");
