@@ -50,6 +50,7 @@ mod in_process {
             ("events", vec![&at::EVENTS]),
             ("subscribe", vec![&at::STREAM]),
             ("viewer", vec![&at::VIEWER]),
+            ("user_names", vec![&at::USER_NAMES]),
             ("snapshot", vec![&at::SNAPSHOT]),
             ("level", vec![&at::LEVEL]),
             ("trace", vec![&at::TRACE]),
