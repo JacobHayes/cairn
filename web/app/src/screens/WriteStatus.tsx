@@ -3,6 +3,7 @@
 // manager's, so this reads it and sends it Retry or Discard; nothing is held here. A control
 // in a transient bar asks for the `line` layout: the same words and actions without the box,
 // and a write the rules refused lists every rule it broke.
+import { WriteProblem } from "../ui/Failed.tsx";
 import { unlandedWords } from "../data/edit-manager.ts";
 import { useSession, useSkew } from "../data/react.ts";
 import type { WriteView } from "../data/write-machine.ts";
@@ -49,14 +50,14 @@ export function WriteStatus({ view, layout = "callout" }: { view: WriteView | un
   if (layout === "line") {
     return (
       <div className="stack" role="alert" data-testid="write-problem">
-        {view.state === "rejected" && view.rejection.rejection === "invalid" ? <ViolationLines violations={view.rejection.violations} /> : <span className="author-problem">{words.message}</span>}
+        {view.state === "rejected" && view.rejection.rejection === "invalid" ? <ViolationLines violations={view.rejection.violations} /> : <span className="author-problem"><WriteProblem message={words.message} detail={words.detail} /></span>}
         {actions}
       </div>
     );
   }
   return (
     <div className="callout callout-bad stack" role="alert" data-testid="write-problem">
-      <span>{words.message}</span>
+      <span><WriteProblem message={words.message} detail={words.detail} /></span>
       {actions}
     </div>
   );

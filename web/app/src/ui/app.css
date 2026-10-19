@@ -943,6 +943,22 @@ table.data {
   font-size: 11px;
   line-height: 1.2;
 }
+.merge-fields {
+  align-items: flex-end;
+}
+/* Details sits under the action that leads: plain secondary text, underlined, still a button for focus. */
+button.failed-details {
+  border: 0;
+  background: none;
+  min-height: 0;
+  padding: 0 var(--space-1);
+  font-size: 14px;
+  color: var(--color-secondary);
+  text-decoration: underline;
+}
+.merge-body {
+  padding: var(--space-4);
+}
 .chips-input {
   display: flex;
   flex-wrap: wrap;

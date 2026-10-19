@@ -13,7 +13,7 @@ import { listed, recount, wordsOf } from "../detail/happened.ts";
 import { useRecordWords } from "../screens/RejectionView.tsx";
 import { Button } from "../ui/kit.tsx";
 import { intervening } from "./model.ts";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed } from "../ui/Failed.tsx";
 
 type PatchEvents = Schema<"PatchEvents">;
 
@@ -118,7 +118,7 @@ export function StalePanel({ review, disabled, onRefresh }: StaleProps) {
       ) : patches === undefined ? (
         <span className="muted small">Reading what changed...</span>
       ) : "failed" in patches ? (
-        <span className="author-problem"><ReadFailed what="What changed" error={patches.failed} /></span>
+        <span className="author-problem"><Failed what="What changed" error={patches.failed} /></span>
       ) : (
         <InterveningPatches journey={journey} patches={patches} />
       )}

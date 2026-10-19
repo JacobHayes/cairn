@@ -23,7 +23,7 @@ import { ChipsInput } from "../ui/ChipsInput.tsx";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { MergeEntities } from "./MergeEntities.tsx";
 import { aliasesOf, byName, EMAIL_RULES, entityOf, mergeAsked, newEntityKey, type Entity } from "./model.ts";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed } from "../ui/Failed.tsx";
 
 /** An entity's edit as typed, and the deployment revision its author saw when they opened it (H5). */
 interface EntityDraft {
@@ -137,7 +137,9 @@ function DeploymentProposals() {
   if (view.status === "failed") {
     return (
       <p className="callout callout-bad" role="alert" data-testid="proposals-failed">
-        <ReadFailed what="The open proposals" error={view.error} /> <Button onClick={refresh}>Try again</Button>
+        <Failed what="The open proposals" error={view.error}>
+          <Button onClick={refresh}>Try again</Button>
+        </Failed>
       </p>
     );
   }

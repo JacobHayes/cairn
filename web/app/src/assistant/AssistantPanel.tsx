@@ -25,7 +25,7 @@ import { aboutWords, assistantOffered, becauseWords, endedWords, shown, toolWord
 import { conversationView, sendTurn, type ConversationRef } from "./conversation.ts";
 import "./assistant.css";
 import { NODE_GONE } from "../ui/gone.ts";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed, kindOf } from "../ui/Failed.tsx";
 
 /** A node's title, when the screen knows it. */
 export type TitleOf = (key: string) => string | undefined;
@@ -265,7 +265,7 @@ function Conversing({ conversation, target, titleOf }: { conversation: Conversat
     <section className="panel assistant-panel" aria-label="Assistant" data-testid="assistant-panel" data-target={key} data-status={sending === undefined ? "idle" : "working"}>
       <div ref={scroller} className="assistant-scroll inspector-body">
         {read.status === "loading" ? <p className="muted small">Reading the conversation...</p> : null}
-        {read.status === "failed" ? <p className="callout callout-bad"><ReadFailed what="The conversation" error={read.message} /></p> : null}
+        {read.status === "failed" ? <p className="callout callout-bad"><Failed what="The conversation" error={read.message} /></p> : null}
         {read.status === "ready" && entries.length === 0 && sending === undefined ? <Empty /> : null}
         <Transcript entries={entries} titleOf={titleOf} />
         {sending === undefined ? null : (
@@ -281,7 +281,7 @@ function Conversing({ conversation, target, titleOf }: { conversation: Conversat
       </div>
       {failure === undefined ? null : (
         <p className="callout callout-bad" role="alert" data-testid="assistant-failed" data-status={failure.status}>
-          {failure.status === 503 ? "The assistant is busy; try again in a moment." : `The message was not answered: ${failure.message}.`}
+          {failure.status === 503 ? "The assistant is busy; try again in a moment." : <Failed what="The message" verb="answered" error={kindOf(failure)} />}
         </p>
       )}
       <Composer target={target} ready={read.status === "ready"} sending={sending !== undefined} send={send} />

@@ -48,7 +48,7 @@ import {
 } from "./model.ts";
 import { EntriesPanel, type Entry } from "./Entries.tsx";
 import "./summary.css";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed } from "../ui/Failed.tsx";
 
 /** The date of a milestone line in words, where it comes from on hover, and its own shortfall as a sentence of its own. */
 function MilestoneWhen({ ready, line }: { ready: Ready; line: MilestoneLine }) {
@@ -280,7 +280,7 @@ function Waiting({ ready, error }: { ready: Ready; error: string | undefined }) 
   }
   return (
     <div className="summary stack" data-testid="summary" data-status={status} tabIndex={-1}>
-      {error === undefined ? <p className="muted small">Summing up the journey...</p> : <p className="callout callout-bad"><ReadFailed what="The summary" error={error} /></p>}
+      {error === undefined ? <p className="muted small">Summing up the journey...</p> : <p className="callout callout-bad"><Failed what="The summary" error={error} /></p>}
     </div>
   );
 }

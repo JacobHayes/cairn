@@ -9,13 +9,14 @@
 // Nothing is discovered through XState's system registry: the writes are an explicit keyed
 // map, each with the last snapshot it relayed (a selector reads that, never `getSnapshot()` of
 // a child, so a change of a write is a change of the manager's snapshot).
+import type { HttpFailure } from "@cairn/client";
 import { assign, enqueueActions, fromPromise, sendTo, setup, waitFor, type ActorRefFrom } from "xstate";
 
 import { EDIT_RECORD_VERSION, idOf, type About, type Answer, type Command, type EditStore, type OperationId } from "./edit-record.ts";
 import type { Markdown, Patch } from "./host.ts";
 import type { Problem } from "./sync.ts";
 import { writeMachine, writeView, recordOf, type Check, type WriteEnv, type WriteRef, type WriteSnapshot, type WriteView } from "./write-machine.ts";
-import { reasonOf, unconfirmed } from "./writes.ts";
+import { reasonOf } from "./writes.ts";
 
 /** What the manager tells the person about the records, in words the session supplies. */
 export interface EditNotes {
@@ -234,7 +235,7 @@ const removedWords = (view: Extract<WriteView, { state: "gone" }>): string => {
  * What the chip says of a write that needs the person, or none for one that does not (out, or
  * still resending, which the chip counts as saving). `skewed`: the tab is in version skew now.
  */
-export function unlandedWords(view: WriteView, skewed: boolean): { kind: Problem["kind"]; message: string; retry: boolean } | undefined {
+export function unlandedWords(view: WriteView, skewed: boolean): { kind: Problem["kind"]; message: string; detail?: HttpFailure; retry: boolean } | undefined {
   switch (view.state) {
     case "rejected":
       return { kind: view.rejection.rejection === "stale" ? "conflict" : "rejected", message: reasonOf(view.rejection), retry: false };
@@ -243,10 +244,12 @@ export function unlandedWords(view: WriteView, skewed: boolean): { kind: Problem
     case "unconfirmed":
       return view.retrying
         ? undefined
-        : { kind: "failed", message: view.failure === undefined ? "Could not confirm the save: the page reloaded before the answer came." : unconfirmed(view.failure), retry: true };
+        : view.failure === undefined
+          ? { kind: "failed", message: "Could not confirm the save: the page reloaded before the answer came.", retry: true }
+          : { kind: "failed", message: "Could not confirm the save; it may have landed.", detail: view.failure, retry: true };
     case "stopped":
       if (view.failure !== undefined) {
-        return { kind: "failed", message: `Not saved: ${view.failure.message}.`, retry: true };
+        return { kind: "failed", message: "Not saved.", detail: view.failure, retry: true };
       }
       return {
         kind: "failed",
@@ -268,7 +271,7 @@ export function problemsOf(writes: EditsContext["writes"], skewed: boolean): Pro
     const view = writeView(snapshot);
     const words = unlandedWords(view, skewed);
     if (words !== undefined) {
-      found.push({ id, kind: words.kind, message: words.message, label: view.about.label, address: view.state === "gone" ? undefined : view.about.address, retry: words.retry });
+      found.push({ id, kind: words.kind, message: words.message, detail: words.detail, label: view.about.label, address: view.state === "gone" ? undefined : view.about.address, retry: words.retry });
     }
   }
   return found;

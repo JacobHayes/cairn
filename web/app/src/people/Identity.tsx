@@ -10,7 +10,7 @@ import type { Capabilities, Viewer } from "../data/host.ts";
 import { useCapabilities, useDeployment, useSession, useUserName, useViewer } from "../data/react.ts";
 import { Segmented } from "../ui/kit.tsx";
 import { THEME_CHOICES, useThemeChoice, type ThemeChoice } from "../ui/theme.ts";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed } from "../ui/Failed.tsx";
 import { byName, mergePath, offeredMerge } from "./model.ts";
 
 /** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
@@ -114,7 +114,7 @@ export function Identity() {
   const capabilities = useCapabilities();
   const userName = useUserName();
   if (viewer === undefined) {
-    return <p className={failed === undefined ? "muted small" : "callout callout-bad"}>{failed === undefined ? "Reading who you are..." : <ReadFailed what="Who you are" error={failed} />}</p>;
+    return <p className={failed === undefined ? "muted small" : "callout callout-bad"}>{failed === undefined ? "Reading who you are..." : <Failed what="Who you are" error={failed} />}</p>;
   }
   const providers = linkable(capabilities);
   return (

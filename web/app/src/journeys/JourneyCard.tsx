@@ -18,7 +18,7 @@ import { Flags, LineageBlock, useLineage } from "./JourneyFacts.tsx";
 import { useMineOf } from "./mine.ts";
 import { useMemo } from "react";
 import "./journeys.css";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed } from "../ui/Failed.tsx";
 
 /** The most items "next up" lists on the card; the Summary lists the whole frontier. */
 const NEXT_UP_SHOWN = 3;
@@ -137,7 +137,7 @@ export function JourneyCard({ ready, selected }: { ready: Ready; selected?: stri
           </>
         )}
       </div>
-      {summaryError === undefined ? null : <p className="callout callout-bad"><ReadFailed what="The summary" error={summaryError} /></p>}
+      {summaryError === undefined ? null : <p className="callout callout-bad"><Failed what="The summary" error={summaryError} /></p>}
       {model === undefined || done === undefined ? (
         summaryError === undefined ? <p className="muted small">Summing up the journey...</p> : null
       ) : (

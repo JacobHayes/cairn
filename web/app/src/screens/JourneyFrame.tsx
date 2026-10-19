@@ -35,7 +35,7 @@ import { useJourneyKeys } from "./keys.ts";
 import { useViewStateValue } from "./useViewStateValue.ts";
 import { CanvasBars, ProjectionBody, type ProjectionProps } from "./Projections.tsx";
 import "./screens.css";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed } from "../ui/Failed.tsx";
 
 const InsertionCanvas = lazy(() => import("../segments/Preview.tsx").then((module) => ({ default: module.InsertionCanvas })));
 
@@ -62,7 +62,7 @@ export function JourneyGate({ id, children }: { id: string; children: (ready: Re
     case "missing":
       return <p className="callout" data-testid="journey-missing">This journey does not exist. <Link to={indexPath()}>All journeys</Link></p>;
     case "failed":
-      return <p className="callout callout-bad"><ReadFailed what="The journey" error={journey.message} /></p>;
+      return <p className="callout callout-bad"><Failed what="The journey" error={journey.message} /></p>;
     case "skew":
       return <p className="callout">This journey comes from a newer Cairn; reload to see it.</p>;
     case "ready":

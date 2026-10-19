@@ -186,10 +186,10 @@ test("a failed read says what happened in a sentence, and keeps the server's mes
   await expect(page.getByText("j_hiring")).toBeHidden();
   const details = page.getByRole("button", { name: "Details" });
   await details.click();
-  await expect(page.getByTestId("read-failed-message")).toContainText("j_hiring");
+  await expect(page.getByTestId("failed-message")).toContainText("j_hiring");
   // Closed again: the page a person reads shows no key, which every test ends by checking.
   await details.click();
-  await expect(page.getByTestId("read-failed-message")).toBeHidden();
+  await expect(page.getByTestId("failed-message")).toBeHidden();
 });
 
 test("C14: a proposal drafted in another page appears in a journey's Proposals tab with no reload", { tag: "@server" }, async ({ context }) => {

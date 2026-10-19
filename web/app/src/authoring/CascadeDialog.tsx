@@ -6,6 +6,7 @@
 // Removing a role or a kind shows its cascade the same way. Exported for proposal review
 // (5.7), which shows cascaded items the same way.
 
+import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";
 import type { Dangling, RemovalPlan } from "./cascade.ts";
 import type { Mutation } from "./graph.ts";
@@ -70,7 +71,7 @@ function PreviewLine({ preview }: { preview: Preview | undefined }) {
     return <span className="muted small">Checking with the engine...</span>;
   }
   if (preview.outcome === "unavailable") {
-    return <span className="muted small">No preview: {preview.message}</span>;
+    return <span className="muted small"><Failed what="The preview" verb="made" error={preview.message} /></span>;
   }
   if (preview.outcome === "rejected") {
     const violations = preview.rejection.rejection === "invalid" ? preview.rejection.violations : [];

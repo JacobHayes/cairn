@@ -102,6 +102,21 @@ test("a rename whose answer is lost is resent with its id and lands once", { tag
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
 });
 
+test("a refused save says what happened in a sentence, and keeps the server's message, ids and all, behind Details", { tag: "@server" }, async ({ page }) => {
+  await openJourney(page, "server", "j_hiring");
+  await page.route(PATCHES, (route) => route.fulfill({ status: 400, contentType: "text/plain", body: "patch p_abc at revision 4 refused for n_offer" }));
+  await startRename(page, "n_offer", fresh("Refused"));
+  await save(page, "n_offer");
+  const problem = page.getByTestId("write-problem").first();
+  await expect(problem).toContainText("Not saved.");
+  await expect(problem).not.toContainText("n_offer");
+  await problem.getByRole("button", { name: "Details" }).click();
+  await expect(problem.getByTestId("failed-message")).toContainText("n_offer");
+  // Closed again: the page a person reads shows no key, which every test ends by checking.
+  await problem.getByRole("button", { name: "Details" }).click();
+  await expect(problem.getByTestId("failed-message")).toBeHidden();
+});
+
 /** Holds the page's patch requests until the returned release; each request's mutations are recorded as it goes out. */
 async function holding(page: Page) {
   let release: () => void = () => undefined;

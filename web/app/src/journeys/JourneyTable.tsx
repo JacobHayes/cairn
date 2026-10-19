@@ -4,6 +4,7 @@
 // "Reading..." or why it could not until it has. With `mine` only the journeys where the viewer
 // holds something are kept (E4). "Upgrade available" is the host's field on each journey, never
 // worked out here. Kept current (H6).
+import { Failed } from "../ui/Failed.tsx";
 import { useMemo, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 
@@ -135,14 +136,11 @@ function ReadingCell({ reading, id }: { reading: Exclude<JourneyReading, { statu
   if (reading.status === "failed") {
     return (
       <td colSpan={4} className="cell-reading" data-column="reading" data-testid="row-failed">
-        <span className="flag-bad">Could not be read.</span>{" "}
-        <details className="cell-why">
-          <summary>Why</summary>
-          {reading.message}
-        </details>{" "}
-        <button type="button" className="ghost" onClick={() => { retry(id); }}>
-          Try again
-        </button>
+        <Failed what="This journey" error={reading.message}>
+          <button type="button" className="ghost" onClick={() => { retry(id); }}>
+            Try again
+          </button>
+        </Failed>
       </td>
     );
   }

@@ -4,6 +4,7 @@
 // engine and today, what needs you, and this tab's recent saves. Nothing on it closes itself
 // or needs closing but the popover, which Esc dismisses. A polite and an assertive live
 // region announce the changes that matter.
+import { WriteProblem } from "../ui/Failed.tsx";
 import { useActorRef, useSelector } from "@xstate/react";
 import { useEffect, useId, useRef } from "react";
 import { Link, useNavigate } from "react-router";
@@ -34,7 +35,7 @@ function NeedsYou({ problems, onGo }: { problems: readonly Problem[]; onGo: () =
           <li key={problem.id} className="stack" data-testid="sync-problem" data-kind={problem.kind}>
             <span>
               {problem.label === undefined ? null : <strong>{problem.label}: </strong>}
-              {problem.message}
+              <WriteProblem message={problem.message} detail={problem.detail} />
             </span>
             <span className="row">
               {problem.address === undefined ? null : (

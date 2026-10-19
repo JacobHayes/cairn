@@ -14,7 +14,7 @@ import { Markdown } from "../ui/markdown.tsx";
 import { type AnswerValue, type GraphNode, type NodeDetail, type Ready } from "./model.ts";
 import { listed, recount, wordsOf, type Happened, type Words } from "./happened.ts";
 import { answerText } from "./sections.tsx";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed } from "../ui/Failed.tsx";
 
 type PatchEvents = Schema<"PatchEvents">;
 
@@ -163,7 +163,7 @@ export function NodeHistory({ view, detail, open }: { view: Ready; detail: NodeD
     <div className="stack" data-testid="history">
       <strong className="detail-subhead">History</strong>
       {loaded === undefined ? <span className="muted small">Reading...</span> : null}
-      {loaded !== undefined && "failed" in loaded ? <span className="callout callout-bad"><ReadFailed what="The history" error={loaded.failed} /></span> : null}
+      {loaded !== undefined && "failed" in loaded ? <span className="callout callout-bad"><Failed what="The history" error={loaded.failed} /></span> : null}
       {loaded !== undefined && "patches" in loaded ? (
         <>
           <ul className="detail-list">

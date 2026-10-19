@@ -28,7 +28,7 @@ import { JourneyTable } from "./JourneyTable.tsx";
 import { useJourneyReading, type JourneyReading } from "./reading.ts";
 import { listPath } from "./view.ts";
 import "./journeys.css";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed } from "../ui/Failed.tsx";
 
 type Ready = Extract<JourneyReading, { status: "ready" }>;
 
@@ -48,14 +48,11 @@ function FailedGroup({ summary, message }: { summary: JourneySummary; message: s
     <li className="home-journey" data-testid="home-failed" data-journey={summary.id}>
       <NodePanel title={<Link to={journeyPath({ journey: summary.id })}>{summary.name}</Link>} label={summary.name}>
         <li className="home-failed-row">
-          <span className="flag-bad">Could not be read.</span>{" "}
-          <details className="cell-why">
-            <summary>Why</summary>
-            {message}
-          </details>{" "}
-          <button type="button" className="ghost" onClick={() => { retry(summary.id); }}>
-            Try again
-          </button>
+          <Failed what="This journey" error={message}>
+            <button type="button" className="ghost" onClick={() => { retry(summary.id); }}>
+              Try again
+            </button>
+          </Failed>
         </li>
       </NodePanel>
     </li>
@@ -168,10 +165,11 @@ function ProposalsToReview({ reading }: { reading: ReturnType<typeof useLive<Pro
     <>
       {view.status === "failed" || view.status === "behind" ? (
         <p className="callout callout-bad" role="alert" data-testid="home-proposals-failed">
-          The proposals waiting on you could not be {found === undefined ? "read" : "refreshed"}: {view.error.message}{" "}
-          <button type="button" className="ghost" onClick={refresh}>
-            Try again
-          </button>
+          <Failed what="The proposals waiting on you" verb={found === undefined ? "read" : "refreshed"} error={view.error}>
+            <button type="button" className="ghost" onClick={refresh}>
+              Try again
+            </button>
+          </Failed>
         </p>
       ) : null}
       {rows.length === 0 ? null : <RowsPanel title="Proposals to review" testId="home-proposals" rows={rows} />}
@@ -229,13 +227,14 @@ export function Home() {
         </p>
       )}
       <ProposalsToReview reading={proposals} />
-      {failed === undefined ? null : <p className="callout callout-bad"><ReadFailed what="Who you are" error={failed} /></p>}
+      {failed === undefined ? null : <p className="callout callout-bad"><Failed what="Who you are" error={failed} /></p>}
       {view.status === "failed" ? (
         <p className="callout callout-bad">
-          <ReadFailed what="The journeys" error={view.error} />{" "}
-          <button type="button" className="ghost" onClick={refresh}>
-            Try again
-          </button>
+          <Failed what="The journeys" error={view.error}>
+            <button type="button" className="ghost" onClick={refresh}>
+              Try again
+            </button>
+          </Failed>
         </p>
       ) : null}
       <Said state={state} />

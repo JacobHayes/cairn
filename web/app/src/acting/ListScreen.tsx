@@ -35,7 +35,7 @@ import { StalledPanel } from "./Stalled.tsx";
 import { addableColumns, columnsOf, columnWords, flatLines, givesWay, rankPositions, SORT_OF, treeLines, type Column, type Line } from "./listModel.ts";
 import { useRows } from "./useRows.ts";
 import "./acting.css";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed } from "../ui/Failed.tsx";
 
 /** The columns held at the left while the table scrolls sideways. */
 function pinned(column: Column, columns: readonly Column[]): string | undefined {
@@ -252,7 +252,7 @@ export function ListBody({ view, state, picks, list, selected, selection }: { vi
   return (
     <section className="stack list" aria-label="List" data-testid="list">
       <ViewBar subject={journeySubject(view)} screen="list" badges={badges} end={<RowEnd list={list} decisionColumns={decisionColumns} total={kept?.length} />} />
-      {error === undefined ? null : <p className="callout callout-bad"><ReadFailed what="The list" error={error} /></p>}
+      {error === undefined ? null : <p className="callout callout-bad"><Failed what="The list" error={error} /></p>}
       <div className="node-panel list-panel" data-empty={lines.length === 0 ? true : undefined} data-testid="list-panel">
         <Table list={list} lines={lines} columns={columns} context={context} selection={selection} selected={selected} everyLine={everyLine} outOfFocus={dimmed} />
         {kept !== undefined && level !== undefined && lines.length === 0 ? (

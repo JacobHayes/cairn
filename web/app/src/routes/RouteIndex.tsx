@@ -17,7 +17,7 @@ import { Badge, IndexState, Segmented } from "../ui/kit.tsx";
 import { newRoutePath, routePath } from "./address.ts";
 import { activeJourneyCounts, inUseWords, ofType, startableVersion, typeOf, type InUse, type RouteType } from "./model.ts";
 import "../journeys/journeys.css";
-import { ReadFailed } from "../ui/ReadFailed.tsx";
+import { Failed } from "../ui/Failed.tsx";
 
 const TYPES = [
   { value: "all", label: "All" },
@@ -28,7 +28,7 @@ const TYPES = [
 const ACTIVE = { ...DEFAULT_FILTERS };
 
 /** What the use cell shows: the use, or that it is being read or could not be. */
-type UseReading = { kind: "reading" } | { kind: "failed"; message: string } | { kind: "known"; use: InUse };
+type UseReading = { kind: "reading" } | { kind: "failed" } | { kind: "known"; use: InUse };
 
 function UseCell({ route, reading }: { route: RouteSummary; reading: UseReading }) {
   const segment = route.header.kind === "segment";
@@ -41,7 +41,7 @@ function UseCell({ route, reading }: { route: RouteSummary; reading: UseReading 
   }
   if (reading.kind === "failed") {
     return (
-      <td data-column="use" title={reading.message}>
+      <td data-column="use">
         <span className="flag-bad">Could not be read</span>
       </td>
     );
@@ -94,7 +94,7 @@ function readingOf<T>(view: ReadView<T>, known: (value: T) => InUse): UseReading
   if (value !== undefined) {
     return { kind: "known", use: known(value) };
   }
-  return view.status === "failed" ? { kind: "failed", message: view.error.message } : { kind: "reading" };
+  return view.status === "failed" ? { kind: "failed" } : { kind: "reading" };
 }
 
 /** The routes and segments as a table, each with its use as `useOf` reads it. */
@@ -159,13 +159,12 @@ export function RouteIndex() {
       {view.status === "failed" ? (
         <IndexState
           kind="failed"
-          action={
+        >
+          <Failed what="The routes" error={view.error}>
             <button type="button" className="ghost" onClick={refresh}>
               Try again
             </button>
-          }
-        >
-          <ReadFailed what="The routes" error={view.error} />
+          </Failed>
         </IndexState>
       ) : null}
       {routes !== undefined && shown.length === 0 ? (

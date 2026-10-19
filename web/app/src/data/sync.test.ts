@@ -40,7 +40,7 @@ const quiet: SyncInput = {
   revision: 42,
 };
 
-const problem = (kind: Problem["kind"], label = "Draft test plan"): Problem => ({ id: `p_${kind}_${label}`, kind, message: "no", label, address: undefined, retry: false });
+const problem = (kind: Problem["kind"], label = "Draft test plan"): Problem => ({ id: `p_${kind}_${label}`, kind, message: "no", detail: undefined, label, address: undefined, retry: false });
 const lag = (since: number, failed = false): Lag => ({ subject: "journey:j_one", shown: 42, announced: 43, since, failed });
 const save = (id: number, warning?: string): SaveEvent => ({ id, at: new Date("2026-10-06T14:02:11"), text: "Renamed", warning, unlocked: undefined, address: undefined });
 

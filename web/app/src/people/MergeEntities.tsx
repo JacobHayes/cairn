@@ -12,6 +12,7 @@ import { useEdit, useSession, useSkew } from "../data/react.ts";
 import { landedWarning } from "../data/writes.ts";
 import { Refused } from "../screens/Refused.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
+import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";
 import { Receipt, useReceipt } from "../ui/Receipt.tsx";
 import { mergeFlow } from "./merge.ts";
@@ -24,8 +25,8 @@ function nameOf(entities: readonly Entity[], key: string): string {
 
 function EntitySelect({ label, value, entities, onChange }: { label: string; value: string; entities: readonly Entity[]; onChange: (key: string) => void }) {
   return (
-    <label className="row">
-      <span className="muted small">{label}</span>
+    <label className="field">
+      <span className="label">{label}</span>
       <select aria-label={label} value={value} onChange={(event) => { onChange(event.target.value); }}>
         <option value="">Choose an entity</option>
         {entities.map((entity) => (
@@ -67,11 +68,14 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
   });
   const ready = survivor !== "" && merged !== "" && survivor !== merged;
   return (
-    <section id="merge-entities" className="stack panel" aria-label="Merge two entities" data-testid="merge-entities">
-      <strong>Merge two entities</strong>
+    <section id="merge-entities" className="node-panel" aria-label="Merge two entities" data-testid="merge-entities">
+      <header className="node-panel-head">
+        <h2 className="node-panel-title">Merge two entities</h2>
+      </header>
+      <div className="stack merge-body">
       <span className="muted small">Journeys and their history will show the entity you keep.</span>
       {ready ? <span data-testid="merge-sentence">{nameOf(entities, merged)} will be merged into {nameOf(entities, survivor)}. {nameOf(entities, survivor)} will remain.</span> : null}
-      <span className="row">
+      <span className="row merge-fields">
         <EntitySelect label="Keep this entity" value={survivor} entities={entities} onChange={setSurvivor} />
         <EntitySelect label="Merge this entity into it" value={merged} entities={entities} onChange={setMerged} />
         <Button
@@ -85,7 +89,7 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
           Merge
         </Button>
       </span>
-      {failure === undefined ? null : <p className="callout callout-bad" role="alert" data-testid="merge-failed">Not merged: {failure}</p>}
+      {failure === undefined ? null : <p className="callout callout-bad" role="alert" data-testid="merge-failed"><Failed what="The merge" verb="made" error={failure} /></p>}
       {write.rejection === undefined ? (
         <>
           <WriteStatus view={write.status} />
@@ -94,6 +98,7 @@ export function MergeEntities({ deployment, entities, asked }: { deployment: Dep
       ) : (
         <Refused rejection={write.rejection} onDismiss={write.dismiss} />
       )}
+      </div>
     </section>
   );
 }

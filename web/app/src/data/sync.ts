@@ -9,7 +9,7 @@
 // else the chip shows is read from its owner when it renders: the stream, version skew and
 // the network, and the writes that did not land and the writes in flight from the edit
 // manager. Nothing derived is stored.
-import type { StreamStatus } from "@cairn/client";
+import type { HttpFailure, StreamStatus } from "@cairn/client";
 import { assign, setup, type ActorRefFrom } from "xstate";
 
 import type { SaveEvent } from "./activity.ts";
@@ -48,6 +48,8 @@ export interface Problem {
   kind: "conflict" | "rejected" | "failed";
   /** What the reason is, in a sentence. */
   message: string;
+  /** The server's own words behind the message, for a Details button: they may name ids, so never shown by default. */
+  detail: HttpFailure | undefined;
   /** What it was about: a node's or journey's title. */
   label: string | undefined;
   /** The screen it happened on, for Go to it (its rejected control is still there). */

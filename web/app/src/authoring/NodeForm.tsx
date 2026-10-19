@@ -5,6 +5,7 @@
 // field before Save (A15); limits stop a value before it is sent (PRACTICES); and a journey's
 // route-copied fields carry their local-edit marker (B4).
 import { useDraft } from "../data/drafts.ts";
+import { Failed } from "../ui/Failed.tsx";
 import { Button } from "../ui/kit.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Receipt } from "../ui/Receipt.tsx";
@@ -183,7 +184,7 @@ export function NodeForm({ authored, node }: NodeFormProps) {
           </Button>
           {preview?.outcome === "accepted" ? <span className="muted small" data-testid="preview" data-status="accepted">The engine accepts this.</span> : null}
           {preview?.outcome === "rejected" ? <span className="muted small" data-testid="preview" data-status="rejected">The engine would refuse this; see the fields.</span> : null}
-          {preview?.outcome === "unavailable" ? <span className="author-problem" data-testid="preview" data-status="unavailable">No preview: {preview.message}</span> : null}
+          {preview?.outcome === "unavailable" ? <span className="author-problem" data-testid="preview" data-status="unavailable"><Failed what="The preview" verb="made" error={preview.message} /></span> : null}
         </span>
       )}
     </form>

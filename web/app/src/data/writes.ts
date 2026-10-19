@@ -3,7 +3,7 @@
 // for a refusal or an answer that never came; and the save a landed write records, with the
 // warnings it caused. Committed state always comes from the host: the tick that follows
 // refetches it.
-import type { HttpFailure, Schema } from "@cairn/client";
+import type { Schema } from "@cairn/client";
 
 import type { Markdown, Patch } from "./host.ts";
 import { consequenceLines, warningOf, type ConsequenceLine, type SaveEvent, type TitleOf, type Unlocked } from "./activity.ts";
@@ -37,11 +37,6 @@ export function patchOf(intent: WriteIntent, id: string = newPatchId()): Patch {
     mutations: intent.mutations,
   };
   return intent.deploymentRevision === undefined ? patch : { ...patch, deployment_revision: intent.deploymentRevision };
-}
-
-/** What the chip says of a write that got no answer: it may have landed, so it is not called unsent. */
-export function unconfirmed(failure: HttpFailure): string {
-  return `Could not confirm the save: ${failure.message}`;
 }
 
 /** Why a write was rejected, in a sentence for the chip's popover. */
