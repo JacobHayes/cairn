@@ -94,8 +94,9 @@ impl<T> At<T> {
     }
 }
 
-/// A page of a list that can grow: at most `page_item_count_max` items (PRACTICES, Explicit
-/// limits), the cursor of the next page, and how many there are in all.
+// PRACTICES: Explicit limits.
+/// A page of a list that can grow: at most `page_item_count_max` items, the cursor of the next
+/// page, and how many there are in all.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, JsonSchema)]
 pub(crate) struct Paged<T> {
     /// The items on this page.

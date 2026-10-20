@@ -9,8 +9,9 @@ use serde::{Deserialize, Serialize};
 use crate::id::Slug;
 use crate::text::{Email, Title};
 
+// ARCHITECTURE: Auth.
 /// An account at one auth provider, keyed by the provider's configured name and its own
-/// subject for the account. A user owns many (ARCHITECTURE, Auth).
+/// subject for the account. A user owns many.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Login {

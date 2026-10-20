@@ -31,7 +31,8 @@ use crate::number::{Days, Weight};
 use crate::refs::{References, key_absent};
 use crate::text::{Markdown, Title};
 
-/// A node kind (PRD glossary: a fixed set).
+// PRD: glossary: a fixed set.
+/// A node kind.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]

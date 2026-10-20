@@ -148,6 +148,7 @@ pub struct ProposalReview {
     /// the proposal creates; none when the candidate breaks a rule.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub after: Option<DestinationAfter>,
+    // PRD: D7.
     /// By journey: what applying it would newly cause; a journey with nothing new is left
     /// out.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
@@ -251,7 +252,8 @@ pub struct RouteImport {
     // PRD: H5.
     /// The import's patch id: the same file under the same id is the same patch.
     pub patch_id: PatchId,
-    /// The file, as JSON (ARCHITECTURE, File format); its route must be the path's.
+    // ARCHITECTURE: File format.
+    /// The file, as JSON; its route must be the path's.
     pub file: RouteFile,
     // PRD: J1.
     /// A note for each of its events.

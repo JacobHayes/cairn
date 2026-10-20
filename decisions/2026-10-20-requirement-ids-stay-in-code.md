@@ -15,7 +15,11 @@ that carried ids as well.
 - A `///` comment is a served description when its item derives a schema (schemars,
   OpenAPI, MCP). On those the doc text is free of ids and the citation moves to a plain
   `// PRD: A2.` comment directly above the doc comment, which no generator reads.
-- A guard (`served_text` in the integration tests) fails on an id in the OpenAPI document,
+- The same holds for the names of the repository's documents ("PRD glossary, Pin",
+  "ARCHITECTURE, File format"): a reader of the API or the schemas cannot open them. The
+  description says the thing itself and a `// PRD: ...` or `// ARCHITECTURE: ...` comment
+  above it keeps the pointer.
+- A guard (`served_text` in the integration tests) fails on an id or a document name in the OpenAPI document,
   the route-file schema, any MCP tool's description or schemas, the guide and workflows,
   and in the message of any violation an engine test's `apply` produces. It detects the
   shape of an id and pins no wording.

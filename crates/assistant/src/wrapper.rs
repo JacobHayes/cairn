@@ -78,7 +78,8 @@ pub enum Policy {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(tag = "reason", rename_all = "snake_case")]
 pub enum Because {
-    /// It changes structure, or writes a route or its draft (PRD glossary, Structural change).
+    // PRD: glossary, Structural change.
+    /// It changes structure, or writes a route or its draft.
     Structural,
     // PRD: I5.
     /// It touches more nodes than one direct write may.

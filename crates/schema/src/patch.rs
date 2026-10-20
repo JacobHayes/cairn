@@ -241,6 +241,7 @@ pub enum Transition {
     Stop,
     /// To `done` (deliverable, action).
     Complete,
+    // PRD: D1.
     /// To `skipped`, with the reason a skip requires.
     Skip {
         /// Why.
@@ -267,7 +268,7 @@ pub enum RecordedEnd {
     Finish,
 }
 
-/// An override to apply (see the glossary entry Override).
+/// An override to apply.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -353,9 +354,11 @@ impl Removal {
 }
 
 // PRD: J2.
-/// One change within a patch (PRD glossary, Mutation), each emitting one event. The
-/// set covers every change the PRD defines; [`Mutation::change_class`] sorts each into
-/// structural or state (PRD glossary, Structural change).
+// PRD: glossary, Mutation.
+// PRD: glossary, Structural change.
+/// One change within a patch, each emitting one event. The
+/// set covers every change a patch can make; [`Mutation::change_class`] sorts each into
+/// structural or state.
 //
 // A mutation without arguments is an empty struct variant, not a unit one: serde lets a unit
 // variant of an internally tagged enum ignore unknown fields, so `{op: delete_journey,
@@ -624,6 +627,7 @@ pub enum Mutation {
         /// The role.
         role: RoleKey,
     },
+    // PRD: F5.
     /// Pin a node's date (`repin`).
     SetPin {
         /// The node.
@@ -631,6 +635,7 @@ pub enum Mutation {
         /// The date.
         date: Date,
     },
+    // PRD: F5.
     /// Move a pin by a number of days (`shift`).
     ShiftPin {
         /// The node.
@@ -638,6 +643,7 @@ pub enum Mutation {
         /// Days later (positive) or earlier (negative).
         offset_days: SignedDays,
     },
+    // PRD: F5.
     /// Remove a pin (`unpin`).
     ClearPin {
         /// The node.
@@ -747,6 +753,7 @@ pub enum Mutation {
         /// The identity as it should be.
         identity: Identity,
     },
+    // PRD: E6.
     /// Merge identities into one that remains (deployment): every merged identity's emails
     /// move to the survivor and each merged key becomes an alias of it, all checked against one
     /// snapshot.
@@ -762,6 +769,7 @@ pub enum Mutation {
         #[schemars(extend("maxProperties" = crate::limits::JOURNEY_COUNT_PER_MERGE_MAX))]
         journeys: BTreeMap<JourneyId, Revision>,
     },
+    // PRD: E6.
     /// Delete an identity nothing refers to (deployment): the identity, its emails, and
     /// every alias resolving to it. Rejected while any journey, route draft, or route version
     /// refers to it or to one of its aliases; the commit rechecks that none does.
@@ -803,7 +811,8 @@ fn merge_journeys<'de, D: serde::Deserializer<'de>>(
     )
 }
 
-/// Structural or state (PRD glossary, Structural change).
+// PRD: glossary, Structural change.
+/// Structural or state.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]

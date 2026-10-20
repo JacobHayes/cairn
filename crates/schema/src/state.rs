@@ -94,7 +94,8 @@ impl State {
     }
 }
 
-/// A node's origin in a journey (PRD glossary, Provenance).
+// PRD: glossary, Provenance.
+/// A node's origin in a journey.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -113,8 +114,9 @@ pub enum Provenance {
 }
 
 // PRD: B4.
+// PRD: glossary, Local edit.
 /// What a journey changed on a route-copied node, so an upgrade leaves it alone. A
-/// marker carries no reason (PRD glossary, Local edit).
+/// marker carries no reason.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -178,7 +180,8 @@ impl NodeState {
 }
 
 // PRD: A4.
-/// A decision's submitted answer (PRD glossary, Answer). Submitted empty text or an
+// PRD: glossary, Answer.
+/// A decision's submitted answer. Submitted empty text or an
 /// empty list is answered.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -328,7 +331,8 @@ pub struct Bypass {
     pub failures: BTreeSet<GuardFailure>,
 }
 
-/// A node's overrides (PRD glossary, Override): reasoned, logged departures.
+// PRD: glossary, Override.
+/// A node's overrides: reasoned, logged departures.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Overrides {
@@ -419,7 +423,8 @@ pub struct JourneyState {
     #[schemars(extend("maxProperties" = crate::limits::ROLE_COUNT_MAX))]
     pub role_fills: BTreeMap<RoleKey, IdentitySet>,
     // PRD: E3.
-    /// Pins: explicit journey-level dates on nodes (PRD glossary, Pin). A pin from a
+    // PRD: glossary, Pin.
+    /// Pins: explicit journey-level dates on nodes. A pin from a
     /// `feeds_milestone` answer is derived from the answer, not stored here.
     #[serde(
         default,

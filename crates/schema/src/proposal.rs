@@ -898,7 +898,8 @@ impl From<ProposalDraft> for ProposalDraftWire {
     }
 }
 
-/// A proposal as stored (ARCHITECTURE, Schema outline: `proposals`).
+// ARCHITECTURE: Schema outline: `proposals`.
+/// A proposal as stored.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Proposal {

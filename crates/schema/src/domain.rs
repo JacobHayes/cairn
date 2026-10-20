@@ -44,7 +44,8 @@ impl fmt::Display for Domain {
     }
 }
 
-/// Which graph a stored record belongs to (ARCHITECTURE, Schema outline: `graphs`).
+// ARCHITECTURE: Schema outline: `graphs`.
+/// Which graph a stored record belongs to.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -63,8 +64,8 @@ pub enum GraphId {
     },
 }
 
-/// A journey's link to the route version it was created from or last upgraded to
-/// (PRD glossary, Lineage).
+// PRD: glossary, Lineage.
+/// A journey's link to the route version it was created from or last upgraded to.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -129,7 +130,8 @@ pub struct Journey {
     pub graph: Graph,
 }
 
-/// What a route is for (PRD glossary, Route): fixed when it is created.
+// PRD: glossary, Route.
+/// What a route is for: fixed when it is created.
 #[derive(
     Clone,
     Copy,
@@ -228,7 +230,8 @@ pub struct RouteVersion {
     pub graph: Graph,
 }
 
-/// A person or team journeys refer to (PRD glossary, Identity), deployment-scoped.
+// PRD: glossary, Identity.
+/// A person or team journeys refer to, deployment-scoped.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Identity {
@@ -282,7 +285,8 @@ impl HasKey for Identity {
 }
 
 // PRD: E6.
-/// The deployment domain (ARCHITECTURE, Engine > Model: `Deployment`).
+// ARCHITECTURE: Engine > Model: `Deployment`.
+/// The deployment domain.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Deployment {

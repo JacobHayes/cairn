@@ -24,7 +24,8 @@ use crate::text::Markdown;
 use jiff::Timestamp;
 use jiff::civil::Date;
 
-/// A key a graph has retired (PRD Invariants: never reused).
+// PRD: Invariants: never reused.
+/// A key a graph has retired.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]

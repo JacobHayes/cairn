@@ -22,7 +22,8 @@ pub struct Caller {
     pub logins: Vec<LinkedLogin>,
 }
 
-/// One login a user signs in with (ARCHITECTURE, Auth: users and logins).
+// ARCHITECTURE: Auth: users and logins.
+/// One login a user signs in with.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct LinkedLogin {

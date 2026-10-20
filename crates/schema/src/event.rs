@@ -23,6 +23,7 @@ use crate::text::Markdown;
 use crate::touched::TouchedSet;
 use jiff::Timestamp;
 
+// PRD: J1.
 /// An event's type. Most mutations have one type; a few take theirs from
 /// their content ([`Mutation::event_type`]).
 #[derive(
@@ -433,8 +434,8 @@ impl Patch {
 }
 
 // PRD: H5.
-/// What a committed patch id is answered from on resubmission (ARCHITECTURE, Schema
-/// outline: `patch_receipts`).
+// ARCHITECTURE: Schema outline: `patch_receipts`.
+/// What a committed patch id is answered from on resubmission.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct PatchReceipt {
@@ -448,7 +449,8 @@ pub struct PatchReceipt {
     pub revision: Revision,
 }
 
-/// The persistence-neutral result of an accepted patch (ARCHITECTURE, Terms: Change set):
+// ARCHITECTURE: Terms: Change set.
+/// The persistence-neutral result of an accepted patch:
 /// its events, whose deltas are every record put and removed, the receipt, and the next
 /// revision. Only the engine's apply produces one.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

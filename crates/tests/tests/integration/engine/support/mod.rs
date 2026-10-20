@@ -115,9 +115,10 @@ pub fn apply(
     if let Err(Rejection::Invalid { violations }) = &result {
         for violation in violations.as_slice() {
             let ids = crate::served_text::requirement_ids(&violation.message);
+            let documents = crate::served_text::document_names(&violation.message);
             assert!(
-                ids.is_empty(),
-                "a violation message says its rule in words, not {ids:?}: {}",
+                ids.is_empty() && documents.is_empty(),
+                "a violation message says its rule in words, not {ids:?} {documents:?}: {}",
                 violation.message
             );
         }

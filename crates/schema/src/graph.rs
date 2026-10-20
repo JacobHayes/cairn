@@ -114,7 +114,8 @@ impl From<FormatVersion> for u32 {
 }
 
 // PRD: A13, A14.
-/// The file document (ARCHITECTURE, File format): a route version or draft as
+// ARCHITECTURE: File format.
+/// The file document: a route version or draft as
 /// written, unresolved. Nodes refer to each other by path and to roles and kinds by id;
 /// keys may be left out for import to match by path against the version extended, or mint.
 /// The JSON Schema in `schema/` describes this type.
@@ -151,8 +152,8 @@ pub struct RouteFile {
     pub nodes: BoundedVec<Node<FileRefs>, NodeCount>,
 }
 
-/// Every key a graph has retired (PRD Invariants: a removed key never comes back as a new
-/// object). Tombstones are the upgrade-facing subset of the node keys.
+// PRD: Invariants: a removed key never comes back as a new object.
+/// Every key a graph has retired. Tombstones are the upgrade-facing subset of the node keys.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct RetiredKeys {
@@ -175,8 +176,9 @@ impl RetiredKeys {
     }
 }
 
+// ARCHITECTURE: Engine > Model.
 /// The graph document (resolved): nodes, roles, and kinds by key, every reference a key,
-/// and, for a journey, its state (ARCHITECTURE, Engine > Model). Collections serialize
+/// and, for a journey, its state. Collections serialize
 /// sorted by key, so a graph has one serialization.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -206,7 +208,8 @@ pub struct Graph {
     pub state: JourneyState,
 }
 
-/// One placement of a segment version in a graph (see the glossary entry Insertion). Its local
+// PRD: B13.
+/// One placement of a segment version in a graph. Its local
 /// edits are not stored: they are its members' differences from the version it is on.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

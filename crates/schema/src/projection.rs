@@ -102,6 +102,7 @@ pub struct LevelEdge {
     pub from: NodeKey,
     /// The stand-in of the dependent side.
     pub to: NodeKey,
+    // PRD: C1.
     /// Every underlying edge is implicit (drawn dotted).
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub implicit: bool,
@@ -189,6 +190,7 @@ pub struct LevelNode {
     /// top level.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub parent: Option<NodeKey>,
+    // PRD: C4.
     /// The hidden nodes that roll up into it (a hidden action is a checklist item on its
     /// deliverable), in tree order.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
@@ -381,6 +383,7 @@ pub struct Level {
     pub nodes: Vec<LevelNode>,
     /// The edges, sorted by their ends.
     pub edges: Vec<LevelEdge>,
+    // PRD: C1.
     /// The count, per relevance class left out: the nodes hidden only for their class (of a
     /// kind shown, within the level, under no collapse, not left out by `top`, and kept by the
     /// filters), so showing a class draws exactly that many more. Empty when every class is
@@ -552,6 +555,7 @@ pub struct NodeRow {
     pub ancestors: Vec<NodeKey>,
     /// Its relevance.
     pub relevance: Relevance,
+    // PRD: D2.
     /// Whether work can be started on it now: relevant, not blocked, and not finished.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub actionable: bool,
@@ -586,6 +590,7 @@ pub struct NodeRow {
     /// A terminal node whose completing guards would now fail.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub stale: bool,
+    // PRD: B10.
     /// Whether it is a placeholder that still needs to be broken down into children.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub needs_breakdown: bool,
@@ -659,6 +664,7 @@ pub enum ListFlag {
     NextUp,
     /// An actionable decision.
     DecisionsNeeded,
+    // PRD: B10.
     /// Placeholders that still need to be broken down.
     NeedsBreakdown,
     /// Stored `active`.
@@ -856,7 +862,8 @@ pub struct Snapshot {
     pub counts: SnapshotCounts,
 }
 
-/// ARCHITECTURE, Read path: a derived value whose explanation list a server response pages.
+// ARCHITECTURE: Read path.
+/// A derived value whose explanation list a server response pages.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -953,6 +960,7 @@ pub struct DecisionEntry {
     /// The role its answer fills (`fills_role`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub fills: Option<RoleKey>,
+    // PRD: C2.
     /// Its unsatisfied prerequisites that no drawn edge stands for (the marker on the card).
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub hidden_prerequisites: Vec<NodeKey>,

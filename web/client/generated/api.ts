@@ -1175,7 +1175,7 @@ export interface components {
         /** @description A decision's answer type. */
         AnswerType: "boolean" | "single_choice" | "multi_choice" | "text" | "date" | "identity" | "identity_list";
         /**
-         * @description A decision's submitted answer (PRD glossary, Answer). Submitted empty text or an
+         * @description A decision's submitted answer. Submitted empty text or an
          *     empty list is answered.
          */
         AnswerValue: {
@@ -1809,7 +1809,7 @@ export interface components {
             /** @description The edges between decisions. */
             edges: components["schemas"]["LevelEdge"][];
         };
-        /** @description How a dependency arose (PRD glossary, Condition gate / implicit edge). */
+        /** @description How a dependency arose. */
         DependencyVia: "explicit" | "containment" | {
             inherited: {
                 /** @description The ancestor whose requirement applies. */
@@ -1826,7 +1826,7 @@ export interface components {
                 group: components["schemas"]["NodeKey"];
             };
         };
-        /** @description The deployment domain (ARCHITECTURE, Engine > Model: `Deployment`). */
+        /** @description The deployment domain. */
         Deployment: {
             /**
              * @description Merged identities' old keys, each resolving to the identity it was merged into, at
@@ -1841,7 +1841,7 @@ export interface components {
             revision: components["schemas"]["Revision"];
         };
         /**
-         * @description The inputs derive takes besides the journey (ARCHITECTURE, Terms: Derive inputs),
+         * @description The inputs derive takes besides the journey,
          *     supplied by the host and never read by the engine.
          */
         DeriveInputs: {
@@ -1859,7 +1859,7 @@ export interface components {
             /** @description The viewer's identities, resolved from verified emails; usually one. */
             viewer?: components["schemas"]["IdentityKey"][];
         };
-        /** @description A derived journey (ARCHITECTURE, Read path: `Derived`). */
+        /** @description A derived journey. */
         Derived: {
             /** @description The acting frontier, ranked. */
             acting_frontier: components["schemas"]["NodeKey"][];
@@ -1932,7 +1932,7 @@ export interface components {
             route: components["schemas"]["RouteId"];
         } | "deployment";
         /**
-         * @description The domain document (ARCHITECTURE, Terms): a journey's graph and state, the inputs to
+         * @description The domain document: a journey's graph and state, the inputs to
          *     derive it. Nothing derived is in it; proposals are not part of it.
          */
         DomainDocument: {
@@ -2063,7 +2063,7 @@ export interface components {
          */
         EventType: "journey_created" | "journey_edited" | "journey_status_changed" | "journey_deleted" | "route_created" | "route_edited" | "route_retired" | "route_unretired" | "draft_opened" | "route_version_imported" | "saved_as_route" | "draft_discarded" | "route_published" | "node_added" | "node_changed" | "weight_changed" | "node_removed" | "edge_changed" | "role_changed" | "participation_kind_changed" | "default_owner_changed" | "participation_changed" | "resource_changed" | "segment_inserted" | "node_transitioned" | "milestone_reached" | "answer_set" | "recorded_date_changed" | "role_fill_changed" | "date_pinned" | "date_shifted" | "date_unpinned" | "snooze_set" | "unsnoozed" | "override_applied" | "guard_bypassed" | "override_removed" | "atomic_changed" | "annotation_added" | "annotation_edited" | "annotation_removed" | "journey_upgraded" | "relinked" | "provenance_changed" | "local_edit_changed" | "identity_created" | "identity_edited" | "identities_merged" | "identity_deleted" | "proposal_created" | "proposal_edited" | "proposal_applied" | "proposal_discarded";
         /**
-         * @description A list of explanation entries with its total (ARCHITECTURE, Read path): complete inside
+         * @description A list of explanation entries with its total: complete inside
          *     the engine and the browser; a server response keeps the largest entries up to
          *     `explanation_entry_count_max` and the total.
          */
@@ -2077,7 +2077,7 @@ export interface components {
             total: number;
         };
         /**
-         * @description A list of explanation entries with its total (ARCHITECTURE, Read path): complete inside
+         * @description A list of explanation entries with its total: complete inside
          *     the engine and the browser; a server response keeps the largest entries up to
          *     `explanation_entry_count_max` and the total.
          */
@@ -2090,7 +2090,7 @@ export interface components {
              */
             total: number;
         };
-        /** @description ARCHITECTURE, Read path: a derived value whose explanation list a server response pages. */
+        /** @description A derived value whose explanation list a server response pages. */
         ExplainedField: "gravity" | "unlocks" | "still_waiting";
         /**
          * @description A page of one value's explanation list, largest first, `explanation_entry_count_max` at a
@@ -2137,7 +2137,7 @@ export interface components {
         FormatVersion: 1;
         /**
          * @description The graph document (resolved): nodes, roles, and kinds by key, every reference a key,
-         *     and, for a journey, its state (ARCHITECTURE, Engine > Model). Collections serialize
+         *     and, for a journey, its state. Collections serialize
          *     sorted by key, so a graph has one serialization.
          */
         Graph: {
@@ -2156,7 +2156,7 @@ export interface components {
             /** @description Journey state; empty for a route version or draft. */
             state?: components["schemas"]["JourneyState"];
         };
-        /** @description Which graph a stored record belongs to (ARCHITECTURE, Schema outline: `graphs`). */
+        /** @description Which graph a stored record belongs to. */
         GraphId: {
             journey: components["schemas"]["JourneyId"];
         } | {
@@ -2377,7 +2377,7 @@ export interface components {
             /** @description At most a page of events, grouped by patch, in log order; a large patch spans pages. */
             patches: components["schemas"]["PatchEvents"][];
         };
-        /** @description A person or team journeys refer to (PRD glossary, Identity), deployment-scoped. */
+        /** @description A person or team journeys refer to, deployment-scoped. */
         Identity: {
             /**
              * @description Its emails, each held by at most one identity, at most
@@ -2418,7 +2418,7 @@ export interface components {
             requires: components["schemas"]["EdgeEnd"];
         };
         /**
-         * @description One placement of a segment version in a graph (see the glossary entry Insertion). Its local
+         * @description One placement of a segment version in a graph. Its local
          *     edits are not stored: they are its members' differences from the version it is on.
          */
         Insertion: {
@@ -2460,7 +2460,7 @@ export interface components {
             upgrade_available: boolean;
         };
         /**
-         * @description A point in time the date network solves for (ARCHITECTURE, Date network). A container's
+         * @description A point in time the date network solves for. A container's
          *     entry is internal and never shown, so it has no form here.
          */
         Instant: {
@@ -2563,7 +2563,7 @@ export interface components {
                 [key: string]: components["schemas"]["Overrides"];
             };
             /**
-             * @description Pins: explicit journey-level dates on nodes (PRD glossary, Pin). A pin from a
+             * @description Pins: explicit journey-level dates on nodes. A pin from a
              *     `feeds_milestone` answer is derived from the answer, not stored here.
              */
             pins?: {
@@ -2729,19 +2729,16 @@ export interface components {
              */
             rolled_up?: components["schemas"]["NodeKey"][];
         };
-        /** @description A limit, by name (PRACTICES, Explicit limits). */
+        /** @description A limit, by name. */
         Limit: string;
-        /**
-         * @description A journey's link to the route version it was created from or last upgraded to
-         *     (PRD glossary, Lineage).
-         */
+        /** @description A journey's link to the route version it was created from or last upgraded to. */
         Lineage: {
             /** @description The route. */
             route: components["schemas"]["RouteId"];
             /** @description The version. */
             version: components["schemas"]["VersionNumber"];
         };
-        /** @description One login a user signs in with (ARCHITECTURE, Auth: users and logins). */
+        /** @description One login a user signs in with. */
         LinkedLogin: {
             /**
              * Format: date-time
@@ -2776,7 +2773,7 @@ export interface components {
         };
         /**
          * @description What a journey changed on a route-copied node, so an upgrade leaves it alone. A
-         *     marker carries no reason (PRD glossary, Local edit).
+         *     marker carries no reason.
          */
         LocalEdit: {
             field: components["schemas"]["NodeField"];
@@ -2787,10 +2784,7 @@ export interface components {
         } | {
             resource: components["schemas"]["AttachmentKey"];
         } | "shape";
-        /**
-         * @description Where a violation is (listed by path; PRD Non-functional, Config-first: specific
-         *     enough to fix without reading source).
-         */
+        /** @description Where a violation is: listed by path, specific enough to fix without reading source. */
         Location: {
             /** @description The node field involved. */
             field?: components["schemas"]["NodeField"] | null;
@@ -2852,9 +2846,9 @@ export interface components {
             token: string;
         };
         /**
-         * @description One change within a patch (PRD glossary, Mutation), each emitting one event. The
-         *     set covers every change the PRD defines; [`Mutation::change_class`] sorts each into
-         *     structural or state (PRD glossary, Structural change).
+         * @description One change within a patch, each emitting one event. The
+         *     set covers every change a patch can make; [`Mutation::change_class`] sorts each into
+         *     structural or state.
          */
         Mutation: {
             /** @description The description. */
@@ -3549,7 +3543,7 @@ export interface components {
         };
         /** @description Starts with "n_"; at most id_bytes_max (64) bytes. */
         NodeKey: string;
-        /** @description A node kind (PRD glossary: a fixed set). */
+        /** @description A node kind. */
         NodeKind: "decision" | "deliverable" | "action" | "milestone" | "group";
         /**
          * @description One node as a row of the list, the next list, or the snapshot: what it is,
@@ -3710,7 +3704,7 @@ export interface components {
             /** @constant */
             fact: "inserts_segment";
         };
-        /** @description An override to apply (see the glossary entry Override). */
+        /** @description An override to apply. */
         Override: {
             force_include: {
                 /** @description Why. */
@@ -3731,7 +3725,7 @@ export interface components {
         };
         /** @description The kind of an override. */
         OverrideKind: "force_include" | "keep" | "guard_bypass";
-        /** @description A node's overrides (PRD glossary, Override): reasoned, logged departures. */
+        /** @description A node's overrides: reasoned, logged departures. */
         Overrides: {
             /** @description A guard bypass on the node's transition. */
             bypass?: components["schemas"]["Bypass"] | null;
@@ -3845,10 +3839,7 @@ export interface components {
         };
         /** @description Starts with "p_"; at most id_bytes_max (64) bytes. */
         PatchId: string;
-        /**
-         * @description What a committed patch id is answered from on resubmission (ARCHITECTURE, Schema
-         *     outline: `patch_receipts`).
-         */
+        /** @description What a committed patch id is answered from on resubmission. */
         PatchReceipt: {
             /** @description Its content hash: the same id with other content is rejected. */
             content_hash: components["schemas"]["ContentHash"];
@@ -3897,8 +3888,8 @@ export interface components {
             request_id?: string | null;
         };
         /**
-         * @description The kinds of error that are not patch rejections (PRACTICES, Errors, panics, and
-         *     rejections). A rejected patch answers its `Rejection` instead.
+         * @description The kinds of error that are not patch rejections. A rejected patch answers its `Rejection`
+         *     instead.
          */
         ProblemCode: "bad_request" | "unsupported_media_type" | "payload_too_large" | "target_mismatch" | "cannot_draft" | "not_found" | "page_moved" | "no_such_endpoint" | "method_not_allowed" | "user_only" | "overloaded" | "subscriber_limit" | "store_busy" | "timed_out" | "engine_panic" | "internal";
         /**
@@ -4098,7 +4089,7 @@ export interface components {
             /** @description The projection. */
             value: components["schemas"]["Trace"];
         };
-        /** @description A proposal as stored (ARCHITECTURE, Schema outline: `proposals`). */
+        /** @description A proposal as stored. */
         Proposal: {
             /**
              * Format: date-time
@@ -4367,7 +4358,7 @@ export interface components {
             /** @description What it proposes, in a line. */
             title: components["schemas"]["Title"];
         };
-        /** @description A node's origin in a journey (PRD glossary, Provenance). */
+        /** @description A node's origin in a journey. */
         Provenance: "from_route" | "local" | "orphaned" | "from_segment";
         /**
          * @description The rank constants (Priority: normative formulas, configurable constants, defaults
@@ -4591,7 +4582,7 @@ export interface components {
             tip?: components["schemas"]["Markdown"];
             title?: components["schemas"]["Title"] | null;
         } & (unknown | unknown | unknown | unknown | unknown);
-        /** @description A key a graph has retired (PRD Invariants: never reused). */
+        /** @description A key a graph has retired. */
         RetiredKey: {
             node: components["schemas"]["NodeKey"];
         } | {
@@ -4599,10 +4590,7 @@ export interface components {
         } | {
             kind: components["schemas"]["KindKey"];
         };
-        /**
-         * @description Every key a graph has retired (PRD Invariants: a removed key never comes back as a new
-         *     object). Tombstones are the upgrade-facing subset of the node keys.
-         */
+        /** @description Every key a graph has retired. Tombstones are the upgrade-facing subset of the node keys. */
         RetiredKeys: {
             /** @description Retired participation kind keys. */
             kinds?: components["schemas"]["KindKey"][];
@@ -4812,7 +4800,7 @@ export interface components {
             graph: components["schemas"]["Graph"];
         };
         /**
-         * @description The file document (ARCHITECTURE, File format): a route version or draft as
+         * @description The file document: a route version or draft as
          *     written, unresolved. Nodes refer to each other by path and to roles and kinds by id;
          *     keys may be left out for import to match by path against the version extended, or mint.
          *     The JSON Schema in `schema/` describes this type.
@@ -4859,14 +4847,14 @@ export interface components {
          *     the path's route, matched against the version it extends.
          */
         RouteImport: {
-            /** @description The file, as JSON (ARCHITECTURE, File format); its route must be the path's. */
+            /** @description The file, as JSON; its route must be the path's. */
             file: components["schemas"]["RouteFile"];
             /** @description A note for each of its events. */
             note?: components["schemas"]["Markdown"] | null;
             /** @description The import's patch id: the same file under the same id is the same patch. */
             patch_id: components["schemas"]["PatchId"];
         };
-        /** @description What a route is for (PRD glossary, Route): fixed when it is created. */
+        /** @description What a route is for: fixed when it is created. */
         RouteKind: "process" | "segment";
         /** @description A page of the route index; `next` is where the next page starts, absent on the last. */
         RoutePage: {

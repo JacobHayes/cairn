@@ -19,6 +19,7 @@ use crate::number::Revision;
 use crate::state::{Guard, GuardFailure};
 use crate::touched::TouchedSet;
 
+// PRD: Invariants; D1, D4, A11, A18, A19, B6, E3, E6, H3.
 /// What a violation breaks.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -99,8 +100,8 @@ pub enum ViolationCode {
 }
 
 // PRD: A15.
-/// Where a violation is (listed by path; PRD Non-functional, Config-first: specific
-/// enough to fix without reading source).
+// PRD: Non-functional requirements, Config-first.
+/// Where a violation is: listed by path, specific enough to fix without reading source.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Location {

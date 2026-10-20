@@ -401,8 +401,8 @@ pub fn fnv1a_body(parts: &[&[u8]]) -> String {
     format!("{hash:016x}")
 }
 
-/// Mints key bodies (PRD, Keys and references: a key is assigned once, when its object
-/// is first created). The engine mints through this trait so the host decides how: random
+// PRD: Keys and references: a key is assigned once, when its object is first created.
+/// Mints key bodies. The engine mints through this trait so the host decides how: random
 /// bodies in production, a counter in tests and fixtures. A body must be a slug; the caller
 /// checks the minted key against every key the graph holds or has retired.
 pub trait KeyAllocator {

@@ -235,8 +235,9 @@ pub struct Problem {
     pub request_id: Option<String>,
 }
 
-/// The kinds of error that are not patch rejections (PRACTICES, Errors, panics, and
-/// rejections). A rejected patch answers its `Rejection` instead.
+// PRACTICES: Errors, panics, and rejections.
+/// The kinds of error that are not patch rejections. A rejected patch answers its `Rejection`
+/// instead.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case")]
 pub enum ProblemCode {
@@ -249,7 +250,7 @@ pub enum ProblemCode {
     PayloadTooLarge,
     /// The patch's target is not the domain the path names, or is a proposal.
     TargetMismatch,
-    // PRD: B7, B8.
+    // PRD: B7, B8, B9.
     /// Cairn cannot draft the upgrade, save as route, or re-link asked for: the journey follows
     /// no route, the version is not newer, or the draft is past a proposal's limits.
     CannotDraft,

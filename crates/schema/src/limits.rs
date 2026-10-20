@@ -289,11 +289,8 @@ impl std::str::FromStr for Limit {
     }
 }
 
-crate::serde_util::string_serde!(
-    Limit,
-    "Limit",
-    "A limit, by name (PRACTICES, Explicit limits)."
-);
+// PRACTICES: Explicit limits.
+crate::serde_util::string_serde!(Limit, "Limit", "A limit, by name.");
 
 /// A value past one of its limits.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]

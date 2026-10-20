@@ -927,7 +927,7 @@
       "type": "string"
     },
     "NodeKind": {
-      "description": "A node kind (PRD glossary: a fixed set).",
+      "description": "A node kind.",
       "oneOf": [
         {
           "const": "decision",
@@ -1151,7 +1151,7 @@
       "type": "string"
     },
     "RouteKind": {
-      "description": "What a route is for (PRD glossary, Route): fixed when it is created.",
+      "description": "What a route is for: fixed when it is created.",
       "oneOf": [
         {
           "const": "process",
@@ -1197,7 +1197,7 @@
   "$id": "https://github.com/JacobHayes/cairn/schema/route-file.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
-  "description": "The file document (ARCHITECTURE, File format): a route version or draft as\nwritten, unresolved. Nodes refer to each other by path and to roles and kinds by id;\nkeys may be left out for import to match by path against the version extended, or mint.\nThe JSON Schema in `schema/` describes this type.",
+  "description": "The file document: a route version or draft as\nwritten, unresolved. Nodes refer to each other by path and to roles and kinds by id;\nkeys may be left out for import to match by path against the version extended, or mint.\nThe JSON Schema in `schema/` describes this type.",
   "properties": {
     "default_owner": {
       "anyOf": [

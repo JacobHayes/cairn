@@ -1,4 +1,4 @@
-//! No requirement id reaches a reader. The ids (a letter and a number, such as `A2`, or
+//! No requirement id or document name reaches a reader. The ids (a letter and a number, such as `A2`, or
 //! with a letter after, such as `D1a`) are how developers cite the PRD from code; the text
 //! that people and agents read says the rule in words. This holds every description the
 //! API document, the route-file schema and the MCP tools serve, and the agent guide, to
@@ -37,6 +37,14 @@ pub fn requirement_ids(text: &str) -> Vec<&str> {
     found
 }
 
+/// The names of the repository's documents in `text` (the PRD and the others), which a reader
+/// of served text cannot open.
+pub fn document_names(text: &str) -> Vec<&str> {
+    text.split(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+        .filter(|word| matches!(*word, "PRD" | "ARCHITECTURE" | "PRACTICES" | "DESIGN"))
+        .collect()
+}
+
 /// Every string a JSON document serves as prose, with the path to it. Schema keywords whose
 /// values are identifiers (`$ref`, `pattern`, `enum`, `const`, `required`, property names)
 /// are not prose.
@@ -68,12 +76,12 @@ fn assert_no_ids(served: &str, document: &Value) {
     prose(document, "", &mut texts);
     let found: Vec<String> = texts
         .iter()
-        .filter(|(_, text)| !requirement_ids(text).is_empty())
+        .filter(|(_, text)| !requirement_ids(text).is_empty() || !document_names(text).is_empty())
         .map(|(path, text)| format!("{served}{path}: {text}"))
         .collect();
     assert!(
         found.is_empty(),
-        "requirement ids in served text:\n{}",
+        "requirement ids or document names in served text:\n{}",
         found.join("\n")
     );
 }
@@ -91,6 +99,14 @@ fn the_detector_finds_ids_and_only_ids() {
     for (text, ids) in cases {
         assert_eq!(requirement_ids(text), ids, "{text}");
     }
+    assert_eq!(
+        document_names("a node (PRD glossary, Pin; ARCHITECTURE, Terms)"),
+        ["PRD", "ARCHITECTURE"]
+    );
+    assert_eq!(
+        document_names("a PRDX, a prd and an ARCHITECTURES"),
+        [] as [&str; 0]
+    );
 }
 
 #[test]

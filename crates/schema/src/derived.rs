@@ -56,6 +56,7 @@ pub struct RelevanceExplanation {
     /// and blocking follow Gating exactly; display state shows such a node as `conditional`.
     #[serde(default, skip_serializing_if = "BTreeSet::is_empty")]
     pub pending_on: BTreeSet<NodeKey>,
+    // PRD: D4.
     /// For an undecided value, the decisions that make it undecided and can be
     /// answered now: open, relevant, and not under a skip, read by a condition leaving it
     /// undecided, its own or an ancestor's, up to a force include. Empty for any other
@@ -64,7 +65,7 @@ pub struct RelevanceExplanation {
     pub unanswered: BTreeSet<NodeKey>,
 }
 
-// PRD: D8.
+// PRD: D8, D3.
 /// The one state every surface shows for a node, composed from relevance, stored state,
 /// effective skip, auto-reach, blocking and snooze, and from the derived flags, which it leaves in
 /// place. Stored state is what transitions act on; this is what people and agents read. The
@@ -264,7 +265,8 @@ impl<const MIN: u32, const MAX: u32> JsonSchema for Thousandths<MIN, MAX> {
     }
 }
 
-/// A list of explanation entries with its total (ARCHITECTURE, Read path): complete inside
+// ARCHITECTURE: Read path.
+/// A list of explanation entries with its total: complete inside
 /// the engine and the browser; a server response keeps the largest entries up to
 /// `explanation_entry_count_max` and the total.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
@@ -455,6 +457,7 @@ pub struct NodeDates {
     pub effective_date: Option<EffectiveDate>,
 }
 
+// PRD: E2.
 /// Where a node's effective participation of one kind comes from (in order: explicit identities, then the role, then inherited).
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]
 #[serde(rename_all = "snake_case", deny_unknown_fields)]
@@ -501,6 +504,7 @@ pub struct Progress {
     pub decisions_needed: u32,
 }
 
+// PRD: D3.
 /// Every derived value for one node, with the inputs that explain it. The flags are its own,
 /// each independent of the others, so they stay booleans rather than a state enum.
 #[allow(clippy::struct_excessive_bools)]
@@ -569,6 +573,7 @@ pub struct NodeDerived {
     /// children are not a gate.
     #[serde(default, skip_serializing_if = "crate::serde_util::is_false")]
     pub started_early: bool,
+    // PRD: D8.
     /// The unsatisfied gate dependencies that hold the node now, its own and
     /// those it inherits through its ancestors (requirements, conditions, openings), its
     /// children aside; one entry per dependency, its nearest holder's; empty when nothing
@@ -696,7 +701,8 @@ pub struct Stalled {
     pub all_blocked: bool,
 }
 
-/// A derived journey (ARCHITECTURE, Read path: `Derived`).
+// ARCHITECTURE: Read path: `Derived`.
+/// A derived journey.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct Derived {
@@ -893,7 +899,8 @@ impl std::str::FromStr for TimeZoneName {
 
 crate::serde_util::string_serde!(TimeZoneName, "TimeZoneName", "An IANA time zone name.");
 
-/// The inputs derive takes besides the journey (ARCHITECTURE, Terms: Derive inputs),
+// ARCHITECTURE: Terms: Derive inputs.
+/// The inputs derive takes besides the journey,
 /// supplied by the host and never read by the engine.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -913,7 +920,8 @@ pub struct DeriveInputs {
     pub deployment: Deployment,
 }
 
-/// The domain document (ARCHITECTURE, Terms): a journey's graph and state, the inputs to
+// ARCHITECTURE: Terms.
+/// The domain document: a journey's graph and state, the inputs to
 /// derive it. Nothing derived is in it; proposals are not part of it.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

@@ -25,7 +25,8 @@ pub enum InstantPoint {
     Finish,
 }
 
-/// A point in time the date network solves for (ARCHITECTURE, Date network). A container's
+// ARCHITECTURE: Date network.
+/// A point in time the date network solves for. A container's
 /// entry is internal and never shown, so it has no form here.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
@@ -50,7 +51,8 @@ pub enum Instant {
     },
 }
 
-/// How a dependency arose (PRD glossary, Condition gate / implicit edge).
+// PRD: glossary, Condition gate / implicit edge.
+/// How a dependency arose.
 #[derive(
     Clone, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
 )]
@@ -143,7 +145,7 @@ pub struct Constraint {
     pub conditional: bool,
 }
 
-// PRD: F1, F3.
+// PRD: F1, F3, F6.
 /// What fixes an instant on a chain: a pin, an actual date, a date answer, or today. A chain always ends at one of these.
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, JsonSchema,
