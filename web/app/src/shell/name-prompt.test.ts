@@ -20,6 +20,12 @@ describe("when Cairn asks what to call the caller (H3)", () => {
     expect(asksName(caller("who_a"), undefined)).toBeUndefined();
   });
 
+  it("goes by the first identity only: another unnamed one does not ask, as the person is shown by the first (H3)", () => {
+    const held = deployment({ key: "who_a", name: "Ana", emails: ["a@example.org"] }, { key: "who_b", emails: ["b@example.org"] });
+    expect(asksName(caller("who_a", "who_b"), held)).toBeUndefined();
+    expect(asksName(caller("who_b", "who_a"), held)).toBeUndefined();
+  });
+
   it("does not ask when the caller holds no identity in the deployment", () => {
     expect(asksName(caller(), deployment({ key: "who_a" }))).toBeUndefined();
     expect(asksName(caller("who_z"), deployment({ key: "who_a" }))).toBeUndefined();

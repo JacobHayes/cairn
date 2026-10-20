@@ -158,6 +158,43 @@ mod in_process {
         assert!(capabilities.sse && capabilities.mcp && !capabilities.assistant);
     }
 
+    /// PRACTICES, Explicit limits: arrival is part of the request, so a create that stalls
+    /// is answered as timed out at the request limit, not held past it; and once the store
+    /// answers again the same user's next request arrives.
+    #[tokio::test(start_paused = true)]
+    async fn an_arrival_that_stalls_runs_into_the_request_timeout() {
+        use std::sync::Arc;
+        use std::sync::atomic::{AtomicU32, Ordering};
+        use std::time::Duration;
+
+        let world = World::start().await;
+        let bob = world.signed_in("bob");
+        // The create's commit waits far past the limit; the count shows it got that far.
+        let reached = Arc::new(AtomicU32::new(0));
+        let counted = Arc::clone(&reached);
+        world.faults.pause_with(Arc::new(move |_| {
+            counted.fetch_add(1, Ordering::SeqCst);
+            Box::pin(tokio::time::sleep(Duration::from_secs(60)))
+        }));
+        let began = tokio::time::Instant::now();
+        let reply = bob.send(Method::GET, "/api/users/me", None).await.unwrap();
+        assert_eq!(reply.status, StatusCode::SERVICE_UNAVAILABLE);
+        assert!(
+            reached.load(Ordering::SeqCst) > 0,
+            "arrival reached the commit"
+        );
+        let waited = began.elapsed();
+        assert!(
+            waited >= cairn_api::limits::REQUEST_DURATION_MAX
+                && waited < cairn_api::limits::REQUEST_DURATION_MAX + Duration::from_secs(1),
+            "answered at the limit, not before or after it: {waited:?}"
+        );
+
+        world.faults.clear_pause();
+        let again: Caller = get(&bob, "/api/users/me").await;
+        assert_eq!(again.identities.len(), 1, "the next request arrives");
+    }
+
     /// H3: a user's first request gives them an identity holding their verified email, named
     /// by their login; later requests, over HTTP and MCP alike, find it rather than adding
     /// another.

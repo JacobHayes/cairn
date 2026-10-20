@@ -4,9 +4,10 @@
 import { useEffect, useRef, useState } from "react";
 
 import { useCaller, useDeployment } from "../data/react.ts";
-import { identityOf } from "../people/model.ts";
+import { identityOf, nameProblem } from "../people/model.ts";
 import { useScreenWrite } from "../screens/write.ts";
 import { RejectionView } from "../screens/RejectionView.tsx";
+import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button, Field } from "../ui/kit.tsx";
 import { asksName } from "./name-prompt.ts";
 
@@ -27,6 +28,7 @@ export function NamePrompt() {
   if (!asking) {
     return null;
   }
+  const problem = nameProblem(name);
   const save = async () => {
     const mutation = { op: "edit_identity" as const, identity: identityOf(identity.key, name, identity.emails ?? []) };
     await write.run({ target: "deployment", baseRevision: deployment.revision, mutations: [mutation] });
@@ -44,11 +46,15 @@ export function NamePrompt() {
     >
       <form className="stack modal-body" onSubmit={(event) => { event.preventDefault(); void save(); }}>
         <strong>What should we call you?</strong>
-        <span className="muted">Cairn knows you by {(identity.emails ?? []).join(", ")}. A name is what others see beside your work.</span>
+        <span className="muted">
+          This names <span className="mono">{identity.emails?.[0] ?? ""}</span>
+          {(identity.emails ?? []).length > 1 ? ` and ${String((identity.emails ?? []).length - 1)} more` : ""}, the identity others see beside your work.
+        </span>
         <Field label="Name" value={name} autoFocus onChange={(event) => { setName(event.target.value); }} />
-        {write.rejection === undefined ? null : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
+        {problem === undefined ? null : <span className="ink-bad" role="alert">{problem}</span>}
+        {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
         <span className="row">
-          <Button primary type="submit" disabled={write.disabled || name.trim() === ""}>Save</Button>
+          <Button primary type="submit" disabled={write.disabled || name.trim() === "" || problem !== undefined}>Save</Button>
           <Button onClick={() => { setLater(true); }}>Later</Button>
         </span>
       </form>

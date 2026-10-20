@@ -25,3 +25,7 @@ This supersedes the parts of the 2026-10-07 callers-identities call that answere
 ## What would change it
 
 A provider that signs people in without any verified email and must be supported; a need to create identities without a request (an import), which would move arrival into the service's own entry points.
+
+## The name prompt asks for one identity: the first by key
+
+A caller whose emails name several identities (duplicates of one person) is shown everywhere by the first of them by key, so the prompt asks about that one only: when it is named, the person is named, and another unnamed duplicate changes nothing they or anyone sees; when it is unnamed, the prompt names it, which is how they are shown. Asking for each unnamed duplicate would ask one person several times for names of the same person, and merging, not naming, is what resolves duplicates. This would change if "mine" ever showed the person by a different identity than the first by key.

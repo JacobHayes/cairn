@@ -26,7 +26,7 @@ import { IndexHead } from "../ui/IndexHead.tsx";
 import { Badge, Button, Field } from "../ui/kit.tsx";
 import { identityLabel } from "./label.ts";
 import { MergeIdentities } from "./MergeIdentities.tsx";
-import { aliasesOf, byName, EMAIL_RULES, identityOf, newIdentityKey, type Identity } from "./model.ts";
+import { aliasesOf, byName, EMAIL_RULES, identityOf, nameProblem, newIdentityKey, type Identity } from "./model.ts";
 import { plural } from "../ui/words.ts";
 
 /** An identity's edit as typed, and the deployment revision its author saw when they opened it (H5). */
@@ -52,6 +52,7 @@ export function deploymentRebase(rejection: Rejection, held: number): number {
 }
 
 function IdentityEditor({ identity, deployment, draft, setDraft, write }: { identity: Identity; deployment: Deployment; draft: IdentityDraft; setDraft: (draft: IdentityDraft | undefined) => void; write: ScreenWrite }) {
+  const problem = nameProblem(draft.name);
   const save = async () => {
     const mutation = { op: "edit_identity" as const, identity: identityOf(identity.key, draft.name, draft.emails) };
     if (await write.run({ target: "deployment", baseRevision: draft.base, mutations: [mutation] })) {
@@ -65,8 +66,9 @@ function IdentityEditor({ identity, deployment, draft, setDraft, write }: { iden
           <Field label="Name" value={draft.name} onChange={(event) => { setDraft({ ...draft, name: event.target.value }); }} />
           <ChipsInput label="Emails" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={draft.emails} text={draft.emailText} onChange={(emails, emailText) => { setDraft({ ...draft, emails, emailText }); }} />
         </span>
+        {problem === undefined ? null : <span className="ink-bad" role="alert">{problem}</span>}
         <span className="row">
-          <Button primary type="submit" disabled={write.disabled || (draft.name.trim() === "" && draft.emails.length === 0) || draft.emailText.trim() !== ""}>Save</Button>
+          <Button primary type="submit" disabled={write.disabled || (draft.name.trim() === "" && draft.emails.length === 0) || draft.emailText.trim() !== "" || problem !== undefined}>Save</Button>
           <Button onClick={() => { setDraft(undefined); write.dismiss(); }}>Cancel</Button>
         </span>
       </form>
@@ -94,6 +96,9 @@ function IdentityRow({ identity, deployment, yours, mark, intoName }: { identity
   // landing closes the draft it sent, never one opened after it.
   const write = useScreenWrite(`identity:${identity.key}`, identityLabel(identity));
   const aliases = aliasesOf(deployment, identity.key);
+  // An unnamed identity is titled by its first email, so that one is not listed again.
+  const named = identity.name !== undefined && identity.name !== null;
+  const shown = named ? (identity.emails ?? []) : (identity.emails ?? []).slice(1);
   return (
     <li className="identity-row" data-testid="identity" data-identity={identity.key} data-diff={mark?.kind}>
       <span className="identity-head">
@@ -113,7 +118,7 @@ function IdentityRow({ identity, deployment, yours, mark, intoName }: { identity
       </span>
       {draft !== undefined && !reviewing ? null : (
         <span data-testid="identity-emails">
-          {(identity.emails ?? []).length === 0 ? <span className="muted small">No emails</span> : <Chips>{(identity.emails ?? []).map((email) => <Chip key={email}>{email}</Chip>)}</Chips>}
+          {(identity.emails ?? []).length === 0 ? <span className="muted small">No emails</span> : shown.length === 0 ? null : <Chips>{shown.map((email) => <Chip key={email}>{email}</Chip>)}</Chips>}
         </span>
       )}
       {draft === undefined || reviewing ? null : <IdentityEditor identity={identity} deployment={deployment} draft={draft} setDraft={setDraft} write={write} />}
@@ -125,6 +130,7 @@ function CreateIdentity({ deployment }: { deployment: Deployment }) {
   const write = useScreenWrite("new-identity");
   const [draft, setDraft] = useDraft<{ name: string; emails: string[]; emailText: string }>("identity-new");
   const { name, emails, emailText } = draft ?? { name: "", emails: [], emailText: "" };
+  const problem = nameProblem(name);
   const create = async () => {
     const mutation = { op: "create_identity" as const, identity: identityOf(newIdentityKey(), name, emails) };
     if (await write.run({ target: "deployment", baseRevision: deployment.revision, mutations: [mutation] })) {
@@ -137,8 +143,9 @@ function CreateIdentity({ deployment }: { deployment: Deployment }) {
         <Field label="Name (optional)" value={name} onChange={(event) => { setDraft({ name: event.target.value, emails, emailText }); }} />
         <ChipsInput label="Emails (optional)" placeholder="Add an email" inputMode="email" rules={EMAIL_RULES} values={emails} text={emailText} onChange={(next, nextText) => { setDraft({ name, emails: next, emailText: nextText }); }} />
       </span>
+      {problem === undefined ? null : <span className="ink-bad" role="alert">{problem}</span>}
       <span className="row">
-        <Button primary type="submit" disabled={write.disabled || (name.trim() === "" && emails.length === 0) || emailText.trim() !== ""}>Add an identity</Button>
+        <Button primary type="submit" disabled={write.disabled || (name.trim() === "" && emails.length === 0) || emailText.trim() !== "" || problem !== undefined}>Add an identity</Button>
         {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
       </span>
     </form>

@@ -8,11 +8,11 @@ import { pathTo } from "../address.ts";
 import type { Capabilities, Caller } from "../data/host.ts";
 import { useCapabilities, useCaller, useDeployment, useToday } from "../data/react.ts";
 import { dateWords } from "../status/when.ts";
-import { Segmented } from "../ui/kit.tsx";
+import { NodePanel } from "../acting/NodeItem.tsx";
+import { Badge, Segmented } from "../ui/kit.tsx";
 import { THEME_CHOICES, useThemeChoice, type ThemeChoice } from "../ui/theme.ts";
 import { Failed } from "../ui/Failed.tsx";
 import { identityLabel } from "./label.ts";
-import { byName } from "./model.ts";
 
 /** Where a sign-in with provider `name` starts, coming back to this screen (the tab keeps its host). */
 export function signInHref(name: string): string {
@@ -27,41 +27,46 @@ export function linkable(capabilities: Capabilities): string[] {
 function Logins({ caller }: { caller: Caller }) {
   const today = useToday();
   return (
-    <ul className="stack plain-list" data-testid="logins">
+    <NodePanel title="Sign-in methods" count={caller.logins.length} testId="logins">
       {caller.logins.map((login) => {
         const linked = login.linked_at.slice(0, 10);
         return (
-          <li key={`${login.provider}:${login.subject}`} className="stack login" data-testid="login" data-provider={login.provider}>
+          <li key={`${login.provider}:${login.subject}`} className="identity-row" data-testid="login" data-provider={login.provider}>
             <span className="row">
               <strong>{login.provider}</strong>
               <span className="mono">{login.subject}</span>
             </span>
-            <span className="small" data-testid="login-emails">
+            <span data-testid="login-emails">
               <span className="muted">Verified emails: </span>
               <span className="mono">{login.verified_emails.join(", ") || "none"}</span>
             </span>
-            <span className="muted small mono" title={login.linked_at}>Linked {dateWords(linked, today)}</span>
+            <span className="muted mono small" title={login.linked_at}>Linked {dateWords(linked, today)}</span>
           </li>
         );
       })}
-    </ul>
+    </NodePanel>
   );
 }
 
 function YourIdentities({ caller }: { caller: Caller }) {
   const deployment = useDeployment();
-  const identities = byName((deployment?.identities ?? []).filter((identity) => caller.identities.includes(identity.key)));
+  // In key order: the first is the one you are shown as everywhere (the name prompt asks about it).
+  const identities = (deployment?.identities ?? []).filter((identity) => caller.identities.includes(identity.key)).sort((one, other) => one.key.localeCompare(other.key));
+  const several = identities.length > 1;
   return (
     <section className="stack" aria-label="Your identity" data-testid="your-identities">
-      <span className="label">Your identity</span>
-      <ul className="stack plain-list">
-        {identities.map((identity) => (
-          <li key={identity.key} className="row" data-testid="your-identity" data-identity={identity.key}>
-            <strong>{identityLabel(identity)}</strong>
-            <span className="mono muted small">{(identity.emails ?? []).join(", ")}</span>
+      <NodePanel title={several ? "Your identities" : "Your identity"} count={identities.length}>
+        {identities.map((identity, at) => (
+          <li key={identity.key} className="identity-row" data-testid="your-identity" data-identity={identity.key}>
+            <span className="row">
+              <strong className={identity.name === undefined || identity.name === null ? "mono" : undefined}>{identityLabel(identity)}</strong>
+              {several && at === 0 ? <Badge tone="good">Shown as</Badge> : null}
+            </span>
+            <span className="mono muted small">{(identity.name === undefined || identity.name === null ? (identity.emails ?? []).slice(1) : (identity.emails ?? [])).join(", ")}</span>
           </li>
         ))}
-      </ul>
+      </NodePanel>
+      {several ? <span className="muted">Each holds a verified email of yours, so all of them are yours. You are shown as the first.</span> : null}
       <Link to={pathTo("identities")}>Edit on the identities page</Link>
     </section>
   );
@@ -82,7 +87,7 @@ function ThemeControl() {
         onChange={setChoice}
         data-testid="theme-control"
       />
-      <span className="muted small">System follows your device. The choice is kept in this browser only.</span>
+      <span className="muted">System follows your device. The choice is kept in this browser only.</span>
     </section>
   );
 }
@@ -112,7 +117,6 @@ export function You() {
       <h1>You</h1>
       <YourIdentities caller={caller} />
       <section className="stack" aria-label="Sign-in methods" data-testid="sign-in-methods">
-        <span className="label">Sign-in methods</span>
         <Logins caller={caller} />
         {providers.length === 0 ? null : (
           <span className="row" data-testid="link-login">
