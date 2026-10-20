@@ -15,7 +15,8 @@ draft, the person reviews on the canvas, and publishing makes the next version.
 2. **Ask before you draft.** Learn the stages of the process, who takes part (roles such as
    an owner or a reviewer), what has to be decided up front, and which dates matter. Model:
    - questions as decisions (with an answer type and, for choices, the choices);
-   - work as deliverables (an output) and actions (a step), grouped into groups;
+   - work as deliverables (an output) and actions (a step), grouped into groups (a stage
+     is a group between milestones; see Stages in the Cairn guide);
    - points in time as milestones;
    - "only if" as a condition on a decision's answer;
    - "after" as an edge (`requires`), and dates as date rules (`due_by`, `not_before`)

@@ -110,6 +110,19 @@ transition); `transition_node` alone is refused with the `has_note` guard. Bypas
 `override` only when the person says no note is needed. Removing the last note later marks
 a finished node `stale` with "missing note".
 
+## Stages
+
+A **stage** is a group bounded by milestones that sit outside it. `opens_at` gates its
+contents (they wait for the milestone) unless `gates: false`; `closes_at` bounds the
+group's finish, and so its contents' due dates, unless `closes: false`. Consecutive
+stages share a milestone: one stage's `closes_at` is the next stage's `opens_at`.
+
+Put inside a stage only the work done during it. Prep belongs before it: in an earlier
+stage, or outside any stage with a `due_by` before the opening milestone. `gates: false`
+lets the contents start before the stage opens, but the opening still bounds their dates,
+so work finished before the milestone reports a shortfall. Move the work out of the stage
+rather than switching the gate off.
+
 ## Reuse a segment
 
 A **segment** is a reusable piece of a process (a security review, a reference check): a

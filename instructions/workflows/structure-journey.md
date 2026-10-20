@@ -11,7 +11,7 @@ but on the journey itself.
    name, and no `from`.
 2. **Understand the situation.** Ask what has to happen, what has to be decided first, who
    is involved, and what dates are fixed. Keep it small: a few groups with the decisions,
-   deliverables, actions, and milestones under them.
+   deliverables, actions, and milestones under them. For phases bounded by milestones, see Stages in the Cairn guide.
 3. **Draft one proposal.** `create_proposal` with `destination` `{"journey": "<journey>"}`,
    the journey's revision as `destination_revision`, and the `add_role`, `add_node`, and
    `add_edge` mutations in order. People involved who are not yet entities are created in
