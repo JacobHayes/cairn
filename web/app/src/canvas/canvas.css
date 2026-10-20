@@ -20,12 +20,10 @@
   border-width: 1px 0 0;
 }
 
-/* A phone's graph is in the page, not a preview: the window less the bars above it and a peek of the inspector below it, which is the page's to scroll (a swipe on the canvas pans it). */
+/* A phone's graph is in the page and fills what the bars leave of the window (app.css gives the page's chain of boxes the room), above the sheet's peek while it is open, so at the peek no graph is under the sheet and a swipe on it pans it, and under no sheet once it is closed. */
 @media (max-width: 719px) {
   .ws-canvas > .canvas {
-    flex: none;
-    height: calc(100dvh - 280px);
-    min-height: 360px;
+    min-height: 320px;
   }
 }
 
@@ -152,16 +150,18 @@
 }
 
 @media (min-width: 720px) and (max-width: 1099px) {
-  .frame[data-inspector="folded"] .canvas {
-    --lift: 24px;
+  .frame:not([data-inspector="off"]) .canvas {
+    --lift: var(--sheet-covers);
   }
+}
 
+/* A phone's graph ends above an open sheet's peek, so its bottom controls ride above what the sheet covers beyond the peek (nothing at the peek, live as it is dragged), and above the pill of a closed one. */
+@media (max-width: 719px) {
   .frame[data-inspector="on"] .canvas {
-    --lift: var(--sheet-h, var(--sheet-half));
+    --lift: max(0px, calc(var(--sheet-covers) - var(--sheet-peek)));
   }
-
-  .frame[data-inspector="on"]:has(.inspector[data-snap="full"]) .canvas {
-    --lift: var(--sheet-h, var(--sheet-full));
+  .frame[data-inspector="folded"] .canvas {
+    --lift: var(--sheet-pill);
   }
 }
 

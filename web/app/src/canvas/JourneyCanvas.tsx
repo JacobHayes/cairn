@@ -17,7 +17,7 @@ import { useJourneyTarget } from "../journeys/useJourneyTarget.ts";
 import { badgesOf, currentStagesOf, depthFaded, journeyLayoutView, levelRequestOf, litOf, stepHides, type LevelRequest } from "../journeys/requests.ts";
 import { EmptyPanel, journeySubject, NothingMatches, ResetView, ViewControls } from "../screens/ViewControls.tsx";
 import { useFrameActions } from "../shell/frame.tsx";
-import { typing } from "../ui/typing.ts";
+import { overlayOpen, typing } from "../ui/typing.ts";
 import { RevealBox, SignalMenu } from "./Chrome.tsx";
 import { GraphCanvas, type Reveal } from "./GraphCanvas.tsx";
 import { errorWords, valueOf, type ReadView } from "../data/keyed-read.ts";
@@ -239,7 +239,7 @@ function useEscapeEdit(on: boolean, leave: () => void): void {
       return undefined;
     }
     const heard = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented && !typing(event.target) && document.querySelector("[data-popover], dialog[open]") === null) {
+      if (event.key === "Escape" && !event.defaultPrevented && !typing(event.target) && !overlayOpen()) {
         event.preventDefault();
         leave();
       }

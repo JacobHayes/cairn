@@ -1,52 +1,144 @@
 // The inspector column of the frame (design 3.1, 3.3): a chrome column on the right at
-// 1100px and wider, a bottom sheet from 720 to 1099px (with a drag handle that snaps between
-// two heights), and stacked under the workspace on a phone. Its head has a tab for each pane on offer, Inspector,
-// Assistant (where the assistant is offered) and Proposals (a journey's or route's open proposals), in sentence case as
-// DESIGN's tabs are, the sheet's grip in the middle, and one control at the right that hides it. Hidden, the column
-// folds to a rail on the right edge (a slim bar at the bottom for the sheet) that shows it again, with a vertical tab
-// for each pane that opens it on that tab, in the rail's uppercase mono (app.css). The panes are empty slots: the
-// screens' content arrives through portals (frame.tsx). The inspector pane is the column's one
-// scroller; the assistant pane holds its own (a transcript above a pinned composer).
-import { useRef, type PointerEvent as ReactPointerEvent, type Ref, type RefObject } from "react";
+// 1100px and wider, and below that, tablet and phone alike, a bottom sheet over the workspace. The
+// sheet has a handle that drags (touch or pointer), taps and answers the arrow keys between three
+// heights, peek (the head and the top of the pane), half and full; letting go below the peek
+// closes it. Its head has a tab for each pane on offer, Inspector, Assistant (where the assistant
+// is offered) and Proposals (a journey's or route's open proposals), in sentence case as DESIGN's
+// tabs are, and one control at the right that hides it. Hidden, the column folds to a rail on the
+// right edge (a labelled pill at the bottom for the sheet, and nothing else: no bar, no blank
+// strip) that shows it again, with a vertical tab for each pane that opens it on that tab, in the
+// rail's uppercase mono (app.css). The panes are empty slots: the screens' content arrives through
+// portals (frame.tsx). The inspector pane is the column's one scroller; the assistant pane holds
+// its own (a transcript above a pinned composer).
+import { useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type Ref, type RefObject } from "react";
 
-import type { InspectorTab } from "./frame.tsx";
+import { COLUMN, useMedia, type InspectorTab } from "./frame.tsx";
 
-/** The sheet's two heights, as `data-snap` on the column (app.css sets each). */
-export type SheetSnap = "half" | "full";
+/** The sheet's heights, as `data-sheet` on the frame (app.css sets each), smallest first. */
+export const SNAPS = ["peek", "half", "full"] as const;
+export type SheetSnap = (typeof SNAPS)[number];
 
-/** Past this share of the window, a released drag snaps to the full height. */
-const FULL_FROM = 0.62;
+/** A pointer that moves less than this (px) between down and up is a tap, not a drag. */
+const TAP_SLOP = 6;
+/** The shortest the sheet is dragged to (px), and how far under the peek a release closes it. */
+const DRAG_FLOOR = 40;
+const CLOSE_BELOW = 0.7;
 
-/** A drag on the sheet's handle: the height follows the pointer, and letting go snaps. */
-function useSheetDrag(column: RefObject<HTMLElement | null>, snap: SheetSnap, onSnap: (snap: SheetSnap) => void) {
+/** The next snap up or down from `snap`, or `snap` at the end. */
+function stepped(snap: SheetSnap, by: 1 | -1): SheetSnap {
+  return SNAPS[Math.min(SNAPS.length - 1, Math.max(0, SNAPS.indexOf(snap) + by))] ?? snap;
+}
+
+/** The height of the sheet at each snap, smallest first: CSS's, read by trying each in turn before the next frame, so there is one source for them. */
+function measureSnaps(frame: HTMLElement | undefined, column: HTMLElement): number[] {
+  const was = frame?.dataset["sheet"];
+  const heights = SNAPS.map((each) => {
+    if (frame !== undefined) {
+      frame.dataset["sheet"] = each;
+    }
+    return column.offsetHeight;
+  });
+  if (frame !== undefined && was !== undefined) {
+    frame.dataset["sheet"] = was;
+  }
+  return heights;
+}
+
+/** A drag in progress: where it began, the sheet's height then, each snap's height, and whether the pointer has moved past a tap. */
+interface Drag {
+  startY: number;
+  startHeight: number;
+  heights: number[];
+  moved: boolean;
+}
+
+/** The sheet's height for a pointer at `clientY`: it follows the pointer, between the floor and the tallest snap. */
+function draggedHeight(drag: Drag, clientY: number): number {
+  return Math.min(Math.max(drag.startHeight + drag.startY - clientY, DRAG_FLOOR), drag.heights[drag.heights.length - 1] ?? drag.startHeight);
+}
+
+/** Where a released drag settles: the snap nearest its height, or none (closed) from under the peek. */
+function settledSnap(drag: Drag, height: number): SheetSnap | undefined {
+  if (height < (drag.heights[0] ?? 0) * CLOSE_BELOW) {
+    return undefined;
+  }
+  const nearest = drag.heights.reduce((best, each, at) => (Math.abs(each - height) < Math.abs((drag.heights[best] ?? 0) - height) ? at : best), 0);
+  return SNAPS[nearest];
+}
+
+/**
+ * The sheet's handle: a drag moves the sheet's height with the pointer and letting go snaps to the
+ * nearest height (or closes it, from under the peek), a tap or Enter toggles the peek and the full
+ * height, and the arrow keys step.
+ */
+function useSheetHandle(column: RefObject<HTMLElement | null>, snap: SheetSnap, onSnap: (snap: SheetSnap) => void, onClose: () => void) {
   // On the frame, not the column, so the workspace's inset above the sheet follows the drag (app.css).
-  const frame = () => column.current?.closest<HTMLElement>(".frame");
-  const start = useRef<{ moved: boolean } | undefined>(undefined);
-  const heightAt = (clientY: number) => globalThis.innerHeight - clientY;
+  const frame = () => column.current?.closest<HTMLElement>(".frame") ?? undefined;
+  const drag = useRef<Drag | undefined>(undefined);
+  const swallowClick = useRef(false);
+  const release = () => {
+    frame()?.style.removeProperty("--sheet-h");
+    drag.current = undefined;
+  };
   return {
     onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => {
-      event.currentTarget.setPointerCapture(event.pointerId);
-      start.current = { moved: false };
-    },
-    onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => {
-      if (start.current === undefined) {
+      const element = column.current;
+      if (element === null) {
         return;
       }
-      start.current.moved = true;
-      const height = Math.min(Math.max(heightAt(event.clientY), 96), globalThis.innerHeight * 0.9);
-      frame()?.style.setProperty("--sheet-h", `${String(height)}px`);
+      event.currentTarget.setPointerCapture(event.pointerId);
+      swallowClick.current = false;
+      drag.current = { startY: event.clientY, startHeight: element.offsetHeight, heights: measureSnaps(frame(), element), moved: false };
+    },
+    onPointerMove: (event: ReactPointerEvent<HTMLButtonElement>) => {
+      const now = drag.current;
+      if (now === undefined || (!now.moved && Math.abs(event.clientY - now.startY) < TAP_SLOP)) {
+        return;
+      }
+      now.moved = true;
+      frame()?.style.setProperty("--sheet-h", `${String(draggedHeight(now, event.clientY))}px`);
     },
     onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => {
-      const dragged = start.current?.moved === true;
-      start.current = undefined;
-      frame()?.style.removeProperty("--sheet-h");
-      if (dragged) {
-        onSnap(heightAt(event.clientY) > globalThis.innerHeight * FULL_FROM ? "full" : "half");
+      const now = drag.current;
+      release();
+      if (now === undefined || !now.moved) {
+        return;
+      }
+      swallowClick.current = true;
+      const settled = settledSnap(now, draggedHeight(now, event.clientY));
+      if (settled === undefined) {
+        onClose();
       } else {
-        onSnap(snap === "half" ? "full" : "half");
+        onSnap(settled);
+      }
+    },
+    onPointerCancel: release,
+    onClick: () => {
+      if (swallowClick.current) {
+        swallowClick.current = false;
+        return;
+      }
+      onSnap(snap === "full" ? "peek" : "full");
+    },
+    onKeyDown: (event: ReactKeyboardEvent<HTMLButtonElement>) => {
+      if (event.key === "ArrowUp" || event.key === "ArrowDown") {
+        event.preventDefault();
+        onSnap(stepped(snap, event.key === "ArrowUp" ? 1 : -1));
       }
     },
   };
+}
+
+/** Hiding moves focus to the control that shows the column, and showing moves it back to the tab in view, so a keyboard is never left on something gone. */
+function useFocusFollowsFold(column: RefObject<HTMLElement | null>, show: RefObject<HTMLElement | null>, folded: boolean): void {
+  const wasFolded = useRef(folded);
+  useEffect(() => {
+    const element = column.current;
+    if (element !== null && wasFolded.current !== folded && (document.activeElement === document.body || element.contains(document.activeElement))) {
+      (folded ? show.current : element.querySelector<HTMLElement>('[role="tab"][aria-selected="true"]'))?.focus();
+    }
+    wasFolded.current = folded;
+  }, [column, show, folded]);
 }
 
 /** A chevron against a bar: `toward` is the way it points, the bar sits at the edge the column folds to. */
@@ -73,6 +165,7 @@ export interface InspectorColumnProps {
   proposalsCount: number | undefined;
   onTab: (tab: InspectorTab) => void;
   onSnap: (snap: SheetSnap) => void;
+  /** Hides or shows the column (the sheet's close, and the pill that opens it). */
   onToggle: () => void;
   inspectorRef: Ref<HTMLDivElement>;
   assistantRef: Ref<HTMLDivElement>;
@@ -91,33 +184,51 @@ function TabName({ tab, count }: { tab: InspectorTab; count: number | undefined 
   );
 }
 
+/** What shows of the column once hidden: the button that shows it and, on the wide rail, a vertical tab for each pane. */
+function FoldedRail({ folded, tab, tabs, proposalsCount, show, onTab, onToggle }: Pick<InspectorColumnProps, "folded" | "tab" | "tabs" | "proposalsCount" | "onTab" | "onToggle"> & { show: Ref<HTMLButtonElement> }) {
+  return (
+    <div className="inspector-rail" hidden={!folded}>
+      <button ref={show} type="button" className="rail-show" aria-label="Show inspector" title="Show the inspector  ]" onClick={onToggle}>
+        <FoldIcon toward="left" />
+        <span className="rail-show-label">Inspector</span>
+      </button>
+      {tabs.map((each) => (
+        <button
+          key={each}
+          type="button"
+          className="rail-tab"
+          data-testid={`rail-tab-${each}`}
+          data-on={tab === each}
+          title={`Show the ${each}`}
+          onClick={() => {
+            onTab(each);
+            onToggle();
+          }}
+        >
+          <TabName tab={each} count={proposalsCount} />
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function InspectorColumn({ present, folded, tab, snap, tabs, proposalsCount, onTab, onSnap, onToggle, inspectorRef, assistantRef, proposalsRef }: InspectorColumnProps) {
   const column = useRef<HTMLElement>(null);
-  const drag = useSheetDrag(column, snap, onSnap);
+  const handle = useSheetHandle(column, snap, onSnap, onToggle);
+  const show = useRef<HTMLButtonElement>(null);
+  // At the peek only the top of the pane shows: it is not read or reached there, and a tap on it opens the sheet to half.
+  const wide = useMedia(COLUMN);
+  const peeking = snap === "peek" && !wide;
+  useFocusFollowsFold(column, show, folded);
   return (
-    <aside ref={column} className="inspector" aria-label="Inspector column" data-snap={snap} data-tab={tab} data-folded={folded} hidden={!present}>
-      <div className="inspector-rail" hidden={!folded}>
-        <button type="button" className="rail-show" aria-label="Show inspector" title="Show the inspector  ]" onClick={onToggle}>
-          <FoldIcon toward="left" />
-        </button>
-        {tabs.map((each) => (
-          <button
-            key={each}
-            type="button"
-            className="rail-tab"
-            data-testid={`rail-tab-${each}`}
-            data-on={tab === each}
-            title={`Show the ${each}`}
-            onClick={() => {
-              onTab(each);
-              onToggle();
-            }}
-          >
-            <TabName tab={each} count={proposalsCount} />
-          </button>
-        ))}
-      </div>
+    <aside ref={column} className="inspector" aria-label="Inspector column" data-tab={tab} data-folded={folded} hidden={!present} onClick={(event) => {
+        if (peeking && event.target === event.currentTarget) {
+          onSnap("half");
+        }
+      }}>
+      <FoldedRail folded={folded} tab={tab} tabs={tabs} proposalsCount={proposalsCount} show={show} onTab={onTab} onToggle={onToggle} />
       <div className="inspector-head" hidden={folded}>
+        <button type="button" className="sheet-handle" aria-label="Resize the inspector" title="Drag to resize; Enter toggles; arrows step" {...handle} />
         {tabs.length > 1 || tabs[0] === "proposals" ? (
           <div className="segmented on-chrome" role="tablist" aria-label="Inspector">
             {tabs.map((each) => (
@@ -138,15 +249,14 @@ export function InspectorColumn({ present, folded, tab, snap, tabs, proposalsCou
         ) : (
           <span className="label">Inspector</span>
         )}
-        <button type="button" className="sheet-handle" aria-label="Resize the inspector" {...drag} />
         <span className="spacer" />
         <button type="button" className="ghost hide" aria-label="Hide inspector" title="Hide the inspector  ]" onClick={onToggle}>
           <FoldIcon toward="right" />
         </button>
       </div>
-      <div ref={inspectorRef} className="inspector-body" data-pane="inspector" hidden={folded || tab !== "inspector"} />
-      <div ref={assistantRef} className="assistant-pane" data-pane="assistant" hidden={folded || tab !== "assistant"} />
-      <div ref={proposalsRef} className="inspector-body" data-pane="proposals" hidden={folded || tab !== "proposals"} />
+      <div ref={inspectorRef} className="inspector-body" data-pane="inspector" hidden={folded || tab !== "inspector"} inert={peeking} />
+      <div ref={assistantRef} className="assistant-pane" data-pane="assistant" hidden={folded || tab !== "assistant"} inert={peeking} />
+      <div ref={proposalsRef} className="inspector-body" data-pane="proposals" hidden={folded || tab !== "proposals"} inert={peeking} />
     </aside>
   );
 }

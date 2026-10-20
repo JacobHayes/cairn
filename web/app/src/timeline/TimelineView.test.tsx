@@ -71,11 +71,11 @@ describe("TimelineChart (C13)", () => {
     expect(count(markup, 'class="timeline-end"')).toBe(2);
   });
 
-  it("says there is no final milestone, and draws no end, without one", () => {
+  it("draws no end, and no label for one, without a final milestone", () => {
     const markup = drawn({ entries: timeline.entries.map((each) => ({ ...each, final: false })) });
     expect(markup).toContain('data-end="" data-end-date=""');
     expect(count(markup, 'class="timeline-end"')).toBe(0);
-    expect(markup).toContain('data-testid="timeline-no-end"');
+    expect(markup).not.toContain("timeline-end-label");
   });
 });
 

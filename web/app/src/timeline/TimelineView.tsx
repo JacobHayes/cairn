@@ -130,9 +130,6 @@ function useWidth(target: React.RefObject<Element | null>): number {
   return width;
 }
 
-/** Room, in pixels, "No final milestone" takes after today's label. */
-const NO_END_LABEL_PX = 190;
-
 /** C13: the axis: its ticks, today (the start, on a route), and the end anchor, or the words that there is none. */
 function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => string }) {
   const svg = useRef<SVGSVGElement>(null);
@@ -163,12 +160,7 @@ function AxisHead({ axis, endTitle }: { axis: Axis; endTitle: (node: string) => 
           {nowWords}
         </text>
       ) : null}
-      {end === undefined || anchorAt === undefined ? (
-        // The note above the chart says it too, so a narrow axis that today's label already fills leaves it out rather than print over it.
-        nowShown && width > 0 && axis.now * width + NO_END_LABEL_PX > width ? null : <text className="timeline-end-label" x="100%" y={32} dx={-4} textAnchor="end" data-testid="timeline-no-end">
-          No final milestone
-        </text>
-      ) : (
+      {end === undefined || anchorAt === undefined ? null : (
         <text className="timeline-end-label" x={percent(anchorAt)} y={32} dx={dx(anchorAt)} textAnchor={textAnchor(anchorAt)}>
           {endLabelWords(
             `Ends: ${endTitle(end.node)}${axis.mode === "relative" ? ` · ${dayWords(end.day)}` : ""}`,

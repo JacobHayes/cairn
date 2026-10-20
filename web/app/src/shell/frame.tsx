@@ -1,5 +1,5 @@
 // The app frame's slots (design: the grid frame). The shell owns three regions beside the
-// workspace: the inspector column (a bottom sheet on a tablet, stacked on a phone) and its
+// workspace: the inspector column (a bottom sheet on a tablet and a phone) and its
 // assistant tab. A screen puts its node detail in the inspector with
 // `<Inspector>` and the assistant puts its panel in the assistant tab with `<AssistantSlot>`:
 // each renders into the shell's slot through a portal, so the screens keep their own state
@@ -15,12 +15,12 @@ import { useNodeAddresses } from "../journeys/address.ts";
 
 export type InspectorTab = "inspector" | "assistant" | "proposals";
 
-/** The window widths that make the inspector a bottom sheet (design 3.3). */
-export const SHEET = "(min-width: 720px) and (max-width: 1099px)";
+/** The window widths that make the inspector a bottom sheet, tablet and phone alike (design 3.3). */
+export const SHEET = "(max-width: 1099px)";
 
-/** The widths that give the inspector a column of its own (design 3.3); narrower, it is a sheet or stacked. */
+/** The widths that give the inspector a column of its own (design 3.3); narrower, it is a sheet. */
 export const COLUMN = "(min-width: 1100px)";
-/** A phone's width: the inspector stacks under the page. */
+/** A phone's width: the top bar replaces the rail and the sheet opens at its peek. */
 export const PHONE_WIDTH = "(max-width: 719px)";
 
 /** Whether the window matches `query` now, and as it changes. */
@@ -82,30 +82,12 @@ export function useFrameActions(): FrameActions | undefined {
   return useContext(FrameActionsContext);
 }
 
-/** On a phone, where the column is stacked under the page, scrolls it into view when `focus` changes and `reveal` holds. */
-function useScrollToColumn(column: HTMLElement | null | undefined, focus: string, reveal: boolean): void {
-  useEffect(() => {
-    if (!reveal || column === null || column === undefined || !globalThis.matchMedia(PHONE_WIDTH).matches) {
-      return undefined;
-    }
-    // After the commit that shows the column, which is hidden until a screen fills it.
-    const frame = requestAnimationFrame(() => {
-      const calm = globalThis.matchMedia("(prefers-reduced-motion: reduce)").matches;
-      column.scrollIntoView({ block: "start", behavior: calm ? "auto" : "smooth" });
-    });
-    return () => {
-      cancelAnimationFrame(frame);
-    };
-    // Picking another node brings it into view.
-  }, [focus, column, reveal]);
-}
-
 /**
  * The inspector's content, rendered in the shell's inspector column. `focus` names what it is
  * about (the open node): when it changes, the inspector tab comes into view, even if the viewer hid the column. Closing sends
  * the sheet's Esc to the screen the node is open on, keeping what that screen shows. With
  * `reveal` off (the journey card, which is there without being asked for) it leaves the tab
- * in view alone and a phone does not scroll to it.
+ * in view alone.
  */
 export function Inspector({ focus, reveal = true, children }: { focus: string; reveal?: boolean; children: ReactNode }) {
   const actions = useFrameActions();
@@ -127,14 +109,13 @@ export function Inspector({ focus, reveal = true, children }: { focus: string; r
       body.scrollTop = 0;
     }
   }, [body, focus]);
-  // On a phone the inspector stacks under the whole page: bring it into view, or opening a node looks like nothing happened.
-  useScrollToColumn(state?.inspector?.parentElement, focus, reveal);
+  // The journey card (not revealed) is no open node: Esc has nothing to go back from, and closes the sheet.
   useEffect(() => {
-    actions?.closeTo(close);
+    actions?.closeTo(reveal ? close : undefined);
     return () => {
       actions?.closeTo(undefined);
     };
-  }, [actions, close]);
+  }, [actions, close, reveal]);
   if (actions === undefined || state === undefined) {
     return children;
   }
@@ -157,7 +138,6 @@ export function ProposalsSlot({ count, reveal, children }: { count: number | und
       actions?.show("proposals");
     }
   }, [actions, reveal, key]);
-  useScrollToColumn(state?.proposals?.parentElement, "proposals", reveal);
   if (actions === undefined || state === undefined) {
     return children;
   }

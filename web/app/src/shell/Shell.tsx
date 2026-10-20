@@ -1,6 +1,6 @@
 // The app frame every screen renders inside (design 3.1): a chrome rail with the screens,
 // the workspace (the screen the router shows, its one scroller `.ws-body`), the inspector
-// column on the right (INSPECTOR | ASSISTANT; a bottom sheet on a tablet; a rail when hidden). The sync dot sits
+// column on the right (INSPECTOR | ASSISTANT; a bottom sheet below 1100px; a rail when hidden). The sync dot sits
 // beside the brand at the top of the rail. The frame is one `100dvh` grid with one scroller per
 // region (app.css); below 720px it is one scrolling column.
 import { Suspense } from "react";
@@ -59,7 +59,7 @@ export function Shell() {
   return (
     <FrameActionsContext value={frame.actions}>
       <FrameStateContext value={frame.state}>
-        <div className="frame" data-inspector={frame.folded ? "folded" : frame.open ? "on" : "off"}>
+        <div className="frame" data-inspector={frame.folded ? "folded" : frame.open ? "on" : "off"} data-sheet={frame.snap}>
           <Rail pathname={pathname} />
           <main className="workspace" data-screen={`${pathname}${search}`}>
             <div className="ws-body">

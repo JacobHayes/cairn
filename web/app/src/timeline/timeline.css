@@ -315,8 +315,8 @@
 }
 
 /* A selected row scrolled into view keeps clear of the sheet over the bottom of the region. */
-@media (min-width: 720px) and (max-width: 1099px) {
-  .frame[data-inspector="on"] .timeline-label {
-    scroll-margin-bottom: calc(var(--sheet-h, var(--sheet-half)) + var(--space-5));
+@media (max-width: 1099px) {
+  .frame:not([data-inspector="off"]) .timeline-label {
+    scroll-margin-bottom: calc(var(--sheet-covers) + var(--space-5));
   }
 }

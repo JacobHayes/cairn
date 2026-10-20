@@ -4,7 +4,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
 import { versionSelect } from "./around.ts";
-import { fresh, open, openJourney, type HostKind } from "./shell.ts";
+import { fresh, open, openJourney, openSheet, type HostKind } from "./shell.ts";
 
 /** A fresh name for a route this run starts. */
 export const routeName = (stem: string) => fresh(stem);
@@ -94,6 +94,7 @@ export async function addRole(page: Page, title: string, multi = false): Promise
 
 /** Opens a structure section of the open node's panel. */
 export async function section(page: Page, testId: string): Promise<Locator> {
+  await openSheet(page);
   const found = structure(page).getByTestId(testId);
   if ((await found.getAttribute("open")) === null) {
     await found.locator("summary").first().click();

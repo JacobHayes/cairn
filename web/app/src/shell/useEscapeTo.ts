@@ -4,7 +4,7 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router";
 
-import { typing } from "../ui/typing.ts";
+import { overlayOpen, typing } from "../ui/typing.ts";
 import { SHEET } from "./frame.tsx";
 
 /** Esc goes to `address`, while there is one (undefined: nothing is open). */
@@ -15,7 +15,7 @@ export function useEscapeTo(address: string | undefined): void {
       return undefined;
     }
     const heard = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented && !typing(event.target) && !globalThis.matchMedia(SHEET).matches && document.querySelector("[data-popover], dialog[open]") === null) {
+      if (event.key === "Escape" && !event.defaultPrevented && !typing(event.target) && !globalThis.matchMedia(SHEET).matches && !overlayOpen()) {
         void navigate(address);
       }
     };

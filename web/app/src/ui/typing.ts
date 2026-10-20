@@ -4,3 +4,8 @@
 export function typing(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && (target.isContentEditable || ["INPUT", "SELECT", "TEXTAREA"].includes(target.tagName));
 }
+
+/** Whether a popover or dialog is open: Esc closes it first, and nothing behind it hears that press. */
+export function overlayOpen(): boolean {
+  return document.querySelector("[data-popover], dialog[open]") !== null;
+}

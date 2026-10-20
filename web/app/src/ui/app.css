@@ -10,9 +10,11 @@
   --inspector-w: 400px;
   --fold-w: 32px; /* the hidden inspector's rail */
   --inspector-pad: 20px; /* where the inspector's cards and the assistant start their content (DESIGN, More air) */
-  /* The sheet's two heights. The tall one leaves room above it for a notice: a window's worth, less a notice. */
+  /* The sheet's three heights (below 1100px): the peek is the grip, the tabs and the top of the pane, and sits clear of the home indicator; the tall one leaves room above it for a notice: a window's worth, less a notice. The pill is the closed sheet's one control. */
+  --sheet-peek: calc(164px + env(safe-area-inset-bottom, 0px));
   --sheet-half: 40dvh;
   --sheet-full: min(85dvh, calc(100dvh - 160px));
+  --sheet-pill: calc(56px + env(safe-area-inset-bottom, 0px));
   /* DESIGN's four corner ticks (L-shaped, 8px, inset 3px) as background layers, for the ruled canvases: the graph and the timeline. */
   --corner-ticks:
     linear-gradient(var(--color-tick), var(--color-tick)) left 3px top 3px / 8px 1px no-repeat,
@@ -277,6 +279,7 @@ body {
   position: relative;
   flex: none;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: var(--space-2);
   min-height: 36px;
@@ -286,7 +289,8 @@ body {
 .inspector-head .label {
   color: var(--chrome-muted);
 }
-/* Hidden, the sheet is a slim bar that opens it (a short grip, like the handle)... */
+/* Hidden, the column is a rail on the right edge (1100px and wider, below), and the sheet is a
+   labelled pill at the bottom (the sheet section). */
 .inspector-rail {
   flex: 1 1 auto;
   display: flex;
@@ -304,14 +308,6 @@ body {
   color: var(--chrome-muted);
   cursor: pointer;
 }
-.rail-show::before {
-  content: "";
-  width: 40px;
-  height: 4px;
-  background: var(--chrome-muted);
-  opacity: 0.6;
-}
-.rail-show .fold-icon,
 .rail-tab {
   display: none;
 }
@@ -337,11 +333,8 @@ body {
     flex: none;
     width: 100%;
   }
-  .rail-show::before {
+  .rail-show-label {
     display: none;
-  }
-  .rail-show .fold-icon {
-    display: block;
   }
   .rail-tab {
     display: block;
@@ -390,30 +383,31 @@ body {
   align-items: center;
   justify-content: center;
 }
-/* Stacked under the page the column folds upward to its bar, so the chevron points up. */
-@media (max-width: 719px) {
-  .inspector-head .hide .fold-icon {
-    transform: rotate(-90deg);
-  }
-}
-/* The sheet's grip sits in the middle of the head, behind its controls. */
+/* The sheet's grip is a row of its own along the head's top (shown below 1100px), drawn as a short bar. */
 .inspector-head .sheet-handle {
   display: none;
-  position: absolute;
-  top: 0;
-  bottom: 0;
-  left: 50%;
-  width: 64px;
-  height: auto;
+  flex: 0 0 100%;
+  order: -1;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
   min-height: 0;
-  margin-left: -32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: grab;
+  touch-action: none;
 }
 .inspector-head .sheet-handle::before {
-  top: calc(50% - 2px);
+  content: "";
+  width: 40px;
+  height: 4px;
+  background: var(--chrome-muted);
+  opacity: 0.6;
 }
-.inspector-head > :not(.sheet-handle) {
-  position: relative;
-  z-index: 1;
+.inspector-head .sheet-handle:focus-visible {
+  outline: 2px solid var(--chrome-muted);
+  outline-offset: -4px;
 }
 .inspector-body {
   flex: 1 1 0;
@@ -439,14 +433,30 @@ body {
   padding: var(--inspector-pad);
 }
 
-/* ---- the sheet on a tablet ---------------------------------------------------------------------- */
-/* 720 to 1099px: the inspector is a bottom sheet over the workspace instead of a column, so the
-   canvas keeps its own region and nothing falls below it into the page. */
-@media (min-width: 720px) and (max-width: 1099px) {
+/* ---- the sheet (tablet and phone) ----------------------------------------------------------------- */
+/* Below 1100px the inspector is a bottom sheet over the workspace instead of a column, so the canvas
+   keeps its own region and nothing falls below it into the page. `--sheet-covers` is how much of the
+   window's foot it lies over (the sheet's height, the pill's, or none): the workspace's end, the
+   canvas's bottom controls, a selected row's scroll margin and the toast all clear it by that. */
+@media (max-width: 1099px) {
   .frame,
   .frame[data-inspector="off"] {
-    grid-template-columns: var(--rail-w) minmax(0, 1fr);
-    grid-template-areas: "rail work";
+    --sheet-covers: 0px;
+  }
+  .frame[data-sheet="peek"] {
+    --sheet-snap: var(--sheet-peek);
+  }
+  .frame[data-sheet="half"] {
+    --sheet-snap: var(--sheet-half);
+  }
+  .frame[data-sheet="full"] {
+    --sheet-snap: var(--sheet-full);
+  }
+  .frame[data-inspector="on"] {
+    --sheet-covers: var(--sheet-h, var(--sheet-snap));
+  }
+  .frame[data-inspector="folded"] {
+    --sheet-covers: var(--sheet-pill);
   }
   .frame > .inspector {
     position: fixed;
@@ -455,40 +465,82 @@ body {
     left: var(--rail-w);
     right: 0;
     bottom: 0;
-    height: var(--sheet-h, var(--sheet-half));
+    height: var(--sheet-covers);
+    padding: 0 env(safe-area-inset-right, 0px) env(safe-area-inset-bottom, 0px) env(safe-area-inset-left, 0px);
     border-left: 0;
     border-top: 1px solid var(--chrome-border);
     box-shadow: var(--shadow-lg);
   }
-  .frame > .inspector[data-snap="full"] {
-    height: var(--sheet-h, var(--sheet-full));
-  }
   .inspector-head .sheet-handle {
-    display: block;
+    display: flex;
   }
-  /* Hidden, the sheet is a slim bar along the bottom that opens it. */
+  .inspector-head {
+    min-height: 0;
+    padding-bottom: var(--space-1);
+  }
+  .inspector-body {
+    overscroll-behavior: contain;
+  }
+  /* At the peek the pane is cut by the sheet's foot: a fade makes that a choice, not a slip. */
+  .frame[data-sheet="peek"] .inspector-body {
+    mask-image: linear-gradient(to bottom, black 60%, transparent);
+  }
+  .inspector-head .hide {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .inspector-head .hide .fold-icon {
+    transform: rotate(90deg);
+  }
+  .inspector-head .segmented {
+    min-width: 0;
+  }
+  /* Hidden, the sheet is gone but for a labelled pill at the bottom that opens it: no bar, no blank strip. */
   .frame > .inspector[data-folded="true"] {
+    left: 50%;
+    right: auto;
+    bottom: calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
     width: auto;
-    height: 24px;
+    height: auto;
+    padding: 0;
+    overflow: visible;
+    background: transparent;
+    border: 0;
     box-shadow: none;
+    transform: translateX(-50%);
   }
+  .frame > .inspector[data-folded="true"] .inspector-rail {
+    flex: none;
+  }
+  .rail-show {
+    flex: none;
+    gap: var(--space-2);
+    min-height: 44px;
+    padding: 0 var(--space-4);
+    border: 1px solid var(--chrome-border);
+    background: var(--chrome-bg);
+    box-shadow: var(--shadow-lg);
+    font: 500 15px / 1 var(--font-body);
+  }
+  .rail-show .fold-icon {
+    transform: rotate(90deg);
+  }
+  /* The workspace ends above the sheet (or the pill), so its last row can be reached. */
+  .frame:not([data-inspector="off"]) .ws-body:not(:has(> .ws-fill)) {
+    padding-bottom: calc(var(--sheet-covers) + var(--space-5));
+  }
+}
+/* The sheet lies over the workspace, so the grid has no column for it. */
+@media (min-width: 720px) and (max-width: 1099px) {
+  .frame,
+  .frame[data-inspector="off"],
   .frame[data-inspector="folded"] {
     grid-template-columns: var(--rail-w) minmax(0, 1fr);
-  }
-  .frame[data-inspector="folded"] .ws-body:not(:has(> .ws-fill)) {
-    padding-bottom: calc(24px + var(--space-5));
-  }
-  /* The sheet covers the workspace's lower part: a scrolling screen's region ends above it, so its last row can be reached. */
-  .frame[data-inspector="on"] .ws-body:not(:has(> .ws-fill)) {
-    padding-bottom: calc(var(--sheet-h, var(--sheet-half)) + var(--space-5));
-  }
-  .frame[data-inspector="on"]:has(.inspector[data-snap="full"]) .ws-body:not(:has(> .ws-fill)) {
-    padding-bottom: calc(var(--sheet-h, var(--sheet-full)) + var(--space-5));
+    grid-template-areas: "rail work";
   }
 }
 
-/* Below 720px: one column the document scrolls. The rail is a top bar, the inspector stacks under the
-   workspace. */
+/* Below 720px: one column the document scrolls. The rail is a top bar, and the sheet spans the window. */
 @media (max-width: 719px) {
   html,
   body,
@@ -519,6 +571,33 @@ body {
     overflow: visible;
     padding: var(--space-4);
   }
+  .frame:not([data-inspector="off"]) .ws-body {
+    padding-bottom: calc(var(--sheet-covers) + var(--space-4));
+  }
+  /* A page that is a graph fills the window: it ends above the peek while the sheet is open (whatever height it is at: the sheet covers the graph's foot, which the page does not scroll to), and at the window's foot when it is closed. */
+  .frame {
+    --sheet-room: 0px;
+  }
+  .frame[data-inspector="on"] {
+    --sheet-room: var(--sheet-peek);
+  }
+  .frame .ws-body:has(> .ws-fill > .ws-canvas > .canvas) {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+    padding-bottom: calc(var(--sheet-room) + var(--space-4));
+  }
+  .frame > .workspace:has(> .ws-body > .ws-fill > .ws-canvas > .canvas) {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
+  .ws-body > .ws-fill:has(> .ws-canvas > .canvas),
+  .ws-fill > .ws-canvas:has(> .canvas) {
+    display: flex;
+    flex: 1 1 auto;
+    flex-direction: column;
+  }
   .ws-fill {
     display: block;
   }
@@ -540,20 +619,7 @@ body {
     background: transparent;
   }
   .frame > .inspector {
-    display: block;
-    border-left: 0;
-    border-top: 1px solid var(--chrome-border);
-  }
-  .inspector-body {
-    overflow: visible;
-  }
-  /* Hidden, the stacked column is a slim bar in the page that opens it. */
-  .frame > .inspector[data-folded="true"] {
-    width: auto;
-    height: 32px;
-  }
-  .frame > .inspector[data-folded="true"] .inspector-rail {
-    height: 100%;
+    left: 0;
   }
 }
 
@@ -570,16 +636,12 @@ body {
   max-width: min(420px, calc(100% - 24px));
   pointer-events: none;
 }
-/* Above an open sheet (either height). */
-@media (min-width: 720px) and (max-width: 1099px) {
-  .frame[data-inspector="on"] .toasts {
-    bottom: calc(var(--sheet-half) + var(--space-3));
-  }
-  .frame[data-inspector="on"]:has(.inspector[data-snap="full"]) .toasts {
-    bottom: calc(var(--sheet-full) + var(--space-3));
+/* Above the sheet, or its pill. A phone's page is one tall column: the toast stays on the window, not at the page's foot. */
+@media (max-width: 1099px) {
+  .frame:not([data-inspector="off"]) .toasts {
+    bottom: calc(var(--sheet-covers) + var(--space-3));
   }
 }
-/* A phone's page is one tall column: the toast stays on the window, not at the page's foot. */
 @media (max-width: 719px) {
   .toasts {
     position: fixed;

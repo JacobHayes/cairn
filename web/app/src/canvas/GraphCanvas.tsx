@@ -182,25 +182,26 @@ function boundsOf(model: CanvasModel, layout: Layout): { width: number; height: 
   return { width, height };
 }
 
-/** Whether the inspector is a sheet fixed over the workspace (a tablet's), not a column beside it or stacked under the page. */
+/** Whether the inspector is a sheet fixed over the page (below 1100px), not a column beside the workspace. */
 function isSheet(column: HTMLElement | null | undefined): column is HTMLElement {
   return column !== null && column !== undefined && getComputedStyle(column).position === "fixed";
 }
 
-/** The height (px) the inspector's sheet or its folded rail lies over the canvas's lower part. */
-function coveredBy(column: HTMLElement | null | undefined): number {
-  return isSheet(column) ? column.getBoundingClientRect().height : 0;
+/** The height (px) the inspector's sheet or its pill lies over the canvas's lower part: none where the canvas ends above it (a phone's, at the peek). */
+function coveredBy(column: HTMLElement | null | undefined, canvas: HTMLElement | null | undefined): number {
+  return isSheet(column) && canvas !== null && canvas !== undefined ? Math.max(0, canvas.getBoundingClientRect().bottom - column.getBoundingClientRect().top) : 0;
 }
 
 /** The padding a manual fit keeps, read when it runs: FIT_PADDING, and more at the bottom under the sheet or rail. */
 function useFitPadding(): () => typeof FIT_PADDING {
   const sheet = useFrameState()?.inspector?.parentElement;
-  return useCallback(() => ({ ...FIT_PADDING, bottom: px(PAD.bottom + coveredBy(sheet)) }), [sheet]);
+  const store = useStoreApi();
+  return useCallback(() => ({ ...FIT_PADDING, bottom: px(PAD.bottom + coveredBy(sheet, store.getState().domNode)) }), [sheet, store]);
 }
 
 /**
- * On a tablet the inspector is a sheet over the canvas's lower
- * part: a node picked is centred in the band the sheet leaves, less the zones the floating controls
+ * Below 1100px the inspector is a sheet over the page, and over the canvas's lower
+ * part where the canvas reaches it: a node picked is centred in the band the sheet leaves, less the zones the floating controls
  * keep (PAD), so the selection is never under the sheet and its neighbours clear the controls.
  */
 function useCenterAboveSheet(selected: string | undefined): void {
@@ -223,8 +224,8 @@ function useCenterAboveSheet(selected: string | undefined): void {
       }
       const { x, y } = card.internals.positionAbsolute;
       const zoom = flow.getZoom();
-      const covered = sheet.getBoundingClientRect().height;
-      const { width, height } = store.getState();
+      const { width, height, domNode } = store.getState();
+      const covered = coveredBy(sheet, domNode);
       const at = { x: (PAD.left + width - PAD.right) / 2, y: (PAD.top + height - covered - PAD.bottom) / 2 };
       void flow.setViewport({ zoom, x: at.x - (x + (card.measured.width ?? 0) / 2) * zoom, y: at.y - (y + (card.measured.height ?? 0) / 2) * zoom });
     });
@@ -331,7 +332,7 @@ function useZoomRange(props: GraphCanvasProps, root: RefObject<HTMLDivElement | 
   const flow = useReactFlow();
   const [width, height] = [useStore((state) => state.width), useStore((state) => state.height)];
   // The room a fit has is what a sheet over the canvas's lower part leaves.
-  const covered = coveredBy(useFrameState()?.inspector?.parentElement);
+  const covered = coveredBy(useFrameState()?.inspector?.parentElement, useStore((state) => state.domNode));
   // Before the canvas has a size there is nothing to fit.
   const fit = useMemo(() => (width === 0 || height === 0 ? 1 : fitZoom(boundsOf(props.model, props.layout), { width, height: Math.max(1, height - covered) }, PAD)), [props.model, props.layout, width, height, covered]);
   const minZoom = minZoomOf(fit);
@@ -357,14 +358,15 @@ function useFirstFit(props: GraphCanvasProps, fit: number): void {
   const flow = useReactFlow();
   const [initialized, sized] = [useNodesInitialized(), useStore((state) => state.width > 0 && state.height > 0)];
   const sheet = useFrameState()?.inspector?.parentElement;
+  const store = useStoreApi();
   const done = useRef(false);
   useEffect(() => {
     if (!initialized || !sized || done.current) {
       return;
     }
     done.current = true;
-    // On a tablet the inspector's sheet lies over the canvas's lower part: fit into what it leaves.
-    const covered = coveredBy(sheet);
+    // Where the inspector's sheet lies over the canvas's lower part, fit into what it leaves.
+    const covered = coveredBy(sheet, store.getState().domNode);
     const padding = { ...FIT_PADDING, bottom: px(PAD.bottom + covered) };
     const target = firstFitCards(props.firstFit, props.model.cards);
     void flow.fitView({ ...FIT, padding, minZoom: minZoomOf(fit), ...(target === undefined ? {} : { nodes: target.map((id) => ({ id })) }) });

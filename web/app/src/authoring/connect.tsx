@@ -13,7 +13,7 @@ import { reasonOf } from "../data/writes.ts";
 import { ViolationLines } from "../screens/RejectionView.tsx";
 import { WriteStatus } from "../screens/WriteStatus.tsx";
 import { Button } from "../ui/kit.tsx";
-import { typing } from "../ui/typing.ts";
+import { overlayOpen, typing } from "../ui/typing.ts";
 import { drawingView, edgeDrawing, type DrawingView, type KeySource, type Refusal } from "./edge-drawing.ts";
 import { titleIn, type Tree } from "./graph.ts";
 import { domainOf, type Authored } from "./target.ts";
@@ -41,7 +41,7 @@ export function useConnecting(): Connecting | undefined {
 export const windowKeys: KeySource = {
   listen: (cancel) => {
     const heard = (event: KeyboardEvent) => {
-      if (event.key === "Escape" && !event.defaultPrevented && !typing(event.target) && document.querySelector("[data-popover], dialog[open]") === null) {
+      if (event.key === "Escape" && !event.defaultPrevented && !typing(event.target) && !overlayOpen()) {
         event.preventDefault();
         cancel();
       }

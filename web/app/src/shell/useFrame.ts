@@ -5,8 +5,8 @@ import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetState
 import { useNavigate } from "react-router";
 
 import type { SheetSnap } from "./InspectorColumn.tsx";
-import { typing } from "../ui/typing.ts";
-import { SHEET, type AssistantDock, type FrameActions, type FrameState, type InspectorTab } from "./frame.tsx";
+import { overlayOpen, typing } from "../ui/typing.ts";
+import { PHONE_WIDTH, SHEET, type AssistantDock, type FrameActions, type FrameState, type InspectorTab } from "./frame.tsx";
 
 export interface Frame {
   state: FrameState;
@@ -46,15 +46,15 @@ function useOpenAssistant(dock: AssistantDock | undefined, actions: FrameActions
 }
 
 /**
- * `]` hides and shows the inspector; Esc closes the tablet's sheet, unless a field has focus:
- * the assistant when its tab is in view, else the open node by going back to the screen it is
- * open on (`closeTo`).
+ * `]` hides and shows the inspector; Esc steps back out of the sheet (below 1100px), unless a field
+ * has focus: the assistant when its tab is in view, else the open node by going back to the screen
+ * it is open on (`closeTo`), else the sheet itself closes.
  */
-function useFrameKeys({ tab, dock, closeTo }: { tab: InspectorTab; dock: AssistantDock | undefined; closeTo: string | undefined }, fold: () => void): void {
+function useFrameKeys({ tab, dock, closeTo, open }: { tab: InspectorTab; dock: AssistantDock | undefined; closeTo: string | undefined; open: boolean }, fold: () => void): void {
   const navigate = useNavigate();
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target)) {
+      if (event.defaultPrevented || event.metaKey || event.ctrlKey || event.altKey || typing(event.target) || overlayOpen()) {
         return;
       }
       if (event.key === "]") {
@@ -64,14 +64,17 @@ function useFrameKeys({ tab, dock, closeTo }: { tab: InspectorTab; dock: Assista
           dock?.close();
         } else if (closeTo !== undefined) {
           void navigate(closeTo);
+        } else if (open) {
+          fold();
         }
       }
     };
-    globalThis.addEventListener("keydown", onKey);
+    // In the capture phase, so a menu or dialog that closes on this Esc is still there to be seen, and the sheet stays.
+    globalThis.addEventListener("keydown", onKey, true);
     return () => {
-      globalThis.removeEventListener("keydown", onKey);
+      globalThis.removeEventListener("keydown", onKey, true);
     };
-  }, [tab, dock, closeTo, navigate, fold]);
+  }, [tab, dock, closeTo, open, navigate, fold]);
 }
 
 /** How many screens have something in each pane. */
@@ -85,6 +88,7 @@ interface Counts {
 interface Setters {
   setCounts: Dispatch<SetStateAction<Counts>>;
   setTab: (tab: InspectorTab) => void;
+  /** Shows the column (a phone's sheet opens at its peek) or hides it. */
   setHidden: (hidden: boolean) => void;
   setDock: Dispatch<SetStateAction<AssistantDock | undefined>>;
   setProposalsCount: (count: number | undefined) => void;
@@ -131,8 +135,15 @@ export function useFrame(): Frame {
   const [counts, setCounts] = useState<Counts>({ inspector: 0, assistant: 0, proposals: 0 });
   const [tab, setTab] = useState<InspectorTab>("inspector");
   const [dock, setDock] = useState<AssistantDock | undefined>(undefined);
-  const [hidden, setHidden] = useState(false);
-  const [snap, setSnap] = useState<SheetSnap>("half");
+  const [sheet, setSheet] = useState<{ hidden: boolean; snap: SheetSnap }>(() => ({ hidden: false, snap: globalThis.matchMedia(PHONE_WIDTH).matches ? "peek" : "half" }));
+  const { hidden, snap } = sheet;
+  const setSnap = useCallback((next: SheetSnap) => {
+    setSheet((now) => ({ ...now, snap: next }));
+  }, []);
+  // A phone's sheet opens at its peek, whatever height it was closed at: picking a node shows its tabs and leaves the graph usable.
+  const setHidden = useCallback((next: boolean) => {
+    setSheet((now) => (now.hidden === next ? now : { hidden: next, snap: !next && globalThis.matchMedia(PHONE_WIDTH).matches ? "peek" : now.snap }));
+  }, []);
   const [closeTo, setCloseTo] = useState<string | undefined>(undefined);
   const actions = useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo });
   // A pane with nothing in it cannot be the tab in view.
@@ -141,9 +152,9 @@ export function useFrame(): Frame {
   // An offered assistant keeps the column, and so its tabs, on screen: they are its only way in.
   const present = counts.inspector > 0 || counts.assistant > 0 || counts.proposals > 0 || dock !== undefined;
   const toggleFolded = useCallback(() => {
-    setHidden((now) => !now);
+    setSheet((now) => ({ hidden: !now.hidden, snap: now.hidden && globalThis.matchMedia(PHONE_WIDTH).matches ? "peek" : now.snap }));
   }, []);
-  useFrameKeys({ tab: shown, dock, closeTo }, toggleFolded);
+  useFrameKeys({ tab: shown, dock, closeTo, open: present && !hidden }, toggleFolded);
   const openAssistant = useOpenAssistant(dock, actions);
   const state = useMemo<FrameState>(() => ({ inspector, assistant, proposals, proposalsCount, tab: shown, openAssistant }), [inspector, assistant, proposals, proposalsCount, shown, openAssistant]);
   // The inspector's tab is there where it has something, or the assistant's does (its tabs are its only way in), or nothing else is.
@@ -166,6 +177,8 @@ export function useFrame(): Frame {
         dock?.open();
       }
       setTab(next);
+      // A tab picked at the peek shows nothing of its pane: the sheet opens to half.
+      setSheet((now) => (now.snap === "peek" ? { ...now, snap: "half" } : now));
     },
     setInspector,
     setAssistant,

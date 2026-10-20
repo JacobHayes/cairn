@@ -9,7 +9,7 @@ import { expect, type Page } from "@playwright/test";
 import { publishDraft, startJourney, versionSelect, journeyName } from "./around.ts";
 import { addEntity } from "./around.ts";
 import { daysAfter } from "./acting.ts";
-import { importRoute, openAt, open, derivedRevision } from "./shell.ts";
+import { importRoute, openAt, open, openSheet, derivedRevision } from "./shell.ts";
 
 /** The day the journey runs on. */
 const TODAY = "2026-10-06";
@@ -112,6 +112,7 @@ async function act(page: Page, menu: "status" | "snooze", item: string, form?: (
 async function answer(page: Page, journey: string, key: string, how: (page: Page) => Promise<void>): Promise<void> {
   await openAt(page, "browser", journey, "list", { node: key });
   const revision = await derivedRevision(page);
+  await openSheet(page);
   await how(page);
   await page.getByRole("button", { name: "Save", exact: true }).click();
   await expect.poll(() => derivedRevision(page)).toBeGreaterThan(revision);

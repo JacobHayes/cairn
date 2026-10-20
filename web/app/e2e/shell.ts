@@ -251,3 +251,12 @@ export function countDocumentFetches(page: Page, journey: string): () => number 
   });
   return () => count;
 }
+
+/** On a phone the inspector opens at its peek, which shows its tabs and not its forms: opens it to full first, where it is a sheet at its peek. */
+export async function openSheet(page: Page): Promise<void> {
+  const handle = page.getByRole("button", { name: "Resize the inspector" });
+  if ((await handle.isVisible()) && (await page.locator(".frame").getAttribute("data-sheet")) === "peek") {
+    await handle.click();
+    await expect(page.locator(".frame")).toHaveAttribute("data-sheet", "full");
+  }
+}

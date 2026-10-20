@@ -98,11 +98,3 @@
   min-height: 64px;
   resize: vertical;
 }
-
-/* On a phone the column stacks under the page, which is the one scroller: the panel is as tall as
-   its conversation, the composer after it. */
-@media (max-width: 719px) {
-  .frame :is(.assistant-panel, .assistant-panel > .assistant-scroll) {
-    flex: none;
-  }
-}

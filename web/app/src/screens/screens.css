@@ -19,8 +19,8 @@
 
 /* The sheet covers the workspace's lower part: the projection ends above it, so its last row can be reached. */
 @media (min-width: 720px) and (max-width: 1099px) {
-  .frame[data-inspector="on"] .journey-scroll {
-    padding-bottom: calc(var(--sheet-h, var(--sheet-half)) + var(--space-5));
+  .frame:not([data-inspector="off"]) .journey-scroll {
+    padding-bottom: calc(var(--sheet-covers) + var(--space-5));
   }
 }
 
@@ -112,8 +112,16 @@
     align-items: flex-start;
   }
 
+  /* The picker is as wide for Graph as for Timeline, so the title's measure does not change between views. */
+  .view-picker > .dropdown-button {
+    min-width: 6rem;
+    justify-content: space-between;
+  }
+
+  /* A smaller title, so a typical name stays on one line beside the picker and a long one takes fewer. */
   .journey-header h1 {
     --name-lines: 3;
+    font-size: 1.35rem;
   }
 
   /* Words a phone can do without: "View:" before the view's name, "to edit" after Open a draft. */
