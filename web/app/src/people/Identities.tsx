@@ -206,7 +206,7 @@ function IdentitiesPage({ deployment, rows }: { deployment: Deployment; rows: Id
     <section className="stack index-page" aria-label="Identities" data-testid="identities" data-revision={deployment.revision} data-layer={layer?.mode} data-rows-page tabIndex={-1}>
       <IndexHead title="Identities" action={reviewing ? undefined : add}>
         <FilterSearch label="Search" placeholder="Name or email" value={search} onChange={setSearch} />
-        <span className="muted" data-testid="identities-count">{countWords({ total: (deployment.identities ?? []).length, shown: shown.length, after })}</span>
+        <span className="index-count" data-testid="identities-count">{countWords({ total: (deployment.identities ?? []).length, shown: shown.length, after })}</span>
       </IndexHead>
       <Band />
       {reviewing ? null : <p className="muted index-intro">People and teams. What each does in a journey is the role it fills there.</p>}

@@ -94,7 +94,7 @@ export function deleteWords(deletion: Deletion, names: readonly string[], blocke
     case "checking":
       return `Checking where ${them} ${several ? "are" : "is"} named...`;
     case "failed":
-      return `Cairn could not check where ${them} ${several ? "are" : "is"} named, so nothing can be deleted.`;
+      return `Cairn could not check which journeys and routes name ${them}, so ${several ? "they" : "it"} cannot be deleted yet.`;
     case "referenced":
       return `${namedList(blocked)} ${blocked.length > 1 ? "are" : "is"} named in journeys or routes, so ${blocked.length > 1 ? "they" : "it"} cannot be deleted. ${several ? "Merge them into one instead." : "Select another identity as well to merge them instead."}`;
     case "allowed":
@@ -143,21 +143,20 @@ function DeleteIdentities({ members, deletion, labels, refresh, onDeleted, deplo
     }
   };
   return (
-    <div className="stack" data-testid="delete-identities" data-deletion={shown.kind}>
+    <div className="stack delete-group" data-testid="delete-identities" data-deletion={shown.kind}>
+      {shown.kind === "failed" ? (
+        <div className="callout callout-bad stack" role="alert" data-testid="delete-why">
+          <p><Failed said={deleteWords(shown, names, blocked)} error={shown.error} retry /></p>
+          <span className="row"><Button onClick={() => { setFound(undefined); refresh(); }}>Try again</Button></span>
+        </div>
+      ) : (
+        <p className="muted" data-testid="delete-why">{deleteWords(shown, names, blocked)}</p>
+      )}
       <span className="row">
         <Button disabled={shown.kind !== "allowed" || write.disabled || checking} onClick={() => void remove()}>
           {members.length === 1 ? "Delete" : `Delete ${String(members.length)}`}
         </Button>
       </span>
-      {shown.kind === "failed" ? (
-        <p className="callout callout-bad" role="alert" data-testid="delete-why">
-          <Failed said={deleteWords(shown, names, blocked)} error={shown.error}>
-            <Button onClick={() => { setFound(undefined); refresh(); }}>Try again</Button>
-          </Failed>
-        </p>
-      ) : (
-        <p className="muted" data-testid="delete-why">{deleteWords(shown, names, blocked)}</p>
-      )}
       {write.rejection === undefined ? <WriteStatus view={write.status} /> : <RejectionView rejection={write.rejection} onDismiss={write.dismiss} />}
     </div>
   );

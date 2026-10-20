@@ -30,14 +30,15 @@ export function kindOf(failure: HttpFailure): ReadError {
 
 /**
  * "`what` could not be `verb`" (or `said`, when the sentence is already written), the next step,
- * `children` (the action that leads), and the raw message on request.
+ * `children` (the action that leads), and the raw message on request. `retry` says a Try again button stands
+ * beside the sentence, so a passing failure is not also told to try again in words.
  */
-export function Failed({ what, verb = "read", said, error, children }: { what?: string; verb?: string; said?: string; error: ReadError | string; children?: ReactNode }) {
+export function Failed({ what, verb = "read", said, error, retry = false, children }: { what?: string; verb?: string; said?: string; error: ReadError | string; retry?: boolean; children?: ReactNode }) {
   const [shown, setShown] = useState(false);
   const { kind, message } = typeof error === "string" ? { kind: "transient" as const, message: error } : error;
   return (
     <>
-      {said ?? `${what ?? "That"} could not be ${verb}.`} {nextStep(kind)}{" "}
+      {said ?? `${what ?? "That"} could not be ${verb}.`} {retry && kind === "transient" ? null : nextStep(kind)}{" "}
       {children === undefined ? null : <>{children}{" "}</>}
       <Button ghost className="failed-details" aria-expanded={shown} onClick={() => { setShown(!shown); }}>
         Details
