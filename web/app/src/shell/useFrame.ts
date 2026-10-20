@@ -1,12 +1,12 @@
 // The frame's state: which of the inspector column's panes have something in them, which tab
 // is in view, whether the viewer hid the column (`]`), and where Esc takes the sheet.
 // The screens report through `FrameActions` (frame.tsx); the shell reads the result.
-import { useCallback, useEffect, useMemo, useState, type Dispatch, type SetStateAction } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import { useNavigate } from "react-router";
 
 import type { SheetSnap } from "./InspectorColumn.tsx";
 import { overlayOpen, typing } from "../ui/typing.ts";
-import { PEEK_FIRST, SHEET, type AssistantDock, type FrameActions, type FrameState, type InspectorTab } from "./frame.tsx";
+import { COLUMN, PEEK_FIRST, SHEET, useMedia, type AssistantDock, type FrameActions, type FrameState, type InspectorTab } from "./frame.tsx";
 
 export interface Frame {
   state: FrameState;
@@ -144,6 +144,15 @@ export function useFrame(): Frame {
   const setHidden = useCallback((next: boolean) => {
     setSheet((now) => (now.hidden === next ? now : { hidden: next, snap: !next && globalThis.matchMedia(PEEK_FIRST).matches ? "peek" : now.snap }));
   }, []);
+  // Widening to a column and narrowing back to a sheet (a resize, a rotation) starts the sheet over at its peek; its heights are CSS's, so they follow the window by themselves.
+  const wide = useMedia(COLUMN);
+  const wasWide = useRef(wide);
+  useEffect(() => {
+    if (wasWide.current && !wide) {
+      setSnap("peek");
+    }
+    wasWide.current = wide;
+  }, [wide, setSnap]);
   const [closeTo, setCloseTo] = useState<string | undefined>(undefined);
   const actions = useActions({ setCounts, setTab, setHidden, setDock, setProposalsCount, setCloseTo });
   // A pane with nothing in it cannot be the tab in view.

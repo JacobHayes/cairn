@@ -5,7 +5,7 @@ import type { Page } from "@playwright/test";
 
 import { expect, test } from "./test.ts";
 
-import { expectAddress, nodeCard, nodePanel, openAt, openJourney } from "./shell.ts";
+import { expectAddress, nodeCard, nodePanel, openAt, openJourney, openSheet } from "./shell.ts";
 
 /** Opens Details (with the History in it) in `node`'s inspector and scrolls it to its end the way a person does: the wheel over it. */
 async function reachHistory(page: Page, node: string, height: number): Promise<void> {
@@ -55,6 +55,8 @@ test("the inspector scrolls to the end of Details at 1440 and 1024px, a node ope
   // On a tablet the summary's inspector reaches History, the screen's end is above the sheet, and Esc closes it.
   await page.setViewportSize({ width: 1024, height: 700 });
   await openAt(page, "browser", "j_vendor_eval", "summary", { node: "n_plan" });
+  // Narrowing from a column starts the sheet at its peek: open it up to read.
+  await openSheet(page);
   await reachHistory(page, "n_plan", 700);
   await page.locator(".ws-body").evaluate((element) => {
     element.scrollTop = element.scrollHeight;
@@ -351,5 +353,38 @@ test.describe("a phone's graph framing", () => {
     await expectCardsInside(page);
     const picked = await nodeCard(page, "n_make_offer").boundingBox();
     expect((picked?.y ?? 0) + (picked?.height ?? 0)).toBeLessThanOrEqual((await page.locator(".inspector").boundingBox())?.y ?? 0);
+  });
+});
+
+test.describe("rotating a phone", () => {
+  test.use({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true });
+
+  const snapOf = (page: Page) => page.locator(".frame").getAttribute("data-sheet");
+  const sheetBox = async (page: Page) => (await page.locator(".inspector").boundingBox()) ?? { y: 0, height: 0 };
+  const graphShare = async (page: Page, height: number) => {
+    const canvas = (await page.getByTestId("canvas").boundingBox()) ?? { y: 0, height: 0 };
+    return (Math.min(canvas.y + canvas.height, (await sheetBox(page)).y) - canvas.y) / height;
+  };
+
+  test("the sheet keeps its snap and takes the new window's height, and a desktop width puts it in its column", async ({ page }) => {
+    await openAt(page, "browser", "j_hiring", "graph?depth=decisions");
+    // A picked node keeps the sheet on screen at tablet widths too.
+    await page.locator('[data-testid="canvas"] [data-testid="node-card"][data-node="n_make_offer"]').getByTestId("card-open").click();
+    await page.getByRole("button", { name: "Resize the inspector" }).focus();
+    await page.keyboard.press("ArrowUp");
+    await expect.poll(() => snapOf(page)).toBe("half");
+    expect((await sheetBox(page)).height).toBeCloseTo(844 * 0.4, 0);
+    await page.setViewportSize({ width: 844, height: 390 });
+    await expect.poll(async () => (await sheetBox(page)).height).toBeCloseTo(390 * 0.4, 0);
+    expect(await snapOf(page)).toBe("half");
+    await expect.poll(() => graphShare(page, 390)).toBeGreaterThan(0.25);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(async () => (await sheetBox(page)).height).toBeCloseTo(844 * 0.4, 0);
+    // A desktop width is a column beside the workspace; narrowing again opens the sheet at its peek.
+    await page.setViewportSize({ width: 1440, height: 800 });
+    await expect.poll(async () => (await page.locator(".inspector").boundingBox())?.width ?? 0).toBeLessThan(500);
+    expect((await sheetBox(page)).height).toBeGreaterThan(600);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect.poll(() => snapOf(page)).toBe("peek");
   });
 });
