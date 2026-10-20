@@ -317,10 +317,18 @@ summary.node-panel-head {
   }
 }
 
-/* A phone has no room for the Due column: it runs off the edge. */
+/* A phone has no room for the Due column: it runs off the edge, and the title's cell says the due words instead. */
+.list-due-phone {
+  display: none;
+}
+
 @media (max-width: 719px) {
   .list-table [data-column="due"] {
     display: none;
+  }
+
+  .list-due-phone {
+    display: block;
   }
 }
 
@@ -518,7 +526,12 @@ table.data.list-table .badge {
 /* A phone gives the status chip a narrower column: the chip is tightened and wraps a two-word state onto two lines, so the longest single word ("conditional", 95px) sets the width, and the title's pin follows it. */
 @media (max-width: 719px) {
   .list-table {
-    --status-width: 104px;
+    --status-width: 92px;
+  }
+
+  .list-table .list-check {
+    width: var(--space-5);
+    min-width: var(--space-5);
   }
 
   table.data.list-table td[data-column="status"] {

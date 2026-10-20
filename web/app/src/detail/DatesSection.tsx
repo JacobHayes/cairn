@@ -42,7 +42,7 @@ function BoundRow({ view, node, label, bound }: { view: Ready; node: string; lab
     <div className="date-row" data-testid="date" data-label={label} data-origin={origin}>
       <span className="date-label">{label}</span> <strong>{dateWords(bound.date, view.derived.today)}</strong> <span className="muted small">{originWord(origin)}</span>
       <details>
-        <summary className="muted small">Why</summary>
+        <summary className="muted small">Why this date</summary>
         <ChainView view={view} chain={bound.chain} />
       </details>
     </div>
@@ -85,7 +85,7 @@ export function DatesSection({
       <BoundRow view={view} node={key} label="Due" bound={dates.due} />
       <Actuals view={view} detail={detail} />
       <details className="date-more" data-testid="more-dates">
-        <summary className="muted small">More dates</summary>
+        <summary className="muted small">Earliest start, latest start and slack</summary>
         <div className="stack">
           <BoundRow view={view} node={key} label="Earliest start" bound={dates.earliest_start} />
           <BoundRow view={view} node={key} label="Latest start" bound={dates.latest_start} />

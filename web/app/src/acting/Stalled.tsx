@@ -87,7 +87,7 @@ export function StalledPanel({ view, nodeTo, readOnly = false, endDate }: { view
   return (
     <section className="callout stalled stack" role="status" data-testid="stalled">
       <p className="stall-head">
-        <strong>Nothing can be acted on right now.</strong> <span>Waiting on:</span>
+        <strong>Waiting on these before anything can move:</strong>
       </p>
       {stalled.all_blocked === true ? <span>Every remaining node is blocked.</span> : null}
       {pastEnd(stalled.waiting_on, endDate) ? <span>Every snooze runs past the final milestone ({dateWords(endDate ?? "", view.derived.today)}), so the journey cannot reach it as things stand.</span> : null}

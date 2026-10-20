@@ -207,7 +207,7 @@ function stateSentence(view: Ready, detail: NodeDetail, rank: RankFacts): Piece[
     case "ready":
       return [`${node.kind === "decision" ? "Ready to decide." : "Ready."}${rankClause(view, derived, rank)}`];
     case "active": {
-      const since = record.started_on == null ? "In progress." : `In progress since ${on(record.started_on)}.`;
+      const since = `${record.started_on == null ? "In progress." : `In progress since ${on(record.started_on)}.`}${rankClause(view, derived, rank)}`;
       return derived.blocked_by?.some((blocker) => blocker.via !== "containment") === true || (derived.blocked_through ?? []).length > 0
         ? [`${since} Started early: still waits on `, ...waitingPhrase(view, node.key), "."]
         : [since];

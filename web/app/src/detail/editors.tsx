@@ -92,16 +92,16 @@ export function PinEditor({ view, detail }: { view: Ready; detail: NodeDetail })
   const clear: Mutation = fedBy === undefined ? { op: "clear_pin", node: key } : transition(fedBy.key, "reopen");
   return (
     <div className="stack" data-testid="pin">
-      <span>
-        {current === undefined ? null : "Pinned to "}
-        <strong data-testid="pin-date">{current === undefined ? "No pin" : dateWords(current, view.derived.today)}</strong>
-        {fedBy === undefined ? null : (
-          <span className="muted small" data-testid="pin-through">
-            {" "}
-            set by answering <NodeLink view={view} node={fedBy.key} />: editing it here answers that decision
-          </span>
-        )}
-      </span>
+      {current === undefined || current === detail.derived.dates.due?.date ? null : (
+        <span>
+          Pinned to <strong data-testid="pin-date">{dateWords(current, view.derived.today)}</strong>
+        </span>
+      )}
+      {fedBy === undefined ? null : (
+        <span className="muted small" data-testid="pin-through">
+          The pin is set by answering <NodeLink view={view} node={fedBy.key} />: editing it here answers that decision
+        </span>
+      )}
       <span className="row">
         <DraftForm
           write={write}

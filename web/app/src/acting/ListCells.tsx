@@ -59,6 +59,18 @@ function Return({ view, line }: { view: Ready; line: Line }) {
   );
 }
 
+/** A phone drops the Due column, so the row says its due words under the title (a snoozed row says where the snooze ends instead). */
+function PhoneDue({ view, line }: { view: Ready; line: Line }) {
+  const derived = view.derived.nodes[line.key];
+  const node = nodeOf(view, line.key);
+  const state = line.row?.display_state ?? derived?.display_state;
+  const due = derived?.dates.due?.date;
+  const open = state !== undefined && state !== "done" && state !== "skipped" && state !== "not_relevant" && state !== "snoozed";
+  return !open || due == null || node === undefined ? null : (
+    <span className={`list-due-phone small ${inkClass(dateInk(due, view.derived.today)) ?? "muted"}`}>{dueWords(due, view.derived.today, node.kind === "decision")}</span>
+  );
+}
+
 /** How far a container is, and the one thing beneath it that needs attention. */
 function Progress({ view, line }: { view: Ready; line: Line }) {
   const roll = rollups(view).get(line.key);
@@ -110,6 +122,7 @@ function Title({ line, context }: { line: Line; context: CellContext }) {
         <DetailLink view={view} node={line.key} />
         {acting ? <Acting line={line} context={context} /> : tree ? (line.container ? <Progress view={view} line={line} /> : null) : <Under view={view} line={line} />}
         <Return view={view} line={line} />
+        <PhoneDue view={view} line={line} />
       </div>
     </div>
   );

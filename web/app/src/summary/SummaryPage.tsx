@@ -230,10 +230,10 @@ function entriesOf(ready: Ready, model: SummaryModel, frontier: NodeRow[], viewe
     const chain = model.shortfalls.some((short) => short.key === each.key);
     const fact = (
       <>
-        {each.reasons.join("; ")}
+        {`${each.reasons.join(". ")}.`}
         {chain ? (
           <>
-            {". "}
+            {" "}
             <Link to={nodeAddress(ready.journey.header.id, each.key)} className="no-print">
               See the chain
             </Link>

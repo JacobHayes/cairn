@@ -17,7 +17,7 @@ test("a later pin is rejected with its chain, kept across a reload and counted a
   await conflict.getByText("Why it is short").click();
   await expect(conflict.getByTestId("chain")).toBeVisible();
   await expect(syncChip(page)).toHaveAttribute("data-state", "not-saved");
-  await expect(panel.getByTestId("pin-date")).toHaveText("Nov 2");
+  await expect(panel.locator('[data-testid="date"][data-label="Due"]')).toContainText("Nov 2");
   // The rejection and a reason typed meanwhile are kept per tab, so a reload loses neither.
   await menuItem(panel, "done-anyway");
   const reason = fresh("Reviewed out of band");
@@ -37,7 +37,7 @@ test("a later pin is rejected with its chain, kept across a reload and counted a
   await expect(conflict).toBeVisible();
   await conflict.locator('[data-testid="resolution"][data-op="shift_pin"]').getByRole("button").click();
   await expect(conflict).toHaveCount(0);
-  await expect(panel.getByTestId("pin-date")).toHaveText("Nov 20");
+  await expect(panel.locator('[data-testid="date"][data-label="Due"]')).toContainText("Nov 20");
   await expect(syncChip(page)).not.toHaveAttribute("data-state", "not-saved");
 });
 

@@ -224,10 +224,12 @@ dl.kv dd {
   padding-left: var(--space-5);
 }
 
+/* A fold inside the dates keeps the browser's marker, so it reads as something that opens. */
 .date-more > summary,
 .date-row summary {
   cursor: pointer;
-  display: inline;
+  display: list-item;
+  list-style-position: inside;
 }
 
 .date-label {
