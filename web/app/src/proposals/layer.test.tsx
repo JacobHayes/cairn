@@ -110,6 +110,11 @@ describe("entityDiff (C14)", () => {
     ]);
   });
 
+  it("lists the rows by name, a created entity among them rather than last", () => {
+    const rows = entityDiff(deployment([entity("e_b", "Bea"), entity("e_d", "Dev")]), deployment([entity("e_b", "Bea"), entity("e_d", "Dev"), entity("e_a", "Ada")]));
+    expect(rows.map((each) => [each.entity.key, each.mark?.kind])).toEqual([["e_a", "added"], ["e_b", undefined], ["e_d", undefined]]);
+  });
+
   it("marks nothing while there is no deployment after", () => {
     expect(entityDiff(deployment([entity("e_a", "Ana")]), undefined).map((each) => each.mark)).toEqual([undefined]);
   });
